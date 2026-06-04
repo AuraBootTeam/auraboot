@@ -109,7 +109,11 @@ public class AutomationServiceImpl implements AutomationService {
         automation.setTriggerType(request.getTriggerType());
         automation.setTriggerConfig(request.getTriggerConfig());
         automation.setTriggerCondition(request.getTriggerCondition());
-        automation.setActions(request.getActions());
+        // Default to an empty list when absent: the visual designer saves its steps in
+        // flowConfig (compiled at enable time), not in the flat actions[] column, and
+        // ab_automation.actions is NOT NULL DEFAULT '[]'. Inserting null would violate it,
+        // so a designer-only save (no flat actions) must persist an empty list here.
+        automation.setActions(request.getActions() != null ? request.getActions() : new ArrayList<>());
         automation.setFlowConfig(request.getFlowConfig());
         automation.setEnabled(request.getEnabled() != null ? request.getEnabled() : false);
         automation.setTriggerCount(0L);
