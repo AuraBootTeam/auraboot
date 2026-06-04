@@ -734,6 +734,8 @@ common:
   my_records: My Records
   created_today: Created Today
   modified_this_week: Modified This Week
+  options_load_failed: Failed to load options
+  retry: Retry
 admin:
   org:
     title: Organization Management

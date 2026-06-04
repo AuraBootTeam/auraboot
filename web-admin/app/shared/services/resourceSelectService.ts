@@ -85,118 +85,86 @@ interface DictItemRecord {
 }
 
 export async function fetchPageOptions(): Promise<ResourceOption[]> {
-  try {
-    const result = await fetchResult<PageRecord>('/api/pages?size=100');
-    return (result?.data?.records || []).map((p) => ({
-      label: `${p.title || p.name} (${p.kind})`,
-      value: p.code || p.pid,
-      description: p.kind,
-    }));
-  } catch {
-    return [];
-  }
+  const result = await fetchResult<PageRecord>('/api/pages?size=100');
+  return (result?.data?.records || []).map((p) => ({
+    label: `${p.title || p.name} (${p.kind})`,
+    value: p.code || p.pid,
+    description: p.kind,
+  }));
 }
 
 export async function fetchDashboardOptions(): Promise<ResourceOption[]> {
-  try {
-    const result = await fetchResult<DashboardRecord>('/api/dashboards?size=100');
-    return (result?.data?.records || []).map((d) => ({
-      label: `${d.title} (${d.code || d.pid})`,
-      value: d.code || d.pid,
-      description: d.status,
-    }));
-  } catch {
-    return [];
-  }
+  const result = await fetchResult<DashboardRecord>('/api/dashboards?size=100');
+  return (result?.data?.records || []).map((d) => ({
+    label: `${d.title} (${d.code || d.pid})`,
+    value: d.code || d.pid,
+    description: d.status,
+  }));
 }
 
 export async function fetchProcessOptions(): Promise<ResourceOption[]> {
-  try {
-    const result = await fetchResult<ProcessRecord>('/api/bpm/process-definitions?size=100');
-    return (result?.data?.records || []).map((p) => ({
-      label: `${p.name} (${p.key})`,
-      value: p.key,
-      description: `v${p.version}`,
-    }));
-  } catch {
-    return [];
-  }
+  const result = await fetchResult<ProcessRecord>('/api/bpm/process-definitions?size=100');
+  return (result?.data?.records || []).map((p) => ({
+    label: `${p.name} (${p.key})`,
+    value: p.key,
+    description: `v${p.version}`,
+  }));
 }
 
 export async function fetchAutomationOptions(): Promise<ResourceOption[]> {
-  try {
-    const result = await fetchResult<AutomationRecord>('/api/automations?size=100');
-    return (result?.data?.records || []).map((a) => ({
-      label: a.name,
-      value: a.pid,
-      description: a.status,
-    }));
-  } catch {
-    return [];
-  }
+  const result = await fetchResult<AutomationRecord>('/api/automations?size=100');
+  return (result?.data?.records || []).map((a) => ({
+    label: a.name,
+    value: a.pid,
+    description: a.status,
+  }));
 }
 
 export async function fetchCommandOptions(): Promise<ResourceOption[]> {
-  try {
-    const result = await fetchResult<CommandRecord>('/api/meta/commands?size=200');
-    return (result?.data?.records || []).map((c) => ({
-      label: `${c.displayName || c.code} (${c.code})`,
-      value: c.code,
-      description: c.type,
-    }));
-  } catch {
-    return [];
-  }
+  const result = await fetchResult<CommandRecord>('/api/meta/commands?size=200');
+  return (result?.data?.records || []).map((c) => ({
+    label: `${c.displayName || c.code} (${c.code})`,
+    value: c.code,
+    description: c.type,
+  }));
 }
 
 export async function fetchModelOptions(): Promise<ResourceOption[]> {
-  try {
-    const result = await fetchResult<ModelRecord>(
-      '/api/meta/models?size=500&currentOnly=true&status=published',
-    );
-    return (result?.data?.records || []).map((m) => ({
-      label: m.displayName || m.code,
-      value: m.code,
-      description: m.description || m.code,
-    }));
-  } catch {
-    return [];
-  }
+  const result = await fetchResult<ModelRecord>(
+    '/api/meta/models?size=500&currentOnly=true&status=published',
+  );
+  return (result?.data?.records || []).map((m) => ({
+    label: m.displayName || m.code,
+    value: m.code,
+    description: m.description || m.code,
+  }));
 }
 
 export async function fetchFieldOptions(modelCode: string): Promise<ResourceOption[]> {
   if (!modelCode) return [];
-  try {
-    const modelResult = await fetchResult<{ pid: string }>(
-      `/api/meta/models/code/${encodeURIComponent(modelCode)}`,
-    );
-    const modelPid = modelResult?.data?.pid;
-    if (!modelPid) return [];
-    const fieldsResult = await fetchResult<FieldRecord[]>(`/api/meta/models/${modelPid}/fields`);
-    return (fieldsResult?.data || []).map((f) => ({
-      label: f.extension?.displayName || f.code,
-      value: f.code,
-      description: f.dataType,
-    }));
-  } catch {
-    return [];
-  }
+  const modelResult = await fetchResult<{ pid: string }>(
+    `/api/meta/models/code/${encodeURIComponent(modelCode)}`,
+  );
+  const modelPid = modelResult?.data?.pid;
+  if (!modelPid) return [];
+  const fieldsResult = await fetchResult<FieldRecord[]>(`/api/meta/models/${modelPid}/fields`);
+  return (fieldsResult?.data || []).map((f) => ({
+    label: f.extension?.displayName || f.code,
+    value: f.code,
+    description: f.dataType,
+  }));
 }
 
 export async function fetchDictOptions(dictCode: string): Promise<ResourceOption[]> {
   if (!dictCode) return [];
-  try {
-    const result = await fetchResult<DictItemRecord>(
-      `/api/meta/dict/by-code/${encodeURIComponent(dictCode)}/data`,
-    );
-    return (result?.data?.items || []).map((item) => ({
-      label: item.label || item.value,
-      value: item.value,
-      description: item.description,
-    }));
-  } catch {
-    return [];
-  }
+  const result = await fetchResult<DictItemRecord>(
+    `/api/meta/dict/by-code/${encodeURIComponent(dictCode)}/data`,
+  );
+  return (result?.data?.items || []).map((item) => ({
+    label: item.label || item.value,
+    value: item.value,
+    description: item.description,
+  }));
 }
 
 interface SemanticMetaRecord {
@@ -212,14 +180,10 @@ interface SemanticMetaRecord {
  * Returns options suitable for BaseResourceSelect.
  */
 export async function fetchSemanticModelOptions(): Promise<ResourceOption[]> {
-  try {
-    const result = await fetchResult<SemanticMetaRecord>('/api/semantic/meta');
-    return (result?.data?.models || []).map((m) => ({
-      label: m.label?.['zh-CN'] || m.label?.['en'] || m.code,
-      value: m.code,
-      description: m.description,
-    }));
-  } catch {
-    return [];
-  }
+  const result = await fetchResult<SemanticMetaRecord>('/api/semantic/meta');
+  return (result?.data?.models || []).map((m) => ({
+    label: m.label?.['zh-CN'] || m.label?.['en'] || m.code,
+    value: m.code,
+    description: m.description,
+  }));
 }

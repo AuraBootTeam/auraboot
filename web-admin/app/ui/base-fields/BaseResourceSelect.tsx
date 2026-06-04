@@ -6,6 +6,7 @@
  */
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useSmartText } from '~/utils/i18n';
 
 export interface ResourceOption {
   label: string;
@@ -30,21 +31,38 @@ export function BaseResourceSelect({
   disabled,
   className,
 }: BaseResourceSelectProps) {
+  const st = useSmartText();
+  // Stable ref so doFetch does not list st as a dependency (avoids re-fetch
+  // every render when the i18n context re-creates the st function reference).
+  const stRef = useRef(st);
+  stRef.current = st;
+
   const [options, setOptions] = useState<ResourceOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const stableFetch = useCallback(fetchOptions, [fetchOptions]);
 
-  useEffect(() => {
+  const doFetch = useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     stableFetch()
-      .then(setOptions)
-      .catch(() => setOptions([]))
+      .then((opts) => {
+        setOptions(opts);
+      })
+      .catch((err) => {
+        console.error('[BaseResourceSelect] failed to load options', err);
+        setLoadError(stRef.current('$i18n:common.options_load_failed', 'Failed to load options'));
+      })
       .finally(() => setLoading(false));
   }, [stableFetch]);
+
+  useEffect(() => {
+    doFetch();
+  }, [doFetch]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -68,6 +86,21 @@ export function BaseResourceSelect({
           o.value.toLowerCase().includes(search.toLowerCase()),
       )
     : options;
+
+  if (loadError) {
+    return (
+      <div className={`flex items-center gap-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-600 ${className || ''}`}>
+        <span className="flex-1">{loadError}</span>
+        <button
+          type="button"
+          onClick={doFetch}
+          className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-100 focus:outline-none"
+        >
+          {st('$i18n:common.retry', 'Retry')}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className={`relative ${className || ''}`}>
