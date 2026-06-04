@@ -91,6 +91,7 @@ export function FlowToolbar({
           : st('$i18n:flow.toolbar.save') || 'Save'
       }
       className={className}
+      saveButtonTestId="designer-save"
     >
       {/* AutoSave indicator (replaces dirty badge when present) */}
       {saveStatus && <AutoSaveIndicator status={saveStatus} />}
