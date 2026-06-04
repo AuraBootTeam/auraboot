@@ -65,6 +65,24 @@ public interface PluginImportService {
     ImportPreviewResult parseDirectory(String directoryPath);
 
     /**
+     * Parse a plugin from a directory, optionally deferring cross-plugin command/binding → model
+     * references.
+     *
+     * <p>When {@code deferReferenceValidation} is {@code true}, a command or binding that references
+     * a model not declared in this manifest nor installed yet is downgraded from a hard error to a
+     * deferred warning, so a batch cold-reset of a cyclic plugin set (e.g. crm↔sales) can import
+     * both sides. The truly-dangling case is re-enforced afterwards by
+     * {@link #verifyImportReferenceIntegrity()}.
+     *
+     * @param directoryPath            path to the plugin directory
+     * @param deferReferenceValidation defer cross-plugin model references to the closing sweep
+     * @return parsed manifest with preview information
+     */
+    default ImportPreviewResult parseDirectory(String directoryPath, boolean deferReferenceValidation) {
+        return parseDirectory(directoryPath);
+    }
+
+    /**
      * Parse a plugin from any PluginSource abstraction.
      * Supports filesystem, URL, S3, and other source types.
      *
@@ -185,6 +203,16 @@ public interface PluginImportService {
      * @return list of validation errors (empty if valid)
      */
     List<String> validateManifest(PluginManifestExtended manifest);
+
+    /**
+     * Closing reference-integrity sweep for the current tenant, run after a batch cold-reset that
+     * imported a cyclic plugin set with deferral on. Returns a message for every command whose
+     * {@code modelCode} resolves to no model now that the whole batch is imported — i.e. genuinely
+     * dangling references rather than not-yet-imported ones. Empty when all references are intact.
+     *
+     * @return human-readable dangling-reference messages (empty if the tenant is consistent)
+     */
+    List<String> verifyImportReferenceIntegrity();
 
     /**
      * Check for resource conflicts.

@@ -254,7 +254,7 @@ import_plugin_once() {
     resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/plugins/import/import-directory-sync" \
         -H "Authorization: Bearer $jwt" \
         -H "Content-Type: application/json" \
-        -d "{\"path\":\"$path\",\"conflictStrategy\":\"OVERWRITE\",\"autoPublishModels\":true,\"autoPublishFields\":true,\"autoPublishCommands\":true,\"autoPublishPages\":true}")"
+        -d "{\"path\":\"$path\",\"conflictStrategy\":\"OVERWRITE\",\"autoPublishModels\":true,\"autoPublishFields\":true,\"autoPublishCommands\":true,\"autoPublishPages\":true,\"deferReferenceValidation\":true}")"
     result="$(printf '%s' "$resp" | python3 -c "
 import sys,json
 try:
@@ -380,6 +380,43 @@ where coalesce(l.status, 'missing') != 'success'
     fi
 }
 
+# Phase 2 of the two-phase cross-plugin reference fix. The per-plugin imports above ran with
+# deferReferenceValidation=true, so a command referencing a model owned by another plugin not yet
+# imported in this batch was allowed through (cyclic crm↔sales). Now that the whole batch is
+# imported, re-enforce integrity: any command whose modelCode still resolves to no model is a
+# genuine dangling reference and must fail the reset.
+verify_reference_integrity() {
+    local resp summary
+    resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/plugins/import/verify-reference-integrity" \
+        -H "Authorization: Bearer $jwt" \
+        -H "Content-Type: application/json")"
+    summary="$(printf '%s' "$resp" | python3 -c "
+import sys,json
+try:
+    d=json.load(sys.stdin)
+except Exception:
+    print('parse-error')
+    sys.exit(0)
+if d.get('valid') is True:
+    print('ok')
+else:
+    refs=d.get('danglingReferences') or []
+    if refs:
+        for r in refs:
+            print('dangling\\t'+str(r))
+    else:
+        print('dangling\\t'+str(d)[:300])
+" 2>/dev/null || echo "parse-error")"
+
+    if [ "$summary" = "ok" ]; then
+        echo "Reference-integrity sweep: OK (no dangling cross-plugin references)"
+        return 0
+    fi
+    echo "ERROR: closing reference-integrity sweep found unresolved cross-plugin references:" >&2
+    printf '%s\n' "$summary" | sed 's/^dangling'$'\t''/  - /' >&2
+    return 1
+}
+
 if [ "${#failures[@]}" -gt 0 ]; then
     echo "ERROR: ${#failures[@]} plugin import(s) failed:" >&2
     printf '  - %s\n' "${failures[@]}" >&2
@@ -387,5 +424,7 @@ if [ "${#failures[@]}" -gt 0 ]; then
 fi
 
 verify_latest_import_statuses
+
+verify_reference_integrity
 
 echo "Plugin import complete."

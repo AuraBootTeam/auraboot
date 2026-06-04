@@ -116,6 +116,8 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.bpm.rule.DroolsRuleService droolsRuleService;
     private final com.auraboot.framework.bpm.service.SlaConfigService slaConfigService;
     private final JdbcTemplate jdbcTemplate;
+    /** Used by {@link #verifyImportReferenceIntegrity()} to enumerate the tenant's commands. */
+    private final com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitionMapper;
 
     private final ObjectMapper objectMapper = createObjectMapper();
     private final AtomicBoolean pluginResourceTypeConstraintChecked = new AtomicBoolean(false);
@@ -178,6 +180,11 @@ public class PluginImportServiceImpl implements PluginImportService {
 
     @Override
     public ImportPreviewResult parseDirectory(String directoryPath) {
+        return parseDirectory(directoryPath, false);
+    }
+
+    @Override
+    public ImportPreviewResult parseDirectory(String directoryPath, boolean deferReferenceValidation) {
         java.nio.file.Path pluginDir = java.nio.file.Paths.get(directoryPath);
 
         if (!java.nio.file.Files.isDirectory(pluginDir)) {
@@ -196,7 +203,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         try {
             PluginManifestExtended manifest = directoryLoader.loadFromDirectory(pluginDir);
-            return createPreviewFromManifest(manifest, directoryPath, "directory");
+            return createPreviewFromManifest(manifest, directoryPath, "directory", deferReferenceValidation);
         } catch (PluginException e) {
             ImportPreviewResult result = new ImportPreviewResult();
             result.setValid(false);
@@ -597,6 +604,11 @@ public class PluginImportServiceImpl implements PluginImportService {
     }
 
     private ImportPreviewResult createPreviewFromManifest(PluginManifestExtended manifest, String sourceName, String sourceType) {
+        return createPreviewFromManifest(manifest, sourceName, sourceType, false);
+    }
+
+    private ImportPreviewResult createPreviewFromManifest(PluginManifestExtended manifest, String sourceName,
+                                                          String sourceType, boolean deferReferenceValidation) {
         // Fail-fast preview when the manifest is missing pluginId. The downstream
         // ab_plugin_import_history.plugin_id column is NOT NULL; without this guard a
         // malformed manifest (e.g. a plugin.json that uses `code` instead of `pluginId`,
@@ -649,8 +661,10 @@ public class PluginImportServiceImpl implements PluginImportService {
             // Remove JSON comment objects (entries with only _-prefixed fields) before validation
             manifest.sanitize();
 
-        // Validate manifest — separate [WARN]-prefixed soft warnings from hard errors
-        List<String> allValidationMessages = validateManifest(manifest);
+        // Validate manifest — separate [WARN]-prefixed soft warnings from hard errors.
+        // deferReferenceValidation downgrades cross-plugin command/binding → model refs to warnings
+        // for batch cyclic cold-reset imports (re-enforced later by verifyImportReferenceIntegrity).
+        List<String> allValidationMessages = validateManifest(manifest, deferReferenceValidation);
         List<String> validationErrors = new ArrayList<>();
         List<String> validationWarnings = new ArrayList<>(manifest.getValidationWarnings());
         for (String msg : allValidationMessages) {
@@ -699,7 +713,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         // Run extended validation pipeline (semantic + governance)
         if (result.isValid()) {
             try {
-                PluginValidationResult validationResult = runValidationPipeline(manifest, validateReferences);
+                PluginValidationResult validationResult = runValidationPipeline(manifest, validateReferences, deferReferenceValidation);
                 result.setValidationResult(validationResult);
                 // Promote validation errors to preview errors
                 validationResult.getMessages().stream()
@@ -2316,6 +2330,25 @@ public class PluginImportServiceImpl implements PluginImportService {
 
     @Override
     public List<String> validateManifest(PluginManifestExtended manifest) {
+        return validateManifest(manifest, false);
+    }
+
+    /**
+     * Validate a manifest, optionally deferring cross-plugin command/binding → model references.
+     *
+     * <p>When {@code deferReferenceValidation} is {@code true}, a command or binding that
+     * references a model which is neither declared in this manifest nor already installed in the
+     * tenant is downgraded from a hard error to a {@code [WARN] }-prefixed soft warning instead of
+     * failing the import. This lets a batch cold-reset of a cyclic plugin set (e.g. crm↔sales)
+     * proceed even though, per-plugin, one side references a model owned by another plugin not yet
+     * imported in the same pass. The truly-dangling case (a model provided by no plugin at all) is
+     * re-enforced afterwards by {@link #verifyImportReferenceIntegrity()} via
+     * {@link #findDanglingCommandModelRefs(List, Set)}.
+     *
+     * <p>Default ({@code false}) keeps the original strict behaviour for single-plugin imports,
+     * the UI, and {@code aura plugin validate}.
+     */
+    public List<String> validateManifest(PluginManifestExtended manifest, boolean deferReferenceValidation) {
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         if (manifest == null) {
@@ -2438,7 +2471,8 @@ public class PluginImportServiceImpl implements PluginImportService {
                 } else if (!manifestModelCodes.contains(binding.getModelCode())
                         && !existsInTenant(tenantId, binding.getModelCode(), modelExistsCache,
                         code -> resourceImporter.checkModelExists(tenantId, code))) {
-                    errors.add("Binding references missing model: " + binding.getModelCode());
+                    String msg = "Binding references missing model: " + binding.getModelCode();
+                    errors.add(deferReferenceValidation ? "[WARN] " + msg : msg);
                 }
 
                 if (isBlank(binding.getFieldCode())) {
@@ -2462,7 +2496,8 @@ public class PluginImportServiceImpl implements PluginImportService {
                 } else if (!manifestModelCodes.contains(modelCode)
                         && !existsInTenant(tenantId, modelCode, modelExistsCache,
                         code -> resourceImporter.checkModelExists(tenantId, code))) {
-                    errors.add("Command '" + command.getCode() + "' references missing model: " + modelCode);
+                    String msg = "Command '" + command.getCode() + "' references missing model: " + modelCode;
+                    errors.add(deferReferenceValidation ? "[WARN] " + msg : msg);
                 }
             }
         }
@@ -2539,6 +2574,81 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
 
         return errors;
+    }
+
+    /**
+     * Closing reference-integrity sweep (decision core): given every command imported across the
+     * full batch and the set of model codes provided by any plugin (or already installed in the
+     * tenant), return a human-readable message for each command whose {@code modelCode} is provided
+     * by nobody.
+     *
+     * <p>This re-enforces the references that
+     * {@link #validateManifest(PluginManifestExtended, boolean)} deferred during a cyclic
+     * cold-reset: a cross-plugin reference that resolves once the whole batch is imported is fine,
+     * but a genuine typo / removed model still surfaces as a dangling reference so the reset fails
+     * loudly instead of leaving a command bound to a non-existent model.
+     *
+     * @param commands       all commands across the imported batch (null / blank-model entries ignored)
+     * @param providedModels model codes provided by any plugin in the batch or already installed
+     * @return messages for commands referencing a model no plugin provides (empty if all resolve)
+     */
+    public List<String> findDanglingCommandModelRefs(List<CommandDefinitionDTO> commands,
+                                                     Set<String> providedModels) {
+        List<String> dangling = new ArrayList<>();
+        if (commands == null) {
+            return dangling;
+        }
+        Set<String> provided = providedModels != null ? providedModels : Set.of();
+        for (CommandDefinitionDTO command : commands) {
+            if (command == null || isBlank(command.getModelCode())) {
+                continue;
+            }
+            if (!provided.contains(command.getModelCode())) {
+                dangling.add("Command '" + command.getCode() + "' references missing model: "
+                        + command.getModelCode() + " (no plugin provides it)");
+            }
+        }
+        return dangling;
+    }
+
+    /**
+     * Closing reference-integrity sweep over the whole tenant. Run after a batch cold-reset that
+     * imported a cyclic plugin set with {@code deferReferenceValidation=true}: by now every plugin
+     * has been imported, so a command whose {@code modelCode} still resolves to no model is a
+     * genuinely dangling reference (typo / removed model) rather than a not-yet-imported one.
+     *
+     * <p>The per-plugin imports already committed (multi-tx, shell-orchestrated), so this can only
+     * <em>report</em> dangling references — the caller (reset/init orchestration) decides to fail.
+     *
+     * @return human-readable messages for every command referencing a non-existent model
+     *         (empty when the tenant's command→model references are all intact)
+     */
+    @Override
+    public List<String> verifyImportReferenceIntegrity() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new PluginException("Tenant context is required for reference-integrity verification");
+        }
+
+        List<com.auraboot.framework.meta.entity.CommandDefinition> commands = commandDefinitionMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.auraboot.framework.meta.entity.CommandDefinition>()
+                        .eq("tenant_id", tenantId)
+                        .eq("is_current", true)
+                        .eq("deleted_flag", false));
+
+        List<CommandDefinitionDTO> commandDtos = new ArrayList<>();
+        Set<String> providedModels = new HashSet<>();
+        for (com.auraboot.framework.meta.entity.CommandDefinition cmd : commands) {
+            CommandDefinitionDTO dto = new CommandDefinitionDTO();
+            dto.setCode(cmd.getCode());
+            dto.setModelCode(cmd.getModelCode());
+            commandDtos.add(dto);
+            if (!isBlank(cmd.getModelCode()) && resourceImporter.checkModelExists(tenantId, cmd.getModelCode())) {
+                providedModels.add(cmd.getModelCode());
+            }
+        }
+
+        return findDanglingCommandModelRefs(commandDtos, providedModels);
     }
 
     /**
@@ -2710,6 +2820,11 @@ public class PluginImportServiceImpl implements PluginImportService {
      * Build validation context and run the pre-flight pipeline.
      */
     private PluginValidationResult runValidationPipeline(PluginManifestExtended manifest, boolean validateReferences) {
+        return runValidationPipeline(manifest, validateReferences, false);
+    }
+
+    private PluginValidationResult runValidationPipeline(PluginManifestExtended manifest, boolean validateReferences,
+                                                         boolean deferReferenceValidation) {
         Long tenantId = MetaContext.getCurrentTenantId();
 
         // Collect installed plugin dependencies for cycle detection
@@ -2793,6 +2908,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 .namespace(manifest.getNamespace())
                 .manifest(manifest)
                 .validateReferences(validateReferences)
+                .deferReferenceValidation(deferReferenceValidation)
                 .installedModelCodes(installedModelCodes)
                 .installedFieldCodes(installedFieldCodes)
                 .installedPermissionCodes(installedPermissionCodes)

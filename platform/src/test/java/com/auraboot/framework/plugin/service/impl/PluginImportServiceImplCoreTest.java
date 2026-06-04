@@ -432,8 +432,13 @@ class PluginImportServiceImplCoreTest {
 
         List<String> messages = service.validateManifest(m, true);
 
-        assertThat(messages).noneMatch(e -> e.contains("crm_lead"));
-        assertThat(messages).noneMatch(e -> e.contains("crm_account_installed"));
+        // Scope to the command->model reference check (the deferral feature's concern). A bare
+        // contains("crm_lead") would also catch the orthogonal "entity model requires a field
+        // binding" structural rule, which legitimately fires for this minimal fixture and is not
+        // what deferral governs.
+        assertThat(messages).noneMatch(e -> e.contains("references missing model") && e.contains("crm_lead"));
+        assertThat(messages).noneMatch(e ->
+                e.contains("references missing model") && e.contains("crm_account_installed"));
     }
 
     /**

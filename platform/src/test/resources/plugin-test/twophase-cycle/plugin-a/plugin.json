@@ -1,0 +1,22 @@
+{
+  "pluginId": "com.test.twophase.plugin-a",
+  "namespace": "tpa",
+  "version": "1.0.0",
+  "displayName": "Two-Phase Cycle Plugin A",
+  "description": "Fixture: declares tp_a_model and a command referencing tp_b_model (owned by plugin B) to reproduce the crm↔sales cross-plugin reference cycle.",
+  "minPlatformVersion": "1.0.0",
+  "pluginType": "config",
+  "fields": [
+    { "code": "tpa_name", "displayName": "Name", "dataType": "string" }
+  ],
+  "models": [
+    { "code": "tp_a_model", "displayName": "TP A Model", "modelType": "entity" }
+  ],
+  "modelFieldBindings": [
+    { "modelCode": "tp_a_model", "fieldCode": "tpa_name", "sequence": 10 }
+  ],
+  "commands": [
+    { "code": "tpa:create", "displayName": "Create A", "modelCode": "tp_a_model", "type": "custom" },
+    { "code": "tpa:use_b", "displayName": "Use B from A", "modelCode": "tp_b_model", "type": "custom" }
+  ]
+}
