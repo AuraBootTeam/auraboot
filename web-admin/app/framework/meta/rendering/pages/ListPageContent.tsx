@@ -82,6 +82,81 @@ interface DynamicEntity {
   pid?: string;
 }
 
+export interface ListReferenceDisplayConfig {
+  field: string;
+  modelCode: string;
+  valueField: string;
+  displayField: string;
+  displayKey: string;
+}
+
+export function buildListReferenceDisplayCacheKey(config: ListReferenceDisplayConfig): string {
+  return `${config.field}|${config.modelCode}|${config.valueField}|${config.displayField}`;
+}
+
+function readRefTargetConfig(column: ColumnConfig, meta?: Record<string, any>): Record<string, any> {
+  return {
+    ...(meta?.extension?.refTarget || {}),
+    ...(meta?.refTarget || {}),
+    ...((column as any).extension?.refTarget || {}),
+    ...((column as any).props?.refTarget || {}),
+    ...((column as any).refTarget || {}),
+  };
+}
+
+export function collectListReferenceDisplayConfigs(
+  columns: ColumnConfig[],
+  modelFieldMap: Map<string, any>,
+): ListReferenceDisplayConfig[] {
+  const configs: ListReferenceDisplayConfig[] = [];
+  const seen = new Set<string>();
+
+  for (const column of columns) {
+    if (!column.field || column.isActionColumn) continue;
+    const meta = modelFieldMap.get(column.field);
+    const refTarget = readRefTargetConfig(column, meta);
+    const dataType = String(
+      (column as any).dataType || column.valueType || meta?.dataType || meta?.extension?.dataType || '',
+    ).toLowerCase();
+    const hasReferenceShape =
+      dataType === 'reference' ||
+      column.valueType === 'reference' ||
+      column.field.endsWith('_id') ||
+      Object.keys(refTarget).length > 0;
+    if (!hasReferenceShape) continue;
+
+    const modelCode = String(
+      refTarget.modelCode ||
+        refTarget.targetModel ||
+        refTarget.targetEntity ||
+        meta?.referenceModelCode ||
+        meta?.extension?.referenceModelCode ||
+        '',
+    ).trim();
+    const displayField = String(
+      refTarget.displayField || refTarget.labelField || refTarget.targetField || '',
+    ).trim();
+    const valueField = String(
+      refTarget.valueField || refTarget.targetValueField || refTarget.idField || 'pid',
+    ).trim();
+    if (!modelCode || !displayField || !valueField) continue;
+
+    const config: ListReferenceDisplayConfig = {
+      field: column.field,
+      modelCode,
+      valueField,
+      displayField,
+      displayKey: `${column.field}_display`,
+    };
+    const key = buildListReferenceDisplayCacheKey(config);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    configs.push(config);
+  }
+
+  return configs;
+}
+
 interface PaginationResult<T> {
   records: T[];
   total: number;
@@ -452,6 +527,49 @@ function ListPageContentInner(props: PageContentProps) {
       .then((model) => setModelPid(model.pid))
       .catch(() => setModelPid(undefined));
   }, [modelCode]);
+
+  const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
+  const [referenceDisplayCache, setReferenceDisplayCache] = useState<
+    Record<string, Record<string, string>>
+  >({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const pageKey = schema?.modelCode || tableName;
+    if (!pageKey) {
+      setModelFieldMap(new Map());
+      return;
+    }
+
+    async function loadModelFields(): Promise<void> {
+      try {
+        const fieldsRes = await fetchResult<any[]>(`/api/dynamic/${pageKey}/field-meta`, {
+          method: 'get',
+          token: token || undefined,
+        });
+        if (cancelled) return;
+        if (!ResultHelper.isSuccess(fieldsRes) || !fieldsRes.data) {
+          setModelFieldMap(new Map());
+          return;
+        }
+        const map = new Map<string, any>();
+        for (const field of fieldsRes.data) {
+          if (field?.code) map.set(field.code, field);
+        }
+        setModelFieldMap(map);
+      } catch (error) {
+        if (!cancelled) {
+          setModelFieldMap(new Map());
+          console.warn('[ListPageContent] Failed to load model field metadata:', error);
+        }
+      }
+    }
+
+    loadModelFields();
+    return () => {
+      cancelled = true;
+    };
+  }, [schema?.modelCode, tableName, token]);
 
   // Handle edit view (name, description, scope) via savedViewService + reload
   const handleEditView = useCallback(
@@ -1368,7 +1486,20 @@ function ListPageContentInner(props: PageContentProps) {
   const renderCellContent = useCallback(
     (column: ColumnConfig, record: DynamicEntity, rowIndex: number) => {
       const value = record[column.field];
-      const effectiveValueType = inferValueType(column, value, record);
+      const referenceConfig = collectListReferenceDisplayConfigs([column], modelFieldMap)[0];
+      const cacheKey = referenceConfig
+        ? buildListReferenceDisplayCacheKey(referenceConfig)
+        : undefined;
+      const referenceDisplayValue =
+        referenceConfig && value !== null && value !== undefined
+          ? record[referenceConfig.displayKey] || referenceDisplayCache[cacheKey || '']?.[String(value)]
+          : undefined;
+      const recordForRenderer = referenceDisplayValue
+        ? { ...record, [referenceConfig!.displayKey]: referenceDisplayValue }
+        : record;
+      const effectiveValueType = referenceConfig
+        ? 'reference'
+        : inferValueType(column, value, recordForRenderer);
 
       // Null/undefined handling
       if (
@@ -1431,7 +1562,7 @@ function ListPageContentInner(props: PageContentProps) {
       const rendererType = (column as any).cellRenderer || effectiveValueType;
       return cellRendererRegistry.render(rendererType, {
         value,
-        record,
+        record: recordForRenderer,
         column: {
           field: column.field,
           label: typeof column.label === 'string' ? column.label : undefined,
@@ -1449,7 +1580,17 @@ function ListPageContentInner(props: PageContentProps) {
         rowIndex,
       });
     },
-    [runtime, pageContext, locale, t, inferValueType, dateTimeFormats, effectiveTimezone],
+    [
+      runtime,
+      pageContext,
+      locale,
+      t,
+      inferValueType,
+      dateTimeFormats,
+      effectiveTimezone,
+      modelFieldMap,
+      referenceDisplayCache,
+    ],
   );
 
   // Inline edit: save a single field value via dynamic data PUT API
@@ -1707,6 +1848,93 @@ function ListPageContentInner(props: PageContentProps) {
 
     return visibleCols;
   }, [tableBlock, currentView]);
+
+  const referenceDisplayConfigs = useMemo(
+    () => collectListReferenceDisplayConfigs(tableColumns, modelFieldMap),
+    [tableColumns, modelFieldMap],
+  );
+
+  useEffect(() => {
+    if (referenceDisplayConfigs.length === 0 || data.length === 0) return;
+    let cancelled = false;
+
+    async function loadReferenceDisplays(): Promise<void> {
+      const pendingByConfig = referenceDisplayConfigs
+        .map((config) => {
+          const cacheKey = buildListReferenceDisplayCacheKey(config);
+          const cached = referenceDisplayCache[cacheKey] || {};
+          const values = Array.from(
+            new Set(
+              data
+                .filter((record) => !record[config.displayKey])
+                .map((record) => record[config.field])
+                .filter((value) => value !== null && value !== undefined && value !== '')
+                .map((value) => String(value)),
+            ),
+          ).filter((value) => cached[value] === undefined);
+          return { config, cacheKey, values };
+        })
+        .filter((entry) => entry.values.length > 0);
+
+      if (pendingByConfig.length === 0) return;
+
+      const updates: Record<string, Record<string, string>> = {};
+      await Promise.all(
+        pendingByConfig.map(async ({ config, cacheKey, values }) => {
+          try {
+            const result = await fetchResult<PaginationResult<DynamicEntity> | DynamicEntity[]>(
+              `${buildApiEndpoint(config.modelCode)}/list`,
+              {
+                method: 'get',
+                params: {
+                  pageNum: 1,
+                  pageSize: Math.max(values.length, 1),
+                  filters: JSON.stringify([
+                    { fieldName: config.valueField, operator: 'IN', value: values },
+                  ]),
+                },
+                token: token || undefined,
+              },
+            );
+            if (cancelled || !ResultHelper.isSuccess(result) || !result.data) return;
+
+            const responseData = result.data;
+            const rows = Array.isArray(responseData) ? responseData : responseData.records || [];
+            for (const row of rows) {
+              const value = row[config.valueField];
+              const label = row[config.displayField];
+              if (value === null || value === undefined || label === null || label === undefined) {
+                continue;
+              }
+              const text = String(label).trim();
+              if (!text) continue;
+              updates[cacheKey] = updates[cacheKey] || {};
+              updates[cacheKey][String(value)] = text;
+            }
+          } catch (error) {
+            console.warn(
+              `[ListPageContent] Failed to resolve reference labels for ${config.field}:`,
+              error,
+            );
+          }
+        }),
+      );
+
+      if (cancelled || Object.keys(updates).length === 0) return;
+      setReferenceDisplayCache((prev) => {
+        const next = { ...prev };
+        for (const [cacheKey, labels] of Object.entries(updates)) {
+          next[cacheKey] = { ...(next[cacheKey] || {}), ...labels };
+        }
+        return next;
+      });
+    }
+
+    loadReferenceDisplays();
+    return () => {
+      cancelled = true;
+    };
+  }, [referenceDisplayConfigs, data, referenceDisplayCache, token]);
 
   // Column order — derived from SavedView or default column order
   const [columnOrder, setColumnOrder] = useState<string[]>([]);

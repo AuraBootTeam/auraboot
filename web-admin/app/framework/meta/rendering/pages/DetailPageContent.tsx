@@ -206,6 +206,12 @@ export function collectDetailDictCodes(
   return [...new Set(codes)];
 }
 
+export function shouldRenderDefaultDetailEditAction(
+  schema: { extension?: Record<string, any> } | undefined | null,
+): boolean {
+  return schema?.extension?.showEdit !== false;
+}
+
 export function resolveSubTableDataSourceConfig(
   dataSource: BlockConfig['dataSource'] | undefined,
   schemaDataSources?: Record<string, DataSourceConfig>,
@@ -425,6 +431,7 @@ export function DetailPageContent(props: PageContentProps) {
   const allBlocks = useMemo(() => {
     return schema?.blocks || [];
   }, [schema]);
+  const showDefaultEditAction = shouldRenderDefaultDetailEditAction(schema);
 
   const headerToolbar = useMemo(
     () => allBlocks.find((b: BlockConfig) => b.blockType === 'toolbar'),
@@ -865,12 +872,14 @@ export function DetailPageContent(props: PageContentProps) {
                 >
                   {t('action.back')}
                 </Link>
-                <Link
-                  to={`/p/${tableName}/edit/${recordId}`}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                >
-                  {t('action.update')}
-                </Link>
+                {showDefaultEditAction && (
+                  <Link
+                    to={`/p/${tableName}/edit/${recordId}`}
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    {t('action.update')}
+                  </Link>
+                )}
               </div>
             )}
           </div>

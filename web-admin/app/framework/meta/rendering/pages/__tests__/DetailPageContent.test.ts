@@ -5,6 +5,7 @@ import {
   enrichDetailField,
   resolveDetailFieldComponent,
   resolveSubTableDataSourceConfig,
+  shouldRenderDefaultDetailEditAction,
 } from '../DetailPageContent';
 
 describe('buildDetailRecordEndpoint', () => {
@@ -12,6 +13,17 @@ describe('buildDetailRecordEndpoint', () => {
     expect(buildDetailRecordEndpoint('showcase_all_fields', '01KPTMPKJEAC6QHW08PE9JE62W')).toBe(
       '/api/dynamic/showcase_all_fields/01KPTMPKJEAC6QHW08PE9JE62W',
     );
+  });
+});
+
+describe('shouldRenderDefaultDetailEditAction', () => {
+  it('keeps the default edit action visible when the schema does not opt out', () => {
+    expect(shouldRenderDefaultDetailEditAction({ extension: {} })).toBe(true);
+    expect(shouldRenderDefaultDetailEditAction(null)).toBe(true);
+  });
+
+  it('hides the default edit action when extension.showEdit is false', () => {
+    expect(shouldRenderDefaultDetailEditAction({ extension: { showEdit: false } })).toBe(false);
   });
 });
 
