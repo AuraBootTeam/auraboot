@@ -3,11 +3,18 @@ package com.auraboot.framework.plugin.dto.imports;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -68,8 +75,14 @@ public class PageSchemaDTO {
     private Map<String, Object> layout;
 
     /**
-     * Content blocks array.
+     * Content blocks.
+     *
+     * <p>Accepts both array form {@code [...]} and single-object form {@code {...}}.
+     * LLM output sometimes produces a bare object here; the flexible deserializer
+     * wraps it in a single-element list so downstream consumers always see a
+     * {@code List}.</p>
      */
+    @JsonDeserialize(using = PageSchemaDTO.BlocksFlexibleDeserializer.class)
     private List<Object> blocks;
 
     /**
@@ -194,6 +207,62 @@ public class PageSchemaDTO {
             return nameEn;
         }
         return name != null ? name : pageKey;
+    }
+
+    // =========================================================================
+    // Flexible deserializer for the blocks field
+    // =========================================================================
+
+    /**
+     * Deserializes the {@code blocks} JSON value into {@code List<Object>} regardless of
+     * whether the source JSON contains an array ({@code [...]}) or a bare object
+     * ({@code {...}}).
+     *
+     * <ul>
+     *   <li>Array token → deserialize each element and collect into list.</li>
+     *   <li>Object token → deserialize the single object and wrap in a one-element list.</li>
+     *   <li>Null token → return {@code null}.</li>
+     * </ul>
+     *
+     * <p>This handles LLM output that occasionally produces a single root block object
+     * instead of an array, which would otherwise cause a Jackson
+     * {@code MismatchedInputException} when binding to {@code List<Object>}.</p>
+     */
+    static class BlocksFlexibleDeserializer extends StdDeserializer<List<Object>> {
+
+        BlocksFlexibleDeserializer() {
+            super(List.class);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public List<Object> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            JsonToken token = p.currentToken();
+
+            if (token == JsonToken.START_ARRAY) {
+                // Normal array form — let Jackson read each element generically
+                List<Object> result = new ArrayList<>();
+                p.nextToken(); // move past '['
+                while (p.currentToken() != JsonToken.END_ARRAY) {
+                    Object element = ctxt.readValue(p, Object.class);
+                    result.add(element);
+                    p.nextToken();
+                }
+                return result;
+            } else if (token == JsonToken.START_OBJECT) {
+                // Bare object form (LLM emitted a single block, not wrapped in array)
+                Object singleBlock = ctxt.readValue(p, Object.class);
+                List<Object> result = new ArrayList<>(1);
+                result.add(singleBlock);
+                return result;
+            } else if (token == JsonToken.VALUE_NULL) {
+                return null;
+            }
+
+            // Fallback: delegate to default deserializer for any other token
+            return (List<Object>) ctxt.findNonContextualValueDeserializer(
+                    ctxt.constructType(List.class)).deserialize(p, ctxt);
+        }
     }
 
 }
