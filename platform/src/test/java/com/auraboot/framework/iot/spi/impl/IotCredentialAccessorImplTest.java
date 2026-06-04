@@ -54,7 +54,9 @@ class IotCredentialAccessorImplTest {
     }
 
     private DeviceView device(long tenantId, String code, String iotId) {
-        return new DeviceView(iotId, code, "pk-air", tenantId, "ONLINE",
+        // pid is a distinct ULID (the primary-key column); tests use a synthetic value.
+        String pid = "pid-" + iotId;
+        return new DeviceView(pid, iotId, code, "pk-air", tenantId, "ONLINE",
                 "/sys/pk-air/" + code + "/#", Map.of(), null);
     }
 
@@ -71,7 +73,8 @@ class IotCredentialAccessorImplTest {
         assertThat(got.expiresAt()).isNotNull();
 
         ArgumentCaptor<Map<String, Object>> patch = ArgumentCaptor.forClass(Map.class);
-        verify(dds).update(eq("iot_device"), eq("iot-1"), patch.capture());
+        // The update key must be the row's primary-key (pid), not the iotId business field.
+        verify(dds).update(eq("iot_device"), eq("pid-iot-1"), patch.capture());
         assertThat(patch.getValue()).containsEntry("iot_d_credentials_type", "ACCESS_TOKEN");
         assertThat((String) patch.getValue().get("iot_d_credentials_enc")).startsWith("ENC:");
         verify(emqx, times(1)).syncDeviceUser(eq(42L), eq("dev-1"), anyString(), eq(List.of("/sys/pk-air/dev-1/#")));
@@ -123,7 +126,8 @@ class IotCredentialAccessorImplTest {
         when(deviceAccessor.lookupByCode(42L, "dev-1")).thenReturn(Optional.of(device(42L, "dev-1", "iot-1")));
         accessor.revokeCredentials(42L, "dev-1");
         ArgumentCaptor<Map<String, Object>> patch = ArgumentCaptor.forClass(Map.class);
-        verify(dds).update(eq("iot_device"), eq("iot-1"), patch.capture());
+        // The update key must be the row's primary-key (pid), not the iotId business field.
+        verify(dds).update(eq("iot_device"), eq("pid-iot-1"), patch.capture());
         assertThat(patch.getValue()).containsEntry("iot_d_status", "DISABLE");
         assertThat(patch.getValue()).containsEntry("iot_d_credentials_enc", null);
         verify(emqx).revokeDeviceUser(42L, "dev-1");
@@ -145,12 +149,12 @@ class IotCredentialAccessorImplTest {
 
     @Test
     void resolveAclPatterns_usesStoredCommaSeparated_orDefault() {
-        DeviceView withStored = new DeviceView("iot", "dev", "pk", 1L, "ONLINE",
+        DeviceView withStored = new DeviceView("pid-1", "iot", "dev", "pk", 1L, "ONLINE",
                 "/sys/pk/dev/up,/sys/pk/dev/down", Map.of(), null);
         assertThat(IotCredentialAccessorImpl.resolveAclPatterns(withStored))
                 .containsExactly("/sys/pk/dev/up", "/sys/pk/dev/down");
 
-        DeviceView empty = new DeviceView("iot", "dev", "pk", 1L, "ONLINE",
+        DeviceView empty = new DeviceView("pid-2", "iot", "dev", "pk", 1L, "ONLINE",
                 null, Map.of(), null);
         assertThat(IotCredentialAccessorImpl.resolveAclPatterns(empty))
                 .containsExactly("/sys/pk/dev/#");

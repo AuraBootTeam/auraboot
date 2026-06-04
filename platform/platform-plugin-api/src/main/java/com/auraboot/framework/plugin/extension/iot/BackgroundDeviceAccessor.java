@@ -49,6 +49,11 @@ public interface BackgroundDeviceAccessor {
      * record components in future minor versions; existing components are
      * stable.
      *
+     * @param recordId    primary-key value ({@code pid} column, ULID) of the
+     *                    underlying dynamic-data row; required when callers need
+     *                    to update the row via
+     *                    {@link com.auraboot.framework.meta.service.DynamicDataService#update}
+     *                    (which resolves by primary key, not by business field)
      * @param iotId       global device id
      * @param deviceCode  tenant-scoped business code
      * @param productKey  product the device belongs to
@@ -59,6 +64,7 @@ public interface BackgroundDeviceAccessor {
      * @param lastSeenAt  last heartbeat / publish timestamp; may be null when never seen
      */
     record DeviceView(
+            String recordId,
             String iotId,
             String deviceCode,
             String productKey,
