@@ -530,4 +530,56 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(response.getRows().get(0)).containsKey("distinct_statuses");
         assertThat(response.getSummary()).containsKey("total_count");
     }
+
+    @Test
+    void shouldInjectCurrentUserIdIntoNamedQueryParams() {
+        // Regression for the chart-data gap: the named-query aggregate path (used by every
+        // smart-*-chart) injected params.tenantId but NOT params.currentUserId, so any
+        // user-scoped named query (#{params.currentUserId}) — "my commission" / team-by-manager
+        // dashboards — returned an empty result in a chart while the /api/datasource/list
+        // (card/table) path returned rows. This proves currentUserId is now injected.
+        String code = generateQueryCode();
+
+        NamedQueryFieldRequest uidField = new NamedQueryFieldRequest();
+        uidField.setFieldCode("uid");
+        uidField.setColumnExpr("uid");
+        uidField.setDataType("string");
+        uidField.setOperators(List.of("eq"));
+        uidField.setSortable(true);
+
+        NamedQueryFieldRequest cntField = new NamedQueryFieldRequest();
+        cntField.setFieldCode("cnt");
+        cntField.setColumnExpr("cnt");
+        cntField.setDataType("number");
+        cntField.setOperators(List.of("eq"));
+
+        NamedQueryCreateRequest createReq = new NamedQueryCreateRequest();
+        createReq.setCode(code);
+        createReq.setTitle("currentUserId echo");
+        createReq.setDescription("Echoes #{params.currentUserId} to prove chart-path injection");
+        // fromSql is wrapped as a subquery; it echoes the injected current user id
+        createReq.setFromSql("(SELECT #{params.currentUserId} AS uid, 1 AS cnt) cu");
+        createReq.setStatus("published");
+        createReq.setFields(List.of(uidField, cntField));
+        namedQueryService.create(createReq);
+
+        MetricConfig total = new MetricConfig();
+        total.setField("cnt");
+        total.setAggregation("sum");
+        total.setAlias("total");
+
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setType("namedQuery");
+        request.setQueryCode(code);
+        request.setDimensions(List.of("uid"));
+        request.setMetrics(List.of(total));
+
+        // When: execute via the chart aggregate path (the one that omitted currentUserId)
+        AggregateQueryResponse response = aggregateQueryService.execute(request);
+
+        // Then: the row echoes the logged-in user's id — i.e. currentUserId was bound, not null
+        assertThat(response.getRows()).isNotEmpty();
+        assertThat(String.valueOf(response.getRows().get(0).get("uid")))
+                .isEqualTo(String.valueOf(testUser.getId()));
+    }
 }
