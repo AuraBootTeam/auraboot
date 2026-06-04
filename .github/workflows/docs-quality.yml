@@ -1,0 +1,57 @@
+name: Docs Quality Gate
+
+# Docs-governance rollout P2 (lite profile): the checker is INSTALLED but
+# DEFANGED (warn-only). continue-on-error keeps findings visible as annotations
+# without blocking, while all pre-anchor docs are grandfathered by
+# baseline_anchor in .docs-governance.json. A later phase flips this to a
+# blocking `--strict --git` gate once the post-anchor surface is clean.
+# Vendored, self-contained checker — see scripts/check-docs-governance.mjs and
+# the enterprise canonical docs/standards/meta/documentation-governance.md.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.docs-governance.json'
+      - 'scripts/check-docs-governance.mjs'
+      - '.github/workflows/docs-quality.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.docs-governance.json'
+      - 'scripts/check-docs-governance.mjs'
+      - '.github/workflows/docs-quality.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs-quality:
+    name: Docs Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so check-docs-governance.mjs --git can detect which
+          # docs were added on/after the baseline_anchor (shallow clones can't).
+          fetch-depth: 0
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Docs governance (lite profile; P2 warn-only, baseline-grandfathered)
+        continue-on-error: true
+        run: |
+          node scripts/check-docs-governance.mjs --git
+          echo "--- full legacy debt (non-blocking) ---"
+          node scripts/check-docs-governance.mjs --audit-legacy --quiet
