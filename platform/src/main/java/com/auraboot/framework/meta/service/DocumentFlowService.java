@@ -212,6 +212,15 @@ public class DocumentFlowService {
             return sourceRecordId;
         }
 
+        // ${today} / ${now} — dynamic dates for downstream documents
+        // (e.g. order date = creation date when a won opportunity becomes a sales order)
+        if ("${today}".equals(expr)) {
+            return java.time.LocalDate.now().toString();
+        }
+        if ("${now}".equals(expr)) {
+            return java.time.Instant.now().toString();
+        }
+
         // 'literal string'
         if (expr.startsWith("'") && expr.endsWith("'") && expr.length() >= 2) {
             return expr.substring(1, expr.length() - 1);
