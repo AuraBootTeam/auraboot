@@ -5,8 +5,10 @@ import com.auraboot.framework.automation.dto.AutomationUpdateRequest;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.mapper.AutomationLogMapper;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
+import com.auraboot.framework.automation.service.AutomationFlowTriggerDeriver;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.exception.ValidationException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -53,8 +55,9 @@ class AutomationServiceImplTenantIsolationTest {
 
     @BeforeEach
     void setUp() {
+        AutomationFlowTriggerDeriver deriver = new AutomationFlowTriggerDeriver(new ObjectMapper());
         service = new AutomationServiceImpl(automationMapper, automationLogMapper, automationTriggerService,
-                automationProcessRuntime);
+                automationProcessRuntime, deriver);
         MetaContext.setContext(CURRENT_TENANT, 10L, "user-1", "tester");
     }
 

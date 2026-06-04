@@ -365,6 +365,8 @@ automation:
     scheduled.desc: 按照 Cron 表达式定时触发
     webhook: Webhook 触发
     webhook.desc: 当收到外部 Webhook 请求时触发
+    bpmEvent: 流程事件触发
+    bpmEvent.desc: 当 BPM 流程事件发生时触发（流程启动、任务完成等）
 
   # Actions
   action:
@@ -453,6 +455,14 @@ automation:
     collection.desc: 要遍历的数组或列表
     itemVariable: 元素变量名
     itemVariable.desc: 当前元素的变量名，默认为 item
+    bpmProcess: BPM 流程
+    eventTypes: 事件类型
+    eventTypes.desc: 留空表示监听所有事件类型
+    eventTypes.process_started: 流程启动
+    eventTypes.process_ended: 流程结束
+    eventTypes.task_created: 任务创建
+    eventTypes.task_completed: 任务完成
+    eventTypes.task_assigned: 任务分配
 
 # Auth
 auth:

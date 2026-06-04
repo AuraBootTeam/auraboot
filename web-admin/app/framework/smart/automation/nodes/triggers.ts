@@ -214,4 +214,42 @@ export const triggerNodes: FlowNodeDefinition[] = [
       validationMode: 'none',
     },
   },
+  {
+    // Triggers when a BPM process event occurs (process_started, task_completed, etc.).
+    // modelCode stores the BPM processKey so the backend listener can match
+    // automation.modelCode == bpmEvent.processKey via findEnabledByModelCodeAndTriggerType.
+    type: 'trigger-bpm-event',
+    label: '$i18n:automation.trigger.bpmEvent',
+    icon: 'Workflow',
+    category: 'trigger',
+    description: '$i18n:automation.trigger.bpmEvent.desc',
+    configSchema: [
+      {
+        // processKey stored as modelCode so the existing dispatch lookup
+        // (findEnabledByModelCodeAndTriggerType) works without schema changes.
+        key: 'modelCode',
+        label: '$i18n:automation.field.bpmProcess',
+        type: 'process-select',
+        required: true,
+        group: 'trigger_source',
+      },
+      {
+        key: 'eventTypes',
+        label: '$i18n:automation.field.eventTypes',
+        type: 'multiselect',
+        description: '$i18n:automation.field.eventTypes.desc',
+        group: 'filter',
+        options: [
+          { label: '$i18n:automation.field.eventTypes.process_started', value: 'process_started' },
+          { label: '$i18n:automation.field.eventTypes.process_ended', value: 'process_ended' },
+          { label: '$i18n:automation.field.eventTypes.task_created', value: 'task_created' },
+          { label: '$i18n:automation.field.eventTypes.task_completed', value: 'task_completed' },
+          { label: '$i18n:automation.field.eventTypes.task_assigned', value: 'task_assigned' },
+        ],
+      },
+    ],
+    defaultConfig: {
+      triggerType: 'on_bpm_event',
+    },
+  },
 ];

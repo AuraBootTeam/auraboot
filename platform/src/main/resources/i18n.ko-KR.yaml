@@ -161,6 +161,8 @@ automation:
     scheduled.desc: Cron 표현식에 따라 정기 실행
     webhook: Webhook 트리거
     webhook.desc: 외부 Webhook 요청을 수신할 때 실행
+    bpmEvent: BPM 이벤트 트리거
+    bpmEvent.desc: BPM 프로세스 이벤트 발생 시 실행 (프로세스 시작, 태스크 완료 등)
 
   # Actions
   action:
@@ -249,6 +251,14 @@ automation:
     collection.desc: 반복 처리할 배열 또는 리스트
     itemVariable: 요소 변수명
     itemVariable.desc: 현재 요소의 변수명 (기본값: item)
+    bpmProcess: BPM 프로세스
+    eventTypes: 이벤트 유형
+    eventTypes.desc: 비워두면 모든 이벤트 유형을 감시합니다
+    eventTypes.process_started: Process Started
+    eventTypes.process_ended: Process Ended
+    eventTypes.task_created: Task Created
+    eventTypes.task_completed: Task Completed
+    eventTypes.task_assigned: Task Assigned
 
 # Auth
 auth:

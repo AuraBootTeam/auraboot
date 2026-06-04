@@ -9,6 +9,8 @@ import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.AutomationLog;
 import com.auraboot.framework.automation.mapper.AutomationLogMapper;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
+import com.auraboot.framework.automation.service.AutomationFlowTriggerDeriver;
+import com.auraboot.framework.automation.service.AutomationFlowTriggerDeriver.DerivedTrigger;
 import com.auraboot.framework.automation.service.AutomationService;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.common.constant.ResponseCode;
@@ -46,6 +48,7 @@ public class AutomationServiceImpl implements AutomationService {
     private final AutomationLogMapper automationLogMapper;
     private final AutomationTriggerService automationTriggerService;
     private final com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
+    private final AutomationFlowTriggerDeriver flowTriggerDeriver;
 
     // ==================== Tenant isolation guards ====================
     // ab_automation is excluded from the global TenantLineInnerInterceptor so the
@@ -80,6 +83,20 @@ public class AutomationServiceImpl implements AutomationService {
 
         validateCreateRequest(request);
 
+        // Derive trigger fields from flowConfig when the designer saves the flow.
+        // The designer POSTs only {name, description, flowConfig}; triggerType/modelCode
+        // live inside flowConfig.nodes[trigger].data.config. Without this derivation,
+        // designer-created automations have null trigger columns and NEVER fire.
+        DerivedTrigger derived = flowTriggerDeriver.derive(request.getFlowConfig());
+        if (!derived.isEmpty()) {
+            // Derived values are authoritative; they override any flat request fields
+            // (the two should be consistent but the flowConfig is the source of truth
+            // for designer automations).
+            request.setTriggerType(derived.triggerType());
+            request.setModelCode(derived.modelCode());
+            request.setTriggerConfig(derived.triggerConfig());
+        }
+
         String currentUserPid = MetaContext.getCurrentUserPid();
         Long tenantId = MetaContext.getCurrentTenantId();
 
@@ -92,7 +109,11 @@ public class AutomationServiceImpl implements AutomationService {
         automation.setTriggerType(request.getTriggerType());
         automation.setTriggerConfig(request.getTriggerConfig());
         automation.setTriggerCondition(request.getTriggerCondition());
-        automation.setActions(request.getActions());
+        // Default to an empty list when absent: the visual designer saves its steps in
+        // flowConfig (compiled at enable time), not in the flat actions[] column, and
+        // ab_automation.actions is NOT NULL DEFAULT '[]'. Inserting null would violate it,
+        // so a designer-only save (no flat actions) must persist an empty list here.
+        automation.setActions(request.getActions() != null ? request.getActions() : new ArrayList<>());
         automation.setFlowConfig(request.getFlowConfig());
         automation.setEnabled(request.getEnabled() != null ? request.getEnabled() : false);
         automation.setTriggerCount(0L);
@@ -129,6 +150,20 @@ public class AutomationServiceImpl implements AutomationService {
         Automation automation = loadOwnedAutomation(pid);
 
         String currentUserPid = MetaContext.getCurrentUserPid();
+
+        // Derive trigger fields from flowConfig when the designer re-saves the flow.
+        // Same gap as create(): the designer only sends flowConfig, so we must populate
+        // triggerType/modelCode/triggerConfig from the trigger node inside it.
+        if (request.getFlowConfig() != null && !request.getFlowConfig().isEmpty()) {
+            DerivedTrigger derived = flowTriggerDeriver.derive(request.getFlowConfig());
+            if (!derived.isEmpty()) {
+                request.setTriggerType(derived.triggerType());
+                request.setTriggerConfig(derived.triggerConfig());
+                // modelCode is not a field on AutomationUpdateRequest, but we apply it
+                // directly to the entity here so updates also keep modelCode in sync.
+                automation.setModelCode(derived.modelCode());
+            }
+        }
 
         if (StringUtils.hasText(request.getName())) {
             automation.setName(request.getName());
@@ -396,7 +431,7 @@ public class AutomationServiceImpl implements AutomationService {
         if (StringUtils.hasText(request.getTriggerType())) {
             List<String> validTriggerTypes = List.of(
                     "on_record_create", "on_record_update", "on_field_change",
-                    "on_state_change", "scheduled", "webhook");
+                    "on_state_change", "scheduled", "webhook", "on_bpm_event");
             if (!validTriggerTypes.contains(request.getTriggerType())) {
                 errors.add("Invalid trigger type: " + request.getTriggerType());
             }
@@ -441,7 +476,7 @@ public class AutomationServiceImpl implements AutomationService {
         if (StringUtils.hasText(request.getTriggerType())) {
             List<String> validTriggerTypes = List.of(
                     "on_record_create", "on_record_update", "on_field_change",
-                    "on_state_change", "scheduled", "webhook");
+                    "on_state_change", "scheduled", "webhook", "on_bpm_event");
             if (!validTriggerTypes.contains(request.getTriggerType())) {
                 throw new ValidationException(ResponseCode.CommonValidationFailed,
                         "Invalid trigger type: " + request.getTriggerType());
