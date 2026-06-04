@@ -114,6 +114,57 @@ class CrossReferenceValidatorTest {
                 && m.getMessage().contains("missing"));
     }
 
+    /**
+     * Phase-1 of the two-phase cross-plugin reference fix: when an import declares
+     * {@code deferReferenceValidation}, a command referencing a model that is not yet
+     * available (it may be supplied by another plugin imported later in the same batch)
+     * must be downgraded from a hard error to a deferred warning so a cyclic
+     * crm↔sales reset can proceed. The truly-dangling case is re-enforced afterwards by
+     * the closing reference-integrity sweep.
+     */
+    @Test
+    void commandReferencingMissingModel_deferred_emitsWarningNotError() {
+        PluginManifestExtended manifest = new PluginManifestExtended();
+        manifest.setCommands(List.of(command("ns:c", "sl_sales_order")));
+        PluginValidationContext ctx = PluginValidationContext.builder()
+                .pluginId("p")
+                .namespace("ns")
+                .manifest(manifest)
+                .deferReferenceValidation(true)
+                .installedModelCodes(Set.of())
+                .installedFieldCodes(Set.of())
+                .installedPermissionCodes(Set.of())
+                .build();
+
+        var msgs = validator.validate(ctx);
+
+        assertThat(msgs).noneMatch(m -> "S-REF-MODEL".equals(m.getCode()) && m.isError());
+        assertThat(msgs).anyMatch(m -> "S-REF-MODEL".equals(m.getCode()) && m.isWarning()
+                && m.getMessage().contains("sl_sales_order"));
+    }
+
+    @Test
+    void bindingReferencingMissingModel_deferred_emitsWarningNotError() {
+        PluginManifestExtended manifest = new PluginManifestExtended();
+        // field is declared locally so only the *model* reference is cross-plugin / deferred
+        manifest.setFields(List.of(field("ns_f")));
+        manifest.setModelFieldBindings(List.of(binding("sl_sales_order", "ns_f")));
+        PluginValidationContext ctx = PluginValidationContext.builder()
+                .pluginId("p")
+                .namespace("ns")
+                .manifest(manifest)
+                .deferReferenceValidation(true)
+                .installedModelCodes(Set.of())
+                .installedFieldCodes(Set.of())
+                .installedPermissionCodes(Set.of())
+                .build();
+
+        var msgs = validator.validate(ctx);
+
+        assertThat(msgs).noneMatch(m -> "S-REF-BINDING-MODEL".equals(m.getCode()) && m.isError());
+        assertThat(msgs).anyMatch(m -> "S-REF-BINDING-MODEL".equals(m.getCode()) && m.isWarning());
+    }
+
     @Test
     void commandWithNullModel_skipped() {
         PluginManifestExtended manifest = new PluginManifestExtended();
