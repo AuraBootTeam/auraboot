@@ -144,6 +144,163 @@ function getReferenceModel(field: FieldConfig): string {
   ).toLowerCase();
 }
 
+/**
+ * Field code on the referenced record that should be shown as its display name.
+ * Mirrors RuntimeFieldRenderer's `displayField || labelField || targetField` precedence
+ * so authored DSL (`refTarget.displayField` / `refTarget.targetField`) renders consistently
+ * in editable pickers and read-only detail views. Unlike the model code this is a column
+ * name, so it must NOT be lowercased.
+ */
+function getReferenceDisplayField(field: FieldConfig): string | undefined {
+  const refTarget = {
+    ...(field.props?.refTarget || {}),
+    ...(field.refTarget || {}),
+  };
+  const candidate =
+    refTarget.displayField || refTarget.labelField || refTarget.targetField;
+  return candidate ? String(candidate) : undefined;
+}
+
+/**
+ * Module-level cache of resolved reference labels, keyed by `<model>:<id>`. Reference
+ * detail fields are read-only and the referenced record's display name is effectively
+ * immutable within a session, so caching avoids re-fetching when the same record is
+ * referenced by several fields / rows or across remounts (N+1 avoidance). Inflight
+ * promises are deduped so concurrent fields pointing at the same record share one request.
+ */
+const referenceLabelCache = new Map<string, string>();
+const referenceLabelInflight = new Map<string, Promise<string>>();
+
+const REFERENCE_DISPLAY_CANDIDATE_FIELDS = [
+  'name',
+  'title',
+  'displayName',
+  'label',
+  'code',
+];
+
+function pickReferenceLabel(
+  record: Record<string, unknown>,
+  displayField: string | undefined,
+  fallbackId: string,
+): string {
+  if (displayField && record[displayField] != null && record[displayField] !== '') {
+    return String(record[displayField]);
+  }
+  for (const key of REFERENCE_DISPLAY_CANDIDATE_FIELDS) {
+    if (record[key] != null && record[key] !== '') {
+      return String(record[key]);
+    }
+  }
+  return fallbackId;
+}
+
+async function resolveReferenceLabel(
+  model: string,
+  id: string,
+  displayField: string | undefined,
+): Promise<string> {
+  const cacheKey = `${model}:${id}`;
+  const cached = referenceLabelCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const inflight = referenceLabelInflight.get(cacheKey);
+  if (inflight) return inflight;
+
+  const request = (async () => {
+    try {
+      const resp = await fetch(`/api/dynamic/${model}/${encodeURIComponent(id)}`);
+      if (!resp.ok) return id;
+      const body = await resp.json();
+      const record = (body?.data ?? {}) as Record<string, unknown>;
+      const label = pickReferenceLabel(record, displayField, id);
+      referenceLabelCache.set(cacheKey, label);
+      return label;
+    } catch {
+      return id;
+    } finally {
+      referenceLabelInflight.delete(cacheKey);
+    }
+  })();
+
+  referenceLabelInflight.set(cacheKey, request);
+  return request;
+}
+
+/**
+ * Read-only renderer for generic reference fields (a record pointing at another model).
+ * Resolves each referenced id to its display name via `/api/dynamic/<model>/<id>` instead of
+ * leaking the raw ULID. System pickers (sys_user / org_department) are handled by their own
+ * dedicated read-only renderers above; this covers every other `refTarget.targetModel`.
+ */
+const ReadonlyReferenceValue: React.FC<{
+  value: unknown;
+  model: string;
+  displayField?: string;
+  multiple?: boolean;
+}> = ({ value, model, displayField, multiple = false }) => {
+  const ids = React.useMemo(() => parseReadonlyValueList(value, multiple), [value, multiple]);
+  const idsKey = ids.join('|');
+  const [labels, setLabels] = React.useState<string[]>(() =>
+    ids.map((id) => referenceLabelCache.get(`${model}:${id}`) ?? id),
+  );
+  const [resolved, setResolved] = React.useState(() =>
+    ids.every((id) => referenceLabelCache.has(`${model}:${id}`)),
+  );
+
+  React.useEffect(() => {
+    let active = true;
+    if (ids.length === 0) {
+      setLabels([]);
+      setResolved(true);
+      return () => {
+        active = false;
+      };
+    }
+
+    const allCached = ids.every((id) => referenceLabelCache.has(`${model}:${id}`));
+    if (allCached) {
+      setLabels(ids.map((id) => referenceLabelCache.get(`${model}:${id}`) as string));
+      setResolved(true);
+      return () => {
+        active = false;
+      };
+    }
+
+    setResolved(false);
+    Promise.all(ids.map((id) => resolveReferenceLabel(model, id, displayField))).then(
+      (nextLabels) => {
+        if (!active) return;
+        setLabels(nextLabels);
+        setResolved(true);
+      },
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [idsKey, model, displayField]);
+
+  if (ids.length === 0) {
+    return <span className="py-1 text-sm text-gray-400">&mdash;</span>;
+  }
+
+  if (!resolved) {
+    // Loading placeholder — never flash the raw ULID before the display name resolves.
+    return (
+      <div className="py-1" aria-label="Loading" data-testid="reference-readonly-loading">
+        <div className="h-4 w-24 animate-pulse rounded bg-gray-200/80" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="py-1 text-sm text-gray-900" data-testid="reference-readonly">
+      {labels.join('、')}
+    </div>
+  );
+};
+
 const ReadonlyOrganizationValue: React.FC<{ value: unknown; multiple?: boolean }> = ({
   value,
   multiple = false,
@@ -258,6 +415,31 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       if (isOrganizationSelect) {
         return (
           <ReadonlyOrganizationValue value={value} multiple={Boolean(field.props?.multiple)} />
+        );
+      }
+
+      // Generic reference field — resolve the target record's display name instead of
+      // leaking the raw ULID. sys_user / org_department are handled by their dedicated
+      // renderers above; this covers every other refTarget.targetModel / referenceModelCode.
+      const isReferenceComponent =
+        componentType === 'reference' ||
+        componentType === 'referenceselect' ||
+        componentType === 'smartreference' ||
+        componentType === 'relationfield' ||
+        componentType === 'relationselect';
+      if (
+        (isReferenceComponent || (referenceModel && !effectiveDictCode)) &&
+        referenceModel &&
+        value != null &&
+        value !== ''
+      ) {
+        return (
+          <ReadonlyReferenceValue
+            value={value}
+            model={referenceModel}
+            displayField={getReferenceDisplayField(field)}
+            multiple={Boolean(field.props?.multiple)}
+          />
         );
       }
 

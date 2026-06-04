@@ -179,6 +179,28 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
   if (rawConfig.defaultSort !== undefined) {
     passthrough.defaultSort = rawConfig.defaultSort as Widget['config']['defaultSort'];
   }
+  // Presentation keys consumed directly by chart components (notably smart-number-card's
+  // `cards[].label` KPI eyebrows). These live at the top level of the authored config —
+  // not under visualization — so they must be forwarded explicitly; otherwise the card
+  // loses its labels and falls back to rendering the raw named-query field codes.
+  // See dashboardService.test.ts ("preserves smart-number-card presentation keys").
+  for (const key of [
+    'cards',
+    'metricField',
+    'format',
+    'precision',
+    'currency',
+    'prefix',
+    'suffix',
+    'color',
+    'icon',
+    'label',
+    'trend',
+  ] as const) {
+    if (rawConfig[key] !== undefined) {
+      (passthrough as Record<string, unknown>)[key] = rawConfig[key];
+    }
+  }
 
   const isModelTableShorthand =
     type === 'smart-table-chart' &&
