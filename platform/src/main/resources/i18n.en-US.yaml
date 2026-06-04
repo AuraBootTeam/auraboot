@@ -316,6 +316,8 @@ automation:
     scheduled.desc: Triggered according to Cron expression
     webhook: Webhook
     webhook.desc: Triggered when an external Webhook request is received
+    bpmEvent: On BPM Event
+    bpmEvent.desc: Triggered when a BPM process event occurs (process started, task completed, etc.)
 
   # Actions
   action:
@@ -404,6 +406,14 @@ automation:
     collection.desc: Array or list to iterate over
     itemVariable: Item Variable Name
     itemVariable.desc: Variable name for current element, default is item
+    bpmProcess: BPM Process
+    eventTypes: Event Types
+    eventTypes.desc: Leave empty to trigger on all event types
+    eventTypes.process_started: Process Started
+    eventTypes.process_ended: Process Ended
+    eventTypes.task_created: Task Created
+    eventTypes.task_completed: Task Completed
+    eventTypes.task_assigned: Task Assigned
 
 # Auth
 auth:

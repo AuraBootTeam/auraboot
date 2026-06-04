@@ -161,6 +161,8 @@ automation:
     scheduled.desc: Cron 式に従って定期実行
     webhook: Webhook トリガー
     webhook.desc: 外部 Webhook リクエストを受信したときに実行
+    bpmEvent: BPM イベント トリガー
+    bpmEvent.desc: BPM プロセスイベント発生時に実行（プロセス開始・タスク完了など）
 
   # Actions
   action:
@@ -249,6 +251,14 @@ automation:
     collection.desc: 反復処理する配列またはリスト
     itemVariable: 要素変数名
     itemVariable.desc: 現在の要素の変数名（デフォルト：item）
+    bpmProcess: BPM プロセス
+    eventTypes: イベントタイプ
+    eventTypes.desc: 空欄の場合はすべてのイベントタイプを監視
+    eventTypes.process_started: Process Started
+    eventTypes.process_ended: Process Ended
+    eventTypes.task_created: Task Created
+    eventTypes.task_completed: Task Completed
+    eventTypes.task_assigned: Task Assigned
 
 # Auth
 auth:
