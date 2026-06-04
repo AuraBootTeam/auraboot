@@ -110,6 +110,7 @@ public class IotDeviceAccessorImpl implements BackgroundDeviceAccessor {
 
     private DeviceView toView(Map<String, Object> row) {
         return new DeviceView(
+                asString(row.get("pid")),
                 asString(row.get(COL_IOT_ID)),
                 asString(row.get(COL_DEVICE_CODE)),
                 asString(row.get(COL_PRODUCT_KEY)),

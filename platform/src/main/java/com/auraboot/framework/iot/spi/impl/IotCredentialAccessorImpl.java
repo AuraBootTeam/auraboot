@@ -115,7 +115,11 @@ public class IotCredentialAccessorImpl implements BackgroundIotCredentialAccesso
         patch.put("iot_d_acl_pattern", joinPatterns(aclPatterns));
 
         withTenant(tenantId, () -> {
-            dynamicDataService.update(IotDeviceAccessorImpl.MODEL_CODE, device.iotId(), patch);
+            // Use device.recordId() (the row PID) as the update key, not device.iotId():
+            // DynamicDataServiceImpl.update resolves the record by primary-key field ('pid'),
+            // so passing the iot_d_iot_id business value would always fail with
+            // "Record not found" for any device whose pid != iotId.
+            dynamicDataService.update(IotDeviceAccessorImpl.MODEL_CODE, device.recordId(), patch);
             return null;
         });
 
@@ -156,7 +160,7 @@ public class IotCredentialAccessorImpl implements BackgroundIotCredentialAccesso
         patch.put("iot_d_status", "DISABLE");
         patch.put("iot_d_credentials_enc", null);
         withTenant(tenantId, () -> {
-            dynamicDataService.update(IotDeviceAccessorImpl.MODEL_CODE, device.iotId(), patch);
+            dynamicDataService.update(IotDeviceAccessorImpl.MODEL_CODE, device.recordId(), patch);
             return null;
         });
 

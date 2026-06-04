@@ -26,11 +26,11 @@ class BackgroundDeviceAccessorContractTest {
     void setUp() {
         accessor = new InMemoryDeviceAccessor();
         accessor.put(new DeviceView(
-                "iot-A-001", "sensor-A", "temp-product",
+                "pid-A-001", "iot-A-001", "sensor-A", "temp-product",
                 100L, "ONLINE", "/sys/temp-product/sensor-A/#",
                 Map.of("zone", "north"), Instant.parse("2026-05-28T00:00:00Z")));
         accessor.put(new DeviceView(
-                "iot-B-002", "sensor-A", "temp-product",
+                "pid-B-002", "iot-B-002", "sensor-A", "temp-product",
                 200L, "OFFLINE", "/sys/temp-product/sensor-A/#",
                 Map.of(), null));
     }
