@@ -174,6 +174,25 @@ export interface WidgetConfig {
   table?: Record<string, unknown>;
   /** Optional default sort applied client-side (e.g. for table widgets). */
   defaultSort?: { field: string; order: 'asc' | 'desc' };
+  /**
+   * Multi-KPI configuration for `smart-number-card`. Each entry binds one column from
+   * the data source row to a labelled tile; `label` carries the human-readable eyebrow
+   * (string or LocalizedText) so the card never falls back to the raw query field code.
+   */
+  cards?: Array<Record<string, unknown>>;
+  /** Pick a specific column for a single-value number card (vs. the first metric). */
+  metricField?: string;
+  /** Number-card value formatting / presentation passthrough. */
+  format?: 'number' | 'currency' | 'percent';
+  precision?: number;
+  currency?: string;
+  prefix?: string;
+  suffix?: string;
+  color?: string;
+  icon?: string;
+  /** Single-card eyebrow override (string or LocalizedText). */
+  label?: DashboardText;
+  trend?: Record<string, unknown>;
 }
 
 /**
