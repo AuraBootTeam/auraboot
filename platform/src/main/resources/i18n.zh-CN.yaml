@@ -43,6 +43,8 @@ common:
   my_records: 我的记录
   created_today: 今日新建
   modified_this_week: 本周修改
+  options_load_failed: 选项加载失败
+  retry: 重试
 
   query_conditions: 查询条件
   reset: 重置
