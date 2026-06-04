@@ -256,9 +256,11 @@ public class PluginImportController {
                     .build());
         }
 
-        log.info("Importing plugin from directory (sync): {}", normalizedPath);
+        boolean deferReferenceValidation = Boolean.TRUE.equals(request.getDeferReferenceValidation());
+        log.info("Importing plugin from directory (sync): {} (deferReferenceValidation={})",
+                normalizedPath, deferReferenceValidation);
 
-        ImportPreviewResult preview = importService.parseDirectory(normalizedPath.toString());
+        ImportPreviewResult preview = importService.parseDirectory(normalizedPath.toString(), deferReferenceValidation);
         if (!preview.isValid()) {
             return ResponseEntity.badRequest().body(ImportExecuteResult.builder()
                     .success(false)
@@ -302,6 +304,11 @@ public class PluginImportController {
         private Boolean autoPublishCommands;
         private Boolean autoPublishPages;
         private Boolean createResourcePermissions;
+        // When true, cross-plugin command/binding → model references that cannot be resolved yet
+        // are deferred to the closing reference-integrity sweep instead of failing the import.
+        // Used by batch cold-reset of cyclic plugin sets (e.g. crm↔sales). See
+        // PluginImportService.verifyImportReferenceIntegrity().
+        private Boolean deferReferenceValidation;
     }
 
     // ==================== Preview ====================
@@ -581,6 +588,20 @@ public class PluginImportController {
                 "errors", errors,
                 "conflicts", conflicts,
                 "dependencies", dependencies
+        ));
+    }
+
+    @PostMapping("/verify-reference-integrity")
+    @Operation(summary = "Closing reference-integrity sweep",
+            description = "Run after a batch cold-reset that imported a cyclic plugin set with "
+                    + "deferReferenceValidation=true. Reports every command whose modelCode resolves "
+                    + "to no model now that the whole batch is imported. 'valid' is false when any "
+                    + "dangling reference remains so the orchestrator can fail the reset.")
+    public ResponseEntity<Map<String, Object>> verifyReferenceIntegrity() {
+        List<String> danglingReferences = importService.verifyImportReferenceIntegrity();
+        return ResponseEntity.ok(Map.of(
+                "valid", danglingReferences.isEmpty(),
+                "danglingReferences", danglingReferences
         ));
     }
 }

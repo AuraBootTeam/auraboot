@@ -43,8 +43,16 @@ public class CrossReferenceValidator implements PluginValidator {
         Set<String> availableFields = buildAvailableFields(manifest, ctx);
         Set<String> availablePermissions = buildAvailablePermissions(manifest, ctx);
 
-        checkCommandModelRefs(manifest, availableModels, messages);
-        checkBindingRefs(manifest, availableModels, availableFields, messages);
+        // Two-phase cross-plugin reference handling: in a batch cold-reset of a cyclic plugin
+        // set (e.g. crm↔sales), a command/binding may legitimately reference a model owned by
+        // another plugin not yet imported in the same pass. When deferral is on, those model
+        // references are downgraded from hard errors to deferred warnings; the truly-dangling
+        // case (a model provided by no plugin at all) is re-enforced afterwards by the closing
+        // reference-integrity sweep (PluginImportService.verifyImportReferenceIntegrity).
+        boolean defer = Boolean.TRUE.equals(ctx.getDeferReferenceValidation());
+
+        checkCommandModelRefs(manifest, availableModels, defer, messages);
+        checkBindingRefs(manifest, availableModels, availableFields, defer, messages);
         checkMenuPermissionRefs(manifest, availablePermissions, messages);
 
         return messages;
@@ -96,7 +104,7 @@ public class CrossReferenceValidator implements PluginValidator {
     }
 
     private void checkCommandModelRefs(PluginManifestExtended manifest, Set<String> availableModels,
-                                        List<PluginValidationMessage> messages) {
+                                        boolean defer, List<PluginValidationMessage> messages) {
         if (manifest.getCommands() == null) return;
 
         for (int i = 0; i < manifest.getCommands().size(); i++) {
@@ -104,16 +112,21 @@ public class CrossReferenceValidator implements PluginValidator {
             if (cmd == null || cmd.getModelCode() == null) continue;
 
             if (!availableModels.contains(cmd.getModelCode())) {
-                messages.add(error("S-REF-MODEL", category(),
-                        "commands[" + i + "].modelCode",
-                        "Command '" + cmd.getCode() + "' references non-existent model '" +
-                                cmd.getModelCode() + "'"));
+                String path = "commands[" + i + "].modelCode";
+                String text = "Command '" + cmd.getCode() + "' references non-existent model '" +
+                        cmd.getModelCode() + "'";
+                // Cross-plugin model reference: deferred to the closing sweep when a cyclic batch
+                // import is in progress, otherwise a hard error.
+                messages.add(defer
+                        ? warning("S-REF-MODEL", category(), path, text)
+                        : error("S-REF-MODEL", category(), path, text));
             }
         }
     }
 
     private void checkBindingRefs(PluginManifestExtended manifest, Set<String> availableModels,
-                                   Set<String> availableFields, List<PluginValidationMessage> messages) {
+                                   Set<String> availableFields, boolean defer,
+                                   List<PluginValidationMessage> messages) {
         if (manifest.getModelFieldBindings() == null) return;
 
         for (int i = 0; i < manifest.getModelFieldBindings().size(); i++) {
@@ -121,9 +134,13 @@ public class CrossReferenceValidator implements PluginValidator {
             if (binding == null) continue;
 
             if (binding.getModelCode() != null && !availableModels.contains(binding.getModelCode())) {
-                messages.add(error("S-REF-BINDING-MODEL", category(),
-                        "modelFieldBindings[" + i + "].modelCode",
-                        "Binding references non-existent model '" + binding.getModelCode() + "'"));
+                String path = "modelFieldBindings[" + i + "].modelCode";
+                String text = "Binding references non-existent model '" + binding.getModelCode() + "'";
+                // Only the *model* reference is cross-plugin / deferrable; the field reference below
+                // stays a hard error since fields are owned by the same plugin as their model.
+                messages.add(defer
+                        ? warning("S-REF-BINDING-MODEL", category(), path, text)
+                        : error("S-REF-BINDING-MODEL", category(), path, text));
             }
 
             if (binding.getFieldCode() != null && !availableFields.contains(binding.getFieldCode())) {

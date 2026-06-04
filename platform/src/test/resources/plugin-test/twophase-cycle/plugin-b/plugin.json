@@ -1,0 +1,22 @@
+{
+  "pluginId": "com.test.twophase.plugin-b",
+  "namespace": "tpb",
+  "version": "1.0.0",
+  "displayName": "Two-Phase Cycle Plugin B",
+  "description": "Fixture: declares tp_b_model and a command referencing tp_a_model (owned by plugin A). Together with plugin A this forms a cycle no import order can satisfy without deferral.",
+  "minPlatformVersion": "1.0.0",
+  "pluginType": "config",
+  "fields": [
+    { "code": "tpb_name", "displayName": "Name", "dataType": "string" }
+  ],
+  "models": [
+    { "code": "tp_b_model", "displayName": "TP B Model", "modelType": "entity" }
+  ],
+  "modelFieldBindings": [
+    { "modelCode": "tp_b_model", "fieldCode": "tpb_name", "sequence": 10 }
+  ],
+  "commands": [
+    { "code": "tpb:create", "displayName": "Create B", "modelCode": "tp_b_model", "type": "custom" },
+    { "code": "tpb:use_a", "displayName": "Use A from B", "modelCode": "tp_a_model", "type": "custom" }
+  ]
+}

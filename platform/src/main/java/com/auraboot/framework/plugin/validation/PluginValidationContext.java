@@ -34,6 +34,23 @@ public class PluginValidationContext {
     @Builder.Default
     private Boolean validateReferences = true;
 
+    /**
+     * Whether command/binding → model references that cannot be resolved yet should be
+     * downgraded from hard errors to deferred warnings.
+     *
+     * <p>Enabled by batch cold-reset imports where a cyclic set of plugins (e.g.
+     * crm↔sales) is imported in a single pass: a command may legitimately reference a
+     * model that is owned by another plugin not yet imported in the same batch. The
+     * truly-dangling case (a model provided by no plugin) is re-enforced afterwards by
+     * the closing reference-integrity sweep
+     * ({@code PluginImportService.verifyImportReferenceIntegrity}).
+     *
+     * <p>Default {@code false}: single-plugin imports, the UI, and {@code aura plugin
+     * validate} keep the original strict "references non-existent model" error.
+     */
+    @Builder.Default
+    private Boolean deferReferenceValidation = false;
+
     /** Model codes that already exist in the tenant (installed by other plugins or manually). */
     private Set<String> installedModelCodes;
 
