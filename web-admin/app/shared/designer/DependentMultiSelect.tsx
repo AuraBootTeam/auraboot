@@ -11,6 +11,7 @@ import type { FieldAdapter } from '~/ui/field-adapter';
 import { fetchDictOptions, fetchFieldOptions } from '~/shared/services/resourceSelectService';
 import { useFlowStore } from '~/plugins/core-designer/components/flow-designer-sdk/store';
 import type { ResourceOption } from '~/ui/base-fields/BaseResourceSelect';
+import { useSmartText } from '~/utils/i18n';
 
 export interface DependentMultiSelectProps {
   adapter: FieldAdapter<unknown>;
@@ -38,8 +39,14 @@ export function DependentMultiSelect({
   const node = nodes.find((n) => n.id === selectedNodeId);
   const parentValue = (node?.data.config?.[dependsOnKey] as string) || '';
 
+  const st = useSmartText();
+  // Stable ref so doFetch callback does not need st as a dependency
+  const stRef = useRef(st);
+  stRef.current = st;
+
   const [options, setOptions] = useState<ResourceOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [isOpen, setIsOpen] = useState(false);
 
@@ -53,6 +60,7 @@ export function DependentMultiSelect({
     if (prevParentRef.current && prevParentRef.current !== parentValue) {
       adapter.setValue([] as any);
       setOptions([]);
+      setLoadError(null);
     }
     prevParentRef.current = parentValue;
   }, [parentValue, adapter]);
@@ -61,9 +69,11 @@ export function DependentMultiSelect({
   const doFetch = useCallback(async () => {
     if (!parentValue) {
       setOptions([]);
+      setLoadError(null);
       return;
     }
     setLoading(true);
+    setLoadError(null);
     try {
       let fetched: ResourceOption[] = [];
       if (optionSource === 'dict') {
@@ -73,8 +83,9 @@ export function DependentMultiSelect({
         fetched = await fetchFieldOptions(parentValue);
       }
       setOptions(fetched);
-    } catch {
-      setOptions([]);
+    } catch (err) {
+      console.error('[DependentMultiSelect] failed to load options', err);
+      setLoadError(stRef.current('$i18n:common.options_load_failed', 'Failed to load options'));
     } finally {
       setLoading(false);
     }
@@ -124,6 +135,25 @@ export function DependentMultiSelect({
         {label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>}
         <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
           Please select a {parentLabel} first
+        </div>
+        {helpText && <p className="mt-1 text-xs text-gray-500">{helpText}</p>}
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        {label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>}
+        <div className="flex items-center gap-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-600">
+          <span className="flex-1">{loadError}</span>
+          <button
+            type="button"
+            onClick={doFetch}
+            className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-100 focus:outline-none"
+          >
+            {st('$i18n:common.retry', 'Retry')}
+          </button>
         </div>
         {helpText && <p className="mt-1 text-xs text-gray-500">{helpText}</p>}
       </div>

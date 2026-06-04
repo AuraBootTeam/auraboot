@@ -71,6 +71,7 @@ function LogEntry({ log, token }: { log: AutomationLog; token?: string | null })
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<AutomationLog | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   const handleToggle = async () => {
     if (expanded) {
@@ -81,14 +82,21 @@ function LogEntry({ log, token }: { log: AutomationLog; token?: string | null })
     if (!detail && !log.actionResults?.length) {
       try {
         setLoadingDetail(true);
+        setDetailError(null);
         const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
         const resp = await fetch(`${BASE_URL}/logs/${log.pid}`, { headers });
         if (resp.ok) {
           const result = await resp.json();
           setDetail(result.data);
+        } else {
+          const msg = `Failed to load details (HTTP ${resp.status})`;
+          console.error('[ExecutionLogDialog] detail load failed', resp.status, log.pid);
+          setDetailError(msg);
         }
-      } catch {
-        // Silently fail - show whatever we have
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to load details';
+        console.error('[ExecutionLogDialog] detail load error', err);
+        setDetailError(msg);
       } finally {
         setLoadingDetail(false);
       }
@@ -132,6 +140,8 @@ function LogEntry({ log, token }: { log: AutomationLog; token?: string | null })
         <div className="border-t border-gray-100 bg-gray-50 py-2">
           {loadingDetail ? (
             <div className="px-4 py-2 text-sm text-gray-400">Loading...</div>
+          ) : detailError ? (
+            <div className="px-4 py-2 text-sm text-red-500">{detailError}</div>
           ) : actions.length > 0 ? (
             <div className="divide-y divide-gray-100">
               {actions.map((action, idx) => (
