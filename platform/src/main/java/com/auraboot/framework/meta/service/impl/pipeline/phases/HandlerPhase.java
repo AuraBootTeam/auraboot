@@ -292,21 +292,17 @@ public class HandlerPhase implements CommandPhase {
 
         String handlerCode = resolvePluginHandlerCode(commandCode, execConfig);
         Optional<CommandHandlerExtension> pluginHandler = extensionRegistry.getCommandHandler(handlerCode);
-        if (pluginHandler.isEmpty()) {
+        // Opt-in secondaries chain AFTER the primary (same transaction + context). Empty for every
+        // command with no opt-in secondaries, i.e. every command today — so this is a no-op now.
+        List<CommandHandlerExtension> secondaryHandlers = extensionRegistry.getSecondaryCommandHandlers(handlerCode);
+        if (pluginHandler.isEmpty() && secondaryHandlers.isEmpty()) {
             log.debug("No plugin command handler found for: {} (command={})", handlerCode, commandCode);
             return;
         }
 
-        CommandHandlerExtension handler = pluginHandler.get();
-
-        // PR-56: gate plugin handlers on the supportsDryRun() SPI method.
-        // Plugins that do not explicitly opt in are skipped under dry-run
-        // because external side effects escape the JDBC rollback envelope.
-        if (request.isDryRun() && !handler.supportsDryRun()) {
-            log.info("Dry-run: skipping plugin handler {} for command {} (supportsDryRun()=false)",
-                    handler.getClass().getName(), handlerCode);
-            return;
-        }
+        // The primary may be absent when a command is otherwise declarative (e.g. a pure
+        // state-transition) but a downstream plugin chains a secondary onto it.
+        CommandHandlerExtension handler = pluginHandler.orElse(null);
 
         Map<String, Object> asyncHandlerParams = resolveHandlerParams(execConfig);
 
@@ -315,7 +311,9 @@ public class HandlerPhase implements CommandPhase {
         // Excel imports) finish in the background instead of blocking the HTTP
         // request and tripping the BFF proxy 30s timeout (502). Dry-run stays
         // synchronous — its side effects must roll back inside the JDBC envelope.
-        if (!request.isDryRun() && isAsyncHandler(asyncHandlerParams) && asyncTaskService != null) {
+        // Async dispatch applies to the primary only; chained secondaries are for
+        // synchronous, same-transaction side effects and are not run on the async path.
+        if (handler != null && !request.isDryRun() && isAsyncHandler(asyncHandlerParams) && asyncTaskService != null) {
             String effectiveRecordId = resolveEffectiveRecordId(request, fieldMapResults);
             String taskCode = submitAsyncHandlerTask(handlerCode, commandCode, modelCode,
                     effectiveRecordId, payload, asyncHandlerParams,
@@ -337,8 +335,9 @@ public class HandlerPhase implements CommandPhase {
             return;
         }
 
-        log.info("Executing plugin command handler for: {} (command={}, handler={})",
-                handlerCode, commandCode, handler.getClass().getName());
+        log.info("Executing plugin command handler for: {} (command={}, primary={}, secondaries={})",
+                handlerCode, commandCode,
+                handler != null ? handler.getClass().getName() : "<none>", secondaryHandlers.size());
 
         try {
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
@@ -371,15 +370,46 @@ public class HandlerPhase implements CommandPhase {
                     .dryRun(request.isDryRun())
                     .build();
 
-            Object result = handler.execute(pluginContext);
+            // Primary handler (if any). Gated per-handler on supportsDryRun() (PR-56): a primary
+            // that is not dry-run-safe is skipped under dry-run because external side effects
+            // escape the JDBC rollback envelope.
+            if (handler != null) {
+                if (request.isDryRun() && !handler.supportsDryRun()) {
+                    log.info("Dry-run: skipping primary handler {} for command {} (supportsDryRun()=false)",
+                            handler.getClass().getName(), handlerCode);
+                } else {
+                    Object result = handler.execute(pluginContext);
+                    if (result instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> resultMap = (Map<String, Object>) result;
+                        handlerResults.putAll(resultMap);
+                        log.info("Plugin handler returned {} entries", resultMap.size());
+                    } else if (result != null) {
+                        handlerResults.put("pluginResult", result);
+                    }
+                }
+            }
 
-            if (result instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> resultMap = (Map<String, Object>) result;
-                handlerResults.putAll(resultMap);
-                log.info("Plugin handler returned {} entries", resultMap.size());
-            } else if (result != null) {
-                handlerResults.put("pluginResult", result);
+            // Chained secondaries run after the primary, in priority order, sharing the same
+            // context (and DataAccessor) and the same command transaction. A secondary that
+            // throws propagates out and rolls back the whole command (intended atomicity). Their
+            // result keys are merged without clobbering the primary's (putIfAbsent).
+            for (CommandHandlerExtension secondary : secondaryHandlers) {
+                if (request.isDryRun() && !secondary.supportsDryRun()) {
+                    log.info("Dry-run: skipping secondary handler {} for command {} (supportsDryRun()=false)",
+                            secondary.getClass().getName(), handlerCode);
+                    continue;
+                }
+                log.info("Executing chained secondary handler {} for command {}",
+                        secondary.getClass().getName(), handlerCode);
+                Object secResult = secondary.execute(pluginContext);
+                if (secResult instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> secMap = (Map<String, Object>) secResult;
+                    secMap.forEach(handlerResults::putIfAbsent);
+                    log.info("Secondary handler {} returned {} entries",
+                            secondary.getClass().getSimpleName(), secMap.size());
+                }
             }
 
         } catch (Exception e) {
