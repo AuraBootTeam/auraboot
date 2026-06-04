@@ -126,6 +126,14 @@ If HTML5 drag: dispatch `dragstart` on the palette item, `dragover`+`drop` on th
 
 ---
 
+> **Phase-0 progress (2026-06-05, in-session):**
+> - ✅ 0.1 drag mechanism = HTML5 native drag (key `application/flow-node`).
+> - ✅ 0.2/0.2b testids added (commit 7a4d632fc): `palette-node-<type>`, `flow-node-<id>` (pre-existing), `node-handle-source/target-<id>` (+ condition `-true`/`-false`), `prop-field-<key>`, `designer-save`. **No in-designer enable control** → enable via list `btn-toggle-<pid>` (UI) or `/enable` API.
+> - ✅ 0.6 palette-coverage test (110 assertions, 18 types) green.
+> - ✅ 0.5 harness first cut committed (`flow-designer-harness.ts`, db26f9923) — UI helpers smoke-PENDING.
+> - 🟡 0.3 GA E2E stack: bring-up in progress (`docker-ga-e2e-up.sh` → start-isolated --slug=ga-e2e; backend builds in-container; disk accepted-risk at ~26Gi). **Finding: the stack rsyncs frontend from CANONICAL `auraboot/web-admin/` → `auraboot-enterprise/build/web-admin-overlaid/`, NOT this worktree.** So A's testids are NOT in the stack's frontend build. **At smoke time: cp the testid-changed files from the worktree into the live overlay build dir (`auraboot-enterprise/build/web-admin-overlaid/...`) → vite HMR picks them up** (per reference-overlay-frontend-docker-mount). Do NOT leave changes in canonical.
+> - ⏳ 0.4 e2et_order verify + 0.5 step-5 harness smoke: pending stack-up.
+
 ## Phase 1 — Layer A: real drag-drop user journey (happy + UI sad/edge)
 
 > All tasks use the Phase-0 harness. Each is a Playwright test in `automation-designer-golden.spec.ts`. TDD here = write the test (it fails until the flow works), run against the stack, make green, screenshot-review, commit.
