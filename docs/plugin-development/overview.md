@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Plugin Development Overview
 
 AuraBoot's plugin system lets you extend the platform with new business modules, custom logic, and UI components -- without modifying core source code. This document covers the architecture, plugin types, lifecycle, and how to choose the right approach for your use case.

@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Models & Fields
 
 Models and fields are the foundation of every AuraBoot application. A model defines a business entity (like a Contract, Employee, or Task), and fields define the attributes of that entity. Together, they drive the database schema, API behavior, form rendering, and validation -- all from a single JSON definition.

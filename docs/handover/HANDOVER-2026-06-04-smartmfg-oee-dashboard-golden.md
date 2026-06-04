@@ -1,3 +1,9 @@
+---
+type: handover
+status: active
+created: 2026-06-04
+---
+
 # Session Handover - 2026-06-04
 
 > Source-of-truth detail + reusable bringup recipe: `~/.claude/plans/2026-06-04-smartmfg-golden-build.md` (see UPDATE + UPDATE 2 sections — the body below them is STALE).

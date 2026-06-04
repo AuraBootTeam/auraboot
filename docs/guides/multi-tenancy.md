@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Multi-Tenancy
 
 Understand AuraBoot's row-level tenant isolation, provision new tenants, and manage cross-tenant administration.

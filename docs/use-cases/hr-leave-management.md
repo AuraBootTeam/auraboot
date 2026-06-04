@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # HR Leave Management
 
 > Employee leave requests, multi-level approvals, balance tracking, and BPM workflow integration -- built with AuraBoot DSL configuration and the "HR Essentials" template.

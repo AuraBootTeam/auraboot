@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-28
+---
+
 # B2c — useBPMNStore → useFlowStore Migration (Phase 1 Checkpoint)
 
 **Date**: 2026-05-28

@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-29
+---
+
 # T4 cutover session — B2c phase3 batch2 complete; B2d (mount-side cutover) pending
 
 **Session date**: 2026-05-29

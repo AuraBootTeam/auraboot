@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Public Demo Mode
 
 > Operations guide for running AuraBoot as a public demo (e.g. demo.auraboot.com).

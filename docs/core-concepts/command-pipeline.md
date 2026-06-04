@@ -1,3 +1,7 @@
+---
+type: system-reference
+status: active
+---
 
 # Command Pipeline
 

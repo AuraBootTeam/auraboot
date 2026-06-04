@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-28
+---
+
 # A1 — flow-designer-sdk JSON Schema validator + CLI lint — report
 
 > Date: 2026-05-28 · Author: subagent · Branch: `wt/sdk-schema-lint` · Spec: [`2026-05-23-unified-graph-grammar-spec.md`](./2026-05-23-unified-graph-grammar-spec.md) · DDR: [`DDR-2026-05-23-automation-bpm-designer-convergence.md`](./DDR-2026-05-23-automation-bpm-designer-convergence.md)

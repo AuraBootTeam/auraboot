@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Dashboards -- Charts & KPIs
 
 Build data-rich dashboards with charts, stat cards, and tables to monitor business metrics. AuraBoot provides two approaches: **DSL Dashboards** (page schema blocks) and the **Dashboard Designer** (drag-and-drop builder).

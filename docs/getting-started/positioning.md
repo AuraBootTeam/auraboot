@@ -1,4 +1,6 @@
 ---
+type: product-doc
+status: active
 title: "产品定位"
 description: "AuraBoot 是什么、不是什么，以及它在数据应用构建器和成熟业务套件之间的位置"
 order: 1

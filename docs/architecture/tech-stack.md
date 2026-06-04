@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Technology Stack
 
 AuraBoot's technology choices prioritize stability, developer productivity, and long-term maintainability. Every component is chosen for a specific reason.

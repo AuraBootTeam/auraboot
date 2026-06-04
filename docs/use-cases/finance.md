@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Financial Management
 
 > Invoicing, accounts payable/receivable, payments, bank reconciliation, cost accounting, and tax compliance -- built entirely with AuraBoot DSL configuration.

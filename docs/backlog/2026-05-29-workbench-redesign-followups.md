@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-29
+---
+
 # Workbench Redesign — Follow-up Backlog
 
 **Source PR:** [#336](https://github.com/AuraBootTeam/auraboot/pull/336)

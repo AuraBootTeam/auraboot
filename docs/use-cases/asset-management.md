@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Asset Management
 
 > Equipment tracking, maintenance scheduling, lifecycle management, and depreciation -- mostly configured through AuraBoot's DSL plugin system.

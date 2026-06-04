@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Full-Stack Plugin Guide
 
 This guide walks through building a complete full-stack plugin that combines config (DSL), backend (PF4J Java), and frontend (Module Federation React) into a single distributable package. The example builds a **Document Approval** plugin.

@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Getting Started (OSS Core)
 
 This guide gets a fresh clone of the AuraBoot open-source core running on your laptop in a few minutes. It targets contributors and evaluators who want to try the core without the enterprise repo.

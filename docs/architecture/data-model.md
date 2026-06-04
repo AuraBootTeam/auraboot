@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Data Model
 
 AuraBoot uses PostgreSQL 16 with two categories of tables: **metadata tables** (`ab_*` prefix) that store DSL definitions and platform configuration, and **dynamic tables** (`mt_*` prefix) that store business data created at runtime.

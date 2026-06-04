@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-29
+---
+
 # BPM 流程定义页 `bpm_process_management` 空壳 (autoCreateDefaultPages stub)
 
 **Status**: **CLOSED — NOT REPRODUCIBLE** (2026-05-29 17:00)

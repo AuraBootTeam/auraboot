@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Procurement Management
 
 > Purchase orders, supplier management, receipts, returns, outsourcing, three-way matching, supplier scorecards, contract lifecycle, and spend analysis -- all driven by DSL configuration.

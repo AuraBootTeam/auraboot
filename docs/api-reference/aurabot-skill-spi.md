@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # AuraBot Skill SPI
 
 **Status**: Stable (C-2 batch shipped 2026-05-08, OSS branch `aurabot-skill-spi-c2`).

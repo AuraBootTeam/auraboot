@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-29
+---
+
 # OSS isolated stack 缺 `TimeSeriesPort` bean — 阻塞所有 OSS E2E
 
 **Status**: OPEN

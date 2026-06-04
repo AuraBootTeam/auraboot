@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-28
+---
+
 # B2a — flow-designer-sdk G7+G8 gap fill (2026-05-28)
 
 Status: PR-ready (no PR opened — main worktree decides merge order with A1/A3).

@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # R2-style Isolated Docker Stack — SOP
 
 **Purpose:** safely run OSS Playwright suites against an isolated docker

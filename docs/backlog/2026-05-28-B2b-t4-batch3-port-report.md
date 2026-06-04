@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-28
+---
+
 # T4 B2b batch3 — pickers + shared.tsx + CallActivity + edge editor port report
 
 **Date**: 2026-05-28

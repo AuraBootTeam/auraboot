@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Pages & Layouts
 
 Pages define how data is presented to users. Every page in AuraBoot is a JSON configuration that specifies a **kind** (what the page does), a list of **blocks** (what content it shows), and a **layout** (how blocks are arranged). The platform renders pages dynamically from these configurations -- no custom React components needed for standard business CRUD.

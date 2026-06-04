@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # GA-E2E Docker Stack — Operator Notes
 
 A fully isolated OSS test stack on non-default host ports. Use it when you want to run Playwright (or curl-driven sanity checks) against a clean backend without disturbing the dev `bootRun` (6443) or `pnpm dev:full` (5173/3500) you have running for daily work.

@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Data Import & Export
 
 Import data from CSV/Excel files, create records in bulk via the CLI, and export data from list pages.

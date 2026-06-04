@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Architecture Overview
 
 AuraBoot is a full-stack platform for building business applications through declarative DSL configuration. This document describes the system architecture, request flow, and extension points.

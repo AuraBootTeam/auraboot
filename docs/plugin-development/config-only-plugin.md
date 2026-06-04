@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Config-Only Plugin Tutorial
 
 This is a step-by-step tutorial for building a small AuraBoot plugin using JSON configuration files. By the end, you will have a working **Task Tracker** with:

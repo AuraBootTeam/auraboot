@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Upgrading AuraBoot
 
 This guide covers the process for upgrading AuraBoot to a new version, including database migrations, plugin compatibility, and rollback procedures.

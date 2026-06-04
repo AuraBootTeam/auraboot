@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Notifications
 
 Configure email, in-app, and webhook notifications triggered by business events, automations, and workflow tasks.
