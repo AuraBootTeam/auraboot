@@ -82,14 +82,26 @@ public class EmqxAclSyncService {
         }
         validateBasics(tenantId, username);
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("user_id", username);
-        body.put("password", passwordOrPublicKey);
-        body.put("is_superuser", false);
-
-        String path = "/api/v5/authentication/" + uri(props.getAuthenticatorId())
-                + "/users/" + uri(username);
-        callWithRetry("PUT", path, body, "upsert device user");
+        // EMQX built-in-DB user upsert: POST /users creates (user_id in body); on 409
+        // the user already exists, so PUT /users/{user_id} updates (NO user_id in body —
+        // it lives in the path, and EMQX rejects it as an unknown field otherwise).
+        String authBase = "/api/v5/authentication/" + uri(props.getAuthenticatorId());
+        Map<String, Object> createBody = new LinkedHashMap<>();
+        createBody.put("user_id", username);
+        createBody.put("password", passwordOrPublicKey);
+        createBody.put("is_superuser", false);
+        try {
+            callWithRetry("POST", authBase + "/users", createBody, "upsert device user");
+        } catch (MetaServiceException e) {
+            if (e.getMessage() != null && e.getMessage().contains("status=409")) {
+                Map<String, Object> updateBody = new LinkedHashMap<>();
+                updateBody.put("password", passwordOrPublicKey);
+                updateBody.put("is_superuser", false);
+                callWithRetry("PUT", authBase + "/users/" + uri(username), updateBody, "upsert device user");
+            } else {
+                throw e;
+            }
+        }
 
         if (aclPatterns != null && !aclPatterns.isEmpty()) {
             pushAclRules(username, aclPatterns);
@@ -183,9 +195,15 @@ public class EmqxAclSyncService {
     }
 
     private void doCall(String method, String path, Object body) {
+        // Build an absolute URI by prepending the configured base URL to the (already
+        // percent-encoded) path. WebClient's uri(URI) overload uses the URI as-is —
+        // which both (a) honours the host/port here and (b) preserves our single
+        // encoding (the authenticatorId's ':' was encoded once by uri()). Passing the
+        // relative path alone made WebClient ignore iot.emqx.base-url (→ localhost:80);
+        // passing it via uri(String) double-encoded the path (':' → %3A → %253A).
         WebClient.RequestBodySpec req = webClient
                 .method(org.springframework.http.HttpMethod.valueOf(method))
-                .uri(URI.create(path));
+                .uri(URI.create(props.getBaseUrl() + path));
         if (body != null) {
             req.bodyValue(toJson(body));
         }
