@@ -66,7 +66,28 @@ public class ExtensionRegistry {
     public Optional<CommandHandlerExtension> getCommandHandler(String commandType) {
         return getAllCommandHandlers().stream()
                 .filter(h -> h.supports(commandType))
+                // A chained secondary never participates in primary selection; the primary is the
+                // highest-priority handler that does NOT chain after the primary. Existing handlers
+                // all return false, so this is the historical winner-take-all selection unchanged.
+                .filter(h -> !h.chainsAfterPrimary())
                 .max(Comparator.comparingInt(CommandHandlerExtension::getPriority));
+    }
+
+    /**
+     * Get the secondary (chained) handlers for a command type — handlers that opt in via
+     * {@link CommandHandlerExtension#chainsAfterPrimary()} and run after the primary, in
+     * descending priority order. Empty for every command that has no opt-in secondaries (i.e.
+     * every command today).
+     *
+     * @param commandType the command type
+     * @return chained secondary handlers, highest priority first (possibly empty)
+     */
+    public List<CommandHandlerExtension> getSecondaryCommandHandlers(String commandType) {
+        return getAllCommandHandlers().stream()
+                .filter(h -> h.supports(commandType))
+                .filter(CommandHandlerExtension::chainsAfterPrimary)
+                .sorted(Comparator.comparingInt(CommandHandlerExtension::getPriority).reversed())
+                .toList();
     }
 
     /**

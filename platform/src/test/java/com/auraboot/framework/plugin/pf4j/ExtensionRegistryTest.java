@@ -44,6 +44,12 @@ class ExtensionRegistryTest {
         @Override public Object execute(CommandHandlerExtension.CommandContext context) { return null; }
     }
 
+    /** A command handler that chains after the primary instead of competing to be the primary. */
+    static class TestChainCmd extends TestCmd {
+        TestChainCmd(String type, int priority) { super(type, priority); }
+        @Override public boolean chainsAfterPrimary() { return true; }
+    }
+
     static class TestEvent implements EventListenerExtension {
         private final Set<String> subs;
         private final int order;
@@ -101,6 +107,53 @@ class ExtensionRegistryTest {
         Optional<CommandHandlerExtension> r = registry.getCommandHandler("ship");
         assertThat(r).isPresent().get().isSameAs(high);
         assertThat(registry.getCommandHandler("nope")).isEmpty();
+    }
+
+    @Test
+    void getCommandHandler_excludes_chained_secondaries_from_primary_selection() {
+        // a chained secondary with HIGHER priority must NOT be picked as the primary; the primary
+        // is the highest-priority handler that does not chain after the primary.
+        TestCmd primary = new TestCmd("pay", 5);
+        TestChainCmd secondaryHigherPriority = new TestChainCmd("pay", 100);
+        when(pluginManager.getExtensionsOfType(eq(CommandHandlerExtension.class)))
+                .thenReturn(List.of(secondaryHigherPriority, primary));
+        registry.refreshAllCaches();
+
+        assertThat(registry.getCommandHandler("pay")).isPresent().get().isSameAs(primary);
+    }
+
+    @Test
+    void getCommandHandler_empty_when_only_chained_secondaries_exist() {
+        // a declarative command (no primary handler) with only chained secondaries has no primary.
+        when(pluginManager.getExtensionsOfType(eq(CommandHandlerExtension.class)))
+                .thenReturn(List.of(new TestChainCmd("approve", 10)));
+        registry.refreshAllCaches();
+
+        assertThat(registry.getCommandHandler("approve")).isEmpty();
+    }
+
+    @Test
+    void getSecondaryCommandHandlers_returns_chainers_in_priority_desc_order() {
+        TestCmd primary = new TestCmd("approve", 5);
+        TestChainCmd secLow = new TestChainCmd("approve", 1);
+        TestChainCmd secHigh = new TestChainCmd("approve", 50);
+        when(pluginManager.getExtensionsOfType(eq(CommandHandlerExtension.class)))
+                .thenReturn(List.of(secLow, primary, secHigh));
+        registry.refreshAllCaches();
+
+        List<CommandHandlerExtension> secondaries = registry.getSecondaryCommandHandlers("approve");
+        // only the chainers, highest priority first; the primary is excluded
+        assertThat(secondaries).containsExactly(secHigh, secLow);
+    }
+
+    @Test
+    void getSecondaryCommandHandlers_empty_when_no_handler_opts_in() {
+        // existing handlers never opt in -> no secondaries -> the chain is a no-op for them.
+        when(pluginManager.getExtensionsOfType(eq(CommandHandlerExtension.class)))
+                .thenReturn(List.of(new TestCmd("ship", 1), new TestCmd("ship", 10)));
+        registry.refreshAllCaches();
+
+        assertThat(registry.getSecondaryCommandHandlers("ship")).isEmpty();
     }
 
     @Test
