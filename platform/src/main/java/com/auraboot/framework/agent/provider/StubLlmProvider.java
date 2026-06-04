@@ -62,6 +62,31 @@ public class StubLlmProvider implements LlmProvider {
      */
     public static final String TOOL_USE_MARKER = "@@AURABOOT_STUB_TOOL_USE@@";
 
+    /**
+     * E2E-only directive. When the latest user message text contains this
+     * marker, the stub delays its synchronous {@link #chat} response (and slows
+     * {@link #streamChat}) by a bounded duration. The marker may be followed by
+     * {@code =<millis>} to override the default; the value is clamped to
+     * {@code [0, }{@link #MAX_STUB_DELAY_MS}{@code ]}.
+     *
+     * <p>Why this exists: the group-agent named-agent turn runs the synchronous
+     * tool loop ({@code ChatTurnRuntime.runToolLoop -> callProvider -> chat()}),
+     * so the {@code delayElements} slow-stream path in {@link #streamChat} never
+     * applies to it. With an instant stub reply, {@code ai_turn_started} and
+     * {@code ai_turn_completed} fire back-to-back and the iOS/Android typing
+     * bubble flashes too fast for a UI test to observe. A bounded delay inside
+     * {@code chat()} keeps the turn observably in-flight so the bubble lifecycle
+     * (started -> ... -> completed -> removed) can be asserted. Test affordance
+     * only — it never fires unless an E2E message explicitly carries the marker.
+     */
+    public static final String DELAY_MARKER = "@@AURABOOT_STUB_DELAY@@";
+
+    /** Default in-flight delay applied when {@link #DELAY_MARKER} has no explicit {@code =millis}. */
+    static final long DEFAULT_STUB_DELAY_MS = 2500L;
+
+    /** Upper bound for the stub reply delay; parsed overrides are clamped to this. */
+    static final long MAX_STUB_DELAY_MS = 10_000L;
+
     /** Fixed response text returned for every chat request. */
     static final String STUB_RESPONSE_TEXT = "[stub response]";
 
@@ -91,6 +116,11 @@ public class StubLlmProvider implements LlmProvider {
 
     @Override
     public LlmChatResponse chat(LlmChatRequest request, String apiKey, String baseUrl) {
+        // E2E observability: keep the turn in-flight long enough for a UI test to
+        // observe the typing-bubble lifecycle. No-op unless the request carries
+        // DELAY_MARKER. onTurnBegin has already fired before chat() is invoked,
+        // so the bubble is visible for the duration of this sleep.
+        applyStubDelay(request);
         LlmChatResponse scripted = scriptedToolUseResponse(request);
         if (scripted != null) {
             return scripted;
@@ -111,6 +141,12 @@ public class StubLlmProvider implements LlmProvider {
         LlmChunk deltaChunk = LlmChunk.delta(0L, STUB_RESPONSE_TEXT);
         LlmChunk doneChunk = LlmChunk.done(1L, aggregate);
         Flux<LlmChunk> stream = Flux.just(deltaChunk, doneChunk);
+        // DELAY_MARKER spreads the two chunks across the requested window so any
+        // streaming caller (SSE bridge, LlmCallExecutor) sees a slow turn too.
+        long delayMs = resolveStubDelayMs(request);
+        if (delayMs > 0) {
+            return stream.delayElements(Duration.ofMillis(Math.max(1L, delayMs / 2)));
+        }
         return shouldSlowVisualStream(request)
                 ? stream.delayElements(Duration.ofMillis(1500))
                 : stream;
@@ -343,18 +379,72 @@ public class StubLlmProvider implements LlmProvider {
     }
 
     private boolean shouldSlowVisualStream(LlmChatRequest request) {
+        String text = latestUserText(request);
+        return text != null && text.contains("WS001 visual stream");
+    }
+
+    /** Text of the most recent {@code user}-role message, or null when absent. */
+    private String latestUserText(LlmChatRequest request) {
         if (request == null || request.getMessages() == null) {
-            return false;
+            return null;
         }
         for (int i = request.getMessages().size() - 1; i >= 0; i--) {
             LlmChatRequest.Message message = request.getMessages().get(i);
             if (message == null || !"user".equals(message.getRole())) continue;
             String text = userText(message);
-            if (text != null && text.contains("WS001 visual stream")) {
-                return true;
+            if (text != null) {
+                return text;
             }
         }
-        return false;
+        return null;
+    }
+
+    /**
+     * Resolve the bounded in-flight delay (ms) requested via {@link #DELAY_MARKER}
+     * in the latest user message. Returns 0 when the marker is absent. An explicit
+     * {@code =<millis>} suffix overrides {@link #DEFAULT_STUB_DELAY_MS}; the result
+     * is clamped to {@code [0, }{@link #MAX_STUB_DELAY_MS}{@code ]}.
+     */
+    long resolveStubDelayMs(LlmChatRequest request) {
+        String text = latestUserText(request);
+        if (text == null) {
+            return 0L;
+        }
+        int marker = text.indexOf(DELAY_MARKER);
+        if (marker < 0) {
+            return 0L;
+        }
+        long delay = DEFAULT_STUB_DELAY_MS;
+        int afterMarker = marker + DELAY_MARKER.length();
+        if (afterMarker < text.length() && text.charAt(afterMarker) == '=') {
+            int j = afterMarker + 1;
+            StringBuilder digits = new StringBuilder();
+            while (j < text.length() && Character.isDigit(text.charAt(j))) {
+                digits.append(text.charAt(j));
+                j++;
+            }
+            if (!digits.isEmpty()) {
+                try {
+                    delay = Long.parseLong(digits.toString());
+                } catch (NumberFormatException ignored) {
+                    delay = DEFAULT_STUB_DELAY_MS;
+                }
+            }
+        }
+        return Math.max(0L, Math.min(delay, MAX_STUB_DELAY_MS));
+    }
+
+    /** Block the calling (async turn) thread for the requested {@link #DELAY_MARKER} window. */
+    private void applyStubDelay(LlmChatRequest request) {
+        long delayMs = resolveStubDelayMs(request);
+        if (delayMs <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(delayMs);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private record ToolUseDirective(int messageIndex, String json) {}
