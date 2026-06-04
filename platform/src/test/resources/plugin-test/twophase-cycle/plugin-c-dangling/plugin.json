@@ -1,0 +1,22 @@
+{
+  "pluginId": "com.test.twophase.plugin-c-dangling",
+  "namespace": "tpc",
+  "version": "1.0.0",
+  "displayName": "Two-Phase Cycle Plugin C (dangling)",
+  "description": "Fixture: declares tp_c_model and a command referencing tp_nonexistent_model which NO plugin provides. Deferral lets it import, but the closing sweep must still flag it.",
+  "minPlatformVersion": "1.0.0",
+  "pluginType": "config",
+  "fields": [
+    { "code": "tpc_name", "displayName": "Name", "dataType": "string" }
+  ],
+  "models": [
+    { "code": "tp_c_model", "displayName": "TP C Model", "modelType": "entity" }
+  ],
+  "modelFieldBindings": [
+    { "modelCode": "tp_c_model", "fieldCode": "tpc_name", "sequence": 10 }
+  ],
+  "commands": [
+    { "code": "tpc:create", "displayName": "Create C", "modelCode": "tp_c_model", "type": "custom" },
+    { "code": "tpc:dangling", "displayName": "Dangling C", "modelCode": "tp_nonexistent_model", "type": "custom" }
+  ]
+}

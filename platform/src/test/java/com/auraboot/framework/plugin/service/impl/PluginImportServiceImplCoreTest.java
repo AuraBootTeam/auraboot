@@ -339,6 +339,153 @@ class PluginImportServiceImplCoreTest {
         assertThat(errors).anyMatch(e -> e.contains("missing permission: perm.missing"));
     }
 
+    // ---------- two-phase cross-plugin reference validation ----------
+
+    /**
+     * Reproduces the cold-reset cyclic-dependency bug: crm declares a command on
+     * {@code sl_sales_quotation} (owned by sales) while sales depends on crm. In a
+     * per-plugin import loop neither order satisfies the other side, so the default
+     * "command references missing model" hard error rolls back the import.
+     *
+     * <p>Default mode (no deferral) MUST keep the hard error — this is the regression
+     * guard proving the fix did not silently weaken validation.
+     */
+    @Test
+    @DisplayName("validateManifest: cross-plugin command->model is a HARD error by default")
+    void validateManifest_crossPluginCommandModel_hardErrorByDefault() {
+        PluginManifestExtended m = baseManifest();
+        m.setPluginId("com.auraboot.crm");
+        m.setNamespace("crm");
+        com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO cmd =
+                new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
+        cmd.setCode("crm:convert_quotation_to_order");
+        cmd.setModelCode("sl_sales_quotation"); // owned by sales, not yet imported
+        cmd.setType("custom");
+        m.setCommands(List.of(cmd));
+
+        when(resourceImporter.checkModelExists(eq(1L), eq("sl_sales_quotation"))).thenReturn(false);
+
+        List<String> errors = service.validateManifest(m);
+
+        assertThat(errors).anyMatch(e ->
+                e.contains("crm:convert_quotation_to_order") && e.contains("sl_sales_quotation"));
+    }
+
+    /**
+     * Assertion 1 (cycle imports): with {@code deferReferenceValidation=true}, the same
+     * cross-plugin command->model reference is downgraded to a deferred warning, so the
+     * plugin is valid and the per-plugin import proceeds. Both sides of a crm↔sales cycle
+     * can therefore import.
+     */
+    @Test
+    @DisplayName("validateManifest: cross-plugin command->model is DEFERRED (no error) when deferral on")
+    void validateManifest_crossPluginCommandModel_deferred() {
+        PluginManifestExtended m = baseManifest();
+        m.setPluginId("com.auraboot.crm");
+        m.setNamespace("crm");
+        com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO cmd =
+                new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
+        cmd.setCode("crm:convert_quotation_to_order");
+        cmd.setModelCode("sl_sales_quotation");
+        cmd.setType("custom");
+        m.setCommands(List.of(cmd));
+
+        when(resourceImporter.checkModelExists(eq(1L), eq("sl_sales_quotation"))).thenReturn(false);
+
+        List<String> messages = service.validateManifest(m, true);
+
+        // No hard error → preview stays valid → import proceeds
+        assertThat(messages).noneMatch(e ->
+                e.contains("references missing model") && !e.startsWith("[WARN] "));
+        // Deferred reference is surfaced as a [WARN] for observability
+        assertThat(messages).anyMatch(e ->
+                e.startsWith("[WARN] ") && e.contains("sl_sales_quotation"));
+    }
+
+    /**
+     * Deferral must NOT mask an intra-manifest typo: a command referencing a model the
+     * plugin itself declares (present in manifest) never errors regardless of mode; and a
+     * command referencing a model already installed in the tenant resolves cleanly.
+     */
+    @Test
+    @DisplayName("validateManifest: command->model satisfied by manifest or DB never errors (deferral on)")
+    void validateManifest_commandModelSatisfied_noErrorWhenDeferred() {
+        PluginManifestExtended m = baseManifest();
+        ModelDefinitionDTO local = new ModelDefinitionDTO();
+        local.setCode("crm_lead");
+        local.setModelType("entity");
+        m.setModels(List.of(local));
+
+        com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO localCmd =
+                new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
+        localCmd.setCode("crm:create_lead");
+        localCmd.setModelCode("crm_lead");
+        localCmd.setType("custom");
+        com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO installedCmd =
+                new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
+        installedCmd.setCode("crm:touch_account");
+        installedCmd.setModelCode("crm_account_installed");
+        installedCmd.setType("custom");
+        m.setCommands(List.of(localCmd, installedCmd));
+
+        when(resourceImporter.checkModelExists(eq(1L), eq("crm_account_installed"))).thenReturn(true);
+
+        List<String> messages = service.validateManifest(m, true);
+
+        // Scope to the command->model reference check (the deferral feature's concern). A bare
+        // contains("crm_lead") would also catch the orthogonal "entity model requires a field
+        // binding" structural rule, which legitimately fires for this minimal fixture and is not
+        // what deferral governs.
+        assertThat(messages).noneMatch(e -> e.contains("references missing model") && e.contains("crm_lead"));
+        assertThat(messages).noneMatch(e ->
+                e.contains("references missing model") && e.contains("crm_account_installed"));
+    }
+
+    /**
+     * Assertion 2 (dangling still fails): the closing reference-integrity sweep flags a
+     * command whose modelCode is provided by no plugin at all, even though the per-plugin
+     * import deferred it. This is the pure decision core of the sweep.
+     */
+    @Test
+    @DisplayName("findDanglingCommandModelRefs flags command->model that no model provides")
+    void closingSweep_flagsDanglingCommandModelRef() {
+        com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO ok =
+                new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
+        ok.setCode("crm:convert_quotation_to_order");
+        ok.setModelCode("sl_sales_quotation"); // provided after full batch
+        com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO dangling =
+                new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
+        dangling.setCode("crm:typo_command");
+        dangling.setModelCode("sl_sales_quotaton"); // typo — provided by nobody
+
+        List<String> danglingMsgs = service.findDanglingCommandModelRefs(
+                List.of(ok, dangling),
+                java.util.Set.of("sl_sales_quotation", "sl_sales_order", "crm_lead"));
+
+        assertThat(danglingMsgs).anyMatch(s ->
+                s.contains("crm:typo_command") && s.contains("sl_sales_quotaton"));
+        assertThat(danglingMsgs).noneMatch(s -> s.contains("crm:convert_quotation_to_order"));
+    }
+
+    @Test
+    @DisplayName("findDanglingCommandModelRefs returns empty when all references resolve")
+    void closingSweep_emptyWhenAllResolve() {
+        com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO a =
+                new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
+        a.setCode("crm:c1");
+        a.setModelCode("crm_lead");
+        com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO b =
+                new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
+        b.setCode("sl:c2");
+        b.setModelCode("sl_sales_order");
+
+        List<String> danglingMsgs = service.findDanglingCommandModelRefs(
+                List.of(a, b),
+                java.util.Set.of("crm_lead", "sl_sales_order"));
+
+        assertThat(danglingMsgs).isEmpty();
+    }
+
     // ---------- checkConflicts branches ----------
 
     @Test
