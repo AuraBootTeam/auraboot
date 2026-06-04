@@ -2,6 +2,26 @@
 
 > Source-of-truth detail + reusable bringup recipe: `~/.claude/plans/2026-06-04-smartmfg-golden-build.md` (see UPDATE + UPDATE 2 sections — the body below them is STALE).
 
+## ⬆️ UPDATE 2026-06-04 (later session) — Downtime-duration bug RESOLVED + merged; 大屏 availability now real
+
+The "Downtime-duration bug" listed below as Next-Step #1 is **DONE + MERGED**, and the OEE 大屏 real-browser golden re-ran with **real availability (89%, not 100%)**.
+
+**Root cause was TWO bugs (the diagnosis below only caught the first):**
+1. `EndDowntimeHandler` `(String)` cast on `pe_dt_start_time` — that column is `datetime`→`timestamptz`, so the dynamic-data layer returns `java.sql.Timestamp`, never a String. The cast threw `ClassCastException` *before* the try/catch, failing the whole command. (The proposed `.toString()` fix would NOT have worked — `Timestamp`/`LocalDateTime`.toString() isn't ISO-instant, so `Instant.parse` then throws and the catch swallows it → duration still null.)
+2. **(missed below)** `pe_dt_duration_hours` was `virtualType: computed_readonly` with **no `computeExpression`** → `DynamicDataService.filterVirtualFields` stripped it from **every** create AND update, and `VirtualFieldEngine.materialize` only runs for `materialized` fields. So the handler's duration write was silently discarded regardless of the cast → availability was *structurally* always 100%.
+
+**Fix (both MERGED to auraboot-plugins `origin/main`):**
+- **PR #12 `41d2d4b`** `fix(pcba-mfg)`: `EndDowntimeHandler` → deterministic `toInstant()` coercion (Timestamp/Instant/OffsetDateTime/ZonedDateTime/LocalDateTime/Date/ISO-String); `pe_dt_duration_hours.json` drop `computed_readonly` (handler write now lands; UI stays read-only via binding `editable:false` + absent from command inputFields); +2 regression tests using the real Timestamp/LocalDateTime types. Unit 14/14.
+- **PR #13 `10b6c1b`** `fix(qc-spc)`: SPC #11 shipped `qc_spc_chart_points` named-query with invalid `status:"active"` → `No enum constant NamedQueryStatus.ACTIVE` → broke the **whole** quality→procurement→pcba import chain (this was the never-run gap #3 latent bug). Fixed `active`→`published`. **Both PRs are needed together** for a working pcba-agent import.
+
+**Golden evidence (isolated stack `smartmfg-dtfix`, since torn down):** 25/25 plugins imported + reference-integrity clean; DB 3/3 downtime rows `pe_dt_duration_hours` = 2.00/5.00/4.00 (exact, no TZ skew); `/fleet/summary` availability 88.6%; OEE 大屏 browser 可用率 **89%**, per-eq 93.8/84.4/87.5%, 故障时长 2/5/4h. Screenshot `auraboot/test-results/oee-downtime-fix-golden-PASS.png`.
+
+**Bringup gotcha (cost ~10 min):** `import-plugins.sh --slug=... --edition=enterprise` resolves plugin configs at the **container** path `/app/plugins-enterprise` via `docker exec`. Do **NOT** pass `ENTERPRISE_PLUGINS_DIR=<host worktree>` to `import-plugins.sh` (only to `start-isolated.sh` for the mount) — doing so makes it `docker exec [ -f <host-path> ]` which never exists in the container → every business/pcba plugin reports "missing". The recipe in the plan was already correct; the deviation was the error.
+
+**Remaining smart-mfg golden (still TODO):** gap #3 SPC **live** golden is now **UNBLOCKED** (quality imports) — drive `qc_spc_chart` in a browser; gap #4 ~40 empty stub detail pages; gap #6 full multi-domain action-point golden; M2-M5.
+
+---
+
 ## Session Summary
 
 Started from "smart-mfg golden build". Verified the **Phase 0 gating infra** (the previously-blocked point), then built + golden-verified the **OEE 大屏 headline** (golden gap #2 + #5) end-to-end with 3 parallel agents, and rebased the SPC feature. **3 PRs merged + closed.** The *broader* smart-mfg golden is NOT complete — only the OEE 大屏 slice (§2.4: precise).
