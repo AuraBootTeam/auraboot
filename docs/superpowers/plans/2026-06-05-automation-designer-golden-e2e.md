@@ -27,6 +27,10 @@
 
 > This phase is a hard gate (§2.1). Do not write Layer A case code until Phase 0 resolves the drag mechanism, the seed model reachability, and the testid availability. Its outputs parameterize Phases 1–3.
 
+> **Phase-0 findings (Task 0.1 + 0.2 resolved 2026-06-05, read-only):**
+> - **Drag mechanism = HTML5 native drag** (NOT @dnd-kit). `flow-designer-sdk/core/FlowCanvas.tsx:148` `onDrop` reads `event.dataTransfer.getData('application/flow-node')`; `:179` `onDragOver` sets `dropEffect='move'`; canvas is `<ReactFlow>` (@xyflow). Palette items set `dataTransfer['application/flow-node'] = nodeType` on dragstart. → `dragNodeToCanvas` dispatches a synthetic `drop` (DataTransfer with key `application/flow-node`) at the canvas position, or try Playwright `dragTo` (HTML5 drag is dragTo-compatible; the §20 dragTo failure is @dnd-kit-specific). `connectEdge` still uses @xyflow handle pointer-drag.
+> - **testid status:** present on `AutomationList` (rows/create/toggle/edit/delete) + `AutomationEditor` shell (name/description/export) + `ExecutionLogDialog`/`TemplateGallery`. **MISSING on the SDK canvas/palette/@xyflow nodes/node handles/property-panel fields/designer Save+Enable** (rg on `flow-designer-sdk` returned 0 testids). → **Task 0.2b IS required**: add `palette-node-<type>`, `flow-node-<id>`, `node-handle-source-<id>`/`-target-<id>`, `prop-field-<key>`, `designer-save`, `designer-enable` to `FlowPalette.tsx`, the @xyflow node wrapper, `FlowPropertyPanel.tsx`, and the designer toolbar.
+
 ### Task 0.1: Verify the @xyflow palette→canvas drop mechanism
 
 **Files:**
