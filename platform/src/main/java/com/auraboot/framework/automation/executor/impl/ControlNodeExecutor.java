@@ -2,9 +2,9 @@ package com.auraboot.framework.automation.executor.impl;
 
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
+import com.auraboot.framework.automation.util.SpelSafetyGuard;
 import com.auraboot.framework.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
@@ -51,6 +51,12 @@ public class ControlNodeExecutor implements ActionExecutor {
         if (expression == null || expression.isBlank()) {
             log.warn("CONDITION action missing expression, defaulting to true");
             return Map.of("branch", "true", "result", true);
+        }
+
+        // Reject expressions that exceed the length limit or contain dangerous patterns
+        if (!SpelSafetyGuard.isSafe(expression)) {
+            log.warn("CONDITION rejected unsafe expression, defaulting to false branch");
+            return Map.of("branch", "false", "result", false, "error", "Expression rejected by safety guard");
         }
 
         try {

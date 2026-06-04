@@ -5,10 +5,12 @@
 
 import React from 'react';
 import { cn } from '~/utils/cn';
+import { useSmartText } from '~/utils/i18n';
 import { useDebugSession } from '../hooks/useDebugSession';
 import { debugStatusConfig } from '../types';
 
 export function DebugToolbar() {
+  const st = useSmartText();
   const { session, loading, step, continueExecution, stop, restart, exitDebugMode } =
     useDebugSession();
 
@@ -28,7 +30,7 @@ export function DebugToolbar() {
           statusCfg.color,
         )}
       >
-        {statusCfg.label}
+        {st(`$i18n:automation.debug.status.${session.status}`) || statusCfg.label}
       </span>
 
       {/* Progress */}
@@ -43,9 +45,9 @@ export function DebugToolbar() {
         onClick={step}
         disabled={!isPaused || loading}
         className="rounded bg-blue-600 px-3 py-1 text-xs font-medium hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-600"
-        title="Execute next action (Step Over)"
+        title={st('$i18n:automation.debug.toolbar.step.title') || 'Execute next action (Step Over)'}
       >
-        Step
+        {st('$i18n:automation.debug.toolbar.step') || 'Step'}
       </button>
 
       {/* Continue */}
@@ -53,9 +55,9 @@ export function DebugToolbar() {
         onClick={continueExecution}
         disabled={!isPaused || loading}
         className="rounded bg-green-600 px-3 py-1 text-xs font-medium hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-600"
-        title="Continue until breakpoint"
+        title={st('$i18n:automation.debug.toolbar.continue.title') || 'Continue until breakpoint'}
       >
-        Continue
+        {st('$i18n:automation.debug.toolbar.continue') || 'Continue'}
       </button>
 
       {/* Restart */}
@@ -63,9 +65,9 @@ export function DebugToolbar() {
         onClick={restart}
         disabled={loading}
         className="rounded bg-yellow-600 px-3 py-1 text-xs font-medium hover:bg-yellow-700 disabled:cursor-not-allowed disabled:bg-gray-600"
-        title="Restart from beginning"
+        title={st('$i18n:automation.debug.toolbar.restart.title') || 'Restart from beginning'}
       >
-        Restart
+        {st('$i18n:automation.debug.toolbar.restart') || 'Restart'}
       </button>
 
       {/* Stop */}
@@ -73,16 +75,16 @@ export function DebugToolbar() {
         onClick={stop}
         disabled={!isActive || loading}
         className="rounded bg-red-600 px-3 py-1 text-xs font-medium hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-600"
-        title="Stop debugging"
+        title={st('$i18n:automation.debug.toolbar.stop.title') || 'Stop debugging'}
       >
-        Stop
+        {st('$i18n:automation.debug.toolbar.stop') || 'Stop'}
       </button>
 
       <div className="flex-1" />
 
       {/* Exit debug mode */}
       <button onClick={exitDebugMode} className="px-3 py-1 text-xs text-gray-400 hover:text-white">
-        Exit Debug
+        {st('$i18n:automation.debug.toolbar.exit') || 'Exit Debug'}
       </button>
 
       {/* Error */}

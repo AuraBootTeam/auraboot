@@ -4,11 +4,14 @@
  */
 
 import React from 'react';
+import { useSmartText } from '~/utils/i18n';
 import { DebugToolbar } from './DebugToolbar';
 import { DebugVariablePanel } from './DebugVariablePanel';
 import { DebugLogPanel } from './DebugLogPanel';
 import { useDebugSession } from '../hooks/useDebugSession';
 import { useDebugEvents } from '../hooks/useDebugEvents';
+import { ACTION_TYPE_I18N_KEYS } from '../../components/automationTypeLabels';
+import { humanizeType } from '~/plugins/core-designer/components/flow-designer-sdk/utils';
 import { cn } from '~/utils/cn';
 import type { ActionResult } from '../../services/automationService';
 
@@ -19,6 +22,7 @@ const actionStatusColors: Record<string, string> = {
 
 /** Action step list for the debugger (replaces flow view with a simpler step list) */
 function DebugActionList() {
+  const st = useSmartText();
   const session = useDebugSession((s) => s.session);
   if (!session) return null;
 
@@ -69,7 +73,9 @@ function DebugActionList() {
               <div className="min-w-0 flex-1">
                 {result ? (
                   <div>
-                    <span className="text-sm font-medium text-gray-700">{result.actionType}</span>
+                    <span className="text-sm font-medium text-gray-700">
+                      {st(ACTION_TYPE_I18N_KEYS[result.actionType] ?? '') || humanizeType(result.actionType)}
+                    </span>
                     {result.durationMs !== undefined && (
                       <span className="ml-2 text-xs text-gray-400">{result.durationMs}ms</span>
                     )}
@@ -79,7 +85,9 @@ function DebugActionList() {
                   </div>
                 ) : (
                   <span className="text-sm text-gray-400">
-                    {isCurrent ? 'Next action →' : `Action #${index}`}
+                    {isCurrent
+                      ? (st('$i18n:automation.debug.actions.next') || 'Next action →')
+                      : (st('$i18n:automation.debug.actions.index', `Action #${index}`) || `Action #${index}`)}
                   </span>
                 )}
               </div>
@@ -98,10 +106,20 @@ function DebugActionList() {
 
         {session.totalActions === 0 && (
           <p className="py-8 text-center text-sm text-gray-400">
-            No actions defined in this automation.
+            {st('$i18n:automation.debug.actions.none') || 'No actions defined in this automation.'}
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Small header component so we can call useSmartText inside a component body. */
+function ActionsHeader() {
+  const st = useSmartText();
+  return (
+    <div className="border-b bg-gray-50 px-3 py-2 text-xs font-medium tracking-wide text-gray-600 uppercase">
+      {st('$i18n:automation.debug.panel.actions') || 'Actions'}
     </div>
   );
 }
@@ -119,9 +137,7 @@ export function AutomationDebugger() {
       <div className="flex min-h-0 flex-1">
         {/* Left: Action steps */}
         <div className="flex flex-1 flex-col overflow-hidden border-r">
-          <div className="border-b bg-gray-50 px-3 py-2 text-xs font-medium tracking-wide text-gray-600 uppercase">
-            Actions
-          </div>
+          <ActionsHeader />
           <DebugActionList />
         </div>
 

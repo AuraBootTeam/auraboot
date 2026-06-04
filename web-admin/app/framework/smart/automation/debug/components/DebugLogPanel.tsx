@@ -4,6 +4,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { cn } from '~/utils/cn';
+import { useSmartText } from '~/utils/i18n';
 import { useDebugSession } from '../hooks/useDebugSession';
 import type { DebugEvent } from '../types';
 
@@ -42,6 +43,7 @@ function EventItem({ event }: { event: DebugEvent }) {
 }
 
 export function DebugLogPanel() {
+  const st = useSmartText();
   const events = useDebugSession((s) => s.events);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -55,13 +57,13 @@ export function DebugLogPanel() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b bg-gray-50 px-3 py-2 text-xs font-medium tracking-wide text-gray-600 uppercase">
-        <span>Events</span>
+        <span>{st('$i18n:automation.debug.panel.events') || 'Events'}</span>
         <span className="font-normal text-gray-400">{events.length}</span>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-auto">
         {events.length === 0 ? (
           <p className="py-4 text-center text-xs text-gray-400">
-            No events yet. Click Step to begin.
+            {st('$i18n:automation.debug.panel.events.empty') || 'No events yet. Click Step to begin.'}
           </p>
         ) : (
           events

@@ -23,8 +23,25 @@ vi.mock('~/ui/ui/dialog', () => ({
   DialogDescription: ({ children }: any) => <p>{children}</p>,
 }));
 
+vi.mock('~/plugins/core-designer/components/flow-designer-sdk/utils', () => ({
+  humanizeType: (type: string) =>
+    type
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, (c: string) => c.toUpperCase()),
+}));
+
 vi.mock('~/utils/i18n', () => ({
-  useSmartText: () => (key: string, fallback?: string) => fallback ?? key,
+  useSmartText:
+    () =>
+    (key: string, fallback?: string): string => {
+      // Simulate i18n resolution: strip the $i18n: prefix and return a
+      // human-readable label so tests can assert on visible text.
+      if (typeof key === 'string' && key.startsWith('$i18n:')) {
+        const resolved = key.slice(6).split('.').pop() ?? '';
+        return resolved;
+      }
+      return fallback ?? (typeof key === 'string' ? key : '');
+    },
 }));
 
 // ---------------------------------------------------------------------------
@@ -43,7 +60,8 @@ import { ExecutionLogDialog } from '../ExecutionLogDialog';
 const SAMPLE_LOG = {
   pid: 'log-001',
   status: 'success',
-  triggerType: 'manual',
+  // Real backend value (snake_case); maps to automation.trigger.recordCreate
+  triggerType: 'on_record_create',
   startedAt: '2024-01-01T10:00:00Z',
   durationMs: 120,
   actionResults: undefined,
@@ -105,10 +123,10 @@ describe('ExecutionLogDialog — error surfacing', () => {
     renderDialog();
 
     // Wait for log list to render
-    await waitFor(() => screen.getByRole('button', { name: /manual/ }));
+    await waitFor(() => screen.getByRole('button', { name: /recordCreate/ }));
 
     // Expand the entry
-    fireEvent.click(screen.getByRole('button', { name: /manual/ }));
+    fireEvent.click(screen.getByRole('button', { name: /recordCreate/ }));
 
     await waitFor(() =>
       expect(screen.getByText('Detail fetch failed')).toBeInTheDocument(),
@@ -128,8 +146,8 @@ describe('ExecutionLogDialog — error surfacing', () => {
 
     renderDialog();
 
-    await waitFor(() => screen.getByRole('button', { name: /manual/ }));
-    fireEvent.click(screen.getByRole('button', { name: /manual/ }));
+    await waitFor(() => screen.getByRole('button', { name: /recordCreate/ }));
+    fireEvent.click(screen.getByRole('button', { name: /recordCreate/ }));
 
     await waitFor(() =>
       expect(screen.getByText(/Failed to load details \(HTTP 404\)/)).toBeInTheDocument(),
@@ -147,8 +165,9 @@ describe('ExecutionLogDialog — error surfacing', () => {
       json: async () => ({
         data: {
           ...SAMPLE_LOG,
+          // Real backend value: create_record → maps to automation.action.createRecord
           actionResults: [
-            { sequence: 1, actionType: 'createRecord', status: 'success', durationMs: 50 },
+            { sequence: 1, actionType: 'create_record', status: 'success', durationMs: 50 },
           ],
         },
       }),
@@ -156,9 +175,11 @@ describe('ExecutionLogDialog — error surfacing', () => {
 
     renderDialog();
 
-    await waitFor(() => screen.getByRole('button', { name: /manual/ }));
-    fireEvent.click(screen.getByRole('button', { name: /manual/ }));
+    await waitFor(() => screen.getByRole('button', { name: /recordCreate/ }));
+    fireEvent.click(screen.getByRole('button', { name: /recordCreate/ }));
 
+    // create_record → ACTION_TYPE_I18N_KEYS → $i18n:automation.action.createRecord
+    // → mock strips prefix and returns last segment: 'createRecord'
     await waitFor(() =>
       expect(screen.getByText('createRecord')).toBeInTheDocument(),
     );

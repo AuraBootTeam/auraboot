@@ -415,6 +415,36 @@ automation:
     eventTypes.task_completed: Task Completed
     eventTypes.task_assigned: Task Assigned
 
+  # Debug
+  debug:
+    # DebugToolbar
+    toolbar.step: Step
+    toolbar.step.title: Execute next action (Step Over)
+    toolbar.continue: Continue
+    toolbar.continue.title: Continue until breakpoint
+    toolbar.restart: Restart
+    toolbar.restart.title: Restart from beginning
+    toolbar.stop: Stop
+    toolbar.stop.title: Stop debugging
+    toolbar.exit: Exit Debug
+    # DebugLogPanel
+    panel.events: Events
+    panel.events.empty: No events yet. Click Step to begin.
+    # DebugVariablePanel
+    panel.variables: Variables
+    panel.variables.empty: No variables yet
+    # AutomationDebugger - action list
+    panel.actions: Actions
+    actions.next: Next action →
+    actions.index: "Action #{index}"
+    actions.none: No actions defined in this automation.
+    # Shared status labels used by debugStatusConfig
+    status.paused: Paused
+    status.running: Running
+    status.completed: Completed
+    status.stopped: Stopped
+    status.error: Error
+
 # Auth
 auth:
   login: Login
@@ -715,6 +745,7 @@ common:
   status:
     active: Active
     inactive: Inactive
+  loading: Loading...
   actions: Actions
   confirm: Confirm
   cancel: Cancel
