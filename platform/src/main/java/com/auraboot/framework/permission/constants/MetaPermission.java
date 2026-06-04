@@ -649,6 +649,17 @@ public final class MetaPermission {
      */
     public static final String IOT_DATA_POINT_READ = "iot.data_point.read";
 
+    // ==================== Manufacturing permissions ====================
+
+    /**
+     * OEE (Overall Equipment Effectiveness) read permission for the platform-side
+     * {@code OeeController}. The OEE calculation engine reads the PCBA manufacturing
+     * dynamic tables ({@code mt_pe_*}) to compute availability / performance / quality
+     * / OEE / TEEP per equipment, so the read contract is registered as a minimal
+     * manufacturing capability in the OSS default bootstrap (module {@code meta}).
+     */
+    public static final String MANUFACTURING_OEE = "meta.manufacturing.oee";
+
     // ==================== Private Constructor ====================
 
     /**
