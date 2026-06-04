@@ -1,6 +1,6 @@
 # Automation 设计器 + 后端链路执行 — 评审结论 / 目标架构 / 实现路线
 
-> 日期:2026-05-23 · 分支:`review/automation-designer-runtime` · 状态:评审完成,实现待拍板
+> 日期:2026-05-23 · 分支:`review/automation-designer-runtime` · 状态:已实现并收口(详见 §5 收口状态,2026-06-04)
 > 评审方式:静态为主(主对话 + 3 个只读 reviewer subagent 交叉印证,全程 verify-before-flag)+ 待补 P0 runtime 实测
 > 红线纪律:每条 P0/P1 均经 ls/grep/read 实地取证;一条 i18n 误判已由 subagent 自检撤回(嵌套 yaml key 实际存在)
 
@@ -140,3 +140,37 @@
   - 这两条今天 PASS 是因为断言的是当前 broken 行为(特征测试);P0 修复后按方法注释**反转断言**即转为正向回归测试,直接补上 P0-5 的执行链路覆盖缺口。
   - 运行命令:`platform/gradlew -p platform :test --tests "com.auraboot.framework.automation.trigger.impl.AutomationTriggerServiceImplTest"`(根项目 test task;子模块 storage/mq 无此测试)。
 - 采用轻量 IT 而非 isolated docker 全栈 UI 复现:静态证据已三方交叉印证,编排类 P0 用真实 orchestrator 单测即可作 runtime 硬证,且免 ≥2 worktree 的共享 DB 冲突(红线 #11)。
+
+---
+
+## 5. 收口状态(2026-06-04)
+
+### 5.1 本会话完成(4 PR,全部 merged 到 OSS `main`)
+
+| 项 | PR | 说明 |
+|----|----|----|
+| **新发现 P0 — 设计器创建的 automation 无法保存 / 永不触发** | **#417** | 全仓**从无** flowConfig→trigger 字段派生:设计器 `handleSave` 只 POST `{name, description, flowConfig}`,`create()` 从 request 取 `triggerType/modelCode`(=null),而 `ab_automation.model_code`/`trigger_type` 是 NOT NULL → 设计器保存直接 NOT NULL 违规失败(即便列可空,事件分发 `findEnabledByModelCodeAndTriggerType` 也永不命中)。原评审聚焦「flowConfig 不被执行」(P0-1),漏了更前置的「设计器根本存不下」——因为原评审是静态 + runtime 特征测试走的是 flat-field payload。修复:新增 `AutomationFlowTriggerDeriver`(读 trigger 节点 `data.config` → 派生 `triggerType/modelCode/triggerConfig`,接入 `create()`/`update()`)。真栈 PG IT 又暴露第二处:`actions` 列 NOT NULL,设计器 payload 不带 actions → 同样保存失败;补 `create()` actions 缺省空 `[]`。 |
+| **缺失能力 `trigger-bpm-event` 前端节点**(roadmap #9) | **#417** | `triggers.ts` 新增节点(process-select 存为 `modelCode`==BPM processKey + eventTypes multiselect)+ 4 locale i18n;后端 `onBpmEvent`/`BpmEventAutomationBridge` 此前已完整。 |
+| **P1-1 Webhook HMAC** | **#415** | HMAC 改为对原始 body 字节计算(原 `payload.toString()` 的 HashMap 顺序不稳=验签功能损坏)+ `MessageDigest.isEqual` 常量时间比较(含 token 模式)。 |
+| **P1-3 resource-select 吞错** | **#416** | 9 个 `catch { return [] }` 改为传播错误;`BaseResourceSelect`/`DependentMultiSelect` 渲染本地化错误态 + Retry;`ExecutionLogDialog` 暴露 detail 加载错误。 |
+| **(派生场景)stale cutover 测试** | **#414** | `AutomationTriggerServiceImplTest` 2 个 cutover 测试在 main 已红(#318 G5 给 `run()` 加第 4 参 logId 后未更新 `verify` 参数数);修复恢复覆盖。 |
+
+验证:派生器单测 8/8、bpm-event 节点 vitest 10/10、resource-select 63/63、webhook 8/8、cutover 27/27;**真 PostgreSQL IT `AutomationFlowConfigDerivationIntegrationTest` 2/2**(设计器式 create 成功 + 派生列持久化 + `getByModelCode` 可查),现有 `AutomationServiceIntegrationTest` 17/17 无回归。
+
+### 5.2 此前会话已完成(T2 核心,本文档原 §2/§3)
+
+P0-1/P0-2(flowConfig→SmartEngine 编译器 + 桥接 delegate + 条件网关 + loop delegate for-each + 行为 cutover):#263/#267/#268。P0-3 IDOR:#264。P0-4 校验门:#269。P0-5 执行链测试:#298。P0-6 模板 i18n:#298。Roadmap #10 运行历史/nodeStatus:#318(G5)。
+
+### 5.3 延后(owner 决策)
+
+- **P2-4 base-path 归一**(`/api/automation` 单数 vs `/api/automations` 复数):DEFERRED。纯美观一致性,但改 `DebugController` 路由会动 debugger 9 端点、需真栈 E2E 验证,边际价值 < 风险(红线 #19)。dev 阶段可 breaking(禁 forwarding stub),归一到复数后须 debugger E2E 验 9 端点可达。
+- **delay/timer**(roadmap #8):仍挂起,等 SmartEngine timer 完善;现状 `Thread.sleep` 玩具级。
+
+### 5.4 仍开放(原评审 P1/P2,未在本轮处理)
+
+- **P1-2** `ControlNodeExecutor` 第二处 SpEL 求值点缺长度上限/黑名单(非 RCE,缺 ReDoS 纵深一致性)。
+- **P1-4** debug 4 组件(AutomationDebugger/DebugLogPanel/DebugToolbar/DebugVariablePanel)硬编码英文。
+- **P2-1** i18n 降级不一致(`FlowPalette` miss→泄漏 raw type vs `FlowPropertyPanel` miss→空);新增节点漏 key 无 lint 拦截。
+- **P2-2** 共享 `PropertyFieldRenderer` dict-select 硬编码中文。
+- **P2-3** `ExecutionLogDialog` 局部硬编码 + raw code(`Loading...`/statusConfig 标签/`actionType`/`triggerType` 直显)——#416 仅补了错误态,i18n 化未做。
+- **双授权入口 UX / T4 BPMN→flow-designer-sdk 迁移**(roadmap #9 的 UX 收敛部分):独立工作线,进行中(见 `DDR-2026-05-23-automation-bpm-designer-convergence.md`)。
