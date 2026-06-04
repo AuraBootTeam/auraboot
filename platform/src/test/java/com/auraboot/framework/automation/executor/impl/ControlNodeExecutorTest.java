@@ -233,6 +233,48 @@ class ControlNodeExecutorTest {
     }
 
     // =========================================================
+    // CONDITION — safety guard integration
+    // =========================================================
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void condition_dangerousExpression_returnsFalseBranch() {
+        AutomationAction action = buildAction("condition",
+                Map.of("expression", "T(java.lang.Runtime).getRuntime()"));
+
+        Map<String, Object> result = (Map<String, Object>) executor.execute(action, Map.of());
+
+        assertThat(result.get("branch")).isEqualTo("false");
+        assertThat(result.get("result")).isEqualTo(false);
+        assertThat(result).containsKey("error");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void condition_overLengthExpression_returnsFalseBranch() {
+        String longExpr = "#x == 'a'".repeat(100); // well over 500 chars
+        AutomationAction action = buildAction("condition", Map.of("expression", longExpr));
+
+        Map<String, Object> result = (Map<String, Object>) executor.execute(action, Map.of());
+
+        assertThat(result.get("branch")).isEqualTo("false");
+        assertThat(result.get("result")).isEqualTo(false);
+        assertThat(result).containsKey("error");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void condition_newKeywordExpression_returnsFalseBranch() {
+        AutomationAction action = buildAction("condition",
+                Map.of("expression", "new java.lang.ProcessBuilder('ls').start()"));
+
+        Map<String, Object> result = (Map<String, Object>) executor.execute(action, Map.of());
+
+        assertThat(result.get("branch")).isEqualTo("false");
+        assertThat(result.get("result")).isEqualTo(false);
+    }
+
+    // =========================================================
     // Unknown type
     // =========================================================
 

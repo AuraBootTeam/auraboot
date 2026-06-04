@@ -92,3 +92,6 @@ export type {
   NodeRuntimeStatus,
   NodeStatusMap,
 } from './runtime/NodeRuntimeStatusContext';
+
+// Utilities
+export { humanizeType } from './utils';

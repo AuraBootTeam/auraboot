@@ -260,6 +260,31 @@ automation:
     eventTypes.task_completed: Task Completed
     eventTypes.task_assigned: Task Assigned
 
+  # Debug
+  debug:
+    toolbar.step: 단계
+    toolbar.step.title: 다음 작업 실행 (스텝 오버)
+    toolbar.continue: 계속
+    toolbar.continue.title: 중단점까지 계속
+    toolbar.restart: 다시 시작
+    toolbar.restart.title: 처음부터 다시 시작
+    toolbar.stop: 중지
+    toolbar.stop.title: 디버깅 중지
+    toolbar.exit: 디버그 종료
+    panel.events: 이벤트
+    panel.events.empty: 이벤트 없음. 단계를 클릭하여 시작하세요.
+    panel.variables: 변수
+    panel.variables.empty: 변수 없음
+    panel.actions: 작업
+    actions.next: 다음 작업 →
+    actions.index: "작업 #{index}"
+    actions.none: 이 자동화에 정의된 작업이 없습니다.
+    status.paused: 일시 정지
+    status.running: 실행 중
+    status.completed: 완료
+    status.stopped: 중지됨
+    status.error: 오류
+
 # Auth
 auth:
   login: 로그인

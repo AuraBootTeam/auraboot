@@ -464,6 +464,36 @@ automation:
     eventTypes.task_completed: 任务完成
     eventTypes.task_assigned: 任务分配
 
+  # Debug
+  debug:
+    # DebugToolbar
+    toolbar.step: 单步
+    toolbar.step.title: 执行下一个动作（单步）
+    toolbar.continue: 继续
+    toolbar.continue.title: 继续执行直到断点
+    toolbar.restart: 重新开始
+    toolbar.restart.title: 从头重新开始
+    toolbar.stop: 停止
+    toolbar.stop.title: 停止调试
+    toolbar.exit: 退出调试
+    # DebugLogPanel
+    panel.events: 事件
+    panel.events.empty: 暂无事件，点击单步开始。
+    # DebugVariablePanel
+    panel.variables: 变量
+    panel.variables.empty: 暂无变量
+    # AutomationDebugger - action list
+    panel.actions: 动作
+    actions.next: 下一个动作 →
+    actions.index: "动作 #{index}"
+    actions.none: 此自动化规则中未定义动作。
+    # Shared status labels
+    status.paused: 已暂停
+    status.running: 运行中
+    status.completed: 已完成
+    status.stopped: 已停止
+    status.error: 错误
+
 # Auth
 auth:
   login: 登录
