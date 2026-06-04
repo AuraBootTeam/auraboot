@@ -175,32 +175,51 @@ public class IotCredentialAccessorImpl implements BackgroundIotCredentialAccesso
         if (tenantId <= 0) {
             throw new IllegalArgumentException("tenantId must be > 0");
         }
-        // Enumerate active (non-DISABLE) devices for this tenant and push
+        // Enumerate ALL active (non-DISABLE) devices for this tenant and push
         // ACL-only authz rules to the broker. §15: do NOT decrypt passwords —
         // this path uses DeviceAclRule (username + patterns only).
-        DynamicQueryRequest req = DynamicQueryRequest.builder()
-                .pageNum(1)
-                .pageSize(500)
-                .conditions(List.of(QueryCondition.builder()
-                        .fieldName(IotDeviceAccessorImpl.COL_STATUS)
-                        .operator(QueryCondition.Operator.NE)
-                        .value("DISABLE")
-                        .build()))
-                .build();
+        // Pagination: loop through all pages so tenants with >batchSize active
+        // devices are fully covered (not silently truncated).
+        final int BATCH_SIZE = 1000;
+        List<EmqxAclSyncService.DeviceAclRule> rules = new ArrayList<>();
+        int pageNum = 1;
 
-        PaginationResult<Map<String, Object>> page = withTenant(tenantId,
-                () -> dynamicDataService.list(IotDeviceAccessorImpl.MODEL_CODE, req));
+        while (true) {
+            final int currentPage = pageNum;
+            DynamicQueryRequest req = DynamicQueryRequest.builder()
+                    .pageNum(currentPage)
+                    .pageSize(BATCH_SIZE)
+                    .conditions(List.of(QueryCondition.builder()
+                            .fieldName(IotDeviceAccessorImpl.COL_STATUS)
+                            .operator(QueryCondition.Operator.NE)
+                            .value("DISABLE")
+                            .build()))
+                    .build();
 
-        List<Map<String, Object>> rows = page != null ? page.getRecords() : null;
-        if (rows == null || rows.isEmpty()) {
-            return 0;
+            PaginationResult<Map<String, Object>> page = withTenant(tenantId,
+                    () -> dynamicDataService.list(IotDeviceAccessorImpl.MODEL_CODE, req));
+
+            List<Map<String, Object>> rows = page != null ? page.getRecords() : null;
+            if (rows == null || rows.isEmpty()) {
+                break;
+            }
+
+            for (Map<String, Object> row : rows) {
+                DeviceView view = IotDeviceAccessorImpl.toViewFromRow(row);
+                List<String> patterns = resolveAclPatterns(view);
+                rules.add(new EmqxAclSyncService.DeviceAclRule(view.deviceCode(), patterns));
+            }
+
+            // Stop when this page returned fewer records than the batch size
+            // (i.e. it was the last page).
+            if (rows.size() < BATCH_SIZE) {
+                break;
+            }
+            pageNum++;
         }
 
-        List<EmqxAclSyncService.DeviceAclRule> rules = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            DeviceView view = IotDeviceAccessorImpl.toViewFromRow(row);
-            List<String> patterns = resolveAclPatterns(view);
-            rules.add(new EmqxAclSyncService.DeviceAclRule(view.deviceCode(), patterns));
+        if (rules.isEmpty()) {
+            return 0;
         }
 
         emqxSync.syncTenantAclRules(tenantId, rules);

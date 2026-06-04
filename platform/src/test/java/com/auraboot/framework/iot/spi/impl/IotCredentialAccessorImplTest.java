@@ -203,6 +203,47 @@ class IotCredentialAccessorImplTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void syncAclToBroker_paginatesThroughAllDevices_accumulatesTotal() {
+        // Page 1: full batch (pageSize=1000 rows), page 2: 3 rows, page 3: empty → stop
+        int batchSize = 1000;
+
+        List<Map<String, Object>> page1Rows = new java.util.ArrayList<>();
+        for (int i = 0; i < batchSize; i++) {
+            page1Rows.add(deviceRow(42L, "dev-p1-" + i, "iot-p1-" + i, "/sys/pk-air/dev-p1-" + i + "/#"));
+        }
+        PaginationResult<Map<String, Object>> page1 =
+                PaginationResult.of(page1Rows, 1003L, 1, batchSize);
+
+        List<Map<String, Object>> page2Rows = List.of(
+                deviceRow(42L, "dev-p2-0", "iot-p2-0", null),
+                deviceRow(42L, "dev-p2-1", "iot-p2-1", null),
+                deviceRow(42L, "dev-p2-2", "iot-p2-2", null));
+        PaginationResult<Map<String, Object>> page2 =
+                PaginationResult.of(page2Rows, 1003L, 2, batchSize);
+
+        // Return page1 for first call, page2 for second call; any third call returns empty.
+        when(dds.list(eq(IotDeviceAccessorImpl.MODEL_CODE), any(DynamicQueryRequest.class)))
+                .thenReturn(page1)
+                .thenReturn(page2)
+                .thenReturn(PaginationResult.of(List.of(), 1003L, 3, batchSize));
+
+        int total = accessor.syncAclToBroker(42L);
+
+        // Must enumerate ALL 1003 devices and return the combined count.
+        assertThat(total).isEqualTo(1003);
+
+        // syncTenantAclRules must have been called once with all 1003 rules.
+        ArgumentCaptor<List<EmqxAclSyncService.DeviceAclRule>> cap =
+                ArgumentCaptor.forClass(List.class);
+        verify(emqx).syncTenantAclRules(eq(42L), cap.capture());
+        assertThat(cap.getValue()).hasSize(1003);
+
+        // §15: no password decryption
+        verifyNoInteractions(encryption);
+    }
+
+    @Test
     void resolveAclPatterns_usesStoredCommaSeparated_orDefault() {
         DeviceView withStored = new DeviceView("pid-1", "iot", "dev", "pk", 1L, "ONLINE",
                 "/sys/pk/dev/up,/sys/pk/dev/down", Map.of(), null);
