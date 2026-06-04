@@ -166,11 +166,21 @@ P0-1/P0-2(flowConfig→SmartEngine 编译器 + 桥接 delegate + 条件网关 + 
 - **P2-4 base-path 归一**(`/api/automation` 单数 vs `/api/automations` 复数):DEFERRED。纯美观一致性,但改 `DebugController` 路由会动 debugger 9 端点、需真栈 E2E 验证,边际价值 < 风险(红线 #19)。dev 阶段可 breaking(禁 forwarding stub),归一到复数后须 debugger E2E 验 9 端点可达。
 - **delay/timer**(roadmap #8):仍挂起,等 SmartEngine timer 完善;现状 `Thread.sleep` 玩具级。
 
-### 5.4 仍开放(原评审 P1/P2,未在本轮处理)
+### 5.4 原评审 P1/P2 收尾(#424,全部完成)
 
-- **P1-2** `ControlNodeExecutor` 第二处 SpEL 求值点缺长度上限/黑名单(非 RCE,缺 ReDoS 纵深一致性)。
-- **P1-4** debug 4 组件(AutomationDebugger/DebugLogPanel/DebugToolbar/DebugVariablePanel)硬编码英文。
-- **P2-1** i18n 降级不一致(`FlowPalette` miss→泄漏 raw type vs `FlowPropertyPanel` miss→空);新增节点漏 key 无 lint 拦截。
-- **P2-2** 共享 `PropertyFieldRenderer` dict-select 硬编码中文。
-- **P2-3** `ExecutionLogDialog` 局部硬编码 + raw code(`Loading...`/statusConfig 标签/`actionType`/`triggerType` 直显)——#416 仅补了错误态,i18n 化未做。
-- **双授权入口 UX / T4 BPMN→flow-designer-sdk 迁移**(roadmap #9 的 UX 收敛部分):独立工作线,进行中(见 `DDR-2026-05-23-automation-bpm-designer-convergence.md`)。
+下列在 5.3 之后由 **#424** 一批清掉:
+
+- **P1-2** `ControlNodeExecutor` SpEL guard:抽共享 `SpelSafetyGuard`(单一 `MAX_EXPRESSION_LENGTH=500` + `DANGEROUS_SPEL_PATTERN`,无 duplication/drift),`ControlNodeExecutor` 与 `evaluateCondition` 两处 call site 统一 `isSafe(...)`(非 RCE,补 ReDoS/纵深一致性)。
+- **P1-4** debug 4 组件全量 i18n(`automation.debug.*`,4 locale)。
+- **P2-1** `FlowPalette`/`FlowPropertyPanel` 缺 key 时改走共享 `humanizeType()` 兜底,不再泄漏 raw kebab type。
+- **P2-2** `PropertyFieldRenderer` dict-select 硬编码中文 → 复用 `common.options_load_failed`/`common.loading`。
+- **P2-3** `ExecutionLogDialog` raw `actionType`/`triggerType` → 映射到 `automation.action.*`/`automation.trigger.*`(humanize 兜底);`Loading...` → `common.loading`。
+
+验证:`SpelSafetyGuardTest` 23/23、`ControlNodeExecutorTest` 22/22、`AutomationTriggerServiceImplTest` 27/27、full compile;前端 tsc clean + 触动 vitest 22/22(全量 1792/1792)。
+
+### 5.5 仍开放 / 独立工作线
+
+- **P2-4 base-path 归一** + **delay/timer**(roadmap #8):DEFERRED,见 §5.3。
+- **双授权入口 UX / T4 BPMN→flow-designer-sdk 迁移**(roadmap #9 的 UX 收敛部分):独立大工作线,进行中(见 `DDR-2026-05-23-automation-bpm-designer-convergence.md`),宜单独会话推进。
+
+> **收口结论(2026-06-04)**:本评审的 P0(含新发现的设计器派生 P0)/ P1 / P2 除显式 DEFER 的 P2-4 + delay/timer 外**全部实现并 merged**;唯一剩余是独立的 T4 设计器收敛工作线。本文档至此闭环。
