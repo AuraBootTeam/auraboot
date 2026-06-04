@@ -1,6 +1,7 @@
 package com.auraboot.framework.automation.executor.impl;
 
 import com.auraboot.framework.automation.entity.AutomationAction;
+import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.notification.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,9 @@ class SendNotificationExecutorTest {
 
     @Mock
     private NotificationService notificationService;
+
+    @Mock
+    private DynamicDataService dynamicDataService;
 
     @InjectMocks
     private SendNotificationExecutor executor;
@@ -160,6 +164,72 @@ class SendNotificationExecutorTest {
         assertThatThrownBy(() -> executor.execute(action, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("config");
+    }
+
+    // =========================================================
+    // execute() — dynamic / templated recipient resolution
+    // =========================================================
+
+    @Test
+    void resolvesReferenceTraversalRecipientToOwnerUserId() {
+        // asset_maintenance row references asset_id=55; asset 55's current_user_id=77.
+        // DynamicDataService.getById takes a STRING recordId (verified §15).
+        when(dynamicDataService.getById("asset", "55"))
+                .thenReturn(Map.of("id", 55L, "current_user_id", 77L));
+
+        AutomationAction action = buildAction(Map.of(
+                "type", "in_app",
+                "title", "Maintenance reported",
+                "content", "New report",
+                "recipients", List.of("${record.asset_id.current_user_id}")
+        ));
+        Map<String, Object> context = new HashMap<>();
+        context.put("record", Map.of("id", 9L, "asset_id", 55L));
+
+        executor.execute(action, context);
+
+        verify(notificationService).sendInApp(eq(77L), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void plainNumericRecipientIsUnchanged() {
+        AutomationAction action = buildAction(Map.of(
+                "type", "in_app", "title", "t", "content", "c",
+                "recipients", List.of("42")
+        ));
+
+        executor.execute(action, new HashMap<>(Map.of("record", Map.of("id", 1L))));
+
+        verify(notificationService).sendInApp(eq(42L), any(), any(), any(), any(), any());
+        verifyNoInteractions(dynamicDataService);
+    }
+
+    @Test
+    void flatRecordFieldRecipientResolves() {
+        AutomationAction action = buildAction(Map.of(
+                "type", "in_app", "title", "t", "content", "c",
+                "recipients", List.of("${record.owner_id}")
+        ));
+
+        executor.execute(action, new HashMap<>(Map.of("record", Map.of("id", 1L, "owner_id", 88L))));
+
+        verify(notificationService).sendInApp(eq(88L), any(), any(), any(), any(), any());
+        verifyNoInteractions(dynamicDataService);
+    }
+
+    @Test
+    void unresolvableRecipientIsSkippedNotCrashed() {
+        AutomationAction action = buildAction(Map.of(
+                "type", "in_app", "title", "t", "content", "c",
+                "recipients", List.of("${record.missing.field}")
+        ));
+
+        // record has no 'missing' key → ref hop returns null → recipient skipped, no crash
+        assertThatCode(() -> executor.execute(action,
+                new HashMap<>(Map.of("record", Map.of("id", 1L)))))
+                .doesNotThrowAnyException();
+
+        verifyNoInteractions(notificationService);
     }
 
     // =========================================================

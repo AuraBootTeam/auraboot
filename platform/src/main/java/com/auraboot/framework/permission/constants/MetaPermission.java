@@ -345,6 +345,14 @@ public final class MetaPermission {
      */
     public static final String PRINT_GENERATE = "meta.print.generate";
 
+    // ==================== QR (AuraQR live code) permissions ====================
+
+    /**
+     * Manage AuraQR live codes: create / list / bind-to-model / publish / set-status.
+     * Gates the enterprise {@code /api/admin/qr} endpoints.
+     */
+    public static final String QR_MANAGE = "meta.qr.manage";
+
     // ==================== DASHBOARD permissions ====================
 
     /**

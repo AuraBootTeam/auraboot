@@ -1055,6 +1055,16 @@
       "resourceType": "function"
     },
     {
+      "code": "meta.qr.manage",
+      "name": "Meta QR manage",
+      "description": "Manage AuraQR live codes — create/list/bind/publish/status",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:qr",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
       "code": "meta.publish.admin",
       "name": "Meta publish admin",
       "description": "Meta publish — admin",
