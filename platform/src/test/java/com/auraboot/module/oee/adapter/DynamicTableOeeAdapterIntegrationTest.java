@@ -159,8 +159,7 @@ class DynamicTableOeeAdapterIntegrationTest {
                 tenant_id BIGINT NOT NULL,
                 pe_eq_resource_id VARCHAR(64),
                 pe_eq_code VARCHAR(64),
-                pe_eq_name VARCHAR(128),
-                deleted_flag BOOLEAN
+                pe_eq_name VARCHAR(128)
             )
             """);
         jdbcTemplate.execute("""
@@ -202,9 +201,9 @@ class DynamicTableOeeAdapterIntegrationTest {
 
         // equipment -> resource
         jdbcTemplate.update(
-                "INSERT INTO mt_pe_equipment (pid, tenant_id, pe_eq_resource_id, pe_eq_code, pe_eq_name, deleted_flag) "
-                        + "VALUES (?, ?, ?, ?, ?, ?)",
-                EQUIPMENT_PID, TENANT_ID, RESOURCE_PID, "EQ-IT-1", "SMT Line IT", false);
+                "INSERT INTO mt_pe_equipment (pid, tenant_id, pe_eq_resource_id, pe_eq_code, pe_eq_name) "
+                        + "VALUES (?, ?, ?, ?, ?)",
+                EQUIPMENT_PID, TENANT_ID, RESOURCE_PID, "EQ-IT-1", "SMT Line IT");
 
         // calendar: one day inside the window, 8 available hours
         jdbcTemplate.update(

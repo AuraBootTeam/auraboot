@@ -99,10 +99,11 @@ public class DynamicTableOeeAdapter implements OeeDataQueryPort {
         }
         Map<String, Object> p = new HashMap<>();
         p.put("tenantId", tenantId);
+        // No soft-delete filter: the pe_equipment dynamic table has no deleted_flag column (the
+        // platform's mt_pe_* tables do not carry one), matching the other OEE adapter queries.
         String sql = "SELECT pid, pe_eq_code AS code, pe_eq_name AS name "
             + "FROM " + TABLE_EQUIPMENT + " "
             + "WHERE tenant_id = #{params.tenantId} "
-            + "AND (deleted_flag = false OR deleted_flag IS NULL) "
             + "ORDER BY pe_eq_code";
         List<OeeEquipmentRef> refs = new ArrayList<>();
         for (Map<String, Object> row : query(sql, p)) {
