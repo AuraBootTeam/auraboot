@@ -126,6 +126,130 @@ describe('DynamicField', () => {
     expect(screen.queryByText('dept-1')).not.toBeInTheDocument();
   });
 
+  it('renders readonly generic reference values as the target display name, not the ULID', async () => {
+    const ulid = '01KT4T39ZE8D9PGR29QNXFE8NW';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: '0',
+        data: {
+          pid: ulid,
+          crm_acc_name: '示范客户有限公司',
+          name: '示范客户有限公司',
+        },
+      }),
+    }) as unknown as typeof fetch;
+
+    render(
+      <DynamicField
+        field={{
+          field: 'crm_opp_account',
+          label: '关联客户',
+          component: 'reference',
+          refTarget: { targetModel: 'crm_account', displayField: 'crm_acc_name' },
+        }}
+        value={ulid}
+        onChange={vi.fn()}
+        readOnly
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('示范客户有限公司')).toBeInTheDocument();
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(`/api/dynamic/crm_account/${ulid}`);
+    // The raw ULID must never leak into the rendered detail.
+    expect(screen.queryByText(ulid)).not.toBeInTheDocument();
+  });
+
+  it('resolves reference via referenceModelCode + targetField fallback chain', async () => {
+    const ulid = '01KT4OPPORTUNITY0000000000A';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: '0',
+        data: { pid: ulid, crm_opp_name: '2026 年度框架采购商机' },
+      }),
+    }) as unknown as typeof fetch;
+
+    render(
+      <DynamicField
+        field={{
+          field: 'so_source_opportunity',
+          label: '来源商机',
+          component: 'smartinput',
+          referenceModelCode: 'crm_opportunity',
+          refTarget: { targetField: 'crm_opp_name' },
+        }}
+        value={ulid}
+        onChange={vi.fn()}
+        readOnly
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('2026 年度框架采购商机')).toBeInTheDocument();
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(`/api/dynamic/crm_opportunity/${ulid}`);
+    expect(screen.queryByText(ulid)).not.toBeInTheDocument();
+  });
+
+  it('falls back to the raw id when the referenced record cannot be loaded', async () => {
+    const ulid = '01KT4MISSING000000000000000';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({}),
+    }) as unknown as typeof fetch;
+
+    render(
+      <DynamicField
+        field={{
+          field: 'crm_opp_account',
+          label: '关联客户',
+          component: 'reference',
+          refTarget: { targetModel: 'crm_account', displayField: 'crm_acc_name' },
+        }}
+        value={ulid}
+        onChange={vi.fn()}
+        readOnly
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(ulid)).toBeInTheDocument();
+    });
+  });
+
+  it('does not treat dict-coded fields as references', () => {
+    // A field with a dictCode must still resolve through the dict path even if some
+    // stray reference metadata is present — no /api/dynamic reference fetch.
+    globalThis.fetch = vi.fn() as unknown as typeof fetch;
+
+    render(
+      <DynamicField
+        field={{
+          field: 'crm_opp_stage',
+          label: '阶段',
+          component: 'smartselect',
+          dictCode: 'crm_opp_stage_dict',
+        }}
+        value="negotiation"
+        onChange={vi.fn()}
+        readOnly
+        getDictItems={(code) =>
+          code === 'crm_opp_stage_dict'
+            ? [{ value: 'negotiation', label: '谈判中' }]
+            : []
+        }
+      />,
+    );
+
+    expect(screen.getByText('谈判中')).toBeInTheDocument();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it('renders readonly addressfield JSON as a readable address', () => {
     render(
       <DynamicField

@@ -68,4 +68,83 @@ describe('dashboardService.normalizeDashboard', () => {
       staticData: [{ name: 'Alpha', value: '10' }],
     });
   });
+
+  it('preserves smart-number-card presentation keys (cards/label) through the dataSource branch', () => {
+    // Regression: the dataSource branch only forwarded a whitelist (dataSource,
+    // visualization, linkage, ...), silently dropping `cards`. The card renderer then
+    // fell back to auto-cards labelled with the raw named-query field codes
+    // (e.g. "new_leads") instead of the authored `cards[].label` eyebrow.
+    const dashboard = normalizeDashboard(
+      baseDashboard([
+        {
+          id: 'block_kpi_cards',
+          type: 'smart-number-card',
+          x: 0,
+          y: 0,
+          w: 12,
+          h: 1,
+          config: {
+            title: { 'zh-CN': '关键指标', en: 'Key Metrics' },
+            dataSource: {
+              type: 'api',
+              url: '/api/datasource/list',
+              params: { datasourceId: 'nq:crm_dashboard_kpi', format: 'records', maxItems: '1' },
+            },
+            cards: [
+              { field: 'new_leads', label: { 'zh-CN': '新线索', en: 'New Leads' }, color: '#3b82f6' },
+              {
+                field: 'open_opportunities',
+                label: { 'zh-CN': '进行中商机', en: 'Open Opportunities' },
+                color: '#f59e0b',
+              },
+            ],
+          },
+        },
+      ]),
+    );
+
+    const config = dashboard.widgets[0].config;
+    expect(config.dataSource).toMatchObject({ type: 'api', url: '/api/datasource/list' });
+    expect(config.cards).toHaveLength(2);
+    expect(config.cards?.[0]).toMatchObject({
+      field: 'new_leads',
+      label: { 'zh-CN': '新线索', en: 'New Leads' },
+    });
+    expect(config.cards?.[1]).toMatchObject({ field: 'open_opportunities' });
+  });
+
+  it('forwards single number-card presentation keys (metricField/format/suffix/label)', () => {
+    const dashboard = normalizeDashboard(
+      baseDashboard([
+        {
+          id: 'revenue_card',
+          type: 'smart-number-card',
+          x: 0,
+          y: 0,
+          w: 3,
+          h: 2,
+          config: {
+            title: { 'zh-CN': '本月回款' },
+            label: { 'zh-CN': '回款金额', en: 'Collected' },
+            dataSource: {
+              type: 'namedQuery',
+              queryCode: 'crm_collection_summary',
+            },
+            metricField: 'collected_amount',
+            format: 'currency',
+            currency: 'cny',
+            precision: 2,
+            suffix: '元',
+          },
+        },
+      ]),
+    );
+
+    const config = dashboard.widgets[0].config;
+    expect(config.metricField).toBe('collected_amount');
+    expect(config.format).toBe('currency');
+    expect(config.precision).toBe(2);
+    expect(config.suffix).toBe('元');
+    expect(config.label).toEqual({ 'zh-CN': '回款金额', en: 'Collected' });
+  });
 });
