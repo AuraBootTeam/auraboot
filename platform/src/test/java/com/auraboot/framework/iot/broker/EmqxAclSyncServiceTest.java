@@ -200,4 +200,43 @@ class EmqxAclSyncServiceTest {
         assertThatThrownBy(() -> svc.revokeDeviceUser(-1L, "x"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    // ---- syncTenantAclRules (ACL-only, no authn-user create) ----
+
+    @Test
+    void syncTenantAclRules_pushesAuthzRulesPerDevice_noAuthnUserCreate() {
+        AtomicInteger aclPushCalls = new AtomicInteger();
+        AtomicInteger authnUserCalls = new AtomicInteger();
+        ExchangeFunction xf = req -> {
+            String path = req.url().getPath();
+            if (path.contains("/authorization/sources/built_in_database/rules/users")) {
+                aclPushCalls.incrementAndGet();
+            } else if (path.contains("/authentication/") && path.endsWith("/users")) {
+                // POST to authn .../users (create-user endpoint)
+                authnUserCalls.incrementAndGet();
+            }
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        };
+        EmqxAclSyncService svc = build(enabledProps(), xf);
+        svc.syncTenantAclRules(7L, List.of(
+                new EmqxAclSyncService.DeviceAclRule("dev-1", List.of("/sys/p/dev-1/#")),
+                new EmqxAclSyncService.DeviceAclRule("dev-2", List.of("/sys/p/dev-2/#"))));
+        assertThat(aclPushCalls.get()).isEqualTo(2);
+        assertThat(authnUserCalls.get()).isZero();
+    }
+
+    @Test
+    void syncTenantAclRules_disabled_isNoOp() {
+        AtomicInteger calls = new AtomicInteger();
+        ExchangeFunction xf = req -> {
+            calls.incrementAndGet();
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        };
+        EmqxAclProperties p = new EmqxAclProperties();
+        p.setEnabled(false);
+        EmqxAclSyncService svc = build(p, xf);
+        svc.syncTenantAclRules(7L, List.of(
+                new EmqxAclSyncService.DeviceAclRule("dev-1", List.of("/sys/p/dev-1/#"))));
+        assertThat(calls.get()).isZero();
+    }
 }
