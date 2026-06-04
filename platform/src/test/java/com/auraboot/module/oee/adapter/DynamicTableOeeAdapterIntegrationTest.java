@@ -2,6 +2,7 @@ package com.auraboot.module.oee.adapter;
 
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.module.oee.dto.OeeEquipmentRef;
 import com.auraboot.module.oee.dto.OeeInputs;
 import com.auraboot.module.oee.dto.OeeRequest;
 import com.auraboot.module.oee.dto.OeeResult;
@@ -156,7 +157,9 @@ class DynamicTableOeeAdapterIntegrationTest {
             CREATE TABLE mt_pe_equipment (
                 pid VARCHAR(64) PRIMARY KEY,
                 tenant_id BIGINT NOT NULL,
-                pe_eq_resource_id VARCHAR(64)
+                pe_eq_resource_id VARCHAR(64),
+                pe_eq_code VARCHAR(64),
+                pe_eq_name VARCHAR(128)
             )
             """);
         jdbcTemplate.execute("""
@@ -198,8 +201,9 @@ class DynamicTableOeeAdapterIntegrationTest {
 
         // equipment -> resource
         jdbcTemplate.update(
-                "INSERT INTO mt_pe_equipment (pid, tenant_id, pe_eq_resource_id) VALUES (?, ?, ?)",
-                EQUIPMENT_PID, TENANT_ID, RESOURCE_PID);
+                "INSERT INTO mt_pe_equipment (pid, tenant_id, pe_eq_resource_id, pe_eq_code, pe_eq_name) "
+                        + "VALUES (?, ?, ?, ?, ?)",
+                EQUIPMENT_PID, TENANT_ID, RESOURCE_PID, "EQ-IT-1", "SMT Line IT");
 
         // calendar: one day inside the window, 8 available hours
         jdbcTemplate.update(
@@ -247,6 +251,25 @@ class DynamicTableOeeAdapterIntegrationTest {
      * A wrong column name (e.g. {@code pe_woo_resource_id}) would make the adapter degrade to zero,
      * failing these assertions.
      */
+    /**
+     * Proves {@code listEquipment} (used by the fleet roll-up) runs on real Postgres with the
+     * production column names ({@code pe_eq_code}/{@code pe_eq_name}) + tenant + soft-delete filter,
+     * and is tenant-isolated. A wrong column name would make the adapter degrade to an empty list.
+     */
+    @Test
+    void listEquipment_returnsSeededEquipment_andIsTenantIsolated() {
+        List<OeeEquipmentRef> eq = adapter.listEquipment(TENANT_ID);
+
+        assertEquals(1, eq.size(), "should list the one seeded equipment for the tenant");
+        OeeEquipmentRef ref = eq.get(0);
+        assertEquals(EQUIPMENT_PID, ref.getEquipmentId());
+        assertEquals("EQ-IT-1", ref.getCode());
+        assertEquals("SMT Line IT", ref.getName());
+
+        assertTrue(adapter.listEquipment(TENANT_ID + 1).isEmpty(),
+                "another tenant must not see this equipment (tenant isolation)");
+    }
+
     @Test
     void fetch_assemblesRawInputsFromRealPostgres() {
         OeeInputs in = adapter.fetch(request());

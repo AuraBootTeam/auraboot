@@ -1,6 +1,7 @@
 package com.auraboot.module.oee.adapter;
 
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.module.oee.dto.OeeEquipmentRef;
 import com.auraboot.module.oee.dto.OeeInputs;
 import com.auraboot.module.oee.dto.OeeRequest;
 import com.auraboot.module.oee.port.OeeDataQueryPort;
@@ -87,6 +88,32 @@ public class DynamicTableOeeAdapter implements OeeDataQueryPort {
             .defectQty(output.defectQty)
             .capacityPerHour(output.capacityPerHour)
             .build();
+    }
+
+    @Override
+    public List<OeeEquipmentRef> listEquipment(Long tenantId) {
+        // Plugin not imported -> no equipment (fleet roll-up degrades to empty, never an error).
+        if (!exists(TABLE_EQUIPMENT)) {
+            log.info("OEE equipment table not found (PCBA manufacturing plugin not imported). Returning no equipment.");
+            return List.of();
+        }
+        Map<String, Object> p = new HashMap<>();
+        p.put("tenantId", tenantId);
+        // No soft-delete filter: the pe_equipment dynamic table has no deleted_flag column (the
+        // platform's mt_pe_* tables do not carry one), matching the other OEE adapter queries.
+        String sql = "SELECT pid, pe_eq_code AS code, pe_eq_name AS name "
+            + "FROM " + TABLE_EQUIPMENT + " "
+            + "WHERE tenant_id = #{params.tenantId} "
+            + "ORDER BY pe_eq_code";
+        List<OeeEquipmentRef> refs = new ArrayList<>();
+        for (Map<String, Object> row : query(sql, p)) {
+            refs.add(OeeEquipmentRef.builder()
+                .equipmentId(str(row.get("pid")))
+                .code(str(row.get("code")))
+                .name(str(row.get("name")))
+                .build());
+        }
+        return refs;
     }
 
     /** Downtime hours grouped by type for the equipment within the window. */

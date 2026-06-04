@@ -1,7 +1,10 @@
 package com.auraboot.module.oee.port;
 
+import com.auraboot.module.oee.dto.OeeEquipmentRef;
 import com.auraboot.module.oee.dto.OeeInputs;
 import com.auraboot.module.oee.dto.OeeRequest;
+
+import java.util.List;
 
 /**
  * Port interface for fetching OEE raw inputs. The engine depends only on this; the real DB
@@ -14,4 +17,10 @@ public interface OeeDataQueryPort {
      * time window. Returns zero-valued inputs when the plugin tables are absent.
      */
     OeeInputs fetch(OeeRequest request);
+
+    /**
+     * List every equipment of the tenant (id / code / name). Returns an empty list when the plugin
+     * tables are absent. Used by the fleet OEE roll-up to iterate all equipment.
+     */
+    List<OeeEquipmentRef> listEquipment(Long tenantId);
 }
