@@ -1155,6 +1155,16 @@
       "resourceType": "function"
     },
     {
+      "code": "meta.manufacturing.oee",
+      "name": "View OEE",
+      "description": "Manufacturing OEE — read availability / performance / quality / OEE / TEEP per equipment",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:manufacturing-oee",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
       "code": "org.role.read",
       "name": "Organization role read",
       "description": "Organization role — read",
