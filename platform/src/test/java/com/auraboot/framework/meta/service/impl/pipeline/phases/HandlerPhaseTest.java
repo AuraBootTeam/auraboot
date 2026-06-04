@@ -27,13 +27,16 @@ import org.springframework.context.ApplicationContext;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -82,6 +85,8 @@ class HandlerPhaseTest {
         ReflectionTestUtils.setField(phase, "fileService", fileService);
         ReflectionTestUtils.setField(phase, "storageProvider", storageProvider);
         ReflectionTestUtils.setField(phase, "asyncTaskService", asyncTaskService);
+        // Default: no chained secondaries (the common case). Individual tests override.
+        lenient().when(extensionRegistry.getSecondaryCommandHandlers(any())).thenReturn(List.of());
     }
 
     @Test
@@ -118,6 +123,55 @@ class HandlerPhaseTest {
                 .containsKey(CommandHandlerExtension.FILE_ACCESSOR_KEY);
         assertThat(handler.capturedContext.get().fileAccessor()).isInstanceOf(FileAccessor.class);
         assertThat(ctx.getHandlerResults()).containsEntry("observedProcessKey", "po_approval");
+    }
+
+    @Test
+    void execute_runsChainedSecondaryAfterPrimary_sharingTheSameContext() throws Exception {
+        RecordingPluginHandler primary = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        RecordingSecondaryHandler secondary = new RecordingSecondaryHandler();
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(primary));
+        when(extensionRegistry.getSecondaryCommandHandlers(PLUGIN_HANDLER_CODE))
+                .thenReturn(List.of(secondary));
+        when(metaModelService.getModelDefinition("pr_purchase_order")).thenReturn(Optional.empty());
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+
+        phase.execute(ctx);
+
+        // both the primary and the chained secondary ran, against the same record/context
+        assertThat(primary.capturedContext.get()).isNotNull();
+        assertThat(secondary.capturedContext.get()).isNotNull();
+        assertThat(secondary.capturedContext.get().recordId()).isEqualTo("po-1");
+        assertThat(secondary.capturedContext.get().settings())
+                .containsKey(CommandHandlerExtension.DATA_ACCESSOR_KEY);
+        // the secondary's result is merged into handlerResults (without clobbering the primary's)
+        assertThat(ctx.getHandlerResults())
+                .containsEntry("observedCommandType", PLUGIN_HANDLER_CODE) // from the primary
+                .containsEntry("secondaryRan", true);                      // from the secondary
+    }
+
+    @Test
+    void execute_chainedSecondaryFailure_propagatesAndAbortsTheCommand() {
+        RecordingPluginHandler primary = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        CommandHandlerExtension boom = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public boolean chainsAfterPrimary() { return true; }
+            @Override public Object execute(CommandContext context) {
+                throw new IllegalStateException("over credit limit");
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(primary));
+        when(extensionRegistry.getSecondaryCommandHandlers(PLUGIN_HANDLER_CODE))
+                .thenReturn(List.of(boom));
+        // (no metaModelService stub: the secondary throws before result persistence runs)
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+
+        // a failing secondary aborts the whole command (so the transaction rolls back)
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .hasMessageContaining("over credit limit");
     }
 
     @Test
@@ -303,6 +357,32 @@ class HandlerPhaseTest {
                 result.put("observedProcessKey", context.settings().get("processKey"));
             }
             result.put("observedCommandType", context.commandType());
+            return result;
+        }
+    }
+
+    /** A chained secondary that records its context and returns a distinct result key. */
+    private static class RecordingSecondaryHandler implements CommandHandlerExtension {
+
+        private final AtomicReference<CommandContext> capturedContext = new AtomicReference<>();
+
+        @Override
+        public String getCommandType() {
+            return PLUGIN_HANDLER_CODE;
+        }
+
+        @Override
+        public boolean chainsAfterPrimary() {
+            return true;
+        }
+
+        @Override
+        public Object execute(CommandContext context) {
+            capturedContext.set(context);
+            Map<String, Object> result = new HashMap<>();
+            result.put("secondaryRan", true);
+            // attempt to clobber a primary key — the merge is putIfAbsent, so the primary wins
+            result.put("observedCommandType", "SECONDARY_SHOULD_NOT_WIN");
             return result;
         }
     }
