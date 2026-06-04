@@ -333,7 +333,10 @@ class AutomationTriggerServiceImplTest {
 
         AutomationLog log = service.executeAutomation(automation, "rec-011", Map.of());
 
-        verify(automationProcessRuntime).run(eq(automation), eq("rec-011"), any());
+        // run(...) takes 4 args since the G5 overlay (#318): (automation, recordId,
+        // triggerPayload, automationLogId). The log id is null in this DB-less unit test,
+        // so the untyped any() matches it.
+        verify(automationProcessRuntime).run(eq(automation), eq("rec-011"), any(), any());
         assertThat(log.getStatus()).isEqualTo("success");
     }
 
@@ -358,7 +361,7 @@ class AutomationTriggerServiceImplTest {
 
         AutomationLog log = service.executeAutomation(automation, "rec-F", Map.of("event", "create"));
 
-        verify(automationProcessRuntime).run(eq(automation), eq("rec-F"), any());
+        verify(automationProcessRuntime).run(eq(automation), eq("rec-F"), any(), any());
         assertThat(log.getStatus()).isEqualTo("success");
     }
 
