@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Compliance & Risk Management
 
 > Regulatory compliance frameworks (SOC 2, ISO 27001, GDPR, HIPAA), control measures, risk assessments, audit tracking, evidence management, policy lifecycle, and dual prevention mechanisms -- built entirely through AuraBoot's JSON DSL configuration.

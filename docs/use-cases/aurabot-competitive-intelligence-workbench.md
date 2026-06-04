@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # AuraBot Competitive Intelligence Workbench
 
 ## Product Goal

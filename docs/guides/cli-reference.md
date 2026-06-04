@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # CLI Reference
 
 Complete reference for the Aura CLI -- authenticate, query data, execute commands, manage plugins, and inspect DSL resources from the terminal.

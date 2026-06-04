@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Event-Driven Automation Rules
 
 Automate repetitive business logic with AuraBoot's automation engine. Define triggers, conditions, and actions to react to data changes, scheduled events, and external webhooks -- without writing code.

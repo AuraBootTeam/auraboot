@@ -76,6 +76,17 @@ test('wrong type under docs/product-docs/ -> S-DOCS-LOC-DISALLOWED', () => {
   assert.ok(codes(result).includes('S-DOCS-LOC-DISALLOWED'));
 });
 
+test('public/product doc dirs (guides, api-reference, architecture) are governed homes, no UNGOVERNED-DIR (v3)', () => {
+  const root = makeRepo();
+  write(root, 'docs/guides/01-intro.md', fm({ type: 'product-doc', status: 'active' }));
+  write(root, 'docs/api-reference/rest.md', fm({ type: 'product-doc', status: 'active' }));
+  write(root, 'docs/architecture/overview.md', fm({ type: 'system-reference', status: 'active' }));
+  write(root, 'docs/core-concepts/model.md', fm({ type: 'system-reference', status: 'active' }));
+  const result = auditRepo(root);
+  assert.deepEqual(bySeverity(result, 'error'), []);
+  assert.ok(!codes(result).includes('S-DOCS-UNGOVERNED-DIR'), 'public dirs must be routed, not ungoverned');
+});
+
 test('clean process handover -> no error', () => {
   const root = makeRepo();
   write(root, 'docs/handover/HANDOVER-2026-06-04-foo-bar.md',

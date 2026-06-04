@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Quick Start (5 Minutes)
 
 Get AuraBoot running locally with Docker Compose. By the end of this guide, you will have a working AuraBoot instance with a PostgreSQL database, Spring Boot backend, and React frontend.

@@ -27,7 +27,9 @@ import { execFileSync } from 'node:child_process';
 // Contract version published in the canonical governance doc's frontmatter.
 // Bump in lockstep with the schema/enums there; vendored copies that fall
 // behind report S-DOCS-CHECKER-STALE.
-const SCHEMA_VERSION = 2;
+// v3: recognize conventional public/product-documentation dirs (guides,
+//     api-reference, …) as product-doc/system-reference homes (DIR_TYPE_RULES).
+const SCHEMA_VERSION = 3;
 
 const GOVERNANCE_DOC = 'docs/standards/meta/documentation-governance.md';
 
@@ -57,6 +59,15 @@ const DIR_TYPE_RULES = [
   { prefix: 'backlog', types: ['backlog', 'retro'] },
   { prefix: 'superpowers', types: ['run-log', 'plan-design', 'plan-impl', 'artifact'] },
   { prefix: 'decisions', types: ['ddr'] }, // lite profile
+  // Conventional public / product-documentation dirs (open-source doc-site
+  // layout). Permissive: a repo without these dirs is unaffected. Public docs
+  // are canonical type {product-doc, system-reference} — type+status only, no
+  // process/precipitation rules. (SCHEMA_VERSION 3)
+  ...[
+    'getting-started', 'guides', 'use-cases', 'api-reference', 'core-concepts',
+    'architecture', 'connector-sdk', 'plugin-development', 'deployment',
+    'operations', 'community', 'mobile', 'releases',
+  ].map((prefix) => ({ prefix, types: ['product-doc', 'system-reference'] })),
   { prefix: 'archive', types: null },
 ];
 

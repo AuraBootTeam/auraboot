@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # The DSL Engine
 
 AuraBoot's DSL Engine is the core of the platform. Instead of writing boilerplate Java controllers, database migrations, and React pages, you define your application in declarative JSON. The engine reads those definitions and generates everything at runtime -- database tables, REST APIs, form validation, list pages, and detail views.

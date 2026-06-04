@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Data Source API Reference
 
 The Data Source API provides a unified interface for querying dictionary data and named queries. It powers dropdown options, reference field lookups, chart data, and custom report pages.

@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-29
+---
+
 # `<Popover>` Invalid hook call → cascades via RenderErrorBoundary
 
 **Status**: OPEN (P3 — non-blocking) — **v2 diagnostic 2026-05-30 by implementer subagent**

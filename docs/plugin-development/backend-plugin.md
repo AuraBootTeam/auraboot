@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Backend Plugin Guide
 
 This guide covers building backend plugins for AuraBoot using PF4J. Backend plugins let you extend the platform with custom Java logic -- command handlers, validators, event listeners, and data providers -- that gets hot-loaded at runtime without restarting the server.

@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Plugin Manifest Reference (plugin.json)
 
 This is the complete reference for the `plugin.json` manifest file. Every AuraBoot plugin must have this file at its root directory.

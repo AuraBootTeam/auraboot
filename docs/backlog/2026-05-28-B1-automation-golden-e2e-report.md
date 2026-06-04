@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-28
+---
+
 # B1 方案 A — Automation 黄金 E2E (host stack 降级版)
 
 **Date**: 2026-05-28

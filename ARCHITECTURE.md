@@ -2,7 +2,7 @@
 
 This document is the entry point for understanding how AuraBoot is structured. It is intentionally short — each section links to the canonical reference in [`docs/core-concepts/`](docs/core-concepts/) or [the documentation site](https://docs.auraboot.com).
 
-Read [POSITIONING](docs/positioning.md) first if you have not — the rest of this document assumes you understand what AuraBoot is optimized for.
+Read [POSITIONING](docs/getting-started/positioning.md) first if you have not — the rest of this document assumes you understand what AuraBoot is optimized for.
 
 ---
 
@@ -99,7 +99,7 @@ Three design pressures push AuraBoot toward this architecture:
 
 ## What this architecture is not
 
-For the things AuraBoot deliberately does not optimize for, see [POSITIONING](docs/positioning.md):
+For the things AuraBoot deliberately does not optimize for, see [POSITIONING](docs/getting-started/positioning.md):
 
 - Not a drop-in replacement for a country-specific accounting suite
 - Not a quickest-time-to-screen data-app builder

@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-28
+---
+
 # B2b — T4 BPMN→SDK Node Port, Batch 1 (4 nodes + 4 editors)
 
 - Date: 2026-05-28

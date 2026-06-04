@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-28
+---
+
 # A3 — flow-designer-sdk BPM-shaped Smoke PoC & T4 Feasibility Report
 
 - Date: 2026-05-28

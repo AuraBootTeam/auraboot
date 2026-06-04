@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Build Your First App: Task Tracker (30 Minutes)
 
 In this tutorial, you build a complete Task Tracker application from scratch using AuraBoot's plugin system. By the end, you will have:

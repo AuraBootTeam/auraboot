@@ -39,7 +39,7 @@ You declare your business in six first-class concepts: **Model**, **Page**, **Co
 | **A packaged business suite** | You want a working ERP/CRM out of the box and your processes fit its defaults | Deep non-standard processes, custom verticals, runtime-level AI execution |
 | **AuraBoot** | The business is complex, the lifecycle is years, and operations must be governed and AI-callable | Higher learning curve than a pure form builder; not a same-quarter accounting replacement |
 
-Full positioning rationale: [`docs/positioning.md`](docs/positioning.md). Architecture: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+Full positioning rationale: [`docs/getting-started/positioning.md`](docs/getting-started/positioning.md). Architecture: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ### The six concepts (one card each)
 

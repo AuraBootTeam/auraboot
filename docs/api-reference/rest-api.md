@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # REST API Reference
 
 AuraBoot exposes a RESTful API served by Spring Boot on port **6443** (default). All endpoints return a unified response envelope and require JWT authentication unless noted otherwise.

@@ -314,7 +314,8 @@ aura:
   # C.2 Cross-tenant sub-agent ACL kill switch.
   # When false, every cross-tenant evaluation returns
   # denied_feature_disabled — same-tenant spawns are unaffected.
-  # See docs/superpowers/specs/2026-05-07-c2-cross-tenant-acl-design.md
+  # Design: C.2 cross-tenant ACL (internal design doc; in git history under
+  # docs/superpowers/specs/ — internal process docs no longer ship in the OSS tree).
   security:
     cross-tenant:
       enabled: ${AURA_CROSS_TENANT_ENABLED:true}

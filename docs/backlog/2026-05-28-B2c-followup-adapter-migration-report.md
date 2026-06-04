@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-28
+---
+
 # B2c-followup — `useBpmFlowStore` Adapter + Consumer Migration
 
 **Date**: 2026-05-28

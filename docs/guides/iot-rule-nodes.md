@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # IoT Rule Nodes (Automation + SmartEngine)
 
 > Status: M0 platform primitives shipped 2026-05-28. Enterprise plugin wiring (Kafka/BPM sinks,

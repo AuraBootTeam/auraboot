@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-28
+---
+
 # B2b batch2 — T4 BPMN→SDK port report (4 nodes + 5 editors)
 
 **Worktree**: `/Users/ghj/work/auraboot/wt-sdk-b2b-t4-batch2`

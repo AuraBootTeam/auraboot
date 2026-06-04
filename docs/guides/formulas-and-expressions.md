@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Formulas and Expressions
 
 Define computed fields, rollup aggregations, and auto-number sequences using AuraBoot's expression engine.

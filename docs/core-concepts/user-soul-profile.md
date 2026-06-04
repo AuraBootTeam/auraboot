@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # User Soul Profile — Subsystem Reference
 
 **Status**: Phases 1-10 + Round-1/2/3 fixes shipped. Admin audit extended to list+stats.

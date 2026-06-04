@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Permissions & Access Control
 
 AuraBoot uses a five-layer permission model combining RBAC (role-based), ReBAC (relationship-based), and ABAC (attribute-based) access control. Every API request passes through a unified permission evaluation pipeline that checks functional permissions, data scope, policy constraints, and field-level visibility -- enforced by the framework for standard business models.

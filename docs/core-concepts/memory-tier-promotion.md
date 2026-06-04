@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Memory Tier Promotion — Subsystem Reference
 
 **Status**: Phases 1-4 shipped + Round-3 Important I1-I3 + terminal-state event coverage. Phase 5+ (real browser E2E + dashboard widgets) pending.

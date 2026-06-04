@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Quality Management
 
 > Inspections (IQC/PQC/FQC), non-conformance reports (NCR), corrective actions (CAPA), SPC control charts, rework orders, batch traceability, and quality cost tracking -- built entirely through AuraBoot's JSON DSL configuration.

@@ -1,3 +1,9 @@
+---
+type: backlog
+status: active
+created: 2026-05-28
+---
+
 # B1 — Automation 黄金 E2E (BLOCKED_WITH_OWNER)
 
 **Status**: BLOCKED_WITH_OWNER (owner: yaoyi.hz@gmail.com)
