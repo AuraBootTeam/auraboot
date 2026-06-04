@@ -1,0 +1,9 @@
+{
+  "profile": "lite",
+  "baseline_anchor": "2026-06-04",
+  "baseline_allowlist": [
+    "docs/archive/**"
+  ],
+  "archive_retention_days": 60,
+  "allowed_root_md": ["README.md", "AGENTS.md", "CLAUDE.md", "CHANGELOG.md"]
+}
