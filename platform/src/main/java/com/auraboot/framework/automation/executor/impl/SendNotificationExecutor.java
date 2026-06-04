@@ -2,6 +2,7 @@ package com.auraboot.framework.automation.executor.impl;
 
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
+import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.util.Map;
 public class SendNotificationExecutor implements ActionExecutor {
 
     private final NotificationService notificationService;
+    private final DynamicDataService dynamicDataService;
 
     @Override
     public Object execute(AutomationAction action, Map<String, Object> context) {
@@ -50,7 +52,12 @@ public class SendNotificationExecutor implements ActionExecutor {
 
         String automationPid = (String) context.get("automationPid");
 
-        for (String recipientId : recipients) {
+        for (String rawRecipient : recipients) {
+            String recipientId = resolveRecipient(rawRecipient, context);
+            if (recipientId == null) {
+                log.warn("[send-notification] recipient '{}' did not resolve to a target, skipping", rawRecipient);
+                continue;
+            }
             try {
                 switch (notificationType != null ? notificationType : "in_app") {
                     case "in_app" -> {
@@ -100,6 +107,56 @@ public class SendNotificationExecutor implements ActionExecutor {
     @Override
     public boolean supports(String actionType) {
         return "send_notification".equals(actionType);
+    }
+
+    /**
+     * Resolve a recipient token to a concrete userId/email string.
+     *
+     * <ul>
+     *   <li>Plain values (numeric id / email) pass through unchanged.</li>
+     *   <li>{@code ${record.<field>}} reads a flat field off the trigger record.</li>
+     *   <li>{@code ${record.<refField>.<targetField>}} performs a single reference hop:
+     *       it reads {@code <refField>} off the record (a referenced row id), loads that
+     *       row via {@link DynamicDataService#getById(String, String)} (the referenced
+     *       model is inferred from the {@code <model>_id} naming convention), and returns
+     *       {@code <targetField>} off it.</li>
+     * </ul>
+     *
+     * Returns {@code null} (caller skips, logs) when the path cannot be resolved.
+     */
+    private String resolveRecipient(String raw, Map<String, Object> context) {
+        if (raw == null || !raw.startsWith("${") || !raw.endsWith("}")) {
+            return raw; // plain id / email
+        }
+        String expr = raw.substring(2, raw.length() - 1).trim(); // e.g. record.asset_id.current_user_id
+        String[] parts = expr.split("\\.");
+        if (parts.length < 2 || !"record".equals(parts[0])) {
+            log.warn("[send-notification] unsupported recipient expression: {}", raw);
+            return null;
+        }
+        Object record = context.get("record");
+        if (!(record instanceof Map<?, ?> rec)) {
+            return null;
+        }
+        if (parts.length == 2) { // ${record.field}
+            Object v = rec.get(parts[1]);
+            return v == null ? null : String.valueOf(v);
+        }
+        // ${record.refField.targetField} — single reference hop.
+        Object refId = rec.get(parts[1]);
+        if (refId == null) {
+            return null;
+        }
+        String refModel = parts[1].endsWith("_id")
+                ? parts[1].substring(0, parts[1].length() - 3) // asset_id -> asset
+                : parts[1];
+        // DynamicDataService.getById(String modelCode, String recordId) — recordId is a String (§15).
+        Map<String, Object> refRow = dynamicDataService.getById(refModel, String.valueOf(refId));
+        if (refRow == null) {
+            return null;
+        }
+        Object target = refRow.get(parts[2]);
+        return target == null ? null : String.valueOf(target);
     }
 
     private String processTemplate(String template, Map<String, Object> context) {
