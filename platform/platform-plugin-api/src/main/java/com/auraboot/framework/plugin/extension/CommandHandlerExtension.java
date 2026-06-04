@@ -84,6 +84,33 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     }
 
     /**
+     * Declare whether this handler chains <i>after</i> the primary handler for a command
+     * instead of competing to <i>be</i> the primary.
+     *
+     * <p>The platform runs exactly one <b>primary</b> handler per command — the highest-priority
+     * handler that returns {@code false} here (the historical winner-take-all behaviour). A handler
+     * that returns {@code true} is a <b>secondary</b>: it does not participate in primary selection,
+     * and instead runs <i>after</i> the primary, within the same command transaction, sharing the
+     * same {@link CommandContext} (and therefore the same {@code DataAccessor}). Multiple secondaries
+     * run in descending {@link #getPriority()} order.
+     *
+     * <p>This lets a downstream plugin add behaviour to a command another plugin already owns —
+     * e.g. posting a GL journal after a payout is paid, or adding a credit check to an order
+     * approval that an incentive plugin already pre-accrues — without inverting the dependency or
+     * replacing the primary. A secondary that throws rolls back the whole command (intended
+     * atomicity), exactly like the primary.
+     *
+     * <p>Default is {@code false}: existing handlers are unaffected, so for every command in the
+     * platform today this changes nothing.
+     *
+     * @return {@code true} to run as a chained secondary after the primary; {@code false} (default)
+     *         to participate in primary selection
+     */
+    default boolean chainsAfterPrimary() {
+        return false;
+    }
+
+    /**
      * Declare whether this handler is safe to execute under
      * {@code CommandExecuteRequest.dryRun=true}.
      *
