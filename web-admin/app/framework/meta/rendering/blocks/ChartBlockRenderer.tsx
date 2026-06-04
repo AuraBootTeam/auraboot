@@ -45,6 +45,34 @@ const ChartLoadingFallback: React.FC = () => (
   </div>
 );
 
+/**
+ * Interpolate `${record.<field>}`, `${recordId}`, and `${<field>}` placeholders in a
+ * named-query params object against the current record. Returns a new object with string
+ * values resolved; non-string values pass through unchanged. Exported for unit testing.
+ *
+ * Mirrors the SubTableViewer convention so a detail-page chart fed by a record-scoped
+ * namedQuery (e.g. an SPC control chart filtered by `${record.pid}`) receives its params.
+ */
+export function resolveRecordParams(
+  params: Record<string, unknown> | undefined,
+  record: Record<string, unknown> | undefined,
+  recordId: unknown,
+): Record<string, unknown> | undefined {
+  if (!params || typeof params !== 'object') return params;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value !== 'string') {
+      out[key] = value;
+      continue;
+    }
+    out[key] = value
+      .replace(/\$\{recordId\}/g, String(recordId ?? ''))
+      .replace(/\$\{record\.(\w+)\}/g, (_m, f: string) => String(record?.[f] ?? ''))
+      .replace(/\$\{(\w+)\}/g, (_m, f: string) => String(record?.[f] ?? ''));
+  }
+  return out;
+}
+
 export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, runtime }) => {
   const chartType = (block.chartType as string) || 'bar';
   const ChartComponent = getChartComponent(chartType);
@@ -60,13 +88,23 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
       ? runtime.getDataSourceManager().getConfig(dataSourceId)
       : config.dataSource;
 
+    // Normalize legacy `params` → `parameters` (the key useChartData/the backend read).
+    // Record-scoped `${record.*}`/`${recordId}` templates are resolved upstream by the page
+    // renderer (DetailBlockRenderer), where the current record is available.
+    let resolvedDataSource = dataSource;
+    if (dataSource && (dataSource as any).params && !(dataSource as any).parameters) {
+      resolvedDataSource = { ...dataSource, parameters: (dataSource as any).params };
+    }
+
     return {
       title: typeof block.title === 'string' ? block.title : undefined,
-      dataSource: dataSource || { type: 'static' as const, staticData: [] },
       // Visualization props (new unified format)
       ...visualization,
       // Legacy chartConfig (backward compat)
       ...config,
+      // Resolved dataSource MUST come after ...config, which otherwise re-injects the raw
+      // (unresolved) config.dataSource and drops the per-record parameters.
+      dataSource: resolvedDataSource || { type: 'static' as const, staticData: [] },
       // Advanced features (previously Dashboard-only, now available in DSL)
       linkage: (block as any).linkage,
       drillDown: (block as any).drillDown,

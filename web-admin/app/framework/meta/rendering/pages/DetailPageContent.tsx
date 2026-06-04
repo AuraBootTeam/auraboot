@@ -44,6 +44,7 @@ import { RecordComments } from '~/framework/meta/rendering/blocks/RecordComments
 import { NbaSuggestionBar } from '~/framework/meta/rendering/blocks/NbaSuggestionBar';
 import { BpmPanelBlock } from '~/framework/meta/rendering/blocks/BpmPanelBlock';
 import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
+import { resolveRecordParams } from '~/framework/meta/rendering/blocks/ChartBlockRenderer';
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type {
@@ -741,7 +742,7 @@ export function DetailPageContent(props: PageContentProps) {
                 .map((block: BlockConfig, blockIndex: number) => (
                   <BlockRenderer
                     key={block.id || `misc-header-${blockIndex}`}
-                    block={block}
+                    block={resolveChartBlockRecordParams(block, recordData, recordId!)}
                     runtime={runtime}
                     areaId="detail-direct"
                   />
@@ -834,7 +835,7 @@ export function DetailPageContent(props: PageContentProps) {
                 .map((block: BlockConfig, blockIndex: number) => (
                   <BlockRenderer
                     key={block.id || `misc-${blockIndex}`}
-                    block={block}
+                    block={resolveChartBlockRecordParams(block, recordData, recordId!)}
                     runtime={runtime}
                     areaId="detail-direct"
                   />
@@ -890,6 +891,30 @@ export function DetailPageContent(props: PageContentProps) {
       <FormDialog />
     </div>
   );
+}
+
+/**
+ * Resolve `${record.*}` / `${recordId}` templates in a chart block's namedQuery dataSource
+ * params against the current record, returning a cloned block with resolved `parameters`.
+ * The chart's own runtime context does not carry the detail record, so this must happen here
+ * (where recordData/recordId are available) before the block is dispatched to BlockRenderer.
+ * Non-chart blocks and charts without templated params pass through unchanged.
+ */
+function resolveChartBlockRecordParams(
+  block: BlockConfig,
+  recordData: RecordData,
+  recordId: string,
+): BlockConfig {
+  if (block.blockType !== 'chart') return block;
+  const chartConfig = (block as any).chartConfig;
+  const ds = chartConfig?.dataSource;
+  const rawParams = ds?.params ?? ds?.parameters;
+  if (!ds || !rawParams || typeof rawParams !== 'object') return block;
+  const resolved = resolveRecordParams(rawParams, recordData as Record<string, unknown>, recordId);
+  return {
+    ...block,
+    chartConfig: { ...chartConfig, dataSource: { ...ds, parameters: resolved } },
+  } as BlockConfig;
 }
 
 /**
@@ -1117,7 +1142,10 @@ function DetailBlockRenderer({
   // stat-card / form / filters / etc.). Renders an "Unknown block type"
   // placeholder if no renderer is registered — NEVER silently null.
   if (runtime) {
-    return <BlockRenderer block={block} runtime={runtime} areaId="detail-tab" />;
+    // Chart blocks fed by a record-scoped namedQuery need their ${record.*}/${recordId}
+    // params resolved here (the chart's runtime context does not carry the detail record).
+    const dispatchBlock = resolveChartBlockRecordParams(block, recordData, recordId);
+    return <BlockRenderer block={dispatchBlock} runtime={runtime} areaId="detail-tab" />;
   }
 
   // No runtime available — log and surface the miss so it's diagnosable.
