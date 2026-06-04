@@ -34,7 +34,7 @@ import { dictService } from '~/shared/services/dictService';
 import { toast } from 'sonner';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import type { PropertySchema } from './types';
-import { getLocalizedText } from '~/utils/i18n';
+import { getLocalizedText, useSmartText } from '~/utils/i18n';
 import { useI18n } from '~/contexts/I18nContext';
 
 // ---------------------------------------------------------------------------
@@ -504,7 +504,7 @@ function defaultForType(type: string): unknown {
 // 'dict-select' component
 // ---------------------------------------------------------------------------
 
-/** Async dict selector — fetches all published dicts on mount and renders a <select>. */
+/** Async dict selector — fetches all published dicts on mount and renders a {@code <select>}. */
 function DictSelectField({
   adapter,
   label,
@@ -518,6 +518,7 @@ function DictSelectField({
   helpText?: string;
   dictCodeFilter?: string[];
 }) {
+  const st = useSmartText();
   const [dicts, setDicts] = useState<{ code: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -535,7 +536,7 @@ function DictSelectField({
       .catch((err) => {
         if (!alive) return;
         console.error('[dict-select] load failed', err);
-        toast.error('加载字典失败');
+        toast.error(st('$i18n:common.options_load_failed') || 'Failed to load options');
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -546,7 +547,7 @@ function DictSelectField({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
-    return <span className="text-sm text-gray-400">加载中…</span>;
+    return <span className="text-sm text-gray-400">{st('$i18n:common.loading') || 'Loading...'}</span>;
   }
 
   return (

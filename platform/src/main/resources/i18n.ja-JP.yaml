@@ -260,6 +260,31 @@ automation:
     eventTypes.task_completed: Task Completed
     eventTypes.task_assigned: Task Assigned
 
+  # Debug
+  debug:
+    toolbar.step: ステップ
+    toolbar.step.title: 次のアクションを実行（ステップオーバー）
+    toolbar.continue: 続行
+    toolbar.continue.title: ブレークポイントまで続行
+    toolbar.restart: 再開
+    toolbar.restart.title: 最初から再開
+    toolbar.stop: 停止
+    toolbar.stop.title: デバッグを停止
+    toolbar.exit: デバッグ終了
+    panel.events: イベント
+    panel.events.empty: イベントなし。ステップをクリックして開始してください。
+    panel.variables: 変数
+    panel.variables.empty: 変数なし
+    panel.actions: アクション
+    actions.next: 次のアクション →
+    actions.index: "アクション #{index}"
+    actions.none: このオートメーションにはアクションが定義されていません。
+    status.paused: 一時停止
+    status.running: 実行中
+    status.completed: 完了
+    status.stopped: 停止
+    status.error: エラー
+
 # Auth
 auth:
   login: ログイン

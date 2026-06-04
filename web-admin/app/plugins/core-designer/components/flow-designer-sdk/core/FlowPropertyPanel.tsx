@@ -4,6 +4,7 @@ import { useSmartText } from '~/utils/i18n';
 import { useFlowStore } from '../store/useFlowStore';
 import { nodeRegistry } from '../nodes/NodeRegistry';
 import { edgeRegistry } from '../edges/EdgeRegistry';
+import { humanizeType } from '../utils';
 import { PropertyField } from './PropertyField';
 import { cn } from '~/utils/cn';
 import { confirmDialog } from '~/utils/confirmDialog';
@@ -96,7 +97,7 @@ export function FlowPropertyPanel({ readOnly, className }: FlowPropertyPanelProp
           </span>
           <div className="flex-1">
             <h3 className="font-medium text-gray-900">
-              {st(definition?.label || selectedNode.type)}
+              {st(definition?.label) || humanizeType(selectedNode.type)}
             </h3>
             {definition?.description && (
               <p className="text-xs text-gray-500">{st(definition.description)}</p>

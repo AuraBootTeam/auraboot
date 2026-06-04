@@ -9,6 +9,8 @@ import {
 } from '~/ui/ui/dialog';
 import { cn } from '~/utils/cn';
 import { useSmartText } from '~/utils/i18n';
+import { ACTION_TYPE_I18N_KEYS, TRIGGER_TYPE_I18N_KEYS } from './automationTypeLabels';
+import { humanizeType } from '~/plugins/core-designer/components/flow-designer-sdk/utils';
 import type { AutomationLog, ActionResult } from '../services/automationService';
 
 const BASE_URL = '/api/automations';
@@ -50,10 +52,13 @@ function formatDuration(ms?: number): string {
 }
 
 function ActionResultItem({ action }: { action: ActionResult }) {
+  const st = useSmartText();
+  const actionLabel =
+    st(ACTION_TYPE_I18N_KEYS[action.actionType] ?? '') || humanizeType(action.actionType);
   return (
     <div className="flex items-start gap-2 px-3 py-1.5 text-sm">
       <span className="w-5 shrink-0 text-right font-mono text-gray-400">{action.sequence}.</span>
-      <span className="min-w-0 font-medium text-gray-700">{action.actionType}</span>
+      <span className="min-w-0 font-medium text-gray-700">{actionLabel}</span>
       <StatusBadge status={action.status} />
       <span className="ml-auto shrink-0 text-xs text-gray-400">
         {formatDuration(action.durationMs)}
@@ -68,6 +73,7 @@ function ActionResultItem({ action }: { action: ActionResult }) {
 }
 
 function LogEntry({ log, token }: { log: AutomationLog; token?: string | null }) {
+  const st = useSmartText();
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<AutomationLog | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -125,7 +131,7 @@ function LogEntry({ log, token }: { log: AutomationLog; token?: string | null })
         <StatusBadge status={log.status} />
         {log.triggerType && (
           <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
-            {log.triggerType}
+            {st(TRIGGER_TYPE_I18N_KEYS[log.triggerType] ?? '') || humanizeType(log.triggerType)}
           </span>
         )}
         <span className="ml-auto shrink-0 text-sm text-gray-600">
@@ -139,7 +145,9 @@ function LogEntry({ log, token }: { log: AutomationLog; token?: string | null })
       {expanded && (
         <div className="border-t border-gray-100 bg-gray-50 py-2">
           {loadingDetail ? (
-            <div className="px-4 py-2 text-sm text-gray-400">Loading...</div>
+            <div className="px-4 py-2 text-sm text-gray-400">
+              {st('$i18n:common.loading') || 'Loading...'}
+            </div>
           ) : detailError ? (
             <div className="px-4 py-2 text-sm text-red-500">{detailError}</div>
           ) : actions.length > 0 ? (

@@ -4,6 +4,7 @@ import * as LucideIcons from 'lucide-react';
 import { useSmartText } from '~/utils/i18n';
 import { nodeRegistry } from '../nodes/NodeRegistry';
 import { useFlowStore } from '../store/useFlowStore';
+import { humanizeType } from '../utils';
 import { DesignerPalette } from '~/shared/designer';
 import type { PaletteItem } from '~/shared/designer';
 
@@ -70,7 +71,7 @@ export function FlowPalette({ categoryOrder, className }: FlowPaletteProps) {
       for (const def of nodes) {
         result.push({
           type: def.type,
-          label: st(def.label) || def.type,
+          label: st(def.label) || humanizeType(def.type),
           icon: renderNodeIcon(def.icon as string | undefined),
           description: def.description ? st(def.description) : undefined,
           category: def.category,

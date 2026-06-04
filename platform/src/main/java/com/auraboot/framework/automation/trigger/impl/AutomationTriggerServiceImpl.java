@@ -11,11 +11,10 @@ import com.auraboot.framework.automation.executor.ActionExecutor;
 import com.auraboot.framework.automation.mapper.AutomationLogMapper;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
+import com.auraboot.framework.automation.util.SpelSafetyGuard;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
@@ -30,7 +29,6 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
-import java.util.regex.Pattern;
 import com.auraboot.framework.common.constant.StatusConstants;
 
 /**
@@ -55,18 +53,6 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     private static final int MAX_CONCURRENCY_MAP_SIZE = 500;
     private final ConcurrentHashMap<String, Semaphore> concurrencyLimits = new ConcurrentHashMap<>();
 
-    /** Max allowed SpEL expression length to prevent ReDoS and abuse */
-    private static final int MAX_EXPRESSION_LENGTH = 500;
-
-    /**
-     * Reject SpEL expressions that contain type references, method calls,
-     * or other constructs that could enable code execution.
-     * Combined with SimpleEvaluationContext.forReadOnlyDataBinding() for defense-in-depth.
-     */
-    private static final Pattern DANGEROUS_SPEL_PATTERN = Pattern.compile(
-            "(?i)(T\\s*\\(|new\\s+|getClass|forName|invoke|exec|Runtime|Process|System|Thread|Class\\." +
-            "|#root|#this|\\bvalueOf\\b|java\\.|javax\\.|org\\.springframework)"
-    );
 
     public AutomationTriggerServiceImpl(
             AutomationMapper automationMapper,
@@ -313,15 +299,8 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             return true;
         }
 
-        // Length limit to prevent ReDoS and expression abuse
-        if (condition.length() > MAX_EXPRESSION_LENGTH) {
-            log.error("Rejected SpEL expression exceeding max length {}: length={}", MAX_EXPRESSION_LENGTH, condition.length());
-            return false;
-        }
-
-        // Reject dangerous expressions that could enable code execution
-        if (DANGEROUS_SPEL_PATTERN.matcher(condition).find()) {
-            log.error("Rejected dangerous SpEL expression: '{}'", condition);
+        // Delegate safety checks (length + dangerous pattern) to the shared guard
+        if (!SpelSafetyGuard.isSafe(condition)) {
             return false;
         }
 

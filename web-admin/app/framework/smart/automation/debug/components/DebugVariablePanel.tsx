@@ -3,6 +3,7 @@
  */
 
 import React, { useState } from 'react';
+import { useSmartText } from '~/utils/i18n';
 import { useDebugSession } from '../hooks/useDebugSession';
 
 function JsonTree({ data, depth = 0 }: { data: unknown; depth?: number }) {
@@ -73,6 +74,7 @@ function JsonTree({ data, depth = 0 }: { data: unknown; depth?: number }) {
 }
 
 export function DebugVariablePanel() {
+  const st = useSmartText();
   const session = useDebugSession((s) => s.session);
 
   if (!session) return null;
@@ -82,11 +84,13 @@ export function DebugVariablePanel() {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b bg-gray-50 px-3 py-2 text-xs font-medium tracking-wide text-gray-600 uppercase">
-        Variables
+        {st('$i18n:automation.debug.panel.variables') || 'Variables'}
       </div>
       <div className="flex-1 overflow-auto p-3 font-mono text-xs">
         {Object.keys(context).length === 0 ? (
-          <p className="py-4 text-center text-gray-400">No variables yet</p>
+          <p className="py-4 text-center text-gray-400">
+            {st('$i18n:automation.debug.panel.variables.empty') || 'No variables yet'}
+          </p>
         ) : (
           <JsonTree data={context} />
         )}

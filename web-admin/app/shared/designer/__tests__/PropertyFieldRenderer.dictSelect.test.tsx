@@ -8,6 +8,22 @@ vi.mock('~/shared/services/dictService', () => ({
   dictService: { findAll: vi.fn() },
 }));
 
+// DictSelectField now calls useSmartText for i18n toast/loading strings
+vi.mock('~/utils/i18n', () => ({
+  useSmartText: () => (key: string, fallback?: string) => fallback ?? key,
+  useLocalizedText: () => (text: unknown) => String(text ?? ''),
+  getLocalizedText: (text: unknown) => String(text ?? ''),
+  translateArray: (arr: unknown[]) => arr,
+}));
+
+// PropertyFieldRenderer uses useI18n directly for label resolution
+vi.mock('~/contexts/I18nContext', () => ({
+  useI18n: () => ({
+    locale: 'en-US',
+    t: (key: string, _params?: unknown, fallback?: string) => fallback ?? key,
+  }),
+}));
+
 function makeAdapter(value: unknown, setValue: (v: unknown) => void) {
   return { value, setValue, error: undefined, required: false, disabled: false };
 }
