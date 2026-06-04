@@ -178,6 +178,13 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         Map<String, Object> params = buildNamedQueryParams(request, fieldMap);
         // Inject tenantId for fromSql that uses #{params.tenantId} for tenant isolation
         params.put("tenantId", tenantId);
+        // Inject currentUserId so user-scoped named queries (#{params.currentUserId}) — e.g.
+        // "my commission" / team-by-manager dashboards — return the same rows when rendered as
+        // a chart (this path) as they do on the /api/datasource/list card/table path. Without
+        // it the WHERE clause matches nothing and the chart shows an empty state. Mirrors
+        // NamedQueryServiceImpl (the datasource/list executor).
+        Long currentUserId = getCurrentUserId();
+        params.put("currentUserId", currentUserId != null ? currentUserId.toString() : null);
 
         log.debug("Executing named query aggregate: code={}, SQL={}, params={}", queryCode, sql, params);
 
