@@ -54,24 +54,57 @@ class EmqxAclSyncServiceTest {
     }
 
     @Test
-    void syncDeviceUser_putsUser_thenPushesAclRules_when2xx() {
+    void syncDeviceUser_postsCreateUser_thenPushesAclRules_when2xx() {
         AtomicInteger calls = new AtomicInteger();
         AtomicReference<URI> firstUri = new AtomicReference<>();
+        AtomicReference<String> firstMethod = new AtomicReference<>();
         AtomicReference<URI> secondUri = new AtomicReference<>();
         ExchangeFunction xf = req -> {
             int n = calls.incrementAndGet();
-            if (n == 1) firstUri.set(req.url());
+            if (n == 1) { firstUri.set(req.url()); firstMethod.set(req.method().name()); }
             else if (n == 2) secondUri.set(req.url());
             return Mono.just(ClientResponse.create(HttpStatus.OK).build());
         };
         EmqxAclSyncService svc = build(enabledProps(), xf);
         svc.syncDeviceUser(7L, "dev-7", "secret", List.of("/sys/p/dev-7/#"));
         assertThat(calls.get()).isEqualTo(2);
+        // Regression guard for the baseUrl bug: the absolute request MUST target the
+        // configured broker host, not localhost (uri(URI) used to ignore baseUrl).
+        assertThat(firstUri.get().getHost()).isEqualTo("emqx-fake");
+        assertThat(firstUri.get().getPort()).isEqualTo(18083);
+        // Create is a POST to /users (user_id is in the body, NOT the path).
+        assertThat(firstMethod.get()).isEqualTo("POST");
         assertThat(firstUri.get().getPath())
                 .contains("/api/v5/authentication/")
-                .contains("/users/dev-7");
+                .endsWith("/users");
         assertThat(secondUri.get().getPath())
                 .contains("/api/v5/authorization/sources/built_in_database/rules/users");
+    }
+
+    @Test
+    void syncDeviceUser_putsUpdate_whenPostConflicts409() {
+        AtomicInteger calls = new AtomicInteger();
+        AtomicReference<URI> putUri = new AtomicReference<>();
+        AtomicReference<String> putMethod = new AtomicReference<>();
+        ExchangeFunction xf = req -> {
+            int n = calls.incrementAndGet();
+            if (n == 1) {
+                // POST create → user already exists.
+                return Mono.just(ClientResponse.create(HttpStatus.CONFLICT)
+                        .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                        .body("{\"message\":\"ALREADY_EXISTS\"}").build());
+            }
+            if (n == 2) { putUri.set(req.url()); putMethod.set(req.method().name()); }
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        };
+        EmqxAclSyncService svc = build(enabledProps(), xf);
+        svc.syncDeviceUser(7L, "dev-7", "secret", List.of("/sys/p/dev-7/#"));
+        // POST (409) → PUT update → ACL push POST = 3 calls.
+        assertThat(calls.get()).isEqualTo(3);
+        assertThat(putMethod.get()).isEqualTo("PUT");
+        // Update targets the specific user (user_id in the path).
+        assertThat(putUri.get().getPath()).endsWith("/users/dev-7");
+        assertThat(putUri.get().getHost()).isEqualTo("emqx-fake");
     }
 
     @Test
@@ -83,7 +116,7 @@ class EmqxAclSyncServiceTest {
         };
         EmqxAclSyncService svc = build(enabledProps(), xf);
         svc.syncDeviceUser(7L, "dev-7", "secret", List.of());
-        assertThat(calls.get()).isEqualTo(1); // only the PUT user call
+        assertThat(calls.get()).isEqualTo(1); // only the POST create-user call
     }
 
     @Test
@@ -114,7 +147,7 @@ class EmqxAclSyncServiceTest {
             return Mono.just(ClientResponse.create(HttpStatus.OK).build());
         };
         EmqxAclSyncService svc = build(enabledProps(), xf);
-        // First call (PUT user) succeeds on last retry → 3 attempts.
+        // First call (POST create-user) succeeds on last retry → 3 attempts.
         // Then ACL push (POST) runs once more and succeeds (call 4).
         svc.syncDeviceUser(7L, "dev-7", "s", List.of("/t/#"));
         assertThat(calls.get()).isEqualTo(EmqxAclSyncService.MAX_RETRIES + 1);
