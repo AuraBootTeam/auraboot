@@ -3090,7 +3090,10 @@ CREATE TABLE IF NOT EXISTS ab_automation (
     -- Basic information
     name VARCHAR(200) NOT NULL,
     description TEXT,
-    model_code VARCHAR(100) NOT NULL,
+    -- Nullable: webhook/scheduled triggers have no model (AutomationFlowTriggerDeriver
+    -- leaves modelCode null for them by design). A NOT NULL here made every
+    -- webhook/scheduled automation create crash with a 500 (golden FINDING-1).
+    model_code VARCHAR(100),
 
     -- Trigger configuration
     trigger_type VARCHAR(50) NOT NULL,  -- ON_RECORD_CREATE, ON_RECORD_UPDATE, ON_FIELD_CHANGE, ON_STATE_CHANGE, SCHEDULED, WEBHOOK

@@ -1,0 +1,14 @@
+-- Make ab_automation.model_code nullable.
+--
+-- Webhook and scheduled triggers have no model: AutomationFlowTriggerDeriver
+-- intentionally leaves modelCode null for them (per its javadoc, "modelCode
+-- optional — absent for scheduled/webhook"). The original NOT NULL constraint
+-- made every webhook/scheduled automation create crash with
+--   null value in column "model_code" of relation "ab_automation" violates not-null constraint
+-- (golden Phase-3 FINDING-1). The webhook fire path resolves the automation by
+-- pid (AutomationWebhookController), not by model_code, so a null model_code is
+-- correct for these triggers.
+--
+-- Safe: nullability relaxation only (no data loss). Idempotent — DROP NOT NULL on
+-- an already-nullable column is a no-op in PostgreSQL.
+ALTER TABLE ab_automation ALTER COLUMN model_code DROP NOT NULL;
