@@ -9,22 +9,7 @@
     "en": "Category Form"
   },
   "layout": {
-    "areas": [
-      "main",
-      "footer"
-    ],
-    "areasConfig": {
-      "main": {
-        "type": "grid",
-        "cols": 12,
-        "rowGap": 16,
-        "colGap": 16
-      },
-      "footer": {
-        "type": "flex",
-        "direction": "row"
-      }
-    }
+    "type": "stack"
   },
   "blocks": [
     {

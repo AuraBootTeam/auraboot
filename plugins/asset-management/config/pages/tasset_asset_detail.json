@@ -9,26 +9,7 @@
     "en": "Asset Detail"
   },
   "layout": {
-    "areas": [
-      "header",
-      "main",
-      "sub-tables"
-    ],
-    "areasConfig": {
-      "header": {
-        "type": "flex",
-        "direction": "row"
-      },
-      "main": {
-        "type": "grid",
-        "cols": 12,
-        "rowGap": 16,
-        "colGap": 16
-      },
-      "sub-tables": {
-        "type": "stack"
-      }
-    }
+    "type": "stack"
   },
   "blocks": [
     {
