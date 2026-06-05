@@ -1159,16 +1159,16 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
   });
 
   // ── trigger-webhook — an inbound webhook POST fires the automation ───────────
-  // KNOWN ISSUE → REAL BUG (golden finding 2026-06-05, FINDING-1): a webhook (or
-  // scheduled) automation cannot be CREATED at all — AutomationFlowTriggerDeriver
-  // intentionally leaves modelCode null for webhook/scheduled triggers (per its own
-  // javadoc: "modelCode optional — absent for scheduled/webhook"), but
-  // ab_automation.model_code is NOT NULL (schema.sql:3093), so the insert crashes
-  // with a 500 (`null value in column "model_code" violates not-null constraint`).
-  // Fix: make ab_automation.model_code nullable (schema.sql + an ALTER migration).
-  // Marked fixme until that schema fix ships + the stack is reset to apply it. See
-  // docs/backlog/2026-06-05-automation-phase3-findings.md.
-  test.fixme('trigger-webhook: an inbound webhook POST fires the automation', async ({ page }) => {
+  // Golden FINDING-1 (FIXED): a webhook (or scheduled) automation could not be
+  // CREATED — AutomationFlowTriggerDeriver intentionally leaves modelCode null for
+  // webhook/scheduled triggers (its javadoc: "modelCode optional — absent for
+  // scheduled/webhook"), but ab_automation.model_code was NOT NULL, so the insert
+  // crashed with a 500. Fixed: model_code is now nullable (schema.sql +
+  // database/migrations/2026-06-05-automation-model-code-nullable.sql). The webhook
+  // fire path resolves the automation by pid (AutomationWebhookController), not by
+  // model_code. validationMode:'none' = no signature/token check (those reject paths
+  // are unit-covered; #415).
+  test('trigger-webhook: an inbound webhook POST fires the automation', async ({ page }) => {
     const t = 'trig', a = 'notify';
     const create = await postAutomation(page, {
       name: `P3-WH ${uniqueId()}`,

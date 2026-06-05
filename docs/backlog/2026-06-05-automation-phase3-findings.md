@@ -11,8 +11,10 @@ fix recorded here.
   the trigger order via `${recordId}` (no recursion: a different model than the
   trigger). Verified: node `completed`, the item exists and is linked. (Reuses
   `CreateRecordExecutor`, which resolves `${var}` in fields against the context.)
+- **trigger-webhook** — an inbound `POST /api/automations/webhooks/{pid}` fires the
+  automation to success. Verified after the FINDING-1 fix below.
 
-## 🟥 FINDING-1 (REAL BUG) — webhook / scheduled automations cannot be created
+## 🟩 FINDING-1 (REAL BUG — FIXED + VERIFIED) — webhook / scheduled automations cannot be created
 - **Symptom:** `POST /api/automations` for a `trigger-webhook` flow → **HTTP 500**
   `null value in column "model_code" of relation "ab_automation" violates not-null
   constraint`.
@@ -24,7 +26,7 @@ fix recorded here.
   scheduled) automation can never be inserted. This is the same class as PB-6 but at
   the schema layer — every static/unit/validator gate is green; only the assembled
   runtime create surfaces it.
-- **Fix:** make `ab_automation.model_code` nullable.
+- **Fix (shipped):** made `ab_automation.model_code` nullable.
   - `schema.sql:3093` → `model_code VARCHAR(100),`
   - new migration `database/migrations/2026-06-05-automation-model-code-nullable.sql`:
     `ALTER TABLE ab_automation ALTER COLUMN model_code DROP NOT NULL;`
@@ -32,9 +34,11 @@ fix recorded here.
     relaxation, no data loss. The webhook fire path uses the webhook controller
     (`AutomationWebhookController` → `findByPid`), not model-based dispatch, so a null
     `model_code` is correct for webhook/scheduled.
-- **Verification (pending):** un-`fixme` the `trigger-webhook` test, reset the GA
-  stack to apply the migration, confirm create + webhook fire → success. Deferred
-  rather than shipped unverified (verify-don't-trust).
+- **Verified:** GA stack reset (`down --purge` + `up --rebuild` + bootstrap) →
+  `ab_automation.model_code` is now `is_nullable=YES`; the `trigger-webhook` test
+  (un-`fixme`d) creates the webhook automation + fires it via the webhook POST →
+  run success. Layer A 6/6 + Layer B 12/12 (B1 + Phase-2 9 + create-record + webhook),
+  no regression from the schema change.
 
 ## 🟧 FINDING-2 (test-fixture gap) — record-update fire path is status-gated
 - **Symptom:** `trigger-record-update` test fires the update via `e2et:update_order`
