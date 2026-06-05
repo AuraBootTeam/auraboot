@@ -460,8 +460,14 @@ public class AutomationServiceImpl implements AutomationService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Automation name is required");
         }
 
-        // If flowConfig is provided (visual designer mode), modelCode/triggerType/actions are optional
-        boolean isFlowConfigOnly = request.getFlowConfig() != null && !request.getFlowConfig().isEmpty();
+        // Visual-designer mode (modelCode/triggerType/actions derived from flowConfig)
+        // applies only when the flowConfig actually carries nodes. A degenerate
+        // flowConfig like {nodes:[],edges:[]} is a non-empty Map but has no trigger
+        // node, so it must still go through the flat-field required checks — otherwise
+        // modelCode stays null and the ab_automation NOT NULL insert crashes with a
+        // raw 500 instead of a clean 400. Mirrors the node check in enable().
+        Object flowNodes = request.getFlowConfig() != null ? request.getFlowConfig().get("nodes") : null;
+        boolean isFlowConfigOnly = flowNodes instanceof List<?> nodeList && !nodeList.isEmpty();
 
         if (!isFlowConfigOnly) {
             if (!StringUtils.hasText(request.getModelCode())) {
