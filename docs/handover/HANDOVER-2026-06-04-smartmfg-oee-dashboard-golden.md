@@ -24,7 +24,18 @@ The "Downtime-duration bug" listed below as Next-Step #1 is **DONE + MERGED**, a
 
 **Bringup gotcha (cost ~10 min):** `import-plugins.sh --slug=... --edition=enterprise` resolves plugin configs at the **container** path `/app/plugins-enterprise` via `docker exec`. Do **NOT** pass `ENTERPRISE_PLUGINS_DIR=<host worktree>` to `import-plugins.sh` (only to `start-isolated.sh` for the mount) — doing so makes it `docker exec [ -f <host-path> ]` which never exists in the container → every business/pcba plugin reports "missing". The recipe in the plan was already correct; the deviation was the error.
 
-**Remaining smart-mfg golden (still TODO):** gap #3 SPC **live** golden is now **UNBLOCKED** (quality imports) — drive `qc_spc_chart` in a browser; gap #4 ~40 empty stub detail pages; gap #6 full multi-domain action-point golden; M2-M5.
+**Remaining smart-mfg golden (still TODO):** gap #4 ~40 empty stub detail pages; gap #6 full multi-domain action-point golden; M2-M5.
+
+## ⬆️⬆️ UPDATE 2026-06-04 (same session) — gap #3 SPC control-chart golden DONE + merged
+
+The SPC control-chart live golden is **complete + merged** (3 PRs). Engine/handlers were already production-correct; the golden surfaced + fixed 3 real gaps:
+- **plugins #13 `10b6c1b`** — SPC `qc_spc_chart_points` named-query shipped invalid `status:"active"` → crashed the whole quality→pcba import chain (the never-run gap-#3 latent bug). `active`→`published`.
+- **plugins #17 `d86153d`** — (a) USL/LSL were in no command's inputFields/form → `qc:calculate_capability` always failed ("spec limits not configured") → Cp/Cpk permanently empty; added to create/update inputFields + form. (b) control-chart param `${record.id}`→`${record.pid}` (data points key the chart by ULID `pid`, not the numeric `id`).
+- **OSS #428 `0bc2fe189`** (platform, reusable) — detail-page `chart` blocks fed by a namedQuery never forwarded their record-scoped `params` (and didn't resolve `${record.*}`). `ChartBlockRenderer` now exports `resolveRecordParams` + normalizes `params`→`parameters`; `DetailPageContent` resolves the templates against the current record before dispatch. Benefits *all* detail-page namedQuery charts. (Backend `AggregateQueryServiceImpl.buildNamedQueryParams` already bound `request.parameters`.)
+
+**Real-stack browser golden PASS:** list (clean i18n) + detail form-section (UCL 10.17/CL 10/LCL 9.83, USL 10.5/LSL 9.5, Cp 0.50/Cpk 0.37) + **control chart renders 23 points + UCL/CL/LCL + 3 WE-Rule-1 violations** (was "AWAITING DATA"). Screenshots `auraboot/test-results/spc-golden-chart-{AWAITING-DATA(before),RENDERS-PASS,viewport}.png`. Unit test `resolveRecordParams` 4/4.
+
+**Minor follow-up (cosmetic, not a blocker):** the line chart plots all returned metrics (incl. `seq`/`is_violation`) as series rather than only the 4 `yField` series — a SmartLineChart yField-honoring polish item, separate from the params fix.
 
 ---
 
