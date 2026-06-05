@@ -138,24 +138,23 @@ If HTML5 drag: dispatch `dragstart` on the palette item, `dragover`+`drop` on th
 >
 > **PHASE 0 COMPLETE.** Infra GREEN + harness smoke-verified. The GA E2E stack stays UP (until `docker-ga-e2e-down.sh`) for Phases 1–4. A fresh session continues from Phase 1 against the up stack: `git checkout feat/automation-designer-golden-e2e`, env `PLAYWRIGHT_BASE_URL=http://localhost:5174 BACKEND_URL=http://localhost:6444 BE_PORT=6444 BFF_PORT=3501 PW_SKIP_WEBSERVER=1 PW_STORAGE_DIR=tests/storage/ga`, run with `--no-deps`.
 
-> **Phase-1 status (2026-06-05) — IMPLEMENTED but E2E-UNVERIFIED (honest):**
-> - A subagent built `automation-designer-golden.spec.ts` (6 cases H1/H2/H3/S1/S2/E5, real drag), heavily tuned the harness, and made 4 product changes it claims are real bugs the golden found: `AutomationServiceImpl.java` (backend), `AutomationEditPageImpl.tsx`, `FlowDesigner.tsx`, `PropertyFieldRenderer.tsx` (PB-4 field-error). Committed: e9fe77af4 (H1-H3 + 2 fixes), f0d4edf49 (S1/S2/E5 + PB-4). No fake-pass markers in the spec.
-> - **The subagent run was cut off by an API ECONNRESET; its final report was lost.**
-> - **NOT verified by the main loop:** during verification the GA E2E stack host-ports (5174/6444) went to **502 and stayed 502 across a container restart** (env degraded under the ~176-min run + disk pressure at ~24Gi — environment-invalid per §2.1, not a product failure). So the 6 cases could NOT be run to confirm pass.
-> - **Static checks (no-stack):** frontend regression 231 tests pass (the shared PropertyFieldRenderer/FlowDesigner changes don't break flow-sdk/bpmn units). BUT `tsc --noEmit` has **1 error in the spec**: `automation-designer-golden.spec.ts:341` `Property 'request' does not exist on type 'Request'` — the committed spec does not cleanly typecheck.
-> - **Backend change unverified:** `AutomationServiceImpl.java` is NOT in the running backend (built at stack-up, before the change) — needs a clean rebuild to take effect + verify.
-> - **TO CLOSE PHASE 1 (fresh session, clean stack):** free disk → `docker-ga-e2e-down.sh` then `up`+`bootstrap` (rebuilds backend with the change) → fix the spec tsc error (line 341) → run the Layer A spec with the env+`--no-deps` → confirm 6 cases pass → REVIEW the 4 product changes for legitimacy (real fix vs make-it-pass hack), esp. the backend + shared-SDK ones.
+> **Phase-1 status (2026-06-05) — ✅ VERIFIED + CLOSED (commit cf7e29a0a):**
+> - All 6 Layer A cases (H1/H2/H3/S1/S2/E5) run **GREEN against a clean fresh GA E2E stack**, proven cold-robust (re-run on a cold-restarted vite: 6/6 pass, H1 7.9s/H2 1.8s/H3 0.8s/S1 2.2s/S2 3.7s/E5 2.1s).
+> - **Fixed two committed defects:** (1) spec tsc error line 341 — `r.request().method()` → `r.method()` (Playwright `Request` already exposes `.method()`); `tsc --noEmit` now 0 errors. (2) cold-vite flake — `openNewDesigner` now waits 30s for the editor name input before palette/pane, so the first fresh-stack hit absorbs the heavy @xyflow chunk compile (the original H1 failure was a cold-compile timeout, NOT a product bug — confirmed by warm re-run passing).
+> - **4 product changes REVIEWED (§14/§20) — all legitimate, no make-it-pass hack:** PB-2 `AutomationServiceImpl.toggle()` delegates to `enable()`/`disable()` so the list "Enable" button shares the SmartEngine deploy (real gate-gap bug: enabled-but-never-deployed → "Process definition version not found"); sound self-invocation, identical toggle semantics. PB-3 `AutomationEditPageImpl` wires `?logId=`→`useAutomationNodeStatuses`→`nodeStatuses` (verified threading all the way to `NodeRuntimeStatusProvider`); gated on `!isNew`. PB-4 `PropertyFieldRenderer` surfaces field-level validation error (red ring + required `*` + error text) mirroring sibling renderers — additive, what §2.2 requires. `FlowDesigner.__flowDesignerStore` is a PROD-guarded test affordance mirroring `__bpmnDesignerStore`.
+> - **Screenshots reviewed (real UI):** H1 = 4-node drag-built flow renders; H3 = G5 green-check badge on executed branch + none on not-taken; S1 = "This field is required" red error + red ring + "存在错误(1)" + Unsaved (gate blocked the write).
+> - Backend change is now in the running backend (clean rebuild at stack-up). Stack stays UP for Phases 2–4.
 
 ## Phase 1 — Layer A: real drag-drop user journey (happy + UI sad/edge)
 
 > All tasks use the Phase-0 harness. Each is a Playwright test in `automation-designer-golden.spec.ts`. TDD here = write the test (it fails until the flow works), run against the stack, make green, screenshot-review, commit.
 
-- [ ] **Task 1.1 (H1) — full happy journey** — drag trigger-record-create → control-condition → action-update-record, connect edges, configure (modelCode=e2et_order, condition `amount>1000`, update field mapping), fill required, save (assert POST flowConfig{3 nodes,edges}), reload (assert canvas re-renders), enable, fire record amount=2000, poll node-statuses → trigger/condition/action all completed, no failed, assert target record field updated + status badges. Screenshot-review. Commit.
-- [ ] **Task 1.2 (H2)** — save → navigate away → return → assert canvas re-renders the saved 3-node graph (persistence roundtrip). Commit.
-- [ ] **Task 1.3 (H3)** — after fire, assert the G5 node-status overlay badges render in the canvas (completed states visible). Commit.
-- [ ] **Task 1.4 (S1)** — build a flow with trigger missing required `modelCode` → click save → assert save blocked + field-level error on `modelCode` (G4 gate), NOT a generic toast. Commit.
-- [ ] **Task 1.5 (S2)** — set an oversized/dangerous SpEL condition on control-condition → assert it is rejected (SpelSafetyGuard / validation), surfaced to the user. Commit.
-- [ ] **Task 1.6 (E5)** — open an existing enabled automation, change the action config via the UI, save, re-fire → assert the NEW behavior takes effect (re-derive + re-deploy). Commit.
+- [x] **Task 1.1 (H1) — full happy journey** — drag trigger-record-create → control-condition → action-update-record, connect edges, configure (modelCode=e2et_order, condition `amount>1000`, update field mapping), fill required, save (assert POST flowConfig{3 nodes,edges}), reload (assert canvas re-renders), enable, fire record amount=2000, poll node-statuses → trigger/condition/action all completed, no failed, assert target record field updated + status badges. Screenshot-review. Commit.
+- [x] **Task 1.2 (H2)** — save → navigate away → return → assert canvas re-renders the saved 3-node graph (persistence roundtrip). Commit.
+- [x] **Task 1.3 (H3)** — after fire, assert the G5 node-status overlay badges render in the canvas (completed states visible). Commit.
+- [x] **Task 1.4 (S1)** — build a flow with trigger missing required `modelCode` → click save → assert save blocked + field-level error on `modelCode` (G4 gate), NOT a generic toast. Commit.
+- [x] **Task 1.5 (S2)** — set an oversized/dangerous SpEL condition on control-condition → assert it is rejected (SpelSafetyGuard / validation), surfaced to the user. Commit.
+- [x] **Task 1.6 (E5)** — open an existing enabled automation, change the action config via the UI, save, re-fire → assert the NEW behavior takes effect (re-derive + re-deploy). Commit.
 
 ---
 
