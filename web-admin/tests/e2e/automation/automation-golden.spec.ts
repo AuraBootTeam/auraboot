@@ -933,3 +933,272 @@ test.describe('Automation Golden — Layer B behavioral matrix (Phase 2)', () =>
     // intentionally empty — see the comment above for the honest-skip rationale.
   });
 });
+
+// ===========================================================================
+// Layer B — Phase 3 node-type back coverage
+//
+// Behavioral per-node-type coverage extending the Layer B matrix. Each test
+// fires a REAL trigger and asserts the node's specific runtime effect. Config
+// shapes are grounded in the node configSchema source (nodes/triggers.ts,
+// actions.ts) + the executor source (ExecuteCommandExecutor / CreateRecordExecutor
+// cast config.get(...) to the documented types). test-fixtures provides the
+// e2et_order command set (e2et:update_order is operationType=update → fires
+// on_record_update; e2eto:create_e2et_order fires on_record_create).
+// ===========================================================================
+
+test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () => {
+  test.describe.configure({ mode: 'serial', timeout: 120_000 });
+
+  const createdPids: string[] = [];
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/automations'); // real in-app origin (colon-in-path fire endpoint)
+  });
+
+  test.afterAll(async ({ browser }) => {
+    if (createdPids.length === 0) return;
+    const ctx = await browser.newContext({
+      storageState:
+        process.env.PW_ADMIN_STORAGE_STATE ||
+        (process.env.PW_STORAGE_DIR ? `${process.env.PW_STORAGE_DIR}/admin.json` : 'tests/storage/admin.json'),
+    });
+    const page = await ctx.newPage();
+    for (const pid of createdPids) await deleteAutomationViaApi(page, pid);
+    await page.close();
+    await ctx.close();
+  });
+
+  function executeCommandNode(id: string, commandCode: string, params: Record<string, unknown>, x = 400, y = 300) {
+    return {
+      id,
+      type: 'action-execute-command',
+      position: { x, y },
+      data: { type: 'action-execute-command', label: 'ExecCmd', config: { actionType: 'execute_command', commandCode, params } },
+    };
+  }
+  function triggerUpdateNode(id: string, modelCode: string, x = 100, y = 100) {
+    return {
+      id,
+      type: 'trigger-record-update',
+      position: { x, y },
+      data: { type: 'trigger-record-update', label: 'on_record_update', config: { triggerType: 'on_record_update', modelCode } },
+    };
+  }
+
+  async function createOrderGetId(page: import('@playwright/test').Page, title: string): Promise<string> {
+    const resp = await page.request.post(`/api/meta/commands/execute/${CREATE_COMMAND}`, {
+      data: { operationType: 'create', payload: { e2et_order_title: title, e2et_order_date: '2026-05-30', e2et_order_type: 'normal', e2et_order_amount: 100 } },
+    });
+    const raw = await resp.json();
+    expect(String(raw?.code), `create order failed: ${JSON.stringify(raw)}`).toBe('0');
+    return raw.data.data.recordId as string;
+  }
+
+  async function updateOrder(page: import('@playwright/test').Page, orderId: string, fields: Record<string, unknown>) {
+    const resp = await page.request.post(`/api/meta/commands/execute/e2et:update_order`, {
+      data: { operationType: 'update', payload: { pid: orderId, ...fields } },
+    });
+    let raw: any = null;
+    try {
+      raw = await resp.json();
+    } catch {
+      raw = await resp.text().catch(() => null);
+    }
+    return { ok: String(raw?.code) === '0', raw };
+  }
+
+  async function pollOrderField(page: import('@playwright/test').Page, recordId: string, field: string, expected: string): Promise<unknown> {
+    const deadline = Date.now() + 15_000;
+    let last: unknown = undefined;
+    while (Date.now() < deadline) {
+      const resp = await page.request.get(`/api/dynamic/${MODEL_CODE}/${recordId}`);
+      if (resp.ok()) {
+        last = (await resp.json())?.data?.[field];
+        if (last === expected) return last;
+      }
+      await new Promise((r) => setTimeout(r, 1_000));
+    }
+    return last;
+  }
+
+  // ── action-execute-command — runs a real command through the command pipeline ──
+  // KNOWN ISSUE (golden finding 2026-06-05, FINDING-3): the execute-command action
+  // runs the target command under the automation's execution principal, which lacks
+  // the command's required permission → the node fails with
+  // "Command permission denied: required one of E2ET.order.manage". Whether an
+  // automation should run commands with its owner's permissions (a propagation bug)
+  // or a restricted system principal (by design) is a security-model decision; the
+  // executor itself is unit-covered (ExecuteCommandExecutor). Marked fixme until the
+  // automation-principal command-permission boundary is decided. See
+  // docs/backlog/2026-06-05-automation-phase3-findings.md.
+  test.fixme('action-execute-command: the action runs e2et:update_order on the trigger order → title updated via the command pipeline', async ({ page }) => {
+    const t = 'trig', a = 'exec';
+    const create = await postAutomation(page, {
+      name: `P3-EXEC ${uniqueId()}`,
+      flowConfig: {
+        nodes: [triggerCreateNode(t, MODEL_CODE), executeCommandNode(a, 'e2et:update_order', { e2et_order_title: 'EXEC_UPDATED' })],
+        edges: [flowEdge(t, a)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `P3-EXEC create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    const firedAt = Date.now();
+    const orderId = await createOrderGetId(page, `P3-EXEC-order ${uniqueId()}`);
+    const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `P3-EXEC run: ${JSON.stringify({ log, statuses })}`).toBe('success');
+    expect(statuses.find((s) => s.nodeId === a)?.status, `execute-command node completed: ${JSON.stringify(statuses)}`).toBe('completed');
+    // The command pipeline (ExecuteCommandExecutor → e2et:update_order, pid injected from ${recordId}) updated the order.
+    expect(await pollOrderField(page, orderId, 'e2et_order_title', 'EXEC_UPDATED')).toBe('EXEC_UPDATED');
+  });
+
+  // ── trigger-record-update — fires when a record is updated (not created) ──────
+  // KNOWN ISSUE (golden finding 2026-06-05, FINDING-2): firing an update through the
+  // e2et:update_order command is blocked by that command's own assert phase
+  // ("仅草稿或已退回状态可编辑") because e2eto:create_e2et_order does not leave the
+  // order in draft status. The trigger-record-update wiring is sound; the blocker is
+  // the test fixture's update path needing a status-unconstrained update (e.g. a
+  // draft-status seed, or e2et:update_order_item if it carries no status gate).
+  // Marked fixme pending a status-unconstrained update fixture. See
+  // docs/backlog/2026-06-05-automation-phase3-findings.md.
+  test.fixme('trigger-record-update: updating a record fires an on_record_update automation (and a create does not)', async ({ page }) => {
+    const t = 'trig', a = 'notify';
+    const create = await postAutomation(page, {
+      name: `P3-UPD ${uniqueId()}`,
+      flowConfig: {
+        nodes: [triggerUpdateNode(t, MODEL_CODE), notifyNode(a, 'record updated')],
+        edges: [flowEdge(t, a)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `P3-UPD create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    // Create an order — on_record_create does NOT match our update trigger, so no run yet.
+    const orderId = await createOrderGetId(page, `P3-UPD-order ${uniqueId()}`);
+    await new Promise((r) => setTimeout(r, 2_000));
+    const createdRuns = await fetchLogIds(page, create.pid!);
+    expect(createdRuns.size, 'a create must NOT fire an on_record_update automation').toBe(0);
+
+    // Now UPDATE the order → on_record_update fires.
+    const firedAt = Date.now();
+    const upd = await updateOrder(page, orderId, { e2et_order_title: 'P3-UPD-CHANGED' });
+    expect(upd.ok, `P3-UPD update fire: ${JSON.stringify(upd.raw)}`).toBe(true);
+    const { log } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `update trigger should run to success: ${JSON.stringify(log)}`).toBe('success');
+  });
+
+  function createRecordNode(id: string, modelCode: string, fields: Record<string, unknown>, x = 400, y = 300) {
+    return {
+      id,
+      type: 'action-create-record',
+      position: { x, y },
+      data: { type: 'action-create-record', label: 'Create', config: { actionType: 'create_record', modelCode, fields } },
+    };
+  }
+
+  /** Poll the dynamic list for an e2et_order_item carrying `name`; tolerant of the PaginationResult records key. */
+  async function pollItemsByName(page: import('@playwright/test').Page, name: string): Promise<any[]> {
+    const deadline = Date.now() + 15_000;
+    let rows: any[] = [];
+    while (Date.now() < deadline) {
+      const resp = await page.request.get(`/api/dynamic/e2et_order_item/list`, {
+        params: { pageNum: 1, pageSize: 50, keyword: name },
+      });
+      if (resp.ok()) {
+        const data = (await resp.json())?.data;
+        rows = data?.records ?? data?.list ?? data?.content ?? data?.rows ?? (Array.isArray(data) ? data : []);
+        const hit = rows.filter((r) => r?.e2et_item_name === name);
+        if (hit.length > 0) return hit;
+      }
+      await new Promise((r) => setTimeout(r, 1_000));
+    }
+    return rows.filter((r) => r?.e2et_item_name === name);
+  }
+
+  // ── action-create-record — creates a child record linked to the trigger ──────
+  test('action-create-record: the action creates a child e2et_order_item linked to the trigger order (no recursion)', async ({ page }) => {
+    const t = 'trig', a = 'create';
+    const itemName = `P3CR-item-${uniqueId()}`;
+    const create = await postAutomation(page, {
+      name: `P3-CR ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          triggerCreateNode(t, MODEL_CODE),
+          createRecordNode(a, 'e2et_order_item', {
+            e2et_order_id: '${recordId}',
+            e2et_item_name: itemName,
+            e2et_item_spec: 'std',
+            e2et_item_qty: 2,
+            e2et_item_price: 50,
+          }),
+        ],
+        edges: [flowEdge(t, a)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `P3-CR create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    const firedAt = Date.now();
+    const orderId = await createOrderGetId(page, `P3-CR-order ${uniqueId()}`);
+    const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `P3-CR run: ${JSON.stringify({ log, statuses })}`).toBe('success');
+    expect(statuses.find((s) => s.nodeId === a)?.status, `create-record node completed: ${JSON.stringify(statuses)}`).toBe('completed');
+    // A new e2et_order_item exists with our unique name, linked to the trigger order.
+    const items = await pollItemsByName(page, itemName);
+    expect(items.length, `expected the created order_item '${itemName}': ${JSON.stringify(items)}`).toBeGreaterThanOrEqual(1);
+    expect(String(items[0].e2et_order_id), 'item linked to the trigger order via ${recordId}').toBe(String(orderId));
+  });
+
+  // ── trigger-webhook — an inbound webhook POST fires the automation ───────────
+  // KNOWN ISSUE → REAL BUG (golden finding 2026-06-05, FINDING-1): a webhook (or
+  // scheduled) automation cannot be CREATED at all — AutomationFlowTriggerDeriver
+  // intentionally leaves modelCode null for webhook/scheduled triggers (per its own
+  // javadoc: "modelCode optional — absent for scheduled/webhook"), but
+  // ab_automation.model_code is NOT NULL (schema.sql:3093), so the insert crashes
+  // with a 500 (`null value in column "model_code" violates not-null constraint`).
+  // Fix: make ab_automation.model_code nullable (schema.sql + an ALTER migration).
+  // Marked fixme until that schema fix ships + the stack is reset to apply it. See
+  // docs/backlog/2026-06-05-automation-phase3-findings.md.
+  test.fixme('trigger-webhook: an inbound webhook POST fires the automation', async ({ page }) => {
+    const t = 'trig', a = 'notify';
+    const create = await postAutomation(page, {
+      name: `P3-WH ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          {
+            id: t,
+            type: 'trigger-webhook',
+            position: { x: 100, y: 100 },
+            data: { type: 'trigger-webhook', label: 'on_webhook', config: { triggerType: 'webhook', validationMode: 'none' } },
+          },
+          notifyNode(a, 'webhook received'),
+        ],
+        edges: [flowEdge(t, a)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `P3-WH create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    const firedAt = Date.now();
+    const resp = await page.request.post(`/api/automations/webhooks/${create.pid}`, {
+      data: { event: 'order.shipped', orderRef: `P3-WH ${uniqueId()}` },
+    });
+    expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
+    const body = await resp.json().catch(() => null);
+    expect(String(body?.code), `webhook POST should be accepted: ${JSON.stringify(body)}`).toBe('0');
+    const { log } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `webhook trigger should run to success: ${JSON.stringify(log)}`).toBe('success');
+  });
+});
