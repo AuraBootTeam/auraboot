@@ -324,4 +324,149 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       fullPage: false,
     });
   });
+
+  test('S1: required modelCode left empty → save is blocked by the validation gate with a field-level error @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `S1 ${uniqueId()}`);
+
+    // Build a trigger node but leave its required modelCode empty.
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 180, y: 150 });
+
+    // Click save; the inner FlowDesigner runs the validation gate and must block.
+    // We watch for any /api/automations write — there must be none (not a silent save).
+    let wroteApi = false;
+    page.on('request', (r) => {
+      if (/\/api\/automations(\/[^/]+)?$/.test(r.url()) && ['POST', 'PUT'].includes(r.request().method())) {
+        wroteApi = true;
+      }
+    });
+    await page.locator('[data-testid="designer-save"]').click();
+
+    // The errored node is auto-selected and its required field renders a
+    // field-level error in the property panel — NOT just a generic toast.
+    const panel = page.locator(`[data-testid="prop-field-modelCode"]`);
+    await expect(panel.getByText('This field is required')).toBeVisible({ timeout: 5_000 });
+    // The toolbar surfaces a structured error count (not a transient toast).
+    await expect(page.getByText(/存在错误|Errors/).first()).toBeVisible();
+
+    // The validation gate truly blocked the write.
+    await page.waitForTimeout(1_000);
+    expect(wroteApi, 'save must NOT fire an /api/automations write when invalid').toBe(false);
+    // And the store validation confirms the field-level error for the trigger.
+    const validation = await page.evaluate(
+      () => (window as unknown as { __flowDesignerStore?: any }).__flowDesignerStore?.getState().validationResult,
+    );
+    expect(validation?.valid).toBe(false);
+    expect(validation?.errors?.[0]).toMatchObject({ nodeId: trigger, fieldKey: 'modelCode' });
+
+    await page.screenshot({
+      path: 'test-results/artifacts/automation-designer-S1-validation-gate.png',
+      fullPage: false,
+    });
+  });
+
+  test('S2: a dangerous condition expression is rejected at runtime — the flow fails and the side effect does not happen @golden', async ({
+    page,
+  }) => {
+    const name = `S2 ${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, name);
+
+    // Build a real 2-branch condition flow, but set the TRUE-branch edge condition
+    // to a dangerous SpEL type reference. The designer persists it (there is no
+    // client-side SpEL guard on the edge), and SmartEngine's read-only gateway
+    // evaluator rejects it at runtime (T(...) is not resolvable) — so the run
+    // fails and the dangerous branch never executes its side effect.
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 70 });
+    const condition = await dragNodeToCanvas(page, 'control-condition', { x: 150, y: 210 });
+    const actHigh = await dragNodeToCanvas(page, 'action-update-record', { x: 30, y: 360 });
+    const actLow = await dragNodeToCanvas(page, 'action-update-record', { x: 240, y: 360 });
+
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, condition);
+    const eTrue = await connectEdge(page, condition, actHigh, 'true');
+    const eFalse = await connectEdge(page, condition, actLow, 'false');
+
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, condition, { expression: 'dangerous' });
+    await fillNodeConfig(page, actHigh, {
+      modelCode: MODEL_LABEL,
+      recordId: '${recordId}',
+      fields: '{"e2et_order_title":"S2_SHOULD_NOT_HAPPEN"}',
+    });
+    await fillNodeConfig(page, actLow, {
+      modelCode: MODEL_LABEL,
+      recordId: '${recordId}',
+      fields: '{"e2et_order_title":"S2_LOW"}',
+    });
+    // Dangerous TRUE-branch expression (SpEL type reference / code-exec attempt).
+    const danger = 'T(java.lang.Runtime).getRuntime().exec("touch /tmp/pwned")';
+    await setEdgeCondition(page, eTrue, danger);
+    await setEdgeCondition(page, eFalse, "record['e2et_order_amount'] <= 1000");
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    // It persists (no client guard) — proving the rejection is a runtime one.
+    const saved = await readFlowConfig(page, pid);
+    const trueEdge = saved.flowConfig.edges.find((e: any) => e.id === eTrue);
+    expect(trueEdge?.data?.condition?.content).toBe(danger);
+
+    await enableViaListToggle(page, pid);
+
+    // Fire with amount that WOULD satisfy the (dangerous) TRUE branch if it
+    // evaluated — but the evaluator rejects it.
+    const firedAt = Date.now();
+    const recordId = await fireCreate(page, 5000, `S2-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(log, 'a log row should exist').not.toBeNull();
+    // The run fails because the dangerous expression is rejected by the evaluator.
+    expect(String(log!.status).toLowerCase(), `S2 run should fail: ${JSON.stringify(log)}`).toBe(
+      'failed',
+    );
+    expect(log!.errorMessage ?? '', 'the failure should reference the rejected expression').toMatch(
+      /T\b|function not found|null pointer/i,
+    );
+    // The dangerous side effect did NOT happen — the record title is untouched.
+    const record = await getOrderRecord(page, recordId);
+    expect(record.e2et_order_title, 'dangerous branch must not have run').not.toBe(
+      'S2_SHOULD_NOT_HAPPEN',
+    );
+  });
+
+  test('E5: edit an enabled automation\'s action config via the UI, save, re-fire → the NEW behavior takes effect @golden', async ({
+    page,
+  }) => {
+    expect(h1.pid, 'E5 reuses the H1 automation').toBeTruthy();
+    const pid = h1.pid!;
+    const [, , actHigh] = h1.nodeIds!;
+    const NEW_MARKER = `E5_REBEHAVED_${uniqueId()}`;
+
+    // Open the existing (enabled) automation and change the TRUE-branch action's
+    // field mapping via the real property panel.
+    await page.goto(`/automation/${pid}`);
+    await expect(page.locator('.react-flow__node')).toHaveCount(4, { timeout: 15_000 });
+    await fillNodeConfig(page, actHigh, {
+      fields: `{"e2et_order_title":"${NEW_MARKER}"}`,
+    });
+    // Re-save via the designer (the gate passes — everything is still valid).
+    const { pid: savedPid } = await saveAutomation(page);
+    expect(savedPid).toBe(pid);
+    const saved = await readFlowConfig(page, pid);
+    const highNode = saved.flowConfig.nodes.find((n: any) => n.id === actHigh);
+    expect(highNode.data.config.fields).toMatchObject({ e2et_order_title: NEW_MARKER });
+
+    // It was already enabled in H1; re-fire and assert the NEW behavior.
+    const firedAt = Date.now();
+    const recordId = await fireCreate(page, 5000, `E5-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `E5 run should succeed: ${JSON.stringify(log)}`).toBe(
+      'success',
+    );
+    const record = await pollRecordField(page, recordId, 'e2et_order_title', NEW_MARKER);
+    expect(record.e2et_order_title, 'the edited action config should now drive the side effect').toBe(
+      NEW_MARKER,
+    );
+  });
 });

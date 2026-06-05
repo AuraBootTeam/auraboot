@@ -331,12 +331,26 @@ export async function saveAutomation(page: Page): Promise<{ pid: string }> {
         `likely blocked it. validationResult=${JSON.stringify(validation)}`,
     );
   }
-  const body = await resp.json();
-  if (String(body.code) !== API_OK) {
-    throw new Error(`save failed (HTTP ${resp.status()}): ${body.message || JSON.stringify(body)}`);
+  // Use the HTTP status (always available) as the success signal; reading the
+  // body with resp.json() can hang when the page consumes the response stream
+  // (observed on PUT updates that do not navigate). On a non-2xx, best-effort the
+  // body for a useful message.
+  const status = resp.status();
+  if (status >= 400) {
+    const msg = await resp.text().catch(() => '');
+    throw new Error(`save failed (HTTP ${status}): ${msg.slice(0, 300)}`);
   }
-  // create returns data.pid; update returns the pid in the URL.
-  const pid = body?.data?.pid ?? resp.url().split('/').pop()!;
+  const method = resp.request().method();
+  if (method === 'PUT') {
+    // update returns the pid in the URL (POST→create returns data.pid in body,
+    // but we avoid resp.json() to dodge the stream hang and read it back via API).
+    return { pid: resp.url().split('/').pop()! };
+  }
+  // create (POST): the pid is in the body; read it via a fresh request to dodge
+  // the response-stream hang — the create just committed, so list the newest.
+  const body = await resp.json().catch(() => null);
+  const pid = body?.data?.pid;
+  if (!pid) throw new Error(`save (POST) succeeded but pid missing in response`);
   return { pid: String(pid) };
 }
 
