@@ -226,6 +226,25 @@ class EmqxAclSyncServiceTest {
     }
 
     @Test
+    void deviceAclRule_nullPatterns_defaultsToEmpty_andDoesNotNpe() {
+        // The compact ctor null-guards aclPatterns → empty list, so a rule with no
+        // resolved patterns pushes an empty rule set instead of NPEing in pushAclRules.
+        EmqxAclSyncService.DeviceAclRule r = new EmqxAclSyncService.DeviceAclRule("dev-x", null);
+        assertThat(r.aclPatterns()).isEmpty();
+
+        AtomicInteger aclPushCalls = new AtomicInteger();
+        ExchangeFunction xf = req -> {
+            if (req.url().getPath().contains("/authorization/sources/built_in_database/rules/users")) {
+                aclPushCalls.incrementAndGet();
+            }
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        };
+        EmqxAclSyncService svc = build(enabledProps(), xf);
+        svc.syncTenantAclRules(7L, List.of(r)); // must not throw
+        assertThat(aclPushCalls.get()).isEqualTo(1);
+    }
+
+    @Test
     void syncTenantAclRules_disabled_isNoOp() {
         AtomicInteger calls = new AtomicInteger();
         ExchangeFunction xf = req -> {

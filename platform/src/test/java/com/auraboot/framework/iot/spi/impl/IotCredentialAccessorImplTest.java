@@ -161,6 +161,16 @@ class IotCredentialAccessorImplTest {
     }
 
     @Test
+    void syncAclToBroker_rejectsNonPositiveTenant() {
+        assertThatThrownBy(() -> accessor.syncAclToBroker(0L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("tenantId must be > 0");
+        // Reject BEFORE touching the device table or the broker.
+        verifyNoInteractions(dds);
+        verify(emqx, never()).syncTenantAclRules(anyLong(), any());
+    }
+
+    @Test
     void syncAclToBroker_emptyResult_returnsZero_andDoesNotCallBroker() {
         // dds.list returns null (no rows) → count=0, no broker call.
         when(dds.list(eq(IotDeviceAccessorImpl.MODEL_CODE), any(DynamicQueryRequest.class)))
@@ -232,6 +242,11 @@ class IotCredentialAccessorImplTest {
 
         // Must enumerate ALL 1003 devices and return the combined count.
         assertThat(total).isEqualTo(1003);
+
+        // The loop must stop as soon as a page returns fewer rows than the batch
+        // size: page1 (==1000) → fetch page2; page2 (3 < 1000) → break. So exactly
+        // TWO list() calls — the third (empty) stub is never consumed.
+        verify(dds, times(2)).list(eq(IotDeviceAccessorImpl.MODEL_CODE), any(DynamicQueryRequest.class));
 
         // syncTenantAclRules must have been called once with all 1003 rules.
         ArgumentCaptor<List<EmqxAclSyncService.DeviceAclRule>> cap =

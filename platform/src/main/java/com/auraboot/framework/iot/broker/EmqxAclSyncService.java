@@ -251,7 +251,13 @@ public class EmqxAclSyncService {
      * Unlike {@link DevicePrincipal}, this record carries no secret/password — it is
      * intended for reconciliation paths where we push authz rules only (§15 ACL-only).
      */
-    public record DeviceAclRule(String username, List<String> aclPatterns) {}
+    public record DeviceAclRule(String username, List<String> aclPatterns) {
+        public DeviceAclRule {
+            // Null-guard the patterns so reconciliation callers can pass a device
+            // with no resolved ACL without NPEing in pushAclRules (treated as no-op).
+            aclPatterns = aclPatterns == null ? List.of() : aclPatterns;
+        }
+    }
 
     /**
      * Push ACL (authz) rules only for each device in {@code rules}.
