@@ -1,6 +1,6 @@
 {
     "version": "2.0",
-    "exportedAt": "2026-03-17T00:00:00.000000Z",
+    "exportedAt": "2026-06-05T16:20:23.143889217Z",
     "enums": {
         "PluginResourceType": [
             {
@@ -269,124 +269,148 @@
         ],
         "ChartType": [
             {
-                "code": "number",
-                "label": "Number card",
-                "since": "1.0"
+                "code": "area",
+                "label": "Area chart",
+                "since": "1.2",
+                "source": "built-in"
             },
             {
                 "code": "bar",
                 "label": "Bar chart",
-                "since": "1.0"
+                "since": "1.0",
+                "source": "built-in"
             },
             {
-                "code": "line",
-                "label": "Line chart",
-                "since": "1.0"
+                "code": "calendar",
+                "label": "Calendar chart",
+                "since": "1.2",
+                "source": "built-in"
             },
             {
-                "code": "pie",
-                "label": "Pie chart",
-                "since": "1.0"
-            },
-            {
-                "code": "table",
-                "label": "Table chart",
-                "since": "1.0"
-            },
-            {
-                "code": "gauge",
-                "label": "Gauge chart",
-                "since": "1.0"
-            },
-            {
-                "code": "area",
-                "label": "Area chart",
-                "since": "1.1"
-            },
-            {
-                "code": "radar",
-                "label": "Radar chart",
-                "since": "1.1"
-            },
-            {
-                "code": "scatter",
-                "label": "Scatter chart",
-                "since": "1.1"
+                "code": "countdown",
+                "label": "Countdown timer widget",
+                "since": "1.2",
+                "source": "built-in"
             },
             {
                 "code": "funnel",
                 "label": "Funnel chart",
-                "since": "1.1"
-            },
-            {
-                "code": "heatmap",
-                "label": "Heatmap chart",
-                "since": "1.1"
-            },
-            {
-                "code": "treemap",
-                "label": "Treemap chart",
-                "since": "1.1"
-            },
-            {
-                "code": "map",
-                "label": "Geographic map chart",
-                "since": "1.1"
-            },
-            {
-                "code": "spc",
-                "label": "Statistical process control chart",
-                "since": "1.1"
-            },
-            {
-                "code": "pareto",
-                "label": "Pareto chart",
-                "since": "1.1"
+                "since": "1.2",
+                "source": "built-in"
             },
             {
                 "code": "gantt",
                 "label": "Gantt chart",
-                "since": "1.1"
+                "since": "1.2",
+                "source": "built-in"
             },
             {
-                "code": "number-card",
-                "label": "Number card (alias)",
-                "since": "1.1"
+                "code": "gauge",
+                "label": "Gauge chart",
+                "since": "1.0",
+                "source": "built-in"
             },
             {
-                "code": "progress",
-                "label": "Progress bar",
-                "since": "1.1"
+                "code": "heatmap",
+                "label": "Heatmap chart",
+                "since": "1.2",
+                "source": "built-in"
             },
             {
-                "code": "leaderboard",
-                "label": "Leaderboard",
-                "since": "1.1"
-            },
-            {
-                "code": "rich-text",
-                "label": "Rich text widget",
-                "since": "1.1"
+                "code": "iframe",
+                "label": "Iframe embed widget",
+                "since": "1.2",
+                "source": "built-in"
             },
             {
                 "code": "image",
                 "label": "Image widget",
-                "since": "1.1"
+                "since": "1.2",
+                "source": "built-in"
             },
             {
-                "code": "iframe",
-                "label": "Embedded iframe",
-                "since": "1.1"
+                "code": "leaderboard",
+                "label": "Leaderboard chart",
+                "since": "1.2",
+                "source": "built-in"
             },
             {
-                "code": "countdown",
-                "label": "Countdown timer",
-                "since": "1.1"
+                "code": "line",
+                "label": "Line chart",
+                "since": "1.0",
+                "source": "built-in"
             },
             {
-                "code": "calendar",
-                "label": "Calendar widget",
-                "since": "1.1"
+                "code": "map",
+                "label": "Geographic map chart",
+                "since": "1.2",
+                "source": "built-in"
+            },
+            {
+                "code": "number",
+                "label": "Number card",
+                "since": "1.0",
+                "source": "built-in"
+            },
+            {
+                "code": "number-card",
+                "label": "Number card widget",
+                "since": "1.2",
+                "source": "built-in"
+            },
+            {
+                "code": "pareto",
+                "label": "Pareto chart",
+                "since": "1.2",
+                "source": "built-in"
+            },
+            {
+                "code": "pie",
+                "label": "Pie chart",
+                "since": "1.0",
+                "source": "built-in"
+            },
+            {
+                "code": "progress",
+                "label": "Progress indicator",
+                "since": "1.2",
+                "source": "built-in"
+            },
+            {
+                "code": "radar",
+                "label": "Radar chart",
+                "since": "1.2",
+                "source": "built-in"
+            },
+            {
+                "code": "rich-text",
+                "label": "Rich text widget",
+                "since": "1.2",
+                "source": "built-in"
+            },
+            {
+                "code": "scatter",
+                "label": "Scatter plot",
+                "since": "1.2",
+                "source": "built-in"
+            },
+            {
+                "code": "spc",
+                "label": "SPC control chart",
+                "since": "1.2",
+                "source": "built-in"
+            },
+            {
+                "code": "table",
+                "label": "Table chart",
+                "since": "1.0",
+                "source": "built-in"
+            },
+            {
+                "code": "treemap",
+                "label": "Treemap chart",
+                "since": "1.2",
+                "source": "built-in"
             }
         ],
         "SavedViewScope": [
@@ -547,6 +571,41 @@
                 "since": "1.1"
             },
             {
+                "code": "ai-fill-banner",
+                "label": "AI fill banner",
+                "since": "1.1"
+            },
+            {
+                "code": "embedded-list",
+                "label": "Embedded record-list block (in-page filterable list)",
+                "since": "1.2"
+            },
+            {
+                "code": "detail-section",
+                "label": "Detail section block",
+                "since": "1.3"
+            },
+            {
+                "code": "activity-timeline",
+                "label": "Activity timeline block",
+                "since": "1.3"
+            },
+            {
+                "code": "record-comments",
+                "label": "Record comments block",
+                "since": "1.3"
+            },
+            {
+                "code": "field-history",
+                "label": "Field history block",
+                "since": "1.3"
+            },
+            {
+                "code": "bpm-panel",
+                "label": "BPM panel block",
+                "since": "1.3"
+            },
+            {
                 "code": "custom",
                 "label": "Custom block",
                 "since": "1.0"
@@ -554,33 +613,28 @@
         ],
         "PageKind": [
             {
-                "code": "Page",
-                "label": "Generic page",
-                "since": "1.0"
-            },
-            {
-                "code": "List",
+                "code": "list",
                 "label": "List page",
                 "since": "1.0"
             },
             {
-                "code": "Form",
+                "code": "form",
                 "label": "Form page",
                 "since": "1.0"
             },
             {
-                "code": "Detail",
+                "code": "detail",
                 "label": "Detail page",
                 "since": "1.0"
             },
             {
-                "code": "PageLayout",
-                "label": "Layout page",
+                "code": "dashboard",
+                "label": "Dashboard page",
                 "since": "1.0"
             },
             {
-                "code": "Dashboard",
-                "label": "Dashboard page",
+                "code": "composite",
+                "label": "Composite page",
                 "since": "1.0"
             }
         ],
@@ -629,17 +683,17 @@
         "RiskLevel": [
             {
                 "code": "L0",
-                "label": "Safe read \u2014 no side effects",
+                "label": "Safe read — no side effects",
                 "since": "1.1"
             },
             {
                 "code": "L1",
-                "label": "Internal write \u2014 single object",
+                "label": "Internal write — single object",
                 "since": "1.1"
             },
             {
                 "code": "L2",
-                "label": "Cross-object write \u2014 cascade",
+                "label": "Cross-object write — cascade",
                 "since": "1.1"
             },
             {
@@ -779,9 +833,14 @@
                 "since": "1.0"
             },
             {
+                "code": "current_date",
+                "label": "Current business date (tenant-local)",
+                "since": "1.2"
+            },
+            {
                 "code": "current_datetime",
-                "label": "Current timestamp",
-                "since": "1.0"
+                "label": "Current UTC timestamp",
+                "since": "1.2"
             },
             {
                 "code": "current_tenant",
@@ -805,8 +864,13 @@
             },
             {
                 "code": "fixed_value",
-                "label": "Fixed constant",
+                "label": "Fixed constant (always overrides payload)",
                 "since": "1.0"
+            },
+            {
+                "code": "default_value",
+                "label": "Default constant (only when payload omits field)",
+                "since": "1.3"
             },
             {
                 "code": "auto_generate",
@@ -1135,326 +1199,458 @@
         ],
         "sideEffectHandlers": [
             {
-                "code": "batch_create_record",
+                "description": "Create a single record",
                 "source": "platform",
-                "description": "Batch create from single template"
+                "code": "create_record"
             },
             {
-                "code": "batch_create_records",
+                "description": "Batch create from array payload",
                 "source": "platform",
-                "description": "Batch create from array payload"
+                "code": "batch_create_records"
             },
             {
-                "code": "aggregate",
+                "description": "Update a single record",
                 "source": "platform",
-                "description": "Aggregate calculation side effect"
+                "code": "update_record"
             },
             {
-                "code": "batch_update_records",
+                "description": "Batch update from array payload",
                 "source": "platform",
-                "description": "Batch update from array payload"
+                "code": "batch_update_records"
             },
             {
-                "code": "batch_update_record",
+                "description": "Batch update from single template",
                 "source": "platform",
-                "description": "Batch update from single template"
+                "code": "batch_update_record"
             },
             {
-                "code": "create_record",
+                "description": "Batch create from single template",
                 "source": "platform",
-                "description": "Create a single record"
+                "code": "batch_create_record"
             },
             {
-                "code": "document_flow",
+                "description": "Document flow tracking",
                 "source": "platform",
-                "description": "Document flow tracking"
+                "code": "document_flow"
             },
             {
-                "code": "update_record",
+                "description": "Aggregate calculation side effect",
                 "source": "platform",
-                "description": "Update a single record"
+                "code": "aggregate"
             }
         ],
         "automationActions": [
             {
-                "code": "conditional",
+                "description": "Create a record",
                 "source": "platform",
-                "description": "Conditional branching"
+                "code": "create_record"
             },
             {
-                "code": "send_notification",
+                "description": "Call an external API",
                 "source": "platform",
-                "description": "Send a notification"
+                "code": "call_api"
             },
             {
-                "code": "call_api",
+                "description": "Update a record",
                 "source": "platform",
-                "description": "Call an external API"
+                "code": "update_record"
             },
             {
-                "code": "loop",
+                "description": "Conditional branching",
                 "source": "platform",
-                "description": "Loop over a collection"
+                "code": "conditional"
             },
             {
-                "code": "execute_command",
+                "description": "Execute actions in parallel",
                 "source": "platform",
-                "description": "Execute a DSL command"
+                "code": "parallel"
             },
             {
-                "code": "send_webhook",
+                "description": "Send a webhook request",
                 "source": "platform",
-                "description": "Send a webhook request"
+                "code": "send_webhook"
             },
             {
-                "code": "create_record",
+                "description": "Loop over a collection",
                 "source": "platform",
-                "description": "Create a record"
+                "code": "loop"
             },
             {
-                "code": "update_record",
+                "description": "Send a notification",
                 "source": "platform",
-                "description": "Update a record"
+                "code": "send_notification"
             },
             {
-                "code": "parallel",
+                "description": "Execute a DSL command",
                 "source": "platform",
-                "description": "Execute actions in parallel"
+                "code": "execute_command"
             }
         ],
         "expressionFunctions": [
             {
-                "name": "#currentUser",
-                "source": "platform",
+                "type": "variable",
                 "description": "Current authenticated user",
-                "type": "variable"
+                "source": "platform",
+                "name": "#currentUser"
             },
             {
-                "name": "#now",
-                "source": "platform",
+                "type": "variable",
                 "description": "Current timestamp",
-                "type": "variable"
+                "source": "platform",
+                "name": "#now"
             },
             {
-                "name": "#record",
-                "source": "platform",
+                "type": "variable",
                 "description": "Current record being processed",
-                "type": "variable"
+                "source": "platform",
+                "name": "#record"
             },
             {
-                "name": "#oldRecord",
-                "source": "platform",
+                "type": "variable",
                 "description": "Previous state of the record before update",
-                "type": "variable"
+                "source": "platform",
+                "name": "#oldRecord"
             },
             {
-                "name": "#env",
-                "source": "platform",
+                "type": "variable",
                 "description": "Environment variables",
-                "type": "variable"
+                "source": "platform",
+                "name": "#env"
             },
             {
-                "name": "#sourceRecordId",
-                "source": "platform",
+                "type": "variable",
                 "description": "Source record ID for side effects",
-                "type": "variable"
+                "source": "platform",
+                "name": "#sourceRecordId"
             },
             {
-                "name": "#payload",
-                "source": "platform",
+                "type": "variable",
                 "description": "Command execution payload",
-                "type": "variable"
+                "source": "platform",
+                "name": "#payload"
             }
         ],
         "renderComponents": [
             {
-                "source": "platform",
-                "code": "date",
-                "category": "basic",
                 "dataTypes": [
                     "date"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "image",
-                "category": "display",
-                "dataTypes": [
-                    "string"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "select",
+                ],
                 "category": "basic",
+                "code": "date",
+                "source": "platform"
+            },
+            {
                 "dataTypes": [
                     "enum"
-                ]
+                ],
+                "category": "basic",
+                "code": "select",
+                "source": "platform"
             },
             {
-                "source": "platform",
-                "code": "upload",
-                "category": "basic",
+                "dataTypes": [
+                    "time",
+                    "json"
+                ],
+                "category": "input",
+                "code": "timerangepicker",
+                "source": "platform"
+            },
+            {
                 "dataTypes": [
                     "file"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "rating",
-                "category": "display",
-                "dataTypes": [
-                    "integer"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "textarea",
+                ],
                 "category": "basic",
-                "dataTypes": [
-                    "text"
-                ]
+                "code": "upload",
+                "source": "platform"
             },
             {
-                "source": "platform",
-                "code": "avatar",
-                "category": "display",
-                "dataTypes": [
-                    "string"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "tag-input",
-                "category": "advanced",
-                "dataTypes": [
-                    "json"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "radio-group",
-                "category": "basic",
-                "dataTypes": [
-                    "enum"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "switch",
-                "category": "basic",
-                "dataTypes": [
-                    "boolean"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "color-picker",
-                "category": "advanced",
-                "dataTypes": [
-                    "string"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "checkbox-group",
-                "category": "basic",
-                "dataTypes": [
-                    "enum"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "input",
-                "category": "basic",
-                "dataTypes": [
-                    "string"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "number",
-                "category": "basic",
                 "dataTypes": [
                     "integer",
                     "decimal"
-                ]
+                ],
+                "category": "input",
+                "code": "rating",
+                "source": "platform"
             },
             {
-                "source": "platform",
-                "code": "datetime",
-                "category": "basic",
-                "dataTypes": [
-                    "datetime"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "progress",
-                "category": "display",
-                "dataTypes": [
-                    "decimal"
-                ]
-            },
-            {
-                "source": "platform",
-                "code": "richtext",
-                "category": "editor",
                 "dataTypes": [
                     "text"
-                ]
+                ],
+                "category": "basic",
+                "code": "textarea",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "boolean"
+                ],
+                "category": "basic",
+                "code": "switch",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "enum"
+                ],
+                "category": "basic",
+                "code": "checkbox-group",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "integer",
+                    "decimal"
+                ],
+                "category": "basic",
+                "code": "number",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "datetime"
+                ],
+                "category": "basic",
+                "code": "datetime",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string",
+                    "reference"
+                ],
+                "category": "selection",
+                "code": "organizationselect",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string"
+                ],
+                "category": "input",
+                "code": "colorpicker",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string",
+                    "json"
+                ],
+                "category": "advanced",
+                "code": "addressfield",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "text",
+                    "string"
+                ],
+                "category": "input",
+                "code": "richtext",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "file",
+                    "json"
+                ],
+                "category": "input",
+                "code": "fileattachment",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string"
+                ],
+                "category": "display",
+                "code": "image",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "date",
+                    "json"
+                ],
+                "category": "input",
+                "code": "daterange",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string",
+                    "text"
+                ],
+                "category": "advanced",
+                "code": "aifield",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string",
+                    "json"
+                ],
+                "category": "selection",
+                "code": "cascadeselect",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string"
+                ],
+                "category": "display",
+                "code": "avatar",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "json"
+                ],
+                "category": "advanced",
+                "code": "tag-input",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "enum"
+                ],
+                "category": "basic",
+                "code": "radio-group",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string",
+                    "reference"
+                ],
+                "category": "selection",
+                "code": "userselect",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string"
+                ],
+                "category": "advanced",
+                "code": "color-picker",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string",
+                    "reference"
+                ],
+                "category": "selection",
+                "code": "memberpicker",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "enum",
+                    "json"
+                ],
+                "category": "selection",
+                "code": "multiselect",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string"
+                ],
+                "category": "basic",
+                "code": "input",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "string",
+                    "json"
+                ],
+                "category": "selection",
+                "code": "treeselect",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "decimal"
+                ],
+                "category": "input",
+                "code": "moneyinput",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "time",
+                    "string"
+                ],
+                "category": "input",
+                "code": "timepicker",
+                "source": "platform"
+            },
+            {
+                "dataTypes": [
+                    "decimal",
+                    "integer"
+                ],
+                "category": "display",
+                "code": "progress",
+                "source": "platform"
             }
         ],
         "blockRenderers": [
             {
-                "code": "tabs",
+                "description": "Toolbar renderer",
                 "source": "platform",
-                "description": "Tab container renderer"
+                "code": "toolbar"
             },
             {
-                "code": "description",
+                "description": "Form section renderer",
                 "source": "platform",
-                "description": "Description/detail renderer"
+                "code": "form-section"
             },
             {
-                "code": "filters",
+                "description": "Form layout renderer",
                 "source": "platform",
-                "description": "Filter panel renderer"
+                "code": "form"
             },
             {
-                "code": "form-wizard",
+                "description": "Form button bar renderer",
                 "source": "platform",
-                "description": "Multi-step form wizard renderer"
+                "code": "form-buttons"
             },
             {
-                "code": "toolbar",
+                "description": "Tab container renderer",
                 "source": "platform",
-                "description": "Toolbar renderer"
+                "code": "tabs"
             },
             {
-                "code": "form-section",
+                "description": "Action button renderer",
                 "source": "platform",
-                "description": "Form section renderer"
+                "code": "action"
             },
             {
-                "code": "form",
+                "description": "Description/detail renderer",
                 "source": "platform",
-                "description": "Form layout renderer"
+                "code": "description"
             },
             {
-                "code": "form-buttons",
+                "description": "Filter form renderer",
                 "source": "platform",
-                "description": "Form button bar renderer"
+                "code": "filters"
             },
             {
-                "code": "chart",
+                "description": "Chart renderer",
                 "source": "platform",
-                "description": "Chart renderer"
+                "code": "chart"
             },
             {
-                "code": "table",
+                "description": "Multi-step form wizard renderer",
                 "source": "platform",
-                "description": "Table renderer"
+                "code": "form-wizard"
+            },
+            {
+                "description": "Data table renderer",
+                "source": "platform",
+                "code": "table"
             }
         ]
     },
