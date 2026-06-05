@@ -1,53 +1,49 @@
-# Session Handover — 2026-06-05 · automation-designer-golden-e2e
+# Session Handover — 2026-06-05 · automation-designer-golden-e2e (Phase 1 ✅ + Phase 2 ✅)
 
 ## Session Summary
-Designed + began building the **automation designer end-to-end golden E2E** (real-browser drag-drop user journey + full 18-node-type coverage). Branch `feat/automation-designer-golden-e2e` (pushed). **Phase 0 COMPLETE + verified** (and the golden smoke already found+fixed 2 real FlowCanvas bugs). **Phase 1 IMPLEMENTED but E2E-UNVERIFIED** — the GA E2E stack degraded (502) mid-verification and was torn down; a fresh session with a clean stack must verify Phase 1 + review its product changes before continuing.
+**Phase 1 (Layer A real-drag golden) and Phase 2 (Layer B behavioral matrix) are both COMPLETE + verified against a clean GA E2E stack.** The Layer-B behavioral golden found **2 real production bugs** (both passed every static/unit gate — only an assembled-runtime behavioral test catches them, §2.2); both are fixed + verified. **Phase 3 (18-node-type back coverage) and Phase 4 (acceptance + PR) are the remaining work.**
 
-> Prior context (DONE, do not re-do): this session also closed the 2026-05-23 automation designer-runtime review — 8 PRs merged to OSS main (#414/#415/#416/#417/#420/#424/#426 + bpm-event/derivation P0). Status recorded in `auraboot/docs/internal/backlog/2026-05-23-automation-designer-runtime-review.md` §5. The golden E2E below is the only OPEN line.
+Branch `feat/automation-designer-golden-e2e` (pushed, tip `564df53fb`).
 
-## The work line: branch `feat/automation-designer-golden-e2e`
+## Tasks Completed (verified) this session
+- **Phase 1 (Layer A) — ✅ 6/6 green, 3× flake-free.** Fixed 2 committed defects in the spec: (1) tsc error line 341 (`r.request().method()` → `r.method()`); (2) cold-vite flake — `openNewDesigner` now waits 30s for the editor name input before palette/pane (the heavy @xyflow chunk compiles >5s on a cold stack). Reviewed the 4 product changes from the prior subagent (PB-2 toggle→deploy, PB-3 ?logId overlay wiring, PB-4 field-error chrome, FlowDesigner test global) — all legitimate, no make-it-pass hack. Screenshots eyeballed (H1 4-node flow, H3 green-check badge, S1 field-level error). Commits `cf7e29a0a` / `5814d90f2`.
+- **Phase 2 (Layer B) — ✅ 10 passed + 1 honest skip, 6× flake-free.** `web-admin/tests/e2e/automation/automation-golden.spec.ts` extended: E6/S4/C3/S3/S5/E1/E2/C2/C1 (+ E3 honest skip). Commits `368339e25` / `dfd62b33f` / `1da77f4b9` / `564df53fb`.
+- **2 real product bugs fixed (platform):**
+  - **PB-5 BPM re-deploy → 500.** `ProcessDeploymentService.createNewVersion` inserted `bpmnContent` verbatim (null from the automation re-deploy caller) instead of compiling from `designerJson` like `create()`/`update()` → the SECOND deploy of any automation (E6 re-enable, edit+re-deploy) hit `null value in column "bpmn_content" violates not-null constraint`. Fixed: compile from designerJson, fall back to "". Verified by E6.
+  - **PB-6 empty-flowConfig create → 500.** `AutomationServiceImpl.validateCreateRequest` treated `{nodes:[],edges:[]}` as visual-designer mode (non-empty Map) → skipped the flat `modelCode` required check → `ab_automation.model_code` NOT NULL crash. Fixed: `isFlowConfigOnly` now checks for actual nodes (mirrors `enable()`) → clean 400. Verified by C3.
+  - Both rebuilt into the GA E2E backend; regress neither Layer A (6/6) nor Layer B B1.
+
+## Current verified state (re-run anytime)
+- Layer A: `automation-designer-golden.spec.ts` → **6/6** (H1/H2/H3/S1/S2/E5).
+- Layer B: `automation-golden.spec.ts` → **10 passed + 1 skip** (B1 + E6/S4/C3/S3/S5/E1/E2/C2/C1; E3 skip).
+- Flake: Layer A 3/3, Layer B 6/6 clean.
+
+## Stack + run recipe (IMPORTANT — used by every run above)
+- **Disk gate:** keep `/` ≥ 30GB (`df -h /`). Prune with `docker image prune -a -f` + `docker volume prune -a -f` (offset-stack leftovers are safe).
+- **Stack:** GA E2E docker stack on canonical ports backend 6444 / vite 5174 / BFF 3501 / pg 5433. Bring up: `scripts/docker-ga-e2e-up.sh` then `scripts/docker-ga-e2e-bootstrap.sh` (seeds admin + test-fixtures → e2et_order + `e2eto:create_e2et_order`).
+  - **⚠️ `--rebuild` offsets ports** (to 6445/5175/3502/5434) when a stack is already up. To rebuild a backend change AND stay on canonical ports: `docker-ga-e2e-up.sh --rebuild` (lands on +1) → `docker-ga-e2e-down.sh` → `docker-ga-e2e-up.sh` (reuses the freshly-built image, claims offset 0). The pg volume persists across down/up (no `--purge`), so bootstrap data survives.
+- **storageState:** `tests/storage/ga/admin.json` (gitignored, JWT not tracked). Regenerate against a fresh stack: `… npx playwright test --project=auth --no-deps` (setup project's invariant-7 "Business Tenant" assertion fails harmlessly because the bash bootstrap only seeds the System tenant — irrelevant to these specs; `--no-deps` runs auth alone). `__session` cookies are port-agnostic.
+- **Run env (every spec):** `PLAYWRIGHT_BASE_URL=http://localhost:5174 BACKEND_URL=http://localhost:6444 BE_PORT=6444 BFF_PORT=3501 PW_SKIP_WEBSERVER=1 PW_STORAGE_DIR=tests/storage/ga npx playwright test <spec> --no-deps`. For specs whose afterAll reads the default storage path, also pass `PW_ADMIN_STORAGE_STATE=tests/storage/ga/admin.json`.
+- **Gotchas baked into the spec:** (a) the fire endpoint `…/execute/e2eto:create_e2et_order` carries a colon → from `about:blank` the `e2eto:` segment mis-parses as a URL scheme and hits the SPA fallback HTML → the Phase-2 `beforeEach` lands on `/automations` first (real origin). (b) Layer-B `data.config` node shapes are grounded in the verified Layer A H1 + the node `configSchema` source (condition reads `record['field']`; gateway out-edges carry `sourceHandle` true/false + `data.condition.content`; update-record `fields` is an OBJECT — `UpdateRecordExecutor` casts `config.get("fields")` to Map).
+
+## Remaining work (next session)
+
+### Phase 3 — full 18-node-type back coverage (the large remaining body; several cases need test infra)
+Plan tasks 3.1–3.4. Grounded config shapes are in `nodes/triggers.ts` / `actions.ts` / `controls.ts` and the verified Layer-A H1. Cheapest-first:
+- **Cheap (extend Layer B as-is):** action-create-record (new-row side effect), action-execute-command (run another e2eto command + assert), trigger-record-update / -field-change / -state-change (fire via a record UPDATE — find/confirm the e2et_order update command path).
+- **Infra-needed (ground before writing):** trigger-webhook (needs a webhook POST endpoint + signature, ties #415), trigger-bpm-event (needs a BPM event publish), action-call-api / action-send-webhook (need outbound-HTTP interception), action-llm-call (needs an LLM stub/mock), action-start-process (needs a deployable BPM process to assert an instance started).
+- **Honest skips (already decided):** trigger-scheduled (heavy cron-realtime; IT `AutomationSchedulerTest`), control-delay (SmartEngine timer suspended, roadmap #8), control-loop fire-path (E3 — multi-iteration covered by `AutomationProcessRuntimeIntegrationTest`; e2et_order has no collection field).
+- **3.4 property-panel render:** a vitest component test asserting each configSchema field type renders (separate from the E2E; pairs with palette-coverage Task 0.6 which is done).
+
+### Phase 4 — acceptance + PR
+4.1 coverage matrix doc, 4.2 screenshot review (done for Layer A; redo if Phase 3 adds UI), 4.3 `/e2e-truth` self-audit, 4.4 ≥3× flake (done for P1+P2), **4.5 open the PR**.
+
+## Key files
+- Plan (status blocks inline, source of truth): `docs/superpowers/plans/2026-06-05-automation-designer-golden-e2e.md`
 - Spec: `docs/superpowers/specs/2026-06-05-automation-designer-golden-e2e-design.md`
-- Plan (executable, per-case checkboxes + full Phase-0/Phase-1 status): `docs/superpowers/plans/2026-06-05-automation-designer-golden-e2e.md` ← **read this first**
-- Commits (origin has them): spec → plan → testids (7a4d632fc) → harness (db26f9923) → Phase-0 smoke + 2 FlowCanvas fixes (e1d16259c) → Phase-0 cleanup (b06cca22c) → Phase-1 H1-H3 (e9fe77af4) → Phase-1 S1/S2/E5 (f0d4edf49) → Phase-1 honest-status (d8103d0c8).
+- Layer A: `web-admin/tests/e2e/automation/automation-designer-golden.spec.ts` + harness `web-admin/tests/e2e/_helpers/flow-designer-harness.ts`
+- Layer B: `web-admin/tests/e2e/automation/automation-golden.spec.ts`
+- Backend fixes: `platform/.../bpm/service/ProcessDeploymentService.java` + `platform/.../automation/service/impl/AutomationServiceImpl.java`
 
-## Tasks Completed (verified)
-- **Phase 0 (infra + harness) — DONE, main-loop verified.** Drag mechanism = HTML5 native drag (`application/flow-node`). Stable testids on palette/nodes/handles/prop-fields/save. Shared harness `web-admin/tests/e2e/_helpers/flow-designer-harness.ts` (drag smoke-verified 2/2 by me). Palette-coverage test: 18 types / 110 assertions. **Golden smoke found + fixed 2 real shared-FlowCanvas bugs** (off-screen node drop: `screenToFlowPosition` called outside provider + `fitView` re-fit on empty canvas) — commit e1d16259c, regression 254 flow-sdk/bpmn tests pass.
-
-## Tasks In Progress (NOT verified — must close before trusting)
-- **Phase 1 (Layer A real drag journey) — IMPLEMENTED but E2E-UNVERIFIED.** A subagent built `web-admin/tests/e2e/automation/automation-designer-golden.spec.ts` (6 cases: H1 full journey, H2 reload, H3 G5 badges, S1 required-gate, S2 dangerous-SpEL, E5 edit-refire) + tuned the harness + made **4 product changes it claims are golden-found bugs** — these are UNREVIEWED:
-  - `platform/.../automation/service/impl/AutomationServiceImpl.java` (backend, 13 lines)
-  - `web-admin/app/framework/smart/automation/components/AutomationEditPageImpl.tsx`
-  - `web-admin/app/plugins/core-designer/components/flow-designer-sdk/core/FlowDesigner.tsx`
-  - `web-admin/app/shared/designer/PropertyFieldRenderer.tsx` (PB-4 field-error)
-  - Committed e9fe77af4 + f0d4edf49. Subagent run was cut off by API ECONNRESET (final report lost).
-  - **Known issues:** (1) `tsc --noEmit` fails — `automation-designer-golden.spec.ts:341` `Property 'request' does not exist on type 'Request'`. (2) backend change NOT in the (now-removed) running stack — needs rebuild. (3) 6 cases never confirmed to pass (stack 502'd before I could run them). Frontend unit regression DID pass (231 tests) — the shared-component changes don't break existing units.
-
-## Next Steps (to close Phase 1, then Phases 2-4)
-1. **Free disk first** (was ~23Gi; §2.3.1 wants ≥30GB — prune or stop an idle stack you own; `docker image prune -a` reclaims ~6GB of unused tagged images).
-2. `cd` into a worktree on `feat/automation-designer-golden-e2e`; bring up a CLEAN GA E2E stack: `scripts/docker-ga-e2e-up.sh` then `scripts/docker-ga-e2e-bootstrap.sh` (the up rebuilds backend → picks up the AutomationServiceImpl change; bootstrap seeds admin + test-fixtures/e2et_order).
-3. **Fix** the spec tsc error (`automation-designer-golden.spec.ts:341`).
-4. **Run** Layer A: `PLAYWRIGHT_BASE_URL=http://localhost:5174 BACKEND_URL=http://localhost:6444 BE_PORT=6444 BFF_PORT=3501 PW_SKIP_WEBSERVER=1 PW_STORAGE_DIR=tests/storage/ga npx playwright test tests/e2e/automation/automation-designer-golden.spec.ts --no-deps` (regenerate `tests/storage/ga/admin.json` via `... npx playwright test auth.setup --no-deps` if expired). Confirm all 6 cases pass; screenshot-review the happy journey.
-5. **Review the 4 product changes** (§14/§20 — real fix vs make-it-pass hack), esp. the backend + shared-SDK ones; back out any hack.
-6. Then Phases 2-4 per the plan (Layer B behavioral matrix, full 18-node back coverage, acceptance + `/e2e-truth`).
-
-## Key Decisions
-| Decision | Chosen | Rationale |
-|---|---|---|
-| Test architecture | Layered: Layer A real-drag journey + Layer B API-setup behavioral matrix | Real-pointer fidelity where it matters (§2.2 interaction layer); behavioral matrix not dragged down by 18 slow drag sequences |
-| Scope/order | automation designer first (full happy/sad/edge/corner + 18 nodes), bpmn slice after (reuse harness) | Backend just verified, lowest risk; harness is @xyflow-generic for bpmn reuse |
-| Skips | delay-runtime (timer suspended #8) + scheduled-realtime (heavy) = HONEST skip | §2 no-fake-pass; counted skip not pass |
-
-## Pitfalls & Lessons
-1. **Stack env degraded under load → 502 (env-invalid).** A ~176-min single subagent run + my verification runs, on a stack brought up at **25Gi disk (below the §2.3.1 30GB gate — accepted risk)**, degraded the docker host↔container port layer to a persistent 502 that survived a container restart. **Lesson:** don't accept sub-30GB stack bring-ups for long E2E sessions; don't let a single subagent run ~3h — checkpoint it. The disk risk I flagged and the user accepted did bite (late, as resource degradation, not an immediate hang).
-2. **Subagent committed product code + a non-compiling spec under "make it green" pressure.** The 4 product changes + the tsc-failing spec are exactly why §14/§20 verify-don't-trust applies — none are trusted until reviewed + the cases actually run green.
-3. **A stack brought up from a worktree mounts THAT worktree at `/repo`** (verified via `docker inspect`) — so frontend source edits are live via vite HMR, no HMR-cp dance needed. (An earlier "rsync from canonical" reading was a misread of an unrelated process.) Backend, however, is built in-container at up time → backend changes need a rebuild.
-
-## Current State
-- **Git:** branch `feat/automation-designer-golden-e2e` pushed (tip d8103d0c8), working tree clean. origin/main far ahead (other sessions).
-- **Stack:** GA E2E stack **torn down** (`docker-ga-e2e-down.sh`, was 502/broken). Fresh session brings up a clean one.
-- **Disk:** ~23Gi free (tight) — free more before the next stack up.
-
-## Context for Next Session
-- Read `docs/superpowers/plans/2026-06-05-automation-designer-golden-e2e.md` (Phase-0 findings + Phase-1 honest status + the close-Phase-1 recipe are all inline).
-- Stack env vars + `--no-deps` + admin creds (admin@auraboot.com/Test2026x, token `data.jwt`) + e2et_order/`e2eto:create_e2et_order` are in the plan.
-- Harness: `web-admin/tests/e2e/_helpers/flow-designer-harness.ts`. Existing reference spec: `web-admin/tests/e2e/automation/automation-golden.spec.ts` (API-setup; reuse its create/fire/poll patterns for Layer B).
+## Commits this session (all pushed)
+`cf7e29a0a` Phase-1 verified (tsc + cold-vite) · `5814d90f2` plan P1 close · `368339e25` 2 backend fixes + P2 batch1 · `dfd62b33f` P2 batch2 · `1da77f4b9` P2 batch3 · `dd16107bb` plan P2 close · `564df53fb` flake fix.
