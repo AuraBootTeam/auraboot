@@ -309,7 +309,7 @@ dependencies {
     }
 
     // 数据库 — PostgreSQL (default) and MySQL (optional)
-    implementation 'org.postgresql:postgresql:42.7.8'
+    implementation 'org.postgresql:postgresql:42.7.11'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     // Apache POI for Excel export
@@ -363,7 +363,7 @@ dependencies {
     }
 
     // PostgreSQL 数据库用于测试
-    testImplementation 'org.postgresql:postgresql:42.7.8'
+    testImplementation 'org.postgresql:postgresql:42.7.11'
 
     // TestContainers — ephemeral MySQL for connector SDK tests
     testImplementation platform('org.testcontainers:testcontainers-bom:1.20.4')
