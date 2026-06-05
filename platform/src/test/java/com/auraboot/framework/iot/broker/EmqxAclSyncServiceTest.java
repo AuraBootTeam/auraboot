@@ -200,4 +200,90 @@ class EmqxAclSyncServiceTest {
         assertThatThrownBy(() -> svc.revokeDeviceUser(-1L, "x"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    // ---- syncTenantAclRules (ACL-only, no authn-user create) ----
+
+    @Test
+    void syncTenantAclRules_pushesAuthzRulesPerDevice_noAuthnUserCreate() {
+        AtomicInteger aclPushCalls = new AtomicInteger();
+        AtomicInteger authnUserCalls = new AtomicInteger();
+        ExchangeFunction xf = req -> {
+            String path = req.url().getPath();
+            if (path.contains("/authorization/sources/built_in_database/rules/users")) {
+                aclPushCalls.incrementAndGet();
+            } else if (path.contains("/authentication/") && path.endsWith("/users")) {
+                // POST to authn .../users (create-user endpoint)
+                authnUserCalls.incrementAndGet();
+            }
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        };
+        EmqxAclSyncService svc = build(enabledProps(), xf);
+        svc.syncTenantAclRules(7L, List.of(
+                new EmqxAclSyncService.DeviceAclRule("dev-1", List.of("/sys/p/dev-1/#")),
+                new EmqxAclSyncService.DeviceAclRule("dev-2", List.of("/sys/p/dev-2/#"))));
+        assertThat(aclPushCalls.get()).isEqualTo(2);
+        assertThat(authnUserCalls.get()).isZero();
+    }
+
+    @Test
+    void syncTenantAclRules_usesIdempotentPut_perUser_andSucceedsOnRepush() {
+        // Regression for the 2026-06-05 D1 golden bug: POST /rules/users 409s on re-push,
+        // breaking reconciliation. PUT /rules/users/{username} is an idempotent upsert.
+        AtomicReference<String> method = new AtomicReference<>();
+        AtomicReference<URI> uri = new AtomicReference<>();
+        AtomicInteger calls = new AtomicInteger();
+        ExchangeFunction xf = req -> {
+            method.set(req.method().name());
+            uri.set(req.url());
+            calls.incrementAndGet();
+            return Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT).build()); // EMQX PUT → 204
+        };
+        EmqxAclSyncService svc = build(enabledProps(), xf);
+        List<EmqxAclSyncService.DeviceAclRule> rules =
+                List.of(new EmqxAclSyncService.DeviceAclRule("dev-1", List.of("/sys/p/dev-1/#")));
+
+        svc.syncTenantAclRules(7L, rules);
+        assertThat(method.get()).isEqualTo("PUT");
+        assertThat(uri.get().getPath())
+                .contains("/authorization/sources/built_in_database/rules/users/")
+                .endsWith("/dev-1");
+
+        // Second call (re-push) must also succeed — no 409, fully idempotent.
+        svc.syncTenantAclRules(7L, rules);
+        assertThat(calls.get()).isEqualTo(2);
+    }
+
+    @Test
+    void deviceAclRule_nullPatterns_defaultsToEmpty_andDoesNotNpe() {
+        // The compact ctor null-guards aclPatterns → empty list, so a rule with no
+        // resolved patterns pushes an empty rule set instead of NPEing in pushAclRules.
+        EmqxAclSyncService.DeviceAclRule r = new EmqxAclSyncService.DeviceAclRule("dev-x", null);
+        assertThat(r.aclPatterns()).isEmpty();
+
+        AtomicInteger aclPushCalls = new AtomicInteger();
+        ExchangeFunction xf = req -> {
+            if (req.url().getPath().contains("/authorization/sources/built_in_database/rules/users")) {
+                aclPushCalls.incrementAndGet();
+            }
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        };
+        EmqxAclSyncService svc = build(enabledProps(), xf);
+        svc.syncTenantAclRules(7L, List.of(r)); // must not throw
+        assertThat(aclPushCalls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void syncTenantAclRules_disabled_isNoOp() {
+        AtomicInteger calls = new AtomicInteger();
+        ExchangeFunction xf = req -> {
+            calls.incrementAndGet();
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        };
+        EmqxAclProperties p = new EmqxAclProperties();
+        p.setEnabled(false);
+        EmqxAclSyncService svc = build(p, xf);
+        svc.syncTenantAclRules(7L, List.of(
+                new EmqxAclSyncService.DeviceAclRule("dev-1", List.of("/sys/p/dev-1/#"))));
+        assertThat(calls.get()).isZero();
+    }
 }

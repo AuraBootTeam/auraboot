@@ -8,8 +8,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 /**
  * Spring config for the TDengine {@link TimeSeriesPort} impl.
@@ -37,6 +40,34 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConditionalOnProperty(name = "iot.tdengine.enabled", havingValue = "true")
 public class TimeSeriesPortConfig {
+
+    /**
+     * Explicit @Primary PostgreSQL DataSource (the platform metadata store).
+     *
+     * <p><b>Why this is required:</b> declaring {@link #tdengineDataSource} as a
+     * {@code DataSource} bean makes Spring Boot's {@code DataSourceAutoConfiguration}
+     * back off ({@code @ConditionalOnMissingBean(DataSource.class)}) — so the platform
+     * would otherwise be left with ONLY the TDengine DataSource and every MyBatis
+     * metadata query would hit TDengine and fail. We therefore pin the PG DataSource
+     * here, primary, from the standard {@code spring.datasource.*} properties, so it
+     * stays the default for all platform persistence while TDengine is used only via
+     * the {@code @Qualifier("tdengineDataSource")} injection point. (Inactive unless
+     * {@code iot.tdengine.enabled=true}, so OSS/community deploys keep auto-config.)
+     */
+    @Bean
+    @Primary
+    @ConfigurationProperties("spring.datasource")
+    public DataSourceProperties primaryDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    @Bean
+    @Primary
+    @ConfigurationProperties("spring.datasource.hikari")
+    public HikariDataSource dataSource(
+            @Qualifier("primaryDataSourceProperties") DataSourceProperties props) {
+        return props.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+    }
 
     @Bean(name = "tdengineDataSource", destroyMethod = "close")
     @ConditionalOnMissingBean(name = "tdengineDataSource")
