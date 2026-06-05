@@ -3,6 +3,8 @@ package com.auraboot.framework.iot.spi.impl;
 import com.auraboot.framework.iot.broker.EmqxAclSyncService;
 import com.auraboot.framework.iot.security.IotCredentialEncryptionService;
 import com.auraboot.framework.iot.security.IotJwtService;
+import com.auraboot.framework.meta.dto.DynamicQueryRequest;
+import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.iot.BackgroundDeviceAccessor;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,6 +31,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class IotCredentialAccessorImplTest {
@@ -58,6 +62,21 @@ class IotCredentialAccessorImplTest {
         String pid = "pid-" + iotId;
         return new DeviceView(pid, iotId, code, "pk-air", tenantId, "ONLINE",
                 "/sys/pk-air/" + code + "/#", Map.of(), null);
+    }
+
+    /** Build a raw device row map as returned by DynamicDataService.list. */
+    private Map<String, Object> deviceRow(long tenantId, String code, String iotId, String aclPattern) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("pid", "pid-" + iotId);
+        row.put("iot_d_iot_id", iotId);
+        row.put("iot_d_device_code", code);
+        row.put("iot_d_product_key", "pk-air");
+        row.put("tenant_id", tenantId);
+        row.put("iot_d_status", "ONLINE");
+        row.put("iot_d_acl_pattern", aclPattern);
+        row.put("iot_d_tags", null);
+        row.put("iot_d_last_seen_at", null);
+        return row;
     }
 
     @Test
@@ -142,9 +161,101 @@ class IotCredentialAccessorImplTest {
     }
 
     @Test
-    void syncAclToBroker_delegatesToBroker() {
-        accessor.syncAclToBroker(42L);
-        verify(emqx).syncTenantAcl(eq(42L), any());
+    void syncAclToBroker_rejectsNonPositiveTenant() {
+        assertThatThrownBy(() -> accessor.syncAclToBroker(0L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("tenantId must be > 0");
+        // Reject BEFORE touching the device table or the broker.
+        verifyNoInteractions(dds);
+        verify(emqx, never()).syncTenantAclRules(anyLong(), any());
+    }
+
+    @Test
+    void syncAclToBroker_emptyResult_returnsZero_andDoesNotCallBroker() {
+        // dds.list returns null (no rows) → count=0, no broker call.
+        when(dds.list(eq(IotDeviceAccessorImpl.MODEL_CODE), any(DynamicQueryRequest.class)))
+                .thenReturn(null);
+        int n = accessor.syncAclToBroker(42L);
+        assertThat(n).isZero();
+        verify(emqx, never()).syncTenantAclRules(anyLong(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void syncAclToBroker_enumeratesActiveDevices_pushesAclOnly_noDecrypt() {
+        // Two device rows: dev-1 has explicit ACL pattern, dev-2 has null (uses default).
+        Map<String, Object> row1 = deviceRow(42L, "dev-1", "iot-1", "/sys/pk-air/dev-1/#");
+        Map<String, Object> row2 = deviceRow(42L, "dev-2", "iot-2", null);
+
+        PaginationResult<Map<String, Object>> page =
+                PaginationResult.of(List.of(row1, row2), 2L, 1, 500);
+
+        when(dds.list(eq(IotDeviceAccessorImpl.MODEL_CODE), any(DynamicQueryRequest.class)))
+                .thenReturn(page);
+
+        int n = accessor.syncAclToBroker(42L);
+
+        assertThat(n).isEqualTo(2);
+
+        ArgumentCaptor<List<EmqxAclSyncService.DeviceAclRule>> cap =
+                ArgumentCaptor.forClass(List.class);
+        verify(emqx).syncTenantAclRules(eq(42L), cap.capture());
+
+        List<EmqxAclSyncService.DeviceAclRule> rules = cap.getValue();
+        assertThat(rules).hasSize(2);
+        assertThat(rules.get(0).username()).isEqualTo("dev-1");
+        assertThat(rules.get(1).username()).isEqualTo("dev-2");
+        // dev-2 has null ACL → default pattern must be used
+        assertThat(rules.get(1).aclPatterns()).containsExactly("/sys/pk-air/dev-2/#");
+
+        // §15: absolutely no password decryption during reconciliation
+        verifyNoInteractions(encryption);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void syncAclToBroker_paginatesThroughAllDevices_accumulatesTotal() {
+        // Page 1: full batch (pageSize=1000 rows), page 2: 3 rows, page 3: empty → stop
+        int batchSize = 1000;
+
+        List<Map<String, Object>> page1Rows = new java.util.ArrayList<>();
+        for (int i = 0; i < batchSize; i++) {
+            page1Rows.add(deviceRow(42L, "dev-p1-" + i, "iot-p1-" + i, "/sys/pk-air/dev-p1-" + i + "/#"));
+        }
+        PaginationResult<Map<String, Object>> page1 =
+                PaginationResult.of(page1Rows, 1003L, 1, batchSize);
+
+        List<Map<String, Object>> page2Rows = List.of(
+                deviceRow(42L, "dev-p2-0", "iot-p2-0", null),
+                deviceRow(42L, "dev-p2-1", "iot-p2-1", null),
+                deviceRow(42L, "dev-p2-2", "iot-p2-2", null));
+        PaginationResult<Map<String, Object>> page2 =
+                PaginationResult.of(page2Rows, 1003L, 2, batchSize);
+
+        // Return page1 for first call, page2 for second call; any third call returns empty.
+        when(dds.list(eq(IotDeviceAccessorImpl.MODEL_CODE), any(DynamicQueryRequest.class)))
+                .thenReturn(page1)
+                .thenReturn(page2)
+                .thenReturn(PaginationResult.of(List.of(), 1003L, 3, batchSize));
+
+        int total = accessor.syncAclToBroker(42L);
+
+        // Must enumerate ALL 1003 devices and return the combined count.
+        assertThat(total).isEqualTo(1003);
+
+        // The loop must stop as soon as a page returns fewer rows than the batch
+        // size: page1 (==1000) → fetch page2; page2 (3 < 1000) → break. So exactly
+        // TWO list() calls — the third (empty) stub is never consumed.
+        verify(dds, times(2)).list(eq(IotDeviceAccessorImpl.MODEL_CODE), any(DynamicQueryRequest.class));
+
+        // syncTenantAclRules must have been called once with all 1003 rules.
+        ArgumentCaptor<List<EmqxAclSyncService.DeviceAclRule>> cap =
+                ArgumentCaptor.forClass(List.class);
+        verify(emqx).syncTenantAclRules(eq(42L), cap.capture());
+        assertThat(cap.getValue()).hasSize(1003);
+
+        // §15: no password decryption
+        verifyNoInteractions(encryption);
     }
 
     @Test

@@ -163,9 +163,12 @@ public class EmqxAclSyncService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("username", username);
         body.put("rules", rules);
-        callWithRetry("POST",
-                "/api/v5/authorization/sources/built_in_database/rules/users",
-                List.of(body),
+        // PUT /rules/users/{username} is an idempotent UPSERT (creates or replaces the
+        // user's authz rules). POST /rules/users would 409 ALREADY_EXISTS on a re-push,
+        // which breaks reconciliation (syncTenantAclRules is meant to run repeatedly).
+        callWithRetry("PUT",
+                "/api/v5/authorization/sources/built_in_database/rules/users/" + uri(username),
+                body,
                 "push acl rules");
     }
 
@@ -243,6 +246,43 @@ public class EmqxAclSyncService {
         }
         if (username == null || username.isBlank()) {
             throw new IllegalArgumentException("username must not be blank");
+        }
+    }
+
+    /**
+     * ACL-only rule snapshot for a single device.
+     * Unlike {@link DevicePrincipal}, this record carries no secret/password — it is
+     * intended for reconciliation paths where we push authz rules only (§15 ACL-only).
+     */
+    public record DeviceAclRule(String username, List<String> aclPatterns) {
+        public DeviceAclRule {
+            // Null-guard the patterns so reconciliation callers can pass a device
+            // with no resolved ACL without NPEing in pushAclRules (treated as no-op).
+            aclPatterns = aclPatterns == null ? List.of() : aclPatterns;
+        }
+    }
+
+    /**
+     * Push ACL (authz) rules only for each device in {@code rules}.
+     * This method does NOT create or modify authn users and does NOT require the device
+     * password — safe to call during background reconciliation (§15: ACL-only, no decrypt).
+     *
+     * @param tenantId owning tenant id (must be &gt; 0)
+     * @param rules    per-device ACL rule snapshots; null or empty is a no-op
+     */
+    public void syncTenantAclRules(long tenantId, List<DeviceAclRule> rules) {
+        if (!props.isEnabled()) {
+            log.debug("[emqx] disabled — skipping syncTenantAclRules tenant={}", tenantId);
+            return;
+        }
+        if (tenantId <= 0) {
+            throw new IllegalArgumentException("tenantId must be > 0");
+        }
+        if (rules == null || rules.isEmpty()) {
+            return;
+        }
+        for (DeviceAclRule r : rules) {
+            pushAclRules(r.username(), r.aclPatterns());
         }
     }
 

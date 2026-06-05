@@ -56,8 +56,9 @@ public interface BackgroundIotCredentialAccessor {
      * new ACL set or throws on rejection.
      *
      * @param tenantId owning tenant id
+     * @return number of device ACL rule sets pushed (active devices enumerated)
      */
-    void syncAclToBroker(long tenantId);
+    int syncAclToBroker(long tenantId);
 
     /**
      * Credential kind. Plugins SHOULD prefer {@link #ACCESS_TOKEN} unless
