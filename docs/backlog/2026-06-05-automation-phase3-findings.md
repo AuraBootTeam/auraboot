@@ -64,11 +64,24 @@ trigger-webhook fire is now green.
   (`variables.values().removeIf(Objects::isNull)`) — an absent variable is the correct
   semantics for a null. `handleStateTransition` additionally best-effort-reads the
   post-commit state (`CommandStateCheckExecutor.readCurrentState`) to enrich `toState`.
-- **FINDING-4b (follow-up, not blocking):** a SPECIFIC `toStates:['cancelled']` filter is
-  still imprecise — `readCurrentState` returns null when the async `CommandCompletedEvent`
-  carries no tenant, so `toState` is unavailable for filtering. The state-change test filters
-  on "any transition" (empty fromStates/toStates), which is fully green. Tightening the
-  toStates filter needs a reliable tenant on the async event (small follow-up).
+- **FINDING-4b (follow-up, not blocking — root cause diagnosed, fix not yet stack-verified):**
+  a SPECIFIC `toStates:['cancelled']` filter is still imprecise because the bridge's best-effort
+  `toState` enrichment (`CommandStateCheckExecutor.readCurrentState`) returns null in the async
+  path. **Root cause (read-only diagnosis, §15 — not yet verified on a stack):** `readCurrentState`
+  runs `SELECT … WHERE tenant_id = #{tenantId} AND <id> = #{recordId}` through
+  `DynamicDataMapper.selectByQuery`, which is the **tenant-line-interceptor-enabled** mapper
+  (contrast `selectByQueryWithoutTenant`, annotated `@InterceptorIgnore(tenantLine="true")`).
+  The bridge runs on `@Async("eventTaskExecutor")`, which does NOT inherit the request's
+  MetaContext/tenant — so the tenant-line interceptor injects a second, wrong/empty `tenant_id`
+  predicate and the row is never found, even though `event.getTenantId()` is passed explicitly
+  in the SQL. **Fix (recommended):** in `AutomationCommandEventBridge`, establish the tenant
+  context from `event.getTenantId()` before `readCurrentState` (mirroring
+  `AutomationProcessRuntime.run`, which already calls `MetaContext.setContext(...)` when absent
+  on the same async path) and clear it after; OR point this specific read at
+  `selectByQueryWithoutTenant` (tenant is already enforced in the WHERE — the mapper documents
+  this as the same security model). Verify with a `toStates:['cancelled']`-filtered state-change
+  test on a fresh stack. Today the state-change test filters on "any transition" (empty
+  fromStates/toStates), fully green — the NPE (the real bug) is fixed; this is filter precision only.
 
 ## ⏭ FINDING-5 (honest skip) — action-llm-call needs stub-mode on the E2E stack
 - The executor + built-in `StubLlmProvider` both exist, but the GA test tenant carries a
