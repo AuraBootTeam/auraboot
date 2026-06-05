@@ -180,6 +180,19 @@ class RuleSimulatorImplTest {
     }
 
     @Test
+    void simulate_noTelemetryStore_throwsTelemetryStoreUnavailable() {
+        // Backend deployed without TDengine → TimeSeriesPort bean absent (null).
+        RuleSimulatorImpl noStore = new RuleSimulatorImpl(dds, ruleAccessor, productAccessor,
+                (com.auraboot.framework.plugin.extension.iot.TimeSeriesPort) null, emqxRuleTest, new ObjectMapper());
+        when(ruleAccessor.findByCode(42L, "rule-temp")).thenReturn(Optional.of(sqlRule()));
+
+        assertThatThrownBy(() -> noStore.simulate(42L, "rule-temp", window(100)))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("telemetry_store_unavailable");
+        verifyNoInteractions(emqxRuleTest);
+    }
+
+    @Test
     void simulate_ruleNotFound_throws() {
         when(ruleAccessor.findByCode(42L, "ghost")).thenReturn(Optional.empty());
         assertThatThrownBy(() -> sim.simulate(42L, "ghost", window(100)))

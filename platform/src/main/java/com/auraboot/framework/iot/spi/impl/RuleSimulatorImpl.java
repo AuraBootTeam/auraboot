@@ -18,6 +18,8 @@ import com.auraboot.framework.plugin.extension.iot.TimeSeriesPoint;
 import com.auraboot.framework.plugin.extension.iot.TimeSeriesPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -66,16 +68,36 @@ public class RuleSimulatorImpl implements BackgroundRuleSimulator {
     private final DynamicDataService dynamicDataService;
     private final BackgroundRuleAccessor ruleAccessor;
     private final BackgroundProductAccessor productAccessor;
+    /** May be null: the TDengine {@link TimeSeriesPort} is {@code @ConditionalOnProperty(iot.tdengine.enabled)}
+     *  and absent in OSS/community/test deploys. Resolved optionally so the bean — and the whole backend —
+     *  still boots; {@link #simulate} then fails closed with a structured error. */
     private final TimeSeriesPort timeSeriesPort;
     private final EmqxRuleTestService emqxRuleTest;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Spring constructor. {@code TimeSeriesPort} is resolved via {@link ObjectProvider}
+     * so its absence (no TDengine) does NOT block bean creation / backend startup —
+     * matching the established {@code @Autowired(required=false) TimeSeriesPort} contract.
+     */
+    @Autowired
     public RuleSimulatorImpl(DynamicDataService dynamicDataService,
                              BackgroundRuleAccessor ruleAccessor,
                              BackgroundProductAccessor productAccessor,
-                             TimeSeriesPort timeSeriesPort,
+                             ObjectProvider<TimeSeriesPort> timeSeriesPortProvider,
                              EmqxRuleTestService emqxRuleTest,
                              ObjectMapper objectMapper) {
+        this(dynamicDataService, ruleAccessor, productAccessor,
+                timeSeriesPortProvider.getIfAvailable(), emqxRuleTest, objectMapper);
+    }
+
+    /** Direct constructor (tests + the @Autowired delegate). */
+    RuleSimulatorImpl(DynamicDataService dynamicDataService,
+                      BackgroundRuleAccessor ruleAccessor,
+                      BackgroundProductAccessor productAccessor,
+                      TimeSeriesPort timeSeriesPort,
+                      EmqxRuleTestService emqxRuleTest,
+                      ObjectMapper objectMapper) {
         this.dynamicDataService = dynamicDataService;
         this.ruleAccessor = ruleAccessor;
         this.productAccessor = productAccessor;
@@ -99,6 +121,13 @@ public class RuleSimulatorImpl implements BackgroundRuleSimulator {
             String suffix = rule.kind() == BackgroundRuleAccessor.RuleKind.SMART_ENGINE ? SMART_ENGINE_BACKLOG : "";
             throw new MetaServiceException(
                     "iot.error.rule_kind_not_production_evaluated:" + rule.kind() + suffix);
+        }
+
+        if (timeSeriesPort == null) {
+            // No TDengine archive on this deploy → we cannot replay telemetry. Fail closed
+            // (do not fabricate a 0-count "success"); the operator gets an honest reason.
+            throw new MetaServiceException(
+                    "iot.error.telemetry_store_unavailable (rule_simulate requires the TDengine time-series archive; set iot.tdengine.enabled=true)");
         }
 
         Set<String> sqlFields = extractPayloadFields(rule.expression());
