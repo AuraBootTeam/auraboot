@@ -261,7 +261,7 @@ dependencies {
 
     // OpenTelemetry Micrometer bridge (for trace-metric correlation)
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
-    implementation 'io.opentelemetry:opentelemetry-exporter-otlp:1.40.0'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp:1.62.0'
     implementation "io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64"
 
     // SmartEngine - Workflow engine
