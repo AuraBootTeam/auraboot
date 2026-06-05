@@ -764,7 +764,7 @@ CREATE TABLE ab_page_schema (
     kind VARCHAR(50) NOT NULL,              -- list/form/detail/dashboard/composite
 
     -- Flat schema fields (replaces dsl_schema JSONB blob)
-    schema_version INTEGER NOT NULL DEFAULT 2,
+    schema_version INTEGER NOT NULL DEFAULT 4,  -- v4 = flat blocks + 12-col grid canvas (PAGE_SCHEMA_CURRENT_VERSION)
     profile VARCHAR(50) DEFAULT 'admin',
     title JSONB,                            -- { "zh-CN": "...", "en": "..." }
     layout JSONB,                           -- { "type": "stack" } or { "type": "grid", "cols": 12 }

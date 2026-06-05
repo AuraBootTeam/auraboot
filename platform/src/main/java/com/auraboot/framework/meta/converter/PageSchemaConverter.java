@@ -96,7 +96,7 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "semver", source = "semver")
     @Mapping(target = "rowVersion", constant = "1")
     @Mapping(target = "isCurrent", constant = "true")
-    @Mapping(target = "schemaVersion", expression = "java(request.getSchemaVersion() != null ? request.getSchemaVersion() : 2)")
+    @Mapping(target = "schemaVersion", expression = "java(request.getSchemaVersion() != null ? request.getSchemaVersion() : com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION)")
     @Mapping(target = "extension", source = "extension", qualifiedByName = "mapToExtensionBean")
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "deletedFlag", constant = "false")

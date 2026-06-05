@@ -4,7 +4,7 @@
   "name:en": "All Field Types",
   "modelCode": "showcase_all_fields",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": {
     "type": "grid",
     "cols": 12

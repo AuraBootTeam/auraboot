@@ -126,14 +126,24 @@ class DslRegistryTest {
     }
 
     @Test
-    void blockType_has16Values() {
-        assertEquals(16, DslRegistry.BlockType.values().length);
+    void blockType_has21Values() {
+        assertEquals(21, DslRegistry.BlockType.values().length);
         Set<String> codes = DslRegistry.BlockType.codes();
         assertTrue(codes.containsAll(Set.of(
                 "form", "form-section", "form-buttons", "form-wizard",
                 "table", "filters", "toolbar", "description", "chart",
                 "tabs", "sub-table", "monthly-grid", "stat-card", "ai-fill-banner",
                 "embedded-list", "custom")));
+        // 1.3 — detail-specialized block types rendered by DetailPageContent
+        // (DETAIL_SPECIALIZED_BLOCK_TYPES); previously a frontend/backend enum drift.
+        assertTrue(codes.containsAll(Set.of(
+                "detail-section", "activity-timeline", "record-comments",
+                "field-history", "bpm-panel")));
+    }
+
+    @Test
+    void pageSchemaCurrentVersionIs4() {
+        assertEquals(4, DslRegistry.PAGE_SCHEMA_CURRENT_VERSION);
     }
 
     @Test

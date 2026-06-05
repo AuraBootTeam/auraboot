@@ -5,7 +5,7 @@
     "name:en": "Agent Definitions",
     "modelCode": "agent_definition",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -109,7 +109,7 @@
     "name:en": "Agent Definition Form",
     "modelCode": "agent_definition",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -235,7 +235,7 @@
     "name:en": "Agent Definition Detail",
     "modelCode": "agent_definition",
     "kind": "detail",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -367,7 +367,7 @@
     "name:en": "Missions",
     "modelCode": "mission",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -516,7 +516,7 @@
     "name:en": "Mission Form",
     "modelCode": "mission",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -598,7 +598,7 @@
     "name:en": "Agent Tasks",
     "modelCode": "agent_task",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -812,7 +812,7 @@
     "name:en": "Agent Task Form",
     "modelCode": "agent_task",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -919,7 +919,7 @@
     "name:en": "Agent Runs",
     "modelCode": "agent_run",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -1002,7 +1002,7 @@
     "name:en": "Agent Run Detail",
     "modelCode": "agent_run",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -1097,7 +1097,7 @@
     "name:en": "Artifacts",
     "modelCode": "agent_artifact",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -1200,7 +1200,7 @@
     "name:en": "Artifact Form",
     "modelCode": "agent_artifact",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -1287,7 +1287,7 @@
     "name:en": "Schedules",
     "modelCode": "agent_schedule",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -1421,7 +1421,7 @@
     "name:en": "Schedule Form",
     "modelCode": "agent_schedule",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -1517,7 +1517,7 @@
     "name:en": "Approval Policies",
     "modelCode": "approval_policy",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -1622,7 +1622,7 @@
     "name:en": "Approval Policy Form",
     "modelCode": "approval_policy",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -1706,7 +1706,7 @@
     "name:en": "Agent Approvals",
     "modelCode": "agent_approval",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -1796,7 +1796,7 @@
     "name:en": "Approval Detail",
     "modelCode": "agent_approval",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -1888,7 +1888,7 @@
     "name:en": "Agent Memory",
     "modelCode": "agent_memory",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -2024,7 +2024,7 @@
     "name:en": "Agent Memory Form",
     "modelCode": "agent_memory",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -2115,7 +2115,7 @@
     "name:en": "Observations",
     "modelCode": "agent_observation",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -2169,7 +2169,7 @@
     "name:en": "Observation Detail",
     "modelCode": "agent_observation",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -2235,7 +2235,7 @@
     "name:en": "Agent Tools",
     "modelCode": "agent_tool",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -2347,7 +2347,7 @@
     "name:en": "Agent Tool Form",
     "modelCode": "agent_tool",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -2452,7 +2452,7 @@
     "name:en": "Skills Market",
     "modelCode": "agent_skill",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -2568,7 +2568,7 @@
     "name:en": "Skill Detail",
     "modelCode": "agent_skill",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -2679,7 +2679,7 @@
     "modelCode": "mission",
     "description": "Agent Control Plane Mission Control dashboard with KPIs, run trends, cost analysis, task distribution, approvals, and recent runs",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -3258,7 +3258,7 @@
     "name:en": "Agent Actions",
     "modelCode": "agent_action",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -3320,7 +3320,7 @@
     "name:en": "Object Aliases",
     "modelCode": "object_alias",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -3386,7 +3386,7 @@
     "name:en": "Semantic Terms",
     "modelCode": "semantic_term",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -3460,7 +3460,7 @@
     "name:en": "MCP Servers",
     "modelCode": "mcp_server",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -3535,7 +3535,7 @@
     "name:en": "Object Alias Form",
     "modelCode": "object_alias",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -3602,7 +3602,7 @@
     "name:en": "Semantic Term Form",
     "modelCode": "semantic_term",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -3681,7 +3681,7 @@
     "name:en": "MCP Server Form",
     "modelCode": "mcp_server",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12

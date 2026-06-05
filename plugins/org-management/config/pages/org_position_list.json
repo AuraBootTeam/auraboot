@@ -5,7 +5,7 @@
   "modelCode": "org_position",
   "description": "Position list with status tabs and CRUD",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": {
     "type": "grid",
     "cols": 12

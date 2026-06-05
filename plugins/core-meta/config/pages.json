@@ -6,7 +6,7 @@
     "modelCode": "meta_models",
     "kind": "list",
     "profile": "admin",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "title": {
       "zh-CN": "模型",
       "en-US": "Models"
@@ -228,7 +228,7 @@
     "modelCode": "meta_fields",
     "kind": "list",
     "profile": "admin",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "title": {
       "zh-CN": "字段库",
       "en-US": "Field Library"

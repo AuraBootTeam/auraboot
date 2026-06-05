@@ -5,7 +5,7 @@
     "name:en": "Announcements",
     "modelCode": "ab_announcement",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -147,7 +147,7 @@
     "name:en": "Announcement Form",
     "modelCode": "ab_announcement",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -195,7 +195,7 @@
     "name:en": "Announcement Detail",
     "modelCode": "ab_announcement",
     "kind": "detail",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
