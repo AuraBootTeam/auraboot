@@ -166,8 +166,10 @@ public class AssertPhase implements CommandPhase {
 
     // ==================== Helper methods ====================
 
-    private boolean evaluatePrecondition(String operator, Object actual, Object expected) {
-        return switch (operator.toUpperCase()) {
+    // package-private for unit testing
+    boolean evaluatePrecondition(String operator, Object actual, Object expected) {
+        String op = normalizeOperator(operator);
+        return switch (op) {
             case "EQ" -> Objects.equals(String.valueOf(actual), String.valueOf(expected));
             case "NEQ" -> !Objects.equals(String.valueOf(actual), String.valueOf(expected));
             case "IN" -> {
@@ -184,13 +186,45 @@ public class AssertPhase implements CommandPhase {
             }
             case "NOT_NULL" -> actual != null;
             case "NULL" -> actual == null;
-            case "GT", "GE", "LT", "LE" -> compareNumeric(operator.toUpperCase(), actual, expected);
+            case "GT", "GE", "LT", "LE" -> compareNumeric(op, actual, expected);
             case "CONTAINS" -> actual != null && String.valueOf(actual).contains(String.valueOf(expected));
             case "NOT_CONTAINS" -> actual == null || !String.valueOf(actual).contains(String.valueOf(expected));
             default -> {
                 log.warn("Unknown precondition operator: {}, failing safe", operator);
                 yield false;
             }
+        };
+    }
+
+    /**
+     * Normalize a precondition operator to its canonical switch form. Command configs author
+     * preconditions with the QueryOperator op-codes (eq / ne / gt / gte / lt / lte / in / not_in /
+     * is_null / is_not_null / contains / not_contains), consistent with the rest of the meta layer
+     * (see {@code QueryOperator}). Older configs/tests may use the canonical EQ / NEQ / NOT_NULL
+     * forms. Both are accepted here; an unrecognized operator returns its upper-cased form, which
+     * the evaluator's {@code default} branch rejects (fail-safe). Previously only the canonical
+     * forms were understood, so a config-style operator like {@code is_not_null} silently fell
+     * through to fail-safe and the precondition could never pass (e.g. a DFM review could never be
+     * completed).
+     */
+    static String normalizeOperator(String operator) {
+        if (operator == null) {
+            return "";
+        }
+        return switch (operator.trim().toLowerCase()) {
+            case "eq", "==", "=" -> "EQ";
+            case "ne", "neq", "!=", "<>" -> "NEQ";
+            case "in" -> "IN";
+            case "not_in", "notin" -> "NOT_IN";
+            case "is_not_null", "not_null", "notnull" -> "NOT_NULL";
+            case "is_null", "null", "isnull" -> "NULL";
+            case "gt", ">" -> "GT";
+            case "gte", "ge", ">=" -> "GE";
+            case "lt", "<" -> "LT";
+            case "lte", "le", "<=" -> "LE";
+            case "contains" -> "CONTAINS";
+            case "not_contains", "notcontains" -> "NOT_CONTAINS";
+            default -> operator.trim().toUpperCase();
         };
     }
 
