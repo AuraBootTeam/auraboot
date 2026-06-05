@@ -661,6 +661,35 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         );
       }
 
+      // 11. Object / jsonb values would stringify to "[object Object]" — render
+      // formatted JSON instead (e.g. cr_cd_metadata spec_table on detail pages).
+      // Unwraps the { type:'jsonb', value:'<json string>' } envelope some APIs return.
+      if (displayValue != null && typeof displayValue === 'object') {
+        const envelope =
+          !Array.isArray(displayValue) &&
+          typeof (displayValue as { value?: unknown }).value === 'string' &&
+          ['json', 'jsonb'].includes(
+            String((displayValue as { type?: unknown }).type ?? '').toLowerCase(),
+          )
+            ? ((displayValue as { value: string }).value as string)
+            : null;
+        let pretty: string;
+        try {
+          pretty = JSON.stringify(
+            envelope != null ? JSON.parse(envelope) : displayValue,
+            null,
+            2,
+          );
+        } catch {
+          pretty = envelope != null ? envelope : String(displayValue);
+        }
+        return (
+          <pre className="max-h-80 overflow-auto rounded-md border border-gray-200 bg-gray-50 p-3 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-gray-900">
+            {pretty}
+          </pre>
+        );
+      }
+
       return (
         <div className="py-1 text-sm text-gray-900">
           {displayValue === '-' ? (
