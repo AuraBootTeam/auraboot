@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import dns from 'node:dns';
+import { loadEnv } from '../../helpers/environments';
 
 // Prefer IPv4 for localhost (BFF listens on IPv4 only).
 dns.setDefaultResultOrder('ipv4first');
@@ -13,7 +14,7 @@ process.env.no_proxy = process.env.NO_PROXY;
 // Self-contained config for the isolated CRM-gap stack (PCBA M5 / J6 sell-side RFQ).
 // No webServer, no auth setup project — the spec performs its own UI login in beforeEach.
 // Default base URL targets the crm-gap stack's vite port; override via PLAYWRIGHT_BASE_URL.
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5239';
+const baseURL = loadEnv('crm-gap').urls.base;
 
 export default defineConfig({
   testDir: '.',

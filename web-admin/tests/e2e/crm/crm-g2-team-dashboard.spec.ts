@@ -24,8 +24,9 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
+import { loadEnv } from '../../helpers/environments';
 
-const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5239';
+const BASE = loadEnv('crm-gap').urls.base;
 const PG = process.env.PG_CONTAINER || 'auraboot-crm-gap-postgres';
 const EMAIL = 'admin@auraboot.com';
 const PW = 'Test2026x';
