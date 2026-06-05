@@ -1,10 +1,11 @@
 // web-admin/app/flow-designer-sdk/core/FlowCanvas.tsx
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
+  useReactFlow,
   type Connection,
   type NodeTypes,
   type EdgeTypes,
@@ -12,6 +13,7 @@ import {
   type Edge,
   type NodeChange,
   type EdgeChange,
+  type XYPosition,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useFlowStore } from '../store/useFlowStore';
@@ -24,6 +26,33 @@ export interface FlowCanvasProps {
   showMinimap?: boolean;
   showControls?: boolean;
   className?: string;
+}
+
+/**
+ * Invisible child component rendered INSIDE <ReactFlow> so that
+ * `useReactFlow()` resolves against the correct @xyflow context.
+ * Captures `screenToFlowPosition` into a ref shared with the parent.
+ *
+ * Why a child component?
+ * `useReactFlow()` must be called inside the ReactFlow provider tree.
+ * `FlowCanvas` renders <ReactFlow> which IS the provider, so `useReactFlow()`
+ * cannot be called directly in `FlowCanvas`. Rendering this null component as
+ * a child of <ReactFlow> gives it access to the correct store context.
+ */
+function ScreenToFlowPositionCapture({
+  onCapture,
+}: {
+  onCapture: (fn: (pos: XYPosition) => XYPosition) => void;
+}) {
+  const { screenToFlowPosition } = useReactFlow();
+  // Sync the function into the parent ref on every render so it stays fresh
+  // (the store's transform updates on zoom/pan, and screenToFlowPosition
+  // reads from the store at call time — so keeping the ref current ensures
+  // onDrop always gets the latest conversion function).
+  // Writing to a ref during render is intentional: no state mutation, no
+  // re-render triggered.
+  onCapture(screenToFlowPosition);
+  return null;
 }
 
 export function FlowCanvas({
@@ -46,6 +75,31 @@ export function FlowCanvas({
     deleteNode,
     deleteEdge,
   } = useFlowStore();
+
+  // Capture whether this canvas mounted with pre-existing nodes (edit mode).
+  // fitView should only activate when loading pre-existing graph data so the
+  // user sees the whole automation on first open.
+  //
+  // On empty canvases (new automation), fitView=true causes @xyflow to
+  // re-run the fit animation every time a node is added via drag-drop, which
+  // zooms to fill the viewport and pushes the freshly-dropped node below the
+  // visible viewport area. Disabling fitView on empty canvases keeps the 1:1
+  // zoom and places dropped nodes exactly where the user drops them.
+  const hadInitialNodesRef = useRef<boolean | null>(null);
+  if (hadInitialNodesRef.current === null) {
+    // Read once at mount; never updated so it doesn't change after the first
+    // node drop.
+    hadInitialNodesRef.current = nodes.length > 0;
+  }
+  const fitViewActive = hadInitialNodesRef.current;
+
+  // Ref to hold the screenToFlowPosition function captured from inside the
+  // ReactFlow context by ScreenToFlowPositionCapture below.
+  const screenToFlowPositionRef = useRef<((pos: XYPosition) => XYPosition) | null>(null);
+
+  const handleCapture = useCallback((fn: (pos: XYPosition) => XYPosition) => {
+    screenToFlowPositionRef.current = fn;
+  }, []);
 
   // Build node types from registry.
   // Depends on registryVersion so it recomputes after nodeRegistry.registerAll().
@@ -155,14 +209,45 @@ export function FlowCanvas({
       const definition = nodeRegistry.get(type);
       if (!definition) return;
 
-      // Get canvas bounds
-      const target = event.currentTarget as HTMLElement;
-      const bounds = target.getBoundingClientRect();
-
-      const position = {
-        x: event.clientX - bounds.left - 75,
-        y: event.clientY - bounds.top - 30,
-      };
+      // Convert viewport (screen) coordinates to flow-graph coordinates.
+      //
+      // screenToFlowPositionRef is populated by ScreenToFlowPositionCapture,
+      // a null child rendered inside <ReactFlow> that has access to the xyflow
+      // store. The function reads the current viewport transform (zoom + pan)
+      // at call time, so it always reflects the latest state even after the
+      // user has panned/zoomed.
+      //
+      // Fallback: derive the inverse transform from the viewport element's
+      // computed CSS matrix (used if the ref isn't populated yet, e.g. if the
+      // drop fires before ScreenToFlowPositionCapture has rendered once).
+      let position: XYPosition;
+      if (screenToFlowPositionRef.current) {
+        position = screenToFlowPositionRef.current({
+          x: event.clientX,
+          y: event.clientY,
+        });
+      } else {
+        const rfEl = event.currentTarget as HTMLElement;
+        const rfBounds = rfEl.getBoundingClientRect();
+        const vpEl = rfEl.querySelector('.react-flow__viewport') as HTMLElement | null;
+        const relX = event.clientX - rfBounds.x;
+        const relY = event.clientY - rfBounds.y;
+        if (vpEl) {
+          const mat = window.getComputedStyle(vpEl).transform;
+          const m = mat.match(/matrix\(([^)]+)\)/);
+          if (m) {
+            const [scale, , , , tx, ty] = m[1].split(',').map(Number);
+            position = {
+              x: (relX - tx) / scale,
+              y: (relY - ty) / scale,
+            };
+          } else {
+            position = { x: relX, y: relY };
+          }
+        } else {
+          position = { x: relX, y: relY };
+        }
+      }
 
       addNode({
         type,
@@ -199,8 +284,15 @@ export function FlowCanvas({
         nodesDraggable={!readOnly}
         nodesConnectable={!readOnly}
         elementsSelectable={!readOnly}
-        fitView
+        // Only auto-fit when this canvas was mounted with pre-existing nodes
+        // (edit mode). On new empty canvases, fitView re-zooms after each
+        // drag-drop and pushes newly-added nodes out of the visible viewport.
+        fitView={fitViewActive}
       >
+        {/* ScreenToFlowPositionCapture must render inside ReactFlow to access
+            its context. It stores screenToFlowPosition in a ref so onDrop
+            can convert viewport→flow coordinates at drop time. */}
+        <ScreenToFlowPositionCapture onCapture={handleCapture} />
         <Background />
         {showControls && <Controls />}
         {showMinimap && <MiniMap />}

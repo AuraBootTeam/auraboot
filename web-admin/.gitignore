@@ -63,3 +63,5 @@ tests/storage/admin.json
 # can resolve the import; pnpm sync-plugins regenerates locally per dev's plugin set.
 # (was previously gitignored, breaking CI typecheck on app/middleware/sessionMiddlewareFactory.ts)
 vite.config.ts.timestamp-*.mjs
+tests/storage/ga/
+tests/storage/*/admin.json

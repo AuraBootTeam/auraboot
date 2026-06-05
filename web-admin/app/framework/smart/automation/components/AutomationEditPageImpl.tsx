@@ -7,6 +7,7 @@
 
 import { useParams, useNavigate, useSearchParams, useLoaderData } from 'react-router';
 import { AutomationEditor } from './AutomationEditor';
+import { useAutomationNodeStatuses } from './useAutomationNodeStatuses';
 import type { Automation } from '../services/automationService';
 import type { FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
 
@@ -80,6 +81,13 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
   const { automation, token, isNew, error } = useLoaderData<LoaderData>();
   const debugMode = searchParams.get('debug') === 'true';
 
+  // G5 runtime overlay: when the URL carries `?logId=<n>` (e.g. opened from a run
+  // history row or after a test run), fetch that log's per-node statuses and feed
+  // them to the canvas so each node renders its completed/failed/running badge.
+  // Without a logId the hook returns null and the canvas shows the plain design view.
+  const logIdParam = searchParams.get('logId') ?? undefined;
+  const { statuses: nodeStatuses } = useAutomationNodeStatuses(isNew ? undefined : logIdParam);
+
   const handleSave = async (saveData: {
     name: string;
     description?: string;
@@ -147,6 +155,7 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
       }
       onSave={handleSave}
       initialDebugMode={debugMode && !isNew}
+      nodeStatuses={nodeStatuses}
     />
   );
 }

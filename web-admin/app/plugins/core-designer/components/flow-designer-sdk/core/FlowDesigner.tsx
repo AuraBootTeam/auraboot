@@ -95,6 +95,18 @@ export function FlowDesigner({
     bumpRegistryVersion();
   }, [config.nodeDefinitions, bumpRegistryVersion]);
 
+  // E2E affordance (dev/test only): expose the live flow store so golden specs can
+  // read nodes/edges/validation without scraping the DOM. Mirrors the bpmn slice's
+  // `window.__bpmnDesignerStore`. Never attached in production builds.
+  useEffect(() => {
+    if (import.meta.env.PROD) return;
+    (window as unknown as { __flowDesignerStore?: typeof useFlowStore }).__flowDesignerStore =
+      useFlowStore;
+    return () => {
+      delete (window as unknown as { __flowDesignerStore?: unknown }).__flowDesignerStore;
+    };
+  }, []);
+
   // Load initial data
   useEffect(() => {
     if (initialData) {

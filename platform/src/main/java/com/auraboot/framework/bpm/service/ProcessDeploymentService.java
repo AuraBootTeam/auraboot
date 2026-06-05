@@ -337,6 +337,17 @@ public class ProcessDeploymentService {
             extension.put(EXTENSION_KEY_DESIGNER_JSON, designerJson);
         }
 
+        // Compile BPMN from designerJson when the caller did not supply bpmnContent
+        // (e.g. AutomationProcessRuntime.deploy re-versioning passes null bpmn +
+        // designerJson). Mirrors create()/update() — bpmn_content is NOT NULL, so
+        // inserting a raw null here violates the constraint. Fall back to "" only
+        // when neither is available, exactly like create().
+        String effectiveBpmnContent = StringUtils.hasText(bpmnContent)
+                ? bpmnContent
+                : StringUtils.hasText(designerJson)
+                        ? compileDesignerJson(designerJson, processKey, current.getProcessName())
+                        : "";
+
         BpmProcessDefinition newVersion = BpmProcessDefinition.builder()
                 .pid(newPid)
                 .tenantId(tenantId)
@@ -344,7 +355,7 @@ public class ProcessDeploymentService {
                 .processName(current.getProcessName())
                 .description(current.getDescription())
                 .category(current.getCategory())
-                .bpmnContent(bpmnContent)
+                .bpmnContent(effectiveBpmnContent)
                 .formBindings(current.getFormBindings())
                 .businessDataBindings(current.getBusinessDataBindings())
                 .extension(extension.isEmpty() ? null : extension)
