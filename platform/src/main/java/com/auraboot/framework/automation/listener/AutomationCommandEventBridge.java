@@ -149,6 +149,18 @@ public class AutomationCommandEventBridge {
             }
         }
 
+        // Final fallback (golden FINDING-4): a state_transition command applies the
+        // toState from its own config without necessarily echoing it into the event
+        // payload, so toState can still be null here. Read the just-committed state
+        // from the record. Without this, toState stays null, which (a) makes the
+        // on_state_change toStates filter unmatchable and (b) propagates a null trigger
+        // variable into the SmartEngine run → "Object.getClass() because value is null"
+        // NPE, crashing EVERY on_state_change automation fired by a state transition.
+        if (!StringUtils.hasText(toState) && StringUtils.hasText(stateField)) {
+            toState = commandStateCheckExecutor.readCurrentState(
+                    event.getTenantId(), modelCode, recordId, stateField);
+        }
+
         log.debug("Triggering onStateChange automation: model={}, record={}, {} -> {}",
                 modelCode, recordId, fromState, toState);
         automationTriggerService.onStateChange(modelCode, recordId, fromState, toState);

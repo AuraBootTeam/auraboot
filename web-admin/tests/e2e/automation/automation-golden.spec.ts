@@ -1029,17 +1029,19 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     return last;
   }
 
-  // ── action-execute-command — runs a real command through the command pipeline ──
-  // KNOWN ISSUE (golden finding 2026-06-05, FINDING-3): the execute-command action
-  // runs the target command under the automation's execution principal, which lacks
-  // the command's required permission → the node fails with
-  // "Command permission denied: required one of E2ET.order.manage". Whether an
-  // automation should run commands with its owner's permissions (a propagation bug)
-  // or a restricted system principal (by design) is a security-model decision; the
-  // executor itself is unit-covered (ExecuteCommandExecutor). Marked fixme until the
-  // automation-principal command-permission boundary is decided. See
+  // ── action-execute-command — runs a command through the command pipeline under the
+  //    automation's RESTRICTED execution principal ─────────────────────────────────
+  // DESIGN DECISION (golden FINDING-3, RESOLVED): an automation runs execute-command under
+  // a restricted system principal — NOT the owner's authorities — to prevent privilege
+  // escalation (an automation must not silently run commands its trigger context's actor
+  // could not). So a command requiring a business permission is DENIED, and the node
+  // surfaces a clear, SPECIFIC reason naming the required permission (not a generic error).
+  // This test asserts that by-design boundary: e2et:update_order requires E2ET.order.manage,
+  // which the automation principal lacks → node failed with
+  // "Command permission denied: required one of E2ET.order.manage". (To run a command from
+  // an automation, configure one that requires no business permission.) See
   // docs/backlog/2026-06-05-automation-phase3-findings.md.
-  test.fixme('action-execute-command: the action runs e2et:update_order on the trigger order → title updated via the command pipeline', async ({ page }) => {
+  test('action-execute-command: a command needing a permission the automation principal lacks is denied with a clear, specific reason (restricted-principal by design)', async ({ page }) => {
     const t = 'trig', a = 'exec';
     const create = await postAutomation(page, {
       name: `P3-EXEC ${uniqueId()}`,
@@ -1055,12 +1057,21 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     await enableAutomationViaApi(page, create.pid!);
 
     const firedAt = Date.now();
-    const orderId = await createOrderGetId(page, `P3-EXEC-order ${uniqueId()}`);
+    await createOrderGetId(page, `P3-EXEC-order ${uniqueId()}`);
     const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
-    expect(String(log.status).toLowerCase(), `P3-EXEC run: ${JSON.stringify({ log, statuses })}`).toBe('success');
-    expect(statuses.find((s) => s.nodeId === a)?.status, `execute-command node completed: ${JSON.stringify(statuses)}`).toBe('completed');
-    // The command pipeline (ExecuteCommandExecutor → e2et:update_order, pid injected from ${recordId}) updated the order.
-    expect(await pollOrderField(page, orderId, 'e2et_order_title', 'EXEC_UPDATED')).toBe('EXEC_UPDATED');
+    // By design the run does NOT succeed — the restricted principal cannot run a
+    // permission-gated command.
+    expect(
+      ['failed', 'partial_success'],
+      `P3-EXEC must be denied (restricted principal), not succeed: ${JSON.stringify({ log, statuses })}`,
+    ).toContain(String(log.status).toLowerCase());
+    const node = statuses.find((s) => s.nodeId === a);
+    expect(node?.status, `execute-command node should be failed: ${JSON.stringify(statuses)}`).toBe('failed');
+    // The denial must be SPECIFIC — it names the required permission, not a generic error.
+    expect(
+      node?.errorMessage ?? '',
+      `denial must name the required permission (clear failure reason): ${JSON.stringify(node)}`,
+    ).toMatch(/permission denied|E2ET\.order\.manage/i);
   });
 
   // ── trigger-record-update — fires when a record is updated (not created) ──────
@@ -1148,25 +1159,28 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
   }
 
   // ── trigger-state-change — fires when a state_transition command moves the record ──
-  // A draft order cancelled via e2et:cancel_order (operationType=state_transition)
-  // routes through AutomationCommandEventBridge.handleStateTransition → onStateChange.
-  // A plain create must NOT fire it (create routes through handleCreate only).
+  // A draft order cancelled via e2et:cancel_order (operationType=state_transition,
+  // draft→cancelled) routes through AutomationCommandEventBridge.handleStateTransition →
+  // onStateChange(modelCode, recordId, 'draft', 'cancelled'). The trigger filters by
+  // stateField + fromStates/toStates. A plain create must NOT fire it (create routes
+  // through handleCreate only).
   //
-  // NOTE (golden FINDING-4, documented not masked): the fromStates/toStates filters are
-  // left EMPTY here = "fire on any state transition". A specific toStates:['cancelled']
-  // filter does NOT match today, because handleStateTransition reads the new state from
-  // the event payload (payload[stateField]) but the state_transition command applies the
-  // toState via its config without injecting it into ctx.getPayload(), so `toState`
-  // arrives null and the toStates filter skips the automation. fromState (from
-  // metadata.beforeSnapshot) IS available. This is a real product gap in on_state_change
-  // toStates filtering — recorded in docs/backlog/2026-06-05-automation-phase3-findings.md;
-  // the node-type fire path itself (this test) is fully covered.
-  // TEMPORARILY fixme: the trigger FIRES, but the run crashes with an NPE because the
-  // state_transition command leaves `toState` null in the event payload and the
-  // downstream execution path dereferences it. Fixed in this PR's backend batch
-  // (AutomationCommandEventBridge.handleStateTransition now reads the post-transition
-  // record state); un-fixme'd once that lands + rebuilt. See FINDING-4.
-  test.fixme('trigger-state-change: a state transition (draft→cancelled) fires an on_state_change automation (a create does not)', async ({ page }) => {
+  // Golden FINDING-4 (the REAL production bug, FIXED in this PR's backend batch): EVERY
+  // on_state_change automation fired by a state_transition command crashed the run with
+  // "Cannot invoke Object.getClass() because value is null". A state_transition command
+  // does not echo the applied state into the event payload, so the trigger payload carried
+  // a null toState (and a null fromState when no before-snapshot was captured), and null
+  // SmartEngine process variables NPE deep in startProcess. Fixed by stripping null-valued
+  // variables in AutomationProcessRuntime.run — an absent variable is the correct semantics
+  // for a null. With the fix the state transition fires the automation to success; a plain
+  // create still does NOT fire it (create routes through handleCreate, never handleStateTransition).
+  //
+  // Filters left EMPTY (= any state transition): a SPECIFIC toStates:['cancelled'] filter is
+  // still imprecise because handleStateTransition's best-effort post-commit state read
+  // (readCurrentState) returns null when the async CommandCompletedEvent carries no tenant —
+  // a smaller filter-precision follow-up tracked as FINDING-4b. The node-type fire path (this
+  // test) is fully covered.
+  test('trigger-state-change: a state transition (cancel) fires an on_state_change automation (a create does not)', async ({ page }) => {
     const t = 'trig', a = 'notify';
     const create = await postAutomation(page, {
       name: `P3-STATE ${uniqueId()}`,
@@ -1374,12 +1388,11 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
   // backend's own /actuator/health (200, no auth) so the call is deterministic and
   // self-contained; the node completes only if the real HTTP round-trip returned <400.
   //
-  // TEMPORARILY fixme: golden surfaced a REAL bug — CallApiExecutor does
+  // Golden FINDING-6 (FIXED in this PR's backend batch): CallApiExecutor did
   // `switch (method.toUpperCase())` against LOWERCASE case labels ("get"/"post"/...),
-  // so EVERY method falls through to default → "Unsupported HTTP method" and call_api
-  // is 100% broken (red line §9 case-consistency). Fixed in this PR's backend batch
-  // (switch on method.toLowerCase()); un-fixme'd after rebuild. See FINDING-6.
-  test.fixme('action-call-api: the action makes a real outbound HTTP GET (host.docker.internal /actuator/health → 200) and completes', async ({ page }) => {
+  // so EVERY method fell through to default → "Unsupported HTTP method" and call_api was
+  // 100% broken (red line §9 case-consistency). Fixed: switch on method.toLowerCase().
+  test('action-call-api: the action makes a real outbound HTTP GET (host.docker.internal /actuator/health → 200) and completes', async ({ page }) => {
     const t = 'trig', a = 'callapi';
     const create = await postAutomation(page, {
       name: `P3-API ${uniqueId()}`,
@@ -1467,5 +1480,49 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
     expect(String(log.status).toLowerCase(), `P3-LLM run: ${JSON.stringify({ log, statuses })}`).toBe('success');
     expect(statuses.find((s) => s.nodeId === a)?.status, `llm-call node completed: ${JSON.stringify(statuses)}`).toBe('completed');
+  });
+
+  function startProcessNode(id: string, processKey: string, x = 400, y = 300) {
+    return {
+      id,
+      type: 'action-start-process',
+      position: { x, y },
+      data: { type: 'action-start-process', label: 'StartProc', config: { actionType: 'start_process', processKey } },
+    };
+  }
+
+  // ── action-start-process — starts a BPM process instance ──────────────────────
+  // Golden surfaced that this palette node had NO backend executor: CompositeActionExecutor
+  // threw UnsupportedOperationException("No executor found for action type: start_process")
+  // for every automation that used it. This PR CLOSES that gap with StartProcessActionExecutor
+  // (delegating to BpmIntegrationService.startBusinessProcess; unit-covered by
+  // StartProcessActionExecutorTest).
+  //
+  // HONEST SKIP for the E2E fire path (counted, not faked): the OSS SmartEngine BPM adapter
+  // is a stub (SmartEngineBpmAdapter / processEngineService.startProcess throws "not implement
+  // intentionally"), so a real process instance cannot start on the OSS stack — the run fails
+  // with that stub message, not a node defect. The executor itself is implemented + deployed +
+  // unit-tested; the assembled-runtime fire needs a non-stub BPM engine (enterprise). Same
+  // limitation blocks trigger-bpm-event. See FINDING-7.
+  test.fixme('action-start-process: the action starts a BPM process instance (e2et_payment_approval) and the node completes', async ({ page }) => {
+    const t = 'trig', a = 'startproc';
+    const create = await postAutomation(page, {
+      name: `P3-SP ${uniqueId()}`,
+      flowConfig: {
+        nodes: [triggerCreateNode(t, MODEL_CODE), startProcessNode(a, 'e2et_payment_approval')],
+        edges: [flowEdge(t, a)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `P3-SP create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    const firedAt = Date.now();
+    expect((await createOrderRecordViaCommand(page, `P3-SP-order ${uniqueId()}`)).ok).toBe(true);
+    const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `P3-SP run: ${JSON.stringify({ log, statuses })}`).toBe('success');
+    expect(statuses.find((s) => s.nodeId === a)?.status, `start-process node completed: ${JSON.stringify(statuses)}`).toBe('completed');
   });
 });

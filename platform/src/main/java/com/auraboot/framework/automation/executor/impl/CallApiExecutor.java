@@ -86,7 +86,11 @@ public class CallApiExecutor implements ActionExecutor {
                 }
             }
 
-            switch (method.toUpperCase()) {
+            // Normalize to lower case to match the case labels below. (Previously
+            // toUpperCase() was switched against lowercase labels, so EVERY method
+            // fell through to default → "Unsupported HTTP method" and call_api was
+            // 100% broken. Golden FINDING-6. §9 case-consistency.)
+            switch (method.toLowerCase()) {
                 case "get" -> requestBuilder.GET();
                 case "post" -> requestBuilder.POST(bodyJson != null
                         ? HttpRequest.BodyPublishers.ofString(bodyJson)
