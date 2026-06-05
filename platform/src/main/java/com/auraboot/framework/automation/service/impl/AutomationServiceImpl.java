@@ -378,11 +378,14 @@ public class AutomationServiceImpl implements AutomationService {
     public AutomationDTO toggle(String pid) {
         Automation automation = loadOwnedAutomation(pid);
         boolean newState = !automation.isActive();
-        String currentUserPid = MetaContext.getCurrentUserPid();
-        automationMapper.updateEnabled(pid, newState, currentUserPid);
-        automation.setEnabled(newState);
-        log.info("Automation toggled: pid={}, enabled={}", pid, newState);
-        return toDTO(automation);
+        // Delegate to enable()/disable() so the SmartEngine deploy step is shared
+        // and cannot drift. Previously toggle() only flipped the `enabled` flag and
+        // skipped the deploy that enable() performs — a visual-flow automation
+        // enabled from the list page (the "Enable" button calls /toggle, not
+        // /enable) was marked Enabled but its compiled flow was never deployed, so
+        // the trigger path failed at runtime with
+        // "Process definition version not found for id: auto_<pid>".
+        return newState ? enable(pid) : disable(pid);
     }
 
     @Transactional
@@ -457,8 +460,14 @@ public class AutomationServiceImpl implements AutomationService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Automation name is required");
         }
 
-        // If flowConfig is provided (visual designer mode), modelCode/triggerType/actions are optional
-        boolean isFlowConfigOnly = request.getFlowConfig() != null && !request.getFlowConfig().isEmpty();
+        // Visual-designer mode (modelCode/triggerType/actions derived from flowConfig)
+        // applies only when the flowConfig actually carries nodes. A degenerate
+        // flowConfig like {nodes:[],edges:[]} is a non-empty Map but has no trigger
+        // node, so it must still go through the flat-field required checks — otherwise
+        // modelCode stays null and the ab_automation NOT NULL insert crashes with a
+        // raw 500 instead of a clean 400. Mirrors the node check in enable().
+        Object flowNodes = request.getFlowConfig() != null ? request.getFlowConfig().get("nodes") : null;
+        boolean isFlowConfigOnly = flowNodes instanceof List<?> nodeList && !nodeList.isEmpty();
 
         if (!isFlowConfigOnly) {
             if (!StringUtils.hasText(request.getModelCode())) {

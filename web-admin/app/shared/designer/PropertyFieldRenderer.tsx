@@ -406,7 +406,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Wraps BaseResourceSelect with a label / helpText chrome. */
+/** Wraps BaseResourceSelect with a label / helpText / field-error chrome. */
 function ResourceSelectField({
   adapter,
   label,
@@ -420,16 +420,33 @@ function ResourceSelectField({
   helpText?: string;
   fetchOptions: () => Promise<{ label: string; value: string }[]>;
 }) {
+  // Surface the field-level validation error (P0-4 gate): without this, a
+  // required resource select (e.g. trigger modelCode) that the save gate flags
+  // showed no inline error — only the toolbar count badge — so the user could
+  // not tell which field was wrong. Mirror the inline-error chrome of the other
+  // field renderers (error text takes precedence over helpText).
+  const hasError = !!adapter.error;
   return (
     <div>
-      {label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>}
-      <BaseResourceSelect
-        value={(adapter.value as string) || ''}
-        onChange={adapter.setValue as any}
-        fetchOptions={fetchOptions}
-        placeholder={placeholder}
-      />
-      {helpText && <p className="mt-1 text-xs text-gray-500">{helpText}</p>}
+      {label && (
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {label}
+          {adapter.required && <span className="ml-1 text-red-500">*</span>}
+        </label>
+      )}
+      <div className={hasError ? 'rounded-md ring-1 ring-red-500' : undefined}>
+        <BaseResourceSelect
+          value={(adapter.value as string) || ''}
+          onChange={adapter.setValue as any}
+          fetchOptions={fetchOptions}
+          placeholder={placeholder}
+        />
+      </div>
+      {hasError ? (
+        <p className="mt-1 text-sm text-red-600">{adapter.error}</p>
+      ) : (
+        helpText && <p className="mt-1 text-xs text-gray-500">{helpText}</p>
+      )}
     </div>
   );
 }

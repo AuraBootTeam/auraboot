@@ -44,7 +44,11 @@ export function PropertyField({ schema, nodeId }: PropertyFieldProps) {
     };
   }, [schema, st]);
 
-  return <PropertyFieldRenderer schema={resolvedSchema} adapter={adapter} />;
+  return (
+    <div data-testid={`prop-field-${schema.key}`}>
+      <PropertyFieldRenderer schema={resolvedSchema} adapter={adapter} />
+    </div>
+  );
 }
 
 export default PropertyField;

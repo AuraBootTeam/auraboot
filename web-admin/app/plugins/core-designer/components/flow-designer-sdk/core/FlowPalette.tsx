@@ -93,6 +93,7 @@ export function FlowPalette({ categoryOrder, className }: FlowPaletteProps) {
       emptyMessage={st('$i18n:flow.palette.empty') || 'No components available'}
       className={className || 'w-64'}
       testId="flow-palette"
+      itemTestIdPrefix="palette-node"
     />
   );
 }

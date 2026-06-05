@@ -48,6 +48,11 @@ export interface DesignerPaletteProps {
   className?: string;
   /** data-testid for the root element */
   testId?: string;
+  /**
+   * When provided, each palette item's testid is `${itemTestIdPrefix}-${item.type}`
+   * (overrides the default `${testId}-item-${item.type}` pattern).
+   */
+  itemTestIdPrefix?: string;
 }
 
 // ==================== Component ====================
@@ -67,6 +72,7 @@ export function DesignerPalette({
   emptyMessage = 'No components available',
   className,
   testId,
+  itemTestIdPrefix,
 }: DesignerPaletteProps) {
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -141,7 +147,13 @@ export function DesignerPalette({
                 : 'border-gray-200 bg-gray-50',
         )}
         title={item.description}
-        data-testid={testId ? `${testId}-item-${item.type}` : undefined}
+        data-testid={
+          itemTestIdPrefix
+            ? `${itemTestIdPrefix}-${item.type}`
+            : testId
+              ? `${testId}-item-${item.type}`
+              : undefined
+        }
       >
         {item.icon && <span className="flex-shrink-0 text-lg">{item.icon}</span>}
         <div className="min-w-0 flex-1">

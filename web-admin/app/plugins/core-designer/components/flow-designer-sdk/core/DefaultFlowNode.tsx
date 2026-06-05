@@ -76,6 +76,7 @@ export function DefaultFlowNode({ id, data, selected, type }: NodeProps) {
         <Handle
           type="target"
           position={Position.Top}
+          data-testid={`node-handle-target-${id}`}
           className="h-3 w-3 border-2 border-white bg-gray-400"
         />
       )}
@@ -98,6 +99,7 @@ export function DefaultFlowNode({ id, data, selected, type }: NodeProps) {
         <Handle
           type="source"
           position={Position.Bottom}
+          data-testid={`node-handle-source-${id}`}
           className="h-3 w-3 border-2 border-white bg-gray-400"
         />
       )}
@@ -109,6 +111,7 @@ export function DefaultFlowNode({ id, data, selected, type }: NodeProps) {
             type="source"
             position={Position.Bottom}
             id="true"
+            data-testid={`node-handle-source-${id}-true`}
             className="h-3 w-3 border-2 border-white bg-green-500"
             style={{ left: '30%' }}
           />
@@ -116,6 +119,7 @@ export function DefaultFlowNode({ id, data, selected, type }: NodeProps) {
             type="source"
             position={Position.Bottom}
             id="false"
+            data-testid={`node-handle-source-${id}-false`}
             className="h-3 w-3 border-2 border-white bg-red-500"
             style={{ left: '70%' }}
           />
