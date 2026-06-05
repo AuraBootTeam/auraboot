@@ -50,9 +50,9 @@ dependencies {
     testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
 
     // TestContainers Kafka — integration test (may be @Disabled when Docker not available)
-    testImplementation 'org.testcontainers:testcontainers:1.20.4'
-    testImplementation 'org.testcontainers:kafka:1.20.4'
-    testImplementation 'org.testcontainers:junit-jupiter:1.20.4'
+    testImplementation 'org.testcontainers:testcontainers:1.21.4'
+    testImplementation 'org.testcontainers:kafka:1.21.4'
+    testImplementation 'org.testcontainers:junit-jupiter:1.21.4'
 }
 
 compileJava {
