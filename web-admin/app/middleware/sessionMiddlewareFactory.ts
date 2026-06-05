@@ -17,6 +17,7 @@ const PUBLIC_ROUTES = [
   '/auth/register',
   '/auth/forgot-password',
   '/api/i18n',
+  '/qr', // anonymous QR scan landing (public_read / public_submit) — backed by /api/public/qr/**
   ...PLUGIN_PUBLIC_ROUTES,
 ];
 
