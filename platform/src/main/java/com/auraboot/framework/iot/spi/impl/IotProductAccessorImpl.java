@@ -98,10 +98,13 @@ public class IotProductAccessorImpl implements BackgroundProductAccessor {
         if (productKey == null || productKey.isBlank()) {
             return Optional.empty();
         }
-        // productKey is treated as globally unique. We use a system tenant
-        // context for the join lookups; per-row tenant_id is the source of
-        // truth and downstream callers must scope follow-ups appropriately.
-        return withTenant(0L, () -> {
+        // Schema rows (data points / events / services) are tenant-scoped, so the
+        // lookup MUST run under the caller's tenant — not tenant 0, which matches no
+        // real tenant and so returned an empty schema for every product (it broke
+        // invoke_service's TSL-service validation: every call failed
+        // iot.error.service_not_found_in_schema, caught by the 2026-06-05 D3 golden).
+        // Falls back to the system tenant only when there is no ambient context.
+        return withTenant(resolveSchemaLookupTenant(), () -> {
             List<PropertyDef> props = listByPk(MODEL_DATA_POINT, COL_DP_PK, productKey).stream()
                     .map(this::toProperty)
                     .toList();
@@ -282,6 +285,24 @@ public class IotProductAccessorImpl implements BackgroundProductAccessor {
         }
         String s = v.toString().trim();
         return "true".equalsIgnoreCase(s) || "1".equals(s) || "y".equalsIgnoreCase(s);
+    }
+
+    /**
+     * The tenant under which to run a productKey schema lookup: the caller's
+     * ambient tenant when present (schema rows are tenant-scoped), else the system
+     * tenant as a last resort for no-context callers.
+     */
+    /** SystemTenantContextExecutor.SYSTEM_TENANT_ID — the platform system tenant. */
+    private static final long SYSTEM_TENANT_ID = 1L;
+
+    private long resolveSchemaLookupTenant() {
+        if (MetaContext.exists()) {
+            Long t = MetaContext.getCurrentTenantId();
+            if (t != null && t > 0) {
+                return t;
+            }
+        }
+        return SYSTEM_TENANT_ID;
     }
 
     private <T> T withTenant(long tenantId, java.util.function.Supplier<T> work) {
