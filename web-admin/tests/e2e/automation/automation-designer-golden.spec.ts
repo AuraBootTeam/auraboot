@@ -127,7 +127,16 @@ async function pollLogTerminal(
 // Bootstrap a designer canvas at /automation/new with the palette + pane ready.
 async function openNewDesigner(page: Page): Promise<void> {
   await page.goto(DESIGNER_NEW);
-  await page.locator('[data-testid="flow-palette"]').waitFor({ state: 'visible', timeout: 15_000 });
+  // Cold vite dev compiles the heavy @xyflow designer chunk on first hit, which can
+  // exceed the default 5s action timeout (the navigation stays "in progress" while
+  // the lazy chunk transforms). Wait explicitly for the outer editor to be
+  // interactive (name input) with a cold-compile-absorbing timeout BEFORE any test
+  // interaction, mirroring the sibling designer specs' name-input gate — otherwise
+  // the first test in a fresh-stack run flakes on setAutomationName.
+  await page
+    .locator('[data-testid="automation-editor-name-input"]')
+    .waitFor({ state: 'visible', timeout: 30_000 });
+  await page.locator('[data-testid="flow-palette"]').waitFor({ state: 'visible', timeout: 20_000 });
   await page.locator('.react-flow__pane').waitFor({ state: 'visible', timeout: 10_000 });
 }
 
@@ -338,7 +347,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     // We watch for any /api/automations write — there must be none (not a silent save).
     let wroteApi = false;
     page.on('request', (r) => {
-      if (/\/api\/automations(\/[^/]+)?$/.test(r.url()) && ['POST', 'PUT'].includes(r.request().method())) {
+      if (/\/api\/automations(\/[^/]+)?$/.test(r.url()) && ['POST', 'PUT'].includes(r.method())) {
         wroteApi = true;
       }
     });
