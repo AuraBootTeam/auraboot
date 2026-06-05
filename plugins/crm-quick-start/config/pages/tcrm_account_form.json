@@ -3,6 +3,7 @@
   "name:zh-CN": "客户表单",
   "name:en": "Account Form",
   "kind": "form",
+  "schemaVersion": 4,
   "modelCode": "tcrm_account",
   "title": {
     "zh-CN": "客户表单",

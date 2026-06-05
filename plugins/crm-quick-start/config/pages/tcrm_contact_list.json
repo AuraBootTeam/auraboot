@@ -3,6 +3,7 @@
   "name:zh-CN": "联系人列表",
   "name:en": "Contacts",
   "kind": "list",
+  "schemaVersion": 4,
   "modelCode": "tcrm_contact",
   "title": {
     "zh-CN": "联系人列表",

@@ -3,6 +3,7 @@
   "name:zh-CN": "分类列表",
   "name:en": "Categories",
   "kind": "list",
+  "schemaVersion": 4,
   "modelCode": "tasset_category",
   "title": {
     "zh-CN": "分类列表",

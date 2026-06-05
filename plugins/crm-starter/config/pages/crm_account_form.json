@@ -2,6 +2,7 @@
   "pageKey": "crm_account_form",
   "modelCode": "crm_account",
   "kind": "form",
+  "schemaVersion": 4,
   "layout": {
     "type": "stack"
   },

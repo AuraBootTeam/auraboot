@@ -4,6 +4,7 @@
   "name:en": "Task Form",
   "modelCode": "tpm_task",
   "kind": "form",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "任务表单",
     "en": "Task Form"

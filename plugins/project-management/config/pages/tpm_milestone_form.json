@@ -4,6 +4,7 @@
   "name:en": "Milestone Form",
   "modelCode": "tpm_milestone",
   "kind": "form",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "里程碑表单",
     "en": "Milestone Form"

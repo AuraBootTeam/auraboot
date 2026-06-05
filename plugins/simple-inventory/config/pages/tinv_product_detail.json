@@ -4,6 +4,7 @@
   "name:en": "Product Detail",
   "modelCode": "tinv_product",
   "kind": "detail",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "产品详情",
     "en": "Product Detail"

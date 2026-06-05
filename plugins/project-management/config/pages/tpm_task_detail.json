@@ -4,6 +4,7 @@
   "name:en": "Task Detail",
   "modelCode": "tpm_task",
   "kind": "detail",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "任务详情",
     "en": "Task Detail"

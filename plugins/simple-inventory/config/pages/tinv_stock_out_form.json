@@ -4,6 +4,7 @@
   "name:en": "Stock Out Form",
   "modelCode": "tinv_stock_out",
   "kind": "form",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "出库表单",
     "en": "Stock Out Form"

@@ -3,6 +3,7 @@
   "name:zh-CN": "商机表单",
   "name:en": "Opportunity Form",
   "kind": "form",
+  "schemaVersion": 4,
   "modelCode": "tcrm_opportunity",
   "title": {
     "zh-CN": "商机表单",

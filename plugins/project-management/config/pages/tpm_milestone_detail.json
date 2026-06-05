@@ -4,6 +4,7 @@
   "name:en": "Milestone Detail",
   "modelCode": "tpm_milestone",
   "kind": "detail",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "里程碑详情",
     "en": "Milestone Detail"

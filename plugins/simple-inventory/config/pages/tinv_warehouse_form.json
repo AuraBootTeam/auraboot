@@ -4,6 +4,7 @@
   "name:en": "Warehouse Form",
   "modelCode": "tinv_warehouse",
   "kind": "form",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "仓库表单",
     "en": "Warehouse Form"

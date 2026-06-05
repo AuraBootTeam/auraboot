@@ -3,6 +3,7 @@
   "name:zh-CN": "商机列表",
   "name:en": "Opportunities",
   "kind": "list",
+  "schemaVersion": 4,
   "modelCode": "tcrm_opportunity",
   "title": {
     "zh-CN": "商机列表",

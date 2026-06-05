@@ -4,6 +4,7 @@
   "name:en": "Employees",
   "modelCode": "thr_employee",
   "kind": "list",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "员工列表",
     "en": "Employees"

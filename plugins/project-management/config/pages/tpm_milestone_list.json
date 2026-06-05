@@ -4,6 +4,7 @@
   "name:en": "Milestones",
   "modelCode": "tpm_milestone",
   "kind": "list",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "里程碑列表",
     "en": "Milestones"

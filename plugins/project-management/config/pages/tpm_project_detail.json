@@ -4,6 +4,7 @@
   "name:en": "Project Detail",
   "modelCode": "tpm_project",
   "kind": "detail",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "项目详情",
     "en": "Project Detail"

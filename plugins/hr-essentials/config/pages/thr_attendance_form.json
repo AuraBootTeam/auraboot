@@ -4,6 +4,7 @@
   "name:en": "Attendance Form",
   "modelCode": "thr_attendance",
   "kind": "form",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "考勤表单",
     "en": "Attendance Form"

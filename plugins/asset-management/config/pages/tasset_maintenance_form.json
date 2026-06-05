@@ -3,6 +3,7 @@
   "name:zh-CN": "维护表单",
   "name:en": "Maintenance Form",
   "kind": "form",
+  "schemaVersion": 4,
   "modelCode": "tasset_maintenance",
   "title": {
     "zh-CN": "维护表单",

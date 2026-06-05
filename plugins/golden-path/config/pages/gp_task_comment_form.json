@@ -4,6 +4,7 @@
   "name:en": "Comment Form",
   "modelCode": "gp_task_comment",
   "kind": "form",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "评论表单",
     "en": "Comment Form"

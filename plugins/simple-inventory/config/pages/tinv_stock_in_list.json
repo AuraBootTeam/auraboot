@@ -4,6 +4,7 @@
   "name:en": "Stock In",
   "modelCode": "tinv_stock_in",
   "kind": "list",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "入库列表",
     "en": "Stock In"

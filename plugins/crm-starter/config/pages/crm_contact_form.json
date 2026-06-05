@@ -2,6 +2,7 @@
   "pageKey": "crm_contact_form",
   "modelCode": "crm_contact",
   "kind": "form",
+  "schemaVersion": 4,
   "layout": {
     "type": "stack"
   },

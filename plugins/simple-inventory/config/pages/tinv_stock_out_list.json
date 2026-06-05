@@ -4,6 +4,7 @@
   "name:en": "Stock Out",
   "modelCode": "tinv_stock_out",
   "kind": "list",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "出库列表",
     "en": "Stock Out"
