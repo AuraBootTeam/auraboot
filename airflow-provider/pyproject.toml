@@ -8,16 +8,15 @@ readme = "README.md"
 packages = [{include = "airflow_provider_auraboot", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
-apache-airflow = ">=2.7,<3.0"
+python = ">=3.10,<3.15 || >3.15,<4.0"
+apache-airflow = ">=3.2.1rc1,<4.0"
 requests = "^2.31"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.0"
+pytest = "^9.0.3"
 pytest-mock = "^3.12"
 responses = "^0.25"             # for HTTP cassette
 pendulum = ">=2.1.2,<4.0"       # transitive dep of apache-airflow; pin explicitly for test env
-importlib_metadata = ">=6.5"    # required by airflow 2.x on Python < 3.12
 
 [tool.poetry.plugins."apache_airflow_provider"]
 provider_info = "airflow_provider_auraboot.__init__:get_provider_info"

@@ -18,16 +18,10 @@ export default defineConfig({
     testTimeout: 30000, // 单个测试最大超时时间：30秒
     hookTimeout: 10000, // 钩子函数超时时间：10秒
     teardownTimeout: 5000, // 清理超时时间：5秒
-    // 并发配置 - 优化内存使用
+    // Concurrency settings - keep memory usage predictable.
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: true, // 使用单线程避免内存问题
-        isolate: true, // 每个测试文件独立模块注册表，保证 vi.mock 正确性
-        minThreads: 1,
-        maxThreads: 1, // 限制为单线程
-      },
-    },
+    isolate: true,
+    maxWorkers: 1,
     // 性能监控
     logHeapUsage: true,
     // 快速失败

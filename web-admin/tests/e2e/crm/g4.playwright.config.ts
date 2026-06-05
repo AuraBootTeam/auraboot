@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import dns from 'node:dns';
+import { loadEnv } from '../../helpers/environments';
 
 dns.setDefaultResultOrder('ipv4first');
 delete process.env.http_proxy;
@@ -10,7 +11,7 @@ process.env.NO_PROXY = 'localhost,127.0.0.1';
 process.env.no_proxy = process.env.NO_PROXY;
 
 // Self-contained config for the isolated crm-gap stack (G4 payout Post-to-GL action).
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5239';
+const baseURL = loadEnv('crm-gap').urls.base;
 
 export default defineConfig({
   testDir: '.',
