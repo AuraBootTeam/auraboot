@@ -5,7 +5,7 @@
     "name:en": "SLA Configuration",
     "modelCode": "sla_config",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -113,7 +113,7 @@
     "name:en": "SLA Configuration Form",
     "modelCode": "sla_config",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -217,7 +217,7 @@
     "name:en": "BPM Domain Configuration",
     "modelCode": "bpm_domain_config",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -309,7 +309,7 @@
     "name:en": "BPM Domain Configuration Form",
     "modelCode": "bpm_domain_config",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -392,7 +392,7 @@
     "name:en": "Data Permission Policies",
     "modelCode": "data_permission",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -506,7 +506,7 @@
     "name:en": "Data Permission Policy Form",
     "modelCode": "data_permission",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -633,7 +633,7 @@
     "name:en": "Webhook Subscriptions",
     "modelCode": "webhook",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -749,7 +749,7 @@
     "name:en": "Webhook Form",
     "modelCode": "webhook",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -841,7 +841,7 @@
     "name:en": "Webhook Detail",
     "modelCode": "webhook",
     "kind": "detail",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -955,7 +955,7 @@
     "name:en": "API Connectors",
     "modelCode": "api_connector",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -1052,7 +1052,7 @@
     "name:en": "API Connector Form",
     "modelCode": "api_connector",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -1136,7 +1136,7 @@
     "name:zh-CN": "BPM 流程定义",
     "name:en": "BPM Process Management",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -1362,7 +1362,7 @@
     "name:zh-CN": "仪表盘管理",
     "name:en": "Dashboard Management",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -1622,7 +1622,7 @@
     "name:en": "Tenant Members",
     "modelCode": "tenant_member",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -1868,7 +1868,7 @@
     "name:en": "Scheduled Tasks",
     "modelCode": "scheduled_task",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -1987,7 +1987,7 @@
     "name:en": "Scheduled Task Form",
     "modelCode": "scheduled_task",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -2093,7 +2093,7 @@
     "name:en": "Scheduled Task Detail",
     "modelCode": "scheduled_task",
     "kind": "detail",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12

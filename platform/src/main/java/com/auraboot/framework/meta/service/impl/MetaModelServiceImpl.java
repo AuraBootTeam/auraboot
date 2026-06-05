@@ -2178,7 +2178,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 "admin",                         // profile
                 "{\"type\":\"stack\"}",          // layout
                 spec.blocks(),                   // blocks
-                2,                               // schemaVersion (V2 flat format)
+                com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION, // schemaVersion (v4 flat blocks + grid)
                 false,                           // isTemplate
                 null,                            // templateCategory
                 now,                             // publishedAt

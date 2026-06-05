@@ -9,22 +9,7 @@
     "en": "Contact Detail"
   },
   "layout": {
-    "areas": [
-      "header",
-      "main"
-    ],
-    "areasConfig": {
-      "header": {
-        "type": "flex",
-        "direction": "row"
-      },
-      "main": {
-        "type": "grid",
-        "cols": 12,
-        "rowGap": 16,
-        "colGap": 16
-      }
-    }
+    "type": "stack"
   },
   "blocks": [
     {

@@ -5,7 +5,7 @@
   "modelCode": "org_employee",
   "description": "Employee create/edit form",
   "kind": "form",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": {
     "type": "grid",
     "cols": 12,

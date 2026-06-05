@@ -6,7 +6,7 @@
     "modelCode": "e2et_order",
     "description": "Order list with status tabs, toolbar, row actions with conditional visibility",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -327,7 +327,7 @@
     "modelCode": "e2et_order",
     "description": "Order form with 2-column grid, sub-table block, conditional visibility (linkage)",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -514,7 +514,7 @@
     "modelCode": "e2et_order",
     "description": "Order detail view with basic info, items sub-table (read-only), and audit logs",
     "kind": "detail",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -802,7 +802,7 @@
     "modelCode": "e2et_customer",
     "description": "Customer list with search fields and data table",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -911,7 +911,7 @@
     "modelCode": "e2et_customer",
     "description": "Customer form with UNIQUE_COMPOSITE validation",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -989,7 +989,7 @@
     "modelCode": "e2et_payment",
     "description": "Payment list with 5 status tabs and REFERENCE column rendering",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -1213,7 +1213,7 @@
     "modelCode": "e2et_payment",
     "description": "Payment form with REFERENCE dropdown for order selection",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -1293,7 +1293,7 @@
     "modelCode": "e2et_payment",
     "description": "Payment detail with conditional toolbar buttons",
     "kind": "detail",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
@@ -1417,7 +1417,7 @@
     "modelCode": "e2et_record",
     "description": "Simple record list for Android E2E tests",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -1454,7 +1454,7 @@
     "modelCode": "e2et_record",
     "description": "Simple detail page for e2et_record — shows all fields with i18n labels",
     "kind": "detail",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },

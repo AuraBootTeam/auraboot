@@ -15,6 +15,13 @@ public final class DslRegistry {
 
     private DslRegistry() {}
 
+    /**
+     * Current page DSL schema version. Mirror of web-admin
+     * {@code framework/meta/migration/schema-version.ts} CURRENT_SCHEMA_VERSION.
+     * v4 = flat blocks + 12-col grid canvas.
+     */
+    public static final int PAGE_SCHEMA_CURRENT_VERSION = 4;
+
     /** Common interface for all DSL enums. */
     public interface DslEnum {
         String code();
@@ -272,6 +279,11 @@ public final class DslRegistry {
         STAT_CARD("stat-card", "Statistics card", "1.1"),
         AI_FILL_BANNER("ai-fill-banner", "AI fill banner", "1.1"),
         EMBEDDED_LIST("embedded-list", "Embedded record-list block (in-page filterable list)", "1.2"),
+        DETAIL_SECTION("detail-section", "Detail section block", "1.3"),
+        ACTIVITY_TIMELINE("activity-timeline", "Activity timeline block", "1.3"),
+        RECORD_COMMENTS("record-comments", "Record comments block", "1.3"),
+        FIELD_HISTORY("field-history", "Field history block", "1.3"),
+        BPM_PANEL("bpm-panel", "BPM panel block", "1.3"),
         CUSTOM("custom", "Custom block", "1.0");
 
         private final String code, label, since;
