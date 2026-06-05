@@ -226,6 +226,34 @@ class EmqxAclSyncServiceTest {
     }
 
     @Test
+    void syncTenantAclRules_usesIdempotentPut_perUser_andSucceedsOnRepush() {
+        // Regression for the 2026-06-05 D1 golden bug: POST /rules/users 409s on re-push,
+        // breaking reconciliation. PUT /rules/users/{username} is an idempotent upsert.
+        AtomicReference<String> method = new AtomicReference<>();
+        AtomicReference<URI> uri = new AtomicReference<>();
+        AtomicInteger calls = new AtomicInteger();
+        ExchangeFunction xf = req -> {
+            method.set(req.method().name());
+            uri.set(req.url());
+            calls.incrementAndGet();
+            return Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT).build()); // EMQX PUT → 204
+        };
+        EmqxAclSyncService svc = build(enabledProps(), xf);
+        List<EmqxAclSyncService.DeviceAclRule> rules =
+                List.of(new EmqxAclSyncService.DeviceAclRule("dev-1", List.of("/sys/p/dev-1/#")));
+
+        svc.syncTenantAclRules(7L, rules);
+        assertThat(method.get()).isEqualTo("PUT");
+        assertThat(uri.get().getPath())
+                .contains("/authorization/sources/built_in_database/rules/users/")
+                .endsWith("/dev-1");
+
+        // Second call (re-push) must also succeed — no 409, fully idempotent.
+        svc.syncTenantAclRules(7L, rules);
+        assertThat(calls.get()).isEqualTo(2);
+    }
+
+    @Test
     void deviceAclRule_nullPatterns_defaultsToEmpty_andDoesNotNpe() {
         // The compact ctor null-guards aclPatterns → empty list, so a rule with no
         // resolved patterns pushes an empty rule set instead of NPEing in pushAclRules.

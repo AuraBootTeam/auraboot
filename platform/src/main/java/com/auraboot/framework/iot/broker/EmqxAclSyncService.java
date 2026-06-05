@@ -163,9 +163,12 @@ public class EmqxAclSyncService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("username", username);
         body.put("rules", rules);
-        callWithRetry("POST",
-                "/api/v5/authorization/sources/built_in_database/rules/users",
-                List.of(body),
+        // PUT /rules/users/{username} is an idempotent UPSERT (creates or replaces the
+        // user's authz rules). POST /rules/users would 409 ALREADY_EXISTS on a re-push,
+        // which breaks reconciliation (syncTenantAclRules is meant to run repeatedly).
+        callWithRetry("PUT",
+                "/api/v5/authorization/sources/built_in_database/rules/users/" + uri(username),
+                body,
                 "push acl rules");
     }
 
