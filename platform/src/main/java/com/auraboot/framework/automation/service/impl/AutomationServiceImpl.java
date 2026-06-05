@@ -378,11 +378,14 @@ public class AutomationServiceImpl implements AutomationService {
     public AutomationDTO toggle(String pid) {
         Automation automation = loadOwnedAutomation(pid);
         boolean newState = !automation.isActive();
-        String currentUserPid = MetaContext.getCurrentUserPid();
-        automationMapper.updateEnabled(pid, newState, currentUserPid);
-        automation.setEnabled(newState);
-        log.info("Automation toggled: pid={}, enabled={}", pid, newState);
-        return toDTO(automation);
+        // Delegate to enable()/disable() so the SmartEngine deploy step is shared
+        // and cannot drift. Previously toggle() only flipped the `enabled` flag and
+        // skipped the deploy that enable() performs — a visual-flow automation
+        // enabled from the list page (the "Enable" button calls /toggle, not
+        // /enable) was marked Enabled but its compiled flow was never deployed, so
+        // the trigger path failed at runtime with
+        // "Process definition version not found for id: auto_<pid>".
+        return newState ? enable(pid) : disable(pid);
     }
 
     @Transactional
