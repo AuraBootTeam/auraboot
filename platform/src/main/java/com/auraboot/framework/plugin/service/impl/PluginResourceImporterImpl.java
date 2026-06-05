@@ -1606,7 +1606,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         String titleDisplay = dto.getEffectiveName();
         boolean isTemplate = dto.getIsTemplate() != null && dto.getIsTemplate();
         int sortWeight = dto.getSortWeight() != null ? dto.getSortWeight() : 0;
-        int schemaVersion = 2;
+        int schemaVersion = dto.getSchemaVersion() != null
+                ? dto.getSchemaVersion()
+                : com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION;
 
         if (exists) {
             // Update existing page via direct SQL to bypass service-layer name uniqueness validation
