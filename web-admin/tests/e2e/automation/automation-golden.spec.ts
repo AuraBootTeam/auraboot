@@ -470,7 +470,11 @@ async function fetchLogIds(
 }
 
 test.describe('Automation Golden — Layer B behavioral matrix (Phase 2)', () => {
-  test.describe.configure({ mode: 'serial', timeout: 60_000 });
+  // 120s (not 60s): the heavier cases chain multiple poll-until-complete waits
+  // (E6 does two 30s-cap polls + a 6s disable window; E2/C2 poll several runs),
+  // which under whole-suite load can approach a 60s per-test budget. Matches the
+  // Layer A golden describe timeout. Eliminates the rare serial-chain timeout flake.
+  test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
   const createdPids: string[] = [];
 
