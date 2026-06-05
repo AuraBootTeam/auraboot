@@ -381,7 +381,7 @@ dependencies {
     testImplementation 'org.junit.platform:junit-platform-launcher'
 
     // Property-Based Testing with jqwik
-    testImplementation 'net.jqwik:jqwik:1.9.3'
+    testImplementation 'net.jqwik:jqwik:1.10.1'
 
     // ArchUnit — architecture constraint tests
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.2'
