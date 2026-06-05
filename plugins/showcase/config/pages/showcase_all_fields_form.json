@@ -4,7 +4,7 @@
   "name:en": "Showcase Form",
   "modelCode": "showcase_all_fields",
   "kind": "form",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": {
     "type": "grid",
     "cols": 12,

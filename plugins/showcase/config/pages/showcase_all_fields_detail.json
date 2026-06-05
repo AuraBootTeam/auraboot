@@ -4,7 +4,7 @@
   "name:en": "Showcase Detail",
   "modelCode": "showcase_all_fields",
   "kind": "detail",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "extension": {
     "showShare": false,
     "showReport": false
