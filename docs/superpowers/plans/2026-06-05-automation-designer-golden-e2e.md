@@ -138,6 +138,14 @@ If HTML5 drag: dispatch `dragstart` on the palette item, `dragover`+`drop` on th
 >
 > **PHASE 0 COMPLETE.** Infra GREEN + harness smoke-verified. The GA E2E stack stays UP (until `docker-ga-e2e-down.sh`) for Phases 1–4. A fresh session continues from Phase 1 against the up stack: `git checkout feat/automation-designer-golden-e2e`, env `PLAYWRIGHT_BASE_URL=http://localhost:5174 BACKEND_URL=http://localhost:6444 BE_PORT=6444 BFF_PORT=3501 PW_SKIP_WEBSERVER=1 PW_STORAGE_DIR=tests/storage/ga`, run with `--no-deps`.
 
+> **Phase-1 status (2026-06-05) — IMPLEMENTED but E2E-UNVERIFIED (honest):**
+> - A subagent built `automation-designer-golden.spec.ts` (6 cases H1/H2/H3/S1/S2/E5, real drag), heavily tuned the harness, and made 4 product changes it claims are real bugs the golden found: `AutomationServiceImpl.java` (backend), `AutomationEditPageImpl.tsx`, `FlowDesigner.tsx`, `PropertyFieldRenderer.tsx` (PB-4 field-error). Committed: e9fe77af4 (H1-H3 + 2 fixes), f0d4edf49 (S1/S2/E5 + PB-4). No fake-pass markers in the spec.
+> - **The subagent run was cut off by an API ECONNRESET; its final report was lost.**
+> - **NOT verified by the main loop:** during verification the GA E2E stack host-ports (5174/6444) went to **502 and stayed 502 across a container restart** (env degraded under the ~176-min run + disk pressure at ~24Gi — environment-invalid per §2.1, not a product failure). So the 6 cases could NOT be run to confirm pass.
+> - **Static checks (no-stack):** frontend regression 231 tests pass (the shared PropertyFieldRenderer/FlowDesigner changes don't break flow-sdk/bpmn units). BUT `tsc --noEmit` has **1 error in the spec**: `automation-designer-golden.spec.ts:341` `Property 'request' does not exist on type 'Request'` — the committed spec does not cleanly typecheck.
+> - **Backend change unverified:** `AutomationServiceImpl.java` is NOT in the running backend (built at stack-up, before the change) — needs a clean rebuild to take effect + verify.
+> - **TO CLOSE PHASE 1 (fresh session, clean stack):** free disk → `docker-ga-e2e-down.sh` then `up`+`bootstrap` (rebuilds backend with the change) → fix the spec tsc error (line 341) → run the Layer A spec with the env+`--no-deps` → confirm 6 cases pass → REVIEW the 4 product changes for legitimacy (real fix vs make-it-pass hack), esp. the backend + shared-SDK ones.
+
 ## Phase 1 — Layer A: real drag-drop user journey (happy + UI sad/edge)
 
 > All tasks use the Phase-0 harness. Each is a Playwright test in `automation-designer-golden.spec.ts`. TDD here = write the test (it fails until the flow works), run against the stack, make green, screenshot-review, commit.
