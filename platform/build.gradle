@@ -366,7 +366,7 @@ dependencies {
     testImplementation 'org.postgresql:postgresql:42.7.11'
 
     // TestContainers — ephemeral MySQL for connector SDK tests
-    testImplementation platform('org.testcontainers:testcontainers-bom:1.20.4')
+    testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
     testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.testcontainers:mysql'
     testImplementation 'org.testcontainers:postgresql'
