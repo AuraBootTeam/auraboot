@@ -995,8 +995,16 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
   }
 
   async function updateOrder(page: import('@playwright/test').Page, orderId: string, fields: Record<string, unknown>) {
+    // The record id MUST be the top-level `targetRecordId` (CommandExecuteRequest),
+    // NOT `payload.pid`. e2et:update_order's precondition (status IN [draft,rejected])
+    // is field-operator mode: AssertPhase reads `payload.get("e2et_order_status")`
+    // first, and only falls back to the persisted record snapshot when
+    // `request.getTargetRecordId()` is non-blank. Passing the id inside `payload`
+    // leaves targetRecordId null → the snapshot never loads → status reads null →
+    // `null IN [draft,rejected]` is false → "仅草稿或已退回状态可编辑" even for a draft
+    // order. (Root cause of golden FINDING-2; the order IS draft — verified.)
     const resp = await page.request.post(`/api/meta/commands/execute/e2et:update_order`, {
-      data: { operationType: 'update', payload: { pid: orderId, ...fields } },
+      data: { operationType: 'update', targetRecordId: orderId, payload: { ...fields } },
     });
     let raw: any = null;
     try {
@@ -1056,15 +1064,14 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
   });
 
   // ── trigger-record-update — fires when a record is updated (not created) ──────
-  // KNOWN ISSUE (golden finding 2026-06-05, FINDING-2): firing an update through the
-  // e2et:update_order command is blocked by that command's own assert phase
-  // ("仅草稿或已退回状态可编辑") because e2eto:create_e2et_order does not leave the
-  // order in draft status. The trigger-record-update wiring is sound; the blocker is
-  // the test fixture's update path needing a status-unconstrained update (e.g. a
-  // draft-status seed, or e2et:update_order_item if it carries no status gate).
-  // Marked fixme pending a status-unconstrained update fixture. See
-  // docs/backlog/2026-06-05-automation-phase3-findings.md.
-  test.fixme('trigger-record-update: updating a record fires an on_record_update automation (and a create does not)', async ({ page }) => {
+  // RESOLVED (golden FINDING-2, 2026-06-05): the earlier diagnosis (create "does not
+  // leave the order in draft") was WRONG — e2eto:create_e2et_order DOES set status=draft
+  // (autoSetFields fixed_value), verified live. The real blocker was the fixture's
+  // update invocation: it passed the record id as `payload.pid` instead of the
+  // top-level `targetRecordId`, so AssertPhase could not load the persisted record's
+  // status for the precondition (see the updateOrder helper note). Fixed there; the
+  // update now succeeds on a draft order and the on_record_update trigger fires.
+  test('trigger-record-update: updating a record fires an on_record_update automation (and a create does not)', async ({ page }) => {
     const t = 'trig', a = 'notify';
     const create = await postAutomation(page, {
       name: `P3-UPD ${uniqueId()}`,
@@ -1091,6 +1098,138 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     expect(upd.ok, `P3-UPD update fire: ${JSON.stringify(upd.raw)}`).toBe(true);
     const { log } = await pollUntilLogCompletes(page, create.pid!, firedAt);
     expect(String(log.status).toLowerCase(), `update trigger should run to success: ${JSON.stringify(log)}`).toBe('success');
+  });
+
+  function triggerStateChangeNode(
+    id: string,
+    modelCode: string,
+    stateField: string,
+    fromStates: string[],
+    toStates: string[],
+    x = 100,
+    y = 100,
+  ) {
+    return {
+      id,
+      type: 'trigger-state-change',
+      position: { x, y },
+      data: {
+        type: 'trigger-state-change',
+        label: 'on_state_change',
+        config: { triggerType: 'on_state_change', modelCode, stateField, fromStates, toStates },
+      },
+    };
+  }
+  function triggerFieldChangeNode(id: string, modelCode: string, fieldCode: string, x = 100, y = 100) {
+    return {
+      id,
+      type: 'trigger-field-change',
+      position: { x, y },
+      data: {
+        type: 'trigger-field-change',
+        label: 'on_field_change',
+        config: { triggerType: 'on_field_change', modelCode, fieldCode },
+      },
+    };
+  }
+
+  /** Run a state_transition command (e.g. e2et:cancel_order draft→cancelled). targetRecordId top-level. */
+  async function stateTransitionOrder(page: import('@playwright/test').Page, commandCode: string, orderId: string) {
+    const resp = await page.request.post(`/api/meta/commands/execute/${commandCode}`, {
+      data: { operationType: 'state_transition', targetRecordId: orderId, payload: {} },
+    });
+    let raw: any = null;
+    try {
+      raw = await resp.json();
+    } catch {
+      raw = await resp.text().catch(() => null);
+    }
+    return { ok: String(raw?.code) === '0', raw };
+  }
+
+  // ── trigger-state-change — fires when a state_transition command moves the record ──
+  // A draft order cancelled via e2et:cancel_order (operationType=state_transition)
+  // routes through AutomationCommandEventBridge.handleStateTransition → onStateChange.
+  // A plain create must NOT fire it (create routes through handleCreate only).
+  //
+  // NOTE (golden FINDING-4, documented not masked): the fromStates/toStates filters are
+  // left EMPTY here = "fire on any state transition". A specific toStates:['cancelled']
+  // filter does NOT match today, because handleStateTransition reads the new state from
+  // the event payload (payload[stateField]) but the state_transition command applies the
+  // toState via its config without injecting it into ctx.getPayload(), so `toState`
+  // arrives null and the toStates filter skips the automation. fromState (from
+  // metadata.beforeSnapshot) IS available. This is a real product gap in on_state_change
+  // toStates filtering — recorded in docs/backlog/2026-06-05-automation-phase3-findings.md;
+  // the node-type fire path itself (this test) is fully covered.
+  // TEMPORARILY fixme: the trigger FIRES, but the run crashes with an NPE because the
+  // state_transition command leaves `toState` null in the event payload and the
+  // downstream execution path dereferences it. Fixed in this PR's backend batch
+  // (AutomationCommandEventBridge.handleStateTransition now reads the post-transition
+  // record state); un-fixme'd once that lands + rebuilt. See FINDING-4.
+  test.fixme('trigger-state-change: a state transition (draft→cancelled) fires an on_state_change automation (a create does not)', async ({ page }) => {
+    const t = 'trig', a = 'notify';
+    const create = await postAutomation(page, {
+      name: `P3-STATE ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          triggerStateChangeNode(t, MODEL_CODE, 'e2et_order_status', [], []),
+          notifyNode(a, 'state changed'),
+        ],
+        edges: [flowEdge(t, a)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `P3-STATE create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    // A create must NOT fire an on_state_change automation.
+    const orderId = await createOrderGetId(page, `P3-STATE-order ${uniqueId()}`);
+    await new Promise((r) => setTimeout(r, 2_000));
+    expect((await fetchLogIds(page, create.pid!)).size, 'a create must NOT fire an on_state_change automation').toBe(0);
+
+    // Cancel the order (draft→cancelled) → on_state_change fires.
+    const firedAt = Date.now();
+    const cancel = await stateTransitionOrder(page, 'e2et:cancel_order', orderId);
+    expect(cancel.ok, `P3-STATE cancel fire: ${JSON.stringify(cancel.raw)}`).toBe(true);
+    const { log } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `state-change trigger should run to success: ${JSON.stringify(log)}`).toBe('success');
+  });
+
+  // ── trigger-field-change — fires when a specific watched field changes ────────
+  // Updating e2et_order_title via e2et:update_order routes through
+  // AutomationCommandEventBridge.handleUpdate → per-changed-field
+  // onFieldChange(modelCode, recordId, 'e2et_order_title', old, new). The trigger
+  // filters by fieldCode, so only a change to that field fires it.
+  test('trigger-field-change: changing a watched field (e2et_order_title) fires an on_field_change automation', async ({ page }) => {
+    const t = 'trig', a = 'notify';
+    const create = await postAutomation(page, {
+      name: `P3-FIELD ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          triggerFieldChangeNode(t, MODEL_CODE, 'e2et_order_title'),
+          notifyNode(a, 'field changed'),
+        ],
+        edges: [flowEdge(t, a)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `P3-FIELD create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    const orderId = await createOrderGetId(page, `P3-FIELD-before ${uniqueId()}`);
+    await new Promise((r) => setTimeout(r, 2_000));
+    expect((await fetchLogIds(page, create.pid!)).size, 'a create must NOT fire an on_field_change automation').toBe(0);
+
+    // Change the watched title field → on_field_change fires.
+    const firedAt = Date.now();
+    const upd = await updateOrder(page, orderId, { e2et_order_title: `P3-FIELD-after ${uniqueId()}` });
+    expect(upd.ok, `P3-FIELD update fire: ${JSON.stringify(upd.raw)}`).toBe(true);
+    const { log } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `field-change trigger should run to success: ${JSON.stringify(log)}`).toBe('success');
   });
 
   function createRecordNode(id: string, modelCode: string, fields: Record<string, unknown>, x = 400, y = 300) {
@@ -1200,5 +1339,133 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     expect(String(body?.code), `webhook POST should be accepted: ${JSON.stringify(body)}`).toBe('0');
     const { log } = await pollUntilLogCompletes(page, create.pid!, firedAt);
     expect(String(log.status).toLowerCase(), `webhook trigger should run to success: ${JSON.stringify(log)}`).toBe('success');
+  });
+
+  // ── action node builders for the outbound / LLM cases ──────────────────────────
+  function callApiNode(id: string, url: string, method = 'get', x = 400, y = 300) {
+    return {
+      id,
+      type: 'action-call-api',
+      position: { x, y },
+      data: { type: 'action-call-api', label: 'CallApi', config: { actionType: 'call_api', url, method } },
+    };
+  }
+  function sendWebhookNode(id: string, eventType: string, payload: Record<string, unknown>, x = 400, y = 300) {
+    return {
+      id,
+      type: 'action-send-webhook',
+      position: { x, y },
+      data: { type: 'action-send-webhook', label: 'SendWebhook', config: { actionType: 'send_webhook', eventType, payload } },
+    };
+  }
+  function llmCallNode(id: string, userPromptTemplate: string, x = 400, y = 300) {
+    return {
+      id,
+      type: 'action-llm-call',
+      position: { x, y },
+      data: { type: 'action-llm-call', label: 'LlmCall', config: { actionType: 'llm_call', userPromptTemplate, maxTokens: 64 } },
+    };
+  }
+
+  // ── action-call-api — makes a real outbound HTTP call ─────────────────────────
+  // CallApiExecutor runs the URL through SsrfValidator + PinnedHttpRequests. Loopback
+  // is blocked, but in the `test` profile SsrfValidator allowlists host.docker.internal
+  // (TEST_PROFILE_PRIVATE_HOST_ALLOWLIST), which routes container→host. We target the
+  // backend's own /actuator/health (200, no auth) so the call is deterministic and
+  // self-contained; the node completes only if the real HTTP round-trip returned <400.
+  //
+  // TEMPORARILY fixme: golden surfaced a REAL bug — CallApiExecutor does
+  // `switch (method.toUpperCase())` against LOWERCASE case labels ("get"/"post"/...),
+  // so EVERY method falls through to default → "Unsupported HTTP method" and call_api
+  // is 100% broken (red line §9 case-consistency). Fixed in this PR's backend batch
+  // (switch on method.toLowerCase()); un-fixme'd after rebuild. See FINDING-6.
+  test.fixme('action-call-api: the action makes a real outbound HTTP GET (host.docker.internal /actuator/health → 200) and completes', async ({ page }) => {
+    const t = 'trig', a = 'callapi';
+    const create = await postAutomation(page, {
+      name: `P3-API ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          triggerCreateNode(t, MODEL_CODE),
+          callApiNode(a, 'http://host.docker.internal:6444/actuator/health', 'get'),
+        ],
+        edges: [flowEdge(t, a)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `P3-API create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    const firedAt = Date.now();
+    expect((await createOrderRecordViaCommand(page, `P3-API-order ${uniqueId()}`)).ok).toBe(true);
+    const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `P3-API run: ${JSON.stringify({ log, statuses })}`).toBe('success');
+    expect(statuses.find((s) => s.nodeId === a)?.status, `call-api node completed: ${JSON.stringify(statuses)}`).toBe('completed');
+  });
+
+  // ── action-send-webhook — dispatches an event to webhook subscriptions ────────
+  // SendWebhookExecutor calls WebhookDispatcher.dispatch(eventType, payload, tenantId).
+  // With no subscription registered for the eventType the dispatch is a harmless no-op
+  // that still completes (the action's side effect is "dispatched"). We assert the node
+  // completes — the executor ran the dispatch path end-to-end. (Asserting an outbound
+  // POST landed would need a registered subscription + a host receiver; the dispatch
+  // itself is exercised here.)
+  test('action-send-webhook: the action dispatches a webhook event and the node completes', async ({ page }) => {
+    const t = 'trig', a = 'webhook';
+    const create = await postAutomation(page, {
+      name: `P3-SWH ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          triggerCreateNode(t, MODEL_CODE),
+          sendWebhookNode(a, 'e2e.test.order.created', { source: 'P3-SWH', orderRef: `${uniqueId()}` }),
+        ],
+        edges: [flowEdge(t, a)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `P3-SWH create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    const firedAt = Date.now();
+    expect((await createOrderRecordViaCommand(page, `P3-SWH-order ${uniqueId()}`)).ok).toBe(true);
+    const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `P3-SWH run: ${JSON.stringify({ log, statuses })}`).toBe('success');
+    expect(statuses.find((s) => s.nodeId === a)?.status, `send-webhook node completed: ${JSON.stringify(statuses)}`).toBe('completed');
+  });
+
+  // ── action-llm-call — invokes the LLM via the built-in stub provider ──────────
+  // TEMPORARILY fixme: the executor + StubLlmProvider both exist, but the GA test tenant
+  // carries a SEEDED real provider (minimax, from the showcase seed) that overrides the
+  // yml stub-sentinel fallback, so the run makes a real call → 401. Forcing the stub
+  // cleanly needs `agent.llm.stub-mode=true` on the E2E backend (its intended use: run
+  // the chat pipeline without real credentials). Enabled on the stack in this PR's
+  // backend batch, then un-fixme'd. The executor is unit + integration covered
+  // (LlmCallExecutorTest + Streaming/Vision IT). See FINDING-5.
+  test.fixme('action-llm-call: the action invokes the LLM (built-in stub provider) and the node completes', async ({ page }) => {
+    const t = 'trig', a = 'llm';
+    const create = await postAutomation(page, {
+      name: `P3-LLM ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          triggerCreateNode(t, MODEL_CODE),
+          llmCallNode(a, 'Summarize order ${recordId} in one word.'),
+        ],
+        edges: [flowEdge(t, a)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `P3-LLM create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    const firedAt = Date.now();
+    expect((await createOrderRecordViaCommand(page, `P3-LLM-order ${uniqueId()}`)).ok).toBe(true);
+    const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `P3-LLM run: ${JSON.stringify({ log, statuses })}`).toBe('success');
+    expect(statuses.find((s) => s.nodeId === a)?.status, `llm-call node completed: ${JSON.stringify(statuses)}`).toBe('completed');
   });
 });
