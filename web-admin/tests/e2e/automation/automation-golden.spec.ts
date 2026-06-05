@@ -611,4 +611,234 @@ test.describe('Automation Golden — Layer B behavioral matrix (Phase 2)', () =>
       ).not.toBe('failed');
     }
   });
+
+  // ── builders for the condition / action behavioral cases (grounded in the
+  //    verified Layer A H1 shapes: condition reads record['field'], gateway
+  //    out-edges carry data.condition.content + sourceHandle true/false, and
+  //    update-record fields is an OBJECT (UpdateRecordExecutor casts to Map)) ──
+  function conditionNode(id: string, expression: string, x = 250, y = 200) {
+    return {
+      id,
+      type: 'control-condition',
+      position: { x, y },
+      data: { type: 'control-condition', label: 'Condition', config: { controlType: 'condition', expression } },
+    };
+  }
+  function updateRecordNode(
+    id: string,
+    modelCode: string,
+    fields: Record<string, unknown>,
+    recordId = '${recordId}',
+    x = 400,
+    y = 300,
+  ) {
+    return {
+      id,
+      type: 'action-update-record',
+      position: { x, y },
+      data: { type: 'action-update-record', label: 'Update', config: { actionType: 'update_record', modelCode, recordId, fields } },
+    };
+  }
+  function branchEdge(source: string, target: string, sourceHandle: 'true' | 'false', conditionContent: string) {
+    return {
+      id: `edge_${source}_${target}_${sourceHandle}`,
+      source,
+      target,
+      sourceHandle,
+      type: 'smoothstep',
+      data: { condition: { content: conditionContent } },
+    };
+  }
+
+  async function fireOrderWithAmount(page: import('@playwright/test').Page, amount: number, title: string) {
+    const resp = await page.request.post(`/api/meta/commands/execute/${CREATE_COMMAND}`, {
+      data: {
+        operationType: 'create',
+        payload: { e2et_order_title: title, e2et_order_date: '2026-05-30', e2et_order_type: 'normal', e2et_order_amount: amount },
+      },
+    });
+    let raw: any = null;
+    try {
+      raw = await resp.json();
+    } catch {
+      raw = await resp.text().catch(() => null);
+    }
+    return { ok: String(raw?.code) === '0', recordId: raw?.data?.data?.recordId as string | undefined, raw };
+  }
+
+  /** Poll GET /api/dynamic/{model}/{id} until `field` equals `expected` (or timeout); returns the last value. */
+  async function pollRecordField(
+    page: import('@playwright/test').Page,
+    recordId: string,
+    field: string,
+    expected: string,
+  ): Promise<unknown> {
+    const deadline = Date.now() + 15_000;
+    let last: unknown = undefined;
+    while (Date.now() < deadline) {
+      const resp = await page.request.get(`/api/dynamic/${MODEL_CODE}/${recordId}`);
+      if (resp.ok()) {
+        const body = await resp.json();
+        last = body?.data?.[field];
+        if (last === expected) return last;
+      }
+      await new Promise((r) => setTimeout(r, 1_000));
+    }
+    return last;
+  }
+
+  // ── S3 — an action that fails at runtime is recorded failed ─────────────────
+  test('S3: an update-record action targeting a nonexistent field fails at runtime (node failed + log not success)', async ({ page }) => {
+    const t = 'trig', a = 'act';
+    const create = await postAutomation(page, {
+      name: `S3 ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          triggerCreateNode(t, MODEL_CODE),
+          updateRecordNode(a, MODEL_CODE, { e2et_order_nonexistent_zzz: 'boom' }),
+        ],
+        edges: [flowEdge(t, a)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `S3 create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    const firedAt = Date.now();
+    expect((await fireOrderWithAmount(page, 3000, `S3 ${uniqueId()}`)).ok).toBe(true);
+    const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+
+    // The bad-field update must NOT let the run report a clean success.
+    expect(
+      ['failed', 'partial_success'],
+      `S3 run must fail (bad field), not succeed: ${JSON.stringify({ log, statuses })}`,
+    ).toContain(String(log.status).toLowerCase());
+    const actStatus = statuses.find((s) => s.nodeId === a);
+    expect(actStatus?.status, `the update-record node should be failed: ${JSON.stringify(statuses)}`).toBe('failed');
+    expect(actStatus?.errorMessage, 'a failed node should carry an error message').toBeTruthy();
+  });
+
+  // ── S5 — condition false branch gates the true-branch action (P0-2) ─────────
+  test('S5: firing below the condition threshold runs the FALSE action and NOT the TRUE action (P0-2 gating)', async ({ page }) => {
+    const t = 'trig', c = 'cond', aHigh = 'aHigh', aLow = 'aLow';
+    const expr = "record['e2et_order_amount'] > 1000";
+    const create = await postAutomation(page, {
+      name: `S5 ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          triggerCreateNode(t, MODEL_CODE),
+          conditionNode(c, expr),
+          updateRecordNode(aHigh, MODEL_CODE, { e2et_order_title: 'S5_TRUE' }, '${recordId}', 30, 350),
+          updateRecordNode(aLow, MODEL_CODE, { e2et_order_title: 'S5_FALSE' }, '${recordId}', 470, 350),
+        ],
+        edges: [
+          flowEdge(t, c),
+          branchEdge(c, aHigh, 'true', expr),
+          branchEdge(c, aLow, 'false', "record['e2et_order_amount'] <= 1000"),
+        ],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `S5 create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    const firedAt = Date.now();
+    const fire = await fireOrderWithAmount(page, 200, `S5-low ${uniqueId()}`);
+    expect(fire.ok, `S5 fire: ${JSON.stringify(fire.raw)}`).toBe(true);
+    const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `S5 run should complete: ${JSON.stringify({ log, statuses })}`).toBe('success');
+    expect(statuses.find((s) => s.nodeId === aLow)?.status, `FALSE action should complete: ${JSON.stringify(statuses)}`).toBe('completed');
+    const high = statuses.find((s) => s.nodeId === aHigh);
+    expect(
+      high === undefined || high.status !== 'completed',
+      `TRUE action must NOT run on a below-threshold fire: ${JSON.stringify(statuses)}`,
+    ).toBe(true);
+    // Side effect: the record reflects the FALSE action, never the TRUE one.
+    expect(await pollRecordField(page, fire.recordId!, 'e2et_order_title', 'S5_FALSE')).toBe('S5_FALSE');
+  });
+
+  // ── E1 — two sequential actions both run, in order ──────────────────────────
+  test('E1: trigger → a1 → a2 — both actions run and the LAST one wins (sequential order)', async ({ page }) => {
+    const t = 'trig', a1 = 'a1', a2 = 'a2';
+    const create = await postAutomation(page, {
+      name: `E1 ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          triggerCreateNode(t, MODEL_CODE),
+          updateRecordNode(a1, MODEL_CODE, { e2et_order_title: 'E1_STEP1' }, '${recordId}', 30, 300),
+          updateRecordNode(a2, MODEL_CODE, { e2et_order_title: 'E1_STEP2' }, '${recordId}', 30, 450),
+        ],
+        edges: [flowEdge(t, a1), flowEdge(a1, a2)],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `E1 create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    const firedAt = Date.now();
+    const fire = await fireOrderWithAmount(page, 3000, `E1 ${uniqueId()}`);
+    expect(fire.ok).toBe(true);
+    const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(log.status).toLowerCase(), `E1 should succeed: ${JSON.stringify({ log, statuses })}`).toBe('success');
+    expect(statuses.find((s) => s.nodeId === a1)?.status, 'a1 completed').toBe('completed');
+    expect(statuses.find((s) => s.nodeId === a2)?.status, 'a2 completed').toBe('completed');
+    // a2 ran after a1 → the final title is a2's value.
+    expect(await pollRecordField(page, fire.recordId!, 'e2et_order_title', 'E1_STEP2')).toBe('E1_STEP2');
+  });
+
+  // ── E2 — condition routes true-fires and false-fires to different actions ────
+  test('E2: a condition routes a true-matching fire to the TRUE action and a false-matching fire to the FALSE action', async ({ page }) => {
+    const t = 'trig', c = 'cond', aHigh = 'aHigh', aLow = 'aLow';
+    const expr = "record['e2et_order_amount'] > 1000";
+    const create = await postAutomation(page, {
+      name: `E2 ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          triggerCreateNode(t, MODEL_CODE),
+          conditionNode(c, expr),
+          updateRecordNode(aHigh, MODEL_CODE, { e2et_order_title: 'E2_TRUE' }, '${recordId}', 30, 350),
+          updateRecordNode(aLow, MODEL_CODE, { e2et_order_title: 'E2_FALSE' }, '${recordId}', 470, 350),
+        ],
+        edges: [
+          flowEdge(t, c),
+          branchEdge(c, aHigh, 'true', expr),
+          branchEdge(c, aLow, 'false', "record['e2et_order_amount'] <= 1000"),
+        ],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `E2 create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+    await enableAutomationViaApi(page, create.pid!);
+
+    // Fire TRUE-matching (amount > 1000) → only the TRUE action runs.
+    let firedAt = Date.now();
+    const fHigh = await fireOrderWithAmount(page, 5000, `E2-high ${uniqueId()}`);
+    expect(fHigh.ok).toBe(true);
+    const runHigh = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(runHigh.log.status).toLowerCase(), `E2 high run: ${JSON.stringify(runHigh)}`).toBe('success');
+    expect(runHigh.statuses.find((s) => s.nodeId === aHigh)?.status, 'TRUE action ran on high fire').toBe('completed');
+    expect(runHigh.statuses.find((s) => s.nodeId === aLow), 'FALSE action did NOT run on high fire').toBeUndefined();
+    expect(await pollRecordField(page, fHigh.recordId!, 'e2et_order_title', 'E2_TRUE')).toBe('E2_TRUE');
+
+    // Space the next fire beyond the log-lookup slack so the two runs are distinct.
+    await new Promise((r) => setTimeout(r, 6_000));
+
+    // Fire FALSE-matching (amount <= 1000) → only the FALSE action runs.
+    firedAt = Date.now();
+    const fLow = await fireOrderWithAmount(page, 200, `E2-low ${uniqueId()}`);
+    expect(fLow.ok).toBe(true);
+    const runLow = await pollUntilLogCompletes(page, create.pid!, firedAt);
+    expect(String(runLow.log.status).toLowerCase(), `E2 low run: ${JSON.stringify(runLow)}`).toBe('success');
+    expect(runLow.statuses.find((s) => s.nodeId === aLow)?.status, 'FALSE action ran on low fire').toBe('completed');
+    expect(runLow.statuses.find((s) => s.nodeId === aHigh), 'TRUE action did NOT run on low fire').toBeUndefined();
+    expect(await pollRecordField(page, fLow.recordId!, 'e2et_order_title', 'E2_FALSE')).toBe('E2_FALSE');
+  });
 });
