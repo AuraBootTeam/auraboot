@@ -7,13 +7,16 @@
  * - Context refreshes between cascade levels
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { LinkageEngine } from '~/framework/meta/runtime/linkage/LinkageEngine';
 import { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state';
 import type { GlobalState } from '~/framework/meta/runtime/expression/context';
 import type { LinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 
 const SCOPE_ID = 'cascade-test';
+
+type FieldValueChangeHandler = (fieldCode: string, value: any) => void;
+type LinkageErrorHandler = (ruleId: string, error: Error) => void;
 
 const createGlobalState = (): GlobalState => ({
   locale: 'zh-CN',
@@ -31,17 +34,17 @@ function createStateManager(initialForm: Record<string, any> = {}): ScopedStateM
 
 describe('LinkageEngine — Multi-level Cascade', () => {
   let sm: ScopedStateManager;
-  let onFieldValueChange: ReturnType<typeof vi.fn>;
-  let onError: ReturnType<typeof vi.fn>;
+  let onFieldValueChange: Mock<FieldValueChangeHandler>;
+  let onError: Mock<LinkageErrorHandler>;
   let engine: LinkageEngine;
 
   beforeEach(() => {
     sm = createStateManager();
-    onFieldValueChange = vi.fn((fieldCode, value) => {
+    onFieldValueChange = vi.fn<FieldValueChangeHandler>((fieldCode, value) => {
       // Simulate actual form update (so getContext returns fresh data)
       sm.updateField(SCOPE_ID, fieldCode, value);
     });
-    onError = vi.fn();
+    onError = vi.fn<LinkageErrorHandler>();
     engine = new LinkageEngine({
       stateManager: sm,
       scopeId: SCOPE_ID,

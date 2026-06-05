@@ -154,7 +154,7 @@ export const PG_ENV = Object.freeze({
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // `loadEnv(profile)` returns a typed `EnvironmentSpec` describing the ports,
-// URLs, and Postgres coordinates for one of the five canonical profiles.
+// URLs, and Postgres coordinates for one of the canonical profiles.
 //
 //   host        — developer host stack (BE 6443 / vite 5173 / BFF 3500 / pg 5432)
 //   r2          — per-worktree isolated docker stack (ports from
@@ -168,13 +168,15 @@ export const PG_ENV = Object.freeze({
 //                 process.env so the workflow can override per-job)
 //   enterprise  — enterprise overlay stack (BE 6444 / vite 5174 / BFF 3501 /
 //                 pg 5433); used by `auraboot-enterprise/web-admin-ext` runs
+//   crm-gap     — isolated CRM golden stack (BE 6509 / vite 5239); used by the
+//                 CRM closure/gap L4 Playwright specs
 //
 // The returned spec ALWAYS reflects `process.env` first; the profile only
 // supplies defaults. This keeps backward-compat with the existing
 // `BACKEND_URL` / `BASE_URL` / `BFF_URL` / `PSQL_BASE` exports above and lets
 // callers stay drift-free regardless of who launched the shell.
 
-export type EnvProfile = 'host' | 'r2' | 'ga-e2e' | 'ci' | 'enterprise';
+export type EnvProfile = 'host' | 'r2' | 'ga-e2e' | 'ci' | 'enterprise' | 'crm-gap';
 
 export interface EnvironmentSpec {
   /** Profile name as supplied. */
@@ -264,6 +266,16 @@ const PROFILE_DEFAULTS: Record<EnvProfile, ProfileDefaults> = {
     bffPort: '3501',
     pgPort: '5433',
     redisPort: '6380',
+    pgHost: 'localhost',
+    pgUser: 'auraboot',
+    pgDb: 'aura_boot',
+  },
+  'crm-gap': {
+    bePort: '6509',
+    vitePort: '5239',
+    bffPort: '3500',
+    pgPort: '5432',
+    redisPort: '6379',
     pgHost: 'localhost',
     pgUser: 'auraboot',
     pgDb: 'aura_boot',

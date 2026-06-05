@@ -11,7 +11,7 @@
  * the real pe:* commands in beforeAll, then asserted through the UI.
  *
  * Run:
- *   PLAYWRIGHT_BASE_URL=http://localhost:5239 PLAYWRIGHT_BE_URL=http://localhost:6509 \
+ *   PLAYWRIGHT_BASE_URL=http://localhost:5239 BACKEND_URL=http://localhost:6509 \
  *   NO_PROXY=localhost,127.0.0.1 \
  *   npx playwright test tests/e2e/crm/crm-m5-pcba.spec.ts \
  *     --project=chromium-m5 --config=tests/e2e/crm/m5.playwright.config.ts
@@ -27,9 +27,11 @@
  *   M8  pe_rfq            · form   — create form opens with labelled fields (no raw leak)
  */
 import { test, expect, type Page } from '@playwright/test';
+import { loadEnv } from '../../helpers/environments';
 
-const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5239';
-const BE = process.env.PLAYWRIGHT_BE_URL || 'http://localhost:6509';
+const CRM_GAP_ENV = loadEnv('crm-gap');
+const BASE = CRM_GAP_ENV.urls.base;
+const BE = CRM_GAP_ENV.urls.backend;
 const EMAIL = 'admin@auraboot.com';
 const PW = 'Test2026x';
 const SHOT = '/tmp/m5-e2e';
