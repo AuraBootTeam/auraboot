@@ -162,16 +162,22 @@ If HTML5 drag: dispatch `dragstart` on the palette item, `dragover`+`drop` on th
 
 > Tests in `automation-golden.spec.ts` (extend). Setup builds flowConfig via API (`POST /api/automations`), enables, fires a real trigger, asserts backend behavior. Clearly labeled "behavioral (non-UI-golden)".
 
-- [ ] **Task 2.1 (S3)** — action configured to fail at runtime (e.g. update-record targeting a nonexistent field) → fire → assert node-status=failed + errorMessage present + AutomationLog status FAILED. Commit.
-- [ ] **Task 2.2 (S4)** — attempt to create/enable a flowConfig with no trigger node, and separately with two trigger nodes → assert `AutomationFlowTriggerDeriver` rejects with ValidationException (HTTP 4xx). Commit.
-- [ ] **Task 2.3 (S5)** — condition false branch → fire with amount below threshold → assert the downstream action did NOT run (P0-2 gating); node-status shows condition completed, action not executed. Commit.
-- [ ] **Task 2.4 (E1)** — trigger → a1 → a2 (two sequential actions) → fire → assert both executed in order. Commit.
-- [ ] **Task 2.5 (E2)** — condition with both true and false branches wired to different actions → fire true-matching → assert only true-branch action ran; fire false-matching → only false-branch. Commit.
-- [ ] **Task 2.6 (E3)** — control-loop over a collection variable → fire → assert the body action ran once per element with itemVariable bound (lift/extend the existing AutomationProcessRuntimeIntegrationTest loop assertion to the fire path). Commit.
-- [ ] **Task 2.7 (E6)** — enable → fire → runs; disable → fire → does not run; re-enable → fire → runs. Commit.
-- [ ] **Task 2.8 (C1)** — tenant isolation: as tenant B, attempt to read/trigger tenant A's automation by pid → 404/denied (IDOR, #264). Commit.
-- [ ] **Task 2.9 (C2)** — fire N concurrent trigger events for one rule → assert the per-rule semaphore bounds concurrency (no error storm / thread exhaustion; all eventually run). Commit.
-- [ ] **Task 2.10 (C3)** — empty flowConfig (no nodes) create → assert rejected or no-op (no crash). Commit.
+- [x] **Task 2.1 (S3)** — action configured to fail at runtime (e.g. update-record targeting a nonexistent field) → fire → assert node-status=failed + errorMessage present + AutomationLog status FAILED. Commit.
+- [x] **Task 2.2 (S4)** — attempt to create/enable a flowConfig with no trigger node, and separately with two trigger nodes → assert `AutomationFlowTriggerDeriver` rejects with ValidationException (HTTP 4xx). Commit.
+- [x] **Task 2.3 (S5)** — condition false branch → fire with amount below threshold → assert the downstream action did NOT run (P0-2 gating); node-status shows condition completed, action not executed. Commit.
+- [x] **Task 2.4 (E1)** — trigger → a1 → a2 (two sequential actions) → fire → assert both executed in order. Commit.
+- [x] **Task 2.5 (E2)** — condition with both true and false branches wired to different actions → fire true-matching → assert only true-branch action ran; fire false-matching → only false-branch. Commit.
+- [~] **Task 2.6 (E3) — HONEST SKIP** — multi-iteration control-loop is covered by the platform `AutomationProcessRuntimeIntegrationTest` (3-element / empty / absent-collection assertions via `runtime.run`). The E2E fire path cannot supply a multi-element collection: the `on_record_create` trigger context is built from the e2et_order record, which has no collection/array field for the loop to iterate. Deferred (counted skip in the suite), not faked.
+- [x] **Task 2.7 (E6)** — enable → fire → runs; disable → fire → does not run; re-enable → fire → runs. Commit.
+- [x] **Task 2.8 (C1)** — tenant isolation: as tenant B, attempt to read/trigger tenant A's automation by pid → 404/denied (IDOR, #264). Commit.
+- [x] **Task 2.9 (C2)** — fire N concurrent trigger events for one rule → assert the per-rule semaphore bounds concurrency (no error storm / thread exhaustion; all eventually run). Commit.
+- [x] **Task 2.10 (C3)** — empty flowConfig (no nodes) create → assert rejected or no-op (no crash). Commit.
+
+> **Phase-2 status (2026-06-05) — ✅ COMPLETE + VERIFIED** (commits 368339e25 / dfd62b33f / 1da77f4b9). `automation-golden.spec.ts` = **10 passed + 1 honest skip** against the real engine + DB (B1 + E6/S4/C3/S3/S5/E1/E2/C2/C1, E3 = counted skip). Layer A designer golden still 6/6 (no regression).
+> **2 real product bugs the Layer-B golden surfaced (both gate-green before — only an assembled-runtime behavioral test catches them, §2.2), fixed + verified:**
+> - **PB-5 BPM re-deploy → 500.** `ProcessDeploymentService.createNewVersion` inserted `bpmnContent` verbatim (null from the automation re-deploy caller) instead of compiling it from `designerJson` like `create()`/`update()` → the SECOND deploy of any automation (E6 re-enable, edit+re-deploy) hit `null value in column "bpmn_content" violates not-null constraint`. Fixed: compile from designerJson (fall back to "" like create()). Verified by E6.
+> - **PB-6 empty-flowConfig create → 500.** `AutomationServiceImpl.validateCreateRequest` treated `{nodes:[],edges:[]}` as visual-designer mode (non-empty Map) and skipped the flat `modelCode` required check → `ab_automation.model_code` NOT NULL crash. Fixed: `isFlowConfigOnly` now checks for actual nodes (mirrors `enable()`) → clean 400. Verified by C3.
+> Both fixes are platform changes (rebuilt into the GA E2E backend) and regress neither Layer A (6/6) nor Layer B B1.
 
 ---
 
