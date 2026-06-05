@@ -5,7 +5,7 @@
     "name:en": "Page Configuration",
     "modelCode": "page_schema",
     "kind": "list",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "stack"
     },
@@ -278,7 +278,7 @@
     "name:en": "New Page",
     "modelCode": "page_schema",
     "kind": "form",
-    "schemaVersion": 2,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
