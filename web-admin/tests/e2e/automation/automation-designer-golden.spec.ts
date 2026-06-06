@@ -715,6 +715,39 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'create-record node completed').toBe(true);
     expect((await pollItemsByName(page, itemName)).length, 'child item created on state-change fire').toBeGreaterThanOrEqual(1);
   });
+
+  test('N-TRIGGER-WEBHOOK: drag trigger-webhook→action-call-api, save, enable, fire via a real inbound webhook POST → automation runs @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-WEBHOOK ${uniqueId()}`);
+
+    // trigger-webhook has no required config (validationMode defaults to none) and no
+    // modelCode (FINDING-1 made model_code nullable). Action does not depend on ${recordId}.
+    const trigger = await dragNodeToCanvas(page, 'trigger-webhook', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-call-api', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, action, {
+      url: 'http://host.docker.internal:6444/actuator/health',
+      method: 'GET',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // FIRE via the real inbound webhook endpoint (resolves the automation by pid).
+    const firedAt = Date.now();
+    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
+      data: { event: 'order.shipped', ref: `NWH ${uniqueId()}` },
+    });
+    expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
+    expect(String((await resp.json())?.code), 'webhook POST accepted').toBe('0');
+
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-WEBHOOK run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'downstream action completed on webhook fire').toBe(true);
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */
