@@ -109,6 +109,19 @@ SmartEngine-excluded = 3 (start-process, bpm-event, control-delay).
   - ⚠️ **Flake to harden (§2.4 not yet 3× clean):** N-CREATE-RECORD flaked once (1 fail / 2 full
     runs) under serial load — needs stabilization (per-test isolation / timeout tuning / retries
     audit) before claiming the suite golden-clean.
+- **P2 (started) — golden sad paths:** N-CALL-API-SAD (`21a93a02d`) — call-api to a 404 → node
+  fails, surfaced on the node. (Original Layer A already has S1 required-gate + S2 dangerous-SpEL.)
+  Remaining: systematic sad/edge/corner per node.
+- **2 confirmed findings (deferred — real fixes, not just tests):**
+  - **FINDING-8 (send-notification config↔executor type mismatch):** the configSchema types
+    `recipients` as `expression` (a string) but `SendNotificationExecutor` reads
+    `(List<String>) config.get("recipients")` → a recipients expression would ClassCastException.
+    Fix = change the field to a multiselect/array (or make the executor tolerant). Blocks the
+    send-notification real-UI happy case.
+  - **FINDING-9 (execute-command command-select picker):** the UI command-select dropdown does not
+    surface options by the zh displayName the harness filtered on (`编辑订单`) — renders by a
+    different label/code, or needs a context the harness didn't supply. Needs picker DOM
+    investigation to drive it; the backend denial path is already covered by Layer B.
 - **Remaining in-scope nodes (P1) — with the config quirks to handle (grounded):**
   - `trigger-field-change` — modelCode(model-select) + **fieldCode(field-select)**: needs the field
     LABEL (e.g. e2et_order_title's displayName). Fire via update of that field.
