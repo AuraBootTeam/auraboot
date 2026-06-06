@@ -15,6 +15,11 @@ import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { useTreeData } from '~/framework/meta/hooks/useTreeData';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useAuth } from '~/contexts/AuthContext';
+import {
+  readDataSourceRows,
+  useDataSourceSubscription,
+  writeRuntimeState,
+} from './workbenchBlockUtils';
 
 export interface TableBlockRendererProps {
   block: BlockConfig;
@@ -117,11 +122,25 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // 获取表格数据 - 从 DataSource
   const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
-  const rawData = dataSourceId ? dataSourceManager.getData(dataSourceId) : [];
+  useDataSourceSubscription(runtime, dataSourceId);
+  const rawData = dataSourceId ? readDataSourceRows(runtime, dataSourceId) : [];
 
   // Tree configuration — enables expandable hierarchical rows
   const treeConfig: TreeConfig | undefined = block.table?.treeConfig || (block as any).treeConfig;
   const { visibleRows, toggleExpand } = useTreeData(rawData, treeConfig);
+  const selectionConfig = block.table?.selection || (block as any).selection;
+  const rowKeyField = block.table?.rowKey || 'pid';
+  const [localSelectedRowKey, setLocalSelectedRowKey] = useState('');
+  const getRowIdentity = (row: any, index?: number): string =>
+    String(row?.[rowKeyField] ?? row?.id ?? row?.pid ?? index ?? '');
+  const selectedRow = selectionConfig?.bind
+    ? (runtime.getContext().state as Record<string, any> | undefined)?.[selectionConfig.bind]
+    : undefined;
+  const selectedRowKey =
+    selectedRow && typeof selectedRow === 'object'
+      ? getRowIdentity(selectedRow)
+      : '';
+  const effectiveSelectedRowKey = localSelectedRowKey || selectedRowKey;
 
   // Use tree-processed rows when treeConfig is set, otherwise flat data
   const data = treeConfig ? visibleRows : rawData;
@@ -291,6 +310,12 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     dispatchAction(normalized, row);
   };
 
+  const handleRowClick = (row: any) => {
+    if (!selectionConfig?.bind) return;
+    writeRuntimeState(runtime, selectionConfig.bind, row);
+    setLocalSelectedRowKey(getRowIdentity(row));
+  };
+
   return (
     <div className="table-block overflow-x-auto" data-testid="table-block">
       <table className="min-w-full divide-y divide-gray-200">
@@ -315,53 +340,64 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
               </td>
             </tr>
           ) : (
-            data.map((row: any, index: number) => (
-              <tr
-                key={row.id || row.pid || index}
-                data-testid={`table-row-${row.id || row.pid || index}`}
-                className="hover:bg-gray-50"
-              >
-                {columns.map((column, colIdx) => (
-                  <td
-                    key={column.field}
-                    className={`px-6 py-4 text-sm text-gray-900 ${
-                      column.ellipsis ? 'truncate' : ''
-                    }`}
-                    style={{
-                      maxWidth: column.ellipsis ? column.width : undefined,
-                      // Tree indent: apply padding to first column
-                      paddingLeft:
-                        treeConfig && colIdx === 0 ? `${(row._depth || 0) * 24 + 24}px` : undefined,
-                    }}
-                  >
-                    {/* Tree expand toggle on first column */}
-                    {treeConfig && colIdx === 0 && (
-                      <span className="mr-1 inline-flex items-center">
-                        {row._hasChildren ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleExpand(row.pid || row.id);
-                            }}
-                            className="flex h-4 w-4 items-center justify-center text-gray-400 hover:text-gray-600"
-                            data-testid={`tree-toggle-${row.pid || row.id}`}
-                          >
-                            {row._expanded ? '▼' : '▶'}
-                          </button>
-                        ) : (
-                          <span className="inline-block h-4 w-4" />
-                        )}
-                      </span>
-                    )}
-                    {renderCellContent(column, row)}
-                  </td>
-                ))}
-                {rowActions.length > 0 && (
-                  <td className="px-6 py-4 text-sm text-gray-900">{renderRowActions(row)}</td>
-                )}
-              </tr>
-            ))
+            data.map((row: any, index: number) => {
+              const rowIdentity = getRowIdentity(row, index);
+              const isSelected =
+                Boolean(effectiveSelectedRowKey) && effectiveSelectedRowKey === rowIdentity;
+
+              return (
+                <tr
+                  key={rowIdentity}
+                  data-testid={`table-row-${rowIdentity}`}
+                  onClick={() => handleRowClick(row)}
+                  className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''} ${
+                    selectionConfig?.bind ? 'cursor-pointer' : ''
+                  }`}
+                >
+                  {columns.map((column, colIdx) => (
+                    <td
+                      key={column.field}
+                      className={`px-6 py-4 text-sm text-gray-900 ${
+                        column.ellipsis ? 'truncate' : ''
+                      }`}
+                      style={{
+                        maxWidth: column.ellipsis ? column.width : undefined,
+                        // Tree indent: apply padding to first column
+                        paddingLeft:
+                          treeConfig && colIdx === 0
+                            ? `${(row._depth || 0) * 24 + 24}px`
+                            : undefined,
+                      }}
+                    >
+                      {/* Tree expand toggle on first column */}
+                      {treeConfig && colIdx === 0 && (
+                        <span className="mr-1 inline-flex items-center">
+                          {row._hasChildren ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpand(row.pid || row.id);
+                              }}
+                              className="flex h-4 w-4 items-center justify-center text-gray-400 hover:text-gray-600"
+                              data-testid={`tree-toggle-${row.pid || row.id}`}
+                            >
+                              {row._expanded ? '▼' : '▶'}
+                            </button>
+                          ) : (
+                            <span className="inline-block h-4 w-4" />
+                          )}
+                        </span>
+                      )}
+                      {renderCellContent(column, row)}
+                    </td>
+                  ))}
+                  {rowActions.length > 0 && (
+                    <td className="px-6 py-4 text-sm text-gray-900">{renderRowActions(row)}</td>
+                  )}
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>

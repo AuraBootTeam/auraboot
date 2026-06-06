@@ -40,6 +40,7 @@ export interface PageSchemaDTO {
   commandCode?: string;
   blocks?: any[];
   layout?: Record<string, any> | null;
+  dataSources?: Record<string, DataSourceConfig> | null;
   profile?: string | null;
   schemaVersion?: number | null;
   metaInfo?: Record<string, unknown> | null;
@@ -104,11 +105,30 @@ function resolveTitle(pageSchemaDTO: PageSchemaDTO): string | Record<string, str
 }
 
 function normalizeDataSourceConfig(dataSource: Record<string, any>): DataSourceConfig {
+  const method =
+    typeof dataSource.method === 'string' ? dataSource.method.toLowerCase() : dataSource.method;
   return {
     ...dataSource,
+    ...(method && { method }),
     ...(dataSource.kind && !dataSource.type && { type: dataSource.kind }),
     ...(dataSource.url && !dataSource.endpoint && { endpoint: dataSource.url }),
   };
+}
+
+function normalizeDataSourceMap(
+  dataSources?: Record<string, DataSourceConfig> | null,
+): Record<string, DataSourceConfig> {
+  if (!dataSources) return {};
+
+  return Object.fromEntries(
+    Object.entries(dataSources).map(([id, source]) => [
+      id,
+      {
+        ...normalizeDataSourceConfig(source as Record<string, any>),
+        id: (source as Record<string, any>).id || id,
+      },
+    ]),
+  );
 }
 
 function normalizeButton(button: ButtonConfig): ButtonConfig {
@@ -392,6 +412,7 @@ export function canonicalizePageSchemaDto(pageSchemaDTO: PageSchemaDTO): Unified
       pageSchemaDTO.blocks || [],
     ),
     layout: pageSchemaDTO.layout || { type: 'stack' },
+    dataSources: pageSchemaDTO.dataSources || undefined,
     profile: pageSchemaDTO.profile || 'admin',
     schemaVersion: pageSchemaDTO.schemaVersion ?? undefined,
     pageKey: pageSchemaDTO.pageKey,
@@ -409,9 +430,9 @@ export function canonicalizePageSchemaDto(pageSchemaDTO: PageSchemaDTO): Unified
   };
 
   const migrated = DslMigrator.migrate(raw);
-  const dataSources: Record<string, DataSourceConfig> = {
-    ...(migrated.dataSources || {}),
-  };
+  const dataSources: Record<string, DataSourceConfig> = normalizeDataSourceMap(
+    migrated.dataSources,
+  );
   const blocks = Array.isArray(migrated.blocks)
     ? migrated.blocks.map((block: BlockConfig) => normalizeBlock(block, dataSources))
     : [];

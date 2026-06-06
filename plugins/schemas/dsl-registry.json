@@ -1,6 +1,6 @@
 {
     "version": "2.0",
-    "exportedAt": "2026-06-05T16:20:23.143889217Z",
+    "exportedAt": "2026-06-06T01:46:57.000000Z",
     "enums": {
         "PluginResourceType": [
             {
@@ -604,6 +604,26 @@
                 "code": "bpm-panel",
                 "label": "BPM panel block",
                 "since": "1.3"
+            },
+            {
+                "code": "metric-strip",
+                "label": "Metric strip block",
+                "since": "1.4"
+            },
+            {
+                "code": "record-inspector",
+                "label": "Record inspector block",
+                "since": "1.4"
+            },
+            {
+                "code": "candidate-list",
+                "label": "Candidate list block",
+                "since": "1.4"
+            },
+            {
+                "code": "workbench-action-bar",
+                "label": "Workbench action bar block",
+                "since": "1.4"
             },
             {
                 "code": "custom",

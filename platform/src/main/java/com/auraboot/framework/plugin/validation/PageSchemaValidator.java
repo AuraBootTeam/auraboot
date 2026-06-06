@@ -373,6 +373,9 @@ public class PageSchemaValidator implements PluginValidator {
     @SuppressWarnings("unchecked")
     private boolean usesExternalDataSource(Map<String, Object> owner) {
         Object dataSource = owner.get("dataSource");
+        if (dataSource instanceof String sourceId) {
+            return !sourceId.isBlank();
+        }
         if (dataSource instanceof Map<?, ?> dataSourceRaw) {
             Map<String, Object> dataSourceMap = (Map<String, Object>) dataSourceRaw;
             String type = stringValue(dataSourceMap.get("type"));

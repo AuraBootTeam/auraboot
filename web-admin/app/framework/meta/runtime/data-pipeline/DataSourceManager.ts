@@ -7,7 +7,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { DataSourceConfig } from '~/framework/meta/schemas/types';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
-import { evaluate, bind } from '~/framework/meta/runtime/expression/evaluator';
+import { bind, evaluate, expressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';
 import type { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state';
 
 /**
@@ -18,6 +18,79 @@ export interface DataSourceState {
   loading: boolean;
   error: Error | null;
   lastFetch: number | null;
+}
+
+const DYNAMIC_LIST_CONTROL_PARAMS = new Set([
+  'page',
+  'pageNum',
+  'current',
+  'size',
+  'pageSize',
+  'sort',
+  'sortField',
+  'sortOrder',
+  'orderBy',
+  'keyword',
+  'search',
+  'filters',
+]);
+
+function normalizeApiParams(endpoint: string, params: Record<string, any>): Record<string, any> {
+  if (!isDynamicListEndpoint(endpoint)) {
+    return params;
+  }
+
+  const passthrough: Record<string, any> = {};
+  const filters = existingFilters(params.filters);
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return;
+    }
+    if (key === 'filters') {
+      return;
+    }
+    if (DYNAMIC_LIST_CONTROL_PARAMS.has(key)) {
+      passthrough[key] = value;
+      return;
+    }
+    if (isLikelyDynamicFieldParam(key)) {
+      filters.push({ fieldName: key, operator: 'EQ', value });
+      return;
+    }
+    passthrough[key] = value;
+  });
+
+  if (filters.length > 0) {
+    passthrough.filters = JSON.stringify(filters);
+  }
+  return passthrough;
+}
+
+function isDynamicListEndpoint(endpoint: string): boolean {
+  return /\/api\/dynamic\/[^/]+\/list(?:$|\?)/.test(endpoint);
+}
+
+function isLikelyDynamicFieldParam(key: string): boolean {
+  return key === 'pid' || key === 'id' || key.includes('_');
+}
+
+function existingFilters(value: unknown): Array<{ fieldName: string; operator: string; value: unknown }> {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return [...value] as Array<{ fieldName: string; operator: string; value: unknown }>;
+  }
+  if (typeof value !== 'string') {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -42,6 +115,11 @@ export class DataSourceManager {
     (this.baseContext as any).__dataSourceManager = this;
   }
 
+  updateContext(context: ExpressionContext): void {
+    this.baseContext = context;
+    (this.baseContext as any).__dataSourceManager = this;
+  }
+
   /**
    * 绑定 ScopedStateManager,用于依赖追踪和上下文刷新
    */
@@ -49,10 +127,34 @@ export class DataSourceManager {
     this.stateManager = stateManager;
     this.scopeId = scopeId;
     this.contextGetter = () => {
-      const ctx = stateManager.getContext(scopeId);
+      const scopedContext = stateManager.getContext(scopeId);
+      const ctx = {
+        ...this.baseContext,
+        ...scopedContext,
+        state: {
+          ...((this.baseContext as any).state || {}),
+          ...(scopedContext.state || {}),
+        },
+        form: {
+          ...((this.baseContext as any).form || {}),
+          ...(scopedContext.form || {}),
+        },
+        record: (scopedContext as any).record ?? (this.baseContext as any).record,
+        row: scopedContext.row ?? (this.baseContext as any).row,
+        $page: {
+          ...((this.baseContext as any).$page || {}),
+          ...((scopedContext as any).$page || {}),
+        },
+      } as ExpressionContext;
       (ctx as any).__dataSourceManager = this;
       return ctx;
     };
+
+    this.dataSources.forEach((config, id) => {
+      if (!config.dependOn || config.dependOn.length === 0) return;
+      this.cleanupDependency(id);
+      this.registerDependencies(id, config);
+    });
   }
 
   private getContext(): ExpressionContext {
@@ -278,6 +380,8 @@ export class DataSourceManager {
         bindResult && typeof bindResult === 'object' && 'path' in bindResult
           ? bindResult.value
           : bindResult;
+    } else if (params && typeof params === 'object' && !Array.isArray(params)) {
+      params = expressionEvaluator.evaluateObject(params, this.getContext());
     }
 
     // 合并额外参数
@@ -286,10 +390,12 @@ export class DataSourceManager {
       ...extraParams,
     };
 
+    const requestParams = normalizeApiParams(config.endpoint, mergedParams);
+
     // 发起请求
     const result = await fetchResult(config.endpoint, {
       method: config.method,
-      params: mergedParams,
+      params: requestParams,
     });
 
     if (!ResultHelper.isSuccess(result)) {
@@ -414,6 +520,28 @@ export class DataSourceManager {
     const ids = Array.isArray(id) ? id : [id];
 
     await Promise.all(ids.map((dsId) => this.fetch(dsId)));
+  }
+
+  async notifyStateChanged(key: string): Promise<void> {
+    const statePath = key.startsWith('state.') ? key : `state.${key}`;
+    const ids: string[] = [];
+
+    this.dataSources.forEach((config, id) => {
+      if (!config.dependOn || config.dependOn.length === 0) {
+        return;
+      }
+
+      const dependsOnStateKey = config.dependOn.some(
+        (dependency) => dependency === statePath || dependency.startsWith(`${statePath}.`),
+      );
+      if (dependsOnStateKey) {
+        ids.push(id);
+      }
+    });
+
+    if (ids.length > 0) {
+      await this.reload(ids);
+    }
   }
 
   /**

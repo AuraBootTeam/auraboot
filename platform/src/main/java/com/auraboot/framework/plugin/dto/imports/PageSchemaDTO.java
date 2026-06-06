@@ -75,6 +75,12 @@ public class PageSchemaDTO {
     private Map<String, Object> layout;
 
     /**
+     * Page-level data source registry for DSL v4 workbench pages. Persisted through
+     * page extension data and exposed as a first-class DTO field for frontend runtime.
+     */
+    private Map<String, Object> dataSources;
+
+    /**
      * Content blocks.
      *
      * <p>Accepts both array form {@code [...]} and single-object form {@code {...}}.

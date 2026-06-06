@@ -109,6 +109,10 @@ export type BlockType =
   | 'selection-info'
   | 'table'
   | 'stat-card'
+  | 'metric-strip'
+  | 'record-inspector'
+  | 'candidate-list'
+  | 'workbench-action-bar'
   | 'chart-card'
   | 'text';
 

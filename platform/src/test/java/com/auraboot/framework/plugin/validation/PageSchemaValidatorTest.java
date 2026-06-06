@@ -4,6 +4,7 @@ import com.auraboot.framework.plugin.dto.imports.FieldDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ModelFieldBindingDTO;
 import com.auraboot.framework.plugin.dto.imports.PageSchemaDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -150,6 +151,69 @@ class PageSchemaValidatorTest {
     }
 
     @Test
+    void namedPageDataSourceTableColumnsAreNotRequiredToBindToPageModel() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        PageSchemaDTO p = page("pe_order_workbench", "detail", "pe_order", List.of(Map.of(
+                "id", "standard_lines",
+                "blockType", "table",
+                "dataSource", "standardLines",
+                "table", Map.of(
+                        "columns", List.of(column("bom_std_material_code", localized("Standard Code")))
+                )
+        )));
+        p.setDataSources(Map.of(
+                "standardLines", Map.of(
+                        "type", "api",
+                        "endpoint", "/api/dynamic/bom_standard_item/list"
+                )
+        ));
+        manifest.setPages(List.of(p));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-FIELD-REF".equals(m.getCode())),
+                () -> "Expected named page dataSource columns to pass field binding validation but got " + messages);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-UNKNOWN-FIELDS".equals(m.getCode())),
+                () -> "Expected top-level dataSources to be a first-class page property but got " + messages);
+    }
+
+    @Test
+    void topLevelDataSourcesDeserializeAsFirstClassPageProperty() throws Exception {
+        PageSchemaDTO page = new ObjectMapper().readValue("""
+                {
+                  "pageKey": "pe_order_workbench",
+                  "kind": "detail",
+                  "schemaVersion": 4,
+                  "modelCode": "pe_order",
+                  "layout": { "type": "stack" },
+                  "dataSources": {
+                    "standardLines": {
+                      "type": "api",
+                      "endpoint": "/api/dynamic/bom_standard_item/list"
+                    }
+                  },
+                  "blocks": [
+                    {
+                      "id": "standard_lines",
+                      "blockType": "table",
+                      "dataSource": "standardLines",
+                      "columns": [
+                        {
+                          "field": "bom_std_material_code",
+                          "label": { "en": "Standard Code", "zh-CN": "Standard Code" }
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """, PageSchemaDTO.class);
+
+        assertTrue(page.getDataSources() != null && page.getDataSources().containsKey("standardLines"),
+                () -> "Expected top-level dataSources to bind to PageSchemaDTO but got " + page);
+        assertTrue(page.getUnknownFields() == null || !page.getUnknownFields().containsKey("dataSources"),
+                () -> "Expected dataSources not to be treated as an unknown field: " + page.getUnknownFields());
+    }
+
+    @Test
     void underscoreActionsColumnIsRecognizedAsActionColumn() {
         PluginManifestExtended manifest = manifestWithOrderModel();
         manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
@@ -258,6 +322,38 @@ class PageSchemaValidatorTest {
         List<PluginValidationMessage> messages = validate(manifest);
         assertTrue(messages.stream().noneMatch(m -> "S-PAGE-BLOCK-TYPE".equals(m.getCode())),
                 () -> "embedded-list should be a recognized block type, got: " + messages);
+    }
+
+    @Test
+    void workbenchBlocksAreRecognizedBlockTypes() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_workbench", "list", "pe_order", List.of(
+                Map.of(
+                        "id", "order_metrics",
+                        "blockType", "metric-strip",
+                        "dataSource", Map.of("type", "namedQuery", "queryCode", "pe_order_metrics"),
+                        "metrics", List.of(Map.of("key", "pending", "label", localized("Pending"), "valueField", "pending_count"))
+                ),
+                Map.of(
+                        "id", "order_inspector",
+                        "blockType", "record-inspector",
+                        "context", "${state.selectedOrder}",
+                        "blocks", List.of(Map.of(
+                                "id", "order_description",
+                                "blockType", "description"
+                        ))
+                ),
+                Map.of(
+                        "id", "order_candidates",
+                        "blockType", "candidate-list",
+                        "dataSource", Map.of("type", "namedQuery", "queryCode", "pe_order_candidates"),
+                        "item", Map.of("keyField", "pid", "titleField", "pe_order_no")
+                )
+        ))));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-BLOCK-TYPE".equals(m.getCode())),
+                () -> "Workbench block types should be recognized, got: " + messages);
     }
 
     @Test
