@@ -827,8 +827,13 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const { pid } = await saveAutomation(page);
     createdPids.push(pid);
 
-    // ENABLED → fire → a run completes.
+    // ENABLED → fire → a run completes. Confirm enabled=true committed before firing.
     await setEnabledViaToggle(page, pid, 'on');
+    await expect
+      .poll(async () => (await (await page.request.get(`/api/automations/${pid}`)).json())?.data?.enabled, {
+        timeout: 10_000,
+      })
+      .toBe(true);
     const firedAt1 = Date.now();
     await fireCreate(page, 100, `NCL-on ${uniqueId()}`);
     const run1 = await pollLogTerminal(page, pid, firedAt1);
@@ -849,8 +854,14 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const newWhileDisabled = [...(await fetchLogIds(page, pid))].filter((id) => !idsBefore.has(id));
     expect(newWhileDisabled, `a disabled automation must NOT run (new logs: ${newWhileDisabled})`).toHaveLength(0);
 
-    // RE-ENABLED → fire → runs again, a distinct newer log.
+    // RE-ENABLED → fire → runs again, a distinct newer log. Confirm enabled=true committed
+    // (the deploy/re-enable can lag the badge) before firing, so the run is not missed.
     await setEnabledViaToggle(page, pid, 'on');
+    await expect
+      .poll(async () => (await (await page.request.get(`/api/automations/${pid}`)).json())?.data?.enabled, {
+        timeout: 10_000,
+      })
+      .toBe(true);
     const firedAt3 = Date.now();
     await fireCreate(page, 100, `NCL-reon ${uniqueId()}`);
     const run3 = await pollLogTerminal(page, pid, firedAt3);
