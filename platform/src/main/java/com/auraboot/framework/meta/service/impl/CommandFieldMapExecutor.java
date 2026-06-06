@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
@@ -144,6 +145,14 @@ public class CommandFieldMapExecutor {
                 columnData.put("pid", UniqueIdGenerator.generate());
                 columnData.putIfAbsent("created_at", now);
                 columnData.putIfAbsent("updated_at", now);
+                // Populate record ownership so row-level data scoping (self/department)
+                // applies to command-created records (gap #7: command path previously
+                // left created_by NULL, making scoped records un-ownable).
+                Long auditUserId = MetaContext.exists() ? MetaContext.getCurrentUserId() : null;
+                if (auditUserId != null) {
+                    columnData.putIfAbsent("created_by", auditUserId);
+                    columnData.putIfAbsent("updated_by", auditUserId);
+                }
                 int inserted = jsonbCols.isEmpty()
                         ? dynamicDataMapper.insert(tableName, columnData)
                         : dynamicDataMapper.insertWithJsonb(tableName, columnData, jsonbCols);
@@ -303,6 +312,13 @@ public class CommandFieldMapExecutor {
             columnData.put("pid", newPid);
             columnData.putIfAbsent("created_at", now);
             columnData.putIfAbsent("updated_at", now);
+            // Populate record ownership so row-level data scoping applies to
+            // command-created records (gap #7).
+            Long auditUserId = MetaContext.exists() ? MetaContext.getCurrentUserId() : null;
+            if (auditUserId != null) {
+                columnData.putIfAbsent("created_by", auditUserId);
+                columnData.putIfAbsent("updated_by", auditUserId);
+            }
             int inserted = jsonbColumns.isEmpty()
                     ? dynamicDataMapper.insert(tableName, columnData)
                     : dynamicDataMapper.insertWithJsonb(tableName, columnData, jsonbColumns);
