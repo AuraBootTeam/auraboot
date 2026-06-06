@@ -99,9 +99,16 @@ SmartEngine-excluded = 3 (start-process, bpm-event, control-delay).
   - `trigger-record-update` (N-TRIGGER-UPDATE, fired by a real update, `04f4e868f`)
   - `action-call-api` (N-CALL-API, real outbound GET, `04f4e868f`)
   - `action-send-webhook` (N-SEND-WEBHOOK, dispatch, `52bee04d7`)
+  - `trigger-field-change` + `trigger-state-change` (N-TRIGGER-FIELD/STATE, field-select, `e50a9a928`)
+  - `trigger-webhook` (N-TRIGGER-WEBHOOK, fired via real inbound POST, `a298c7c5c`)
   - **Already real-UI-covered by the original Layer A:** trigger-record-create, control-condition,
     action-update-record (H1) + sad (S1 required-gate, S2 dangerous-SpEL) + edit-refire (E5).
-  - **Real-UI-driven node types now = 7** of the 15 in-scope.
+  - **Real-UI-driven node types now = 10** of the 15 in-scope (triggers: record-create/record-update/
+    field-change/state-change/webhook; actions: update-record/create-record/call-api/send-webhook;
+    control-condition). Each verified individually; full Layer A suite = **13 cases, 13/13 green**.
+  - ⚠️ **Flake to harden (§2.4 not yet 3× clean):** N-CREATE-RECORD flaked once (1 fail / 2 full
+    runs) under serial load — needs stabilization (per-test isolation / timeout tuning / retries
+    audit) before claiming the suite golden-clean.
 - **Remaining in-scope nodes (P1) — with the config quirks to handle (grounded):**
   - `trigger-field-change` — modelCode(model-select) + **fieldCode(field-select)**: needs the field
     LABEL (e.g. e2et_order_title's displayName). Fire via update of that field.
