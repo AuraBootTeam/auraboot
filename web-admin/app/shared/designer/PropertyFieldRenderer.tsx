@@ -179,6 +179,9 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
           label={label}
           helpText={helpText}
           placeholder={placeholder}
+          dependsOnKey={schema.dependsOn?.field}
+          optionSource={schema.optionSource}
+          dictCode={schema.dictCode}
         />
       );
 

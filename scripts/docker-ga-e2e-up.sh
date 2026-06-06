@@ -15,4 +15,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# Deterministic LLM for the GA E2E stack: route every provider lookup to the
+# StubLlmProvider (canned, no real credentials) so the automation llm-call golden
+# (and any agent/chat E2E that touches the LLM) runs CI-portably without a key.
+# Scoped to this GA E2E entrypoint — dev / prod stacks keep the false default.
+# Override by exporting AGENT_LLM_STUB_MODE=false before invoking this script.
+export AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-true}"
+
 exec scripts/dev/start-isolated.sh --slug=ga-e2e --wait "$@"

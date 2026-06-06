@@ -1125,6 +1125,173 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       ).toBeGreaterThanOrEqual(1);
     }
   });
+
+  // ── action-llm-call: deterministic stub provider (AGENT_LLM_STUB_MODE on the ──────
+  // ga-e2e stack) so the node runs CI-portably with no real key. The stub returns a
+  // fixed "[stub response]" text which the executor stores under the output variable;
+  // a downstream update-record consumes ${llmOutput} so we can assert the LLM output
+  // actually flowed through the run and persisted.
+  test('N-LLM-CALL: drag trigger-record-create→action-llm-call→action-update-record, configure model+prompt+output via panel, save, enable, fire → the LLM (stub) output is captured and persisted (happy) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-LLM-CALL ${uniqueId()}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 70 });
+    const llm = await dragNodeToCanvas(page, 'action-llm-call', { x: 150, y: 200 });
+    const upd = await dragNodeToCanvas(page, 'action-update-record', { x: 150, y: 330 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, llm);
+    await connectEdge(page, llm, upd);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // model is a radix select (option label); prompt + output are text fields.
+    await fillNodeConfig(page, llm, {
+      model: 'Claude Sonnet 4.6',
+      userPromptTemplate: 'Summarise order ${recordId}',
+      outputVariableName: 'llmOutput',
+    });
+    await fillNodeConfig(page, upd, {
+      modelCode: MODEL_LABEL,
+      recordId: '${recordId}',
+      fields: '{"e2et_order_remark":"${llmOutput}"}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+    const firedAt = Date.now();
+    const recordId = await fireCreate(page, 100, `LLM-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-LLM-CALL run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), llm), 'llm-call node completed').toBe(true);
+    // The stub LLM output flowed into the downstream update and persisted on the record.
+    const record = await pollRecordField(page, recordId, 'e2et_order_remark', '[stub response]');
+    expect(record.e2et_order_remark, 'the LLM (stub) output was captured and persisted').toBe('[stub response]');
+  });
+
+  // ── on_state_change toStates filter (golden EDGE + FINDING-4b regression) ─────────
+  // A toStates:['cancelled'] filter only fires on the matching transition. This is the
+  // FINDING-4b regression: the @Async bridge reads the just-committed state via
+  // CommandStateCheckExecutor.readCurrentState; before the tenant fix that read returned
+  // null (TenantLineInterceptor appended an empty-tenant predicate), so toState was null
+  // and the filter never matched. After the fix toState='cancelled' and the filter fires.
+  test('N-TRIGGER-STATE-FILTER: trigger-state-change with toStates=[已取消] fires on cancel but NOT on a non-matching transition (edge / FINDING-4b) @golden', async ({
+    page,
+  }) => {
+    const itemName = `NSF-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-STATE-FILTER ${uniqueId()}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-state-change', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    // modelCode → stateField → toStates (multiselect; option label 已取消 = value cancelled).
+    await fillNodeConfig(page, trigger, {
+      modelCode: MODEL_LABEL,
+      stateField: '订单状态',
+      toStates: ['已取消'],
+    });
+    // A fixed-name child item so existence == "the filtered automation fired".
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields:
+        '{"e2et_order_id":"${recordId}","e2et_item_name":"' +
+        itemName +
+        '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    // The multiselect drove a real value → the toStates filter persisted as the code.
+    // (This is also the regression for the toStates picker fix: the multiselect now
+    // cascades its options from the stateField's dict instead of fetching model fields.)
+    const saved = await readFlowConfig(page, pid);
+    const tnode = saved.flowConfig.nodes.find((n: any) => n.id === trigger);
+    expect(tnode.data.config.toStates, 'toStates filter persisted the selected state code').toContain('cancelled');
+    await enableViaListToggle(page, pid);
+
+    // CONTROL: a plain create (no state transition) must NOT fire a toStates-filtered
+    // on_state_change automation — confirms the filter is actually applied.
+    await fireCreate(page, 100, `NSF-noop ${uniqueId()}`);
+    await page.waitForTimeout(5_000);
+    expect(
+      (await pollItemsByName(page, itemName, 3_000)).length,
+      'a plain create must NOT fire the toStates-filtered on_state_change automation',
+    ).toBe(0);
+
+    // MATCH: cancel an order (draft→cancelled). toState=cancelled = the filter → fires,
+    // creating the child item. Before FINDING-4b the read-back toState was null (the
+    // @Async bridge's tenant-scoped read returned nothing) so the cancelled filter never
+    // matched and this fire was lost.
+    const orderB = await fireCreate(page, 100, `NSF-cancel ${uniqueId()}`);
+    const firedAt = Date.now();
+    await fireCancel(page, orderB);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-STATE-FILTER run: ${JSON.stringify(log)}`).toBe('success');
+    expect(
+      (await pollItemsByName(page, itemName)).length,
+      'the matching cancel transition fired the toStates-filtered automation (FINDING-4b)',
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  /** Poll the e2et_order dynamic list for a record carrying `title`. */
+  async function pollOrdersByTitle(page: Page, title: string, timeoutMs = 100_000): Promise<any[]> {
+    const deadline = Date.now() + timeoutMs;
+    let rows: any[] = [];
+    while (Date.now() < deadline) {
+      const resp = await page.request.get(`/api/dynamic/${MODEL_CODE}/list`, {
+        params: { pageNum: 1, pageSize: 50, keyword: title },
+      });
+      if (resp.ok()) {
+        const data = (await resp.json())?.data;
+        rows = data?.records ?? data?.list ?? data?.content ?? data?.rows ?? (Array.isArray(data) ? data : []);
+        const hit = rows.filter((r) => r?.e2et_order_title === title);
+        if (hit.length) return hit;
+      }
+      await page.waitForTimeout(3_000);
+    }
+    return rows.filter((r) => r?.e2et_order_title === title);
+  }
+
+  // ── trigger-scheduled: real cron fire path (AutomationScheduler polls every 60s) ──
+  // The scheduler evaluates a 6-field Spring cron against the automation's last-trigger
+  // (or created) time on a 60s fixed-delay loop, so an every-second cron is due on the
+  // next tick. The body creates a marked e2et_order; its existence proves the scheduled
+  // automation fired with no triggering record (the scheduler supplies the tenant).
+  test('N-SCHEDULED: drag trigger-scheduled(cron)→action-create-record, save, enable, wait for the scheduler → the cron automation fires and creates a marked record @golden', async ({
+    page,
+  }) => {
+    test.setTimeout(160_000); // the scheduler runs on a 60s fixed-delay loop
+    const marker = `SCHED_${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-SCHEDULED ${uniqueId()}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-scheduled', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    // 6-field Spring cron, every second → due on the next scheduler tick.
+    await fillNodeConfig(page, trigger, { cron: '* * * * * *' });
+    await fillNodeConfig(page, action, {
+      modelCode: MODEL_LABEL,
+      // A scheduled body create-records directly (no command), so it must supply every
+      // required field including e2et_order_status (the create command would default it).
+      fields:
+        '{"e2et_order_title":"' +
+        marker +
+        '","e2et_order_status":"draft","e2et_order_date":"2026-05-30","e2et_order_type":"normal","e2et_order_amount":1}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const tnode = saved.flowConfig.nodes.find((n: any) => n.id === trigger);
+    expect(tnode.data.config.cron, 'cron persisted from the panel').toBe('* * * * * *');
+    await enableViaListToggle(page, pid);
+
+    // Wait for the scheduler (≤ ~60s loop) to fire the cron automation → a marked order exists.
+    const orders = await pollOrdersByTitle(page, marker, 110_000);
+    expect(orders.length, `the scheduled cron automation fired and created the marked order`).toBeGreaterThanOrEqual(1);
+    // A run log was recorded for the scheduled fire.
+    const resp = await page.request.get(`/api/automations/${pid}/logs`, { params: { limit: 5 } });
+    const logs: any[] = (await resp.json())?.data ?? [];
+    expect(logs.length, 'the scheduled fire recorded an automation log').toBeGreaterThanOrEqual(1);
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */
