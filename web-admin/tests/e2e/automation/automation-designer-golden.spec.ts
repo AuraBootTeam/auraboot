@@ -780,6 +780,83 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(node?.status, `call-api node should be failed on 4xx: ${JSON.stringify(statuses)}`).toBe('failed');
     expect(node?.errorMessage ?? '', 'failure should reference the API failure / status').toMatch(/API call failed|40[0-9]|status/i);
   });
+
+  /** Click the list-page toggle for an automation and assert the resulting enabled/disabled state. */
+  async function setEnabledViaToggle(page: Page, pid: string, target: 'on' | 'off'): Promise<void> {
+    await page.goto('/automations');
+    const toggle = page.locator(`[data-testid="btn-toggle-${pid}"]`);
+    await toggle.waitFor({ state: 'visible', timeout: 15_000 });
+    await expect(toggle).toBeEnabled({ timeout: 10_000 });
+    const respStatus = page
+      .waitForResponse((r) => r.url().includes(`/api/automations/${pid}/toggle`) && r.request().method() === 'POST', { timeout: 15_000 })
+      .then((r) => r.status())
+      .catch(() => 0);
+    await toggle.click();
+    const status = await respStatus;
+    if (status && status >= 400) throw new Error(`toggle returned HTTP ${status}`);
+    const badge = page.locator(`[data-testid="status-${pid}"]`);
+    if (target === 'on') await expect(badge).toContainText(/Enabled|已启用/, { timeout: 10_000 });
+    else await expect(badge).toContainText(/Disabled|已禁用|已停用|未启用/, { timeout: 10_000 });
+  }
+
+  /** The set of AutomationLog ids currently recorded for an automation. */
+  async function fetchLogIds(page: Page, pid: string): Promise<Set<number>> {
+    const resp = await page.request.get(`/api/automations/${pid}/logs`, { params: { limit: 50 } });
+    if (!resp.ok()) return new Set();
+    const rows: any[] = (await resp.json())?.data ?? [];
+    return new Set(rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n)));
+  }
+
+  // ── golden CORNER path (real UI) — lifecycle: enable / disable / re-enable ──────
+  test('N-CORNER-LIFECYCLE: enable→fire runs, disable→fire does NOT run, re-enable→fire runs (lifecycle via real UI toggle) @golden', async ({
+    page,
+  }) => {
+    const itemName = `NCL-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CORNER-LIFECYCLE ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+
+    // ENABLED → fire → a run completes.
+    await setEnabledViaToggle(page, pid, 'on');
+    const firedAt1 = Date.now();
+    await fireCreate(page, 100, `NCL-on ${uniqueId()}`);
+    const run1 = await pollLogTerminal(page, pid, firedAt1);
+    expect(String(run1!.status).toLowerCase(), `enabled fire should run: ${JSON.stringify(run1)}`).toBe('success');
+
+    // DISABLED → fire → NO *new* run row appears. Confirm enabled=false committed (the badge
+    // can flip a beat early), then compare the log-id SET before/after — a time-window check
+    // would alias the just-prior enabled run (the slack), so we diff ids (cf. Layer B E6).
+    await setEnabledViaToggle(page, pid, 'off');
+    await expect
+      .poll(async () => (await (await page.request.get(`/api/automations/${pid}`)).json())?.data?.enabled, {
+        timeout: 10_000,
+      })
+      .toBe(false);
+    const idsBefore = await fetchLogIds(page, pid);
+    await fireCreate(page, 100, `NCL-off ${uniqueId()}`);
+    await page.waitForTimeout(6_000); // give the engine a chance to (not) run
+    const newWhileDisabled = [...(await fetchLogIds(page, pid))].filter((id) => !idsBefore.has(id));
+    expect(newWhileDisabled, `a disabled automation must NOT run (new logs: ${newWhileDisabled})`).toHaveLength(0);
+
+    // RE-ENABLED → fire → runs again, a distinct newer log.
+    await setEnabledViaToggle(page, pid, 'on');
+    const firedAt3 = Date.now();
+    await fireCreate(page, 100, `NCL-reon ${uniqueId()}`);
+    const run3 = await pollLogTerminal(page, pid, firedAt3);
+    expect(String(run3!.status).toLowerCase(), `re-enabled fire should run: ${JSON.stringify(run3)}`).toBe('success');
+    expect(run3!.id, 're-enabled run is a distinct newer log row').not.toBe(run1!.id);
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */
