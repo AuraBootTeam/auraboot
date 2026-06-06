@@ -857,6 +857,43 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(String(run3!.status).toLowerCase(), `re-enabled fire should run: ${JSON.stringify(run3)}`).toBe('success');
     expect(run3!.id, 're-enabled run is a distinct newer log row').not.toBe(run1!.id);
   });
+
+  // ── golden EDGE path (real UI) — condition boundary value ───────────────────────
+  test('N-CONDITION-EDGE: build trigger→condition(>1000)→true/false actions, fire at the EXACT boundary (amount=1000) → the FALSE branch runs, not TRUE (edge) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CONDITION-EDGE ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 70 });
+    const condition = await dragNodeToCanvas(page, 'control-condition', { x: 150, y: 210 });
+    const actHigh = await dragNodeToCanvas(page, 'action-update-record', { x: 30, y: 360 });
+    const actLow = await dragNodeToCanvas(page, 'action-update-record', { x: 240, y: 360 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, condition);
+    const eTrue = await connectEdge(page, condition, actHigh, 'true');
+    const eFalse = await connectEdge(page, condition, actLow, 'false');
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, condition, { expression: "record['e2et_order_amount'] > 1000" });
+    await fillNodeConfig(page, actHigh, { modelCode: MODEL_LABEL, recordId: '${recordId}', fields: '{"e2et_order_title":"EDGE_TRUE"}' });
+    await fillNodeConfig(page, actLow, { modelCode: MODEL_LABEL, recordId: '${recordId}', fields: '{"e2et_order_title":"EDGE_FALSE"}' });
+    await setEdgeCondition(page, eTrue, "record['e2et_order_amount'] > 1000");
+    await setEdgeCondition(page, eFalse, "record['e2et_order_amount'] <= 1000");
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // Fire EXACTLY at the boundary: amount=1000. 1000 > 1000 is FALSE → the FALSE branch runs.
+    const firedAt = Date.now();
+    const recordId = await fireCreate(page, 1000, `N-EDGE-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-CONDITION-EDGE run: ${JSON.stringify(log)}`).toBe('success');
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(statuses.find((s) => s.nodeId === actLow)?.status, 'FALSE branch runs at the boundary').toBe('completed');
+    expect(statuses.find((s) => s.nodeId === actHigh), 'TRUE branch must NOT run at amount=1000 (not >1000)').toBeUndefined();
+    const record = await pollRecordField(page, recordId, 'e2et_order_title', 'EDGE_FALSE');
+    expect(record.e2et_order_title, 'boundary value took the FALSE branch').toBe('EDGE_FALSE');
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */
