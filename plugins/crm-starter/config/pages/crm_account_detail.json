@@ -2,6 +2,7 @@
   "pageKey": "crm_account_detail",
   "modelCode": "crm_account",
   "kind": "detail",
+  "schemaVersion": 4,
   "layout": {
     "type": "stack"
   },

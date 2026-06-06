@@ -4,6 +4,7 @@
   "name:en": "Employee Detail",
   "modelCode": "thr_employee",
   "kind": "detail",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "员工详情",
     "en": "Employee Detail"

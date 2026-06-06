@@ -3,6 +3,7 @@
   "name:zh-CN": "客户列表",
   "name:en": "Accounts",
   "kind": "list",
+  "schemaVersion": 4,
   "modelCode": "tcrm_account",
   "title": {
     "zh-CN": "客户列表",

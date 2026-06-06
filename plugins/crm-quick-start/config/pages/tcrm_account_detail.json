@@ -3,6 +3,7 @@
   "name:zh-CN": "客户详情",
   "name:en": "Account Detail",
   "kind": "detail",
+  "schemaVersion": 4,
   "modelCode": "tcrm_account",
   "title": {
     "zh-CN": "客户详情",

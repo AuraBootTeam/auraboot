@@ -2,6 +2,7 @@
   "pageKey": "crm_opportunity_list",
   "modelCode": "crm_opportunity",
   "kind": "list",
+  "schemaVersion": 4,
   "layout": {
     "type": "stack"
   },

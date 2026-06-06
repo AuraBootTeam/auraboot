@@ -369,6 +369,91 @@ class PageSchemaValidatorTest {
                 () -> "Expected button content to satisfy business label but got " + messages);
     }
 
+    // ===== Phase B: v4 structural import-format checks (hard-fail candidates) =====
+
+    @Test
+    void pageWithoutSchemaVersionIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        PageSchemaDTO p = page("pe_order_list", "list", "pe_order", validTable());
+        p.setSchemaVersion(null);
+        manifest.setPages(List.of(p));
+        assertHasError(validate(manifest), "S-PAGE-VERSION", "pages[0].schemaVersion");
+    }
+
+    @Test
+    void pageWithLegacySchemaVersionIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        PageSchemaDTO p = page("pe_order_list", "list", "pe_order", validTable());
+        p.setSchemaVersion(2);
+        manifest.setPages(List.of(p));
+        assertHasError(validate(manifest), "S-PAGE-VERSION", "pages[0].schemaVersion");
+    }
+
+    @Test
+    void pageWithSchemaVersion4HasNoVersionError() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", validTable())));
+        assertNoError(validate(manifest), "S-PAGE-VERSION");
+    }
+
+    @Test
+    void dashboardKindIsRejectedForImport() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_dash", "dashboard", "pe_order", validTable())));
+        assertHasError(validate(manifest), "S-PAGE-KIND-UNKNOWN", "pages[0].kind");
+    }
+
+    @Test
+    void compositeKindIsRejectedForImport() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_comp", "composite", "pe_order", validTable())));
+        assertHasError(validate(manifest), "S-PAGE-KIND-UNKNOWN", "pages[0].kind");
+    }
+
+    @Test
+    void layoutTypeOutsideGridStackIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        PageSchemaDTO p = page("pe_order_list", "list", "pe_order", validTable());
+        p.setLayout(Map.of("type", "flex"));
+        manifest.setPages(List.of(p));
+        assertHasError(validate(manifest), "S-PAGE-LAYOUT-TYPE", "pages[0].layout.type");
+    }
+
+    @Test
+    void layoutTypeGridIsAccepted() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        PageSchemaDTO p = page("pe_order_list", "list", "pe_order", validTable());
+        p.setLayout(Map.of("type", "grid", "cols", 12));
+        manifest.setPages(List.of(p));
+        assertNoError(validate(manifest), "S-PAGE-LAYOUT-TYPE");
+    }
+
+    @Test
+    void blockColExceedingGridWidthIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        PageSchemaDTO p = page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "layout", Map.of("col", 10, "colSpan", 6),
+                "columns", List.of(column("pe_order_no", localized("Order No"))))));
+        p.setLayout(Map.of("type", "grid", "cols", 12));
+        manifest.setPages(List.of(p));
+        assertHasError(validate(manifest), "S-PAGE-BLOCK-COL", "pages[0].blocks[0].layout.col");
+    }
+
+    @Test
+    void blockColWithinGridWidthIsAccepted() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        PageSchemaDTO p = page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "layout", Map.of("col", 0, "colSpan", 8),
+                "columns", List.of(column("pe_order_no", localized("Order No"))))));
+        p.setLayout(Map.of("type", "grid", "cols", 12));
+        manifest.setPages(List.of(p));
+        assertNoError(validate(manifest), "S-PAGE-BLOCK-COL");
+    }
+
     private List<PluginValidationMessage> validate(PluginManifestExtended manifest) {
         PluginValidationContext ctx = PluginValidationContext.builder()
                 .pluginId("com.test.plugin")
@@ -431,9 +516,22 @@ class PageSchemaValidatorTest {
         page.setPageKey(pageKey);
         page.setKind(kind);
         page.setModelCode(modelCode);
-        page.setLayout(Map.of("type", kind));
+        page.setSchemaVersion(4);
+        page.setLayout(Map.of("type", "stack"));
         page.setBlocks(blocks);
         return page;
+    }
+
+    private List<Object> validTable() {
+        return List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(column("pe_order_no", localized("Order No")))));
+    }
+
+    private void assertNoError(List<PluginValidationMessage> messages, String code) {
+        assertTrue(messages.stream().noneMatch(m -> code.equals(m.getCode())),
+                () -> "Expected no " + code + " but got " + messages);
     }
 
     private Map<String, Object> column(String field, Object label) {

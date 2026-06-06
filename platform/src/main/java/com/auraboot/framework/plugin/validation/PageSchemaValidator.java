@@ -34,7 +34,11 @@ import static com.auraboot.framework.plugin.validation.PluginValidationMessage.e
 @Component
 public class PageSchemaValidator implements PluginValidator {
 
-    private static final Set<String> VALID_KINDS = DslRegistry.PageKind.codes();
+    // Import accepts only the three production-renderable page kinds. dashboard/composite
+    // are valid PageKind values for the V3 designer but have no plugin-page renderer, so
+    // they are rejected at import time (DSL V4 Phase B). This validator is import-only.
+    private static final Set<String> VALID_KINDS = Set.of("list", "form", "detail");
+    private static final Set<String> VALID_LAYOUT_TYPES = Set.of("grid", "stack");
     private static final Set<String> KNOWN_BLOCK_TYPES = DslRegistry.BlockType.codes();
     private static final Set<String> FORBIDDEN_LEGACY_TOP_LEVEL_FIELDS = Set.of("dslSchema", "pageType");
     private static final Set<String> FORM_FIELD_BLOCK_TYPES = Set.of("form-section");
@@ -77,7 +81,16 @@ public class PageSchemaValidator implements PluginValidator {
             } else if (!VALID_KINDS.contains(kind)) {
                 messages.add(error("S-PAGE-KIND-UNKNOWN", category(), path + ".kind",
                         "Page '" + pageKey + "' has unsupported kind '" + kind + "'. " +
-                                "Supported kinds: " + VALID_KINDS + "."));
+                                "Importable kinds: " + VALID_KINDS + " (dashboard/composite have no plugin-page renderer)."));
+            }
+
+            // schemaVersion must be explicitly declared as the current v4 page format.
+            Integer schemaVersion = page.getSchemaVersion();
+            if (schemaVersion == null || schemaVersion != DslRegistry.PAGE_SCHEMA_CURRENT_VERSION) {
+                messages.add(error("S-PAGE-VERSION", category(), path + ".schemaVersion",
+                        "Page '" + pageKey + "' must declare schemaVersion=" + DslRegistry.PAGE_SCHEMA_CURRENT_VERSION
+                                + " (the current v4 page format) but was " + schemaVersion + ". "
+                                + "Re-author/migrate the page to v4 before import."));
             }
 
             validateLegacyTopLevelFields(page, path, pageKey, messages);
@@ -87,6 +100,13 @@ public class PageSchemaValidator implements PluginValidator {
                 messages.add(error("S-PAGE-LAYOUT", category(), path + ".layout",
                         "Page '" + pageKey + "' is missing required top-level field 'layout'. " +
                                 "Platform only accepts the latest V2 flat page format: kind/layout/blocks."));
+            } else {
+                Object layoutType = layout.get("type");
+                if (layoutType == null || !VALID_LAYOUT_TYPES.contains(layoutType.toString())) {
+                    messages.add(error("S-PAGE-LAYOUT-TYPE", category(), path + ".layout.type",
+                            "Page '" + pageKey + "' has unsupported layout.type '" + layoutType + "'. " +
+                                    "v4 pages must use layout.type 'grid' or 'stack'."));
+                }
             }
 
             // Validate blocks (on DTO directly)
@@ -96,6 +116,8 @@ public class PageSchemaValidator implements PluginValidator {
                         "Page '" + pageKey + "' is missing required top-level field 'blocks' " +
                                 "or the array is empty. Platform only accepts the latest V2 flat page format."));
             } else {
+                int cols = (layout != null && layout.get("cols") instanceof Number colsNum)
+                        ? colsNum.intValue() : 12;
                 for (int j = 0; j < blocks.size(); j++) {
                     if (blocks.get(j) instanceof Map<?, ?> block) {
                         Object blockType = block.get("blockType");
@@ -104,6 +126,18 @@ public class PageSchemaValidator implements PluginValidator {
                                     path + ".blocks[" + j + "].blockType",
                                     "Page '" + pageKey + "' has unknown blockType: '" +
                                             blockType + "'"));
+                        }
+                        // v4 grid blocks must fit within the page grid width (col + colSpan <= cols).
+                        if (block.get("layout") instanceof Map<?, ?> bl && bl.get("col") instanceof Number colNum) {
+                            int col = colNum.intValue();
+                            int span = bl.get("colSpan") instanceof Number spanNum ? spanNum.intValue() : 0;
+                            if (col >= cols || (col + span) > cols) {
+                                messages.add(error("S-PAGE-BLOCK-COL", category(),
+                                        path + ".blocks[" + j + "].layout.col",
+                                        "Page '" + pageKey + "' block #" + j + " has col=" + col + " colSpan=" + span
+                                                + " exceeding grid width cols=" + cols
+                                                + ". v4 grid blocks must satisfy col + colSpan <= cols."));
+                            }
                         }
                         validateBlockContract(page, path, pageKey, j, (Map<String, Object>) block,
                                 modelIndex, messages);

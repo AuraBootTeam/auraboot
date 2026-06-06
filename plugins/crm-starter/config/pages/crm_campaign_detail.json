@@ -2,6 +2,7 @@
   "pageKey": "crm_campaign_detail",
   "modelCode": "crm_campaign",
   "kind": "detail",
+  "schemaVersion": 4,
   "layout": {
     "type": "stack"
   },

@@ -3,6 +3,7 @@
   "name:zh-CN": "线索详情",
   "name:en": "Lead Detail",
   "kind": "detail",
+  "schemaVersion": 4,
   "modelCode": "tcrm_lead",
   "title": {
     "zh-CN": "线索详情",

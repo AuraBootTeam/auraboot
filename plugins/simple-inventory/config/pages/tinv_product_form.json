@@ -4,6 +4,7 @@
   "name:en": "Product Form",
   "modelCode": "tinv_product",
   "kind": "form",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "产品表单",
     "en": "Product Form"

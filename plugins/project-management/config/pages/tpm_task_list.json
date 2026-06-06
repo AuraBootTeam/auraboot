@@ -4,6 +4,7 @@
   "name:en": "Tasks",
   "modelCode": "tpm_task",
   "kind": "list",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "任务列表",
     "en": "Tasks"

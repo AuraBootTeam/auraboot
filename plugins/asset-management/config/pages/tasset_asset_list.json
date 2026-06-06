@@ -3,6 +3,7 @@
   "name:zh-CN": "资产列表",
   "name:en": "Assets",
   "kind": "list",
+  "schemaVersion": 4,
   "modelCode": "tasset_asset",
   "title": {
     "zh-CN": "资产列表",

@@ -4,6 +4,7 @@
   "name:en": "Leave Requests",
   "modelCode": "thr_leave_request",
   "kind": "list",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "请假列表",
     "en": "Leave Requests"
