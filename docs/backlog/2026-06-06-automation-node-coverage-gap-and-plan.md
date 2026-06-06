@@ -109,9 +109,16 @@ SmartEngine-excluded = 3 (start-process, bpm-event, control-delay).
   - ⚠️ **Flake to harden (§2.4 not yet 3× clean):** N-CREATE-RECORD flaked once (1 fail / 2 full
     runs) under serial load — needs stabilization (per-test isolation / timeout tuning / retries
     audit) before claiming the suite golden-clean.
-- **P2 (started) — golden sad paths:** N-CALL-API-SAD (`21a93a02d`) — call-api to a 404 → node
-  fails, surfaced on the node. (Original Layer A already has S1 required-gate + S2 dangerous-SpEL.)
-  Remaining: systematic sad/edge/corner per node.
+- **P2 (in progress) — golden 4-path now all represented via real UI (not yet systematic per-node):**
+  happy ×10 nodes · **sad ×3** (S1 required-gate, S2 dangerous-SpEL, N-CALL-API-SAD 4xx) ·
+  **corner ×1** (N-CORNER-LIFECYCLE enable/disable/re-enable via real toggle, `5d34524dd`) ·
+  **edge ×1** (N-CONDITION-EDGE boundary amount=1000 → FALSE branch, `3c67a8614`). Full Layer A
+  suite = **16 cases**. Remaining: extend sad/edge/corner to every in-scope node.
+- ⚠️ **Suite NOT yet 3× flake-free (§2.4 golden bar unmet):** full-suite runs = [1 fail, 13/13,
+  16/16, 1 fail]. The two flaky cases are the heaviest UI-interaction ones — N-CREATE-RECORD
+  (drag under serial load) and N-CORNER-LIFECYCLE (double-toggle/enabled-state timing). Each
+  passes in isolation; the suite needs synchronization hardening (poll backend state between
+  UI steps; avoid time-window aliasing) before the golden-clean claim holds.
 - **2 confirmed findings (deferred — real fixes, not just tests):**
   - **FINDING-8 (send-notification config↔executor type mismatch):** the configSchema types
     `recipients` as `expression` (a string) but `SendNotificationExecutor` reads
