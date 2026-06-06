@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.pf4j;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.plugin.extension.KnowledgeBaseAccessor;
 import com.auraboot.framework.rag.service.KbTextIngestService;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,21 @@ public class KnowledgeBaseAccessorImpl implements KnowledgeBaseAccessor {
     @Override
     public String ingestText(long tenantId, String kbPid, String sourceType, String sourceId,
                              String docName, String text, Map<String, Object> metadata) {
-        return ingestService.ingestText(tenantId, kbPid, sourceType, sourceId, docName, text);
+        // Plugin callers (e.g. the crawler CrawledDocumentUpsertConsumer) invoke this from a
+        // Kafka consumer thread that has NO MetaContext, but KbTextIngestService → KnowledgeBaseService
+        // runs tenant-scoped DB queries that require it ("MetaContext not initialized for current
+        // thread"). Establish a system tenant context from the tenantId we were given, and clear it
+        // afterward — but only if we created it, so request-thread callers keep their own context.
+        boolean owns = !MetaContext.exists();
+        if (owns) {
+            MetaContext.setSystemTenantContext(tenantId);
+        }
+        try {
+            return ingestService.ingestText(tenantId, kbPid, sourceType, sourceId, docName, text);
+        } finally {
+            if (owns) {
+                MetaContext.clear();
+            }
+        }
     }
 }
