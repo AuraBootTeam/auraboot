@@ -4,6 +4,7 @@ import {
   normalizePayloadValue,
   parseValidationSummaryMessages,
   resolveFormButtonContent,
+  shouldBypassFormSubmit,
 } from '../FormPageContent';
 import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 
@@ -177,5 +178,49 @@ describe('normalizePayloadValue', () => {
     expect(
       parseValidationSummaryMessages('结束日期不能早于开始日期; 请完善开始/结束日期与时段，系统才能计算请假天数'),
     ).toEqual(['结束日期不能早于开始日期', '请完善开始/结束日期与时段，系统才能计算请假天数']);
+  });
+
+  it('keeps cancel and navigation buttons out of the form submit path', () => {
+    expect(
+      shouldBypassFormSubmit(
+        {
+          code: 'cancel',
+          action: { type: 'navigate', to: 'bom_supplier_part_list' },
+        },
+        'navigate',
+      ),
+    ).toBe(true);
+
+    expect(
+      shouldBypassFormSubmit(
+        {
+          code: 'cancel',
+          action: 'cancel',
+        },
+        'cancel',
+      ),
+    ).toBe(true);
+
+    expect(
+      shouldBypassFormSubmit(
+        {
+          code: 'cancel',
+          commandCode: 'bom:create_supplier_part',
+          action: { type: 'command', command: 'bom:create_supplier_part' },
+        },
+        'command',
+      ),
+    ).toBe(false);
+
+    expect(
+      shouldBypassFormSubmit(
+        {
+          code: 'save',
+          commandCode: 'bom:create_supplier_part',
+          action: { type: 'command', command: 'bom:create_supplier_part' },
+        },
+        'command',
+      ),
+    ).toBe(false);
   });
 });

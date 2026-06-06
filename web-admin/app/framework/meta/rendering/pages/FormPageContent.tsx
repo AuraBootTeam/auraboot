@@ -246,6 +246,26 @@ function resolveActionType(action: unknown): string {
   return '';
 }
 
+export function shouldBypassFormSubmit(
+  button: { code?: string; commandCode?: string; action?: unknown } | null | undefined,
+  actionType: string,
+): boolean {
+  const normalizedActionType = String(actionType || '').toLowerCase();
+  if (['navigate', 'cancel', 'back', 'close'].includes(normalizedActionType)) {
+    return true;
+  }
+
+  const action = button?.action;
+  const actionCommand =
+    action && typeof action === 'object' ? (action as Record<string, unknown>).command : undefined;
+  const buttonCode = String(button?.code || '').toLowerCase();
+  return (
+    ['cancel', 'back', 'close'].includes(buttonCode) &&
+    !button?.commandCode &&
+    typeof actionCommand !== 'string'
+  );
+}
+
 /**
  * Resolve the redirect target after a successful form submit.
  *
@@ -941,6 +961,12 @@ export function FormPageContent(props: PageContentProps) {
       // L1 SDK: delegate to external submit handler when provided
       if (onSubmitOverride) {
         const actionType = resolveActionType(button.action);
+        if (shouldBypassFormSubmit(button, actionType)) {
+          setFieldErrors({});
+          setSummaryErrors([]);
+          setError(null);
+          return handleAction(button as any, formData as any);
+        }
         const shouldValidate =
           ['submit', 'create', 'update', 'edit', 'save', 'command'].includes(
             actionType.toLowerCase(),
@@ -985,6 +1011,12 @@ export function FormPageContent(props: PageContentProps) {
         ...button,
         action: effectiveAction,
       };
+      if (shouldBypassFormSubmit(effectiveButton, effectiveActionType)) {
+        setFieldErrors({});
+        setSummaryErrors([]);
+        setError(null);
+        return handleAction(effectiveButton as any, actionRecord as any);
+      }
       // When action is an object like {type: "command", command: "xx:update_xx"},
       // extract the command code from it as well.
       const actionCommandCode =
