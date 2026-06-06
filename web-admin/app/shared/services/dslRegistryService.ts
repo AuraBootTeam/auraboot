@@ -141,6 +141,10 @@ const FALLBACK_REGISTRY: DslRegistryData = {
       { code: 'sub-table', label: 'Sub Table' },
       { code: 'monthly-grid', label: 'Monthly Grid' },
       { code: 'stat-card', label: 'Stat Card' },
+      { code: 'metric-strip', label: 'Metric Strip' },
+      { code: 'record-inspector', label: 'Record Inspector' },
+      { code: 'candidate-list', label: 'Candidate List' },
+      { code: 'workbench-action-bar', label: 'Workbench Action Bar' },
       { code: 'custom', label: 'Custom' },
     ],
     ChartType: [

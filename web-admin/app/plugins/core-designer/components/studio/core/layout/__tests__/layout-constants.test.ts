@@ -5,6 +5,13 @@ describe('DEFAULT_COL_SPAN_BY_TYPE', () => {
   it('returns 4 for stat-card', () => {
     expect(getDefaultColSpan('stat-card')).toBe(4);
   });
+
+  it('returns workbench-oriented defaults for workbench blocks', () => {
+    expect(getDefaultColSpan('metric-strip')).toBe(12);
+    expect(getDefaultColSpan('record-inspector')).toBe(8);
+    expect(getDefaultColSpan('candidate-list')).toBe(4);
+    expect(getDefaultColSpan('workbench-action-bar')).toBe(12);
+  });
   it('returns 6 for chart', () => {
     expect(getDefaultColSpan('chart')).toBe(6);
   });

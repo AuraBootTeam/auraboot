@@ -75,6 +75,13 @@ public class PageSchemaUpdateRequest extends AbstractUpdateRequest {
     private Map<String, Object> layout;
 
     /**
+     * Page-level data source registry used by DSL v4 pages. Stored in extension
+     * data so the page schema table does not need a dedicated column.
+     */
+    @JsonProperty("dataSources")
+    private Map<String, Object> dataSources;
+
+    /**
      * Ordered list of page blocks.
      */
     @JsonProperty("blocks")

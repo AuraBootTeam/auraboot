@@ -50,6 +50,22 @@ export interface UsePageDataSourcesResult {
   subscribe: (id: string, callback: (state: DataSourceState) => void) => () => void;
 }
 
+function createContextSignature(context: ExpressionContext): string {
+  try {
+    return JSON.stringify({
+      locale: context.locale,
+      form: context.form,
+      record: (context as any).record,
+      row: context.row,
+      state: context.state,
+      args: context.args,
+      $page: (context as any).$page,
+    });
+  } catch {
+    return String(Date.now());
+  }
+}
+
 /**
  * Page-level DataSource Manager Hook
  *
@@ -75,6 +91,8 @@ export function usePageDataSources(options: UsePageDataSourcesOptions): UsePageD
   const managerRef = useRef<DataSourceManager | null>(null);
   const [, forceUpdate] = useState({});
   const dataSourcesStringRef = useRef<string>('');
+  const contextSignatureRef = useRef<string | null>(null);
+  const dataSourceUnsubscribersRef = useRef<Array<() => void>>([]);
 
   // 初始化 DataSourceManager
   if (!managerRef.current) {
@@ -82,9 +100,14 @@ export function usePageDataSources(options: UsePageDataSourcesOptions): UsePageD
   }
 
   const manager = managerRef.current;
+  manager.updateContext(options.context);
   if (options.context && !(options.context as any).__dataSourceManager) {
     (options.context as any).__dataSourceManager = manager;
   }
+  const contextSignature = useMemo(
+    () => createContextSignature(options.context),
+    [options.context],
+  );
 
   /**
    * 自动合并 dataSources
@@ -122,17 +145,52 @@ export function usePageDataSources(options: UsePageDataSourcesOptions): UsePageD
     dataSourcesStringRef.current = dataSourcesString;
 
     // 清除旧的数据源
+    dataSourceUnsubscribersRef.current.forEach((unsubscribe) => unsubscribe());
+    dataSourceUnsubscribersRef.current = [];
     manager.clear();
 
     // 注册新的数据源
     Object.entries(mergedDataSources).forEach(([id, config]) => {
       manager.register(id, config);
+      dataSourceUnsubscribersRef.current.push(
+        manager.subscribe(id, () => {
+          forceUpdate({});
+        }),
+      );
     });
   }, [mergedDataSources, manager]);
+
+  useEffect(() => {
+    if (!manager || !mergedDataSources || Object.keys(mergedDataSources).length === 0) {
+      contextSignatureRef.current = contextSignature;
+      return;
+    }
+
+    if (contextSignatureRef.current === null) {
+      contextSignatureRef.current = contextSignature;
+      return;
+    }
+
+    if (contextSignatureRef.current === contextSignature) {
+      return;
+    }
+
+    contextSignatureRef.current = contextSignature;
+
+    const reloadIds = Object.entries(mergedDataSources)
+      .filter(([, config]) => !config.pagination && config.autoFetch !== false)
+      .map(([id]) => id);
+
+    if (reloadIds.length > 0) {
+      void manager.reload(reloadIds);
+    }
+  }, [contextSignature, manager, mergedDataSources]);
 
   // 清理
   useEffect(() => {
     return () => {
+      dataSourceUnsubscribersRef.current.forEach((unsubscribe) => unsubscribe());
+      dataSourceUnsubscribersRef.current = [];
       manager.clear();
     };
   }, []);

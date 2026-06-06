@@ -61,6 +61,9 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
     global: {},
     state: {},
   };
+  const updateState = vi.fn((scopeId: string, key: string, value: any) => {
+    context.state[key] = value;
+  });
   const stub = {
     getContext: () => context,
     getEvaluator: () => ({
@@ -73,6 +76,12 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
       has: () => false,
       register: vi.fn(),
     }),
+    getStateManager: () => ({
+      updateState,
+      getContext: () => context,
+    }),
+    getScopeId: () => 'scope-1',
+    __updateState: updateState,
     ...overrides,
   };
   return stub as unknown as SchemaRuntime;
@@ -208,6 +217,25 @@ describe('TableBlockRenderer', () => {
     });
   }
 
+  it('renders rows from table-adaptor data source records', () => {
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => ({ records: [baseRow], total: 1, current: 1, pageSize: 10 }),
+        has: () => true,
+        register: vi.fn(),
+      }),
+    });
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      columns: baseColumns,
+    };
+
+    const { getByText } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    expect(getByText('Alpha')).toBeInTheDocument();
+  });
+
   it('dispatches new-format row action with the row as record', () => {
     const runtime = makeRuntimeWithData();
     const block = {
@@ -256,5 +284,50 @@ describe('TableBlockRenderer', () => {
     expect(passedButton.code).toBe('delete');
     expect(passedButton.events?.onClick?.handler).toBe('deleteRow');
     expect(passedRecord).toEqual(baseRow);
+  });
+
+  it('writes clicked row into runtime state when table.selection.bind is configured', () => {
+    const runtime = makeRuntimeWithData() as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: { mode: 'single', bind: 'selectedLine' },
+        columns: baseColumns,
+      },
+    };
+
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(getByTestId('table-row-row-1'));
+
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', baseRow);
+  });
+
+  it('uses configured rowKey for row identity and highlights the clicked row immediately', () => {
+    const row = { lineNo: 'L-001', name: 'Beta' };
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => [row],
+        has: () => true,
+        register: vi.fn(),
+      }),
+    }) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'lineNo',
+        selection: { mode: 'single', bind: 'selectedLine' },
+        columns: baseColumns,
+      },
+    };
+
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    const tableRow = getByTestId('table-row-L-001');
+    fireEvent.click(tableRow);
+
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', row);
+    expect(tableRow.className).toContain('bg-blue-50');
   });
 });

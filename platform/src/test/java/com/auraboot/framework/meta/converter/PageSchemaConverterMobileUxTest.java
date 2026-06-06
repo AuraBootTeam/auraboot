@@ -77,6 +77,64 @@ class PageSchemaConverterMobileUxTest {
         assertThat(dto.getMobileUx()).containsKey("list");
     }
 
+    @Test
+    void exposesExtensionDataSourcesAsTopLevelDtoField() {
+        PageSchemaConverter converter = buildConverter();
+
+        ExtensionBean extension = new ExtensionBean();
+        extension.setExtension(Map.of(
+                "dataSources", Map.of(
+                        "standardLines", Map.of(
+                                "type", "api",
+                                "endpoint", "/api/dynamic/bom_standard_item/list"
+                        )
+                )
+        ));
+
+        PageSchema entity = new PageSchema();
+        entity.setPageKey("bom_workbench_detail");
+        entity.setKind("detail");
+        entity.setLayout("{}");
+        entity.setBlocks("[]");
+        entity.setExtension(extension);
+
+        com.auraboot.framework.meta.dto.PageSchemaDTO dto = converter.toDTO(entity);
+
+        assertThat(dto.getExtension()).containsKey("dataSources");
+        assertThat(dto.getDataSources()).isNotNull();
+        assertThat(dto.getDataSources()).containsKey("standardLines");
+    }
+
+    @Test
+    void createAndUpdateRequestsPersistTopLevelDataSourcesThroughExtension() {
+        PageSchemaConverter converter = buildConverter();
+        Map<String, Object> dataSources = Map.of(
+                "standardLines", Map.of("type", "api", "endpoint", "/api/dynamic/bom_standard_item/list")
+        );
+
+        PageSchemaCreateRequest createRequest = new PageSchemaCreateRequest();
+        createRequest.setPageKey("bom_workbench_detail");
+        createRequest.setName("BOM Workbench");
+        createRequest.setTitle("BOM Workbench");
+        createRequest.setKind("detail");
+        createRequest.setBlocks(List.of());
+        createRequest.setDataSources(dataSources);
+
+        PageSchema created = converter.toEntity(createRequest);
+
+        assertThat(converter.extensionBeanToMap(created.getExtension()))
+                .containsEntry("dataSources", dataSources);
+
+        PageSchema existing = new PageSchema();
+        PageSchemaUpdateRequest updateRequest = new PageSchemaUpdateRequest();
+        updateRequest.setDataSources(dataSources);
+
+        converter.updateEntity(existing, updateRequest);
+
+        assertThat(converter.extensionBeanToMap(existing.getExtension()))
+                .containsEntry("dataSources", dataSources);
+    }
+
     private PageSchemaConverter buildConverter() {
         PageSchemaConverter converter = Mappers.getMapper(PageSchemaConverter.class);
         ReflectionTestUtils.setField(converter, "objectMapper", new ObjectMapper());

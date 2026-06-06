@@ -8,7 +8,11 @@ function collectPluginPageFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
 
   return readdirSync(dir).flatMap((entry) => {
+    if (entry === 'node_modules' || entry === '.git') return [];
+
     const path = resolve(dir, entry);
+    if (!existsSync(path)) return [];
+
     const stat = statSync(path);
     if (stat.isDirectory()) {
       return collectPluginPageFiles(path);
@@ -143,6 +147,54 @@ describe('canonicalizePageSchemaDto', () => {
       type: 'namedQuery',
       queryCode: 'legacy_summary',
       endpoint: '/api/datasource/list',
+    });
+    expect(validateStructure(schema)).toEqual([]);
+  });
+
+  it('preserves top-level page dataSources from DSL v4 page DTOs', () => {
+    const schema = canonicalizePageSchemaDto({
+      pageKey: 'workbench_detail',
+      modelCode: 'workbench_task',
+      modelCategory: null,
+      kind: 'detail',
+      layout: { type: 'stack' },
+      dataSources: {
+        taskSummary: {
+          type: 'api',
+          endpoint: '/api/dynamic/workbench_task/list',
+          method: 'GET' as any,
+          adaptor: 'table',
+          autoFetch: true,
+          params: {
+            pid: '${form.pid}',
+          },
+        },
+      },
+      blocks: [
+        {
+          id: 'metrics',
+          blockType: 'metric-strip',
+          dataSource: 'taskSummary',
+          metrics: [
+            {
+              id: 'green',
+              label: 'Green',
+              valueField: 'green_count',
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(schema.dataSources?.taskSummary).toMatchObject({
+      type: 'api',
+      endpoint: '/api/dynamic/workbench_task/list',
+      method: 'get',
+      adaptor: 'table',
+      autoFetch: true,
+      params: {
+        pid: '${form.pid}',
+      },
     });
     expect(validateStructure(schema)).toEqual([]);
   });

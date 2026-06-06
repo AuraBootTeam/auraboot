@@ -54,6 +54,7 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "schemaVersion", source = "schemaVersion")
     @Mapping(target = "modelCategory", ignore = true) // enriched at query time
     @Mapping(target = "extension", source = "extension", qualifiedByName = "extensionBeanToMap")
+    @Mapping(target = "dataSources", ignore = true)
     @Mapping(target = "mobileUx", ignore = true)
     @Mapping(target = "deletedFlag", source = "deletedFlag")
     @Mapping(target = "createdAt", source = "createdAt")
@@ -61,8 +62,17 @@ public abstract class PageSchemaConverter {
     public abstract PageSchemaDTO toDTO(PageSchema entity);
 
     @AfterMapping
-    protected void exposeMobileUx(@MappingTarget PageSchemaDTO dto) {
-        if (dto.getExtension() == null || dto.getMobileUx() != null) {
+    protected void exposeExtensionTopLevelFields(@MappingTarget PageSchemaDTO dto) {
+        if (dto.getExtension() == null) {
+            return;
+        }
+        Object dataSources = dto.getExtension().get("dataSources");
+        if (dataSources instanceof Map<?, ?> map && dto.getDataSources() == null) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> typed = (Map<String, Object>) map;
+            dto.setDataSources(typed);
+        }
+        if (dto.getMobileUx() != null) {
             return;
         }
         Object mobileUx = dto.getExtension().get("mobileUx");
@@ -104,6 +114,22 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "updatedAt", ignore = true)
     public abstract PageSchema toEntity(PageSchemaCreateRequest request);
 
+    @AfterMapping
+    protected void mergeCreateTopLevelExtensionFields(PageSchemaCreateRequest request,
+                                                      @MappingTarget PageSchema entity) {
+        if (request == null || request.getDataSources() == null) {
+            return;
+        }
+        Map<String, Object> extension = extensionBeanToMap(entity.getExtension());
+        if (extension == null) {
+            extension = new HashMap<>();
+        } else {
+            extension = new HashMap<>(extension);
+        }
+        extension.put("dataSources", request.getDataSources());
+        entity.setExtension(extensionConverter.toBean(extension));
+    }
+
     // ── UpdateRequest → Entity (partial) ──────────────────────────
 
     @Mapping(target = "id", ignore = true)
@@ -136,6 +162,22 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "updatedAt", ignore = true)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     public abstract void updateEntity(@MappingTarget PageSchema target, PageSchemaUpdateRequest request);
+
+    @AfterMapping
+    protected void mergeUpdateTopLevelExtensionFields(PageSchemaUpdateRequest request,
+                                                      @MappingTarget PageSchema entity) {
+        if (request == null || request.getDataSources() == null) {
+            return;
+        }
+        Map<String, Object> extension = extensionBeanToMap(entity.getExtension());
+        if (extension == null) {
+            extension = new HashMap<>();
+        } else {
+            extension = new HashMap<>(extension);
+        }
+        extension.put("dataSources", request.getDataSources());
+        entity.setExtension(extensionConverter.toBean(extension));
+    }
 
     // ── Entity list → DTO list ────────────────────────────────────
 

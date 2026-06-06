@@ -25,6 +25,10 @@ export const BLOCK_TYPES = [
   'sub-table',
   'monthly-grid',
   'stat-card',
+  'metric-strip',
+  'record-inspector',
+  'candidate-list',
+  'workbench-action-bar',
   'custom',
 ] as const;
 

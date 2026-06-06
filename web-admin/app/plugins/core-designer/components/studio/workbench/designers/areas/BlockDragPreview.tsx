@@ -23,6 +23,10 @@ const BLOCK_INFO: Record<BlockType, { name: string; icon: string }> = {
   'selection-info': { name: 'Selection Info', icon: '☑️' },
   'table': { name: 'Data Table', icon: '📊' },
   'stat-card': { name: 'Stat Card', icon: '📈' },
+  'metric-strip': { name: 'Metric Strip', icon: 'KPI' },
+  'record-inspector': { name: 'Record Inspector', icon: 'ROW' },
+  'candidate-list': { name: 'Candidate List', icon: 'ALT' },
+  'workbench-action-bar': { name: 'Workbench Action Bar', icon: 'ACT' },
   'chart-card': { name: 'Chart Card', icon: '📉' },
   text: { name: 'Text Content', icon: '📃' },
 };

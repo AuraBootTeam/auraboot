@@ -235,6 +235,7 @@ export function DetailPageContent(props: PageContentProps) {
   const { schema, tableName, recordId, token } = props;
   const location = useLocation();
   const routerNavigate = useRouterNavigate();
+  const recordModelCode = schema?.modelCode || tableName;
 
   // Client-side record + model field loading (parallelized)
   const [recordData, setRecordData] = useState<RecordData>({});
@@ -267,7 +268,7 @@ export function DetailPageContent(props: PageContentProps) {
     }
 
     async function loadRecord(): Promise<void> {
-      const endpoint = buildDetailRecordEndpoint(tableName, recordId!);
+      const endpoint = buildDetailRecordEndpoint(recordModelCode, recordId!);
       const result = await fetchResult<RecordData>(endpoint, {
         method: 'get',
         token: token || undefined,
@@ -290,18 +291,18 @@ export function DetailPageContent(props: PageContentProps) {
     return () => {
       cancelled = true;
     };
-  }, [recordId, tableName, schema?.modelCode, token]);
+  }, [recordId, tableName, recordModelCode, schema?.modelCode, token]);
 
   // Stable callback to reload the parent record (used after sub-table command execution)
   const reloadRecord = useCallback(() => {
     if (!recordId || !tableName) return;
-    const endpoint = buildDetailRecordEndpoint(tableName, recordId);
+    const endpoint = buildDetailRecordEndpoint(recordModelCode, recordId);
     fetchResult<RecordData>(endpoint, { method: 'get', token: token || undefined })
       .then((result) => {
         if (ResultHelper.isSuccess(result) && result.data) setRecordData(result.data);
       })
       .catch(() => {});
-  }, [recordId, tableName, token]);
+  }, [recordId, tableName, recordModelCode, token]);
 
   // Enrich a page-schema field with model field metadata (dictCode, component, dataType)
   const enrichField = useCallback(
@@ -349,6 +350,8 @@ export function DetailPageContent(props: PageContentProps) {
     showToast,
     additionalContext: {
       record: recordData,
+      row: recordData,
+      form: recordData,
       $page: {
         kind: (schema as any)?.kind,
         modelCode: (schema as any)?.modelCode,

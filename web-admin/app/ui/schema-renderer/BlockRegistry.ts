@@ -107,6 +107,30 @@ export function initBlockRegistry(): void {
   BlockRegistry.register('stat-card', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/StatCardBlockRenderer'), 'StatCardBlockRenderer'),
   });
+  BlockRegistry.register('metric-strip', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/MetricStripBlockRenderer'),
+      'MetricStripBlockRenderer',
+    ),
+  });
+  BlockRegistry.register('record-inspector', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/RecordInspectorBlockRenderer'),
+      'RecordInspectorBlockRenderer',
+    ),
+  });
+  BlockRegistry.register('candidate-list', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/CandidateListBlockRenderer'),
+      'CandidateListBlockRenderer',
+    ),
+  });
+  BlockRegistry.register('workbench-action-bar', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/WorkbenchActionBarBlockRenderer'),
+      'WorkbenchActionBarBlockRenderer',
+    ),
+  });
   BlockRegistry.register('rich-text', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/RichTextBlockRenderer'), 'RichTextBlockRenderer'),
   });

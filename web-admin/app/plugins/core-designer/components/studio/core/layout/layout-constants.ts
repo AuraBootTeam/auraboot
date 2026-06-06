@@ -8,12 +8,16 @@ export const MIN_ROW_SPAN = 1;
 
 export const DEFAULT_COL_SPAN_BY_TYPE: Record<string, number> = {
   'stat-card': 4,
+  'candidate-list': 4,
+  'workbench-action-bar': 12,
   'chart': 6,
   'form-section': 6,
   'rich-text': 6,
   'detail-section': 6,
+  'record-inspector': 8,
   'table': 12,
   'sub-table': 12,
+  'metric-strip': 12,
   'toolbar': 12,
   'form-buttons': 12,
   'filters': 12,

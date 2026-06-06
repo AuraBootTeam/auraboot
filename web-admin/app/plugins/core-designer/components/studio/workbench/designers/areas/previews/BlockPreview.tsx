@@ -179,6 +179,18 @@ const BlockContent: React.FC<{
     case 'stat-card':
       return <StatCardPreview block={block} />;
 
+    case 'metric-strip':
+      return <MetricStripPreview block={block} />;
+
+    case 'record-inspector':
+      return <RecordInspectorPreview block={block} />;
+
+    case 'candidate-list':
+      return <CandidateListPreview block={block} />;
+
+    case 'workbench-action-bar':
+      return <WorkbenchActionBarPreview block={block} />;
+
     case 'chart-card':
       return <ChartCardPreview block={block} />;
 
@@ -229,6 +241,95 @@ const StatCardPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
       </div>
       <div className="text-2xl font-semibold text-gray-900">--</div>
       <div className="mt-1 text-xs text-green-600">+0%</div>
+    </div>
+  );
+};
+
+/**
+ * Metric strip preview
+ */
+const MetricStripPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const { locale } = useI18n();
+  return (
+    <div className="p-3">
+      <div className="mb-2 text-sm font-medium text-gray-900">
+        {resolveLocalizedText(block.title, locale) || 'Metric Strip'}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {['Total', 'Pending', 'Risk'].map((label) => (
+          <div key={label} className="rounded border border-gray-200 bg-white p-2">
+            <div className="text-[10px] text-gray-500">{label}</div>
+            <div className="mt-1 text-lg font-semibold text-gray-900">--</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Record inspector preview
+ */
+const RecordInspectorPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const { locale } = useI18n();
+  return (
+    <div className="p-3">
+      <div className="mb-2 text-sm font-medium text-gray-900">
+        {resolveLocalizedText(block.title, locale) || 'Record Inspector'}
+      </div>
+      <div className="rounded border border-blue-100 bg-blue-50 p-3">
+        <div className="h-2 w-2/3 rounded bg-blue-200" />
+        <div className="mt-2 h-2 w-1/2 rounded bg-blue-100" />
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="h-8 rounded bg-white" />
+          <div className="h-8 rounded bg-white" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Candidate list preview
+ */
+const CandidateListPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const { locale } = useI18n();
+  return (
+    <div className="p-3">
+      <div className="mb-2 text-sm font-medium text-gray-900">
+        {resolveLocalizedText(block.title, locale) || 'Candidate List'}
+      </div>
+      <div className="space-y-2">
+        {[0, 1, 2].map((index) => (
+          <div
+            key={index}
+            className={`rounded border p-2 ${
+              index === 0 ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'
+            }`}
+          >
+            <div className="h-2 w-2/3 rounded bg-gray-300" />
+            <div className="mt-2 h-2 w-1/2 rounded bg-gray-100" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Workbench action bar preview
+ */
+const WorkbenchActionBarPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const { locale } = useI18n();
+  return (
+    <div className="p-3">
+      <div className="mb-2 text-sm font-medium text-gray-900">
+        {resolveLocalizedText(block.title, locale) || 'Workbench Action Bar'}
+      </div>
+      <div className="flex justify-end gap-2 rounded border border-gray-200 bg-white p-2">
+        <div className="h-8 w-20 rounded bg-gray-100" />
+        <div className="h-8 w-24 rounded bg-blue-500" />
+      </div>
     </div>
   );
 };

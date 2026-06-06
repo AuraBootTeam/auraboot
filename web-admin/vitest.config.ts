@@ -21,6 +21,7 @@ export default defineConfig({
     // Concurrency settings - keep memory usage predictable.
     pool: 'threads',
     isolate: true,
+    minWorkers: 1,
     maxWorkers: 1,
     // 性能监控
     logHeapUsage: true,

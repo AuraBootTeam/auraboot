@@ -56,6 +56,10 @@ const BLOCK_INFO: Record<string, { name: string; icon: string }> = {
   'selection-info': { name: 'Selection Info', icon: '☑️' },
   'table': { name: 'Data Table', icon: '📊' },
   'stat-card': { name: 'Stat Card', icon: '📈' },
+  'metric-strip': { name: 'Metric Strip', icon: 'KPI' },
+  'record-inspector': { name: 'Record Inspector', icon: 'ROW' },
+  'candidate-list': { name: 'Candidate List', icon: 'ALT' },
+  'workbench-action-bar': { name: 'Workbench Action Bar', icon: 'ACT' },
   'chart-card': { name: 'Chart Card', icon: '📉' },
   text: { name: 'Text Content', icon: '📃' },
 };
@@ -69,6 +73,10 @@ const BLOCK_INFO_ZH: Record<string, string> = {
   'selection-info': '选择信息',
   table: '数据表格',
   'stat-card': '统计卡片',
+  'metric-strip': '指标条',
+  'record-inspector': '记录检查器',
+  'candidate-list': '候选列表',
+  'workbench-action-bar': '工作台操作栏',
   'chart-card': '图表卡片',
   text: '文本内容',
 };

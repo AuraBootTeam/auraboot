@@ -78,6 +78,12 @@ public class PageSchemaDTO extends AbstractResponse {
     private Map<String, Object> layout;
 
     /**
+     * Page-level data source registry used by DSL v4 workbench/composite pages.
+     */
+    @JsonProperty("dataSources")
+    private Map<String, Object> dataSources;
+
+    /**
      * Ordered list of page blocks (toolbar, filters, table, form-section, etc.).
      */
     @JsonProperty("blocks")

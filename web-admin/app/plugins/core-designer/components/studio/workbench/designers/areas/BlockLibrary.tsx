@@ -25,7 +25,7 @@ type LibraryTab = 'blocks' | 'components';
 /**
  * Block category types
  */
-type BlockCategory = 'form' | 'display' | 'layout' | 'chart' | 'all';
+type BlockCategory = 'form' | 'display' | 'layout' | 'chart' | 'workbench' | 'all';
 
 /**
  * Category display configuration
@@ -36,6 +36,7 @@ const CATEGORY_CONFIG: Record<BlockCategory, { label: Record<'zh-CN' | 'en-US', 
   display: { label: { 'zh-CN': '展示', 'en-US': 'Display' }, icon: '📊' },
   layout: { label: { 'zh-CN': '布局', 'en-US': 'Layout' }, icon: '📐' },
   chart: { label: { 'zh-CN': '图表', 'en-US': 'Chart' }, icon: '📈' },
+  workbench: { label: { 'zh-CN': '工作台', 'en-US': 'Workbench' }, icon: 'WB' },
 };
 
 /**
@@ -141,6 +142,42 @@ const BLOCK_TYPES: BlockTypeInfo[] = [
     keywords: ['stat', 'metric', 'kpi', '统计', '指标'],
   },
   {
+    type: 'metric-strip',
+    name: '指标条',
+    icon: 'KPI',
+    description: '横向指标与筛选入口',
+    availableIn: ['list', 'form'],
+    category: 'workbench',
+    keywords: ['metric', 'strip', 'kpi', 'filter'],
+  },
+  {
+    type: 'record-inspector',
+    name: '记录检查器',
+    icon: 'ROW',
+    description: '随选中记录联动的详情面板',
+    availableIn: ['list', 'form'],
+    category: 'workbench',
+    keywords: ['record', 'inspector', 'detail', 'selection'],
+  },
+  {
+    type: 'candidate-list',
+    name: '候选列表',
+    icon: 'ALT',
+    description: '点选候选项并写入状态',
+    availableIn: ['list', 'form'],
+    category: 'workbench',
+    keywords: ['candidate', 'choice', 'selection', 'review'],
+  },
+  {
+    type: 'workbench-action-bar',
+    name: '工作台操作栏',
+    icon: 'ACT',
+    description: '工作台顶部或局部操作按钮组',
+    availableIn: ['list', 'form'],
+    category: 'workbench',
+    keywords: ['action', 'command', 'download', 'reload', 'export'],
+  },
+  {
     type: 'chart-card',
     name: '图表卡片',
     icon: '📉',
@@ -161,6 +198,10 @@ const BLOCK_TYPE_EN: Record<BlockType, { name: string; description: string }> = 
   toolbar: { name: 'Toolbar Buttons', description: 'Action button group' },
   'selection-info': { name: 'Selection Info', description: 'Show selected item information' },
   'stat-card': { name: 'Stat Card', description: 'Metric summary card' },
+  'metric-strip': { name: 'Metric Strip', description: 'Horizontal metrics and filter entry' },
+  'record-inspector': { name: 'Record Inspector', description: 'Selection-bound detail panel' },
+  'candidate-list': { name: 'Candidate List', description: 'Selectable candidate records' },
+  'workbench-action-bar': { name: 'Workbench Action Bar', description: 'Workbench action group' },
   'chart-card': { name: 'Chart Card', description: 'Chart visualization' },
 };
 
@@ -368,6 +409,7 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKin
       display: [],
       layout: [],
       chart: [],
+      workbench: [],
     };
 
     filteredBlocks.forEach((block) => {
