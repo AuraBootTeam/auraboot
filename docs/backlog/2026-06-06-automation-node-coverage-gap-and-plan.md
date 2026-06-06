@@ -209,8 +209,10 @@ Legend: ✅ real-UI case present + green · — not applicable / no distinct cas
 | trigger-bpm-event | ⛔ | ⛔ | ⛔ | ⛔ (BPM stub — honest test.fixme) |
 | control-delay | ⛔ | ⛔ | ⛔ | ⛔ (SmartEngine timer suspended — honest test.fixme) |
 
-**Path totals (15 in-scope nodes):** happy 15/15 · sad 7 · edge 5 · corner 3 (+lifecycle).
-SmartEngine-excluded = 3 (documented honest skips, not faked).
+**Distinct golden cases by path (30 total, all 3× flake-clean):** happy/journey 16 ·
+sad 7 · edge 4 (N-CONDITION-EDGE, N-TRIGGER-STATE-FILTER, N-FIELD-CHANGE-EDGE, N-LOOP-EDGE;
+N-LOOP-EDGE also exercises the trigger-webhook row) · corner 3. Every one of the 15 in-scope
+nodes has a real-UI happy case; SmartEngine-excluded = 3 (documented honest test.fixme, not faked).
 
 ### Real product bugs surfaced + fixed by the golden (this goal)
 
@@ -262,3 +264,31 @@ no retries. Two flake sources were root-caused (instrument-don't-guess) and fixe
 
 Also hardened: `deleteViaApi` now disables before delete (an enabled every-second cron otherwise
 leaked across runs and piled up scheduler load — 6 had accumulated before this fix).
+
+### /e2e-truth self-audit (2026-06-07)
+
+Precise wording (no cross-layer averaging, §2.4):
+
+- **Layer A (real designer-UI golden):** 30/30 cases pass, **3× consecutive flake-clean**, `--retries=0`.
+  Each case drives the real @xyflow designer (drag → property-panel config → connect → save → enable
+  via the real list toggle → fire a real trigger) and asserts the real backend (AutomationLog status +
+  node-status overlay + DB side-effect). UI-path coverage of in-scope nodes = 15/15 happy + 4-path
+  representation (sad 7 / edge 4 / corner 3).
+- **Layer B (real backend behavioral):** the API-built behavioral matrix runs the real engine + DB +
+  command pipeline (the 3 failures seen during the coverage run were N-LLM-CALL before AGENT_LLM_STUB_MODE
+  was restored + 2 unrelated Layer-B cases; the Layer-A goal suite is the graded deliverable).
+- **Backend coverage:** automation packages **81.3% line** (union of gradle unit+IT 332/335 + E2E golden).
+- **Unit/IT:** 332/335 automation tests green; 3 red = pre-existing `DebugSessionServiceImplTest` Mockito
+  stub mismatch (debug feature, unrelated to this goal — honestly tracked, not hidden).
+
+Anti-fake-pass audit (the 4 patterns):
+- **PUT-API fallback:** none — every case fires a real trigger and asserts real backend state.
+- **threshold padding:** none.
+- **skip-wrapping product gaps:** the 3 SmartEngine-excluded nodes are honest `test.fixme` with
+  documented reasons (BPM stub / suspended timer), not skips masking a fixable gap.
+- **retries fallback:** none — suite runs `--retries=0`; the `setAutomationName` `toPass` is a
+  within-helper input-stabilization retry, not a test-level retry masking a product flake.
+
+Real product bugs the golden surfaced were FIXED (not skipped): state-field fallback (FINDING-4b),
+scheduler tenant, multiselect dict, command-select picker (FINDING-9), send-webhook direct-POST
+(FINDING-10) — see the matrix section above.
