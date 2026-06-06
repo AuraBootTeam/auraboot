@@ -936,6 +936,37 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(String(log!.status).toLowerCase(), `N-SEND-NOTIFICATION run: ${JSON.stringify(log)}`).toBe('success');
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'send-notification node completed').toBe(true);
   });
+
+  // ── golden SAD path (real UI) — update-record targeting a nonexistent field fails ──
+  test('N-UPDATE-RECORD-SAD: drag trigger-record-create→action-update-record with a nonexistent field, save, enable, fire → the node FAILS at runtime with an error (sad) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-UPDATE-RECORD-SAD ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-update-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: MODEL_LABEL,
+      recordId: '${recordId}',
+      fields: '{"e2et_order_nonexistent_zzz":"boom"}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-UPD-SAD-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(['failed', 'partial_success'], `N-UPDATE-RECORD-SAD must fail (bad field): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    const node = statuses.find((s) => s.nodeId === action);
+    expect(node?.status, `update-record node should be failed: ${JSON.stringify(statuses)}`).toBe('failed');
+    expect(node?.errorMessage ?? '', 'a failed node should carry an error message').toBeTruthy();
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */
