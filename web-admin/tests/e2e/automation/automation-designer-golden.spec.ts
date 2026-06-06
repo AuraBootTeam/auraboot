@@ -27,6 +27,8 @@
  *
  * @since Phase 1 (Layer A)
  */
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 import {
@@ -620,30 +622,88 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'call-api node completed (real outbound GET <400)').toBe(true);
   });
 
-  test('N-SEND-WEBHOOK: drag trigger-record-create→action-send-webhook, configure url+payload via panel, save, enable, fire → node completes (dispatch) @golden', async ({
+  // ── send-webhook REAL OUTBOUND (GAP-F): the node POSTs the payload directly to the ──
+  // configured url (golden FINDING-10 — the executor previously ignored `url` and fanned
+  // out to webhook subscriptions, so a designer-built send-webhook never hit the URL the
+  // user typed). We stand up an in-process host receiver (reachable from the docker backend
+  // via host.docker.internal) and assert the outbound POST actually LANDED with the payload.
+  test('N-SEND-WEBHOOK-OUTBOUND: drag trigger-record-create→action-send-webhook, configure url+payload, fire → the outbound POST actually lands at a host receiver with the payload (happy) @golden', async ({
     page,
   }) => {
-    await openNewDesigner(page);
-    await setAutomationName(page, `N-SEND-WEBHOOK ${uniqueId()}`);
+    const marker = `WBK_${uniqueId()}`;
+    const receiver = await startWebhookReceiver();
+    try {
+      await openNewDesigner(page);
+      await setAutomationName(page, `N-SEND-WEBHOOK-OUTBOUND ${uniqueId()}`);
+      const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+      const action = await dragNodeToCanvas(page, 'action-send-webhook', { x: 150, y: 240 });
+      await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+      await connectEdge(page, trigger, action);
+      await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+      await fillNodeConfig(page, action, {
+        url: `http://host.docker.internal:${receiver.port}/hook`,
+        // ${recordId} must survive into the saved config (the executor resolves it); ${marker}
+        // is interpolated by the test here so the receiver can key on it.
+        payload: `{"event":"e2e.designer.webhook","marker":"${marker}","orderId":"\${recordId}"}`,
+      });
+      const { pid } = await saveAutomation(page);
+      createdPids.push(pid);
+      await enableViaListToggle(page, pid);
 
-    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
-    const action = await dragNodeToCanvas(page, 'action-send-webhook', { x: 150, y: 240 });
-    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
-    await connectEdge(page, trigger, action);
-    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
-    await fillNodeConfig(page, action, {
-      url: 'http://host.docker.internal:6444/actuator/health',
-      payload: '{"event":"e2e.designer.webhook","orderId":"${recordId}"}',
-    });
-    const { pid } = await saveAutomation(page);
-    createdPids.push(pid);
-    await enableViaListToggle(page, pid);
+      const firedAt = Date.now();
+      await fireCreate(page, 100, `WBK-order ${uniqueId()}`);
+      const log = await pollLogTerminal(page, pid, firedAt);
+      expect(String(log!.status).toLowerCase(), `N-SEND-WEBHOOK-OUTBOUND run: ${JSON.stringify(log)}`).toBe('success');
+      expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'send-webhook node completed').toBe(true);
+      // The outbound POST actually landed at the host receiver carrying the payload.
+      await expect
+        .poll(() => receiver.received.some((r) => r.body.includes(marker)), { timeout: 15_000 })
+        .toBe(true);
+      const hit = receiver.received.find((r) => r.body.includes(marker))!;
+      expect(hit.method, 'webhook delivered as a POST').toBe('POST');
+      expect(hit.path, 'POST landed on the configured /hook path').toContain('/hook');
+      const parsed = JSON.parse(hit.body);
+      expect(parsed.event, 'payload event field delivered').toBe('e2e.designer.webhook');
+      expect(parsed.orderId, '${recordId} resolved in the delivered payload').toBeTruthy();
+    } finally {
+      await receiver.close();
+    }
+  });
 
-    const firedAt = Date.now();
-    await fireCreate(page, 100, `N-SEND-WEBHOOK-order ${uniqueId()}`);
-    const log = await pollLogTerminal(page, pid, firedAt);
-    expect(String(log!.status).toLowerCase(), `N-SEND-WEBHOOK run: ${JSON.stringify(log)}`).toBe('success');
-    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'send-webhook node completed (dispatch)').toBe(true);
+  // ── send-webhook SAD (real UI): the receiver returns 500 → the node FAILS with the status ──
+  test('N-SEND-WEBHOOK-SAD: send-webhook to an endpoint returning 500 → the node FAILS with the upstream status, and the POST still physically reached the receiver (sad) @golden', async ({
+    page,
+  }) => {
+    const receiver = await startWebhookReceiver();
+    try {
+      await openNewDesigner(page);
+      await setAutomationName(page, `N-SEND-WEBHOOK-SAD ${uniqueId()}`);
+      const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+      const action = await dragNodeToCanvas(page, 'action-send-webhook', { x: 150, y: 240 });
+      await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+      await connectEdge(page, trigger, action);
+      await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+      // The /fail path on the receiver returns HTTP 500 → SendWebhookExecutor throws on >=400.
+      await fillNodeConfig(page, action, {
+        url: `http://host.docker.internal:${receiver.port}/fail`,
+        payload: '{"event":"e2e.designer.webhook.sad","orderId":"${recordId}"}',
+      });
+      const { pid } = await saveAutomation(page);
+      createdPids.push(pid);
+      await enableViaListToggle(page, pid);
+
+      const firedAt = Date.now();
+      await fireCreate(page, 100, `WBK-SAD-order ${uniqueId()}`);
+      const log = await pollLogTerminal(page, pid, firedAt);
+      expect(['failed', 'partial_success'], `N-SEND-WEBHOOK-SAD must fail (500): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
+      const node = (await pollNodeStatuses(page, log!.id, 30_000)).find((s) => s.nodeId === action);
+      expect(node?.status, 'send-webhook node should be failed on 500').toBe('failed');
+      expect(node?.errorMessage ?? '', 'failure references the upstream status').toMatch(/Webhook POST failed|500|status/i);
+      // The POST physically reached the receiver even though it 500'd (proves real outbound).
+      expect(receiver.received.length, 'the POST reached the receiver before the 500').toBeGreaterThanOrEqual(1);
+    } finally {
+      await receiver.close();
+    }
   });
 
   /** Fire a state_transition command (cancel: draft→cancelled). Fires on_state_change. */
@@ -1469,4 +1529,44 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
 /** True if the given node reached 'completed' in the polled statuses. */
 function statusesNodeCompleted(statuses: { nodeId: string; status: string }[], nodeId: string): boolean {
   return statuses.find((s) => s.nodeId === nodeId)?.status === 'completed';
+}
+
+interface WebhookReceiver {
+  /** The ephemeral host port the docker backend reaches via host.docker.internal. */
+  port: number;
+  /** Every request the receiver captured (proves the outbound POST physically landed). */
+  received: { method: string; path: string; body: string }[];
+  close: () => Promise<void>;
+}
+
+/**
+ * Stand up an in-process HTTP receiver bound to 0.0.0.0 on an ephemeral port. The
+ * docker backend reaches it via host.docker.internal:<port> (the same path
+ * N-CALL-API uses to hit host.docker.internal:6444). POST /hook → 200, POST /fail
+ * → 500; every request is recorded so a golden case can assert the real outbound
+ * webhook actually landed with its payload (GAP-F).
+ */
+async function startWebhookReceiver(): Promise<WebhookReceiver> {
+  const received: { method: string; path: string; body: string }[] = [];
+  const server = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk) => (body += chunk));
+    req.on('end', () => {
+      received.push({ method: req.method || '', path: req.url || '', body });
+      if ((req.url || '').includes('/fail')) {
+        res.statusCode = 500;
+        res.end('{"error":"forced failure"}');
+      } else {
+        res.statusCode = 200;
+        res.end('{"ok":true}');
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '0.0.0.0', () => resolve()));
+  const port = (server.address() as AddressInfo).port;
+  return {
+    port,
+    received,
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
 }
