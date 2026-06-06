@@ -116,11 +116,16 @@ SmartEngine-excluded = 3 (start-process, bpm-event, control-delay).
   **corner ×1** (N-CORNER-LIFECYCLE enable/disable/re-enable via real toggle, `5d34524dd`) ·
   **edge ×1** (N-CONDITION-EDGE boundary amount=1000 → FALSE branch, `3c67a8614`). Full Layer A
   suite = **16 cases**. Remaining: extend sad/edge/corner to every in-scope node.
-- ⚠️ **Suite NOT yet 3× flake-free (§2.4 golden bar unmet):** full-suite runs = [1 fail, 13/13,
-  16/16, 1 fail]. The two flaky cases are the heaviest UI-interaction ones — N-CREATE-RECORD
-  (drag under serial load) and N-CORNER-LIFECYCLE (double-toggle/enabled-state timing). Each
-  passes in isolation; the suite needs synchronization hardening (poll backend state between
-  UI steps; avoid time-window aliasing) before the golden-clean claim holds.
+- ⚠️ **Suite NOT yet 3× flake-free (§2.4 golden bar unmet) — partially hardened:**
+  - N-CORNER-LIFECYCLE **hardened** (`81a3f0d28`): poll the API enabled-state to the expected
+    value after each enable/disable/re-enable toggle before firing (the badge flips before
+    /toggle commits). Now 3× green in isolation.
+  - N-CREATE-RECORD: 3× green in isolation; its flake only appears under full-suite serial load.
+  - **Full-suite serial runs still flake ~1/2** (latest pair = [1 fail, 17/17]). The residual is
+    a load/timing flake under 17 back-to-back heavy UI cases (cold-compile on the first case +
+    resource contention). Remaining hardening: capture the specific full-suite failure (instrument,
+    don't guess), then fix (e.g. warm-up step, per-test context isolation, or a justified retry
+    audit per §2.4) before the golden-clean claim holds.
 - **Findings:**
   - **FINDING-8 (send-notification config↔executor type mismatch) — ✅ FIXED (`cafb632bf`):** the
     configSchema typed `recipients` as `expression` (a string) but `SendNotificationExecutor` cast
