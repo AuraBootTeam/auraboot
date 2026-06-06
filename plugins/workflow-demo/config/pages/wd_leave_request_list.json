@@ -2,6 +2,7 @@
   "pageKey": "wd_leave_request_list",
   "modelCode": "wd_leave_request",
   "kind": "list",
+  "schemaVersion": 4,
   "layout": {
     "type": "stack"
   },

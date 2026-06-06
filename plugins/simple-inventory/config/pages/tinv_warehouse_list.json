@@ -4,6 +4,7 @@
   "name:en": "Warehouses",
   "modelCode": "tinv_warehouse",
   "kind": "list",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "仓库列表",
     "en": "Warehouses"

@@ -3,6 +3,7 @@
   "name:zh-CN": "商机详情",
   "name:en": "Opportunity Detail",
   "kind": "detail",
+  "schemaVersion": 4,
   "modelCode": "tcrm_opportunity",
   "title": {
     "zh-CN": "商机详情",

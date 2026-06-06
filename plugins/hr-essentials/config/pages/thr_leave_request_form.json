@@ -4,6 +4,7 @@
   "name:en": "Leave Request Form",
   "modelCode": "thr_leave_request",
   "kind": "form",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "请假表单",
     "en": "Leave Request Form"

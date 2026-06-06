@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auraboot.com/schemas/page-import-v4.schema.json",
+  "title": "AuraBoot plugin page import envelope (DSL v4)",
+  "description": "Declarative structural gate for plugin config/pages.json page envelopes at import time. Block-level contracts (column/field/label rules) are validated by PageSchemaValidator, not this schema; additional top-level fields (pageKey, modelCode, title, extension, profile, ...) are allowed.",
+  "type": "object",
+  "required": ["kind", "schemaVersion", "layout", "blocks"],
+  "properties": {
+    "schemaVersion": {
+      "const": 4,
+      "description": "Pages must declare the current v4 page format."
+    },
+    "kind": {
+      "enum": ["list", "form", "detail"],
+      "description": "Only the three production-renderable page kinds are importable as plugin pages."
+    },
+    "layout": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["grid", "stack"],
+          "description": "v4 page layout is either a 12-column grid or a vertical stack."
+        }
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "minItems": 1,
+      "description": "A page must declare at least one block."
+    }
+  }
+}

@@ -4,6 +4,7 @@
   "name:en": "Stock In Form",
   "modelCode": "tinv_stock_in",
   "kind": "form",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "入库表单",
     "en": "Stock In Form"

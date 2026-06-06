@@ -4,6 +4,7 @@
   "name:en": "Attendance",
   "modelCode": "thr_attendance",
   "kind": "list",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "考勤列表",
     "en": "Attendance"

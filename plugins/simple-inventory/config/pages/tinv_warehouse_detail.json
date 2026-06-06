@@ -4,6 +4,7 @@
   "name:en": "Warehouse Detail",
   "modelCode": "tinv_warehouse",
   "kind": "detail",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "仓库详情",
     "en": "Warehouse Detail"

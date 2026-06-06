@@ -4,6 +4,7 @@
   "name:en": "Project Form",
   "modelCode": "tpm_project",
   "kind": "form",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "项目表单",
     "en": "Project Form"

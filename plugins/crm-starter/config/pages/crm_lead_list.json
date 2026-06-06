@@ -2,6 +2,7 @@
   "pageKey": "crm_lead_list",
   "modelCode": "crm_lead",
   "kind": "list",
+  "schemaVersion": 4,
   "layout": {
     "type": "stack"
   },

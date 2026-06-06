@@ -4,6 +4,7 @@
   "name:en": "Leave Request Detail",
   "modelCode": "thr_leave_request",
   "kind": "detail",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "请假详情",
     "en": "Leave Request Detail"

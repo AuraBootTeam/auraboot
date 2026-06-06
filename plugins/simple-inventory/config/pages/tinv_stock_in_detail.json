@@ -4,6 +4,7 @@
   "name:en": "Stock In Detail",
   "modelCode": "tinv_stock_in",
   "kind": "detail",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "入库详情",
     "en": "Stock In Detail"

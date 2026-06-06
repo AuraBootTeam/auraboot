@@ -4,6 +4,7 @@
   "name:en": "Projects",
   "modelCode": "tpm_project",
   "kind": "list",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "项目列表",
     "en": "Projects"

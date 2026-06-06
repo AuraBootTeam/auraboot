@@ -2,6 +2,7 @@
   "pageKey": "crm_contact_detail",
   "modelCode": "crm_contact",
   "kind": "detail",
+  "schemaVersion": 4,
   "layout": {
     "type": "stack"
   },

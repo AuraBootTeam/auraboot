@@ -88,6 +88,7 @@ class PluginImportServiceImplBranchTest {
     @Mock private PlatformVersionChecker platformVersionChecker;
     @Mock private PluginValidationPipeline validationPipeline;
     @Mock private PluginQualityScorer qualityScorer;
+    @Mock private com.auraboot.framework.plugin.validation.PageSchemaImportGate pageSchemaImportGate;
     @Mock private SavedViewMapper savedViewMapper;
     @Mock private AutoPermissionAssignmentService autoPermissionAssignmentService;
     @Mock private ApplicationEventPublisher applicationEventPublisher;

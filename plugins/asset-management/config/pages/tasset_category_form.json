@@ -3,6 +3,7 @@
   "name:zh-CN": "分类表单",
   "name:en": "Category Form",
   "kind": "form",
+  "schemaVersion": 4,
   "modelCode": "tasset_category",
   "title": {
     "zh-CN": "分类表单",

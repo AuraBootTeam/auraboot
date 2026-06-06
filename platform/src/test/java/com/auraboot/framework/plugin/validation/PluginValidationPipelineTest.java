@@ -336,7 +336,8 @@ class PluginValidationPipelineTest {
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey("pe_order_list");
         page.setKind("list");
-        page.setLayout(Map.of("type", "list"));
+        page.setSchemaVersion(4);
+        page.setLayout(Map.of("type", "stack"));
         page.setBlocks(List.of(Map.of(
                 "id", "orders_table",
                 "blockType", "table",

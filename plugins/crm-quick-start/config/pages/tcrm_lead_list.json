@@ -3,6 +3,7 @@
   "name:zh-CN": "线索列表",
   "name:en": "Leads",
   "kind": "list",
+  "schemaVersion": 4,
   "modelCode": "tcrm_lead",
   "title": {
     "zh-CN": "线索列表",

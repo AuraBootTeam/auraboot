@@ -3,6 +3,7 @@
   "name:zh-CN": "维护列表",
   "name:en": "Maintenance",
   "kind": "list",
+  "schemaVersion": 4,
   "modelCode": "tasset_maintenance",
   "title": {
     "zh-CN": "维护列表",

@@ -4,6 +4,7 @@
   "name:en": "Employee Form",
   "modelCode": "thr_employee",
   "kind": "form",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "员工表单",
     "en": "Employee Form"

@@ -4,6 +4,7 @@
   "name:en": "Comments",
   "modelCode": "gp_task_comment",
   "kind": "list",
+  "schemaVersion": 4,
   "title": {
     "zh-CN": "评论列表",
     "en": "Comments"

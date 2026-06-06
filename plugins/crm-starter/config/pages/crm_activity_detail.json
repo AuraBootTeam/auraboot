@@ -2,6 +2,7 @@
   "pageKey": "crm_activity_detail",
   "modelCode": "crm_activity",
   "kind": "detail",
+  "schemaVersion": 4,
   "layout": {
     "type": "stack"
   },
