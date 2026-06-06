@@ -645,6 +645,76 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(String(log!.status).toLowerCase(), `N-SEND-WEBHOOK run: ${JSON.stringify(log)}`).toBe('success');
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'send-webhook node completed (dispatch)').toBe(true);
   });
+
+  /** Fire a state_transition command (cancel: draft→cancelled). Fires on_state_change. */
+  async function fireCancel(page: Page, orderId: string): Promise<void> {
+    const resp = await page.request.post(`/api/meta/commands/execute/e2et:cancel_order`, {
+      data: { operationType: 'state_transition', targetRecordId: orderId, payload: {} },
+    });
+    const body = await resp.json();
+    expect(String(body.code), `cancel fire failed: ${JSON.stringify(body)}`).toBe('0');
+  }
+
+  test('N-TRIGGER-FIELD-CHANGE: drag trigger-field-change(field-select)→action-create-record, save, enable, change the watched field → on_field_change runs @golden', async ({
+    page,
+  }) => {
+    const itemName = `NFC-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-FIELD ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-field-change', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    // modelCode (model-select) MUST be filled before fieldCode (field-select loads fields for it).
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL, fieldCode: '订单标题' });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const orderId = await fireCreate(page, 100, `NFC-order ${uniqueId()}`);
+    const firedAt = Date.now();
+    await fireUpdate(page, orderId, { e2et_order_title: `NFC-changed ${uniqueId()}` }); // watched field changes
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-FIELD run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'create-record node completed').toBe(true);
+    expect((await pollItemsByName(page, itemName)).length, 'child item created on field-change fire').toBeGreaterThanOrEqual(1);
+  });
+
+  test('N-TRIGGER-STATE-CHANGE: drag trigger-state-change(field-select)→action-create-record, save, enable, cancel the order → on_state_change runs @golden', async ({
+    page,
+  }) => {
+    const itemName = `NSC-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-STATE ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-state-change', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    // modelCode first, then stateField (field-select). toStates left empty (any transition;
+    // FINDING-4b ⇒ a specific toStates filter is imprecise on the async event).
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL, stateField: '订单状态' });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const orderId = await fireCreate(page, 100, `NSC-order ${uniqueId()}`);
+    const firedAt = Date.now();
+    await fireCancel(page, orderId); // draft→cancelled state transition
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-STATE run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'create-record node completed').toBe(true);
+    expect((await pollItemsByName(page, itemName)).length, 'child item created on state-change fire').toBeGreaterThanOrEqual(1);
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */
