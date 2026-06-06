@@ -599,7 +599,7 @@ The Sales plugin ships with **33 page configurations** covering every model:
   "name:en": "Sales Management",
   "modelCode": "sl_sales_order",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12 },
   "blocks": [
     {
@@ -688,7 +688,7 @@ The Sales plugin ships with **33 page configurations** covering every model:
   "name:en": "Sales Order Form",
   "modelCode": "sl_sales_order",
   "kind": "form",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 12 },
   "blocks": [
     {
@@ -738,13 +738,15 @@ The Sales plugin ships with **33 page configurations** covering every model:
 
 The dashboard page combines stat cards, charts, and data tables:
 
+> **Note:** Dashboards are built with the **Dashboard Designer** (stored in `ab_dashboard`), not imported as a `pages.json` page — the plugin importer rejects `kind: "dashboard"`. The JSON below illustrates the dashboard's block content for reference.
+
 ```json
 {
   "pageKey": "sales_dashboard",
   "name:en": "Sales Dashboard",
   "modelCode": "sl_sales_order",
   "kind": "dashboard",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },
   "blocks": [
     {

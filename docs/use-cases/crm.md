@@ -686,7 +686,7 @@ List pages use the V2 flat block format with `tabs`, `toolbar`, and `table` bloc
   "name:en": "Opportunities",
   "modelCode": "crm_opportunity",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12 },
   "blocks": [
     {
@@ -761,7 +761,7 @@ Key features:
   "name:en": "Opportunity Form",
   "modelCode": "crm_opportunity",
   "kind": "form",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },
   "blocks": [
     {
@@ -803,7 +803,7 @@ The opportunity detail page demonstrates tabbed sub-tables with three different 
   "name:en": "Opportunity Detail",
   "modelCode": "crm_opportunity",
   "kind": "detail",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "stack" },
   "blocks": [
     {
@@ -919,12 +919,14 @@ Sub-table data modes demonstrated:
 
 The CRM dashboard demonstrates all dashboard block types:
 
+> **Note:** Dashboards are built with the **Dashboard Designer** (stored in `ab_dashboard`), not imported as a `pages.json` page — the plugin importer rejects `kind: "dashboard"`. The JSON below illustrates the dashboard's block content for reference.
+
 ```json
 {
   "pageKey": "crm_dashboard",
   "name:en": "CRM Dashboard",
   "kind": "dashboard",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },
   "blocks": [
     {

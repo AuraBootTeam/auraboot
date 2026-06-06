@@ -551,7 +551,7 @@ Bindings connect fields to a model and define their order and editability.
 
 ## Step 6: Define Pages (pages/*.json)
 
-Pages define the UI layout for list, form, and detail views. AuraBoot uses a block-based page schema (V2 flat format).
+Pages define the UI layout for list, form, and detail views. AuraBoot uses a block-based page schema (v4 flat format).
 
 ### List Page
 
@@ -564,7 +564,7 @@ Pages define the UI layout for list, form, and detail views. AuraBoot uses a blo
   "name:en": "Task List",
   "modelCode": "tt_task",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": {
     "type": "grid",
     "cols": 12
@@ -669,7 +669,7 @@ Pages define the UI layout for list, form, and detail views. AuraBoot uses a blo
 
 | Concept | Description | Values |
 |---------|-------------|--------|
-| `kind` | Page type | `list`, `form`, `detail`, `dashboard` |
+| `kind` | Page type | `list`, `form`, `detail` (dashboards use the Dashboard Designer, not `pages.json`) |
 | `blockType` | Content block type | `table`, `tabs`, `toolbar`, `form-section`, `form-buttons` |
 | `layout.type` | Layout engine | `grid` (12-column) or `stack` (vertical) |
 
@@ -684,7 +684,7 @@ Pages define the UI layout for list, form, and detail views. AuraBoot uses a blo
   "name:en": "Task Form",
   "modelCode": "tt_task",
   "kind": "form",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": {
     "type": "grid",
     "cols": 12,
@@ -745,7 +745,7 @@ Pages define the UI layout for list, form, and detail views. AuraBoot uses a blo
   "name:en": "Task Detail",
   "modelCode": "tt_task",
   "kind": "detail",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": {
     "type": "stack"
   },

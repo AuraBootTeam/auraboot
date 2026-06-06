@@ -31,7 +31,7 @@ AuraBoot pages use a **flat block-based DSL** stored in `ab_page_schema`:
 | `layout` | Arrangement strategy | `{ "type": "stack" }` or `{ "type": "grid", "cols": 12 }` |
 | `profile` | Rendering strategy | `admin`, `report` |
 
-> There is no `pageType`, `pageCategory`, or `dslSchema` nesting. The V2 flat format is the only supported format.
+> There is no `pageType`, `pageCategory`, or `dslSchema` nesting. The v4 flat format is the only supported format.
 
 ## Step-by-Step: Create a List Page
 

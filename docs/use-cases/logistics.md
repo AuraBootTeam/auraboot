@@ -368,7 +368,7 @@ stateDiagram-v2
   "name:en": "Shipments",
   "modelCode": "lg_shipment",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "blocks": [
     {
       "id": "block_sh_toolbar",
@@ -439,7 +439,7 @@ stateDiagram-v2
   "name:en": "Shipment Form",
   "modelCode": "lg_shipment",
   "kind": "form",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 12 },
   "blocks": [
     {

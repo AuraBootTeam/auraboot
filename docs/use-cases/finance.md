@@ -549,11 +549,13 @@ The `handler` field triggers server-side validation that ensures debit = credit 
 
 The dashboard uses `stat-card`, `chart`, and `table` blocks powered by named queries:
 
+> **Note:** Dashboards are built with the **Dashboard Designer** (stored in `ab_dashboard`), not imported as a `pages.json` page — the plugin importer rejects `kind: "dashboard"`. The JSON below illustrates the dashboard's block content for reference.
+
 ```json
 {
   "pageKey": "fin_financial_dashboard",
   "kind": "dashboard",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },
   "blocks": [
     {
@@ -627,7 +629,7 @@ Demonstrates a list page with toolbar buttons, conditional row actions, and stat
   "pageKey": "fin_journal_entry_list",
   "kind": "list",
   "modelCode": "fin_journal_entry",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12 },
   "blocks": [
     {
@@ -708,7 +710,7 @@ Shows how the form includes an editable sub-table for journal lines:
   "pageKey": "fin_journal_entry_form",
   "kind": "form",
   "modelCode": "fin_journal_entry",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 12 },
   "blocks": [
     {
