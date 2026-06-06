@@ -619,6 +619,32 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(String(log!.status).toLowerCase(), `N-CALL-API run: ${JSON.stringify(log)}`).toBe('success');
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'call-api node completed (real outbound GET <400)').toBe(true);
   });
+
+  test('N-SEND-WEBHOOK: drag trigger-record-create→action-send-webhook, configure url+payload via panel, save, enable, fire → node completes (dispatch) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-SEND-WEBHOOK ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-send-webhook', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      url: 'http://host.docker.internal:6444/actuator/health',
+      payload: '{"event":"e2e.designer.webhook","orderId":"${recordId}"}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-SEND-WEBHOOK-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-SEND-WEBHOOK run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'send-webhook node completed (dispatch)').toBe(true);
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */
