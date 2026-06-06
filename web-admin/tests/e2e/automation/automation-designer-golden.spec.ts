@@ -548,4 +548,80 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const items = await pollItemsByName(page, itemName);
     expect(items.length, `child order_item '${itemName}' created by the create-record action`).toBeGreaterThanOrEqual(1);
   });
+
+  /** Fire a record UPDATE (top-level targetRecordId — FINDING-2). Fires on_record_update. */
+  async function fireUpdate(page: Page, orderId: string, fields: Record<string, unknown>): Promise<void> {
+    const resp = await page.request.post(`/api/meta/commands/execute/e2et:update_order`, {
+      data: { operationType: 'update', targetRecordId: orderId, payload: fields },
+    });
+    const body = await resp.json();
+    expect(String(body.code), `update fire failed: ${JSON.stringify(body)}`).toBe('0');
+  }
+
+  test('N-TRIGGER-UPDATE: drag trigger-record-update→action-create-record, save, enable, fire via a real UPDATE → on_record_update runs @golden', async ({
+    page,
+  }) => {
+    const itemName = `NTU-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-UPDATE ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-update', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields:
+        '{"e2et_order_id":"${recordId}","e2et_item_name":"' +
+        itemName +
+        '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // Create an order (on_record_create — does NOT fire this on_record_update automation)…
+    const orderId = await fireCreate(page, 100, `NTU-order ${uniqueId()}`);
+    // …then UPDATE it → on_record_update fires.
+    const firedAt = Date.now();
+    await fireUpdate(page, orderId, { e2et_order_title: `NTU-changed ${uniqueId()}` });
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-UPDATE run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'create-record node completed').toBe(true);
+    expect((await pollItemsByName(page, itemName)).length, `child item created on update fire`).toBeGreaterThanOrEqual(1);
+  });
+
+  test('N-CALL-API: drag trigger-record-create→action-call-api, configure url+method via panel, save, enable, fire → node completes (real outbound GET) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CALL-API ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-call-api', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // url (expression) → the backend's own actuator/health via the test-allowlisted
+    // host.docker.internal; method (select) → GET. (call_api fix = FINDING-6.)
+    await fillNodeConfig(page, action, {
+      url: 'http://host.docker.internal:6444/actuator/health',
+      method: 'GET',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-CALL-API-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-CALL-API run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'call-api node completed (real outbound GET <400)').toBe(true);
+  });
 });
+
+/** True if the given node reached 'completed' in the polled statuses. */
+function statusesNodeCompleted(statuses: { nodeId: string; status: string }[], nodeId: string): boolean {
+  return statuses.find((s) => s.nodeId === nodeId)?.status === 'completed';
+}
