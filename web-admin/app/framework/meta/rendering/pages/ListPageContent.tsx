@@ -1808,6 +1808,21 @@ function ListPageContentInner(props: PageContentProps) {
           ...cols,
           { field: '_actions', isActionColumn: true, buttons: rowActions },
         ] as ColumnConfig[];
+      } else {
+        // An action column already exists (e.g. default view/edit/delete injected
+        // for existing models). Merge in the block-level custom rowActions (dedup
+        // by code) so page-defined commands surface alongside the defaults — without
+        // this, custom rowActions on existing models are silently dropped.
+        baseCols = cols.map((c: any) => {
+          if (!c.isActionColumn) return c;
+          const existing = Array.isArray(c.buttons) ? c.buttons : [];
+          const existingCodes = new Set(existing.map((b: any) => b.code));
+          const merged = [
+            ...existing,
+            ...rowActions.filter((ra: any) => !existingCodes.has(ra.code)),
+          ];
+          return { ...c, buttons: merged };
+        }) as ColumnConfig[];
       }
     }
 
