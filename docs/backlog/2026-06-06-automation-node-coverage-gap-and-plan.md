@@ -103,9 +103,11 @@ SmartEngine-excluded = 3 (start-process, bpm-event, control-delay).
   - `trigger-webhook` (N-TRIGGER-WEBHOOK, fired via real inbound POST, `a298c7c5c`)
   - **Already real-UI-covered by the original Layer A:** trigger-record-create, control-condition,
     action-update-record (H1) + sad (S1 required-gate, S2 dangerous-SpEL) + edit-refire (E5).
-  - **Real-UI-driven node types now = 10** of the 15 in-scope (triggers: record-create/record-update/
-    field-change/state-change/webhook; actions: update-record/create-record/call-api/send-webhook;
-    control-condition). Each verified individually; full Layer A suite = **13 cases, 13/13 green**.
+  - `action-send-notification` (N-SEND-NOTIFICATION, `cafb632bf`) — **solved via the FINDING-8 fix**
+    (real backend bug fixed + node now driven through the real UI).
+  - **Real-UI-driven node types now = 11** of the 15 in-scope (triggers: record-create/record-update/
+    field-change/state-change/webhook; actions: update-record/create-record/call-api/send-webhook/
+    send-notification; control-condition). Each verified individually.
   - ⚠️ **Flake to harden (§2.4 not yet 3× clean):** N-CREATE-RECORD flaked once (1 fail / 2 full
     runs) under serial load — needs stabilization (per-test isolation / timeout tuning / retries
     audit) before claiming the suite golden-clean.
@@ -119,12 +121,12 @@ SmartEngine-excluded = 3 (start-process, bpm-event, control-delay).
   (drag under serial load) and N-CORNER-LIFECYCLE (double-toggle/enabled-state timing). Each
   passes in isolation; the suite needs synchronization hardening (poll backend state between
   UI steps; avoid time-window aliasing) before the golden-clean claim holds.
-- **2 confirmed findings (deferred — real fixes, not just tests):**
-  - **FINDING-8 (send-notification config↔executor type mismatch):** the configSchema types
-    `recipients` as `expression` (a string) but `SendNotificationExecutor` reads
-    `(List<String>) config.get("recipients")` → a recipients expression would ClassCastException.
-    Fix = change the field to a multiselect/array (or make the executor tolerant). Blocks the
-    send-notification real-UI happy case.
+- **Findings:**
+  - **FINDING-8 (send-notification config↔executor type mismatch) — ✅ FIXED (`cafb632bf`):** the
+    configSchema typed `recipients` as `expression` (a string) but `SendNotificationExecutor` cast
+    it straight to `List<String>` → ClassCastException for EVERY designer-built send-notification
+    (verified live). Fixed with a tolerant `parseRecipients` (List | String single/comma-list) +
+    accept `notificationType` alongside legacy `type`. send-notification node now solved.
   - **FINDING-9 (execute-command command-select picker):** the UI command-select dropdown does not
     surface options by the zh displayName the harness filtered on (`编辑订单`) — renders by a
     different label/code, or needs a context the harness didn't supply. Needs picker DOM
