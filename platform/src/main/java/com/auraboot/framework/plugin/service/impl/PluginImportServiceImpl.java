@@ -109,6 +109,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.plugin.service.PlatformVersionChecker platformVersionChecker;
     private final PluginValidationPipeline validationPipeline;
     private final PluginQualityScorer qualityScorer;
+    private final com.auraboot.framework.plugin.validation.PageSchemaImportGate pageSchemaImportGate;
     private final SavedViewMapper savedViewMapper;
     private final AutoPermissionAssignmentService autoPermissionAssignmentService;
     private final ApplicationEventPublisher applicationEventPublisher;
@@ -1197,6 +1198,12 @@ public class PluginImportServiceImpl implements PluginImportService {
         try {
             // Update status to importing
             importHistoryMapper.updateStatus(importId, ImportStatus.IMPORTING.code());
+
+            // DSL V4 Phase B: hard-fail BEFORE any resource is persisted if a declared page
+            // violates the v4 import contract (version/kind/layout/blockType/grid/JSON-schema).
+            // Advisory page findings (label/i18n/field-ref/...) do not block here; they continue
+            // to flow to the post-import quality score below.
+            pageSchemaImportGate.enforce(manifest);
 
             // Create or update plugin record
             String pluginPid = createOrUpdatePlugin(manifest, tenantId);
