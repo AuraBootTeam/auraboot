@@ -65,8 +65,15 @@ SmartEngine-excluded = 3 (start-process, bpm-event, control-delay).
   runtime failure surfaced with a clear, field-level/node-level reason) / edge (boundary: empty,
   max, missing-optional, threshold) / corner (concurrency, re-entrancy, disabled-then-fire,
   duplicate, unicode/i18n). Both at the UI layer (designer gates) and the backend (node-status).
-- **GAP-C — backend integration coverage → 80%.** Measure the current jacoco baseline for the
-  automation packages (executor / trigger.impl / listener / bpm / service); add IT to reach 80%.
+- **GAP-C — backend integration coverage → 80%.** Add IT to reach 80% for the automation packages
+  (executor / trigger.impl / listener / bpm / service).
+  - **Measurement finding (2026-06-06):** a host-side `./gradlew :test --tests
+    "com.auraboot.framework.automation.*" jacocoTestReport` is NOT a valid baseline — most of the
+    automation *integration* tests fail host-side (they need the running Spring context / DB), so
+    the report shows ~3% (a broken run), not real coverage. **The 80% IT target requires the
+    jacoco-agent-on-running-backend approach:** start the GA backend with `-javaagent:jacocoagent.jar`,
+    run the E2E/IT against it, dump the exec, and `jacocoReport` against the automation classes.
+    This is its own infra slice (instrument the docker backend + collect) — scoped, not started.
 - **GAP-D — FINDING-4b.** `on_state_change` toStates filter is imprecise: `readCurrentState` runs
   via the tenant-line-interceptor `selectByQuery` and the `@Async` bridge has no MetaContext →
   wrong tenant predicate → null. Fix: set tenant from `event.getTenantId()` before the read
