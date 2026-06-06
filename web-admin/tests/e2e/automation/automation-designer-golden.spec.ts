@@ -748,6 +748,38 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(String(log!.status).toLowerCase(), `N-TRIGGER-WEBHOOK run: ${JSON.stringify(log)}`).toBe('success');
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'downstream action completed on webhook fire').toBe(true);
   });
+
+  // ── golden SAD path (real UI) — a runtime failure surfaces on the node ──────────
+  test('N-CALL-API-SAD: drag trigger-record-create→action-call-api with a 404 URL, save, enable, fire → the call-api node FAILS with the upstream status (sad path) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CALL-API-SAD ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-call-api', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // A reachable host (SSRF test-allowlisted) but a path that 404s → CallApiExecutor throws
+    // on status >= 400 → the node fails (not a silent success).
+    await fillNodeConfig(page, action, {
+      url: 'http://host.docker.internal:6444/api/this-endpoint-does-not-exist-404',
+      method: 'GET',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-CALL-API-SAD-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(['failed', 'partial_success'], `N-CALL-API-SAD must fail (4xx): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    const node = statuses.find((s) => s.nodeId === action);
+    expect(node?.status, `call-api node should be failed on 4xx: ${JSON.stringify(statuses)}`).toBe('failed');
+    expect(node?.errorMessage ?? '', 'failure should reference the API failure / status').toMatch(/API call failed|40[0-9]|status/i);
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */
