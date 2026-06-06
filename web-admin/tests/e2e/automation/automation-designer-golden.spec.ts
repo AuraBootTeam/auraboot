@@ -995,6 +995,136 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const node = (await pollNodeStatuses(page, log!.id, 30_000)).find((s) => s.nodeId === action);
     expect(node?.status, 'create-record node should be failed').toBe('failed');
   });
+
+  // ── execute-command: real command-select picker (FINDING-9 fix) happy + sad ──────
+  // The command-select picker was broken (fetchCommandOptions hit GET /api/meta/commands
+  // without the required modelCode → 500 → zero options). Fixed: the endpoint lists all
+  // commands when modelCode is absent, and fetchCommandOptions reads the bare list. These
+  // cases drive the now-working picker in the real designer.
+
+  test('N-EXECUTE-COMMAND: drag trigger-record-create→action-execute-command, pick a permission-free command via the real command-select picker, set params, save, enable, fire → the command runs under the automation principal and updates the trigger record (happy) @golden', async ({
+    page,
+  }) => {
+    const marker = `EXECCMD_OK_${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-EXECUTE-COMMAND ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-execute-command', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // commandCode via the real command-select picker — filter by the unique command code
+    // (BaseResourceSelect filters by label OR value). e2et:touch_order_noperm is a
+    // permission-free update (test-fixtures) the restricted automation principal CAN run.
+    await fillNodeConfig(page, action, {
+      commandCode: 'e2et:touch_order_noperm',
+      params: `{"e2et_order_remark":"${marker}"}`,
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    // The real picker drove the selection — assert the chosen command persisted.
+    const saved = await readFlowConfig(page, pid);
+    const node = saved.flowConfig.nodes.find((n: any) => n.id === action);
+    expect(node.data.config.commandCode, 'command-select persisted the picked command').toBe(
+      'e2et:touch_order_noperm',
+    );
+
+    await enableViaListToggle(page, pid);
+    const firedAt = Date.now();
+    const recordId = await fireCreate(page, 100, `EXECCMD-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-EXECUTE-COMMAND run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'execute-command node completed').toBe(true);
+    // Side effect: the permission-free update command set the remark on the trigger record.
+    const record = await pollRecordField(page, recordId, 'e2et_order_remark', marker);
+    expect(record.e2et_order_remark, 'permission-free command updated the trigger record').toBe(marker);
+  });
+
+  test('N-EXECUTE-COMMAND-SAD: pick a permission-gated command via the picker; under the restricted automation principal the run FAILS with a clear permission-denied reason and the side effect does not happen (sad) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-EXECUTE-COMMAND-SAD ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-execute-command', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // e2et:update_order requires E2ET.order.manage → the automation principal lacks it (FINDING-3).
+    await fillNodeConfig(page, action, {
+      commandCode: 'e2et:update_order',
+      params: '{"e2et_order_title":"EXEC_SHOULD_BE_DENIED"}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    const recordId = await fireCreate(page, 100, `EXEC-SAD-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(['failed', 'partial_success'], `N-EXECUTE-COMMAND-SAD must fail (denied): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    const node = statuses.find((s) => s.nodeId === action);
+    expect(node?.status, `execute-command node should be failed: ${JSON.stringify(statuses)}`).toBe('failed');
+    expect(node?.errorMessage ?? '', 'denial must name the required permission (clear reason)').toMatch(/permission denied|E2ET\.order\.manage/i);
+    // The denied command did NOT change the record title.
+    const record = await getOrderRecord(page, recordId);
+    expect(record.e2et_order_title, 'denied command must not have run').not.toBe('EXEC_SHOULD_BE_DENIED');
+  });
+
+  // ── control-loop: real designer, collection-carrying webhook fixture ─────────────
+  // control-loop iterates its body action once per collection element (the SmartEngine
+  // fork is userTask-only, so AutomationActionServiceTaskDelegate iterates serviceTask
+  // bodies manually). resolveCollection does a FLAT process-var lookup, so the collection
+  // must be a top-level var; the webhook trigger spreads the inbound body's top-level keys
+  // into the process variables, so a webhook body { items: [...] } exposes `${items}`.
+  test('N-LOOP: build trigger-webhook→control-loop→create-record(body) in the designer; fire a webhook carrying a 3-element collection → the body runs once per element creating 3 child items (loop) @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const names = [`LOOP-A-${tag}`, `LOOP-B-${tag}`, `LOOP-C-${tag}`];
+    // A parent order to satisfy the child item's parent reference (created directly; the
+    // webhook automation is not enabled yet so this does not fire it).
+    const parentOrderId = await fireCreate(page, 100, `LOOP-parent ${tag}`);
+
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-LOOP ${tag}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-webhook', { x: 150, y: 70 });
+    const loop = await dragNodeToCanvas(page, 'control-loop', { x: 150, y: 200 });
+    const body = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 330 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, loop);
+    await connectEdge(page, loop, body);
+    // collection references the top-level webhook var `items`; itemVariable=item (default).
+    await fillNodeConfig(page, loop, { collection: '${items}', itemVariable: 'item' });
+    // The body create-record runs once per element with `item` bound to the element value.
+    await fillNodeConfig(page, body, {
+      modelCode: '订单明细',
+      fields:
+        '{"e2et_order_id":"${parentOrderId}","e2et_item_name":"${item}","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // Fire via the real inbound webhook with a 3-element collection (+ the parent id).
+    const firedAt = Date.now();
+    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
+      data: { items: names, parentOrderId },
+    });
+    expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-LOOP run: ${JSON.stringify(log)}`).toBe('success');
+    // The loop body created one child item per element name.
+    for (const n of names) {
+      expect(
+        (await pollItemsByName(page, n)).length,
+        `loop body created a child item for element ${n}`,
+      ).toBeGreaterThanOrEqual(1);
+    }
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */

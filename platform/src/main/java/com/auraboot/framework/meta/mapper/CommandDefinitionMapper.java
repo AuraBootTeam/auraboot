@@ -47,6 +47,12 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
     @Select("SELECT * FROM ab_command_definition WHERE model_code = #{modelCode} AND is_current = TRUE AND deleted_flag = false ORDER BY code")
     List<CommandDefinition> findByModelCode(@Param("modelCode") String modelCode);
 
+    // List all current commands across every model (no model scope). Used by the
+    // automation execute-command picker, which has no model context and must offer
+    // every executable command. Note: tenant_id is added by TenantLineInnerInterceptor.
+    @Select("SELECT * FROM ab_command_definition WHERE is_current = TRUE AND deleted_flag = false ORDER BY model_code, code")
+    List<CommandDefinition> findAllCurrent();
+
     // Note: tenant_id condition is automatically added by TenantLineInnerInterceptor
     @Update("UPDATE ab_command_definition SET is_current = FALSE WHERE code = #{code}")
     int markAsNotCurrent(@Param("code") String code);

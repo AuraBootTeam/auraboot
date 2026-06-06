@@ -49,12 +49,10 @@ interface AutomationRecord {
   }>;
 }
 
-interface CommandRecord {
-  records: Array<{
-    displayName?: string;
-    code: string;
-    type: string;
-  }>;
+interface CommandItem {
+  displayName?: string;
+  code: string;
+  type: string;
 }
 
 interface ModelRecord {
@@ -121,8 +119,13 @@ export async function fetchAutomationOptions(): Promise<ResourceOption[]> {
 }
 
 export async function fetchCommandOptions(): Promise<ResourceOption[]> {
-  const result = await fetchResult<CommandRecord>('/api/meta/commands?size=200');
-  return (result?.data?.records || []).map((c) => ({
+  // GET /api/meta/commands (no modelCode) lists every current command as a bare
+  // array in `data` — the execute-command picker has no model scope. The earlier
+  // `?size=200` + `data.records` read was doubly wrong: the endpoint required a
+  // `modelCode` param (→ 500) and returns a List, not a paginated `{records}`
+  // envelope, so the picker surfaced zero options. (golden FINDING-9)
+  const result = await fetchResult<CommandItem[]>('/api/meta/commands');
+  return (result?.data || []).map((c) => ({
     label: `${c.displayName || c.code} (${c.code})`,
     value: c.code,
     description: c.type,

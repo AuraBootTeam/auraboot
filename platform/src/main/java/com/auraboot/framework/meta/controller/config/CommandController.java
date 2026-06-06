@@ -86,8 +86,14 @@ public class CommandController {
 
     @GetMapping
     @RequirePermission(MetaPermission.COMMAND_READ)
-    public ApiResponse<List<CommandDefinitionDTO>> listByModelCode(@RequestParam String modelCode) {
-        List<CommandDefinitionDTO> result = commandService.listByModelCode(modelCode);
+    public ApiResponse<List<CommandDefinitionDTO>> list(
+            @RequestParam(required = false) String modelCode) {
+        // modelCode scopes the listing to one model (command-management UI); when
+        // absent, list every current command (the automation execute-command picker
+        // has no model context and must offer all executable commands).
+        List<CommandDefinitionDTO> result = (modelCode == null || modelCode.isBlank())
+                ? commandService.listAll()
+                : commandService.listByModelCode(modelCode);
         return ApiResponse.success(result);
     }
 

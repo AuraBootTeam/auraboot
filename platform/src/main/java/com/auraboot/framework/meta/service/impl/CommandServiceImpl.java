@@ -155,6 +155,13 @@ public class CommandServiceImpl implements CommandService {
     }
 
     @Override
+    public List<CommandDefinitionDTO> listAll() {
+        // tenant_id is automatically added by TenantLineInnerInterceptor
+        List<CommandDefinition> entities = commandDefinitionMapper.findAllCurrent();
+        return entities.stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public void delete(String pid) {
         log.info("Deleting command definition: {}", pid);
