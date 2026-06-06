@@ -88,11 +88,39 @@ SmartEngine-excluded = 3 (start-process, bpm-event, control-delay).
   palette-coverage.
 - These stay honest `test.fixme` with the documented reason; NOT faked.
 
+## Progress (2026-06-06 session)
+- **P0 ✅** — doc committed; disk freed (5→14GB); GA stack rebuilt (my `prune -a` removed the cached
+  image → full rebuild from committed source; all backend fixes deployed) + bootstrapped; Layer A
+  golden re-verified **7/7** on the fresh stack (the harness drives the real designer).
+- **P1 (in progress) — real-UI per-node golden, 4 new nodes verified + committed** (each: drag the
+  node → configure via the real property panel → save → enable via list toggle → fire → backend
+  asserts run-success + node-completed + DB side-effect):
+  - `action-create-record` (N-CREATE-RECORD, `42c83aa3e`)
+  - `trigger-record-update` (N-TRIGGER-UPDATE, fired by a real update, `04f4e868f`)
+  - `action-call-api` (N-CALL-API, real outbound GET, `04f4e868f`)
+  - `action-send-webhook` (N-SEND-WEBHOOK, dispatch, `52bee04d7`)
+  - **Already real-UI-covered by the original Layer A:** trigger-record-create, control-condition,
+    action-update-record (H1) + sad (S1 required-gate, S2 dangerous-SpEL) + edit-refire (E5).
+  - **Real-UI-driven node types now = 7** of the 15 in-scope.
+- **Remaining in-scope nodes (P1) — with the config quirks to handle (grounded):**
+  - `trigger-field-change` — modelCode(model-select) + **fieldCode(field-select)**: needs the field
+    LABEL (e.g. e2et_order_title's displayName). Fire via update of that field.
+  - `trigger-state-change` — modelCode + **stateField(field-select)** + toStates(multiselect). Use
+    empty/any-transition (FINDING-4b ⇒ specific toStates won't match until GAP-D). Fire via cancel.
+  - `trigger-webhook` — webhook node config (validationMode='none'); fire via `POST /api/automations/webhooks/{pid}`.
+  - `trigger-scheduled` — **heavy**: needs a scheduler fire path (short cron + wait, or a manual
+    trigger endpoint). Lowest priority.
+  - `action-send-notification` — notificationType(select) + title/content/**recipients all
+    expression**; verify the executor accepts a recipients expression (Layer B used `['1']`).
+  - `action-execute-command` — commandCode + params; assert the **denial** (FINDING-3 by-design) or
+    add a permission-free command for a success path (GAP-F). Verify the commandCode control type.
+  - `action-llm-call` — **blocked on GAP-E** (seed stub provider) — the seeded minimax 401s.
+  - `control-loop` — needs a **collection-carrying trigger fixture** (e2et_order has no array field).
+
 ## Plan (phased; feature branch `feat/automation-golden-back-coverage`, §11 isolated GA stack)
-- **P0 (this doc + infra):** ✅ doc. Free disk. Bring up GA stack (no rebuild; bootstrap). Confirm
-  the Phase-0 designer harness still drives the canvas (smoke).
-- **P1 — UI per-node happy (GAP-A):** one Layer-A case per in-scope node driving the real designer
-  to a happy success. Verify backend (node-status=completed + DB side-effect) after each.
+- **P0 (this doc + infra):** ✅ done.
+- **P1 — UI per-node happy (GAP-A):** ⏳ 7/15 node types done. one Layer-A case per in-scope node
+  driving the real designer to a happy success + backend verify. Remaining list above.
 - **P2 — golden 4-path (GAP-B):** extend each to sad/edge/corner. UI gates (field-level errors,
   SpEL safety, required) + backend failure assertions.
 - **P3 — backend fixes (GAP-D/E/F):** FINDING-4b tenant fix (rebuild) + verify toStates filter;
