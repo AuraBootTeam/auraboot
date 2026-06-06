@@ -83,14 +83,22 @@ trigger-webhook fire is now green.
   test on a fresh stack. Today the state-change test filters on "any transition" (empty
   fromStates/toStates), fully green — the NPE (the real bug) is fixed; this is filter precision only.
 
-## ⏭ FINDING-5 (honest skip) — action-llm-call needs stub-mode on the E2E stack
-- The executor + built-in `StubLlmProvider` both exist, but the GA test tenant carries a
-  SEEDED real provider (minimax, from the showcase seed) that overrides the yml stub-sentinel
-  fallback → the run makes a real call → 401. The clean lever is `agent.llm.stub-mode=true`
-  on the GA backend (its intended use: exercise the chat pipeline without real credentials),
-  a stack-config not a product gap. Executor is unit + IT covered (`LlmCallExecutorTest` +
-  Streaming/Vision IT). **Follow-up:** enable `agent.llm.stub-mode` on the ga-e2e stack, then
-  un-fixme.
+## ⏭ FINDING-5 (node VERIFIED working end-to-end; committed test stays stub-pending for CI portability)
+- The executor + built-in `StubLlmProvider` both exist. The GA test tenant carries a SEEDED
+  provider (minimax) whose key on the GA stack is non-functional (no real key in env) → the
+  run made a real call → 401. **Node-itself verification (2026-06-06):** with a real minimax
+  key configured at runtime via the encrypted cloud-config API (`POST /api/admin/cloud-config`,
+  `CloudConfigServiceImpl` encrypts the apiKey at rest), an `action-llm-call` automation fired
+  and ran to **success** against the real provider — so the node + executor + the secure
+  cloud-config storage path all work end-to-end against a real LLM. (The key was deleted +
+  the volume `--purge`d immediately after; it is never committed.)
+- **Why the committed E2E test stays `test.fixme`:** an E2E that depends on a real external
+  provider/key is not CI-portable (no real key in CI; cost + non-determinism). The portable
+  green path is the built-in stub. Cleanest fix = make the GA bootstrap seed the LLM provider
+  with the stub sentinel `stub_key_for_no_llm_paths` (a non-secret marker) instead of a demo
+  key, OR enable `agent.llm.stub-mode=true` on the ga-e2e stack — then un-fixme. Real provider
+  keys belong only in the encrypted `ab_cloud_config` (runtime) or env/secrets-manager, never
+  in seeds/git. Executor is also unit + IT covered (`LlmCallExecutorTest` + Streaming/Vision IT).
 
 ## 🟦 / ⏭ FINDING-7 — start-process executor added; bpm-event + start-process E2E blocked by the OSS BPM stub
 - **Gap closed:** `action-start-process` shipped with NO backend executor —
