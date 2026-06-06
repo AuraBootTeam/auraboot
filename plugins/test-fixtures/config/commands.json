@@ -678,5 +678,17 @@
       "confirmMessage:zh-CN": "确认已完成付款？",
       "confirmMessage:en": "Confirm payment completed?"
     }
+  },
+  {
+    "code": "e2et:touch_order_noperm",
+    "displayName:zh-CN": "标注订单备注(免权限)",
+    "displayName:en": "Annotate Order Remark (no-permission)",
+    "description": "Permission-free update used to exercise the automation execute-command success path under the restricted automation principal (golden GAP-F). Sets the remark field; requires no business permission, so the automation principal can run it.",
+    "type": "update",
+    "modelCode": "e2et_order",
+    "inputFields": [
+      "e2et_order_remark"
+    ],
+    "permissions": []
   }
 ]

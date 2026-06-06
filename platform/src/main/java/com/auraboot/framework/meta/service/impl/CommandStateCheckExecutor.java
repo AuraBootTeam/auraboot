@@ -113,21 +113,25 @@ public class CommandStateCheckExecutor {
         }
         try {
             List<StateGraphDefinition> graphs = stateGraphService.listByModelCode(modelCode);
-            if (graphs == null || graphs.isEmpty()) {
-                return null;
-            }
-            // Find the first published state graph
-            for (StateGraphDefinition graph : graphs) {
-                if (StatusConstants.PUBLISHED.equals(graph.getStatus()) && StringUtils.hasText(graph.getStateField())) {
-                    return graph.getStateField();
+            if (graphs != null && !graphs.isEmpty()) {
+                // Find the first published state graph
+                for (StateGraphDefinition graph : graphs) {
+                    if (StatusConstants.PUBLISHED.equals(graph.getStatus()) && StringUtils.hasText(graph.getStateField())) {
+                        return graph.getStateField();
+                    }
+                }
+                // Fallback to any graph with state field
+                for (StateGraphDefinition graph : graphs) {
+                    if (StringUtils.hasText(graph.getStateField())) {
+                        return graph.getStateField();
+                    }
                 }
             }
-            // Fallback to any graph with state field
-            for (StateGraphDefinition graph : graphs) {
-                if (StringUtils.hasText(graph.getStateField())) {
-                    return graph.getStateField();
-                }
-            }
+            // Field-based fallback (reached even when NO state graph is registered). The
+            // previous early `return null` on empty graphs left models whose state lives in
+            // a `*_status` field (e.g. e2et_order_status) without a resolvable state field on
+            // the @Async on_state_change bridge, so toState was never read back and a
+            // toStates filter never matched (golden FINDING-4b).
             Optional<ModelDefinition> modelOpt = metaModelService.getModelDefinition(modelCode);
             if (modelOpt.isPresent() && modelOpt.get().getFields() != null) {
                 List<FieldDefinition> fields = modelOpt.get().getFields();
@@ -159,10 +163,22 @@ public class CommandStateCheckExecutor {
             String tableName = metaModelService.getTableName(modelCode);
             CommandExecutorUtils.validateSqlIdentifier(tableName, "state check tableName");
             var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordId);
+            // The `pid` column is a globally-unique ULID, so a pid lookup identifies exactly
+            // one row across all tenants and needs no tenant predicate. This is essential on
+            // the @Async on_state_change automation bridge: it runs after-commit on an
+            // executor thread where a tenant-scoped read silently returned no row, so the
+            // read-back state was null and a toStates filter never matched (golden FINDING-4b).
+            // A numeric `id` is a per-tenant sequence, so it still needs the tenant scope.
+            // Either way we use selectByQueryWithoutTenant to bypass the TenantLineInnerInterceptor
+            // (which would append an empty-tenant predicate off the async thread).
+            boolean byPid = "pid".equals(idEntry.getKey());
             String sql = "SELECT " + stateField + " FROM " + tableName
-                    + " WHERE tenant_id = #{params.tenantId} AND " + idEntry.getKey() + " = #{params.recordId}";
-            Map<String, Object> params = Map.of("tenantId", tenantId, "recordId", idEntry.getValue());
-            List<Map<String, Object>> result = dynamicDataMapper.selectByQuery(sql, params);
+                    + " WHERE " + idEntry.getKey() + " = #{params.recordId}"
+                    + (byPid ? "" : " AND tenant_id = #{params.tenantId}");
+            Map<String, Object> params = byPid
+                    ? Map.of("recordId", idEntry.getValue())
+                    : Map.of("tenantId", tenantId, "recordId", idEntry.getValue());
+            List<Map<String, Object>> result = dynamicDataMapper.selectByQueryWithoutTenant(sql, params);
             if (result == null || result.isEmpty()) {
                 return null;
             }

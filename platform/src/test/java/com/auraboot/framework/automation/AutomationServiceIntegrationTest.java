@@ -2,6 +2,7 @@ package com.auraboot.framework.automation;
 
 import com.auraboot.framework.automation.dto.AutomationDTO;
 import com.auraboot.framework.automation.dto.AutomationCreateRequest;
+import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.dto.AutomationLogDTO;
 import com.auraboot.framework.automation.dto.AutomationUpdateRequest;
 import com.auraboot.framework.automation.service.AutomationService;
@@ -58,8 +59,18 @@ public class AutomationServiceIntegrationTest extends BaseIntegrationTest {
         req.setName(name);
         req.setModelCode(modelCode);
         req.setTriggerType("on_record_create");
-        req.setActions(List.of()); // empty list satisfies DB NOT NULL DEFAULT '[]'
-        req.setFlowConfig(Map.of("type", "simple")); // non-empty flowConfig bypasses actions validation
+        // A non-empty flat action satisfies the create-time "actions required" check.
+        // A degenerate flowConfig WITHOUT nodes does NOT bypass it (the validation was
+        // tightened — see AutomationServiceImpl#validateCreateRequest line ~469: a
+        // flowConfig is "designer mode" only when flowConfig.nodes is a non-empty list).
+        // enable() skips the SmartEngine deploy for flat-actions automations, so
+        // create → enable → state-transition → search → logs all work on this path.
+        req.setActions(List.of(
+                AutomationAction.builder()
+                        .type("update_record")
+                        .config(Map.of("modelCode", modelCode, "recordId", "${recordId}",
+                                "fields", Map.of("status", "done")))
+                        .build()));
         req.setEnabled(false);
         return req;
     }

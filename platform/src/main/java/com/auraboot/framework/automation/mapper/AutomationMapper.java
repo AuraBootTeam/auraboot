@@ -1,6 +1,7 @@
 package com.auraboot.framework.automation.mapper;
 
 import com.auraboot.framework.automation.entity.Automation;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.*;
 
@@ -64,8 +65,15 @@ public interface AutomationMapper extends BaseMapper<Automation> {
     List<Automation> findByModelCode(@Param("modelCode") String modelCode);
 
     /**
-     * Find all scheduled automations that are enabled
+     * Find all scheduled automations that are enabled.
+     *
+     * <p>{@code @InterceptorIgnore(tenantLine)}: the {@code @Scheduled} poller runs on a
+     * scheduler thread with no MetaContext, so the TenantLineInnerInterceptor would append
+     * an empty-tenant predicate and this cross-tenant system query would return nothing —
+     * i.e. scheduled automations would never fire. The per-automation run still scopes to
+     * {@code automation.getTenantId()} downstream. (golden: N-SCHEDULED never fired.)
      */
+    @InterceptorIgnore(tenantLine = "true")
     @ResultMap("mybatis-plus_Automation")
     @Select("""
         SELECT * FROM ab_automation
@@ -77,8 +85,12 @@ public interface AutomationMapper extends BaseMapper<Automation> {
     List<Automation> findEnabledScheduled();
 
     /**
-     * Find all inactivity-triggered automations that are enabled
+     * Find all inactivity-triggered automations that are enabled.
+     *
+     * <p>{@code @InterceptorIgnore(tenantLine)} for the same reason as
+     * {@link #findEnabledScheduled()} — this is polled from the scheduler thread.
      */
+    @InterceptorIgnore(tenantLine = "true")
     @ResultMap("mybatis-plus_Automation")
     @Select("""
         SELECT * FROM ab_automation
