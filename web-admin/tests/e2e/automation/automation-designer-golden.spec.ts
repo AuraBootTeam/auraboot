@@ -1292,6 +1292,178 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const logs: any[] = (await resp.json())?.data ?? [];
     expect(logs.length, 'the scheduled fire recorded an automation log').toBeGreaterThanOrEqual(1);
   });
+
+  // ── golden EDGE (real UI) — field-change filter precision: only the watched field fires ──
+  // AutomationTriggerServiceImpl#onFieldChange skips when the changed field != config.fieldCode
+  // (`fieldCode.equals(config.getFieldCode())`); the command bridge emits a per-field change
+  // event only when oldValue != newValue. So an update to an UNWATCHED field must NOT fire a
+  // field-change automation watching a different field; the watched field MUST fire.
+  test('N-FIELD-CHANGE-EDGE: trigger-field-change watching 订单标题 — updating a DIFFERENT field does NOT fire, updating the watched field DOES (edge / field filter) @golden', async ({
+    page,
+  }) => {
+    const itemName = `NFCE-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-FIELD-CHANGE-EDGE ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-field-change', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL, fieldCode: '订单标题' });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const orderId = await fireCreate(page, 100, `NFCE-order ${uniqueId()}`);
+    // EDGE: update an UNWATCHED field (remark, not the title) → the fieldCode filter must
+    // skip it → NO child item created.
+    await fireUpdate(page, orderId, { e2et_order_remark: `unwatched ${uniqueId()}` });
+    await page.waitForTimeout(5_000); // give the @Async bridge a chance to (not) fire
+    expect(
+      (await pollItemsByName(page, itemName, 3_000)).length,
+      'changing an unwatched field must NOT fire the field-change automation',
+    ).toBe(0);
+
+    // POSITIVE CONTROL: update the WATCHED field (title) → fires → child item created.
+    const firedAt = Date.now();
+    await fireUpdate(page, orderId, { e2et_order_title: `NFCE-changed ${uniqueId()}` });
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-FIELD-CHANGE-EDGE watched-field run: ${JSON.stringify(log)}`).toBe('success');
+    expect(
+      (await pollItemsByName(page, itemName)).length,
+      'the watched field change fired the automation (control)',
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── golden EDGE (real UI) — loop over an EMPTY collection runs the body 0 times ──
+  // AutomationActionServiceTaskDelegate iterates `for (element : items)`; an empty collection
+  // runs the body 0 times then still marks the node COMPLETED — so the run succeeds with no
+  // side effect (boundary: empty input).
+  test('N-LOOP-EDGE: control-loop over an EMPTY collection — the body runs 0 times, the run still succeeds, no child item is created (edge / boundary) @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const itemName = `NLE-item-${tag}`;
+    const parentOrderId = await fireCreate(page, 100, `NLE-parent ${tag}`);
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-LOOP-EDGE ${tag}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-webhook', { x: 150, y: 70 });
+    const loop = await dragNodeToCanvas(page, 'control-loop', { x: 150, y: 200 });
+    const body = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 330 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, loop);
+    await connectEdge(page, loop, body);
+    await fillNodeConfig(page, loop, { collection: '${items}', itemVariable: 'item' });
+    await fillNodeConfig(page, body, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${parentOrderId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // Fire with an EMPTY collection → the loop body iterates 0 times.
+    const firedAt = Date.now();
+    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
+      data: { items: [], parentOrderId },
+    });
+    expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-LOOP-EDGE empty-collection run should still succeed: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), body), 'the loop body node completes with 0 iterations').toBe(true);
+    await page.waitForTimeout(3_000);
+    expect(
+      (await pollItemsByName(page, itemName, 3_000)).length,
+      'an empty collection creates no child items',
+    ).toBe(0);
+  });
+
+  // ── golden CORNER (real UI) — re-entrancy: the same enabled automation fires twice ──────
+  // Two back-to-back creates must each produce an independent run + its own side effect
+  // (no dropped run, no cross-contamination). The child item name binds to ${recordId}
+  // (the trigger order id, distinct per fire) so each run's side effect is independently keyed.
+  test('N-CORNER-CONCURRENT: fire the same enabled automation TWICE back-to-back — both runs complete independently and each creates its own child item (corner / re-entrancy) @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CORNER-CONCURRENT ${tag}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"${recordId}","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // Fire TWICE back-to-back (no wait between) → two independent runs.
+    const firedAt = Date.now();
+    const orderA = await fireCreate(page, 100, `NCC-A ${tag}`);
+    const orderB = await fireCreate(page, 100, `NCC-B ${tag}`);
+    // Each run created its own child item keyed by its distinct trigger order id.
+    expect((await pollItemsByName(page, orderA)).length, 'first fire created its own child item').toBeGreaterThanOrEqual(1);
+    expect((await pollItemsByName(page, orderB)).length, 'second fire created its own child item').toBeGreaterThanOrEqual(1);
+    // Two distinct run logs were recorded for the two fires (re-entrancy, not a single merged run).
+    const logsResp = await page.request.get(`/api/automations/${pid}/logs`, { params: { limit: 10 } });
+    const logs: any[] = ((await logsResp.json())?.data ?? []).filter(
+      (r: any) => (r.startedAt ? new Date(r.startedAt).getTime() : 0) >= firedAt - 5_000,
+    );
+    expect(logs.length, 'two back-to-back fires recorded two independent run logs').toBeGreaterThanOrEqual(2);
+  });
+
+  // ── golden CORNER (real UI) — unicode/i18n: a CJK+emoji payload round-trips intact ──────
+  // The golden standard lists unicode/i18n as a corner case. A create-record carrying a
+  // CJK+emoji+ascii name must persist byte-exact through the command pipeline + DB.
+  test('N-CORNER-UNICODE: create-record with a CJK/emoji item name round-trips and persists exactly (corner / i18n robustness) @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const itemName = `订单🎉项目-${tag}`; // CJK + emoji + ascii tag (ascii tag keeps it searchable)
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CORNER-UNICODE ${tag}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"规格✓","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `NCU-order ${tag}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-CORNER-UNICODE run: ${JSON.stringify(log)}`).toBe('success');
+    // Search by the ascii tag (reliably keyword-searchable), then match the EXACT unicode name.
+    const deadline = Date.now() + 20_000;
+    let found: any | undefined;
+    while (Date.now() < deadline && !found) {
+      const resp = await page.request.get(`/api/dynamic/e2et_order_item/list`, {
+        params: { pageNum: 1, pageSize: 50, keyword: tag },
+      });
+      if (resp.ok()) {
+        const data = (await resp.json())?.data;
+        const rows = data?.records ?? data?.list ?? data?.content ?? data?.rows ?? (Array.isArray(data) ? data : []);
+        found = rows.find((r: any) => r?.e2et_item_name === itemName);
+      }
+      if (!found) await page.waitForTimeout(1_500);
+    }
+    expect(found, 'the unicode item name round-tripped and persisted exactly').toBeTruthy();
+    expect(found.e2et_item_name, 'the persisted name matches the unicode source byte-exact').toBe(itemName);
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */
