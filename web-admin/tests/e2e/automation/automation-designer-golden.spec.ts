@@ -967,6 +967,34 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(node?.status, `update-record node should be failed: ${JSON.stringify(statuses)}`).toBe('failed');
     expect(node?.errorMessage ?? '', 'a failed node should carry an error message').toBeTruthy();
   });
+
+  // ── golden SAD path (real UI) — create-record targeting a nonexistent field fails ──
+  test('N-CREATE-RECORD-SAD: drag trigger-record-create→action-create-record with a nonexistent field, save, enable, fire → the node FAILS (sad) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CREATE-RECORD-SAD ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_item_nonexistent_zzz":"boom"}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-CR-SAD-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(['failed', 'partial_success'], `N-CREATE-RECORD-SAD must fail (bad field): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
+    const node = (await pollNodeStatuses(page, log!.id, 30_000)).find((s) => s.nodeId === action);
+    expect(node?.status, 'create-record node should be failed').toBe('failed');
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */
