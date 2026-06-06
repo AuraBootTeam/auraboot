@@ -894,6 +894,37 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const record = await pollRecordField(page, recordId, 'e2et_order_title', 'EDGE_FALSE');
     expect(record.e2et_order_title, 'boundary value took the FALSE branch').toBe('EDGE_FALSE');
   });
+
+  test('N-SEND-NOTIFICATION: drag trigger-record-create→action-send-notification, configure title/content/recipients via panel, save, enable, fire → node completes (FINDING-8 recipients fix) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-SEND-NOTIFICATION ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-send-notification', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // notificationType is pre-set to in_app by the node defaultConfig. title/content/recipients
+    // are expression fields; recipients='1' resolves to a single user id after the FINDING-8
+    // tolerant-parse fix (configSchema types recipients as expression/string, executor reads a
+    // list — previously a ClassCastException for any designer-built send-notification).
+    await fillNodeConfig(page, action, {
+      title: 'Order created',
+      content: 'A new order was created by the automation',
+      recipients: '1',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-NOTIFY-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-SEND-NOTIFICATION run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'send-notification node completed').toBe(true);
+  });
 });
 
 /** True if the given node reached 'completed' in the polled statuses. */

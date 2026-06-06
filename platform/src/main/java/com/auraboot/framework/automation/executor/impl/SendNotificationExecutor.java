@@ -32,11 +32,12 @@ public class SendNotificationExecutor implements ActionExecutor {
             throw new IllegalArgumentException("SEND_NOTIFICATION action requires config");
         }
 
-        String notificationType = (String) config.get("type"); // EMAIL, SMS, IN_APP, WEBHOOK
+        // Accept both `type` (legacy) and `notificationType` (the configSchema key the
+        // visual designer writes); defaults to in_app downstream when absent.
+        String notificationType = (String) config.getOrDefault("type", config.get("notificationType"));
         String title = (String) config.get("title");
         String content = (String) config.get("content");
-        @SuppressWarnings("unchecked")
-        List<String> recipients = (List<String>) config.get("recipients");
+        List<String> recipients = parseRecipients(config.get("recipients"));
 
         String processedContent = processTemplate(content, context);
         String processedTitle = processTemplate(title, context);
@@ -107,6 +108,32 @@ public class SendNotificationExecutor implements ActionExecutor {
     @Override
     public boolean supports(String actionType) {
         return "send_notification".equals(actionType);
+    }
+
+    /**
+     * Parse the {@code recipients} config into a list of recipient tokens. Tolerates both
+     * shapes: a {@code List<String>} (the API/flat-actions form, e.g. {@code ["1"]}) AND a
+     * plain {@code String} (the visual designer's {@code recipients} field is typed as an
+     * {@code expression} in the configSchema — a single id, a {@code ${var}} template, or a
+     * comma-separated list). Golden FINDING-8: the previous straight cast
+     * {@code (List<String>) config.get("recipients")} threw a ClassCastException for every
+     * send-notification built in the designer (recipients arrived as a String). The per-token
+     * {@code ${...}} resolution still happens in {@link #resolveRecipient}.
+     */
+    private List<String> parseRecipients(Object raw) {
+        if (raw == null) {
+            return java.util.List.of();
+        }
+        if (raw instanceof List<?> list) {
+            return list.stream().map(String::valueOf).map(String::trim)
+                    .filter(s -> !s.isBlank()).collect(java.util.stream.Collectors.toList());
+        }
+        String s = String.valueOf(raw).trim();
+        if (s.isBlank()) {
+            return java.util.List.of();
+        }
+        return java.util.Arrays.stream(s.split(",")).map(String::trim)
+                .filter(x -> !x.isBlank()).collect(java.util.stream.Collectors.toList());
     }
 
     /**
