@@ -332,7 +332,7 @@ stateDiagram-v2
   "name:en": "Nonconformance Management",
   "modelCode": "qc_ncr",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "blocks": [
     {
       "id": "block_nc_toolbar",
@@ -385,7 +385,7 @@ stateDiagram-v2
   "name:en": "CAPA Management",
   "modelCode": "qc_capa",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "blocks": [
     {
       "id": "block_capa_toolbar",

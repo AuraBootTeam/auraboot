@@ -613,7 +613,7 @@ The Procurement plugin ships with **38 page configurations**:
   "name:en": "Purchase Management",
   "modelCode": "pr_purchase_order",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12 },
   "blocks": [
     {
@@ -706,7 +706,7 @@ The Procurement plugin ships with **38 page configurations**:
   "name:en": "Purchase Order Form",
   "modelCode": "pr_purchase_order",
   "kind": "form",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 12 },
   "blocks": [
     {
@@ -757,13 +757,15 @@ The Procurement plugin ships with **38 page configurations**:
 
 ### Procurement Dashboard (Complete JSON)
 
+> **Note:** Dashboards are built with the **Dashboard Designer** (stored in `ab_dashboard`), not imported as a `pages.json` page — the plugin importer rejects `kind: "dashboard"`. The JSON below illustrates the dashboard's block content for reference.
+
 ```json
 {
   "pageKey": "proc_dashboard",
   "name:en": "Procurement Dashboard",
   "modelCode": "pr_purchase_order",
   "kind": "dashboard",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },
   "blocks": [
     {

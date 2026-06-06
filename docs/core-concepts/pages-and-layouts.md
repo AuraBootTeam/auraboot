@@ -18,9 +18,10 @@ Every page has a `kind` that determines its fundamental behavior:
 | `list` | Browse, search, and filter records. Table with toolbar, tabs, and pagination. | `/p/{pageKey}` |
 | `form` | Create or edit a single record. Grouped field sections with validation. | `/p/{pageKey}/new` or `/p/{pageKey}/edit/{id}` |
 | `detail` | View a single record in read-only mode. Tabbed sections with related sub-tables. | `/p/{pageKey}/view/{id}` |
-| `dashboard` | KPI overview with charts, stat cards, and metrics. No record-level data binding. | `/p/{pageKey}` |
 
 All values are **lowercase**. There are no aliases -- `pageType`, `pageCategory`, `RuntimePageType`, and `SchemaKind` have been removed.
+
+> **Importable plugin page kinds are `list` / `form` / `detail` only.** Dashboards are built with the separate **Dashboard Designer** (stored in `ab_dashboard`, served under `/dashboards/...`), **not** as a `pages.json` page — the plugin importer hard-rejects `kind: "dashboard"` (and `composite`), which have no plugin-page renderer. `chart` / `stat-card` blocks may still be embedded inside `detail` pages.
 
 ## Block Types
 
@@ -35,8 +36,8 @@ Blocks are the building units of a page. Each block has a `blockType` and type-s
 | `form-section` | form, detail | A group of fields with a section title. In forms, fields are editable. In details, fields are read-only. |
 | `form-buttons` | form | Submit and cancel buttons for the form |
 | `sub-table` | detail | Related child records displayed as an inline table. Supports three data modes. |
-| `chart` | dashboard | Visualization: bar, line, pie, funnel, radar, area, gauge, scatter, heatmap, treemap, combo, wordcloud, nps |
-| `stat-card` | dashboard | KPI metric cards with icon, value, and title |
+| `chart` | detail | Visualization: bar, line, pie, funnel, radar, area, gauge, scatter, heatmap, treemap, combo, wordcloud, nps (embeddable in detail pages; standalone dashboards use the Dashboard Designer) |
+| `stat-card` | detail | KPI metric cards with icon, value, and title |
 | `custom` | any | Escape hatch for custom React components (platform pages only, not business CRUD) |
 
 ## Layout System
@@ -116,7 +117,7 @@ Every page JSON file follows this top-level structure:
   "name:en": "All Field Types",
   "modelCode": "showcase_all_fields",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": {
     "type": "grid",
     "cols": 12
@@ -135,8 +136,8 @@ Every page JSON file follows this top-level structure:
 | `name:zh-CN` | string | Yes | Chinese display name |
 | `name:en` | string | Yes | English display name |
 | `modelCode` | string | Model pages | Required for model-backed `list`, `form`, and `detail` pages. Optional for dashboards and custom non-record pages. |
-| `kind` | string | Yes | `list`, `form`, `detail`, or `dashboard` |
-| `schemaVersion` | number | Yes | Always `2` (V2 flat format) |
+| `kind` | string | Yes | `list`, `form`, or `detail` (importable plugin page kinds). `dashboard`/`composite` are **not** importable as pages — see note under Page Kinds. |
+| `schemaVersion` | number | Yes | Always `4` (DSL V4 flat format). The plugin importer **hard-fails** any page that does not explicitly declare `schemaVersion: 4`. |
 | `layout` | object | Yes | `{ "type": "stack" }` or `{ "type": "grid", "cols": 12 }` |
 | `blocks` | array | Yes | Flat array of block objects |
 | `profile` | string | No | `admin` (default) or `report` |
@@ -152,7 +153,7 @@ Plugin import rejects obvious page DSL gaps before the page can be published. Ge
 | `S-PAGE-KIND` / `S-PAGE-KIND-UNKNOWN` | page | `kind` is required and must be one of the registered page kinds. |
 | `S-PAGE-LAYOUT` | page | `layout` is required and cannot be empty. |
 | `S-PAGE-BLOCKS` | page | `blocks` is required and cannot be empty. |
-| `S-PAGE-LEGACY-FORMAT` | page | Legacy top-level `dslSchema` and `pageType` are rejected. Use the V2 flat format. |
+| `S-PAGE-LEGACY-FORMAT` | page | Legacy top-level `dslSchema` and `pageType` are rejected. Use the v4 flat format. |
 | `S-PAGE-BLOCK-ID` | block | Every block requires a stable `id` for runtime diagnostics and golden verification. |
 | `S-PAGE-BLOCK-TYPE` | block | `blockType` must be registered in `DslRegistry.BlockType`. |
 | `S-PAGE-TABLE-COLUMNS` | `table`, `sub-table` | Table-like blocks require non-empty `columns`. For `sub-table`, columns may live under `subTable.columns`. |
@@ -188,7 +189,7 @@ This is a real configuration from the Showcase plugin:
   "name:en": "All Field Types",
   "modelCode": "showcase_all_fields",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12 },
   "blocks": [
     {
@@ -328,7 +329,7 @@ A form page contains `form-section` blocks for field grouping and a `form-button
   "name:en": "Showcase Form",
   "modelCode": "showcase_all_fields",
   "kind": "form",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },
   "blocks": [
     {
@@ -410,7 +411,7 @@ From the CRM Opportunity plugin, showing sub-tables in three different data mode
   "name:en": "Opportunity Detail",
   "modelCode": "crm_opportunity",
   "kind": "detail",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "stack" },
   "blocks": [
     {
@@ -565,7 +566,7 @@ Dashboard pages display KPIs and visualizations using stat-card and chart blocks
   "name:en": "Widget Dashboard",
   "modelCode": "showcase_all_fields",
   "kind": "dashboard",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },
   "blocks": [
     {
@@ -677,7 +678,7 @@ AuraBoot includes a visual **Page Designer** for building pages through drag-and
 - Live preview of the page
 - Auto-saving drafts via `latestDslRef`
 
-The Page Designer produces pages in V2 flat format (`blocks` array, no nesting). Pages created through the designer are functionally identical to hand-written JSON.
+The Page Designer produces pages in v4 flat format (`blocks` array, no nesting). Pages created through the designer are functionally identical to hand-written JSON.
 
 ## Database Schema
 
@@ -707,4 +708,4 @@ There are no `page_type`, `page_category`, or `dsl_schema` columns.
 
 6. **Grid layout for dashboards, stack for details.** Dashboards benefit from multi-column grid layouts. Detail pages work well with stack layout and tabbed sections.
 
-7. **Always specify `schemaVersion: 2`.** This is the V2 flat format. V1 formats with `dslSchema` nesting are no longer supported.
+7. **Always specify `schemaVersion: 4`.** This is the v4 flat format. V1 formats with `dslSchema` nesting are no longer supported.
