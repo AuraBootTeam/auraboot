@@ -351,6 +351,36 @@ class DataPermissionEngineIntegrationTest {
     }
 
     @Test
+    @DisplayName("Engine: getNonWritableFields returns fields for FIELD_WRITE policies (gap #1)")
+    void testGetNonWritableFields() {
+        DataPermissionPolicyCreateRequest req = new DataPermissionPolicyCreateRequest();
+        req.setName("Readonly Credit Limit");
+        req.setModelCode("write_model");
+        req.setPolicyType("field_write");
+        req.setFieldCode("credit_limit");
+        DataPermissionPolicy policy = policyService.create(req);
+        policyService.bindToRole(policy.getPid(), localRole.getPid());
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        java.util.Set<String> nonWritable =
+                dataPermissionEngine.getNonWritableFields(tenantId, "write_model", userId);
+
+        assertTrue(nonWritable.contains("credit_limit"));
+    }
+
+    @Test
+    @DisplayName("Engine: getNonWritableFields empty when no FIELD_WRITE policy applies (gap #1)")
+    void testGetNonWritableFieldsEmptyWhenNoPolicy() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        java.util.Set<String> nonWritable =
+                dataPermissionEngine.getNonWritableFields(tenantId, "unpoliced_model_" + testSuffix, userId);
+
+        assertTrue(nonWritable.isEmpty());
+    }
+
+    @Test
     @DisplayName("Engine: applyFieldMasking HIDE sets value to null")
     void testApplyFieldMaskingHide() {
         List<FieldMaskRule> rules = List.of(

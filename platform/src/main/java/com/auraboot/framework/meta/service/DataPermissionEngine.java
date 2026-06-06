@@ -4,6 +4,7 @@ import com.auraboot.framework.meta.dto.FieldMaskRule;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Data Permission Engine.
@@ -76,6 +77,16 @@ public interface DataPermissionEngine {
      * @return list of masking rules (empty if no masking needed)
      */
     List<FieldMaskRule> getFieldMaskRules(Long tenantId, String modelCode, Long userId);
+
+    /**
+     * Field-level WRITE permission (gap #1): the set of field codes the current
+     * user may NOT write for this model (effective policies with
+     * policyType = "field_write"). Callers strip these from create/update
+     * payloads so a user cannot mutate fields outside their write scope.
+     *
+     * @return non-writable field codes (empty if none apply)
+     */
+    Set<String> getNonWritableFields(Long tenantId, String modelCode, Long userId);
 
     /**
      * Apply field masking to query results.
