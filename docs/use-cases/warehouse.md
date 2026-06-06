@@ -574,11 +574,13 @@ Inventory (root)
 
 A comprehensive dashboard with 11 blocks:
 
+> **Note:** Dashboards are built with the **Dashboard Designer** (stored in `ab_dashboard`), not imported as a `pages.json` page — the plugin importer rejects `kind: "dashboard"`. The JSON below illustrates the dashboard's block content for reference.
+
 ```json
 {
   "pageKey": "inv_inventory_dashboard",
   "kind": "dashboard",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },
   "blocks": [
     {

@@ -361,7 +361,7 @@ The list page features status tab filtering, a create button, and conditional ro
   "pageKey": "thr_leave_request_list",
   "kind": "list",
   "modelCode": "thr_leave_request",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12 },
   "blocks": [
     {
@@ -461,7 +461,7 @@ The list page features status tab filtering, a create button, and conditional ro
   "pageKey": "thr_leave_request_form",
   "kind": "form",
   "modelCode": "thr_leave_request",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 12 },
   "blocks": [
     {

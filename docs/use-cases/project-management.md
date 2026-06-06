@@ -856,7 +856,7 @@ The project list page (`pm_project_list`) features status-based tab filtering, a
   "pageKey": "pm_project_list",
   "modelCode": "pm_project",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12 },
   "blocks": [
     {
@@ -920,7 +920,7 @@ The task form uses multiple `form-section` blocks to group fields logically: bas
   "pageKey": "pm_task_form",
   "modelCode": "pm_task",
   "kind": "form",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 12 },
   "blocks": [
     {

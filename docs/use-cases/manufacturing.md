@@ -431,7 +431,7 @@ List page with toolbar, searchable table, and inline status transition actions:
   "pageKey": "prd_production_order_list",
   "modelCode": "prd_production_order",
   "kind": "list",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "blocks": [
     {
       "id": "block_po_toolbar",
@@ -575,6 +575,8 @@ Row-level actions use `visibleWhen` expressions to show context-appropriate butt
 #### Production Dashboard (`pe_production_dashboard`)
 
 A dashboard page with KPI cards, charts, and operational tables:
+
+> **Note:** Dashboards are built with the **Dashboard Designer** (stored in `ab_dashboard`), not imported as a `pages.json` page — the plugin importer rejects `kind: "dashboard"`. The JSON below illustrates the dashboard's block content for reference.
 
 ```json
 {

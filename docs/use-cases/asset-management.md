@@ -307,6 +307,8 @@ Asset Management (icon: Package)
 
 The dashboard uses a **grid layout** (12 columns) with stat cards, charts, and a pending tasks table:
 
+> **Note:** Dashboards are built with the **Dashboard Designer** (stored in `ab_dashboard`), not imported as a `pages.json` page — the plugin importer rejects `kind: "dashboard"`. The JSON below illustrates the dashboard's block content for reference.
+
 ```json
 {
   "pageKey": "asset_dashboard",
