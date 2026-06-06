@@ -478,4 +478,74 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       NEW_MARKER,
     );
   });
+
+  // ─────────────────── Per-node real-UI golden (goal 2026-06-06) ───────────────────
+  // Each case below drives the REAL designer (drag the node-under-test, configure via
+  // the real property panel, connect, save, enable via the list toggle, fire a real
+  // trigger) then verifies the backend ran correctly. Reuses only proven H1 patterns
+  // (model-select by label, json field). SmartEngine-dependent nodes (start-process,
+  // bpm-event, control-delay) are excluded per the directive.
+
+  /** Poll the dynamic list for an e2et_order_item carrying `name` (create-record side effect). */
+  async function pollItemsByName(page: Page, name: string, timeoutMs = 20_000): Promise<any[]> {
+    const deadline = Date.now() + timeoutMs;
+    let rows: any[] = [];
+    while (Date.now() < deadline) {
+      const resp = await page.request.get(`/api/dynamic/e2et_order_item/list`, {
+        params: { pageNum: 1, pageSize: 50, keyword: name },
+      });
+      if (resp.ok()) {
+        const data = (await resp.json())?.data;
+        rows = data?.records ?? data?.list ?? data?.content ?? data?.rows ?? (Array.isArray(data) ? data : []);
+        const hit = rows.filter((r) => r?.e2et_item_name === name);
+        if (hit.length) return hit;
+      }
+      await page.waitForTimeout(1_000);
+    }
+    return rows.filter((r) => r?.e2et_item_name === name);
+  }
+
+  test('N-CREATE-RECORD: drag trigger-record-create→action-create-record, configure via panel, save, enable, fire → a child order_item is created (happy) @golden', async ({
+    page,
+  }) => {
+    const itemName = `NCR-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CREATE-RECORD ${uniqueId()}`);
+
+    // BUILD by real drag-drop + connect.
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+
+    // CONFIGURE via the real property panel (model-select by label, json field).
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细', // e2et_order_item displayName
+      fields:
+        '{"e2et_order_id":"${recordId}","e2et_item_name":"' +
+        itemName +
+        '","e2et_item_spec":"std","e2et_item_qty":2,"e2et_item_price":50}',
+    });
+
+    // SAVE → assert persisted 2-node/1-edge flow.
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    expect(saved.flowConfig.nodes).toHaveLength(2);
+    expect(saved.flowConfig.edges).toHaveLength(1);
+
+    // ENABLE via the real list toggle, then FIRE a real create.
+    await enableViaListToggle(page, pid);
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `NCR-order ${uniqueId()}`);
+
+    // BACKEND verify: run success + the create-record node completed + the child item exists.
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-CREATE-RECORD run: ${JSON.stringify(log)}`).toBe('success');
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(statuses.find((s) => s.nodeId === action)?.status, `create-record node completed: ${JSON.stringify(statuses)}`).toBe('completed');
+    const items = await pollItemsByName(page, itemName);
+    expect(items.length, `child order_item '${itemName}' created by the create-record action`).toBeGreaterThanOrEqual(1);
+  });
 });
