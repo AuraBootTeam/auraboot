@@ -5,6 +5,7 @@ import com.auraboot.framework.rag.entity.KnowledgeBase;
 import com.auraboot.framework.rag.mapper.KbDocumentMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
@@ -104,6 +105,40 @@ class KbTextIngestServiceTest {
                 anyString(), anyString());
         verify(kbService).updateDocumentAfterProcessing(anyString(), eq("completed"), eq(11), eq(2), eq(null));
         verify(kbService).refreshKbCounters("KB1");
+    }
+
+
+    @Test
+    void normalizesLogicalSourceType_toInternalDoc_forDbConstraint() {
+        // "crawler" is not in ab_kb_document.chk_doc_source {file,entity,internal_doc};
+        // it must be persisted as internal_doc so the INSERT does not violate the constraint.
+        stubKb("KB1", "openai");
+        when(docMapper.selectList(any())).thenReturn(List.of());
+        when(chunkingService.chunk(any(), anyInt(), anyInt())).thenReturn(List.of(chunk(0, "x")));
+        when(embeddingService.embedBatch(anyLong(), any(), anyString())).thenReturn(List.of(new float[]{0.1f}));
+
+        svc.ingestText(1L, "KB1", "crawler", "u1", "Doc", "x");
+
+        ArgumentCaptor<KbDocument> cap = ArgumentCaptor.forClass(KbDocument.class);
+        verify(docMapper).insert(cap.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("internal_doc", cap.getValue().getSourceType());
+        org.junit.jupiter.api.Assertions.assertEquals("u1", cap.getValue().getSourceEntityId());
+        // dedup query also keyed on the normalized type
+        verify(docMapper).selectList(any());
+    }
+
+    @Test
+    void preservesAllowedSourceType_entity() {
+        stubKb("KB1", "openai");
+        when(docMapper.selectList(any())).thenReturn(List.of());
+        when(chunkingService.chunk(any(), anyInt(), anyInt())).thenReturn(List.of(chunk(0, "x")));
+        when(embeddingService.embedBatch(anyLong(), any(), anyString())).thenReturn(List.of(new float[]{0.1f}));
+
+        svc.ingestText(1L, "KB1", "entity", "rec1", "Doc", "x");
+
+        ArgumentCaptor<KbDocument> cap = ArgumentCaptor.forClass(KbDocument.class);
+        verify(docMapper).insert(cap.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("entity", cap.getValue().getSourceType());
     }
 
     @Test

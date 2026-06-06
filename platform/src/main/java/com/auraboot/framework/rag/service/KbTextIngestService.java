@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Reusable text-document RAG ingest: chunk &rarr; insert pending chunks &rarr; embed
@@ -50,6 +51,9 @@ public class KbTextIngestService {
 
     private TransactionTemplate tx;
 
+    /** DB-allowed ab_kb_document.source_type values (chk_doc_source); other logical sources map to internal_doc. */
+    private static final Set<String> DB_SOURCE_TYPES = Set.of("file", "entity", "internal_doc");
+
     @PostConstruct
     void initTx() {
         this.tx = new TransactionTemplate(txManager);
@@ -73,11 +77,15 @@ public class KbTextIngestService {
         String hash = sha256(text);
         String resolvedName = (docName != null && !docName.isBlank())
                 ? docName : sourceType + ":" + sourceId;
+        // ab_kb_document.chk_doc_source allows only {file, entity, internal_doc}. A plugin's
+        // logical source (e.g. "crawler") maps to internal_doc — a programmatically ingested
+        // document that is neither a user file-upload (file) nor an entity-record sync (entity).
+        String dbSourceType = DB_SOURCE_TYPES.contains(sourceType) ? sourceType : "internal_doc";
 
         return tx.execute(status -> {
             // Idempotent: drop this source's prior document + chunks before re-inserting.
             List<KbDocument> existing = docMapper.selectList(new LambdaQueryWrapper<KbDocument>()
-                    .eq(KbDocument::getSourceType, sourceType)
+                    .eq(KbDocument::getSourceType, dbSourceType)
                     .eq(KbDocument::getSourceEntityId, sourceId));
             for (KbDocument d : existing) {
                 jdbcTemplate.update("DELETE FROM ab_kb_chunk WHERE doc_id = ?", d.getPid());
@@ -89,7 +97,7 @@ public class KbTextIngestService {
                     .pid(docPid).tenantId(tenantId).kbId(kbPid)
                     .docName(resolvedName).docType("html")
                     .fileSize((long) text.length()).charCount(text.length())
-                    .sourceType(sourceType).sourceEntityId(sourceId)
+                    .sourceType(dbSourceType).sourceEntityId(sourceId)
                     .contentHash(hash).status("processing")
                     .build();
             docMapper.insert(doc);
