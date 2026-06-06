@@ -404,6 +404,10 @@ export async function enableViaApi(page: Page, pid: string): Promise<void> {
 }
 
 export async function deleteViaApi(page: Page, pid: string): Promise<void> {
+  // Disable first — an enabled automation (especially a scheduled every-second cron)
+  // keeps firing, and leaving it enabled lets it pile up scheduler load across runs.
+  // Best-effort + idempotent; then delete.
+  await page.request.post(`/api/automations/${pid}/disable`).catch(() => {});
   await page.request.delete(`/api/automations/${pid}`).catch(() => {});
 }
 

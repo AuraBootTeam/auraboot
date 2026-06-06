@@ -181,3 +181,84 @@ SmartEngine-excluded = 3 (start-process, bpm-event, control-delay).
 - **Disk:** host `/` is volatile (~5–9GB, drained by 6 other sessions' stacks). Avoid rebuilds
   where possible; prune artifacts between runs; a backend rebuild (GAP-D) needs headroom.
 - This is a multi-session body of work; progress is committed incrementally on the feature branch.
+
+## Final status (2026-06-07) — GAP-A/B/C/F resolved
+
+### Per-node golden matrix (Layer A real designer-UI; backend-asserted)
+
+Legend: ✅ real-UI case present + green · — not applicable / no distinct case · ⛔ SmartEngine-excluded.
+
+| Node | happy | sad | edge | corner |
+|------|-------|-----|------|--------|
+| trigger-record-create | ✅ N-CREATE-RECORD / H1 | ✅ S1 (required save-gate) | ✅ N-CONDITION-EDGE (boundary) | ✅ N-CORNER-CONCURRENT / -UNICODE / -LIFECYCLE |
+| trigger-record-update | ✅ N-TRIGGER-UPDATE | — | — | — |
+| trigger-field-change | ✅ N-TRIGGER-FIELD-CHANGE | — | ✅ N-FIELD-CHANGE-EDGE (unwatched field no-fire) | — |
+| trigger-state-change | ✅ N-TRIGGER-STATE-CHANGE | — | ✅ N-TRIGGER-STATE-FILTER (toStates filter) | — |
+| trigger-webhook | ✅ N-TRIGGER-WEBHOOK | — | ✅ N-LOOP-EDGE (empty body via webhook) | — |
+| trigger-scheduled | ✅ N-SCHEDULED (cron fire) | — | — | — |
+| action-update-record | ✅ H1 / E5 | ✅ N-UPDATE-RECORD-SAD | — | — |
+| action-create-record | ✅ N-CREATE-RECORD | ✅ N-CREATE-RECORD-SAD | — | ✅ N-CORNER-UNICODE |
+| action-send-notification | ✅ N-SEND-NOTIFICATION | — | — | — |
+| action-execute-command | ✅ N-EXECUTE-COMMAND | ✅ N-EXECUTE-COMMAND-SAD (denial) | — | — |
+| action-call-api | ✅ N-CALL-API | ✅ N-CALL-API-SAD (404) | — | — |
+| action-send-webhook | ✅ N-SEND-WEBHOOK-OUTBOUND (real POST lands) | ✅ N-SEND-WEBHOOK-SAD (500) | — | — |
+| action-llm-call | ✅ N-LLM-CALL (stub) | — | — | — |
+| control-condition | ✅ H1 | ✅ S2 (dangerous SpEL) | ✅ N-CONDITION-EDGE | — |
+| control-loop | ✅ N-LOOP | — | ✅ N-LOOP-EDGE (empty collection) | — |
+| action-start-process | ⛔ | ⛔ | ⛔ | ⛔ (BPM stub — honest test.fixme) |
+| trigger-bpm-event | ⛔ | ⛔ | ⛔ | ⛔ (BPM stub — honest test.fixme) |
+| control-delay | ⛔ | ⛔ | ⛔ | ⛔ (SmartEngine timer suspended — honest test.fixme) |
+
+**Path totals (15 in-scope nodes):** happy 15/15 · sad 7 · edge 5 · corner 3 (+lifecycle).
+SmartEngine-excluded = 3 (documented honest skips, not faked).
+
+### Real product bugs surfaced + fixed by the golden (this goal)
+
+- FINDING-4b: `CommandStateCheckExecutor.getStateFieldForModel` early-returned null on a model
+  with no registered state graph → on_state_change toStates filter never matched. Fixed (field
+  fallback + pid read without tenant predicate). Verified by N-TRIGGER-STATE-FILTER.
+- Scheduler tenant: `AutomationMapper.findEnabledScheduled` ran on the @Scheduled thread with no
+  MetaContext → empty-tenant predicate → no scheduled automation ever fired. Fixed
+  (`@InterceptorIgnore`). Verified by N-SCHEDULED.
+- Multiselect dict: toStates/fromStates rendered DependentMultiSelect without dependsOnKey/
+  optionSource → always-empty dropdown. Fixed. Verified by N-TRIGGER-STATE-FILTER.
+- FINDING-9: command-select picker hit `GET /api/meta/commands` without modelCode → 500 + wrong
+  shape → zero options. Fixed (modelCode optional + bare-list read). Verified by N-EXECUTE-COMMAND.
+- FINDING-10: `SendWebhookExecutor` ignored the node's `url` and fanned out to webhook subscriptions
+  instead of POSTing to the URL its UI promises. Fixed (direct SSRF-validated POST). Verified by
+  N-SEND-WEBHOOK-OUTBOUND/-SAD.
+
+### GAP-C coverage
+
+Automation-package line coverage **81.3%** (union of gradle unit+IT 332/335 + E2E golden). Stale IT
+`buildRequest` helpers fixed (24 cases greened). Methodology + per-package table:
+[2026-06-07-automation-coverage-measurement.md](./2026-06-07-automation-coverage-measurement.md).
+
+### Remaining (out of scope / pre-existing)
+
+- SmartEngine-dependent nodes (start-process, bpm-event, delay) — honest test.fixme.
+- `DebugSessionServiceImplTest` 3 red (pre-existing Mockito stub mismatch, debug feature).
+
+### P5 flake result — full Layer-A suite 3× clean ✅ (2026-06-07)
+
+The full 30-case Layer-A suite now passes **3× consecutively clean (30/30 each, ~3 min/run)**,
+no retries. Two flake sources were root-caused (instrument-don't-guess) and fixed:
+
+1. **N-SCHEDULED — cross-test interference (test isolation, NOT a backend bug).** Under full-suite
+   serial load the case deterministically failed its title keyword-search (0 orders) while the run
+   logged success. Instrumentation proved the scheduled create-record node reached `completed` and
+   the row WAS inserted — but the suite leaves every case's automation **enabled** for the whole
+   serial run, so the scheduled order's creation re-triggered the still-enabled `on_record_create`
+   automations from earlier cases (notably N-CONDITION-EDGE, amount-gated → FALSE branch) which
+   **overwrote `e2et_order_title` to EDGE_FALSE** before the search ran. Fix: assert the scheduled
+   fire via the by-pid **automation LOG + create-record node-status** (`completed`) — immune to the
+   title overwrite and the authoritative "a record was persisted" proof. (Broader latent isolation
+   note: the suite could disable each automation post-test; only N-SCHEDULED's delayed title check
+   surfaced it, so the targeted node-status assertion is the minimal correct fix.)
+2. **`setAutomationName` — controlled-input keystroke drop.** `pressSequentially` occasionally lost
+   the first keystrokes before React attached the onChange handler (value=""), failing
+   `toHaveValue`. Every case calls this, so it was the residual ~1/2 full-suite flake. Fix: wrap
+   clear→type→verify in `expect(...).toPass()` so it retries until the value sticks.
+
+Also hardened: `deleteViaApi` now disables before delete (an enabled every-second cron otherwise
+leaked across runs and piled up scheduler load — 6 had accumulated before this fix).

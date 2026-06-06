@@ -149,9 +149,17 @@ async function openNewDesigner(page: Page): Promise<void> {
 // automation-validation-gate.spec.ts).
 async function setAutomationName(page: Page, name: string): Promise<void> {
   const input = page.locator('[data-testid="automation-editor-name-input"]');
-  await input.click();
-  await input.pressSequentially(name, { delay: 10 });
-  await expect(input).toHaveValue(name);
+  await input.waitFor({ state: 'visible' });
+  // pressSequentially occasionally drops the first keystrokes when React has not yet
+  // attached the controlled onChange handler — observed as value="" under full-suite
+  // serial load (the residual flake source, since every case calls this). Retry the
+  // clear→type→verify block until the value actually sticks.
+  await expect(async () => {
+    await input.click();
+    await input.fill('');
+    await input.pressSequentially(name, { delay: 15 });
+    await expect(input).toHaveValue(name, { timeout: 2_000 });
+  }).toPass({ timeout: 15_000, intervals: [250, 500, 1_000] });
 }
 
 // ───────────────────────── tests ─────────────────────────
@@ -1291,25 +1299,6 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     ).toBeGreaterThanOrEqual(1);
   });
 
-  /** Poll the e2et_order dynamic list for a record carrying `title`. */
-  async function pollOrdersByTitle(page: Page, title: string, timeoutMs = 100_000): Promise<any[]> {
-    const deadline = Date.now() + timeoutMs;
-    let rows: any[] = [];
-    while (Date.now() < deadline) {
-      const resp = await page.request.get(`/api/dynamic/${MODEL_CODE}/list`, {
-        params: { pageNum: 1, pageSize: 50, keyword: title },
-      });
-      if (resp.ok()) {
-        const data = (await resp.json())?.data;
-        rows = data?.records ?? data?.list ?? data?.content ?? data?.rows ?? (Array.isArray(data) ? data : []);
-        const hit = rows.filter((r) => r?.e2et_order_title === title);
-        if (hit.length) return hit;
-      }
-      await page.waitForTimeout(3_000);
-    }
-    return rows.filter((r) => r?.e2et_order_title === title);
-  }
-
   // ── trigger-scheduled: real cron fire path (AutomationScheduler polls every 60s) ──
   // The scheduler evaluates a 6-field Spring cron against the automation's last-trigger
   // (or created) time on a 60s fixed-delay loop, so an every-second cron is due on the
@@ -1318,7 +1307,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   test('N-SCHEDULED: drag trigger-scheduled(cron)→action-create-record, save, enable, wait for the scheduler → the cron automation fires and creates a marked record @golden', async ({
     page,
   }) => {
-    test.setTimeout(160_000); // the scheduler runs on a 60s fixed-delay loop
+    test.setTimeout(240_000); // the scheduler runs on a 60s fixed-delay loop; allow load headroom
     const marker = `SCHED_${uniqueId()}`;
     await openNewDesigner(page);
     await setAutomationName(page, `N-SCHEDULED ${uniqueId()}`);
@@ -1342,15 +1331,26 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const saved = await readFlowConfig(page, pid);
     const tnode = saved.flowConfig.nodes.find((n: any) => n.id === trigger);
     expect(tnode.data.config.cron, 'cron persisted from the panel').toBe('* * * * * *');
+    const firedAt = Date.now();
     await enableViaListToggle(page, pid);
 
-    // Wait for the scheduler (≤ ~60s loop) to fire the cron automation → a marked order exists.
-    const orders = await pollOrdersByTitle(page, marker, 110_000);
-    expect(orders.length, `the scheduled cron automation fired and created the marked order`).toBeGreaterThanOrEqual(1);
-    // A run log was recorded for the scheduled fire.
-    const resp = await page.request.get(`/api/automations/${pid}/logs`, { params: { limit: 5 } });
-    const logs: any[] = (await resp.json())?.data ?? [];
-    expect(logs.length, 'the scheduled fire recorded an automation log').toBeGreaterThanOrEqual(1);
+    // Wait for the scheduler (≤ ~60s fixed-delay loop) to fire the cron automation, then assert
+    // via the automation LOG + create-record node-status (both queried by pid/logId). These are
+    // immune to cross-test interference; a title keyword-search is NOT reliable here. Root cause
+    // (instrumented 2026-06-07): the scheduled body creates a generic e2et_order, and under full-
+    // suite serial load the still-enabled on_record_create automations from earlier cases (notably
+    // N-CONDITION-EDGE) re-fire on that order and overwrite e2et_order_title (→ EDGE_FALSE) before
+    // the search runs — so the marker is gone even though the order WAS persisted. The create-
+    // record node reaching 'completed' is the authoritative proof the scheduled run inserted a
+    // record (verified: node=completed ⇔ the row exists, just re-titled by a concurrent automation).
+    const firedLog = await pollLogTerminal(page, pid, firedAt, 150_000);
+    expect(firedLog, 'the scheduler should have fired the cron automation (a run log exists)').not.toBeNull();
+    expect(String(firedLog!.status).toLowerCase(), `the scheduled run should succeed: ${JSON.stringify(firedLog)}`).toBe('success');
+    const statuses = await pollNodeStatuses(page, firedLog!.id, 30_000);
+    expect(
+      statuses.find((s) => s.nodeId === action)?.status,
+      `the scheduled create-record node persisted a record: ${JSON.stringify(statuses)}`,
+    ).toBe('completed');
   });
 
   // ── golden EDGE (real UI) — field-change filter precision: only the watched field fires ──
