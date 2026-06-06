@@ -108,6 +108,14 @@ public class AutomationProcessRuntime {
             variables.put(AutomationActionServiceTaskDelegate.TENANT_ID_VAR, automation.getTenantId());
         }
 
+        // SmartEngine process variables cannot be null — a null value NPEs deep in
+        // startProcess ("Cannot invoke Object.getClass() because value is null"). Trigger
+        // payloads legitimately carry nulls (e.g. on_state_change fromState when no
+        // before-snapshot was captured, on_field_change oldValue on a first set), so drop
+        // null-valued entries: an absent variable is the correct semantics for a null.
+        // Without this, every such automation run crashed. (Golden FINDING-4.)
+        variables.values().removeIf(java.util.Objects::isNull);
+
         // The trigger path runs on @Async("eventTaskExecutor") threads that may not carry
         // a MetaContext; startProcess needs the tenant. Set it from the automation when absent.
         boolean tenantContextSet = false;

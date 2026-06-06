@@ -27,6 +27,8 @@
  *
  * @since Phase 1 (Layer A)
  */
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 import {
@@ -147,9 +149,17 @@ async function openNewDesigner(page: Page): Promise<void> {
 // automation-validation-gate.spec.ts).
 async function setAutomationName(page: Page, name: string): Promise<void> {
   const input = page.locator('[data-testid="automation-editor-name-input"]');
-  await input.click();
-  await input.pressSequentially(name, { delay: 10 });
-  await expect(input).toHaveValue(name);
+  await input.waitFor({ state: 'visible' });
+  // pressSequentially occasionally drops the first keystrokes when React has not yet
+  // attached the controlled onChange handler — observed as value="" under full-suite
+  // serial load (the residual flake source, since every case calls this). Retry the
+  // clear→type→verify block until the value actually sticks.
+  await expect(async () => {
+    await input.click();
+    await input.fill('');
+    await input.pressSequentially(name, { delay: 15 });
+    await expect(input).toHaveValue(name, { timeout: 2_000 });
+  }).toPass({ timeout: 15_000, intervals: [250, 500, 1_000] });
 }
 
 // ───────────────────────── tests ─────────────────────────
@@ -478,4 +488,1085 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       NEW_MARKER,
     );
   });
+
+  // ─────────────────── Per-node real-UI golden (goal 2026-06-06) ───────────────────
+  // Each case below drives the REAL designer (drag the node-under-test, configure via
+  // the real property panel, connect, save, enable via the list toggle, fire a real
+  // trigger) then verifies the backend ran correctly. Reuses only proven H1 patterns
+  // (model-select by label, json field). SmartEngine-dependent nodes (start-process,
+  // bpm-event, control-delay) are excluded per the directive.
+
+  /** Poll the dynamic list for an e2et_order_item carrying `name` (create-record side effect). */
+  async function pollItemsByName(page: Page, name: string, timeoutMs = 20_000): Promise<any[]> {
+    const deadline = Date.now() + timeoutMs;
+    let rows: any[] = [];
+    while (Date.now() < deadline) {
+      const resp = await page.request.get(`/api/dynamic/e2et_order_item/list`, {
+        params: { pageNum: 1, pageSize: 50, keyword: name },
+      });
+      if (resp.ok()) {
+        const data = (await resp.json())?.data;
+        rows = data?.records ?? data?.list ?? data?.content ?? data?.rows ?? (Array.isArray(data) ? data : []);
+        const hit = rows.filter((r) => r?.e2et_item_name === name);
+        if (hit.length) return hit;
+      }
+      await page.waitForTimeout(1_000);
+    }
+    return rows.filter((r) => r?.e2et_item_name === name);
+  }
+
+  test('N-CREATE-RECORD: drag trigger-record-create→action-create-record, configure via panel, save, enable, fire → a child order_item is created (happy) @golden', async ({
+    page,
+  }) => {
+    const itemName = `NCR-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CREATE-RECORD ${uniqueId()}`);
+
+    // BUILD by real drag-drop + connect.
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+
+    // CONFIGURE via the real property panel (model-select by label, json field).
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细', // e2et_order_item displayName
+      fields:
+        '{"e2et_order_id":"${recordId}","e2et_item_name":"' +
+        itemName +
+        '","e2et_item_spec":"std","e2et_item_qty":2,"e2et_item_price":50}',
+    });
+
+    // SAVE → assert persisted 2-node/1-edge flow.
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    expect(saved.flowConfig.nodes).toHaveLength(2);
+    expect(saved.flowConfig.edges).toHaveLength(1);
+
+    // ENABLE via the real list toggle, then FIRE a real create.
+    await enableViaListToggle(page, pid);
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `NCR-order ${uniqueId()}`);
+
+    // BACKEND verify: run success + the create-record node completed + the child item exists.
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-CREATE-RECORD run: ${JSON.stringify(log)}`).toBe('success');
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(statuses.find((s) => s.nodeId === action)?.status, `create-record node completed: ${JSON.stringify(statuses)}`).toBe('completed');
+    const items = await pollItemsByName(page, itemName);
+    expect(items.length, `child order_item '${itemName}' created by the create-record action`).toBeGreaterThanOrEqual(1);
+  });
+
+  /** Fire a record UPDATE (top-level targetRecordId — FINDING-2). Fires on_record_update. */
+  async function fireUpdate(page: Page, orderId: string, fields: Record<string, unknown>): Promise<void> {
+    const resp = await page.request.post(`/api/meta/commands/execute/e2et:update_order`, {
+      data: { operationType: 'update', targetRecordId: orderId, payload: fields },
+    });
+    const body = await resp.json();
+    expect(String(body.code), `update fire failed: ${JSON.stringify(body)}`).toBe('0');
+  }
+
+  test('N-TRIGGER-UPDATE: drag trigger-record-update→action-create-record, save, enable, fire via a real UPDATE → on_record_update runs @golden', async ({
+    page,
+  }) => {
+    const itemName = `NTU-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-UPDATE ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-update', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields:
+        '{"e2et_order_id":"${recordId}","e2et_item_name":"' +
+        itemName +
+        '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // Create an order (on_record_create — does NOT fire this on_record_update automation)…
+    const orderId = await fireCreate(page, 100, `NTU-order ${uniqueId()}`);
+    // …then UPDATE it → on_record_update fires.
+    const firedAt = Date.now();
+    await fireUpdate(page, orderId, { e2et_order_title: `NTU-changed ${uniqueId()}` });
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-UPDATE run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'create-record node completed').toBe(true);
+    expect((await pollItemsByName(page, itemName)).length, `child item created on update fire`).toBeGreaterThanOrEqual(1);
+  });
+
+  test('N-CALL-API: drag trigger-record-create→action-call-api, configure url+method via panel, save, enable, fire → node completes (real outbound GET) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CALL-API ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-call-api', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // url (expression) → the backend's own actuator/health via the test-allowlisted
+    // host.docker.internal; method (select) → GET. (call_api fix = FINDING-6.)
+    await fillNodeConfig(page, action, {
+      url: 'http://host.docker.internal:6444/actuator/health',
+      method: 'GET',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-CALL-API-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-CALL-API run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'call-api node completed (real outbound GET <400)').toBe(true);
+  });
+
+  // ── send-webhook REAL OUTBOUND (GAP-F): the node POSTs the payload directly to the ──
+  // configured url (golden FINDING-10 — the executor previously ignored `url` and fanned
+  // out to webhook subscriptions, so a designer-built send-webhook never hit the URL the
+  // user typed). We stand up an in-process host receiver (reachable from the docker backend
+  // via host.docker.internal) and assert the outbound POST actually LANDED with the payload.
+  test('N-SEND-WEBHOOK-OUTBOUND: drag trigger-record-create→action-send-webhook, configure url+payload, fire → the outbound POST actually lands at a host receiver with the payload (happy) @golden', async ({
+    page,
+  }) => {
+    const marker = `WBK_${uniqueId()}`;
+    const receiver = await startWebhookReceiver();
+    try {
+      await openNewDesigner(page);
+      await setAutomationName(page, `N-SEND-WEBHOOK-OUTBOUND ${uniqueId()}`);
+      const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+      const action = await dragNodeToCanvas(page, 'action-send-webhook', { x: 150, y: 240 });
+      await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+      await connectEdge(page, trigger, action);
+      await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+      await fillNodeConfig(page, action, {
+        url: `http://host.docker.internal:${receiver.port}/hook`,
+        // ${recordId} must survive into the saved config (the executor resolves it); ${marker}
+        // is interpolated by the test here so the receiver can key on it.
+        payload: `{"event":"e2e.designer.webhook","marker":"${marker}","orderId":"\${recordId}"}`,
+      });
+      const { pid } = await saveAutomation(page);
+      createdPids.push(pid);
+      await enableViaListToggle(page, pid);
+
+      const firedAt = Date.now();
+      await fireCreate(page, 100, `WBK-order ${uniqueId()}`);
+      const log = await pollLogTerminal(page, pid, firedAt);
+      expect(String(log!.status).toLowerCase(), `N-SEND-WEBHOOK-OUTBOUND run: ${JSON.stringify(log)}`).toBe('success');
+      expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'send-webhook node completed').toBe(true);
+      // The outbound POST actually landed at the host receiver carrying the payload.
+      await expect
+        .poll(() => receiver.received.some((r) => r.body.includes(marker)), { timeout: 15_000 })
+        .toBe(true);
+      const hit = receiver.received.find((r) => r.body.includes(marker))!;
+      expect(hit.method, 'webhook delivered as a POST').toBe('POST');
+      expect(hit.path, 'POST landed on the configured /hook path').toContain('/hook');
+      const parsed = JSON.parse(hit.body);
+      expect(parsed.event, 'payload event field delivered').toBe('e2e.designer.webhook');
+      expect(parsed.orderId, '${recordId} resolved in the delivered payload').toBeTruthy();
+    } finally {
+      await receiver.close();
+    }
+  });
+
+  // ── send-webhook SAD (real UI): the receiver returns 500 → the node FAILS with the status ──
+  test('N-SEND-WEBHOOK-SAD: send-webhook to an endpoint returning 500 → the node FAILS with the upstream status, and the POST still physically reached the receiver (sad) @golden', async ({
+    page,
+  }) => {
+    const receiver = await startWebhookReceiver();
+    try {
+      await openNewDesigner(page);
+      await setAutomationName(page, `N-SEND-WEBHOOK-SAD ${uniqueId()}`);
+      const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+      const action = await dragNodeToCanvas(page, 'action-send-webhook', { x: 150, y: 240 });
+      await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+      await connectEdge(page, trigger, action);
+      await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+      // The /fail path on the receiver returns HTTP 500 → SendWebhookExecutor throws on >=400.
+      await fillNodeConfig(page, action, {
+        url: `http://host.docker.internal:${receiver.port}/fail`,
+        payload: '{"event":"e2e.designer.webhook.sad","orderId":"${recordId}"}',
+      });
+      const { pid } = await saveAutomation(page);
+      createdPids.push(pid);
+      await enableViaListToggle(page, pid);
+
+      const firedAt = Date.now();
+      await fireCreate(page, 100, `WBK-SAD-order ${uniqueId()}`);
+      const log = await pollLogTerminal(page, pid, firedAt);
+      expect(['failed', 'partial_success'], `N-SEND-WEBHOOK-SAD must fail (500): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
+      const node = (await pollNodeStatuses(page, log!.id, 30_000)).find((s) => s.nodeId === action);
+      expect(node?.status, 'send-webhook node should be failed on 500').toBe('failed');
+      expect(node?.errorMessage ?? '', 'failure references the upstream status').toMatch(/Webhook POST failed|500|status/i);
+      // The POST physically reached the receiver even though it 500'd (proves real outbound).
+      expect(receiver.received.length, 'the POST reached the receiver before the 500').toBeGreaterThanOrEqual(1);
+    } finally {
+      await receiver.close();
+    }
+  });
+
+  /** Fire a state_transition command (cancel: draft→cancelled). Fires on_state_change. */
+  async function fireCancel(page: Page, orderId: string): Promise<void> {
+    const resp = await page.request.post(`/api/meta/commands/execute/e2et:cancel_order`, {
+      data: { operationType: 'state_transition', targetRecordId: orderId, payload: {} },
+    });
+    const body = await resp.json();
+    expect(String(body.code), `cancel fire failed: ${JSON.stringify(body)}`).toBe('0');
+  }
+
+  test('N-TRIGGER-FIELD-CHANGE: drag trigger-field-change(field-select)→action-create-record, save, enable, change the watched field → on_field_change runs @golden', async ({
+    page,
+  }) => {
+    const itemName = `NFC-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-FIELD ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-field-change', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    // modelCode (model-select) MUST be filled before fieldCode (field-select loads fields for it).
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL, fieldCode: '订单标题' });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const orderId = await fireCreate(page, 100, `NFC-order ${uniqueId()}`);
+    const firedAt = Date.now();
+    await fireUpdate(page, orderId, { e2et_order_title: `NFC-changed ${uniqueId()}` }); // watched field changes
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-FIELD run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'create-record node completed').toBe(true);
+    expect((await pollItemsByName(page, itemName)).length, 'child item created on field-change fire').toBeGreaterThanOrEqual(1);
+  });
+
+  test('N-TRIGGER-STATE-CHANGE: drag trigger-state-change(field-select)→action-create-record, save, enable, cancel the order → on_state_change runs @golden', async ({
+    page,
+  }) => {
+    const itemName = `NSC-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-STATE ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-state-change', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    // modelCode first, then stateField (field-select). toStates left empty (any transition;
+    // FINDING-4b ⇒ a specific toStates filter is imprecise on the async event).
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL, stateField: '订单状态' });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const orderId = await fireCreate(page, 100, `NSC-order ${uniqueId()}`);
+    const firedAt = Date.now();
+    await fireCancel(page, orderId); // draft→cancelled state transition
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-STATE run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'create-record node completed').toBe(true);
+    expect((await pollItemsByName(page, itemName)).length, 'child item created on state-change fire').toBeGreaterThanOrEqual(1);
+  });
+
+  test('N-TRIGGER-WEBHOOK: drag trigger-webhook→action-call-api, save, enable, fire via a real inbound webhook POST → automation runs @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-WEBHOOK ${uniqueId()}`);
+
+    // trigger-webhook has no required config (validationMode defaults to none) and no
+    // modelCode (FINDING-1 made model_code nullable). Action does not depend on ${recordId}.
+    const trigger = await dragNodeToCanvas(page, 'trigger-webhook', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-call-api', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, action, {
+      url: 'http://host.docker.internal:6444/actuator/health',
+      method: 'GET',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // FIRE via the real inbound webhook endpoint (resolves the automation by pid).
+    const firedAt = Date.now();
+    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
+      data: { event: 'order.shipped', ref: `NWH ${uniqueId()}` },
+    });
+    expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
+    expect(String((await resp.json())?.code), 'webhook POST accepted').toBe('0');
+
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-WEBHOOK run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'downstream action completed on webhook fire').toBe(true);
+  });
+
+  // ── golden SAD path (real UI) — a runtime failure surfaces on the node ──────────
+  test('N-CALL-API-SAD: drag trigger-record-create→action-call-api with a 404 URL, save, enable, fire → the call-api node FAILS with the upstream status (sad path) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CALL-API-SAD ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-call-api', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // A reachable host (SSRF test-allowlisted) but a path that 404s → CallApiExecutor throws
+    // on status >= 400 → the node fails (not a silent success).
+    await fillNodeConfig(page, action, {
+      url: 'http://host.docker.internal:6444/api/this-endpoint-does-not-exist-404',
+      method: 'GET',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-CALL-API-SAD-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(['failed', 'partial_success'], `N-CALL-API-SAD must fail (4xx): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    const node = statuses.find((s) => s.nodeId === action);
+    expect(node?.status, `call-api node should be failed on 4xx: ${JSON.stringify(statuses)}`).toBe('failed');
+    expect(node?.errorMessage ?? '', 'failure should reference the API failure / status').toMatch(/API call failed|40[0-9]|status/i);
+  });
+
+  /** Click the list-page toggle for an automation and assert the resulting enabled/disabled state. */
+  async function setEnabledViaToggle(page: Page, pid: string, target: 'on' | 'off'): Promise<void> {
+    await page.goto('/automations');
+    const toggle = page.locator(`[data-testid="btn-toggle-${pid}"]`);
+    await toggle.waitFor({ state: 'visible', timeout: 15_000 });
+    await expect(toggle).toBeEnabled({ timeout: 10_000 });
+    const respStatus = page
+      .waitForResponse((r) => r.url().includes(`/api/automations/${pid}/toggle`) && r.request().method() === 'POST', { timeout: 15_000 })
+      .then((r) => r.status())
+      .catch(() => 0);
+    await toggle.click();
+    const status = await respStatus;
+    if (status && status >= 400) throw new Error(`toggle returned HTTP ${status}`);
+    const badge = page.locator(`[data-testid="status-${pid}"]`);
+    if (target === 'on') await expect(badge).toContainText(/Enabled|已启用/, { timeout: 10_000 });
+    else await expect(badge).toContainText(/Disabled|已禁用|已停用|未启用/, { timeout: 10_000 });
+  }
+
+  /** The set of AutomationLog ids currently recorded for an automation. */
+  async function fetchLogIds(page: Page, pid: string): Promise<Set<number>> {
+    const resp = await page.request.get(`/api/automations/${pid}/logs`, { params: { limit: 50 } });
+    if (!resp.ok()) return new Set();
+    const rows: any[] = (await resp.json())?.data ?? [];
+    return new Set(rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n)));
+  }
+
+  // ── golden CORNER path (real UI) — lifecycle: enable / disable / re-enable ──────
+  test('N-CORNER-LIFECYCLE: enable→fire runs, disable→fire does NOT run, re-enable→fire runs (lifecycle via real UI toggle) @golden', async ({
+    page,
+  }) => {
+    const itemName = `NCL-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CORNER-LIFECYCLE ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+
+    // ENABLED → fire → a run completes. Confirm enabled=true committed before firing.
+    await setEnabledViaToggle(page, pid, 'on');
+    await expect
+      .poll(async () => (await (await page.request.get(`/api/automations/${pid}`)).json())?.data?.enabled, {
+        timeout: 10_000,
+      })
+      .toBe(true);
+    const firedAt1 = Date.now();
+    await fireCreate(page, 100, `NCL-on ${uniqueId()}`);
+    const run1 = await pollLogTerminal(page, pid, firedAt1);
+    expect(String(run1!.status).toLowerCase(), `enabled fire should run: ${JSON.stringify(run1)}`).toBe('success');
+
+    // DISABLED → fire → NO *new* run row appears. Confirm enabled=false committed (the badge
+    // can flip a beat early), then compare the log-id SET before/after — a time-window check
+    // would alias the just-prior enabled run (the slack), so we diff ids (cf. Layer B E6).
+    await setEnabledViaToggle(page, pid, 'off');
+    await expect
+      .poll(async () => (await (await page.request.get(`/api/automations/${pid}`)).json())?.data?.enabled, {
+        timeout: 10_000,
+      })
+      .toBe(false);
+    const idsBefore = await fetchLogIds(page, pid);
+    await fireCreate(page, 100, `NCL-off ${uniqueId()}`);
+    await page.waitForTimeout(6_000); // give the engine a chance to (not) run
+    const newWhileDisabled = [...(await fetchLogIds(page, pid))].filter((id) => !idsBefore.has(id));
+    expect(newWhileDisabled, `a disabled automation must NOT run (new logs: ${newWhileDisabled})`).toHaveLength(0);
+
+    // RE-ENABLED → fire → runs again, a distinct newer log. Confirm enabled=true committed
+    // (the deploy/re-enable can lag the badge) before firing, so the run is not missed.
+    await setEnabledViaToggle(page, pid, 'on');
+    await expect
+      .poll(async () => (await (await page.request.get(`/api/automations/${pid}`)).json())?.data?.enabled, {
+        timeout: 10_000,
+      })
+      .toBe(true);
+    const firedAt3 = Date.now();
+    await fireCreate(page, 100, `NCL-reon ${uniqueId()}`);
+    const run3 = await pollLogTerminal(page, pid, firedAt3);
+    expect(String(run3!.status).toLowerCase(), `re-enabled fire should run: ${JSON.stringify(run3)}`).toBe('success');
+    expect(run3!.id, 're-enabled run is a distinct newer log row').not.toBe(run1!.id);
+  });
+
+  // ── golden EDGE path (real UI) — condition boundary value ───────────────────────
+  test('N-CONDITION-EDGE: build trigger→condition(>1000)→true/false actions, fire at the EXACT boundary (amount=1000) → the FALSE branch runs, not TRUE (edge) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CONDITION-EDGE ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 70 });
+    const condition = await dragNodeToCanvas(page, 'control-condition', { x: 150, y: 210 });
+    const actHigh = await dragNodeToCanvas(page, 'action-update-record', { x: 30, y: 360 });
+    const actLow = await dragNodeToCanvas(page, 'action-update-record', { x: 240, y: 360 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, condition);
+    const eTrue = await connectEdge(page, condition, actHigh, 'true');
+    const eFalse = await connectEdge(page, condition, actLow, 'false');
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, condition, { expression: "record['e2et_order_amount'] > 1000" });
+    await fillNodeConfig(page, actHigh, { modelCode: MODEL_LABEL, recordId: '${recordId}', fields: '{"e2et_order_title":"EDGE_TRUE"}' });
+    await fillNodeConfig(page, actLow, { modelCode: MODEL_LABEL, recordId: '${recordId}', fields: '{"e2et_order_title":"EDGE_FALSE"}' });
+    await setEdgeCondition(page, eTrue, "record['e2et_order_amount'] > 1000");
+    await setEdgeCondition(page, eFalse, "record['e2et_order_amount'] <= 1000");
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // Fire EXACTLY at the boundary: amount=1000. 1000 > 1000 is FALSE → the FALSE branch runs.
+    const firedAt = Date.now();
+    const recordId = await fireCreate(page, 1000, `N-EDGE-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-CONDITION-EDGE run: ${JSON.stringify(log)}`).toBe('success');
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(statuses.find((s) => s.nodeId === actLow)?.status, 'FALSE branch runs at the boundary').toBe('completed');
+    expect(statuses.find((s) => s.nodeId === actHigh), 'TRUE branch must NOT run at amount=1000 (not >1000)').toBeUndefined();
+    const record = await pollRecordField(page, recordId, 'e2et_order_title', 'EDGE_FALSE');
+    expect(record.e2et_order_title, 'boundary value took the FALSE branch').toBe('EDGE_FALSE');
+  });
+
+  test('N-SEND-NOTIFICATION: drag trigger-record-create→action-send-notification, configure title/content/recipients via panel, save, enable, fire → node completes (FINDING-8 recipients fix) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-SEND-NOTIFICATION ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-send-notification', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // notificationType is pre-set to in_app by the node defaultConfig. title/content/recipients
+    // are expression fields; recipients='1' resolves to a single user id after the FINDING-8
+    // tolerant-parse fix (configSchema types recipients as expression/string, executor reads a
+    // list — previously a ClassCastException for any designer-built send-notification).
+    await fillNodeConfig(page, action, {
+      title: 'Order created',
+      content: 'A new order was created by the automation',
+      recipients: '1',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-NOTIFY-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-SEND-NOTIFICATION run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'send-notification node completed').toBe(true);
+  });
+
+  // ── golden SAD path (real UI) — update-record targeting a nonexistent field fails ──
+  test('N-UPDATE-RECORD-SAD: drag trigger-record-create→action-update-record with a nonexistent field, save, enable, fire → the node FAILS at runtime with an error (sad) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-UPDATE-RECORD-SAD ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-update-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: MODEL_LABEL,
+      recordId: '${recordId}',
+      fields: '{"e2et_order_nonexistent_zzz":"boom"}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-UPD-SAD-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(['failed', 'partial_success'], `N-UPDATE-RECORD-SAD must fail (bad field): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    const node = statuses.find((s) => s.nodeId === action);
+    expect(node?.status, `update-record node should be failed: ${JSON.stringify(statuses)}`).toBe('failed');
+    expect(node?.errorMessage ?? '', 'a failed node should carry an error message').toBeTruthy();
+  });
+
+  // ── golden SAD path (real UI) — create-record targeting a nonexistent field fails ──
+  test('N-CREATE-RECORD-SAD: drag trigger-record-create→action-create-record with a nonexistent field, save, enable, fire → the node FAILS (sad) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CREATE-RECORD-SAD ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_item_nonexistent_zzz":"boom"}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-CR-SAD-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(['failed', 'partial_success'], `N-CREATE-RECORD-SAD must fail (bad field): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
+    const node = (await pollNodeStatuses(page, log!.id, 30_000)).find((s) => s.nodeId === action);
+    expect(node?.status, 'create-record node should be failed').toBe('failed');
+  });
+
+  // ── execute-command: real command-select picker (FINDING-9 fix) happy + sad ──────
+  // The command-select picker was broken (fetchCommandOptions hit GET /api/meta/commands
+  // without the required modelCode → 500 → zero options). Fixed: the endpoint lists all
+  // commands when modelCode is absent, and fetchCommandOptions reads the bare list. These
+  // cases drive the now-working picker in the real designer.
+
+  test('N-EXECUTE-COMMAND: drag trigger-record-create→action-execute-command, pick a permission-free command via the real command-select picker, set params, save, enable, fire → the command runs under the automation principal and updates the trigger record (happy) @golden', async ({
+    page,
+  }) => {
+    const marker = `EXECCMD_OK_${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-EXECUTE-COMMAND ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-execute-command', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // commandCode via the real command-select picker — filter by the unique command code
+    // (BaseResourceSelect filters by label OR value). e2et:touch_order_noperm is a
+    // permission-free update (test-fixtures) the restricted automation principal CAN run.
+    await fillNodeConfig(page, action, {
+      commandCode: 'e2et:touch_order_noperm',
+      params: `{"e2et_order_remark":"${marker}"}`,
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    // The real picker drove the selection — assert the chosen command persisted.
+    const saved = await readFlowConfig(page, pid);
+    const node = saved.flowConfig.nodes.find((n: any) => n.id === action);
+    expect(node.data.config.commandCode, 'command-select persisted the picked command').toBe(
+      'e2et:touch_order_noperm',
+    );
+
+    await enableViaListToggle(page, pid);
+    const firedAt = Date.now();
+    const recordId = await fireCreate(page, 100, `EXECCMD-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-EXECUTE-COMMAND run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'execute-command node completed').toBe(true);
+    // Side effect: the permission-free update command set the remark on the trigger record.
+    const record = await pollRecordField(page, recordId, 'e2et_order_remark', marker);
+    expect(record.e2et_order_remark, 'permission-free command updated the trigger record').toBe(marker);
+  });
+
+  test('N-EXECUTE-COMMAND-SAD: pick a permission-gated command via the picker; under the restricted automation principal the run FAILS with a clear permission-denied reason and the side effect does not happen (sad) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-EXECUTE-COMMAND-SAD ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-execute-command', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // e2et:update_order requires E2ET.order.manage → the automation principal lacks it (FINDING-3).
+    await fillNodeConfig(page, action, {
+      commandCode: 'e2et:update_order',
+      params: '{"e2et_order_title":"EXEC_SHOULD_BE_DENIED"}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    const recordId = await fireCreate(page, 100, `EXEC-SAD-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(['failed', 'partial_success'], `N-EXECUTE-COMMAND-SAD must fail (denied): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    const node = statuses.find((s) => s.nodeId === action);
+    expect(node?.status, `execute-command node should be failed: ${JSON.stringify(statuses)}`).toBe('failed');
+    expect(node?.errorMessage ?? '', 'denial must name the required permission (clear reason)').toMatch(/permission denied|E2ET\.order\.manage/i);
+    // The denied command did NOT change the record title.
+    const record = await getOrderRecord(page, recordId);
+    expect(record.e2et_order_title, 'denied command must not have run').not.toBe('EXEC_SHOULD_BE_DENIED');
+  });
+
+  // ── control-loop: real designer, collection-carrying webhook fixture ─────────────
+  // control-loop iterates its body action once per collection element (the SmartEngine
+  // fork is userTask-only, so AutomationActionServiceTaskDelegate iterates serviceTask
+  // bodies manually). resolveCollection does a FLAT process-var lookup, so the collection
+  // must be a top-level var; the webhook trigger spreads the inbound body's top-level keys
+  // into the process variables, so a webhook body { items: [...] } exposes `${items}`.
+  test('N-LOOP: build trigger-webhook→control-loop→create-record(body) in the designer; fire a webhook carrying a 3-element collection → the body runs once per element creating 3 child items (loop) @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const names = [`LOOP-A-${tag}`, `LOOP-B-${tag}`, `LOOP-C-${tag}`];
+    // A parent order to satisfy the child item's parent reference (created directly; the
+    // webhook automation is not enabled yet so this does not fire it).
+    const parentOrderId = await fireCreate(page, 100, `LOOP-parent ${tag}`);
+
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-LOOP ${tag}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-webhook', { x: 150, y: 70 });
+    const loop = await dragNodeToCanvas(page, 'control-loop', { x: 150, y: 200 });
+    const body = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 330 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, loop);
+    await connectEdge(page, loop, body);
+    // collection references the top-level webhook var `items`; itemVariable=item (default).
+    await fillNodeConfig(page, loop, { collection: '${items}', itemVariable: 'item' });
+    // The body create-record runs once per element with `item` bound to the element value.
+    await fillNodeConfig(page, body, {
+      modelCode: '订单明细',
+      fields:
+        '{"e2et_order_id":"${parentOrderId}","e2et_item_name":"${item}","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // Fire via the real inbound webhook with a 3-element collection (+ the parent id).
+    const firedAt = Date.now();
+    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
+      data: { items: names, parentOrderId },
+    });
+    expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-LOOP run: ${JSON.stringify(log)}`).toBe('success');
+    // The loop body created one child item per element name.
+    for (const n of names) {
+      expect(
+        (await pollItemsByName(page, n)).length,
+        `loop body created a child item for element ${n}`,
+      ).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  // ── action-llm-call: deterministic stub provider (AGENT_LLM_STUB_MODE on the ──────
+  // ga-e2e stack) so the node runs CI-portably with no real key. The stub returns a
+  // fixed "[stub response]" text which the executor stores under the output variable;
+  // a downstream update-record consumes ${llmOutput} so we can assert the LLM output
+  // actually flowed through the run and persisted.
+  test('N-LLM-CALL: drag trigger-record-create→action-llm-call→action-update-record, configure model+prompt+output via panel, save, enable, fire → the LLM (stub) output is captured and persisted (happy) @golden', async ({
+    page,
+  }) => {
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-LLM-CALL ${uniqueId()}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 70 });
+    const llm = await dragNodeToCanvas(page, 'action-llm-call', { x: 150, y: 200 });
+    const upd = await dragNodeToCanvas(page, 'action-update-record', { x: 150, y: 330 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, llm);
+    await connectEdge(page, llm, upd);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    // model is a radix select (option label); prompt + output are text fields.
+    await fillNodeConfig(page, llm, {
+      model: 'Claude Sonnet 4.6',
+      userPromptTemplate: 'Summarise order ${recordId}',
+      outputVariableName: 'llmOutput',
+    });
+    await fillNodeConfig(page, upd, {
+      modelCode: MODEL_LABEL,
+      recordId: '${recordId}',
+      fields: '{"e2et_order_remark":"${llmOutput}"}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+    const firedAt = Date.now();
+    const recordId = await fireCreate(page, 100, `LLM-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-LLM-CALL run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), llm), 'llm-call node completed').toBe(true);
+    // The stub LLM output flowed into the downstream update and persisted on the record.
+    const record = await pollRecordField(page, recordId, 'e2et_order_remark', '[stub response]');
+    expect(record.e2et_order_remark, 'the LLM (stub) output was captured and persisted').toBe('[stub response]');
+  });
+
+  // ── on_state_change toStates filter (golden EDGE + FINDING-4b regression) ─────────
+  // A toStates:['cancelled'] filter only fires on the matching transition. This is the
+  // FINDING-4b regression: the @Async bridge reads the just-committed state via
+  // CommandStateCheckExecutor.readCurrentState; before the tenant fix that read returned
+  // null (TenantLineInterceptor appended an empty-tenant predicate), so toState was null
+  // and the filter never matched. After the fix toState='cancelled' and the filter fires.
+  test('N-TRIGGER-STATE-FILTER: trigger-state-change with toStates=[已取消] fires on cancel but NOT on a non-matching transition (edge / FINDING-4b) @golden', async ({
+    page,
+  }) => {
+    const itemName = `NSF-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-STATE-FILTER ${uniqueId()}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-state-change', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    // modelCode → stateField → toStates (multiselect; option label 已取消 = value cancelled).
+    await fillNodeConfig(page, trigger, {
+      modelCode: MODEL_LABEL,
+      stateField: '订单状态',
+      toStates: ['已取消'],
+    });
+    // A fixed-name child item so existence == "the filtered automation fired".
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields:
+        '{"e2et_order_id":"${recordId}","e2et_item_name":"' +
+        itemName +
+        '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    // The multiselect drove a real value → the toStates filter persisted as the code.
+    // (This is also the regression for the toStates picker fix: the multiselect now
+    // cascades its options from the stateField's dict instead of fetching model fields.)
+    const saved = await readFlowConfig(page, pid);
+    const tnode = saved.flowConfig.nodes.find((n: any) => n.id === trigger);
+    expect(tnode.data.config.toStates, 'toStates filter persisted the selected state code').toContain('cancelled');
+    await enableViaListToggle(page, pid);
+
+    // CONTROL: a plain create (no state transition) must NOT fire a toStates-filtered
+    // on_state_change automation — confirms the filter is actually applied.
+    await fireCreate(page, 100, `NSF-noop ${uniqueId()}`);
+    await page.waitForTimeout(5_000);
+    expect(
+      (await pollItemsByName(page, itemName, 3_000)).length,
+      'a plain create must NOT fire the toStates-filtered on_state_change automation',
+    ).toBe(0);
+
+    // MATCH: cancel an order (draft→cancelled). toState=cancelled = the filter → fires,
+    // creating the child item. Before FINDING-4b the read-back toState was null (the
+    // @Async bridge's tenant-scoped read returned nothing) so the cancelled filter never
+    // matched and this fire was lost.
+    const orderB = await fireCreate(page, 100, `NSF-cancel ${uniqueId()}`);
+    const firedAt = Date.now();
+    await fireCancel(page, orderB);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-STATE-FILTER run: ${JSON.stringify(log)}`).toBe('success');
+    expect(
+      (await pollItemsByName(page, itemName)).length,
+      'the matching cancel transition fired the toStates-filtered automation (FINDING-4b)',
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── trigger-scheduled: real cron fire path (AutomationScheduler polls every 60s) ──
+  // The scheduler evaluates a 6-field Spring cron against the automation's last-trigger
+  // (or created) time on a 60s fixed-delay loop, so an every-second cron is due on the
+  // next tick. The body creates a marked e2et_order; its existence proves the scheduled
+  // automation fired with no triggering record (the scheduler supplies the tenant).
+  test('N-SCHEDULED: drag trigger-scheduled(cron)→action-create-record, save, enable, wait for the scheduler → the cron automation fires and creates a marked record @golden', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000); // the scheduler runs on a 60s fixed-delay loop; allow load headroom
+    const marker = `SCHED_${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-SCHEDULED ${uniqueId()}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-scheduled', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    // 6-field Spring cron, every second → due on the next scheduler tick.
+    await fillNodeConfig(page, trigger, { cron: '* * * * * *' });
+    await fillNodeConfig(page, action, {
+      modelCode: MODEL_LABEL,
+      // A scheduled body create-records directly (no command), so it must supply every
+      // required field including e2et_order_status (the create command would default it).
+      fields:
+        '{"e2et_order_title":"' +
+        marker +
+        '","e2et_order_status":"draft","e2et_order_date":"2026-05-30","e2et_order_type":"normal","e2et_order_amount":1}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const tnode = saved.flowConfig.nodes.find((n: any) => n.id === trigger);
+    expect(tnode.data.config.cron, 'cron persisted from the panel').toBe('* * * * * *');
+    const firedAt = Date.now();
+    await enableViaListToggle(page, pid);
+
+    // Wait for the scheduler (≤ ~60s fixed-delay loop) to fire the cron automation, then assert
+    // via the automation LOG + create-record node-status (both queried by pid/logId). These are
+    // immune to cross-test interference; a title keyword-search is NOT reliable here. Root cause
+    // (instrumented 2026-06-07): the scheduled body creates a generic e2et_order, and under full-
+    // suite serial load the still-enabled on_record_create automations from earlier cases (notably
+    // N-CONDITION-EDGE) re-fire on that order and overwrite e2et_order_title (→ EDGE_FALSE) before
+    // the search runs — so the marker is gone even though the order WAS persisted. The create-
+    // record node reaching 'completed' is the authoritative proof the scheduled run inserted a
+    // record (verified: node=completed ⇔ the row exists, just re-titled by a concurrent automation).
+    const firedLog = await pollLogTerminal(page, pid, firedAt, 150_000);
+    expect(firedLog, 'the scheduler should have fired the cron automation (a run log exists)').not.toBeNull();
+    expect(String(firedLog!.status).toLowerCase(), `the scheduled run should succeed: ${JSON.stringify(firedLog)}`).toBe('success');
+    const statuses = await pollNodeStatuses(page, firedLog!.id, 30_000);
+    expect(
+      statuses.find((s) => s.nodeId === action)?.status,
+      `the scheduled create-record node persisted a record: ${JSON.stringify(statuses)}`,
+    ).toBe('completed');
+  });
+
+  // ── golden EDGE (real UI) — field-change filter precision: only the watched field fires ──
+  // AutomationTriggerServiceImpl#onFieldChange skips when the changed field != config.fieldCode
+  // (`fieldCode.equals(config.getFieldCode())`); the command bridge emits a per-field change
+  // event only when oldValue != newValue. So an update to an UNWATCHED field must NOT fire a
+  // field-change automation watching a different field; the watched field MUST fire.
+  test('N-FIELD-CHANGE-EDGE: trigger-field-change watching 订单标题 — updating a DIFFERENT field does NOT fire, updating the watched field DOES (edge / field filter) @golden', async ({
+    page,
+  }) => {
+    const itemName = `NFCE-item-${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-FIELD-CHANGE-EDGE ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-field-change', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL, fieldCode: '订单标题' });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const orderId = await fireCreate(page, 100, `NFCE-order ${uniqueId()}`);
+    // EDGE: update an UNWATCHED field (remark, not the title) → the fieldCode filter must
+    // skip it → NO child item created.
+    await fireUpdate(page, orderId, { e2et_order_remark: `unwatched ${uniqueId()}` });
+    await page.waitForTimeout(5_000); // give the @Async bridge a chance to (not) fire
+    expect(
+      (await pollItemsByName(page, itemName, 3_000)).length,
+      'changing an unwatched field must NOT fire the field-change automation',
+    ).toBe(0);
+
+    // POSITIVE CONTROL: update the WATCHED field (title) → fires → child item created.
+    const firedAt = Date.now();
+    await fireUpdate(page, orderId, { e2et_order_title: `NFCE-changed ${uniqueId()}` });
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-FIELD-CHANGE-EDGE watched-field run: ${JSON.stringify(log)}`).toBe('success');
+    expect(
+      (await pollItemsByName(page, itemName)).length,
+      'the watched field change fired the automation (control)',
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── golden EDGE (real UI) — loop over an EMPTY collection runs the body 0 times ──
+  // AutomationActionServiceTaskDelegate iterates `for (element : items)`; an empty collection
+  // runs the body 0 times then still marks the node COMPLETED — so the run succeeds with no
+  // side effect (boundary: empty input).
+  test('N-LOOP-EDGE: control-loop over an EMPTY collection — the body runs 0 times, the run still succeeds, no child item is created (edge / boundary) @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const itemName = `NLE-item-${tag}`;
+    const parentOrderId = await fireCreate(page, 100, `NLE-parent ${tag}`);
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-LOOP-EDGE ${tag}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-webhook', { x: 150, y: 70 });
+    const loop = await dragNodeToCanvas(page, 'control-loop', { x: 150, y: 200 });
+    const body = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 330 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, loop);
+    await connectEdge(page, loop, body);
+    await fillNodeConfig(page, loop, { collection: '${items}', itemVariable: 'item' });
+    await fillNodeConfig(page, body, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${parentOrderId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // Fire with an EMPTY collection → the loop body iterates 0 times.
+    const firedAt = Date.now();
+    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
+      data: { items: [], parentOrderId },
+    });
+    expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-LOOP-EDGE empty-collection run should still succeed: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), body), 'the loop body node completes with 0 iterations').toBe(true);
+    await page.waitForTimeout(3_000);
+    expect(
+      (await pollItemsByName(page, itemName, 3_000)).length,
+      'an empty collection creates no child items',
+    ).toBe(0);
+  });
+
+  // ── golden CORNER (real UI) — re-entrancy: the same enabled automation fires twice ──────
+  // Two back-to-back creates must each produce an independent run + its own side effect
+  // (no dropped run, no cross-contamination). The child item name binds to ${recordId}
+  // (the trigger order id, distinct per fire) so each run's side effect is independently keyed.
+  test('N-CORNER-CONCURRENT: fire the same enabled automation TWICE back-to-back — both runs complete independently and each creates its own child item (corner / re-entrancy) @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CORNER-CONCURRENT ${tag}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"${recordId}","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    // Fire TWICE back-to-back (no wait between) → two independent runs.
+    const firedAt = Date.now();
+    const orderA = await fireCreate(page, 100, `NCC-A ${tag}`);
+    const orderB = await fireCreate(page, 100, `NCC-B ${tag}`);
+    // Each run created its own child item keyed by its distinct trigger order id.
+    expect((await pollItemsByName(page, orderA)).length, 'first fire created its own child item').toBeGreaterThanOrEqual(1);
+    expect((await pollItemsByName(page, orderB)).length, 'second fire created its own child item').toBeGreaterThanOrEqual(1);
+    // Two distinct run logs were recorded for the two fires (re-entrancy, not a single merged run).
+    const logsResp = await page.request.get(`/api/automations/${pid}/logs`, { params: { limit: 10 } });
+    const logs: any[] = ((await logsResp.json())?.data ?? []).filter(
+      (r: any) => (r.startedAt ? new Date(r.startedAt).getTime() : 0) >= firedAt - 5_000,
+    );
+    expect(logs.length, 'two back-to-back fires recorded two independent run logs').toBeGreaterThanOrEqual(2);
+  });
+
+  // ── golden CORNER (real UI) — unicode/i18n: a CJK+emoji payload round-trips intact ──────
+  // The golden standard lists unicode/i18n as a corner case. A create-record carrying a
+  // CJK+emoji+ascii name must persist byte-exact through the command pipeline + DB.
+  test('N-CORNER-UNICODE: create-record with a CJK/emoji item name round-trips and persists exactly (corner / i18n robustness) @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const itemName = `订单🎉项目-${tag}`; // CJK + emoji + ascii tag (ascii tag keeps it searchable)
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CORNER-UNICODE ${tag}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields: '{"e2et_order_id":"${recordId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"规格✓","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `NCU-order ${tag}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-CORNER-UNICODE run: ${JSON.stringify(log)}`).toBe('success');
+    // Search by the ascii tag (reliably keyword-searchable), then match the EXACT unicode name.
+    const deadline = Date.now() + 20_000;
+    let found: any | undefined;
+    while (Date.now() < deadline && !found) {
+      const resp = await page.request.get(`/api/dynamic/e2et_order_item/list`, {
+        params: { pageNum: 1, pageSize: 50, keyword: tag },
+      });
+      if (resp.ok()) {
+        const data = (await resp.json())?.data;
+        const rows = data?.records ?? data?.list ?? data?.content ?? data?.rows ?? (Array.isArray(data) ? data : []);
+        found = rows.find((r: any) => r?.e2et_item_name === itemName);
+      }
+      if (!found) await page.waitForTimeout(1_500);
+    }
+    expect(found, 'the unicode item name round-tripped and persisted exactly').toBeTruthy();
+    expect(found.e2et_item_name, 'the persisted name matches the unicode source byte-exact').toBe(itemName);
+  });
 });
+
+/** True if the given node reached 'completed' in the polled statuses. */
+function statusesNodeCompleted(statuses: { nodeId: string; status: string }[], nodeId: string): boolean {
+  return statuses.find((s) => s.nodeId === nodeId)?.status === 'completed';
+}
+
+interface WebhookReceiver {
+  /** The ephemeral host port the docker backend reaches via host.docker.internal. */
+  port: number;
+  /** Every request the receiver captured (proves the outbound POST physically landed). */
+  received: { method: string; path: string; body: string }[];
+  close: () => Promise<void>;
+}
+
+/**
+ * Stand up an in-process HTTP receiver bound to 0.0.0.0 on an ephemeral port. The
+ * docker backend reaches it via host.docker.internal:<port> (the same path
+ * N-CALL-API uses to hit host.docker.internal:6444). POST /hook → 200, POST /fail
+ * → 500; every request is recorded so a golden case can assert the real outbound
+ * webhook actually landed with its payload (GAP-F).
+ */
+async function startWebhookReceiver(): Promise<WebhookReceiver> {
+  const received: { method: string; path: string; body: string }[] = [];
+  const server = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk) => (body += chunk));
+    req.on('end', () => {
+      received.push({ method: req.method || '', path: req.url || '', body });
+      if ((req.url || '').includes('/fail')) {
+        res.statusCode = 500;
+        res.end('{"error":"forced failure"}');
+      } else {
+        res.statusCode = 200;
+        res.end('{"ok":true}');
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '0.0.0.0', () => resolve()));
+  const port = (server.address() as AddressInfo).port;
+  return {
+    port,
+    received,
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}

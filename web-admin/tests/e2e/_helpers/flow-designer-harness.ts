@@ -259,10 +259,15 @@ async function fillOneField(
   }
 
   if (Array.isArray(value)) {
-    // multiselect with no options-list (DependentMultiSelect) — open + pick each.
+    // DependentMultiSelect (e.g. trigger-state-change toStates): a custom div+input
+    // that opens a dropdown of <button> option rows (NOT role=option). Its options load
+    // async after the parent field (e.g. stateField) is set, so open the control and wait
+    // for each option button to appear, then click it by its visible label.
     for (const v of value) {
       await field.click();
-      await page.getByRole('option', { name: v, exact: false }).first().click();
+      const opt = field.locator('div.absolute button').filter({ hasText: v }).first();
+      await opt.waitFor({ state: 'visible', timeout: 5_000 });
+      await opt.click();
     }
     return;
   }
@@ -399,6 +404,10 @@ export async function enableViaApi(page: Page, pid: string): Promise<void> {
 }
 
 export async function deleteViaApi(page: Page, pid: string): Promise<void> {
+  // Disable first — an enabled automation (especially a scheduled every-second cron)
+  // keeps firing, and leaving it enabled lets it pile up scheduler load across runs.
+  // Best-effort + idempotent; then delete.
+  await page.request.post(`/api/automations/${pid}/disable`).catch(() => {});
   await page.request.delete(`/api/automations/${pid}`).catch(() => {});
 }
 

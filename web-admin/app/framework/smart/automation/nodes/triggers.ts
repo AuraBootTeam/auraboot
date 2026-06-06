@@ -120,6 +120,9 @@ export const triggerNodes: FlowNodeDefinition[] = [
         type: 'multiselect',
         description: '$i18n:automation.field.fromStates.desc',
         dependsOn: { field: 'stateField' },
+        // The options are the state field's dict values (e.g. draft/submitted/cancelled),
+        // not model fields — cascade from the selected stateField's dict.
+        optionSource: 'dict',
         group: 'filter',
       },
       {
@@ -128,6 +131,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
         type: 'multiselect',
         description: '$i18n:automation.field.toStates.desc',
         dependsOn: { field: 'stateField' },
+        optionSource: 'dict',
         group: 'filter',
       },
     ],

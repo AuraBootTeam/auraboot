@@ -26,6 +26,9 @@ public interface CommandService {
 
     List<CommandDefinitionDTO> listByModelCode(String modelCode);
 
+    /** List all current commands across every model (no model scope). */
+    List<CommandDefinitionDTO> listAll();
+
     void delete(String pid);
 
     // ==================== Binding Rules ====================

@@ -1,32 +1,33 @@
 package com.auraboot.framework.automation.executor.impl;
 
 import com.auraboot.framework.automation.entity.AutomationAction;
-import com.auraboot.framework.webhook.service.WebhookDispatcher;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for SendWebhookExecutor.
+ * Unit tests for SendWebhookExecutor — validation + SSRF paths only.
+ *
+ * <p>The executor now POSTs the payload directly to the configured {@code url}
+ * (golden FINDING-10 — previously it ignored {@code url} and fanned out to
+ * webhook subscriptions). The actual outbound POST is covered end-to-end by the
+ * Layer-A golden (N-SEND-WEBHOOK-OUTBOUND drives the real designer node and
+ * asserts a host receiver captured the POST); here we cover config validation
+ * and SSRF, mirroring {@link CallApiExecutorTest}.
  */
-@ExtendWith(MockitoExtension.class)
 class SendWebhookExecutorTest {
 
-    @Mock
-    private WebhookDispatcher webhookDispatcher;
-
-    @InjectMocks
     private SendWebhookExecutor executor;
+
+    @BeforeEach
+    void setUp() {
+        executor = new SendWebhookExecutor(new ObjectMapper());
+    }
 
     // =========================================================
     // supports()
@@ -40,104 +41,11 @@ class SendWebhookExecutorTest {
     @Test
     void supports_other_returnsFalse() {
         assertThat(executor.supports("create_record")).isFalse();
-        assertThat(executor.supports("condition")).isFalse();
+        assertThat(executor.supports("call_api")).isFalse();
     }
 
     // =========================================================
-    // execute() — happy path
-    // =========================================================
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void execute_withEventType_dispatchesCorrectEvent() {
-        AutomationAction action = buildAction(Map.of(
-                "eventType", "crm.lead.qualified"
-        ));
-        Map<String, Object> context = Map.of(
-                "tenantId", 100L,
-                "recordId", "lead-001",
-                "automationPid", "auto-abc"
-        );
-
-        Map<String, Object> result = (Map<String, Object>) executor.execute(action, context);
-
-        assertThat(result.get("success")).isEqualTo(true);
-        assertThat(result.get("eventType")).isEqualTo("crm.lead.qualified");
-        assertThat(result.get("dispatched")).isEqualTo(true);
-        verify(webhookDispatcher).dispatch(eq("crm.lead.qualified"), any(), eq(100L));
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void execute_noEventType_defaultsToAutomationAction() {
-        AutomationAction action = buildAction(new HashMap<>());
-        Map<String, Object> context = Map.of("tenantId", 200L);
-
-        Map<String, Object> result = (Map<String, Object>) executor.execute(action, context);
-
-        assertThat(result.get("eventType")).isEqualTo("automation.action");
-        verify(webhookDispatcher).dispatch(eq("automation.action"), any(), eq(200L));
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void execute_withCustomPayload_sendsProcessedPayload() {
-        AutomationAction action = buildAction(Map.of(
-                "eventType", "order.created",
-                "payload", Map.of(
-                        "orderId", "${recordId}",
-                        "tenantId", "${tenantId}",
-                        "source", "automation"
-                )
-        ));
-        Map<String, Object> context = new HashMap<>();
-        context.put("tenantId", 300L);
-        context.put("recordId", "order-999");
-
-        executor.execute(action, context);
-
-        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(webhookDispatcher).dispatch(eq("order.created"), payloadCaptor.capture(), eq(300L));
-        Map<String, Object> sentPayload = payloadCaptor.getValue();
-        assertThat(sentPayload.get("orderId")).isEqualTo("order-999");
-        assertThat(sentPayload.get("tenantId")).isEqualTo(300L);
-        assertThat(sentPayload.get("source")).isEqualTo("automation");
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void execute_defaultPayload_includesContextFields() {
-        AutomationAction action = buildAction(Map.of("eventType", "test.event"));
-        Map<String, Object> context = new HashMap<>();
-        context.put("tenantId", 400L);
-        context.put("recordId", "rec-123");
-        context.put("automationPid", "auto-xyz");
-        context.put("event", "record_created");
-        context.put("record", Map.of("id", "rec-123", "name", "Test"));
-
-        executor.execute(action, context);
-
-        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(webhookDispatcher).dispatch(any(), payloadCaptor.capture(), eq(400L));
-        Map<String, Object> payload = payloadCaptor.getValue();
-        assertThat(payload.get("recordId")).isEqualTo("rec-123");
-        assertThat(payload.get("automationPid")).isEqualTo("auto-xyz");
-        assertThat(payload.get("event")).isEqualTo("record_created");
-        assertThat(payload).containsKey("record");
-    }
-
-    @Test
-    void execute_noTenantInContext_passesNullTenantId() {
-        AutomationAction action = buildAction(Map.of("eventType", "test.no.tenant"));
-        Map<String, Object> context = Map.of("recordId", "rec-456");
-
-        executor.execute(action, context);
-
-        verify(webhookDispatcher).dispatch(eq("test.no.tenant"), any(), isNull());
-    }
-
-    // =========================================================
-    // execute() — validation
+    // execute() — config validation (before HTTP call)
     // =========================================================
 
     @Test
@@ -150,6 +58,94 @@ class SendWebhookExecutorTest {
         assertThatThrownBy(() -> executor.execute(action, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("config");
+    }
+
+    @Test
+    void execute_missingUrl_throwsIllegalArgument() {
+        AutomationAction action = buildAction(Map.of(
+                "payload", Map.of("event", "x")
+        ));
+
+        assertThatThrownBy(() -> executor.execute(action, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("url");
+    }
+
+    @Test
+    void execute_blankUrl_throwsIllegalArgument() {
+        AutomationAction action = buildAction(Map.of("url", "  "));
+
+        assertThatThrownBy(() -> executor.execute(action, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("url");
+    }
+
+    // =========================================================
+    // execute() — SSRF validation (blocked scheme / port)
+    // =========================================================
+
+    @Test
+    void execute_ftpScheme_throwsIllegalArgument() {
+        AutomationAction action = buildAction(Map.of("url", "ftp://example.com/hook"));
+
+        assertThatThrownBy(() -> executor.execute(action, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("scheme");
+    }
+
+    @Test
+    void execute_blockedPort_throwsIllegalArgument() {
+        // Port 6443 (platform backend) is explicitly blocked by SsrfValidator.
+        AutomationAction action = buildAction(Map.of("url", "http://example.com:6443/hook"));
+
+        assertThatThrownBy(() -> executor.execute(action, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("port");
+    }
+
+    @Test
+    void execute_postgresPort_throwsIllegalArgument() {
+        AutomationAction action = buildAction(Map.of("url", "http://example.com:5432/hook"));
+
+        assertThatThrownBy(() -> executor.execute(action, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("port");
+    }
+
+    // =========================================================
+    // execute() — URL template substitution (observable via SSRF error)
+    // =========================================================
+
+    @Test
+    void execute_urlTemplateSubstitution_appliedBeforeSsrfCheck() {
+        // The substituted URL includes a blocked port, proving substitution happened.
+        Map<String, Object> config = new HashMap<>();
+        config.put("url", "http://example.com:${port}/hook");
+        AutomationAction action = buildAction(config);
+
+        Map<String, Object> context = Map.of("port", "6379"); // Redis — blocked
+
+        assertThatThrownBy(() -> executor.execute(action, context))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("port");
+    }
+
+    // =========================================================
+    // execute() — hostname that doesn't resolve fails fast (pinning)
+    // =========================================================
+
+    @Test
+    void execute_unreachableExternalHost_failsFast() {
+        // SsrfValidator.validate() returns null on UnknownHostException and the
+        // executor cannot pin without a resolved IP → fail fast (P3-E #1 pinning).
+        AutomationAction action = buildAction(Map.of(
+                "url", "https://this-host-definitely-does-not-exist-aura.invalid/hook",
+                "timeoutSeconds", 1
+        ));
+
+        assertThatThrownBy(() -> executor.execute(action, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("could not be resolved");
     }
 
     // =========================================================
