@@ -88,6 +88,11 @@ class DebugSessionServiceImplTest {
     private Automation automationWithActions(int count) {
         Automation a = new Automation();
         a.setPid(AUTOMATION_PID);
+        // Match the system tenant set in @BeforeEach — createSession() now enforces
+        // tenant ownership (MetaContext.getCurrentTenantId() == automation.tenantId) to
+        // block cross-tenant IDOR. Without a matching tenantId the guard rejects the
+        // stubbed automation with "Automation not found".
+        a.setTenantId(1L);
         List<AutomationAction> actions = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             AutomationAction action = new AutomationAction();
