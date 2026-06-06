@@ -795,8 +795,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             throw new MetaServiceException("Data cannot be null or empty");
         }
 
+        // Field-level write permission (gap #1): strip fields the current user may not write
+        stripNonWritableFields(modelCode, data);
+
         logOperation("create", modelCode, data.keySet());
-        
+
         ModelDefinition model = getModelDefinition(modelCode);
         
         // 检查表是否存在，如果不存在则自动创建
@@ -924,6 +927,32 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     /**
+     * Field-level write permission enforcement (gap #1).
+     *
+     * <p>Removes from the incoming payload any field the current user is not
+     * permitted to write (effective {@code field_write} data-permission policies).
+     * Stripping (rather than rejecting) keeps clients tolerant while guaranteeing
+     * restricted fields never reach the row; each strip is logged for audit.
+     */
+    private void stripNonWritableFields(String modelCode, Map<String, Object> data) {
+        if (data == null || data.isEmpty()) {
+            return;
+        }
+        Long tenantId = getCurrentTenantId();
+        Long userId = getCurrentUserId();
+        Set<String> nonWritable = dataPermissionEngine.getNonWritableFields(tenantId, modelCode, userId);
+        if (nonWritable == null || nonWritable.isEmpty()) {
+            return;
+        }
+        for (String fieldCode : nonWritable) {
+            if (data.remove(fieldCode) != null) {
+                log.warn("Field-write permission: stripped non-writable field '{}' from {} write by user {}",
+                        logSafe(fieldCode), logSafe(modelCode), logSafe(userId));
+            }
+        }
+    }
+
+    /**
      * 转换单个字段值
      */
     private Object convertFieldValue(FieldDefinition field, Object value) {
@@ -1040,6 +1069,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             throw new MetaServiceException("Data cannot be null or empty");
         }
         
+        // Field-level write permission (gap #1): strip fields the current user may not write
+        stripNonWritableFields(modelCode, data);
+
         logOperation("update", modelCode, recordId, data.keySet());
         
         try {

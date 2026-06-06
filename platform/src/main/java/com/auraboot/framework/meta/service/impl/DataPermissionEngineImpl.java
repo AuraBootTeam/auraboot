@@ -245,6 +245,24 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     }
 
     @Override
+    public Set<String> getNonWritableFields(Long tenantId, String modelCode, Long userId) {
+        // Intentionally NOT @Cacheable: writes are not the hot path, and a fresh
+        // read avoids stale enforcement when policies change (the mask-rule cache
+        // is evicted on policy CRUD; a separate write cache would need the same
+        // eviction wiring — simpler and safer to query each write).
+        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
+        if (memberId == null) {
+            return Collections.emptySet();
+        }
+        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, memberId);
+        return policies.stream()
+                .filter(p -> "field_write".equals(p.getPolicyType()))
+                .map(DataPermissionPolicy::getFieldCode)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
     public List<Map<String, Object>> applyFieldMasking(
             List<Map<String, Object>> records, List<FieldMaskRule> rules) {
         if (records == null || records.isEmpty() || rules == null || rules.isEmpty()) {
