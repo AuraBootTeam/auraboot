@@ -438,7 +438,13 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         @Override
         public QueryBuilder addRawCondition(String rawSql) {
             if (rawSql != null && !rawSql.isBlank()) {
-                conditions.add(rawSql);
+                // Conditions are joined with " and " in buildSelectSql/buildCountSql. A
+                // fragment carrying its own leading conjunction (e.g.
+                // DataPermissionEngine.buildRowFilter returns "AND created_by = ...") would
+                // otherwise produce invalid "... and AND created_by = ..." SQL, breaking all
+                // row-level data permission filtering. Strip a leading AND so the join owns
+                // the conjunction.
+                conditions.add(rawSql.replaceFirst("(?i)^\\s*AND\\s+", ""));
             }
             return this;
         }
