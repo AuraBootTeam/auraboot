@@ -375,6 +375,46 @@
       "resourceType": "function"
     },
     {
+      "code": "decision.definition.read",
+      "name": "Decision Runtime definition read",
+      "description": "Decision Runtime — list, view definitions and versions",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:definition",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "decision.definition.manage",
+      "name": "Decision Runtime definition manage",
+      "description": "Decision Runtime — create, update definitions and draft versions",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:definition",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "decision.definition.publish",
+      "name": "Decision Runtime definition publish",
+      "description": "Decision Runtime — validate and publish versions",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:definition",
+      "action": "publish",
+      "resourceType": "function"
+    },
+    {
+      "code": "decision.runtime.evaluate",
+      "name": "Decision Runtime evaluate",
+      "description": "Decision Runtime — call evaluate and test-run endpoints",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:runtime",
+      "action": "evaluate",
+      "resourceType": "function"
+    },
+    {
       "code": "automation.admin",
       "name": "Automation automation admin",
       "description": "Automation automation — admin",
