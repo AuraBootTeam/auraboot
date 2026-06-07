@@ -191,6 +191,15 @@ const BlockContent: React.FC<{
     case 'workbench-action-bar':
       return <WorkbenchActionBarPreview block={block} />;
 
+    case 'evidence-panel':
+      return <EvidencePanelPreview block={block} />;
+
+    case 'artifact-timeline':
+      return <ArtifactTimelinePreview block={block} />;
+
+    case 'review-drawer':
+      return <ReviewDrawerPreview block={block} />;
+
     case 'chart-card':
       return <ChartCardPreview block={block} />;
 
@@ -329,6 +338,88 @@ const WorkbenchActionBarPreview: React.FC<{ block: DslBlock }> = ({ block }) => 
       <div className="flex justify-end gap-2 rounded border border-gray-200 bg-white p-2">
         <div className="h-8 w-20 rounded bg-gray-100" />
         <div className="h-8 w-24 rounded bg-blue-500" />
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Evidence panel preview
+ */
+const EvidencePanelPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const { locale } = useI18n();
+  return (
+    <div className="p-3">
+      <div className="mb-2 text-sm font-medium text-gray-900">
+        {resolveLocalizedText(block.title, locale) || 'Evidence Panel'}
+      </div>
+      <div className="space-y-2 rounded border border-gray-200 bg-white p-3">
+        <div className="h-2 w-1/3 rounded bg-gray-300" />
+        <div className="rounded bg-gray-50 p-2">
+          <div className="h-2 w-2/3 rounded bg-gray-200" />
+          <div className="mt-2 h-2 w-1/2 rounded bg-gray-100" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Artifact timeline preview
+ */
+const ArtifactTimelinePreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const { locale } = useI18n();
+  return (
+    <div className="p-3">
+      <div className="mb-2 text-sm font-medium text-gray-900">
+        {resolveLocalizedText(block.title, locale) || 'Artifact Timeline'}
+      </div>
+      <div className="space-y-2 rounded border border-gray-200 bg-white p-3">
+        {[0, 1].map((index) => (
+          <div key={index} className="grid grid-cols-[auto_1fr_auto] items-start gap-2">
+            <div className="mt-1 h-2 w-2 rounded-full bg-blue-400" />
+            <div>
+              <div className="h-2 w-2/3 rounded bg-gray-300" />
+              <div className="mt-2 h-2 w-1/2 rounded bg-gray-100" />
+            </div>
+            <div className="h-5 w-10 rounded bg-blue-50" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Review drawer preview
+ */
+const ReviewDrawerPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const { locale } = useI18n();
+  return (
+    <div className="p-3">
+      <div className="mb-2 text-sm font-medium text-gray-900">
+        {resolveLocalizedText(block.title, locale) || 'Review Drawer'}
+      </div>
+      <div className="overflow-hidden rounded border border-blue-200 bg-white shadow-sm">
+        <div className="bg-blue-600 px-3 py-2 text-xs font-semibold text-white">
+          Row 5 · LED1 · Review
+        </div>
+        <div className="flex gap-2 border-b border-gray-100 px-3 py-2">
+          <div className="h-5 w-16 rounded bg-blue-50" />
+          <div className="h-5 w-14 rounded bg-emerald-50" />
+          <div className="h-5 w-20 rounded bg-violet-50" />
+        </div>
+        <div className="grid grid-cols-[90px_1fr]">
+          <div className="space-y-2 border-r border-gray-100 bg-gray-50 p-2">
+            <div className="h-6 rounded bg-blue-100" />
+            <div className="h-6 rounded bg-gray-100" />
+            <div className="h-6 rounded bg-gray-100" />
+          </div>
+          <div className="grid grid-cols-2 gap-2 p-2">
+            <div className="h-24 rounded border border-gray-100 bg-gray-50" />
+            <div className="h-24 rounded border border-blue-100 bg-blue-50" />
+          </div>
+        </div>
       </div>
     </div>
   );

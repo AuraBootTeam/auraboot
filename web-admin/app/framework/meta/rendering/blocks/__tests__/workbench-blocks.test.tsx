@@ -1,13 +1,18 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
+import { evaluateCondition as evaluateExpressionCondition } from '~/framework/meta/runtime/expression/evaluator';
 
 import { MetricStripBlockRenderer } from '../MetricStripBlockRenderer';
 import { CandidateListBlockRenderer } from '../CandidateListBlockRenderer';
 import { RecordInspectorBlockRenderer } from '../RecordInspectorBlockRenderer';
 import { WorkbenchActionBarBlockRenderer } from '../WorkbenchActionBarBlockRenderer';
+import { EvidencePanelBlockRenderer } from '../EvidencePanelBlockRenderer';
+import { ArtifactTimelineBlockRenderer } from '../ArtifactTimelineBlockRenderer';
+import { ReviewDrawerBlockRenderer } from '../ReviewDrawerBlockRenderer';
+import { useRuntimeStateSubscription } from '../workbenchBlockUtils';
 
 function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
   const context: Record<string, any> = {
@@ -25,7 +30,8 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
   const stub = {
     getContext: () => context,
     getEvaluator: () => ({
-      evaluateCondition: (expr: string) => expr !== 'false',
+      evaluateCondition: (expr: string, expressionContext = context) =>
+        evaluateExpressionCondition(expr, expressionContext as any),
       evaluateTemplate: (tpl: string) => tpl,
       evaluateObject: (obj: any) => obj,
     }),
@@ -199,6 +205,73 @@ describe('MetricStripBlockRenderer', () => {
 
     expect(screen.getByTestId('metric-strip-item-confirmed')).toHaveTextContent('2');
   });
+
+  it('renders compact chips and reads values from JSON string fields', () => {
+    const runtime = makeRuntime({
+      data: {
+        summary: {
+          reasonBreakdown: '{"match_multi_candidate":48,"unrecognized_category":1}',
+        },
+      },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'reason_filters',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      variant: 'chips',
+      title: 'Reason Breakdown',
+      metrics: [
+        {
+          key: 'multi',
+          label: 'Multiple Candidates',
+          valueField: 'reasonBreakdown.match_multi_candidate',
+          onClick: {
+            action: 'state.set',
+            args: { reasonFilterCodes: ['match_multi_candidate'] },
+          },
+        },
+      ],
+    };
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip-reason_filters')).toHaveTextContent('Reason Breakdown');
+    expect(screen.getByTestId('metric-strip-item-multi')).toHaveTextContent('48');
+    fireEvent.click(screen.getByTestId('metric-strip-item-multi'));
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'reasonFilterCodes', [
+      'match_multi_candidate',
+    ]);
+  });
+
+  it('maps boolean metric values to configured display text', () => {
+    const runtime = makeRuntime({
+      data: {
+        summary: {
+          dirty: true,
+        },
+      },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'metrics',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      metrics: [
+        {
+          key: 'dirty',
+          label: 'Export State',
+          valueField: 'dirty',
+          valueMap: {
+            true: 'Dirty',
+            false: 'Synced',
+          },
+        },
+      ],
+    };
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip-item-dirty')).toHaveTextContent('Dirty');
+  });
 });
 
 describe('WorkbenchActionBarBlockRenderer', () => {
@@ -229,6 +302,29 @@ describe('WorkbenchActionBarBlockRenderer', () => {
 
     expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
   });
+
+  it('supports bare compact action bars for workbench headers', () => {
+    const runtime = makeRuntime() as any;
+    const block: BlockConfig = {
+      id: 'actions',
+      blockType: 'workbench-action-bar',
+      surface: 'bare',
+      density: 'compact',
+      actions: [
+        {
+          code: 'download',
+          label: 'Download',
+          variant: 'primary',
+        },
+      ],
+    };
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+
+    const bar = screen.getByTestId('workbench-action-bar');
+    expect(bar).not.toHaveClass('border');
+    expect(screen.getByTestId('workbench-action-download')).toHaveClass('text-xs');
+  });
 });
 
 describe('CandidateListBlockRenderer', () => {
@@ -255,6 +351,14 @@ describe('CandidateListBlockRenderer', () => {
   it('writes selected candidate into runtime state', () => {
     const runtime = makeRuntime({
       data: {
+        rawItems: [
+          {
+            pid: 'RAW-1',
+            bom_raw_row_no: 11,
+            bom_raw_extra_columns_json:
+              '{"__parse_evidence":{"profileCode":"JIEJIA_WB_FLEX_MAIN_V1","composition":{"match":"Description + Value + Footprint"},"llm":{"confidence":0.88}}}',
+          },
+        ],
         candidates: [
           {
             pid: 'C-1',
@@ -331,6 +435,375 @@ describe('CandidateListBlockRenderer', () => {
     fireEvent.click(actionButton);
 
     expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
+  });
+
+  it('renders configured candidate detail fields from a JSON snapshot', () => {
+    const runtime = makeRuntime({
+      data: {
+        candidates: [
+          {
+            pid: 'C-1',
+            materialCode: 'D410000098100',
+            snapshot: '{"materialName":"Resistor","spec":"62R 1% 0603","brand":"YAGEO"}',
+          },
+        ],
+      },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'candidate_list',
+      blockType: 'candidate-list',
+      dataSource: 'candidates',
+      item: {
+        titleField: 'materialCode',
+        descriptionField: 'snapshot',
+        detailFields: [
+          { key: 'name', label: 'Material Name', sourceField: 'snapshot', field: 'materialName' },
+          { key: 'spec', label: 'Spec', sourceField: 'snapshot', field: 'spec', span: 2 },
+          { key: 'brand', label: 'Brand', sourceField: 'snapshot', field: 'brand' },
+        ],
+      },
+    };
+
+    render(<CandidateListBlockRenderer block={block} runtime={runtime} />);
+
+    const candidate = screen.getByTestId('candidate-list-item-C-1');
+    expect(candidate).toHaveTextContent('Material Name');
+    expect(candidate).toHaveTextContent('Resistor');
+    expect(candidate).toHaveTextContent('62R 1% 0603');
+    expect(candidate).toHaveTextContent('YAGEO');
+    expect(candidate).not.toHaveTextContent('{"materialName"');
+  });
+
+  it('constrains long candidate lists when maxHeight is configured', () => {
+    const runtime = makeRuntime({
+      data: {
+        candidates: [{ pid: 'C-1', materialCode: 'D410000098100' }],
+      },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'candidate_list',
+      blockType: 'candidate-list',
+      dataSource: 'candidates',
+      maxHeight: 480,
+      item: {
+        titleField: 'materialCode',
+      },
+    };
+
+    render(<CandidateListBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('candidate-list')).toHaveClass('min-h-0');
+    expect(screen.getByTestId('candidate-list')).toHaveStyle({ maxHeight: '480px' });
+  });
+});
+
+describe('ReviewDrawerBlockRenderer', () => {
+  const selectedLine = {
+    pid: 'std-1',
+    bom_std_row_no: 5,
+    bom_std_raw_row_no: 11,
+    bom_std_refdes: 'LED1',
+    bom_std_status_label: '待确认',
+    bom_std_material_code: '',
+    bom_std_material_name: '贴片 LED',
+    bom_std_spec: '绿色 0603 高亮 20mA + BL-HG034A-TRB',
+    bom_std_qty: 1,
+    bom_std_reason_code: 'match_multi_candidate',
+    bom_std_parse_confidence: 92,
+    bom_std_source_hash: 'a9f3',
+    bom_std_profile_score: 96,
+    bom_std_llm_mode: 'field_parse',
+    bom_std_llm_translation_policy: 'none',
+    bom_std_parse_json: '{"profileCode":"JIEJIA_WB_FLEX_MAIN_V1","llm":{"mode":"field_parse"}}',
+  };
+
+  function makeReviewDrawerRuntime(line = selectedLine) {
+    return makeRuntime({
+      data: {
+        rawItems: [
+          {
+            pid: 'raw-1',
+            bom_raw_row_no: 11,
+            bom_raw_extra_columns_json: JSON.stringify({
+              __parse_evidence: {
+                profileCode: 'JIEJIA_WB_FLEX_MAIN_V1',
+                composition: {
+                  matchRule: 'Description + Value + Footprint',
+                },
+                llm: {
+                  confidence: 0.88,
+                },
+              },
+            }),
+          },
+        ],
+        candidates: [
+          {
+            pid: 'ME-1',
+            bom_me_material_code: 'D790000012300',
+            bom_me_score: 92,
+            bom_me_candidate_snapshot_json:
+              '{"materialName":"贴片 LED","spec":"绿色 0603 高亮 20mA","brand":"BrightLED","mpn":"BL-HG034A-TRB"}',
+            bom_me_evidence_json: '{"matchSource":"mpn_exact"}',
+          },
+        ],
+        exports: [
+          {
+            pid: 'export-1',
+            bom_er_revision_no: 3,
+            bom_er_filename: 'standard-bom.xlsx',
+            bom_er_status: 'dirty',
+          },
+        ],
+      },
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: { pid: 'task-1' },
+        global: {},
+        state: { selectedBomLine: line },
+      }),
+    }) as any;
+  }
+
+  const reviewDrawerBlock: BlockConfig = {
+    id: 'review_drawer',
+    blockType: 'review-drawer',
+    context: '${state.selectedBomLine}',
+    titleTemplate: 'Row ${record.bom_std_row_no} · ${record.bom_std_refdes} · ${record.bom_std_status_label}',
+    summaryBadges: [
+      { key: 'profile', label: 'Profile', valueField: 'bom_std_profile_score', unit: '%', tone: 'blue' },
+      { key: 'parse', label: '解析', valueField: 'bom_std_parse_confidence', unit: '%', tone: 'green' },
+      { key: 'llm', label: 'LLM', valueField: 'bom_std_llm_mode', tone: 'purple' },
+    ],
+    compare: {
+      rawTitle: '原始 BOM',
+      canonicalTitle: 'Canonical Line',
+      rawFields: [
+        { key: 'refdes', label: 'Designator', field: 'bom_std_refdes' },
+        { key: 'qty', label: 'Qty', field: 'bom_std_qty' },
+        { key: 'sourceHash', label: 'source_hash', field: 'bom_std_source_hash' },
+      ],
+      canonicalFields: [
+        { key: 'name', label: '物料名称', field: 'bom_std_material_name' },
+        { key: 'spec', label: 'match_spec', field: 'bom_std_spec' },
+        { key: 'code', label: '标准编码', field: 'bom_std_material_code', emptyText: '待确认候选后写入' },
+      ],
+    },
+    source: {
+      record: {
+        dataSource: 'rawItems',
+        matchField: 'bom_raw_row_no',
+        recordField: 'bom_std_raw_row_no',
+      },
+      cards: [
+        {
+          key: 'profile',
+          title: 'Profile Detector',
+          sourceField: 'bom_raw_extra_columns_json',
+          field: '__parse_evidence.profileCode',
+        },
+        {
+          key: 'composition',
+          title: '字段融合规则',
+          sourceField: 'bom_raw_extra_columns_json',
+          field: '__parse_evidence.composition.matchRule',
+        },
+        {
+          key: 'llm',
+          title: 'LLM 辅助',
+          sourceField: 'bom_raw_extra_columns_json',
+          field: '__parse_evidence.llm.confidence',
+        },
+      ],
+      policies: [
+        { key: 'allowed', title: '允许行为', items: ['extract_fields', 'compose_match_spec'] },
+        { key: 'forbidden', title: '禁止行为', items: ['generate_material_code', 'auto_select_candidate'] },
+      ],
+      jsonField: 'bom_raw_extra_columns_json',
+    },
+    candidates: {
+      dataSource: 'candidates',
+      selection: { bind: 'selectedCandidate' },
+      item: {
+        titleField: 'bom_me_material_code',
+        scoreField: 'bom_me_score',
+        detailFields: [
+          { key: 'name', label: '物料名称', sourceField: 'bom_me_candidate_snapshot_json', field: 'materialName' },
+          { key: 'spec', label: '规格', sourceField: 'bom_me_candidate_snapshot_json', field: 'spec' },
+          { key: 'brand', label: '品牌', sourceField: 'bom_me_candidate_snapshot_json', field: 'brand' },
+        ],
+      },
+      selectedFields: [
+        { key: 'matchSource', label: '匹配来源', sourceField: 'bom_me_evidence_json', field: 'matchSource' },
+      ],
+      actions: [
+        {
+          code: 'confirm_candidate',
+          label: '确认候选',
+          disabledWhen:
+            "record.bom_std_material_code !== undefined && record.bom_std_material_code !== null && record.bom_std_material_code !== ''",
+          onClick: { action: 'dataSource.reload', args: { ids: ['taskSummary', 'standardLines'] } },
+        },
+        {
+          code: 'undo_decision',
+          label: '撤销决策',
+          variant: 'secondary',
+          requiresSelection: false,
+          disabledWhen:
+            "record.bom_std_reason_code !== 'manual_confirm' && record.bom_std_reason_code !== 'manual_override'",
+          onClick: { action: 'dataSource.reload', args: { ids: ['taskSummary', 'standardLines'] } },
+        },
+      ],
+    },
+    exportImpact: {
+      dataSource: 'exports',
+      fields: [
+        { key: 'currentRevision', label: '当前导出版本', value: 'Rev 03' },
+        { key: 'nextRevision', label: '下一导出版本', value: 'Rev 04' },
+        { key: 'dirty', label: '导出状态', value: 'Dirty' },
+      ],
+      actions: [
+        {
+          code: 'download_new_bom',
+          label: '重新生成并下载 Rev 04',
+          variant: 'primary',
+          onClick: { action: 'dataSource.reload', args: { ids: ['exports'] } },
+        },
+      ],
+    },
+  };
+
+  it('renders the selected row review drawer with compare and source tabs', () => {
+    const runtime = makeReviewDrawerRuntime();
+
+    render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+
+    const drawer = screen.getByTestId('review-drawer');
+    expect(drawer).toHaveTextContent('Row 5 · LED1 · 待确认');
+    expect(drawer).not.toHaveClass('fixed');
+    expect(screen.getByTestId('review-drawer-badge-profile')).toHaveTextContent('Profile');
+    expect(screen.getByTestId('review-drawer-badge-profile')).toHaveTextContent('96%');
+    expect(screen.getByRole('tab', { name: '原始 vs 转换' })).toBeInTheDocument();
+    expect(screen.getByText('Designator')).toBeInTheDocument();
+    expect(screen.getByText('LED1')).toBeInTheDocument();
+    expect(screen.getByText('待确认候选后写入')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: '解析来源' }));
+
+    expect(screen.getByText('Profile Detector')).toBeInTheDocument();
+    expect(screen.getByText('JIEJIA_WB_FLEX_MAIN_V1')).toBeInTheDocument();
+    expect(screen.getByText('Description + Value + Footprint')).toBeInTheDocument();
+    expect(screen.getByText('0.88')).toBeInTheDocument();
+    expect(screen.getByText('LLM 辅助')).toBeInTheDocument();
+    expect(screen.getByText('generate_material_code')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '收起复核浮层' }));
+    expect(screen.getByTestId('review-drawer-minimized')).toHaveTextContent('复核');
+    fireEvent.click(screen.getByRole('button', { name: '展开复核浮层' }));
+    expect(screen.getByTestId('review-drawer')).toHaveTextContent('Row 5 · LED1 · 待确认');
+  });
+
+  it('keeps the workbench unobstructed until a row is selected', () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: { pid: 'task-1' },
+        global: {},
+        state: {},
+      }),
+    }) as any;
+
+    render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+
+    expect(screen.getByTestId('review-drawer-empty')).toHaveTextContent('Select a row');
+    expect(screen.queryByTestId('review-drawer')).not.toBeInTheDocument();
+  });
+
+  it('selects a candidate and runs candidate/export actions from the drawer', async () => {
+    const runtime = makeReviewDrawerRuntime();
+
+    render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: '候选与决策' }));
+    expect(screen.getByTestId('review-drawer-candidate-ME-1')).toHaveTextContent('D790000012300');
+    expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).toBeDisabled();
+    expect(screen.getByTestId('review-drawer-candidate-action-undo_decision')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('review-drawer-candidate-ME-1'));
+    expect(screen.getByText('匹配来源')).toBeInTheDocument();
+    expect(screen.getByText('mpn_exact')).toBeInTheDocument();
+    expect(runtime.__updateState).toHaveBeenCalledWith(
+      'scope-1',
+      'selectedCandidate',
+      expect.objectContaining({ pid: 'ME-1', bom_me_material_code: 'D790000012300' }),
+    );
+    expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).not.toBeDisabled();
+    expect(screen.getByTestId('review-drawer-candidate-action-undo_decision')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('review-drawer-candidate-action-confirm_candidate'));
+    expect(runtime.__reload).toHaveBeenCalledWith(['taskSummary', 'standardLines']);
+    await waitFor(() => {
+      expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).not.toBeDisabled();
+    });
+
+    fireEvent.click(screen.getByRole('tab', { name: '导出影响' }));
+    expect(screen.getByText('下一导出版本')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('review-drawer-export-action-download_new_bom'));
+    expect(runtime.__reload).toHaveBeenCalledWith(['exports']);
+  });
+
+  it('honors drawer action conditions for confirmed review decisions', () => {
+    const runtime = makeReviewDrawerRuntime({
+      ...selectedLine,
+      bom_std_material_code: 'D790000012300',
+      bom_std_reason_code: 'manual_confirm',
+    });
+
+    render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: '候选与决策' }));
+    fireEvent.click(screen.getByTestId('review-drawer-candidate-ME-1'));
+
+    expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).toBeDisabled();
+    expect(screen.getByTestId('review-drawer-candidate-action-undo_decision')).not.toBeDisabled();
+  });
+
+  it('refreshes the selected row from its backing data source after reloads', () => {
+    const runtime = makeRuntime({
+      data: {
+        standardLines: [
+          {
+            ...selectedLine,
+            bom_std_material_code: 'D790000099999',
+            bom_std_reason_code: 'manual_confirm',
+          },
+        ],
+      },
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: { pid: 'task-1' },
+        global: {},
+        state: { selectedBomLine: selectedLine },
+      }),
+    }) as any;
+
+    render(
+      <ReviewDrawerBlockRenderer
+        block={{
+          ...reviewDrawerBlock,
+          contextDataSource: 'standardLines',
+          contextKeyField: 'pid',
+          titleTemplate: 'Row ${record.bom_std_row_no} · ${record.bom_std_reason_code}',
+        }}
+        runtime={runtime}
+      />,
+    );
+
+    expect(screen.getByText('D790000099999')).toBeInTheDocument();
+    expect(screen.getByTestId('review-drawer')).toHaveTextContent('manual_confirm');
   });
 });
 
@@ -421,5 +894,158 @@ describe('RecordInspectorBlockRenderer', () => {
     });
 
     expect(screen.getByTestId('record-inspector')).toHaveTextContent('D410000098100');
+  });
+
+  it('refreshes once after subscribing so sibling mount-time state writes are not missed', async () => {
+    const context: Record<string, any> = {
+      locale: 'en-US',
+      t: (k: string) => k,
+      form: {},
+      global: {},
+      state: {},
+    };
+    const runtime = makeRuntime({
+      getContext: () => context,
+      getStateManager: () => ({
+        getStore: () => ({
+          subscribe: () => () => undefined,
+        }),
+      }),
+      getScopeId: () => 'scope-1',
+    });
+
+    const Writer = () => {
+      React.useEffect(() => {
+        context.state.selectedLine = { materialCode: 'D410000098100' };
+      }, []);
+      return null;
+    };
+    const Reader = () => {
+      useRuntimeStateSubscription(runtime);
+      return <div>{runtime.getContext().state.selectedLine?.materialCode ?? 'empty'}</div>;
+    };
+
+    render(
+      <>
+        <Writer />
+        <Reader />
+      </>,
+    );
+
+    expect(await screen.findByText('D410000098100')).toBeInTheDocument();
+  });
+});
+
+describe('EvidencePanelBlockRenderer', () => {
+  it('renders an empty state when the configured context is missing', () => {
+    const runtime = makeRuntime();
+    const block: BlockConfig = {
+      id: 'evidence',
+      blockType: 'evidence-panel',
+      context: '${state.selectedCandidate}',
+      empty: { title: 'Select evidence' },
+    };
+
+    render(<EvidencePanelBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('evidence-panel-empty')).toHaveTextContent('Select evidence');
+  });
+
+  it('renders configured evidence sections and formats JSON payloads', () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'en-US',
+        t: (k: string) => k,
+        form: {},
+        global: {},
+        state: {
+          selectedCandidate: {
+            materialCode: 'D410000098100',
+            evidenceJson: '{"spec":"62R","package":"0603"}',
+            conflictJson: { brand: 'alternative' },
+          },
+        },
+      }),
+    });
+    const block: BlockConfig = {
+      id: 'evidence',
+      blockType: 'evidence-panel',
+      context: '${state.selectedCandidate}',
+      title: 'Evidence',
+      sections: [
+        { key: 'candidate', label: 'Candidate', field: 'materialCode' },
+        { key: 'evidence', label: 'Evidence JSON', field: 'evidenceJson', format: 'json' },
+        { key: 'conflict', label: 'Conflict JSON', field: 'conflictJson', format: 'json' },
+      ],
+    };
+
+    render(<EvidencePanelBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('evidence-panel')).toHaveTextContent('Evidence');
+    expect(screen.getByTestId('evidence-panel-section-candidate')).toHaveTextContent('D410000098100');
+    expect(screen.getByTestId('evidence-panel-section-evidence')).toHaveTextContent('"spec": "62R"');
+    expect(screen.getByTestId('evidence-panel-section-conflict')).toHaveTextContent('"brand": "alternative"');
+  });
+});
+
+describe('ArtifactTimelineBlockRenderer', () => {
+  it('renders a stable empty state when no artifacts exist', () => {
+    const runtime = makeRuntime({
+      data: {
+        exports: [],
+      },
+    });
+    const block: BlockConfig = {
+      id: 'exports',
+      blockType: 'artifact-timeline',
+      dataSource: 'exports',
+      empty: { title: 'No artifacts' },
+    };
+
+    render(<ArtifactTimelineBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('artifact-timeline-empty')).toHaveTextContent('No artifacts');
+  });
+
+  it('renders artifact rows with status, hash and download link', () => {
+    const runtime = makeRuntime({
+      data: {
+        exports: [
+          {
+            pid: 'export-1',
+            revisionNo: 2,
+            filename: 'standard-bom.xlsx',
+            generatedAt: '2026-06-06T15:32:00+08:00',
+            status: 'generated',
+            stateHash: 'abcdef1234567890',
+            fileId: 'file-1',
+          },
+        ],
+      },
+    });
+    const block: BlockConfig = {
+      id: 'exports',
+      blockType: 'artifact-timeline',
+      dataSource: 'exports',
+      item: {
+        titleField: 'filename',
+        subtitleField: 'generatedAt',
+        revisionField: 'revisionNo',
+        statusField: 'status',
+        hashField: 'stateHash',
+        fileIdField: 'fileId',
+      },
+    };
+
+    render(<ArtifactTimelineBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('artifact-timeline')).toHaveTextContent('standard-bom.xlsx');
+    expect(screen.getByTestId('artifact-timeline-item-export-1')).toHaveTextContent('Rev 2');
+    expect(screen.getByTestId('artifact-timeline-item-export-1')).toHaveTextContent('generated');
+    expect(screen.getByTestId('artifact-timeline-item-export-1')).toHaveTextContent('abcdef12');
+    expect(screen.getByTestId('artifact-timeline-download-export-1')).toHaveAttribute(
+      'href',
+      '/api/file/download/file-1',
+    );
   });
 });

@@ -1,0 +1,128 @@
+import React from 'react';
+import type { BlockConfig } from '~/framework/meta/schemas/types';
+import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
+import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import {
+  readDataSourceRows,
+  readDataSourceState,
+  readPath,
+  useDataSourceSubscription,
+} from './workbenchBlockUtils';
+
+export interface ArtifactTimelineBlockRendererProps {
+  block: BlockConfig;
+  runtime: SchemaRuntime;
+}
+
+function shortHash(value: unknown): string {
+  const text = String(value ?? '');
+  return text.length > 8 ? text.slice(0, 8) : text;
+}
+
+export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRendererProps> = ({
+  block,
+  runtime,
+}) => {
+  const context = runtime.getContext();
+  const locale = context.locale || 'zh-CN';
+  const t = context.t || ((key: string) => key);
+  const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
+  const item = (block as any).item || {};
+
+  useDataSourceSubscription(runtime, dataSourceId);
+
+  const rows = readDataSourceRows(runtime, dataSourceId);
+  const dataSourceState = readDataSourceState(runtime, dataSourceId);
+  const title = getLocalizedText(block.title || (block as any).label || 'Artifacts', locale, t);
+  const emptyTitle = getLocalizedText(
+    (block as any).empty?.title || 'No artifacts',
+    locale,
+    t,
+  );
+
+  if (dataSourceState?.loading) {
+    return (
+      <div
+        className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500"
+        data-testid="artifact-timeline-loading"
+      >
+        {t('common.loading') !== 'common.loading' ? t('common.loading') : 'Loading...'}
+      </div>
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div
+        className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500"
+        data-testid="artifact-timeline-empty"
+      >
+        {emptyTitle}
+      </div>
+    );
+  }
+
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white" data-testid="artifact-timeline">
+      <div className="border-b border-gray-100 px-4 py-3">
+        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+      </div>
+      <ol className="divide-y divide-gray-100">
+        {rows.map((row: any, index: number) => {
+          const rowKey = String(readPath(row, item.keyField) ?? row.pid ?? row.id ?? index);
+          const titleValue = readPath(row, item.titleField) ?? rowKey;
+          const subtitle = readPath(row, item.subtitleField);
+          const revision = readPath(row, item.revisionField);
+          const status = readPath(row, item.statusField);
+          const hash = readPath(row, item.hashField);
+          const fileId = readPath(row, item.fileIdField);
+          const downloadUrl = fileId ? `/api/file/download/${encodeURIComponent(String(fileId))}` : undefined;
+
+          return (
+            <li
+              key={rowKey}
+              className="grid gap-3 px-4 py-3 sm:grid-cols-[auto_1fr_auto]"
+              data-testid={`artifact-timeline-item-${rowKey}`}
+            >
+              <div className="mt-1 h-2.5 w-2.5 rounded-full bg-blue-500" />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-sm font-semibold text-gray-900">
+                    {String(titleValue)}
+                  </span>
+                  {revision !== undefined && revision !== null && (
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                      Rev {String(revision)}
+                    </span>
+                  )}
+                  {status && (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                      {String(status)}
+                    </span>
+                  )}
+                </div>
+                {subtitle && <div className="mt-1 text-xs text-gray-500">{String(subtitle)}</div>}
+                {hash && (
+                  <div className="mt-1 font-mono text-xs text-gray-500">
+                    {shortHash(hash)}
+                  </div>
+                )}
+              </div>
+              {downloadUrl && (
+                <a
+                  href={downloadUrl}
+                  data-testid={`artifact-timeline-download-${rowKey}`}
+                  className="self-start rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  {t('common.download') !== 'common.download' ? t('common.download') : 'Download'}
+                </a>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+};
+
+export default ArtifactTimelineBlockRenderer;

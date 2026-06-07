@@ -29,6 +29,11 @@ export interface PageContentProps {
     hideBuiltInExport?: boolean;
     hideBuiltInPrint?: boolean;
     hideSavedViews?: boolean;
+    hideQuickFilters?: boolean;
+    hideSort?: boolean;
+    hideColumnSettings?: boolean;
+    hideRowHeight?: boolean;
+    hideFilterChips?: boolean;
     reloadEventName?: string;
   };
   // --- L1 SDK extensions ---

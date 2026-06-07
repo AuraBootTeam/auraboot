@@ -11,7 +11,7 @@
  * Used by DynamicPageRenderer when the page kind is "form".
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useUser, usePermissions } from '~/contexts/AuthContext';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
@@ -137,6 +137,21 @@ export function normalizeCommandPayloadValue(rawValue: any, dataType?: string): 
     return JSON.stringify(normalized);
   }
   return normalized;
+}
+
+export function mergeLoadedRecordWithDirtyFields(
+  loadedRecord: Record<string, any>,
+  currentData: Record<string, any>,
+  dirtyFields: ReadonlySet<string>,
+): Record<string, any> {
+  if (dirtyFields.size === 0) return loadedRecord;
+  const merged = { ...loadedRecord };
+  for (const fieldCode of dirtyFields) {
+    if (Object.prototype.hasOwnProperty.call(currentData, fieldCode)) {
+      merged[fieldCode] = currentData[fieldCode];
+    }
+  }
+  return merged;
 }
 
 function isJsonLikeDataType(dataType?: string): boolean {
@@ -433,6 +448,7 @@ export function FormPageContent(props: PageContentProps) {
   const [initialFormData, setInitialFormData] = useState<Record<string, any> | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [summaryErrors, setSummaryErrors] = useState<string[]>([]);
+  const dirtyFieldsRef = useRef<Set<string>>(new Set());
 
   // Read URL params:
   // - commandCode: explicit submit command provided by navigation actions
@@ -1136,6 +1152,7 @@ export function FormPageContent(props: PageContentProps) {
             }
             setFieldErrors({});
             setSummaryErrors([]);
+            dirtyFieldsRef.current.clear();
             navigate(resolveAfterSubmitRedirect(schema, tableName, result.data, recordId));
           })
           .catch((err) => {
@@ -1208,6 +1225,7 @@ export function FormPageContent(props: PageContentProps) {
             );
           }
           showSuccessToast(t('common.saveSuccess') || 'Saved successfully');
+          dirtyFieldsRef.current.clear();
           navigate(resolveAfterSubmitRedirect(schema, targetModelCode, result.data, recordId));
         });
       }
@@ -1252,6 +1270,7 @@ export function FormPageContent(props: PageContentProps) {
   const [mainRecordLoaded, setMainRecordLoaded] = useState(!isEditMode);
   useEffect(() => {
     if (!recordId) return;
+    dirtyFieldsRef.current.clear();
     setMainRecordLoaded(false);
     fetchResult<any>(`/api/dynamic/${tableName}/${recordId}`, {
       method: 'get',
@@ -1259,7 +1278,9 @@ export function FormPageContent(props: PageContentProps) {
     })
       .then((resp) => {
         if (ResultHelper.isSuccess(resp) && resp.data) {
-          setFormData(resp.data);
+          setFormData((prev) =>
+            mergeLoadedRecordWithDirtyFields(resp.data, prev, dirtyFieldsRef.current),
+          );
           setInitialFormData(resp.data);
         }
       })
@@ -1439,7 +1460,11 @@ export function FormPageContent(props: PageContentProps) {
 
   // Render smart field using utility
   const renderSmartField = useMemo(
-    () => createFieldRenderer(formData, setFormData, pageContext, fieldErrors, clearFieldError),
+    () =>
+      createFieldRenderer(formData, setFormData, pageContext, fieldErrors, (fieldCode) => {
+        dirtyFieldsRef.current.add(fieldCode);
+        clearFieldError(fieldCode);
+      }),
     [formData, pageContext, fieldErrors, clearFieldError],
   );
 

@@ -288,6 +288,9 @@ public final class DslRegistry {
         RECORD_INSPECTOR("record-inspector", "Record inspector block", "1.4"),
         CANDIDATE_LIST("candidate-list", "Candidate list block", "1.4"),
         WORKBENCH_ACTION_BAR("workbench-action-bar", "Workbench action bar block", "1.4"),
+        EVIDENCE_PANEL("evidence-panel", "Evidence panel block", "1.4"),
+        ARTIFACT_TIMELINE("artifact-timeline", "Artifact timeline block", "1.4"),
+        REVIEW_DRAWER("review-drawer", "Review drawer block", "1.4"),
         CUSTOM("custom", "Custom block", "1.0");
 
         private final String code, label, since;

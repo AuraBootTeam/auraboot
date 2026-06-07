@@ -10,6 +10,8 @@ export const DEFAULT_COL_SPAN_BY_TYPE: Record<string, number> = {
   'stat-card': 4,
   'candidate-list': 4,
   'workbench-action-bar': 12,
+  'evidence-panel': 6,
+  'artifact-timeline': 6,
   'chart': 6,
   'form-section': 6,
   'rich-text': 6,

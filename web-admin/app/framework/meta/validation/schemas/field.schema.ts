@@ -15,8 +15,11 @@ const eventConfigSchema = z.object({
 });
 
 const blockLayoutConfigSchema = z.object({
+  col: z.number().optional(),
   colSpan: z.number().optional(),
+  row: z.number().optional(),
   rowSpan: z.number().optional(),
+  order: z.number().optional(),
   columns: z.number().optional(),
   colGap: z.number().optional(),
   rowGap: z.number().optional(),

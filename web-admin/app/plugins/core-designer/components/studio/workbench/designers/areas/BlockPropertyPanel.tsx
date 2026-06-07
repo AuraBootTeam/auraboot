@@ -60,6 +60,9 @@ const BLOCK_INFO: Record<string, { name: string; icon: string }> = {
   'record-inspector': { name: 'Record Inspector', icon: 'ROW' },
   'candidate-list': { name: 'Candidate List', icon: 'ALT' },
   'workbench-action-bar': { name: 'Workbench Action Bar', icon: 'ACT' },
+  'evidence-panel': { name: 'Evidence Panel', icon: 'EV' },
+  'artifact-timeline': { name: 'Artifact Timeline', icon: 'TL' },
+  'review-drawer': { name: 'Review Drawer', icon: 'REV' },
   'chart-card': { name: 'Chart Card', icon: '📉' },
   text: { name: 'Text Content', icon: '📃' },
 };
@@ -77,6 +80,9 @@ const BLOCK_INFO_ZH: Record<string, string> = {
   'record-inspector': '记录检查器',
   'candidate-list': '候选列表',
   'workbench-action-bar': '工作台操作栏',
+  'evidence-panel': '证据面板',
+  'artifact-timeline': '产物时间线',
+  'review-drawer': '复核浮层',
   'chart-card': '图表卡片',
   text: '文本内容',
 };

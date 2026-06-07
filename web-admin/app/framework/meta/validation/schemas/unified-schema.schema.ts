@@ -12,6 +12,8 @@ export const kindEnum = z.enum(KIND_VALUES);
 const layoutConfigSchema = z.object({
   type: z.enum(['grid', 'stack']).optional(),
   cols: z.number().optional(),
+  columnTemplate: z.string().optional(),
+  gridTemplateColumns: z.string().optional(),
   colGap: z.number().optional(),
   rowGap: z.number().optional(),
   gap: z.number().optional(),

@@ -348,6 +348,28 @@ class PageSchemaValidatorTest {
                         "blockType", "candidate-list",
                         "dataSource", Map.of("type", "namedQuery", "queryCode", "pe_order_candidates"),
                         "item", Map.of("keyField", "pid", "titleField", "pe_order_no")
+                ),
+                Map.of(
+                        "id", "order_evidence",
+                        "blockType", "evidence-panel",
+                        "context", "${state.selectedCandidate}",
+                        "sections", List.of(Map.of(
+                                "key", "evidence",
+                                "label", localized("Evidence"),
+                                "field", "evidence_json",
+                                "format", "json"
+                        ))
+                ),
+                Map.of(
+                        "id", "order_artifacts",
+                        "blockType", "artifact-timeline",
+                        "dataSource", "exportRevisions",
+                        "item", Map.of(
+                                "keyField", "pid",
+                                "titleField", "file_name",
+                                "revisionField", "revision_no",
+                                "fileIdField", "file_id"
+                        )
                 )
         ))));
 
