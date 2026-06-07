@@ -370,6 +370,13 @@ class PageSchemaValidatorTest {
                                 "revisionField", "revision_no",
                                 "fileIdField", "file_id"
                         )
+                ),
+                Map.of(
+                        "id", "order_status",
+                        "blockType", "status-banner",
+                        "dataSource", "taskSummary",
+                        "statusField", "status",
+                        "hideStatuses", List.of("completed")
                 )
         ))));
 

@@ -159,6 +159,63 @@ describe('ControlledFieldRenderer', () => {
     });
   });
 
+  it('clamps large reference pageSize and passes reference sort params', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid="component-loader">{componentName}</div>;
+      },
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'bom_sp_manufacturer_part_id',
+            component: 'SmartSelect',
+            dataType: 'reference',
+            props: {
+              refTarget: {
+                modelCode: 'bom_manufacturer_part',
+                displayField: 'bom_mp_mpn',
+                pageSize: 5000,
+                sortField: 'created_at',
+                sortOrder: 'desc',
+              },
+            },
+          } as any
+        }
+        value={undefined}
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader')).toHaveTextContent('SmartSelect');
+    });
+
+    expect(capturedPropsSpy.mock.calls[0]?.[0]?.props?.dataSource).toEqual({
+      type: 'api',
+      endpoint: '/api/dynamic/bom_manufacturer_part/list',
+      method: 'get',
+      params: { pageNum: 1, pageSize: 500, sortField: 'created_at', sortOrder: 'desc' },
+      adaptor: 'optionList',
+      valueField: 'pid',
+      labelField: 'bom_mp_mpn',
+      autoFetch: true,
+    });
+  });
+
   it('rehydrates stringified daterange values for edit mode', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({

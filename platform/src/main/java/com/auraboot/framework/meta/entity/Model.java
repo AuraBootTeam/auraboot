@@ -190,14 +190,50 @@ public class Model extends AbstractMultiVersionEntity {
      * Set via extension: {"skipTableCreation": true}
      */
     public boolean isSkipTableCreation() {
-        Object val = getExtensionValue("skipTableCreation");
+        return getExtensionBoolean("skipTableCreation", false);
+    }
+
+    /**
+     * Check if all default CRUD pages should be skipped during publish.
+     * Set via extension: {"skipDefaultPages": true}
+     */
+    public boolean isSkipDefaultPages() {
+        return getExtensionBoolean("skipDefaultPages", false);
+    }
+
+    /**
+     * Check if default list page creation should be skipped during publish.
+     * Set via extension: {"skipListPage": true}
+     */
+    public boolean isSkipListPageCreation() {
+        return getExtensionBoolean("skipListPage", false);
+    }
+
+    /**
+     * Check if default form page creation should be skipped during publish.
+     * Set via extension: {"skipFormPage": true}
+     */
+    public boolean isSkipFormPageCreation() {
+        return getExtensionBoolean("skipFormPage", false);
+    }
+
+    /**
+     * Check if default detail page creation should be skipped during publish.
+     * Set via extension: {"skipDetailPage": true}
+     */
+    public boolean isSkipDetailPageCreation() {
+        return getExtensionBoolean("skipDetailPage", false);
+    }
+
+    private boolean getExtensionBoolean(String key, boolean defaultValue) {
+        Object val = getExtensionValue(key);
         if (val instanceof Boolean b) {
             return b;
         }
         if (val != null) {
             return Boolean.parseBoolean(val.toString());
         }
-        return false;
+        return defaultValue;
     }
 
     /**

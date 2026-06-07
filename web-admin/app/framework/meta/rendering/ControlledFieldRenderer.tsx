@@ -43,6 +43,8 @@ const SYSTEM_MODEL_ENDPOINTS: Record<
   },
 };
 
+const MAX_DYNAMIC_REFERENCE_PAGE_SIZE = 500;
+
 /**
  * Controlled 模式字段渲染器
  *
@@ -303,11 +305,21 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
           autoFetch: true,
         } satisfies DataSourceConfig;
       } else {
+        const configuredPageSize = Number(refTarget?.pageSize || refTarget?.maxItems || 200);
+        const pageSize =
+          Number.isFinite(configuredPageSize) && configuredPageSize > 0
+            ? Math.min(configuredPageSize, MAX_DYNAMIC_REFERENCE_PAGE_SIZE)
+            : 200;
+        const params: Record<string, any> = { pageNum: 1, pageSize };
+        if (refTarget?.sortField) {
+          params.sortField = refTarget.sortField;
+          params.sortOrder = refTarget.sortOrder || 'desc';
+        }
         const referenceDataSource: DataSourceConfig = {
           type: 'api',
           endpoint: `/api/dynamic/${targetModelCode}/list`,
           method: 'get',
-          params: { pageNum: 1, pageSize: 200 },
+          params,
           adaptor: 'optionList',
           valueField: 'pid',
           autoFetch: true,

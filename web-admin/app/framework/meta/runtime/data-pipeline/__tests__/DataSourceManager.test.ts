@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { waitFor } from '@testing-library/react';
 import { fetchResult } from '~/shared/services/http-client';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
@@ -12,6 +12,10 @@ vi.mock('~/shared/services/http-client', () => ({
 const mockedFetchResult = vi.mocked(fetchResult);
 
 describe('DataSourceManager', () => {
+  beforeEach(() => {
+    mockedFetchResult.mockReset();
+  });
+
   it('evaluates object params against runtime record and state context', async () => {
     mockedFetchResult.mockResolvedValueOnce({
       code: '0',
@@ -156,6 +160,61 @@ describe('DataSourceManager', () => {
     expect(JSON.parse(params.filters)).toEqual([
       { fieldName: 'bom_me_canonical_line_id', operator: 'EQ', value: 'std-1' },
     ]);
+  });
+
+  it('skips nested state-dependent auto-fetch while parent selection is missing', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockedFetchResult.mockResolvedValue({
+      code: '0',
+      data: { records: [{ pid: 'me-1' }], total: 1, current: 1, pageSize: 50 },
+    } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        state: {},
+      } as any),
+    );
+    const stateManager = new ScopedStateManager({
+      locale: 'zh-CN',
+      theme: 'light',
+      user: undefined,
+      tenant: undefined,
+      t: (key: string) => key,
+    } as any);
+    stateManager.createScope('scope-1', { state: {} });
+    manager.bindStateManager(stateManager, 'scope-1');
+
+    manager.register('matchEvidence', {
+      type: 'api',
+      endpoint: '/api/dynamic/bom_match_evidence/list',
+      method: 'get',
+      adaptor: 'table',
+      params: {
+        bom_me_canonical_line_id: '${state.selectedBomLine.pid}',
+      },
+      dependOn: ['state.selectedBomLine.pid'],
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mockedFetchResult).not.toHaveBeenCalled();
+    expect(consoleWarn).not.toHaveBeenCalledWith(
+      expect.stringContaining('[ExpressionParser] 尝试访问 null 或 undefined 的属性'),
+    );
+
+    stateManager.updateState('scope-1', 'selectedBomLine', { pid: 'std-1' });
+
+    await waitFor(() => {
+      expect(mockedFetchResult).toHaveBeenCalledWith(
+        '/api/dynamic/bom_match_evidence/list',
+        expect.objectContaining({ method: 'get' }),
+      );
+    });
+    const params = mockedFetchResult.mock.calls.at(-1)?.[1]?.params as Record<string, any>;
+    expect(JSON.parse(params.filters)).toEqual([
+      { fieldName: 'bom_me_canonical_line_id', operator: 'EQ', value: 'std-1' },
+    ]);
+
+    consoleWarn.mockRestore();
   });
 
   it('reloads nested state dependents when a root state key is notified', async () => {
