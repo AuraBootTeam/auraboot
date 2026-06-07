@@ -108,4 +108,29 @@ class CrossFieldDecisionAdapterTest {
         assertThat(v.valid()).isTrue();
         assertThat(v.fieldRefs()).contains("record.data.attachment");
     }
+
+    /** expression-mode rule (SpEL assert) via the reusable safe CommandSpelEvaluator. */
+    @Test
+    void expressionModeAssertViaSafeSpel() {
+        RuleAssert exprAssert = new RuleAssert();
+        exprAssert.setExpr("amount <= 5000"); // safe SpEL over recordData (MapAccessor root)
+        CrossFieldRule rule = new CrossFieldRule();
+        rule.setId("amount_cap");
+        rule.setRuleAssert(exprAssert);
+        rule.setMessage("amount must be <= 5000");
+        rule.setSeverity("ERROR");
+        rule.setTargetField("amount");
+
+        // amount 20000 violates the SpEL assert -> violation
+        DecisionResult bad = adapter.evaluate(decision(rule), ctx(Map.of("amount", 20000)),
+                DecisionEvaluateOptions.defaults());
+        assertThat(bad.status()).isEqualTo(DecisionStatus.VIOLATED);
+        assertThat(bad.violations()).hasSize(1);
+
+        // amount 100 satisfies it -> no violation
+        DecisionResult ok = adapter.evaluate(decision(rule), ctx(Map.of("amount", 100)),
+                DecisionEvaluateOptions.defaults());
+        assertThat(ok.status()).isEqualTo(DecisionStatus.NOT_MATCHED);
+        assertThat(ok.violations()).isEmpty();
+    }
 }
