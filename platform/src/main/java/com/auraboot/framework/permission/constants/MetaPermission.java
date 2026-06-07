@@ -693,6 +693,31 @@ public final class MetaPermission {
      */
     public static final String DRT_RUNTIME_EVALUATE = "decision.runtime.evaluate";
 
+    // ==================== EVENT POLICY permissions ====================
+    // NOTE: These are for the EventPolicy module (ab_drt_policy_* tables, /api/event-policy).
+    // They are DISTINCT from the decision.definition.* permissions above which belong to the
+    // Decision Runtime module (ab_drt_definition / ab_drt_version).
+
+    /**
+     * Event Policy definition read permission (list, view definitions and versions).
+     */
+    public static final String POLICY_DEFINITION_READ = "decision.policy.read";
+
+    /**
+     * Event Policy definition manage permission (create definitions and draft versions).
+     */
+    public static final String POLICY_DEFINITION_MANAGE = "decision.policy.manage";
+
+    /**
+     * Event Policy definition publish permission (validate → publish a version).
+     */
+    public static final String POLICY_DEFINITION_PUBLISH = "decision.policy.publish";
+
+    /**
+     * Event Policy run permission (call /run endpoint to evaluate a published policy).
+     */
+    public static final String POLICY_RUNTIME_RUN = "decision.policy.run";
+
     // ==================== Private Constructor ====================
 
     /**

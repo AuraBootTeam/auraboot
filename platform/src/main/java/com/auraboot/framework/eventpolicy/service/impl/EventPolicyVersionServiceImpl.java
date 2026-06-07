@@ -198,6 +198,16 @@ public class EventPolicyVersionServiceImpl implements EventPolicyVersionService 
         return versionMapper.selectOne(w);
     }
 
+    @Override
+    public List<DrtPolicyVersionEntity> listByCode(String policyCode) {
+        Long tid = requireTenant();
+        LambdaQueryWrapper<DrtPolicyVersionEntity> w = new LambdaQueryWrapper<>();
+        w.eq(DrtPolicyVersionEntity::getTenantId, tid)
+         .eq(DrtPolicyVersionEntity::getPolicyCode, policyCode)
+         .orderByAsc(DrtPolicyVersionEntity::getVersion);
+        return versionMapper.selectList(w);
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     private String sha256(String input) {

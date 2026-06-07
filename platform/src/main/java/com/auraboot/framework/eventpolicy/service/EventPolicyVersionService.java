@@ -2,6 +2,8 @@ package com.auraboot.framework.eventpolicy.service;
 
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
 import com.auraboot.framework.eventpolicy.model.MatchMode;
+
+import java.util.List;
 import com.auraboot.framework.eventpolicy.model.PolicyPhase;
 import com.auraboot.framework.eventpolicy.model.ExecutionMode;
 import com.auraboot.framework.eventpolicy.model.FailureStrategy;
@@ -49,4 +51,10 @@ public interface EventPolicyVersionService {
      * Returns null if not found.
      */
     DrtPolicyVersionEntity findByPid(String pid);
+
+    /**
+     * List all versions for a given policyCode within the current tenant,
+     * ordered by version number ascending.
+     */
+    List<DrtPolicyVersionEntity> listByCode(String policyCode);
 }
