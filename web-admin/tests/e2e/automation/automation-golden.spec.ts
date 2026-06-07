@@ -272,6 +272,17 @@ test.describe('Automation Golden — full user flow E2E (B1)', () => {
 
   const createdPids: string[] = [];
 
+  // Isolation: disable every automation created so far after each test. B1 enables an
+  // on_record_create automation and only deletes it in afterAll; a delete that leaks (or
+  // an engine-undeploy lag) leaves it firing on the e2et_order records the later Phase 2/3
+  // tests create, cascading update_record actions that trip their on_record_update
+  // assertions ('a create must NOT fire' → Received: N). Disabling per-test stops it.
+  test.afterEach(async ({ page }) => {
+    for (const pid of createdPids) {
+      await page.request.post(`/api/automations/${pid}/disable`).catch(() => {});
+    }
+  });
+
   test.afterAll(async ({ browser }) => {
     if (createdPids.length === 0) return;
     const ctx = await browser.newContext({
@@ -494,6 +505,16 @@ test.describe('Automation Golden — Layer B behavioral matrix (Phase 2)', () =>
   // first gives page.request a proper http origin, exactly like a real user.
   test.beforeEach(async ({ page }) => {
     await page.goto('/automations');
+  });
+
+  // Isolation: disable every automation created so far after each test. A trigger left
+  // enabled by an earlier test would otherwise fire (or cascade an update_record) on the
+  // next test's e2et_order records — the cross-test interference behind the E2 /
+  // trigger-record-update flake. Disable is idempotent; afterAll still deletes them.
+  test.afterEach(async ({ page }) => {
+    for (const pid of createdPids) {
+      await page.request.post(`/api/automations/${pid}/disable`).catch(() => {});
+    }
   });
 
   test.afterAll(async ({ browser }) => {
@@ -961,6 +982,14 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/automations'); // real in-app origin (colon-in-path fire endpoint)
+  });
+
+  // Isolation: disable every automation created so far after each test (see Phase 2) so a
+  // left-enabled trigger can't fire or cascade-update onto the next test's records.
+  test.afterEach(async ({ page }) => {
+    for (const pid of createdPids) {
+      await page.request.post(`/api/automations/${pid}/disable`).catch(() => {});
+    }
   });
 
   test.afterAll(async ({ browser }) => {
