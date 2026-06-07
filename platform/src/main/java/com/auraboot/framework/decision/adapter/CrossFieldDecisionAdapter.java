@@ -11,12 +11,14 @@ import com.auraboot.framework.decision.model.ResultType;
 import com.auraboot.framework.decision.model.RuntimeAdapter;
 import com.auraboot.framework.decision.runtime.ResolvedDecision;
 import com.auraboot.framework.meta.dto.CrossFieldRule;
+import com.auraboot.framework.meta.service.impl.CommandSpelEvaluator;
 import com.auraboot.framework.meta.validation.CrossFieldRuleEngine;
 import com.auraboot.framework.meta.validation.RuleEvaluationResult;
 import com.auraboot.framework.meta.validation.RuleViolation;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.expression.EvaluationContext;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -33,15 +35,15 @@ import java.util.Set;
 public class CrossFieldDecisionAdapter implements DecisionAdapter {
 
     private final ObjectMapper mapper;
-    private final CrossFieldRuleEngine engine;
+    private final CommandSpelEvaluator spelEvaluator;
 
-    public CrossFieldDecisionAdapter(ObjectMapper mapper, CrossFieldRuleEngine engine) {
+    public CrossFieldDecisionAdapter(ObjectMapper mapper, CommandSpelEvaluator spelEvaluator) {
         this.mapper = mapper;
-        this.engine = engine;
+        this.spelEvaluator = spelEvaluator;
     }
 
     public CrossFieldDecisionAdapter() {
-        this(new ObjectMapper(), new CrossFieldRuleEngine());
+        this(new ObjectMapper(), new CommandSpelEvaluator());
     }
 
     @Override
@@ -86,6 +88,13 @@ public class CrossFieldDecisionAdapter implements DecisionAdapter {
     public DecisionResult evaluate(ResolvedDecision decision, DecisionContext context, DecisionEvaluateOptions options) {
         List<CrossFieldRule> rules = parseRules(decision.content());
         Map<String, Object> recordData = recordData(context);
+
+        // Build a per-evaluation engine whose SpEL evaluator (for expression-mode rules) reuses the
+        // platform's safe CommandSpelEvaluator (SimpleEvaluationContext — no bean/type/method refs),
+        // mirroring PreInvariantPhase. Declarative when/assert rules need no SpEL.
+        EvaluationContext spelContext = spelEvaluator.buildSpelContext(recordData);
+        CrossFieldRuleEngine engine = new CrossFieldRuleEngine(
+                expr -> Boolean.TRUE.equals(spelEvaluator.evaluate(expr, spelContext, Boolean.class)));
         RuleEvaluationResult result = engine.evaluate(rules, List.of(), recordData);
 
         List<DecisionResult.Violation> violations = new ArrayList<>();
