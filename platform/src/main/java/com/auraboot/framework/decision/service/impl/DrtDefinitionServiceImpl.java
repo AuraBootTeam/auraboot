@@ -8,7 +8,7 @@ import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtDefinitionDTO;
 import com.auraboot.framework.decision.entity.DrtDefinitionEntity;
 import com.auraboot.framework.decision.mapper.DrtDefinitionMapper;
-import com.auraboot.framework.decision.service.DecisionDefinitionService;
+import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.exception.ValidationException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DecisionDefinitionServiceImpl implements DecisionDefinitionService {
+public class DrtDefinitionServiceImpl implements DrtDefinitionService {
 
     private final DrtDefinitionMapper definitionMapper;
 

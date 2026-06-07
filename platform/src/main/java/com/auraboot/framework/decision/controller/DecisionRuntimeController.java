@@ -12,7 +12,7 @@ import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionDTO;
 import com.auraboot.framework.decision.model.DecisionResult;
 import com.auraboot.framework.decision.model.DecisionValidateResult;
-import com.auraboot.framework.decision.service.DecisionDefinitionService;
+import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.decision.service.DecisionEvaluationService;
 import com.auraboot.framework.decision.service.DecisionVersionService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -46,7 +46,7 @@ import java.util.List;
 @Tag(name = "Decision Runtime", description = "Decision definition management and runtime evaluation")
 public class DecisionRuntimeController {
 
-    private final DecisionDefinitionService definitionService;
+    private final DrtDefinitionService definitionService;
     private final DecisionVersionService versionService;
     private final DecisionEvaluationService evaluationService;
 

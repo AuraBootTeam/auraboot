@@ -10,7 +10,7 @@ import com.auraboot.framework.common.dto.PageResult;
  * @author AuraBoot Team
  * @since 2.3.0
  */
-public interface DecisionDefinitionService {
+public interface DrtDefinitionService {
 
     /** Create a new definition. Throws if the decision_code already exists in this tenant. */
     DrtDefinitionDTO create(DrtDefinitionCreateRequest request);

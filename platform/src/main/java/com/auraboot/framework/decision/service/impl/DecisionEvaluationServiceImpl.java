@@ -69,7 +69,6 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
     @Override
     public DecisionResult evaluate(DrtEvaluateRequest request) {
         Long tid = requireTenant();
-        String traceId = UUID.randomUUID().toString();
 
         DrtVersionEntity versionEntity = resolveVersion(tid, request);
         DecisionContext ctx = buildContext(request.getContext());
@@ -79,7 +78,10 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         DecisionResult result = decisionRuntime.evaluate(resolved, ctx, DecisionEvaluateOptions.defaults());
         long durationMs = System.currentTimeMillis() - start;
 
-        writelog(tid, traceId, request, versionEntity, result, durationMs);
+        // Log under the SAME traceId the runtime stamped on the result, so callers can correlate
+        // result.traceId() -> ab_drt_log (the §22 audit contract). Generating a separate id here
+        // would orphan the log from the returned result.
+        writelog(tid, result.traceId(), request, versionEntity, result, durationMs);
 
         log.info("Decision evaluated: code={}, version={}, matched={}, durationMs={}",
                 versionEntity.getDecisionCode(), versionEntity.getVersion(),
