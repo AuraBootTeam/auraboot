@@ -56,6 +56,39 @@ class QueryBuilderKeywordSearchTest {
     }
 
     @Test
+    @DisplayName("json/jsonb fields are excluded from fallback keyword search (no bare ILIKE on jsonb columns)")
+    void jsonFieldsAreExcludedFromKeywordSearch() {
+        // Regression for the api-connector list-search 500: a JSONB column declared
+        // as a JSON field must NOT be keyword-searched with a bare ILIKE, which
+        // Postgres rejects with `operator does not exist: jsonb ~~* character varying`.
+        ModelDefinition model = ModelDefinition.builder()
+            .code("test_connector")
+            .tableName("test_connector")
+            .fields(List.of(
+                FieldDefinition.builder()
+                    .code("name")
+                    .columnName("name")
+                    .dataType("string")
+                    .build(),
+                FieldDefinition.builder()
+                    .code("auth_config")
+                    .columnName("auth_config")
+                    .dataType("json")
+                    .build()
+            ))
+            .build();
+
+        QueryBuilderService.QueryBuilder query = queryBuilderService.buildConditionQuery(model, List.of());
+        queryBuilderService.buildKeywordSearch(query, "secret", model);
+
+        String sql = query.getSql().toLowerCase(Locale.ROOT);
+        assertTrue(sql.contains("name ilike"), "fallback should still search the text field");
+        assertFalse(sql.contains("auth_config ilike"), "jsonb column must not get a bare ILIKE");
+        assertFalse(sql.contains("auth_config as text"), "jsonb config column should be excluded entirely, not cast-searched");
+        assertEquals(List.of("%secret%"), query.getParameters());
+    }
+
+    @Test
     @DisplayName("numeric fields are not part of fallback keyword search unless explicitly searchable")
     void numericFieldsAreNotFallbackSearchable() {
         ModelDefinition model = ModelDefinition.builder()
