@@ -272,6 +272,17 @@ test.describe('Automation Golden — full user flow E2E (B1)', () => {
 
   const createdPids: string[] = [];
 
+  // Isolation: disable every automation created so far after each test. B1 enables an
+  // on_record_create automation and only deletes it in afterAll; a delete that leaks (or
+  // an engine-undeploy lag) leaves it firing on the e2et_order records the later Phase 2/3
+  // tests create, cascading update_record actions that trip their on_record_update
+  // assertions ('a create must NOT fire' → Received: N). Disabling per-test stops it.
+  test.afterEach(async ({ page }) => {
+    for (const pid of createdPids) {
+      await page.request.post(`/api/automations/${pid}/disable`).catch(() => {});
+    }
+  });
+
   test.afterAll(async ({ browser }) => {
     if (createdPids.length === 0) return;
     const ctx = await browser.newContext({
@@ -477,6 +488,30 @@ async function fetchLogIds(
   return new Set(rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n)));
 }
 
+/**
+ * AutomationLog ids for a SPECIFIC triggering record. A record-trigger automation
+ * (on_record_create/update/...) is model-scoped: it fires for EVERY record of the
+ * model, including records that other test files (which share e2et_order) mutate in
+ * parallel workers. Counting all log ids therefore races; scope by triggerRecordId so
+ * an assertion only sees fires caused by THIS test's own record.
+ */
+async function fetchLogIdsForRecord(
+  page: import('@playwright/test').Page,
+  pid: string,
+  recordId: string,
+): Promise<Set<number>> {
+  const resp = await page.request.get(`/api/automations/${pid}/logs`, { params: { limit: 50 } });
+  if (!resp.ok()) return new Set();
+  const body = await resp.json();
+  const rows: any[] = body?.data ?? [];
+  return new Set(
+    rows
+      .filter((r) => String(r.triggerRecordId) === String(recordId))
+      .map((r) => Number(r.id))
+      .filter((n) => Number.isFinite(n)),
+  );
+}
+
 test.describe('Automation Golden — Layer B behavioral matrix (Phase 2)', () => {
   // 120s (not 60s): the heavier cases chain multiple poll-until-complete waits
   // (E6 does two 30s-cap polls + a 6s disable window; E2/C2 poll several runs),
@@ -494,6 +529,16 @@ test.describe('Automation Golden — Layer B behavioral matrix (Phase 2)', () =>
   // first gives page.request a proper http origin, exactly like a real user.
   test.beforeEach(async ({ page }) => {
     await page.goto('/automations');
+  });
+
+  // Isolation: disable every automation created so far after each test. A trigger left
+  // enabled by an earlier test would otherwise fire (or cascade an update_record) on the
+  // next test's e2et_order records — the cross-test interference behind the E2 /
+  // trigger-record-update flake. Disable is idempotent; afterAll still deletes them.
+  test.afterEach(async ({ page }) => {
+    for (const pid of createdPids) {
+      await page.request.post(`/api/automations/${pid}/disable`).catch(() => {});
+    }
   });
 
   test.afterAll(async ({ browser }) => {
@@ -963,6 +1008,14 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     await page.goto('/automations'); // real in-app origin (colon-in-path fire endpoint)
   });
 
+  // Isolation: disable every automation created so far after each test (see Phase 2) so a
+  // left-enabled trigger can't fire or cascade-update onto the next test's records.
+  test.afterEach(async ({ page }) => {
+    for (const pid of createdPids) {
+      await page.request.post(`/api/automations/${pid}/disable`).catch(() => {});
+    }
+  });
+
   test.afterAll(async ({ browser }) => {
     if (createdPids.length === 0) return;
     const ctx = await browser.newContext({
@@ -1106,10 +1159,12 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     await enableAutomationViaApi(page, create.pid!);
 
     // Create an order — on_record_create does NOT match our update trigger, so no run yet.
+    // Scope the assertion to THIS order's triggerRecordId: the automation is model-scoped
+    // and parallel test files mutating e2et_order would otherwise inflate the count.
     const orderId = await createOrderGetId(page, `P3-UPD-order ${uniqueId()}`);
     await new Promise((r) => setTimeout(r, 2_000));
-    const createdRuns = await fetchLogIds(page, create.pid!);
-    expect(createdRuns.size, 'a create must NOT fire an on_record_update automation').toBe(0);
+    const createdRuns = await fetchLogIdsForRecord(page, create.pid!, orderId);
+    expect(createdRuns.size, 'a create must NOT fire an on_record_update automation (for this order)').toBe(0);
 
     // Now UPDATE the order → on_record_update fires.
     const firedAt = Date.now();
