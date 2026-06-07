@@ -25,8 +25,14 @@ public class DrtEvaluateRequest {
      */
     private VersionBinding binding;
 
-    /** Specific version number (required when binding = FIXED_VERSION). */
+    /** Specific version number (required when binding = FIXED_VERSION / DEPLOYMENT_VERSION). */
     private Integer fixedVersion;
+
+    /** Version tag (required when binding = VERSION_TAG). */
+    private String versionTag;
+
+    /** Point in time (required when binding = EFFECTIVE_TIME / AS_OF_EVENT_TIME). */
+    private java.time.Instant asOf;
 
     /** Caller identity for audit log */
     private String callerType;
