@@ -341,21 +341,21 @@
     "code": "auth_config",
     "displayName:zh-CN": "认证配置",
     "displayName:en": "Auth Configuration",
-    "dataType": "text",
+    "dataType": "json",
     "extension": { "multiline": true, "placeholder:zh-CN": "JSON 格式的认证配置", "placeholder:en": "JSON auth config" }
   },
   {
     "code": "default_headers",
     "displayName:zh-CN": "默认请求头",
     "displayName:en": "Default Headers",
-    "dataType": "text",
+    "dataType": "json",
     "extension": { "multiline": true, "placeholder:zh-CN": "JSON 格式", "placeholder:en": "JSON format" }
   },
   {
     "code": "retry_policy",
     "displayName:zh-CN": "重试策略",
     "displayName:en": "Retry Policy",
-    "dataType": "text",
+    "dataType": "json",
     "extension": { "multiline": true, "placeholder:zh-CN": "JSON 格式", "placeholder:en": "JSON format" }
   },
 

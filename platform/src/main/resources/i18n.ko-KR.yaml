@@ -163,6 +163,8 @@ automation:
     webhook.desc: 외부 Webhook 요청을 수신할 때 실행
     bpmEvent: BPM 이벤트 트리거
     bpmEvent.desc: BPM 프로세스 이벤트 발생 시 실행 (프로세스 시작, 태스크 완료 등)
+    inactivity: 비활성 시
+    inactivity.desc: 레코드가 지정된 시간 동안 활동(업데이트)이 없을 때 실행되며, 예약 스윕으로 구동됩니다
 
   # Actions
   action:
@@ -204,6 +206,12 @@ automation:
     fromStates.desc: 비워두면 모든 상태와 매칭
     toStates: 변경 후 상태
     toStates.desc: 비워두면 모든 상태와 매칭
+    inactivityHours: 비활성 기준 시간(시간)
+    inactivityHours.desc: '이 시간 동안 업데이트되지 않은 레코드는 비활성으로 간주됩니다. 예: 168 = 7일'
+    inactivityField: 활동 시간 필드
+    inactivityField.desc: 비활성 판단에 사용할 시간 필드이며, 비워두면 updated_at이 사용됩니다
+    inactivityStates: 상태 필터
+    inactivityStates.desc: 해당 상태의 레코드만 확인하며, 비워두면 전체를 확인합니다
     cron: Cron 표현식
     cron.desc: '예: 0 0 * * * (매일 자정)'
     timezone: 시간대

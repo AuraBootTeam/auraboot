@@ -220,7 +220,7 @@ test.describe('BPM Process Status Viewer @bpm-regression', () => {
         },
       });
       if (createResp.status() === 403) {
-        envSkipReason = 'Missing permission: system.process.update';
+        envSkipReason = 'Missing permission: bpm.process.update';
         return;
       }
       if (!createResp.ok()) {

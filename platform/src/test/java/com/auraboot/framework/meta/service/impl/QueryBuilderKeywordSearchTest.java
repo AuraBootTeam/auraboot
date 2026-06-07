@@ -56,6 +56,72 @@ class QueryBuilderKeywordSearchTest {
     }
 
     @Test
+    @DisplayName("text-declared field whose PHYSICAL column is JSONB is CAST to text (robust defense)")
+    void textDeclaredButPhysicallyJsonbIsCast() {
+        // Defense-in-depth: a global field code can be jsonb in one table and text in
+        // another; ab_meta_field stores one dataType per code, so the declaration can be
+        // wrong for a given model. When live introspection reports the column is JSONB,
+        // keyword search must CAST it instead of emitting a bare (jsonb) ILIKE.
+        ModelDefinition model = ModelDefinition.builder()
+            .code("test_conn")
+            .tableName("test_conn")
+            .fields(List.of(
+                FieldDefinition.builder().code("name").columnName("name").dataType("text").searchable(true).build(),
+                FieldDefinition.builder().code("auth_config").columnName("auth_config").dataType("text").searchable(true).build()
+            ))
+            .build();
+
+        QueryBuilderServiceImpl impl = new QueryBuilderServiceImpl(null);
+        impl.setTableMetadataService(new com.auraboot.framework.meta.ddl.TableMetadataService(null, null) {
+            @Override
+            public String getColumnTypeDefinition(String tableName, String columnName) {
+                return "auth_config".equals(columnName) ? "jsonb" : "VARCHAR(200)";
+            }
+        });
+
+        QueryBuilderService.QueryBuilder query = impl.buildConditionQuery(model, List.of());
+        impl.buildKeywordSearch(query, "secret", model);
+
+        String sql = query.getSql().toLowerCase(Locale.ROOT);
+        assertTrue(sql.contains("name ilike"), "plain text column keeps bare ILIKE");
+        assertTrue(sql.contains("cast(auth_config as text) ilike"), "physically-jsonb column must be CAST");
+        assertFalse(sql.contains("(auth_config ilike"), "no bare ILIKE on a jsonb column");
+    }
+
+    @Test
+    @DisplayName("json/jsonb fields are excluded from fallback keyword search (no bare ILIKE on jsonb columns)")
+    void jsonFieldsAreExcludedFromKeywordSearch() {
+        // Regression for the api-connector list-search 500: a JSONB column declared
+        // as a JSON field must NOT be keyword-searched with a bare ILIKE, which
+        // Postgres rejects with `operator does not exist: jsonb ~~* character varying`.
+        ModelDefinition model = ModelDefinition.builder()
+            .code("test_connector")
+            .tableName("test_connector")
+            .fields(List.of(
+                FieldDefinition.builder()
+                    .code("name")
+                    .columnName("name")
+                    .dataType("string")
+                    .build(),
+                FieldDefinition.builder()
+                    .code("auth_config")
+                    .columnName("auth_config")
+                    .dataType("json")
+                    .build()
+            ))
+            .build();
+
+        QueryBuilderService.QueryBuilder query = queryBuilderService.buildConditionQuery(model, List.of());
+        queryBuilderService.buildKeywordSearch(query, "secret", model);
+
+        String sql = query.getSql().toLowerCase(Locale.ROOT);
+        assertTrue(sql.contains("name ilike"), "fallback should still search the text field");
+        assertFalse(sql.contains("auth_config ilike"), "jsonb column must not get a bare ILIKE");
+        assertFalse(sql.contains("auth_config as text"), "jsonb config column should be excluded entirely, not cast-searched");
+        assertEquals(List.of("%secret%"), query.getParameters());
+    }
+
+    @Test
     @DisplayName("numeric fields are not part of fallback keyword search unless explicitly searchable")
     void numericFieldsAreNotFallbackSearchable() {
         ModelDefinition model = ModelDefinition.builder()

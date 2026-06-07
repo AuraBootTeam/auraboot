@@ -256,4 +256,63 @@ export const triggerNodes: FlowNodeDefinition[] = [
       triggerType: 'on_bpm_event',
     },
   },
+  {
+    // Triggers when a record has had no activity (no update to its time field)
+    // for `inactivityHours` hours. Unlike the event-driven triggers, this is a
+    // scheduled sweep driven by AutomationScheduler.checkInactivityAutomations
+    // (findEnabledInactivity). Config keys map 1:1 to backend TriggerConfig:
+    // inactivityHours / inactivityField / inactivityStates (+ stateField for the
+    // state column); modelCode is derived to the automation's modelCode column.
+    type: 'trigger-inactivity',
+    label: '$i18n:automation.trigger.inactivity',
+    icon: 'TimerOff',
+    category: 'trigger',
+    description: '$i18n:automation.trigger.inactivity.desc',
+    configSchema: [
+      {
+        key: 'modelCode',
+        label: '$i18n:automation.field.modelCode',
+        type: 'model-select',
+        required: true,
+        group: 'trigger_source',
+      },
+      {
+        key: 'inactivityHours',
+        label: '$i18n:automation.field.inactivityHours',
+        type: 'number',
+        required: true,
+        placeholder: '168',
+        description: '$i18n:automation.field.inactivityHours.desc',
+        group: 'trigger_source',
+      },
+      {
+        key: 'inactivityField',
+        label: '$i18n:automation.field.inactivityField',
+        type: 'field-select',
+        description: '$i18n:automation.field.inactivityField.desc',
+        dependsOn: { field: 'modelCode' },
+        group: 'advanced',
+      },
+      {
+        key: 'stateField',
+        label: '$i18n:automation.field.stateField',
+        type: 'field-select',
+        dependsOn: { field: 'modelCode' },
+        group: 'filter',
+      },
+      {
+        key: 'inactivityStates',
+        label: '$i18n:automation.field.inactivityStates',
+        type: 'multiselect',
+        description: '$i18n:automation.field.inactivityStates.desc',
+        // States are the stateField's dict values — cascade like state-change's fromStates.
+        dependsOn: { field: 'stateField' },
+        optionSource: 'dict',
+        group: 'filter',
+      },
+    ],
+    defaultConfig: {
+      triggerType: 'on_inactivity',
+    },
+  },
 ];

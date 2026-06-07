@@ -38,6 +38,14 @@ const CREATE_COMMAND = 'e2eto:create_e2et_order';
 const POLL_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
 
+// A reachable, no-auth, HTTP-200 URL for the real call_api round-trip. Default targets
+// the docker GA E2E stack (backend /actuator/health on the non-blocked port 6444,
+// reached container→host via host.docker.internal). NOTE the backend's own port 6443
+// is in SsrfValidator.BLOCKED_PORTS by design (anti-SSRF) — never target it. For a
+// host-mode run, set E2E_CALLAPI_OK_URL=http://127.0.0.1:3500/health (the BFF; 3500 is
+// not blocked) and start the backend with AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1.
+const CALLAPI_OK_URL = process.env.E2E_CALLAPI_OK_URL || 'http://host.docker.internal:6444/actuator/health';
+
 // ---------------------------------------------------------------------------
 // API helpers — setup + poll only. UI assertions are real browser interactions.
 // ---------------------------------------------------------------------------
@@ -1399,7 +1407,7 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
       flowConfig: {
         nodes: [
           triggerCreateNode(t, MODEL_CODE),
-          callApiNode(a, 'http://host.docker.internal:6444/actuator/health', 'get'),
+          callApiNode(a, CALLAPI_OK_URL, 'get'),
         ],
         edges: [flowEdge(t, a)],
       },

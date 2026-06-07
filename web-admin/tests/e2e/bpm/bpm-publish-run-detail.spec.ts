@@ -249,7 +249,7 @@ test.describe('BPM Publish -> Run -> Instance Detail', () => {
   // PR-002: Menu navigation to Task Center -> todo tab has task  [D1, D2] @smoke
   // =========================================================================
   test('PR-002 @smoke -- Menu navigation to Task Center, todo tab has tasks', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToTaskCenter(page);
 
     // "待办任务" tab should be active by default, click explicitly

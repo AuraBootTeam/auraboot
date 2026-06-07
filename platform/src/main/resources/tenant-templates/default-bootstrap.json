@@ -75,36 +75,6 @@
       "resourceType": "menu"
     },
     {
-      "code": "workflow.process.manage",
-      "name": "流程管理",
-      "description": "管理BPM流程定义（创建、编辑、删除、部署）",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:process-definition",
-      "action": "manage",
-      "resourceType": "function"
-    },
-    {
-      "code": "workflow.process.execute",
-      "name": "流程执行",
-      "description": "执行BPM工作流（启动实例、完成任务）",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:process-instance",
-      "action": "execute",
-      "resourceType": "function"
-    },
-    {
-      "code": "workflow.process.admin",
-      "name": "流程管理员",
-      "description": "BPM管理操作（挂起、恢复、终止、监控）",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:admin",
-      "action": "admin",
-      "resourceType": "function"
-    },
-    {
       "code": "bpm.form.manage",
       "name": "BPM表单管理",
       "description": "管理BPM任务表单（查看、提交）",
@@ -1415,7 +1385,7 @@
         "bpm_management",
         "bpm_task_center",
         "bpm_monitor",
-        "workflow.process.execute",
+        "bpm.process.execute",
         "bpm.task.read",
         "bpm.task.manage",
         "bpm.form.manage",

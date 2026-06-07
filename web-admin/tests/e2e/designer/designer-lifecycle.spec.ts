@@ -448,7 +448,7 @@ test.describe.serial('BPMN Designer Lifecycle (DL-BPMN)', () => {
   }
 
   test('DL-BPMN-01: Node add — create process and verify palette', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
 
     // Create via API (matching bpm-lifecycle.spec.ts pattern)
     const resp = await page.request.post('/api/bpm/process-definitions', {
@@ -487,9 +487,9 @@ test.describe.serial('BPMN Designer Lifecycle (DL-BPMN)', () => {
       },
     });
     const body = await resp.json();
-    if (resp.status() === 403 && JSON.stringify(body).includes('system.process.update')) {
+    if (resp.status() === 403 && JSON.stringify(body).includes('bpm.process.update')) {
       missingProcessUpdatePermission = true;
-      test.skip(true, 'Missing permission: system.process.update');
+      test.skip(true, 'Missing permission: bpm.process.update');
     }
     pid = body.data?.pid || body.data?.id;
     expect(pid, `Create BPMN failed: ${JSON.stringify(body)}`).toBeTruthy();
@@ -508,7 +508,7 @@ test.describe.serial('BPMN Designer Lifecycle (DL-BPMN)', () => {
   });
 
   test('DL-BPMN-02: Property edit — click userTask, verify property panel', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await page.goto(`/bpmn-designer?id=${pid}`, { waitUntil: 'domcontentloaded' });
     await page
       .locator('[data-testid="bpmn-page-title"]')
@@ -535,7 +535,7 @@ test.describe.serial('BPMN Designer Lifecycle (DL-BPMN)', () => {
   });
 
   test('DL-BPMN-03: Save + API verify', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await page.goto(`/bpmn-designer?id=${pid}`, { waitUntil: 'domcontentloaded' });
     await page
       .locator('[data-testid="bpmn-page-title"]')
@@ -587,7 +587,7 @@ test.describe.serial('BPMN Designer Lifecycle (DL-BPMN)', () => {
   });
 
   test('DL-BPMN-04: Deploy + API verify', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     expect(pid).toBeTruthy();
     const resp = await page.request.post(`/api/bpm/process-definitions/${pid}/deploy`);
     // Deploy may fail with validation errors (missing assignee); accept < 500
@@ -595,7 +595,7 @@ test.describe.serial('BPMN Designer Lifecycle (DL-BPMN)', () => {
   });
 
   test('DL-BPMN-05: Backend data verify — designerJson non-empty', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     expect(pid).toBeTruthy();
     const resp = await page.request.get(`/api/bpm/process-definitions/${pid}`);
     expect(resp.ok()).toBeTruthy();

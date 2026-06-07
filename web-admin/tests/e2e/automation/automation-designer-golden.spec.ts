@@ -49,6 +49,18 @@ const MODEL_CODE = 'e2et_order';
 const MODEL_LABEL = '测试订单'; // e2et_order displayName — model-select options render by label.
 const CREATE_COMMAND = 'e2eto:create_e2et_order';
 
+// Reachable URLs for the real call_api round-trips. Defaults target the docker GA E2E
+// stack (backend on the non-blocked port 6444, reached container→host via
+// host.docker.internal). The backend's own port 6443 is in SsrfValidator.BLOCKED_PORTS
+// by design (anti-SSRF) — never target it. OUTBOUND_HOST is the host the backend uses to
+// reach the in-process webhook receiver (an ephemeral, non-blocked port). For a host-mode
+// run set E2E_OUTBOUND_HOST=127.0.0.1, E2E_CALLAPI_OK_URL=http://127.0.0.1:3500/health,
+// E2E_CALLAPI_404_URL=http://127.0.0.1:3500/api/this-endpoint-does-not-exist-404 and start
+// the backend with AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1 (3500 = BFF, not blocked).
+const OUTBOUND_HOST = process.env.E2E_OUTBOUND_HOST || 'host.docker.internal';
+const CALLAPI_OK_URL = process.env.E2E_CALLAPI_OK_URL || 'http://host.docker.internal:6444/actuator/health';
+const CALLAPI_404_URL = process.env.E2E_CALLAPI_404_URL || 'http://host.docker.internal:6444/api/this-endpoint-does-not-exist-404';
+
 // ───────────────────────── fire + assert helpers (no UI surface) ─────────────────────────
 
 /**
@@ -616,7 +628,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     // url (expression) → the backend's own actuator/health via the test-allowlisted
     // host.docker.internal; method (select) → GET. (call_api fix = FINDING-6.)
     await fillNodeConfig(page, action, {
-      url: 'http://host.docker.internal:6444/actuator/health',
+      url: CALLAPI_OK_URL,
       method: 'GET',
     });
     const { pid } = await saveAutomation(page);
@@ -649,7 +661,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       await connectEdge(page, trigger, action);
       await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
       await fillNodeConfig(page, action, {
-        url: `http://host.docker.internal:${receiver.port}/hook`,
+        url: `http://${OUTBOUND_HOST}:${receiver.port}/hook`,
         // ${recordId} must survive into the saved config (the executor resolves it); ${marker}
         // is interpolated by the test here so the receiver can key on it.
         payload: `{"event":"e2e.designer.webhook","marker":"${marker}","orderId":"\${recordId}"}`,
@@ -693,7 +705,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
       // The /fail path on the receiver returns HTTP 500 → SendWebhookExecutor throws on >=400.
       await fillNodeConfig(page, action, {
-        url: `http://host.docker.internal:${receiver.port}/fail`,
+        url: `http://${OUTBOUND_HOST}:${receiver.port}/fail`,
         payload: '{"event":"e2e.designer.webhook.sad","orderId":"${recordId}"}',
       });
       const { pid } = await saveAutomation(page);
@@ -797,7 +809,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
     await connectEdge(page, trigger, action);
     await fillNodeConfig(page, action, {
-      url: 'http://host.docker.internal:6444/actuator/health',
+      url: CALLAPI_OK_URL,
       method: 'GET',
     });
     const { pid } = await saveAutomation(page);
@@ -832,7 +844,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     // A reachable host (SSRF test-allowlisted) but a path that 404s → CallApiExecutor throws
     // on status >= 400 → the node fails (not a silent success).
     await fillNodeConfig(page, action, {
-      url: 'http://host.docker.internal:6444/api/this-endpoint-does-not-exist-404',
+      url: CALLAPI_404_URL,
       method: 'GET',
     });
     const { pid } = await saveAutomation(page);
