@@ -668,6 +668,31 @@ public final class MetaPermission {
      */
     public static final String MANUFACTURING_OEE = "meta.manufacturing.oee";
 
+    // ==================== DECISION RUNTIME permissions ====================
+    // NOTE: These are for the Decision Runtime module (ab_drt_* tables, /api/decision).
+    // They are DISTINCT from the meta.decision.* permissions above which belong to the
+    // meta-adjudication concept (ab_decision_definition / ab_decision_record).
+
+    /**
+     * Decision Runtime definition read permission (list, view, query versions/logs).
+     */
+    public static final String DRT_DEFINITION_READ = "decision.definition.read";
+
+    /**
+     * Decision Runtime definition manage permission (create, update, create draft versions).
+     */
+    public static final String DRT_DEFINITION_MANAGE = "decision.definition.manage";
+
+    /**
+     * Decision Runtime definition publish permission (validate → publish a version).
+     */
+    public static final String DRT_DEFINITION_PUBLISH = "decision.definition.publish";
+
+    /**
+     * Decision Runtime evaluate permission (call /evaluate and /test-run endpoints).
+     */
+    public static final String DRT_RUNTIME_EVALUATE = "decision.runtime.evaluate";
+
     // ==================== Private Constructor ====================
 
     /**
