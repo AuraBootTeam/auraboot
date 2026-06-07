@@ -38,6 +38,14 @@ const CREATE_COMMAND = 'e2eto:create_e2et_order';
 const POLL_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
 
+// Outbound host:port the backend uses to reach the host machine for a real call_api
+// round-trip. Defaults target the docker GA E2E stack (container → host via
+// host.docker.internal:6444). For a host-mode run, set E2E_OUTBOUND_HOST=127.0.0.1 +
+// E2E_SELF_PORT=6443 and start the backend with AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1
+// so SsrfValidator permits the loopback target.
+const OUTBOUND_HOST = process.env.E2E_OUTBOUND_HOST || 'host.docker.internal';
+const SELF_PORT = process.env.E2E_SELF_PORT || '6444';
+
 // ---------------------------------------------------------------------------
 // API helpers — setup + poll only. UI assertions are real browser interactions.
 // ---------------------------------------------------------------------------
@@ -1399,7 +1407,7 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
       flowConfig: {
         nodes: [
           triggerCreateNode(t, MODEL_CODE),
-          callApiNode(a, 'http://host.docker.internal:6444/actuator/health', 'get'),
+          callApiNode(a, `http://${OUTBOUND_HOST}:${SELF_PORT}/actuator/health`, 'get'),
         ],
         edges: [flowEdge(t, a)],
       },
