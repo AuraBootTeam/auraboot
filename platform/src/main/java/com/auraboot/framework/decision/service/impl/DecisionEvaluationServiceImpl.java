@@ -23,6 +23,7 @@ import com.auraboot.framework.decision.model.VersionBinding;
 import com.auraboot.framework.decision.model.VersionStatus;
 import com.auraboot.framework.decision.runtime.DecisionRuntime;
 import com.auraboot.framework.decision.runtime.ResolvedDecision;
+import com.auraboot.framework.decision.runtime.VersionSelector;
 import com.auraboot.framework.decision.service.DecisionEvaluationService;
 import com.auraboot.framework.exception.ValidationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -130,22 +131,29 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
     private DrtVersionEntity resolveVersion(Long tid, DrtEvaluateRequest request) {
         VersionBinding binding = request.getBinding() != null ? request.getBinding() : VersionBinding.LATEST;
 
-        DrtVersionEntity entity = switch (binding) {
-            case LATEST -> versionMapper.findPublished(tid, request.getDecisionCode());
-            case FIXED_VERSION -> {
-                if (request.getFixedVersion() == null) {
-                    throw new ValidationException(ResponseCode.CommonValidationFailed,
-                            "fixedVersion is required when binding=FIXED_VERSION");
-                }
-                yield versionMapper.findByTenantCodeVersion(tid, request.getDecisionCode(), request.getFixedVersion());
-            }
-            default -> throw new ValidationException(ResponseCode.CommonValidationFailed,
-                    "Unsupported binding strategy: " + binding);
-        };
+        // Required-criteria checks per binding (clear error rather than a silent null/UNKNOWN).
+        if ((binding == VersionBinding.FIXED_VERSION || binding == VersionBinding.DEPLOYMENT_VERSION)
+                && request.getFixedVersion() == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "fixedVersion is required when binding=" + binding);
+        }
+        if (binding == VersionBinding.VERSION_TAG && request.getVersionTag() == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "versionTag is required when binding=VERSION_TAG");
+        }
+        if ((binding == VersionBinding.EFFECTIVE_TIME || binding == VersionBinding.AS_OF_EVENT_TIME)
+                && request.getAsOf() == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "asOf is required when binding=" + binding);
+        }
+
+        java.util.List<DrtVersionEntity> candidates = versionMapper.findAllByCode(tid, request.getDecisionCode());
+        DrtVersionEntity entity = VersionSelector.select(candidates, binding,
+                VersionSelector.Criteria.of(request.getFixedVersion(), request.getVersionTag(), request.getAsOf()));
 
         if (entity == null) {
             throw new ValidationException(ResponseCode.NOT_FOUND,
-                    "No published version found for decision: " + request.getDecisionCode());
+                    "No version found for decision " + request.getDecisionCode() + " with binding=" + binding);
         }
 
         VersionStatus status = VersionStatus.valueOf(entity.getStatus());

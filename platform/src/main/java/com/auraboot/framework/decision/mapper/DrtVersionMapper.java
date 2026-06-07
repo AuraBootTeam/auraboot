@@ -41,4 +41,10 @@ public interface DrtVersionMapper extends BaseMapper<DrtVersionEntity> {
             @Param("tenantId") Long tenantId,
             @Param("decisionCode") String decisionCode,
             @Param("version") Integer version);
+
+    /** All versions for a (tenant, decisionCode) — candidates for VersionSelector binding resolution. */
+    @Select("SELECT * FROM ab_drt_version WHERE tenant_id = #{tenantId} AND decision_code = #{decisionCode}")
+    java.util.List<DrtVersionEntity> findAllByCode(
+            @Param("tenantId") Long tenantId,
+            @Param("decisionCode") String decisionCode);
 }
