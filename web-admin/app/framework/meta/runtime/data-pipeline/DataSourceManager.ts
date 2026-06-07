@@ -79,15 +79,29 @@ function existingFilters(value: unknown): Array<{ fieldName: string; operator: s
   if (!value) {
     return [];
   }
+  const removeBlankFilters = (
+    filters: Array<{ fieldName: string; operator: string; value: unknown }>,
+  ) =>
+    filters.filter((filter) => {
+      const filterValue = filter?.value;
+      return !(
+        filterValue === undefined ||
+        filterValue === null ||
+        filterValue === '' ||
+        (Array.isArray(filterValue) && filterValue.length === 0)
+      );
+    });
   if (Array.isArray(value)) {
-    return [...value] as Array<{ fieldName: string; operator: string; value: unknown }>;
+    return removeBlankFilters([
+      ...value,
+    ] as Array<{ fieldName: string; operator: string; value: unknown }>);
   }
   if (typeof value !== 'string') {
     return [];
   }
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? removeBlankFilters(parsed) : [];
   } catch {
     return [];
   }

@@ -129,6 +129,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const treeConfig: TreeConfig | undefined = block.table?.treeConfig || (block as any).treeConfig;
   const { visibleRows, toggleExpand } = useTreeData(rawData, treeConfig);
   const selectionConfig = block.table?.selection || (block as any).selection;
+  const defaultFirstSelection = Boolean((selectionConfig as any)?.defaultFirst);
   const rowKeyField = block.table?.rowKey || 'pid';
   const [localSelectedRowKey, setLocalSelectedRowKey] = useState('');
   const getRowIdentity = (row: any, index?: number): string =>
@@ -144,15 +145,54 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // Use tree-processed rows when treeConfig is set, otherwise flat data
   const data = treeConfig ? visibleRows : rawData;
+  const density = block.table?.density || (block as any).density || 'default';
+  const isCompact = density === 'compact';
+  const headerCellClass = isCompact ? 'px-3 py-2' : 'px-6 py-3';
+  const bodyCellClass = isCompact ? 'px-3 py-2' : 'px-6 py-4';
+  const maxHeight = block.table?.maxHeight || (block as any).maxHeight;
+  const tableContainerStyle =
+    maxHeight === undefined
+      ? {
+          width: '100%',
+          maxWidth: '100%',
+        }
+      : {
+          maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : String(maxHeight),
+          width: '100%',
+          maxWidth: '100%',
+        };
 
   // 渲染列头
+  useEffect(() => {
+    if (!selectionConfig?.bind || !defaultFirstSelection) return;
+    const current = (runtime.getContext().state as Record<string, any> | undefined)?.[
+      selectionConfig.bind
+    ];
+    const currentKey =
+      current && typeof current === 'object' ? getRowIdentity(current) : '';
+    const currentStillVisible =
+      Boolean(currentKey) && data.some((row: any, index: number) => getRowIdentity(row, index) === currentKey);
+
+    if (data.length > 0 && !currentStillVisible) {
+      const firstRow = data[0];
+      writeRuntimeState(runtime, selectionConfig.bind, firstRow);
+      setLocalSelectedRowKey(getRowIdentity(firstRow, 0));
+      return;
+    }
+
+    if (data.length === 0 && current) {
+      writeRuntimeState(runtime, selectionConfig.bind, null);
+      setLocalSelectedRowKey('');
+    }
+  }, [data, runtime, selectionConfig?.bind, defaultFirstSelection, rowKeyField]);
+
   const renderColumnHeader = (column: ColumnConfig) => {
     const label = getLocalizedText(column.label, locale, t);
     return (
       <th
         key={column.field}
         data-testid={`table-th-${column.field}`}
-        className={`px-6 py-3 text-${column.align || 'left'} text-xs font-medium tracking-wider text-gray-500 uppercase`}
+        className={`${headerCellClass} text-${column.align || 'left'} text-xs font-medium tracking-wider text-gray-500 uppercase`}
         style={{ width: column.width }}
       >
         {label}
@@ -317,13 +357,17 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   };
 
   return (
-    <div className="table-block overflow-x-auto" data-testid="table-block">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+    <div
+      className={`table-block w-full max-w-full overflow-x-auto ${maxHeight ? 'overflow-y-auto' : ''}`}
+      data-testid="table-block"
+      style={tableContainerStyle}
+    >
+      <table className="w-max min-w-full divide-y divide-gray-200">
+        <thead className={maxHeight ? 'sticky top-0 z-10 bg-gray-50' : 'bg-gray-50'}>
           <tr>
             {columns.map(renderColumnHeader)}
             {rowActions.length > 0 && (
-              <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+              <th className={`${headerCellClass} text-left text-xs font-medium tracking-wider text-gray-500 uppercase`}>
                 {t('common.actions') !== 'common.actions' ? t('common.actions') : 'Actions'}
               </th>
             )}
@@ -357,7 +401,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                   {columns.map((column, colIdx) => (
                     <td
                       key={column.field}
-                      className={`px-6 py-4 text-sm text-gray-900 ${
+                      className={`${bodyCellClass} text-sm text-gray-900 ${
                         column.ellipsis ? 'truncate' : ''
                       }`}
                       style={{
@@ -393,7 +437,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                     </td>
                   ))}
                   {rowActions.length > 0 && (
-                    <td className="px-6 py-4 text-sm text-gray-900">{renderRowActions(row)}</td>
+                    <td className={`${bodyCellClass} text-sm text-gray-900`}>{renderRowActions(row)}</td>
                   )}
                 </tr>
               );

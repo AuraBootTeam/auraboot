@@ -55,6 +55,11 @@ export interface ListToolbarProps {
   hasFilterBlock?: boolean;
   /** Resolve a filter's value to a localized label (e.g. dict code → label). */
   resolveChipValueLabel?: (filter: ViewFilterConfig) => string | undefined;
+  hideQuickFilters?: boolean;
+  hideSort?: boolean;
+  hideColumnSettings?: boolean;
+  hideRowHeight?: boolean;
+  hideFilterChips?: boolean;
 }
 
 export function ListToolbar({
@@ -79,6 +84,11 @@ export function ListToolbar({
   onFilterFormToggle,
   hasFilterBlock,
   resolveChipValueLabel,
+  hideQuickFilters,
+  hideSort,
+  hideColumnSettings,
+  hideRowHeight,
+  hideFilterChips,
 }: ListToolbarProps) {
   const { t } = useI18n();
   const handleKeyDown = useCallback(
@@ -97,6 +107,12 @@ export function ListToolbar({
       icon: '\uD83D\uDD50',
     },
   ];
+  const showInlineControls =
+    !hideSort ||
+    !hideColumnSettings ||
+    Boolean(hasFilterBlock && onFilterFormToggle) ||
+    !hideQuickFilters ||
+    !hideRowHeight;
 
   return (
     <>
@@ -133,63 +149,67 @@ export function ListToolbar({
         </div>
 
         {/* Separator */}
-        <div className="mx-1 h-6 w-px bg-gray-200" />
+        {showInlineControls && <div className="mx-1 h-6 w-px bg-gray-200" />}
 
         {/* Sort popover trigger */}
-        <SortPopover
-          activeSorts={activeSorts}
-          onSortsChange={onSortsChange}
-          sortableColumns={sortableColumns}
-        >
+        {!hideSort && (
+          <SortPopover
+            activeSorts={activeSorts}
+            onSortsChange={onSortsChange}
+            sortableColumns={sortableColumns}
+          >
+            <button
+              type="button"
+              className={`flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                activeSorts.length > 0
+                  ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100'
+                  : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+              }`}
+              data-testid="sort-popover-trigger"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
+                />
+              </svg>
+              {t('common.sort', undefined, 'Sort')}
+              {activeSorts.length > 0 && (
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                  {activeSorts.length}
+                </span>
+              )}
+            </button>
+          </SortPopover>
+        )}
+
+        {/* Fields / Column settings button */}
+        {!hideColumnSettings && (
           <button
             type="button"
-            className={`flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-              activeSorts.length > 0
-                ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100'
-                : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-            }`}
-            data-testid="sort-popover-trigger"
+            onClick={onColumnSettingsOpen}
+            className="flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+            data-testid="column-settings-btn"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
               />
             </svg>
-            {t('common.sort', undefined, 'Sort')}
-            {activeSorts.length > 0 && (
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
-                {activeSorts.length}
-              </span>
-            )}
+            {t('common.fields', undefined, 'Fields')}
           </button>
-        </SortPopover>
-
-        {/* Fields / Column settings button */}
-        <button
-          type="button"
-          onClick={onColumnSettingsOpen}
-          className="flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
-          data-testid="column-settings-btn"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-          </svg>
-          {t('common.fields', undefined, 'Fields')}
-        </button>
+        )}
 
         {/* Filter form toggle button — only shown when a filter block exists */}
         {hasFilterBlock && onFilterFormToggle && (
@@ -227,40 +247,44 @@ export function ListToolbar({
         <div className="flex-1" />
 
         {/* Quick filter chips */}
-        <div className="flex gap-1.5" data-testid="quick-filters">
-          {quickFilters.map((qf) => (
-            <button
-              key={qf.key}
-              type="button"
-              onClick={() => onQuickFilter(qf.key)}
-              data-testid={`quick-filter-${qf.key}`}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                activeQuickFilter === qf.key
-                  ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-300'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {qf.label}
-            </button>
-          ))}
-        </div>
+        {!hideQuickFilters && (
+          <div className="flex gap-1.5" data-testid="quick-filters">
+            {quickFilters.map((qf) => (
+              <button
+                key={qf.key}
+                type="button"
+                onClick={() => onQuickFilter(qf.key)}
+                data-testid={`quick-filter-${qf.key}`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  activeQuickFilter === qf.key
+                    ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-300'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {qf.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Row height */}
-        <RowHeightSelector value={rowHeight} onChange={onRowHeightChange} />
+        {!hideRowHeight && <RowHeightSelector value={rowHeight} onChange={onRowHeightChange} />}
       </div>
 
       {/* Filter Chip Bar */}
-      <FilterChipBar
-        filters={chipFilters}
-        sorts={activeSorts}
-        fieldMetadata={fieldMetadata}
-        onFiltersChange={onChipFiltersChange}
-        onSortsChange={onSortsChange}
-        onAddFilter={onAddFilter}
-        onChipClick={onChipClick}
-        onClearAll={onClearAll}
-        resolveValueLabel={resolveChipValueLabel}
-      />
+      {!hideFilterChips && (
+        <FilterChipBar
+          filters={chipFilters}
+          sorts={activeSorts}
+          fieldMetadata={fieldMetadata}
+          onFiltersChange={onChipFiltersChange}
+          onSortsChange={onSortsChange}
+          onAddFilter={onAddFilter}
+          onChipClick={onChipClick}
+          onClearAll={onClearAll}
+          resolveValueLabel={resolveChipValueLabel}
+        />
+      )}
     </>
   );
 }

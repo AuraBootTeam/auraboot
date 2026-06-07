@@ -29,5 +29,8 @@ describe('BlockLibrary workbench blocks', () => {
     expect(screen.getByTestId('block-palette-item-record-inspector')).toBeInTheDocument();
     expect(screen.getByTestId('block-palette-item-candidate-list')).toBeInTheDocument();
     expect(screen.getByTestId('block-palette-item-workbench-action-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('block-palette-item-evidence-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('block-palette-item-artifact-timeline')).toBeInTheDocument();
+    expect(screen.getByTestId('block-palette-item-review-drawer')).toBeInTheDocument();
   });
 });

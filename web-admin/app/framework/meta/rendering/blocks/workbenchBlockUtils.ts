@@ -45,15 +45,38 @@ export function useRuntimeStateSubscription(runtime: SchemaRuntime): void {
     const store = stateManager?.getStore?.(scopeId);
     if (!store?.subscribe) return undefined;
 
-    return store.subscribe(() => {
+    const unsubscribe = store.subscribe(() => {
       forceUpdate((version) => version + 1);
     });
+
+    // A sibling block can write runtime state during the same mount effect
+    // phase before this subscription is active. Refresh once after subscribing
+    // so state-bound blocks render the current snapshot, not only future writes.
+    forceUpdate((version) => version + 1);
+
+    return unsubscribe;
   }, [runtime]);
+}
+
+function parseJsonLike(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+    return value;
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return value;
+  }
 }
 
 export function readPath(source: any, path?: string): any {
   if (!path) return undefined;
-  return path.split('.').reduce((current, part) => current?.[part], source);
+  return path.split('.').reduce((current, part) => {
+    const resolved = parseJsonLike(current);
+    return (resolved as any)?.[part];
+  }, source);
 }
 
 export function resolveRuntimeValue(runtime: SchemaRuntime, expression: unknown): any {

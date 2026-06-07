@@ -18,11 +18,8 @@ export default defineConfig({
     testTimeout: 30000, // 单个测试最大超时时间：30秒
     hookTimeout: 10000, // 钩子函数超时时间：10秒
     teardownTimeout: 5000, // 清理超时时间：5秒
-    // Concurrency settings - keep memory usage predictable.
     pool: 'threads',
     isolate: true,
-    minWorkers: 1,
-    maxWorkers: 1,
     // 性能监控
     logHeapUsage: true,
     // 快速失败

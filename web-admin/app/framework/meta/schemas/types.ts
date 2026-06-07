@@ -19,6 +19,8 @@ export interface LocalizedText {
 export interface LayoutConfig {
   type?: 'grid' | 'stack'; // Layout mode: 'grid' (12-col) or 'stack' (vertical). Default: 'stack'
   cols?: number;            // Grid column count (default 12, only for type='grid')
+  columnTemplate?: string;   // Optional CSS grid-template-columns override
+  gridTemplateColumns?: string; // Alias for columnTemplate
   colGap?: number;          // Column gap in px (default 16)
   rowGap?: number;          // Row gap in px (default 16)
   gap?: number;             // Stack gap in px (only for type='stack')
@@ -331,6 +333,8 @@ export interface ButtonConfig {
 export interface TableConfig {
   rowKey?: string;
   dataSource?: string;
+  maxHeight?: number | string;
+  density?: 'default' | 'compact';
   pagination?: PaginationConfig;
   selection?: SelectionConfig;
   columns: ColumnConfig[];
@@ -351,6 +355,7 @@ export interface PaginationConfig {
 export interface SelectionConfig {
   mode: 'single' | 'multiple';
   bind: string;
+  defaultFirst?: boolean;
 }
 
 // List Tabs filter configuration
@@ -507,6 +512,7 @@ export interface DetailTabConfig {
   key: string;
   label: string | LocalizedText;
   blocks: BlockConfig[];
+  layout?: LayoutConfig;
   system?: boolean;
   /** List tab filter (present only when tab is a ListTabConfig in a union context) */
   filter?: TabFilterExpression | null;

@@ -131,6 +131,24 @@ export function initBlockRegistry(): void {
       'WorkbenchActionBarBlockRenderer',
     ),
   });
+  BlockRegistry.register('evidence-panel', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/EvidencePanelBlockRenderer'),
+      'EvidencePanelBlockRenderer',
+    ),
+  });
+  BlockRegistry.register('artifact-timeline', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/ArtifactTimelineBlockRenderer'),
+      'ArtifactTimelineBlockRenderer',
+    ),
+  });
+  BlockRegistry.register('review-drawer', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/ReviewDrawerBlockRenderer'),
+      'ReviewDrawerBlockRenderer',
+    ),
+  });
   BlockRegistry.register('rich-text', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/RichTextBlockRenderer'), 'RichTextBlockRenderer'),
   });

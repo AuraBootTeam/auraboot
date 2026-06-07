@@ -126,8 +126,8 @@ class DslRegistryTest {
     }
 
     @Test
-    void blockType_has25Values() {
-        assertEquals(25, DslRegistry.BlockType.values().length);
+    void blockType_has28Values() {
+        assertEquals(28, DslRegistry.BlockType.values().length);
         Set<String> codes = DslRegistry.BlockType.codes();
         assertTrue(codes.containsAll(Set.of(
                 "form", "form-section", "form-buttons", "form-wizard",
@@ -142,7 +142,8 @@ class DslRegistryTest {
         // 1.4 — workbench blocks used for composite analysis pages.
         assertTrue(codes.containsAll(Set.of(
                 "metric-strip", "record-inspector", "candidate-list",
-                "workbench-action-bar")));
+                "workbench-action-bar", "evidence-panel", "artifact-timeline",
+                "review-drawer")));
     }
 
     @Test
