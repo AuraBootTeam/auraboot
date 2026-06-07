@@ -94,8 +94,9 @@ CREATE TABLE IF NOT EXISTS ab_drt_version (
     CONSTRAINT chk_drt_ver_status CHECK (status IN (
         'DRAFT', 'VALIDATED', 'PUBLISHED', 'DEPRECATED', 'RETIRED'
     )),
+    -- must match com.auraboot.framework.decision.model.DecisionKind exactly
     CONSTRAINT chk_drt_ver_kind CHECK (kind IN (
-        'SIMPLE_CONDITION', 'DECISION_TABLE', 'RULE_SET', 'EXPRESSION', 'COMPOSITE'
+        'SIMPLE_CONDITION', 'CROSS_FIELD', 'DECISION_TABLE', 'DMN', 'DRL', 'TEMPLATE_MAPPING', 'CUSTOM'
     ))
 );
 
