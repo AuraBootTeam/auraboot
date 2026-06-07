@@ -1,0 +1,162 @@
+package com.auraboot.framework.eventpolicy.service.impl;
+
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.decision.ast.DecisionContext;
+import com.auraboot.framework.decision.ast.Scope;
+import com.auraboot.framework.decision.model.VersionStatus;
+import com.auraboot.framework.eventpolicy.entity.DrtPolicyDefinitionEntity;
+import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
+import com.auraboot.framework.eventpolicy.mapper.DrtPolicyDefinitionMapper;
+import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
+import com.auraboot.framework.eventpolicy.model.ConflictStrategy;
+import com.auraboot.framework.eventpolicy.model.DedupStrategy;
+import com.auraboot.framework.eventpolicy.model.EventPolicy;
+import com.auraboot.framework.eventpolicy.model.EventPolicyResult;
+import com.auraboot.framework.eventpolicy.model.ExecutionMode;
+import com.auraboot.framework.eventpolicy.model.FailureStrategy;
+import com.auraboot.framework.eventpolicy.model.MatchMode;
+import com.auraboot.framework.eventpolicy.model.PolicyPhase;
+import com.auraboot.framework.eventpolicy.model.PolicyRule;
+import com.auraboot.framework.eventpolicy.runtime.EventPolicyEvaluator;
+import com.auraboot.framework.eventpolicy.service.EventPolicyRuntimeService;
+import com.auraboot.framework.exception.ValidationException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * EventPolicy runtime service: resolves the PUBLISHED policy, builds the domain object,
+ * evaluates it via {@link EventPolicyEvaluator}, and returns the result.
+ *
+ * <p>§8 compliance: no catch-and-swallow; missing policy returns NOT_MATCHED (not a system error).
+ * Parse errors on rules_json surface as errors (a published version should already be valid).
+ *
+ * @author AuraBoot Team
+ * @since 2.3.0
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService {
+
+    private final DrtPolicyDefinitionMapper definitionMapper;
+    private final DrtPolicyVersionMapper versionMapper;
+    private final ObjectMapper objectMapper;
+
+    private final EventPolicyEvaluator evaluator = new EventPolicyEvaluator();
+
+    // ─── public API ──────────────────────────────────────────────────────────
+
+    @Override
+    public EventPolicyResult run(String eventType, String targetType, String targetKey,
+                                  Map<String, Map<String, Object>> context) {
+        Long tid = requireTenant();
+
+        // 1. Resolve the policy definition
+        List<DrtPolicyDefinitionEntity> defs = definitionMapper.findByEventAndTarget(
+                tid, eventType, targetType, targetKey);
+
+        if (defs.isEmpty()) {
+            log.debug("No event policy found for eventType={}, targetType={}, targetKey={}",
+                    eventType, targetType, targetKey);
+            // Return a synthetic NOT_MATCHED rather than throwing — no policy is a valid state
+            return new EventPolicyResult("__none__", EventPolicyResult.Status.NOT_MATCHED,
+                    List.of(), List.of(), List.of(), List.of());
+        }
+
+        // Use first matching policy (one active policy per event+target by convention)
+        DrtPolicyDefinitionEntity def = defs.get(0);
+
+        // 2. Resolve the PUBLISHED version
+        DrtPolicyVersionEntity ver = versionMapper.findPublished(tid, def.getPolicyCode());
+        if (ver == null) {
+            log.debug("No published version for policy={}", def.getPolicyCode());
+            return new EventPolicyResult(def.getPolicyCode(), EventPolicyResult.Status.NOT_MATCHED,
+                    List.of(), List.of(), List.of(), List.of());
+        }
+
+        // Sanity check — findPublished already filters by status='PUBLISHED'
+        VersionStatus status = VersionStatus.valueOf(ver.getStatus());
+        if (!status.isBindable()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Event policy version is not bindable (status=" + status + ")");
+        }
+
+        // 3. Deserialize rules_json → List<PolicyRule>
+        List<PolicyRule> rules;
+        try {
+            rules = objectMapper.convertValue(
+                    ver.getRulesJson(),
+                    new TypeReference<List<PolicyRule>>() {});
+        } catch (Exception e) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Failed to deserialize rules for policy " + def.getPolicyCode() + ": " + e.getMessage());
+        }
+
+        // 4. Build EventPolicy domain object from version columns + rules
+        EventPolicy policy = new EventPolicy(
+                def.getPolicyCode(),
+                def.getPolicyName(),
+                def.getEventType(),
+                def.getTargetType(),
+                def.getTargetKey(),
+                PolicyPhase.valueOf(ver.getPhase()),
+                MatchMode.valueOf(ver.getMatchMode()),
+                ExecutionMode.valueOf(ver.getExecutionMode()),
+                FailureStrategy.valueOf(ver.getFailureStrategy()),
+                ConflictStrategy.valueOf(ver.getConflictStrategy()),
+                DedupStrategy.valueOf(ver.getDedupStrategy()),
+                def.getEnabled() != null && def.getEnabled(),
+                rules
+        );
+
+        // 5. Build DecisionContext from context map (mirroring DecisionEvaluationServiceImpl.buildContext)
+        DecisionContext ctx = buildContext(context);
+
+        // 6. Evaluate
+        EventPolicyResult result = evaluator.evaluate(policy, ctx);
+
+        log.info("EventPolicy evaluated: code={}, version={}, status={}",
+                def.getPolicyCode(), ver.getVersion(), result.status());
+
+        return result;
+    }
+
+    // ─── context building ────────────────────────────────────────────────────
+
+    /**
+     * Mirror of DecisionEvaluationServiceImpl.buildContext: iterate context map,
+     * parse scope keys via Scope.valueOf(key.toUpperCase()), silently skip unknown scopes.
+     */
+    private DecisionContext buildContext(Map<String, Map<String, Object>> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return DecisionContext.of(Map.of());
+        }
+        DecisionContext.Builder builder = DecisionContext.builder();
+        for (Map.Entry<String, Map<String, Object>> entry : raw.entrySet()) {
+            try {
+                Scope scope = Scope.valueOf(entry.getKey().toUpperCase());
+                builder.scope(scope, entry.getValue());
+            } catch (IllegalArgumentException ignored) {
+                log.debug("Skipping unknown context scope: {}", entry.getKey());
+            }
+        }
+        return builder.build();
+    }
+
+    // ─── tenant guard ────────────────────────────────────────────────────────
+
+    private Long requireTenant() {
+        Long tid = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        if (tid == null) {
+            throw new ValidationException(ResponseCode.NOT_FOUND, "Tenant context required for EventPolicy runtime");
+        }
+        return tid;
+    }
+}
