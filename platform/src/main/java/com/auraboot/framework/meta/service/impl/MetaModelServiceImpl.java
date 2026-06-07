@@ -2136,14 +2136,24 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
         record PageSpec(String kind, String pageKey, String blocks) {}
 
-        List<PageSpec> specs = List.of(
-            new PageSpec("list", modelCode + "_list",
-                "[{\"blockType\":\"toolbar\"},{\"blockType\":\"filters\"},{\"blockType\":\"table\"}]"),
-            new PageSpec("form", modelCode + "_form",
-                "[{\"blockType\":\"form-section\"}]"),
-            new PageSpec("detail", modelCode + "_detail",
-                "[{\"blockType\":\"form-section\"},{\"blockType\":\"tabs\"}]")
-        );
+        if (model.isSkipDefaultPages()) {
+            log.info("Skipping all default page schemas for model: {}", logSafe(modelCode));
+            return;
+        }
+
+        List<PageSpec> specs = new ArrayList<>();
+        if (!model.isSkipListPageCreation()) {
+            specs.add(new PageSpec("list", modelCode + "_list",
+                "[{\"blockType\":\"toolbar\"},{\"blockType\":\"filters\"},{\"blockType\":\"table\"}]"));
+        }
+        if (!model.isSkipFormPageCreation()) {
+            specs.add(new PageSpec("form", modelCode + "_form",
+                "[{\"blockType\":\"form-section\"}]"));
+        }
+        if (!model.isSkipDetailPageCreation()) {
+            specs.add(new PageSpec("detail", modelCode + "_detail",
+                "[{\"blockType\":\"form-section\"},{\"blockType\":\"tabs\"}]"));
+        }
 
         for (PageSpec spec : specs) {
             // Check existence by page_key (unique per tenant+namespace)

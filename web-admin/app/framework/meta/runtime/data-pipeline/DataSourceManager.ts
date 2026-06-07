@@ -324,12 +324,32 @@ export class DataSourceManager {
     this.notifySubscribers(id, newState);
   }
 
+  private clearSkippedDataSource(id: string): void {
+    const state = this.dataSourceStates.get(id);
+    if (!state) return;
+
+    const newState = {
+      ...state,
+      data: null,
+      loading: false,
+      error: null,
+    };
+
+    this.dataSourceStates.set(id, newState);
+    this.notifySubscribers(id, newState);
+  }
+
   /**
    * 获取数据 (with request dedup — stale responses are discarded)
    */
   async fetch(id: string, extraParams?: Record<string, any>): Promise<any> {
     const config = this.dataSources.get(id);
     if (!config) {
+      return null;
+    }
+
+    if (this.hasMissingDependencyParent(config)) {
+      this.clearSkippedDataSource(id);
       return null;
     }
 
@@ -671,11 +691,45 @@ export class DataSourceManager {
   }
 
   private evaluateDependency(expression: string) {
+    const pathValue = this.readDependencyPath(expression);
+    if (pathValue.matched) {
+      return pathValue.value;
+    }
     try {
       return evaluate(`\${${expression}}`, this.getContext());
     } catch {
       return undefined;
     }
+  }
+
+  private hasMissingDependencyParent(config: DataSourceConfig): boolean {
+    const dependencies = config.dependOn || [];
+    return dependencies.some((dependency) => this.readDependencyPath(dependency).missingParent);
+  }
+
+  private readDependencyPath(expression: string): {
+    matched: boolean;
+    missingParent: boolean;
+    value: any;
+  } {
+    const path = String(expression || '').trim();
+    if (!/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(path)) {
+      return { matched: false, missingParent: false, value: undefined };
+    }
+
+    const segments = path.split('.');
+    let value: any = this.getContext() as any;
+    for (let index = 0; index < segments.length; index += 1) {
+      if (value === undefined || value === null) {
+        return { matched: true, missingParent: true, value: undefined };
+      }
+      value = value[segments[index]];
+      if ((value === undefined || value === null) && index < segments.length - 1) {
+        return { matched: true, missingParent: true, value: undefined };
+      }
+    }
+
+    return { matched: true, missingParent: false, value };
   }
 
   /**

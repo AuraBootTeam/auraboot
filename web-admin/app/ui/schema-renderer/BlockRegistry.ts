@@ -149,6 +149,12 @@ export function initBlockRegistry(): void {
       'ReviewDrawerBlockRenderer',
     ),
   });
+  BlockRegistry.register('status-banner', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/StatusBannerBlockRenderer'),
+      'StatusBannerBlockRenderer',
+    ),
+  });
   BlockRegistry.register('rich-text', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/RichTextBlockRenderer'), 'RichTextBlockRenderer'),
   });

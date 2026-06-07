@@ -12,6 +12,7 @@ import { WorkbenchActionBarBlockRenderer } from '../WorkbenchActionBarBlockRende
 import { EvidencePanelBlockRenderer } from '../EvidencePanelBlockRenderer';
 import { ArtifactTimelineBlockRenderer } from '../ArtifactTimelineBlockRenderer';
 import { ReviewDrawerBlockRenderer } from '../ReviewDrawerBlockRenderer';
+import { StatusBannerBlockRenderer } from '../StatusBannerBlockRenderer';
 import { useRuntimeStateSubscription } from '../workbenchBlockUtils';
 
 function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
@@ -327,6 +328,93 @@ describe('WorkbenchActionBarBlockRenderer', () => {
   });
 });
 
+describe('StatusBannerBlockRenderer', () => {
+  it('renders a running task banner and polls configured data sources', () => {
+    vi.useFakeTimers();
+    const reload = vi.fn().mockResolvedValue(undefined);
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => ({
+          bom_task_status: 'parsing',
+          bom_task_raw_filename: 'raw.xlsx',
+          bom_task_total_rows: 88,
+        }),
+        getState: () => ({
+          data: {
+            bom_task_status: 'parsing',
+            bom_task_raw_filename: 'raw.xlsx',
+            bom_task_total_rows: 88,
+          },
+          loading: false,
+          error: null,
+        }),
+        has: () => true,
+        register: vi.fn(),
+        reload,
+        subscribe: vi.fn(() => () => undefined),
+      }),
+    }) as any;
+    const block: BlockConfig = {
+      id: 'task_status',
+      blockType: 'status-banner',
+      dataSource: 'summary',
+      statusField: 'bom_task_status',
+      hideStatuses: ['completed'],
+      failedStatuses: ['failed'],
+      titleMap: {
+        parsing: 'Parsing BOM',
+      },
+      descriptionMap: {
+        parsing: 'Parsing ${record.bom_task_raw_filename}; the page will refresh automatically.',
+      },
+      summaryFields: [{ key: 'total', label: 'Total Rows', field: 'bom_task_total_rows' }],
+      poll: {
+        enabledWhenStatuses: ['parsing'],
+        intervalMs: 3000,
+        reload: ['summary', 'lines'],
+      },
+    };
+
+    render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('status-banner-task_status')).toHaveTextContent('Parsing BOM');
+    expect(screen.getByTestId('status-banner-task_status')).toHaveTextContent('raw.xlsx');
+    expect(screen.getByTestId('status-banner-task_status')).toHaveTextContent('Total Rows');
+    expect(screen.getByTestId('status-banner-task_status')).toHaveTextContent('88');
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(reload).toHaveBeenCalledWith(['summary', 'lines']);
+    vi.useRealTimers();
+  });
+
+  it('hides when the current status is configured as hidden', () => {
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => ({ bom_task_status: 'completed' }),
+        getState: () => ({ data: { bom_task_status: 'completed' }, loading: false, error: null }),
+        has: () => true,
+        register: vi.fn(),
+        reload: vi.fn(),
+        subscribe: vi.fn(() => () => undefined),
+      }),
+    }) as any;
+    const block: BlockConfig = {
+      id: 'task_status',
+      blockType: 'status-banner',
+      dataSource: 'summary',
+      statusField: 'bom_task_status',
+      hideStatuses: ['completed'],
+    };
+
+    render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.queryByTestId('status-banner-task_status')).not.toBeInTheDocument();
+  });
+});
+
 describe('CandidateListBlockRenderer', () => {
   it('renders a stable empty state when no candidates are available', () => {
     const runtime = makeRuntime({
@@ -570,10 +658,23 @@ describe('ReviewDrawerBlockRenderer', () => {
     id: 'review_drawer',
     blockType: 'review-drawer',
     context: '${state.selectedBomLine}',
-    titleTemplate: 'Row ${record.bom_std_row_no} · ${record.bom_std_refdes} · ${record.bom_std_status_label}',
+    titleTemplate:
+      'Row ${record.bom_std_row_no} · ${record.bom_std_refdes} · ${record.bom_std_status_label}',
     summaryBadges: [
-      { key: 'profile', label: 'Profile', valueField: 'bom_std_profile_score', unit: '%', tone: 'blue' },
-      { key: 'parse', label: '解析', valueField: 'bom_std_parse_confidence', unit: '%', tone: 'green' },
+      {
+        key: 'profile',
+        label: 'Profile',
+        valueField: 'bom_std_profile_score',
+        unit: '%',
+        tone: 'blue',
+      },
+      {
+        key: 'parse',
+        label: '解析',
+        valueField: 'bom_std_parse_confidence',
+        unit: '%',
+        tone: 'green',
+      },
       { key: 'llm', label: 'LLM', valueField: 'bom_std_llm_mode', tone: 'purple' },
     ],
     compare: {
@@ -587,7 +688,12 @@ describe('ReviewDrawerBlockRenderer', () => {
       canonicalFields: [
         { key: 'name', label: '物料名称', field: 'bom_std_material_name' },
         { key: 'spec', label: 'match_spec', field: 'bom_std_spec' },
-        { key: 'code', label: '标准编码', field: 'bom_std_material_code', emptyText: '待确认候选后写入' },
+        {
+          key: 'code',
+          label: '标准编码',
+          field: 'bom_std_material_code',
+          emptyText: '待确认候选后写入',
+        },
       ],
     },
     source: {
@@ -618,7 +724,11 @@ describe('ReviewDrawerBlockRenderer', () => {
       ],
       policies: [
         { key: 'allowed', title: '允许行为', items: ['extract_fields', 'compose_match_spec'] },
-        { key: 'forbidden', title: '禁止行为', items: ['generate_material_code', 'auto_select_candidate'] },
+        {
+          key: 'forbidden',
+          title: '禁止行为',
+          items: ['generate_material_code', 'auto_select_candidate'],
+        },
       ],
       jsonField: 'bom_raw_extra_columns_json',
     },
@@ -629,13 +739,33 @@ describe('ReviewDrawerBlockRenderer', () => {
         titleField: 'bom_me_material_code',
         scoreField: 'bom_me_score',
         detailFields: [
-          { key: 'name', label: '物料名称', sourceField: 'bom_me_candidate_snapshot_json', field: 'materialName' },
-          { key: 'spec', label: '规格', sourceField: 'bom_me_candidate_snapshot_json', field: 'spec' },
-          { key: 'brand', label: '品牌', sourceField: 'bom_me_candidate_snapshot_json', field: 'brand' },
+          {
+            key: 'name',
+            label: '物料名称',
+            sourceField: 'bom_me_candidate_snapshot_json',
+            field: 'materialName',
+          },
+          {
+            key: 'spec',
+            label: '规格',
+            sourceField: 'bom_me_candidate_snapshot_json',
+            field: 'spec',
+          },
+          {
+            key: 'brand',
+            label: '品牌',
+            sourceField: 'bom_me_candidate_snapshot_json',
+            field: 'brand',
+          },
         ],
       },
       selectedFields: [
-        { key: 'matchSource', label: '匹配来源', sourceField: 'bom_me_evidence_json', field: 'matchSource' },
+        {
+          key: 'matchSource',
+          label: '匹配来源',
+          sourceField: 'bom_me_evidence_json',
+          field: 'matchSource',
+        },
       ],
       actions: [
         {
@@ -674,23 +804,23 @@ describe('ReviewDrawerBlockRenderer', () => {
     },
   };
 
-  it('renders the selected row review drawer with compare and source tabs', () => {
+  it('renders the selected row in a unified floating review drawer', () => {
     const runtime = makeReviewDrawerRuntime();
 
     render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
 
     const drawer = screen.getByTestId('review-drawer');
     expect(drawer).toHaveTextContent('Row 5 · LED1 · 待确认');
-    expect(drawer).not.toHaveClass('fixed');
+    expect(drawer).toHaveClass('fixed');
     expect(screen.getByTestId('review-drawer-badge-profile')).toHaveTextContent('Profile');
     expect(screen.getByTestId('review-drawer-badge-profile')).toHaveTextContent('96%');
-    expect(screen.getByRole('tab', { name: '原始 vs 转换' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '原始 vs 转换' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('review-drawer-tab-compare')).toBeInTheDocument();
+    expect(screen.getByTestId('review-drawer-tab-source')).toBeInTheDocument();
+    expect(screen.getByTestId('review-drawer-tab-candidates')).toBeInTheDocument();
     expect(screen.getByText('Designator')).toBeInTheDocument();
     expect(screen.getByText('LED1')).toBeInTheDocument();
     expect(screen.getByText('待确认候选后写入')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('tab', { name: '解析来源' }));
-
     expect(screen.getByText('Profile Detector')).toBeInTheDocument();
     expect(screen.getByText('JIEJIA_WB_FLEX_MAIN_V1')).toBeInTheDocument();
     expect(screen.getByText('Description + Value + Footprint')).toBeInTheDocument();
@@ -699,7 +829,7 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByText('generate_material_code')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '收起复核浮层' }));
-    expect(screen.getByTestId('review-drawer-minimized')).toHaveTextContent('复核');
+    expect(screen.getByTestId('review-drawer-minimized')).toHaveTextContent('展开行级复核');
     fireEvent.click(screen.getByRole('button', { name: '展开复核浮层' }));
     expect(screen.getByTestId('review-drawer')).toHaveTextContent('Row 5 · LED1 · 待确认');
   });
@@ -726,7 +856,6 @@ describe('ReviewDrawerBlockRenderer', () => {
 
     render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
 
-    fireEvent.click(screen.getByRole('tab', { name: '候选与决策' }));
     expect(screen.getByTestId('review-drawer-candidate-ME-1')).toHaveTextContent('D790000012300');
     expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).toBeDisabled();
     expect(screen.getByTestId('review-drawer-candidate-action-undo_decision')).toBeDisabled();
@@ -739,16 +868,19 @@ describe('ReviewDrawerBlockRenderer', () => {
       'selectedCandidate',
       expect.objectContaining({ pid: 'ME-1', bom_me_material_code: 'D790000012300' }),
     );
-    expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).not.toBeDisabled();
+    expect(
+      screen.getByTestId('review-drawer-candidate-action-confirm_candidate'),
+    ).not.toBeDisabled();
     expect(screen.getByTestId('review-drawer-candidate-action-undo_decision')).toBeDisabled();
 
     fireEvent.click(screen.getByTestId('review-drawer-candidate-action-confirm_candidate'));
     expect(runtime.__reload).toHaveBeenCalledWith(['taskSummary', 'standardLines']);
     await waitFor(() => {
-      expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).not.toBeDisabled();
+      expect(
+        screen.getByTestId('review-drawer-candidate-action-confirm_candidate'),
+      ).not.toBeDisabled();
     });
 
-    fireEvent.click(screen.getByRole('tab', { name: '导出影响' }));
     expect(screen.getByText('下一导出版本')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('review-drawer-export-action-download_new_bom'));
     expect(runtime.__reload).toHaveBeenCalledWith(['exports']);
@@ -763,7 +895,6 @@ describe('ReviewDrawerBlockRenderer', () => {
 
     render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
 
-    fireEvent.click(screen.getByRole('tab', { name: '候选与决策' }));
     fireEvent.click(screen.getByTestId('review-drawer-candidate-ME-1'));
 
     expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).toBeDisabled();
@@ -802,7 +933,7 @@ describe('ReviewDrawerBlockRenderer', () => {
       />,
     );
 
-    expect(screen.getByText('D790000099999')).toBeInTheDocument();
+    expect(screen.getAllByText('D790000099999').length).toBeGreaterThan(0);
     expect(screen.getByTestId('review-drawer')).toHaveTextContent('manual_confirm');
   });
 });
@@ -982,9 +1113,15 @@ describe('EvidencePanelBlockRenderer', () => {
     render(<EvidencePanelBlockRenderer block={block} runtime={runtime} />);
 
     expect(screen.getByTestId('evidence-panel')).toHaveTextContent('Evidence');
-    expect(screen.getByTestId('evidence-panel-section-candidate')).toHaveTextContent('D410000098100');
-    expect(screen.getByTestId('evidence-panel-section-evidence')).toHaveTextContent('"spec": "62R"');
-    expect(screen.getByTestId('evidence-panel-section-conflict')).toHaveTextContent('"brand": "alternative"');
+    expect(screen.getByTestId('evidence-panel-section-candidate')).toHaveTextContent(
+      'D410000098100',
+    );
+    expect(screen.getByTestId('evidence-panel-section-evidence')).toHaveTextContent(
+      '"spec": "62R"',
+    );
+    expect(screen.getByTestId('evidence-panel-section-conflict')).toHaveTextContent(
+      '"brand": "alternative"',
+    );
   });
 });
 
