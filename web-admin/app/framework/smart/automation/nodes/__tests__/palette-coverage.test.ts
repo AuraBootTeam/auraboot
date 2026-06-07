@@ -3,7 +3,7 @@ import { automationNodes } from '../index';
 
 /**
  * Palette coverage test — asserts the automation node registry contains exactly
- * the 18 canonical types expected by the golden E2E harness, and that each node
+ * the 19 canonical types expected by the golden E2E harness, and that each node
  * definition satisfies the minimal property contract (category, i18n label,
  * i18n description, configSchema array).
  */
@@ -16,6 +16,7 @@ const EXPECTED_TYPES = [
   'trigger-scheduled',
   'trigger-webhook',
   'trigger-bpm-event',
+  'trigger-inactivity',
   'action-update-record',
   'action-create-record',
   'action-send-notification',
@@ -39,11 +40,11 @@ function expectedCategory(type: string): string {
 }
 
 describe('automationNodes palette coverage', () => {
-  it('exports exactly 18 node definitions', () => {
-    expect(automationNodes).toHaveLength(18);
+  it('exports exactly 19 node definitions', () => {
+    expect(automationNodes).toHaveLength(19);
   });
 
-  it('contains exactly the 18 expected type values (no extras, no missing)', () => {
+  it('contains exactly the 19 expected type values (no extras, no missing)', () => {
     const actualTypes = automationNodes.map((n) => n.type).sort();
     const expectedSorted = [...EXPECTED_TYPES].sort();
     expect(actualTypes).toEqual(expectedSorted);

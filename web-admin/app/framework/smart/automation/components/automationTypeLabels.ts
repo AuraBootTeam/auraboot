@@ -29,4 +29,5 @@ export const TRIGGER_TYPE_I18N_KEYS: Record<string, string> = {
   scheduled: '$i18n:automation.trigger.scheduled',
   webhook: '$i18n:automation.trigger.webhook',
   on_bpm_event: '$i18n:automation.trigger.bpmEvent',
+  on_inactivity: '$i18n:automation.trigger.inactivity',
 };

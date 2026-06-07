@@ -367,6 +367,8 @@ automation:
     webhook.desc: 当收到外部 Webhook 请求时触发
     bpmEvent: 流程事件触发
     bpmEvent.desc: 当 BPM 流程事件发生时触发（流程启动、任务完成等）
+    inactivity: 记录闲置时
+    inactivity.desc: 当记录在指定时长内没有活动（未更新）时触发，由定时巡检驱动
 
   # Actions
   action:
@@ -408,6 +410,12 @@ automation:
     fromStates.desc: 留空表示任意原状态
     toStates: 目标状态
     toStates.desc: 留空表示任意目标状态
+    inactivityHours: 闲置时长（小时）
+    inactivityHours.desc: 记录超过该小时数未更新即视为闲置，例如 168 = 7 天
+    inactivityField: 活动时间字段
+    inactivityField.desc: 用于判断闲置的时间字段，留空默认 updated_at
+    inactivityStates: 限定状态
+    inactivityStates.desc: 仅检查处于这些状态的记录，留空表示全部
     cron: Cron 表达式
     cron.desc: '例如: 0 0 * * * (每天零点)'
     timezone: 时区
