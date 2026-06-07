@@ -626,6 +626,21 @@
                 "since": "1.4"
             },
             {
+                "code": "evidence-panel",
+                "label": "Evidence panel block",
+                "since": "1.4"
+            },
+            {
+                "code": "artifact-timeline",
+                "label": "Artifact timeline block",
+                "since": "1.4"
+            },
+            {
+                "code": "review-drawer",
+                "label": "Review drawer block",
+                "since": "1.4"
+            },
+            {
                 "code": "custom",
                 "label": "Custom block",
                 "since": "1.0"

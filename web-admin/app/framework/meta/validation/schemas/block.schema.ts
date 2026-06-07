@@ -29,14 +29,20 @@ export const BLOCK_TYPES = [
   'record-inspector',
   'candidate-list',
   'workbench-action-bar',
+  'evidence-panel',
+  'artifact-timeline',
+  'review-drawer',
   'custom',
 ] as const;
 
 export const blockTypeEnum = z.enum(BLOCK_TYPES);
 
 const blockLayoutConfigSchema = z.object({
+  col: z.number().optional(),
   colSpan: z.number().optional(),
+  row: z.number().optional(),
   rowSpan: z.number().optional(),
+  order: z.number().optional(),
   columns: z.number().optional(),
   colGap: z.number().optional(),
   rowGap: z.number().optional(),
@@ -45,6 +51,7 @@ const blockLayoutConfigSchema = z.object({
 const selectionConfigSchema = z.object({
   mode: z.enum(['single', 'multiple']),
   bind: z.string(),
+  defaultFirst: z.boolean().optional(),
 });
 
 const paginationConfigSchema = z.object({
@@ -58,8 +65,17 @@ const paginationConfigSchema = z.object({
 const tableConfigSchema = z.object({
   rowKey: z.string().optional(),
   dataSource: z.string().optional(),
+  maxHeight: z.union([z.number(), z.string()]).optional(),
+  density: z.enum(['default', 'compact']).optional(),
   pagination: paginationConfigSchema.optional(),
   selection: selectionConfigSchema.optional(),
+  treeConfig: z
+    .object({
+      parentField: z.string(),
+      maxDepth: z.number().optional(),
+      defaultExpanded: z.boolean().optional(),
+    })
+    .optional(),
   columns: z.array(columnSchema),
 });
 

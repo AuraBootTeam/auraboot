@@ -9,7 +9,7 @@ vi.mock('~/shared/services/http-client', () => ({
   fetchResult: fetchResultMock,
 }));
 
-import { executeSimpleWorkbenchAction, writeRuntimeState } from '../workbenchBlockUtils';
+import { executeSimpleWorkbenchAction, readPath, writeRuntimeState } from '../workbenchBlockUtils';
 
 function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
   const context: Record<string, any> = {
@@ -170,5 +170,18 @@ describe('workbenchBlockUtils action runner', () => {
     });
     expect(assign).toHaveBeenCalledWith('/api/file/download/export-file-1');
     expect(runtime.__reload).toHaveBeenCalledWith(['summary']);
+  });
+});
+
+describe('workbenchBlockUtils readPath', () => {
+  it('reads nested fields from JSON string values', () => {
+    expect(
+      readPath(
+        {
+          reasonBreakdown: '{"match_multi_candidate":48,"unrecognized_category":1}',
+        },
+        'reasonBreakdown.match_multi_candidate',
+      ),
+    ).toBe(48);
   });
 });

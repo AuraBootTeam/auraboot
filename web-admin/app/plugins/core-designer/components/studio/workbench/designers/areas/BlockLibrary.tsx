@@ -178,6 +178,33 @@ const BLOCK_TYPES: BlockTypeInfo[] = [
     keywords: ['action', 'command', 'download', 'reload', 'export'],
   },
   {
+    type: 'evidence-panel',
+    name: '证据面板',
+    icon: 'EV',
+    description: '展示选中记录的证据、冲突和原始载荷',
+    availableIn: ['list', 'form'],
+    category: 'workbench',
+    keywords: ['evidence', 'json', 'proof', 'audit'],
+  },
+  {
+    type: 'artifact-timeline',
+    name: '产物时间线',
+    icon: 'TL',
+    description: '展示导出、附件或版本化产物',
+    availableIn: ['list', 'form'],
+    category: 'workbench',
+    keywords: ['artifact', 'timeline', 'revision', 'export'],
+  },
+  {
+    type: 'review-drawer',
+    name: '复核浮层',
+    icon: 'REV',
+    description: '行级复核、候选确认和导出影响浮层',
+    availableIn: ['list', 'form'],
+    category: 'workbench',
+    keywords: ['review', 'drawer', 'candidate', 'decision', 'export'],
+  },
+  {
     type: 'chart-card',
     name: '图表卡片',
     icon: '📉',
@@ -202,6 +229,9 @@ const BLOCK_TYPE_EN: Record<BlockType, { name: string; description: string }> = 
   'record-inspector': { name: 'Record Inspector', description: 'Selection-bound detail panel' },
   'candidate-list': { name: 'Candidate List', description: 'Selectable candidate records' },
   'workbench-action-bar': { name: 'Workbench Action Bar', description: 'Workbench action group' },
+  'evidence-panel': { name: 'Evidence Panel', description: 'Selection-bound evidence viewer' },
+  'artifact-timeline': { name: 'Artifact Timeline', description: 'Revision and artifact timeline' },
+  'review-drawer': { name: 'Review Drawer', description: 'Row review drawer with candidates and export impact' },
   'chart-card': { name: 'Chart Card', description: 'Chart visualization' },
 };
 

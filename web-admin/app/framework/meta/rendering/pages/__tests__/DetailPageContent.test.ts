@@ -3,6 +3,7 @@ import {
   buildDetailRecordEndpoint,
   collectDetailDictCodes,
   enrichDetailField,
+  resolveActiveDetailTab,
   resolveDetailFieldComponent,
   resolveSubTableDataSourceConfig,
   shouldRenderDefaultDetailEditAction,
@@ -143,5 +144,30 @@ describe('resolveSubTableDataSourceConfig', () => {
         subtable_ds_dataSource: config,
       }),
     ).toEqual(config);
+  });
+});
+
+describe('resolveActiveDetailTab', () => {
+  const tabs = [
+    { key: 'overview', label: 'Overview', blocks: [] },
+    { key: 'review', label: 'Review', blocks: [] },
+  ] as any;
+
+  it('returns only the requested active tab', () => {
+    expect(resolveActiveDetailTab(tabs, 1)).toMatchObject({
+      index: 1,
+      tab: { key: 'review' },
+    });
+  });
+
+  it('falls back to the first tab when the active index is out of range', () => {
+    expect(resolveActiveDetailTab(tabs, 99)).toMatchObject({
+      index: 0,
+      tab: { key: 'overview' },
+    });
+  });
+
+  it('returns null when no tabs are configured', () => {
+    expect(resolveActiveDetailTab([], 0)).toBeNull();
   });
 });

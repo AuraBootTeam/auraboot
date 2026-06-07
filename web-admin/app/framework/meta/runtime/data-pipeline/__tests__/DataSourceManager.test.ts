@@ -244,4 +244,44 @@ describe('DataSourceManager', () => {
     expect(params).not.toHaveProperty('bom_std_task_id');
     expect(params).not.toHaveProperty('bom_std_reason_code');
   });
+
+  it('skips blank optional filter-array entries after expression evaluation', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: { records: [], total: 0, current: 1, pageSize: 500 },
+    } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { pid: 'task-1' },
+        state: { reasonFilterCodes: [] },
+      } as any),
+    );
+    manager.register('standardLines', {
+      type: 'api',
+      endpoint: '/api/dynamic/bom_standard_item/list',
+      method: 'get',
+      adaptor: 'table',
+      autoFetch: false,
+      params: {
+        pageNum: 1,
+        pageSize: 500,
+        filters: [
+          { fieldName: 'bom_std_task_id', operator: 'EQ', value: '${form.pid}' },
+          {
+            fieldName: 'bom_std_reason_code',
+            operator: 'IN',
+            value: '${state.reasonFilterCodes}',
+          },
+        ],
+      },
+    });
+
+    await manager.fetch('standardLines');
+
+    const params = mockedFetchResult.mock.calls.at(-1)?.[1]?.params as Record<string, any>;
+    expect(JSON.parse(params.filters)).toEqual([
+      { fieldName: 'bom_std_task_id', operator: 'EQ', value: 'task-1' },
+    ]);
+  });
 });

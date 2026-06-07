@@ -16,6 +16,13 @@ const variantClass: Record<string, string> = {
   ghost: 'bg-transparent text-gray-700 hover:bg-gray-100',
 };
 
+const activeVariantClass: Record<string, string> = {
+  primary: 'ring-2 ring-blue-300 ring-offset-1',
+  secondary: 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200 ring-offset-1',
+  danger: 'ring-2 ring-rose-300 ring-offset-1',
+  ghost: 'bg-blue-50 text-blue-700 ring-2 ring-blue-200 ring-offset-1',
+};
+
 export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRendererProps> = ({
   block,
   runtime,
@@ -37,15 +44,29 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
     return null;
   }
 
+  const surface = (block as any).surface || ((block as any).detailPlacement === 'header' ? 'bare' : 'card');
+  const density = (block as any).density || 'default';
+  const align = (block as any).align || 'end';
+  const alignClass =
+    align === 'start' ? 'justify-start' : align === 'center' ? 'justify-center' : 'justify-end';
+  const surfaceClass =
+    surface === 'bare'
+      ? 'flex flex-wrap items-center gap-2'
+      : 'flex flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-white p-3';
+  const buttonSizeClass = density === 'compact' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm';
+
   return (
     <div
-      className="flex flex-wrap items-center justify-end gap-2 rounded-md border border-gray-200 bg-white p-3"
+      className={`${surfaceClass} ${alignClass}`}
       data-testid="workbench-action-bar"
     >
       {visibleActions.map((actionConfig: any) => {
         const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
         const label = getLocalizedText(actionConfig.label || code, locale, t);
         const variant = actionConfig.variant || 'secondary';
+        const active = actionConfig.activeWhen
+          ? evaluator.evaluateCondition(actionConfig.activeWhen, context)
+          : false;
         const disabledByCondition = actionConfig.disabledWhen
           ? evaluator.evaluateCondition(actionConfig.disabledWhen, context)
           : false;
@@ -65,8 +86,10 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
                 })
                 .finally(() => setRunningAction(null));
             }}
-            className={`rounded-md px-3 py-2 text-sm font-medium ${
+            className={`rounded-md font-medium ${
               variantClass[variant] || variantClass.secondary
+            } ${active ? activeVariantClass[variant] || activeVariantClass.secondary : ''} ${
+              buttonSizeClass
             } disabled:cursor-not-allowed disabled:opacity-50`}
           >
             {runningAction === code ? t('common.loading') : label}

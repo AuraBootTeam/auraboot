@@ -11,6 +11,8 @@ describe('DEFAULT_COL_SPAN_BY_TYPE', () => {
     expect(getDefaultColSpan('record-inspector')).toBe(8);
     expect(getDefaultColSpan('candidate-list')).toBe(4);
     expect(getDefaultColSpan('workbench-action-bar')).toBe(12);
+    expect(getDefaultColSpan('evidence-panel')).toBe(6);
+    expect(getDefaultColSpan('artifact-timeline')).toBe(6);
   });
   it('returns 6 for chart', () => {
     expect(getDefaultColSpan('chart')).toBe(6);
