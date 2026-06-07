@@ -137,4 +137,12 @@ export function initBlockRegistry(): void {
   BlockRegistry.register('divider', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/DividerBlockRenderer'), 'DividerBlockRenderer'),
   });
+
+  // Trace / digital-thread blocks
+  BlockRegistry.register('trace-graph', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/TraceGraphBlockRenderer'),
+      'TraceGraphBlockRenderer',
+    ),
+  });
 }
