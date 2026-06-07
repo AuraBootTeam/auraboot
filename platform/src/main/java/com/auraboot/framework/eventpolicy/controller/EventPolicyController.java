@@ -163,4 +163,20 @@ public class EventPolicyController {
         log.info("Event policy run complete: status={}", result.status());
         return ApiResponse.success(result);
     }
+
+    @PostMapping("/run-and-execute")
+    @Operation(summary = "Run and execute the published event policy",
+            description = "End-to-end: resolves the policy, evaluates rules, then executes the resolved "
+                    + "action plans via the PolicyExecutor (ordered, idempotent). Returns both outcomes.")
+    @RequirePermission(MetaPermission.POLICY_RUNTIME_RUN)
+    public ApiResponse<com.auraboot.framework.eventpolicy.model.EventPolicyExecutionResult> runAndExecute(
+            @Valid @RequestBody EventPolicyRunRequest request) {
+        log.info("Run+execute event policy: eventType={}, targetType={}, targetKey={}",
+                request.getEventType(), request.getTargetType(), request.getTargetKey());
+        Map<String, Map<String, Object>> context =
+                request.getContext() != null ? request.getContext() : Map.of();
+        var result = runtimeService.runAndExecute(
+                request.getEventType(), request.getTargetType(), request.getTargetKey(), context);
+        return ApiResponse.success(result);
+    }
 }
