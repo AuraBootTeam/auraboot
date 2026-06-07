@@ -302,6 +302,23 @@ ai:
 
 # AuraBoot Git 配置
 aura:
+  scheduler:
+    # local: AuraBoot database-backed Spring TaskScheduler
+    # xxl: delegate scheduling to XXL-JOB Admin while executing inside AuraBoot
+    engine: ${AURA_SCHEDULER_ENGINE:local}
+    xxl:
+      admin-addresses: ${XXL_JOB_ADMIN_ADDRESSES:}
+      admin-username: ${XXL_JOB_ADMIN_USERNAME:admin}
+      admin-password: ${XXL_JOB_ADMIN_PASSWORD:123456}
+      access-token: ${XXL_JOB_ACCESS_TOKEN:}
+      executor-app-name: ${XXL_JOB_EXECUTOR_APP_NAME:auraboot-platform}
+      executor-address: ${XXL_JOB_EXECUTOR_ADDRESS:}
+      executor-ip: ${XXL_JOB_EXECUTOR_IP:}
+      executor-port: ${XXL_JOB_EXECUTOR_PORT:9999}
+      log-path: ${XXL_JOB_LOG_PATH:./data/xxl-job/logs}
+      log-retention-days: ${XXL_JOB_LOG_RETENTION_DAYS:30}
+      connect-timeout-millis: ${XXL_JOB_CONNECT_TIMEOUT_MILLIS:5000}
+      read-timeout-millis: ${XXL_JOB_READ_TIMEOUT_MILLIS:10000}
   # Public-demo guardrails. When enabled, the DemoModeGuard filter rejects
   # destructive endpoints (license, plugin upload, admin, password reset, etc.)
   # with HTTP 403 regardless of caller authentication. Used by the public

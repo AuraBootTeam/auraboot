@@ -3,6 +3,8 @@ package com.auraboot.framework.scheduler.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.time.Instant;
+
 /**
  * Request DTO for creating/updating a scheduled task.
  *
@@ -31,6 +33,8 @@ public class ScheduledTaskCreateRequest {
     private String timezone;
 
     private Long intervalMs;
+
+    private Instant nextRunAt;
 
     @NotBlank
     private String handlerBean;
