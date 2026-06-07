@@ -40,6 +40,12 @@ public class DecisionRuntimeConfig {
         return new com.auraboot.framework.decision.adapter.CrossFieldDecisionAdapter();
     }
 
+    @Bean
+    public com.auraboot.framework.decision.adapter.DroolsDrlAdapter droolsDrlAdapter(
+            com.auraboot.framework.bpm.rule.DroolsEngineService droolsEngineService) {
+        return new com.auraboot.framework.decision.adapter.DroolsDrlAdapter(droolsEngineService);
+    }
+
     /**
      * Build the runtime from all {@link DecisionAdapter} beans.
      * Spring injects the full list automatically via {@code List<DecisionAdapter>}.
