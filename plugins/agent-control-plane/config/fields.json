@@ -1492,7 +1492,7 @@
     "code": "auth_config",
     "displayName:zh-CN": "认证配置",
     "displayName:en": "Auth Config",
-    "dataType": "text",
+    "dataType": "json",
     "extension": {
       "multiline": true,
       "rows": 3

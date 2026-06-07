@@ -45,7 +45,7 @@ function generateMinimalBpmn(processKey: string, processName: string): string {
 }
 
 function isProcessUpdateForbidden(message: string): boolean {
-  return /system\.process\.update|Access forbidden|Access denied/i.test(message);
+  return /bpm\.process\.update|Access forbidden|Access denied/i.test(message);
 }
 
 test.describe('BPM Process Lifecycle', () => {
@@ -118,7 +118,7 @@ test.describe('BPM Process Lifecycle', () => {
    * BPM-LC02: Create process via API with designerJson, then verify it appears in list as draft
    */
   test.fixme('BPM-LC02: Create draft process, visible in list', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     const bpmnContent = generateMinimalBpmn(processKey, processName);
 
     // Create via API (stays in draft status)
@@ -162,7 +162,7 @@ test.describe('BPM Process Lifecycle', () => {
       const bodyText = await createResp.text().catch(() => '');
       if (createResp.status() === 403 && isProcessUpdateForbidden(bodyText)) {
         missingProcessUpdatePermission = true;
-        test.skip(true, 'Missing permission: system.process.update');
+        test.skip(true, 'Missing permission: bpm.process.update');
         return;
       }
     }

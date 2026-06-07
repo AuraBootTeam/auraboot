@@ -14,7 +14,7 @@
 import { test, expect } from '../../fixtures';
 
 function isProcessUpdateForbidden(message: string): boolean {
-  return /system\.process\.update|Access forbidden|Access denied/i.test(message);
+  return /bpm\.process\.update|Access forbidden|Access denied/i.test(message);
 }
 
 /**
@@ -143,7 +143,7 @@ test.describe('BPM Process Definition Lifecycle', () => {
    */
   test('D1-E03: Open process in designer', async ({ page }) => {
     if (missingProcessUpdatePermission) {
-      test.skip(true, 'Missing permission: system.process.update');
+      test.skip(true, 'Missing permission: bpm.process.update');
       return;
     }
 

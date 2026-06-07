@@ -163,6 +163,8 @@ automation:
     webhook.desc: 外部 Webhook リクエストを受信したときに実行
     bpmEvent: BPM イベント トリガー
     bpmEvent.desc: BPM プロセスイベント発生時に実行（プロセス開始・タスク完了など）
+    inactivity: 無活動時
+    inactivity.desc: レコードが指定時間内に活動（更新）がない場合に実行され、定期スイープで駆動されます
 
   # Actions
   action:
@@ -204,6 +206,12 @@ automation:
     fromStates.desc: 空欄の場合は任意のステータスにマッチ
     toStates: 変更後のステータス
     toStates.desc: 空欄の場合は任意のステータスにマッチ
+    inactivityHours: 無活動しきい値(時間)
+    inactivityHours.desc: 'この時間更新がないレコードは無活動とみなされます。例: 168 = 7日'
+    inactivityField: 活動時間フィールド
+    inactivityField.desc: 無活動の判定に使う時間フィールド。空欄の場合は updated_at が使われます
+    inactivityStates: ステータスフィルター
+    inactivityStates.desc: これらのステータスのレコードのみを確認します。空欄の場合は全件を確認します
     cron: Cron 式
     cron.desc: '例: 0 0 * * * (毎日0時)'
     timezone: タイムゾーン

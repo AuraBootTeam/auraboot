@@ -27,6 +27,25 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
 
     private final DynamicDataMapper dynamicDataMapper;
 
+    /**
+     * Optional live DB column-type introspection. When wired, keyword search resolves
+     * the ACTUAL physical column type (not just the declared dataType), so a JSONB
+     * column a model mis-declares as text is searched safely (CAST to text) instead of
+     * emitting a bare {@code col ILIKE ?} — which Postgres rejects on jsonb with
+     * {@code operator does not exist: jsonb ~~* character varying}. Optional so unit
+     * tests (and any pre-introspection path) fall back to declared-dataType behavior.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.ddl.TableMetadataService tableMetadataService;
+
+    /** Cache of {@code table.column -> isJsonb} to avoid per-query DB introspection. */
+    private final Map<String, Boolean> jsonbColumnCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Test seam: inject a (possibly stubbed) TableMetadataService without Spring. */
+    void setTableMetadataService(com.auraboot.framework.meta.ddl.TableMetadataService svc) {
+        this.tableMetadataService = svc;
+    }
+
     @Override
     public List<Map<String, Object>> executeRaw(String sql, Map<String, Object> params) {
         List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, params);
@@ -169,7 +188,7 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         // Resolve column expressions for each searchable field
         List<String> columnExprs = new ArrayList<>();
         for (FieldDefinition field : searchFields) {
-            columnExprs.add(toKeywordColumnExpression(field));
+            columnExprs.add(toKeywordColumnExpression(field, modelDefinition.getTableName()));
         }
 
         String likeValue = "%" + escapeIlike(keyword) + "%";
@@ -829,14 +848,39 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         return field.getDataType() != null ? field.getDataType().toLowerCase(Locale.ROOT) : "";
     }
 
-    private static String toKeywordColumnExpression(FieldDefinition field) {
+    private String toKeywordColumnExpression(FieldDefinition field, String tableName) {
         if (field.isJsonbVirtual()) {
             return field.getJsonbColumn() + "->>'" + field.getJsonbPath() + "'";
         }
         String columnName = field.getColumnName();
-        return TEXT_SEARCHABLE_DATA_TYPES.contains(normalizeDataType(field))
-                ? columnName
-                : "CAST(" + columnName + " AS TEXT)";
+        boolean declaredText = TEXT_SEARCHABLE_DATA_TYPES.contains(normalizeDataType(field));
+        // A physically-JSONB column cannot take a bare ILIKE even when the model declares
+        // it as text (a global field code reused across models can be jsonb in one table and
+        // text in another). Cast to text so the ILIKE is valid regardless of declaration.
+        if (declaredText && isActualJsonbColumn(tableName, columnName)) {
+            return "CAST(" + columnName + " AS TEXT)";
+        }
+        return declaredText ? columnName : "CAST(" + columnName + " AS TEXT)";
+    }
+
+    /**
+     * True when the physical column is JSONB per live DB introspection (cached).
+     * Null-safe: returns false when no metadata service is wired or the lookup fails,
+     * preserving declared-dataType behavior for unit tests and unknown tables.
+     */
+    private boolean isActualJsonbColumn(String tableName, String columnName) {
+        if (tableMetadataService == null || tableName == null || columnName == null) {
+            return false;
+        }
+        return jsonbColumnCache.computeIfAbsent(tableName + "." + columnName, k -> {
+            try {
+                String type = tableMetadataService.getColumnTypeDefinition(tableName, columnName);
+                return type != null && type.toUpperCase(Locale.ROOT).contains("JSON");
+            } catch (Exception e) {
+                // Column/table not found or no datasource — fall back to declared dataType.
+                return false;
+            }
+        });
     }
 
     private boolean containsSqlInjectionPatterns(String sql) {

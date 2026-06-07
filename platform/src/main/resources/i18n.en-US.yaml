@@ -318,6 +318,8 @@ automation:
     webhook.desc: Triggered when an external Webhook request is received
     bpmEvent: On BPM Event
     bpmEvent.desc: Triggered when a BPM process event occurs (process started, task completed, etc.)
+    inactivity: On Inactivity
+    inactivity.desc: Triggered when a record has had no activity (no update) for the configured duration; driven by a scheduled sweep
 
   # Actions
   action:
@@ -359,6 +361,12 @@ automation:
     fromStates.desc: Leave empty for any original state
     toStates: To States
     toStates.desc: Leave empty for any target state
+    inactivityHours: Inactivity Threshold (hours)
+    inactivityHours.desc: A record not updated for this many hours is treated as inactive, e.g. 168 = 7 days
+    inactivityField: Activity Time Field
+    inactivityField.desc: Timestamp field used to measure inactivity; defaults to updated_at when empty
+    inactivityStates: State Filter
+    inactivityStates.desc: Only check records in these states; leave empty to check all
     cron: Cron Expression
     cron.desc: 'Example: 0 0 * * * (daily at midnight)'
     timezone: Timezone

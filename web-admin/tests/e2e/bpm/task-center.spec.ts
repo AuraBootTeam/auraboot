@@ -369,7 +369,7 @@ test.describe('BPM Task Center', () => {
   // ==================== Task Detail Navigation ====================
 
   test('TC-04: Task detail click navigates to a detail page instead of opening a drawer', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     const result = await gotoTaskCenter(page);
     if (result !== 'content') {
       throw new Error(`Task center not available: ${result}`);
