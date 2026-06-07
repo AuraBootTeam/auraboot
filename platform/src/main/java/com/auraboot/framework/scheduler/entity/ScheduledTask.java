@@ -67,6 +67,33 @@ public class ScheduledTask {
     @TableField("enabled")
     private Boolean enabled;
 
+    @TableField("scheduler_type")
+    private String schedulerType;
+
+    @TableField("external_job_id")
+    private String externalJobId;
+
+    @TableField("external_executor_app")
+    private String externalExecutorApp;
+
+    @TableField("external_sync_status")
+    private String externalSyncStatus;
+
+    @TableField("external_sync_error")
+    private String externalSyncError;
+
+    @TableField("route_strategy")
+    private String routeStrategy;
+
+    @TableField("block_strategy")
+    private String blockStrategy;
+
+    @TableField("misfire_strategy")
+    private String misfireStrategy;
+
+    @TableField("sharding_enabled")
+    private Boolean shardingEnabled;
+
     @TableField("last_run_at")
     private Instant lastRunAt;
 

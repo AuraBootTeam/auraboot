@@ -18,4 +18,6 @@ public interface SchedulerEngine {
     void scheduleTask(ScheduledTask task);
 
     void unscheduleTask(String taskPid);
+
+    void triggerTask(ScheduledTask task);
 }

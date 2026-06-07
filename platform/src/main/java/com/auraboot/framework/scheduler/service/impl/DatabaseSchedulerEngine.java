@@ -9,6 +9,7 @@ import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
@@ -30,6 +31,7 @@ import java.util.concurrent.ScheduledFuture;
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(name = "aura.scheduler.engine", havingValue = "local", matchIfMissing = true)
 @RequiredArgsConstructor
 public class DatabaseSchedulerEngine implements SchedulerEngine {
 
@@ -138,6 +140,14 @@ public class DatabaseSchedulerEngine implements SchedulerEngine {
             future.cancel(false);
             log.debug("Unscheduled task: pid={}", taskPid);
         }
+    }
+
+    @Override
+    public void triggerTask(ScheduledTask task) {
+        if (task == null || task.getPid() == null) {
+            return;
+        }
+        taskExecutor.execute(task);
     }
 
     /**

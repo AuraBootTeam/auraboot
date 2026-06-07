@@ -7,7 +7,6 @@ import com.auraboot.framework.scheduler.entity.ScheduledTaskLog;
 import com.auraboot.framework.scheduler.mapper.ScheduledTaskMapper;
 import com.auraboot.framework.scheduler.service.ScheduledTaskService;
 import com.auraboot.framework.scheduler.service.SchedulerEngine;
-import com.auraboot.framework.scheduler.service.TaskExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,7 +26,6 @@ public class ScheduledTaskServiceImpl implements ScheduledTaskService {
 
     private final ScheduledTaskMapper taskMapper;
     private final SchedulerEngine schedulerEngine;
-    private final TaskExecutor taskExecutor;
 
     @Override
     @Transactional
@@ -49,6 +47,7 @@ public class ScheduledTaskServiceImpl implements ScheduledTaskService {
         entity.setCronExpression(request.getCronExpression());
         entity.setTimezone(request.getTimezone());
         entity.setIntervalMs(request.getIntervalMs());
+        entity.setNextRunAt(request.getNextRunAt());
         entity.setHandlerBean(request.getHandlerBean());
         entity.setHandlerMethod(request.getHandlerMethod());
         entity.setParams(request.getParams());
@@ -99,6 +98,7 @@ public class ScheduledTaskServiceImpl implements ScheduledTaskService {
         existing.setCronExpression(request.getCronExpression());
         existing.setTimezone(request.getTimezone());
         existing.setIntervalMs(request.getIntervalMs());
+        existing.setNextRunAt(request.getNextRunAt());
         existing.setHandlerBean(request.getHandlerBean());
         existing.setHandlerMethod(request.getHandlerMethod());
         existing.setParams(request.getParams());
@@ -152,7 +152,7 @@ public class ScheduledTaskServiceImpl implements ScheduledTaskService {
             throw new IllegalArgumentException("Scheduled task not found: " + pid);
         }
         log.info("Manually triggering task: pid={}, name={}", pid, task.getName());
-        taskExecutor.execute(task);
+        schedulerEngine.triggerTask(task);
         return null; // Log is created within the executor
     }
 }
