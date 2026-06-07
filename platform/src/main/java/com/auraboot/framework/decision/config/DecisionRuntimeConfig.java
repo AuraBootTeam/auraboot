@@ -1,6 +1,7 @@
 package com.auraboot.framework.decision.config;
 
 import com.auraboot.framework.decision.adapter.DecisionAdapter;
+import com.auraboot.framework.decision.adapter.DecisionTableAdapter;
 import com.auraboot.framework.decision.adapter.SimpleConditionAdapter;
 import com.auraboot.framework.decision.runtime.DecisionRuntime;
 import com.auraboot.framework.decision.runtime.DefaultDecisionRuntime;
@@ -27,6 +28,11 @@ public class DecisionRuntimeConfig {
     @Bean
     public SimpleConditionAdapter simpleConditionAdapter() {
         return new SimpleConditionAdapter();
+    }
+
+    @Bean
+    public DecisionTableAdapter decisionTableAdapter() {
+        return new DecisionTableAdapter();
     }
 
     /**
