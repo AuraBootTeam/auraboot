@@ -1,5 +1,6 @@
 package com.auraboot.framework.eventpolicy.service;
 
+import com.auraboot.framework.eventpolicy.model.EventPolicyExecutionResult;
 import com.auraboot.framework.eventpolicy.model.EventPolicyResult;
 
 import java.util.Map;
@@ -26,4 +27,12 @@ public interface EventPolicyRuntimeService {
      */
     EventPolicyResult run(String eventType, String targetType, String targetKey,
                           Map<String, Map<String, Object>> context);
+
+    /**
+     * Run the policy AND execute its resolved action plans via the PolicyExecutor (docs/2.md §2):
+     * the end-to-end chokepoint — event → matched rules → ordered/idempotent action execution.
+     * Uses the policy version's FailureStrategy. Returns both the decision and execution outcomes.
+     */
+    EventPolicyExecutionResult runAndExecute(String eventType, String targetType, String targetKey,
+                                             Map<String, Map<String, Object>> context);
 }

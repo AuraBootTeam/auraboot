@@ -48,6 +48,7 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
     private final DrtPolicyDefinitionMapper definitionMapper;
     private final DrtPolicyVersionMapper versionMapper;
     private final ObjectMapper objectMapper;
+    private final com.auraboot.framework.eventpolicy.executor.PolicyExecutor policyExecutor;
 
     private final EventPolicyEvaluator evaluator = new EventPolicyEvaluator();
 
@@ -126,6 +127,38 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
                 def.getPolicyCode(), ver.getVersion(), result.status());
 
         return result;
+    }
+
+    @Override
+    public com.auraboot.framework.eventpolicy.model.EventPolicyExecutionResult runAndExecute(
+            String eventType, String targetType, String targetKey, Map<String, Map<String, Object>> context) {
+        EventPolicyResult result = run(eventType, targetType, targetKey, context);
+        if (result.status() != EventPolicyResult.Status.MATCHED
+                || result.actionPlans() == null || result.actionPlans().isEmpty()) {
+            return new com.auraboot.framework.eventpolicy.model.EventPolicyExecutionResult(result,
+                    new com.auraboot.framework.eventpolicy.executor.PolicyExecutionResult(
+                            result.policyCode(),
+                            com.auraboot.framework.eventpolicy.executor.PolicyExecutionResult.OverallStatus.NOTHING_TO_DO,
+                            List.of()));
+        }
+        Long tid = requireTenant();
+        FailureStrategy fs = resolveFailureStrategy(tid, eventType, targetType, targetKey);
+        DecisionContext ctx = buildContext(context);
+        var exec = policyExecutor.execute(result, ctx, fs, tid);
+        log.info("EventPolicy executed: code={}, overall={}", result.policyCode(), exec.overallStatus());
+        return new com.auraboot.framework.eventpolicy.model.EventPolicyExecutionResult(result, exec);
+    }
+
+    /** Re-resolve the published version's FailureStrategy (defaults to CONTINUE_ON_ERROR). */
+    private FailureStrategy resolveFailureStrategy(Long tid, String eventType, String targetType, String targetKey) {
+        List<DrtPolicyDefinitionEntity> defs = definitionMapper.findByEventAndTarget(tid, eventType, targetType, targetKey);
+        if (defs.isEmpty()) {
+            return FailureStrategy.CONTINUE_ON_ERROR;
+        }
+        DrtPolicyVersionEntity ver = versionMapper.findPublished(tid, defs.get(0).getPolicyCode());
+        return ver != null && ver.getFailureStrategy() != null
+                ? FailureStrategy.valueOf(ver.getFailureStrategy())
+                : FailureStrategy.CONTINUE_ON_ERROR;
     }
 
     // ─── context building ────────────────────────────────────────────────────
