@@ -25,7 +25,7 @@ function generateProcessKey(): string {
 }
 
 function isProcessUpdateForbidden(message: string): boolean {
-  return /system\.process\.update|Access forbidden|Access denied/i.test(message);
+  return /bpm\.process\.update|Access forbidden|Access denied/i.test(message);
 }
 
 test.describe('BPMN Designer UI', () => {
@@ -137,7 +137,7 @@ test.describe('BPMN Designer UI', () => {
       const bodyText = await createResponse.text().catch(() => '');
       console.warn(`Designer D2-E03: create failed ${createResponse.status()} ${bodyText}`);
       if (createResponse.status() === 403 && isProcessUpdateForbidden(bodyText)) {
-        test.skip(true, 'Missing permission: system.process.update');
+        test.skip(true, 'Missing permission: bpm.process.update');
         return;
       }
       throw new Error(String(`Process creation failed with status ${createResponse.status()}`));

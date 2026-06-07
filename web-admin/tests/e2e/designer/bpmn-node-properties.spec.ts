@@ -443,7 +443,7 @@ test.describe('BPMN Node Properties — Full Coverage', () => {
       },
     });
     if (!resp.ok()) {
-      test.skip(resp.status() === 403, 'Missing permission: system.process.update');
+      test.skip(resp.status() === 403, 'Missing permission: bpm.process.update');
       throw new Error(`Process creation failed: ${resp.status()}`);
     }
     const body = await resp.json();

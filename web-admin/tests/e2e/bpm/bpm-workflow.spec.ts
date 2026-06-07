@@ -234,7 +234,7 @@ test.describe('BPM Workflow Operations', () => {
    * Fetch a task from the API and verify task info is accessible.
    */
   test('D7-E05: Task detail accessible', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     // Fetch todo tasks via API to get a task ID
     const todoResponse = await page.request.get(`/api/bpm/tasks/todo`);
 

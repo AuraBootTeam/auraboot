@@ -53,7 +53,7 @@ const PROCESS_KEY_DELETE = `pd_del_${UID}`;
 const PROCESS_NAME_DELETE = `Delete Target ${UID}`;
 
 function isProcessUpdateForbidden(message: string): boolean {
-  return /system\.process\.update|Access forbidden|Access denied/i.test(message);
+  return /bpm\.process\.update|Access forbidden|Access denied/i.test(message);
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // D2 + D6: Table has data rows with correct field values
   // =========================================================================
   test('PD-002 — Table has data rows with correct content', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     // Find our main process in the list
@@ -299,7 +299,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   test('PD-003 @critical — Create process via designer toolbar -> visible in list', async ({
     page,
   }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     // Click Create button in toolbar (navigates to /bpmn-designer)
@@ -374,7 +374,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // D7: View process detail row data (all fields)
   // =========================================================================
   test('PD-004 — View process detail: all fields correct', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     const row = await findRowInPaginatedList(page, PROCESS_KEY_MAIN, 12_000);
@@ -394,7 +394,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   test('PD-005 @critical — Edit process name -> save -> reopen verify updated', async ({
     page,
   }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     // Find row and click Edit
@@ -443,7 +443,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // D9: Deploy process -> status changes to deployed
   // =========================================================================
   test('PD-006 @critical — Deploy process -> status changes to deployed', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     // Find the draft process row and click the deploy action button
@@ -479,7 +479,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // D9: Suspend deployed process -> status changes to suspended
   // =========================================================================
   test('PD-007 — Suspend deployed process -> status changes to suspended', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     // Find the deployed process row and click the suspend action button
@@ -520,7 +520,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // D9: Resume suspended process -> status back to deployed
   // =========================================================================
   test('PD-008 — Resume suspended process -> status back to deployed', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     // Find the suspended process row and click the resume action button
@@ -556,7 +556,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // D3: Tab filter — Draft/Deployed tabs show correct records
   // =========================================================================
   test('PD-009 — Tab filter: draft/deployed tabs show correct records', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     // Click Draft tab — must exist
@@ -614,7 +614,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // D11 + D14: Delete draft process -> confirm dialog -> record disappears
   // =========================================================================
   test('PD-010 — Delete draft process -> confirm dialog -> record disappears', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     // Switch to draft tab
@@ -668,7 +668,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // D10: Cannot delete deployed process (button hidden or error)
   // =========================================================================
   test('PD-011 — Cannot delete deployed process', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     const row = await findRowInPaginatedList(page, PROCESS_KEY_MAIN, 12_000);
@@ -700,7 +700,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // D13: Search by process name filters results
   // =========================================================================
   test('PD-012 — Search by process name filters results', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     // Find search input — ListToolbar renders [data-testid="list-search-input"];
@@ -755,7 +755,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // D12: Form validation — empty name should show error
   // =========================================================================
   test('PD-014 — Form validation: save without name shows error', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     // Click Create button to open designer
@@ -801,7 +801,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // D14: Test data trace remains visible (no afterAll cleanup)
   // =========================================================================
   test('PD-013 — Trace: test data remains visible in system', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
+    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
     // Switch to "All" tab
