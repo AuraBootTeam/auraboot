@@ -35,6 +35,11 @@ public class DecisionRuntimeConfig {
         return new DecisionTableAdapter();
     }
 
+    @Bean
+    public com.auraboot.framework.decision.adapter.CrossFieldDecisionAdapter crossFieldDecisionAdapter() {
+        return new com.auraboot.framework.decision.adapter.CrossFieldDecisionAdapter();
+    }
+
     /**
      * Build the runtime from all {@link DecisionAdapter} beans.
      * Spring injects the full list automatically via {@code List<DecisionAdapter>}.
