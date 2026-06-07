@@ -1,0 +1,134 @@
+package com.auraboot.framework.eventpolicy.executor;
+
+import com.auraboot.framework.decision.ast.DecisionContext;
+import com.auraboot.framework.eventpolicy.model.EventPolicyResult;
+import com.auraboot.framework.eventpolicy.model.FailureStrategy;
+import com.auraboot.framework.eventpolicy.model.ResolvedActionPlan;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Executes the resolved action plans of an {@link EventPolicyResult} (docs/2.md §7, §8): in order,
+ * skipping plans whose idempotency key already succeeded, dispatching each to the supporting
+ * {@link ActionHandler}, and applying the policy's {@link FailureStrategy}. This is the side-effect
+ * half of the boundary — the runtime decided WHAT; this runs it safely (idempotent, ordered).
+ *
+ * <p>{@code ALL_OR_NOTHING} throws {@link PolicyExecutionException} on the first failure so the
+ * caller's transaction rolls back (including the just-written idempotency rows).
+ */
+@Slf4j
+public class PolicyExecutor {
+
+    public static class PolicyExecutionException extends RuntimeException {
+        public PolicyExecutionException(String message) {
+            super(message);
+        }
+    }
+
+    private final List<ActionHandler> handlers;
+    private final IdempotencyStore idempotencyStore;
+
+    public PolicyExecutor(List<ActionHandler> handlers, IdempotencyStore idempotencyStore) {
+        this.handlers = handlers != null ? handlers : List.of();
+        this.idempotencyStore = idempotencyStore;
+    }
+
+    public PolicyExecutionResult execute(EventPolicyResult policyResult, DecisionContext context,
+                                         FailureStrategy strategy, Long tenantId) {
+        List<ResolvedActionPlan> plans = policyResult.actionPlans();
+        if (plans == null || plans.isEmpty()) {
+            return new PolicyExecutionResult(policyResult.policyCode(),
+                    PolicyExecutionResult.OverallStatus.NOTHING_TO_DO, List.of());
+        }
+        FailureStrategy fs = strategy != null ? strategy : FailureStrategy.CONTINUE_ON_ERROR;
+
+        List<ActionExecutionResult> results = new ArrayList<>();
+        boolean stopped = false;
+        for (ResolvedActionPlan plan : plans) {
+            if (stopped) {
+                results.add(ActionExecutionResult.of(plan.ruleCode(), plan.type(), plan.idempotencyKey(),
+                        ActionExecutionStatus.NOT_EXECUTED));
+                continue;
+            }
+            ActionExecutionResult r = executeOne(plan, context, fs, tenantId);
+            results.add(r);
+            if (r.isFailure() && (fs == FailureStrategy.FAIL_FAST || fs == FailureStrategy.ALL_OR_NOTHING)) {
+                if (fs == FailureStrategy.ALL_OR_NOTHING) {
+                    throw new PolicyExecutionException(
+                            "ALL_OR_NOTHING: action " + plan.type() + " failed: " + r.error());
+                }
+                stopped = true; // FAIL_FAST: mark the rest NOT_EXECUTED
+            }
+        }
+        return new PolicyExecutionResult(policyResult.policyCode(), overall(results), results);
+    }
+
+    private ActionExecutionResult executeOne(ResolvedActionPlan plan, DecisionContext context,
+                                             FailureStrategy fs, Long tenantId) {
+        String key = plan.idempotencyKey();
+        if (key != null && idempotencyStore != null && idempotencyStore.alreadySucceeded(tenantId, key)) {
+            return ActionExecutionResult.of(plan.ruleCode(), plan.type(), key, ActionExecutionStatus.SKIPPED);
+        }
+        ActionHandler handler = select(plan.type());
+        if (handler == null) {
+            ActionExecutionResult r = new ActionExecutionResult(plan.ruleCode(), plan.type(), key,
+                    ActionExecutionStatus.NO_HANDLER, "no handler for action type " + plan.type());
+            recordSafe(tenantId, r);
+            return r;
+        }
+        try {
+            handler.execute(plan, context);
+            ActionExecutionResult r = ActionExecutionResult.of(plan.ruleCode(), plan.type(), key,
+                    ActionExecutionStatus.SUCCESS);
+            recordSafe(tenantId, r);
+            return r;
+        } catch (Exception e) {
+            ActionExecutionStatus status = switch (fs) {
+                case RETRY_ASYNC -> ActionExecutionStatus.RETRY_PENDING;
+                case DEAD_LETTER -> ActionExecutionStatus.DEAD_LETTER;
+                default -> ActionExecutionStatus.FAILED;
+            };
+            String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            log.warn("Action {} (rule {}) failed: {}", plan.type(), plan.ruleCode(), msg);
+            ActionExecutionResult r = new ActionExecutionResult(plan.ruleCode(), plan.type(), key, status, msg);
+            recordSafe(tenantId, r);
+            return r;
+        }
+    }
+
+    private void recordSafe(Long tenantId, ActionExecutionResult r) {
+        if (idempotencyStore != null) {
+            idempotencyStore.record(tenantId, r);
+        }
+    }
+
+    private ActionHandler select(String type) {
+        for (ActionHandler h : handlers) {
+            if (h.supports(type)) {
+                return h;
+            }
+        }
+        return null;
+    }
+
+    private PolicyExecutionResult.OverallStatus overall(List<ActionExecutionResult> results) {
+        boolean anySuccess = false;
+        boolean anyFailure = false;
+        for (ActionExecutionResult r : results) {
+            switch (r.status()) {
+                case SUCCESS -> anySuccess = true;
+                case FAILED, NO_HANDLER, DEAD_LETTER, RETRY_PENDING, NOT_EXECUTED -> anyFailure = true;
+                case SKIPPED -> { /* neutral */ }
+            }
+        }
+        if (anyFailure && anySuccess) {
+            return PolicyExecutionResult.OverallStatus.PARTIAL_SUCCESS;
+        }
+        if (anyFailure) {
+            return PolicyExecutionResult.OverallStatus.FAILED;
+        }
+        return PolicyExecutionResult.OverallStatus.ALL_SUCCESS;
+    }
+}
