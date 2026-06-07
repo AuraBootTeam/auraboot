@@ -12,6 +12,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
@@ -58,6 +60,22 @@ class ScheduledTaskServiceImplTest {
     }
 
     @Test
+    void create_oneTimeTask_persistsNextRunAtAndSchedules() {
+        Instant nextRunAt = Instant.parse("2026-06-07T09:10:11Z");
+        ScheduledTaskCreateRequest req = baseRequest();
+        req.setTaskType("one_time");
+        req.setCronExpression(null);
+        req.setNextRunAt(nextRunAt);
+
+        ScheduledTask result = service.create(req);
+
+        assertThat(result.getTaskType()).isEqualTo("one_time");
+        assertThat(result.getNextRunAt()).isEqualTo(nextRunAt);
+        verify(taskMapper).insert(any(ScheduledTask.class));
+        verify(schedulerEngine).scheduleTask(result);
+    }
+
+    @Test
     void create_invalidCron_throws() {
         ScheduledTaskCreateRequest req = baseRequest();
         req.setCronExpression("not-a-cron");
@@ -88,6 +106,26 @@ class ScheduledTaskServiceImplTest {
 
         ScheduledTask result = service.update("p", baseRequest());
         assertThat(result.getName()).isEqualTo("nightly");
+        verify(schedulerEngine).unscheduleTask("p");
+        verify(schedulerEngine).scheduleTask(existing);
+    }
+
+    @Test
+    void update_oneTimeTask_updatesNextRunAt() {
+        ScheduledTask existing = new ScheduledTask();
+        existing.setPid("p");
+        existing.setEnabled(true);
+        when(taskMapper.findByPid("p")).thenReturn(existing);
+        ScheduledTaskCreateRequest req = baseRequest();
+        Instant nextRunAt = Instant.parse("2026-06-07T09:10:11Z");
+        req.setTaskType("one_time");
+        req.setCronExpression(null);
+        req.setNextRunAt(nextRunAt);
+
+        ScheduledTask result = service.update("p", req);
+
+        assertThat(result.getNextRunAt()).isEqualTo(nextRunAt);
+        verify(taskMapper).updateById(existing);
         verify(schedulerEngine).unscheduleTask("p");
         verify(schedulerEngine).scheduleTask(existing);
     }
@@ -158,7 +196,8 @@ class ScheduledTaskServiceImplTest {
         t.setName("n");
         when(taskMapper.findByPid("p")).thenReturn(t);
         service.triggerManually("p");
-        verify(taskExecutor).execute(t);
+        verify(schedulerEngine).triggerTask(t);
+        verifyNoInteractions(taskExecutor);
     }
 
     @Test

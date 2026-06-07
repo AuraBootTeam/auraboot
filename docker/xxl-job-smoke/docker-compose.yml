@@ -1,0 +1,40 @@
+services:
+  xxl-job-mysql:
+    image: mysql:8.4
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot-xxl-smoke}-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${XXL_JOB_MYSQL_ROOT_PASSWORD:-xxl_job_root}
+      MYSQL_DATABASE: xxl_job
+      TZ: ${XXL_JOB_TZ:-UTC}
+    ports:
+      - "${XXL_JOB_MYSQL_PORT:-33306}:3306"
+    volumes:
+      - xxl_job_mysql_data:/var/lib/mysql
+      - ./tables_xxl_job.sql:/docker-entrypoint-initdb.d/01-tables_xxl_job.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  xxl-job-admin:
+    image: xuxueli/xxl-job-admin:${XXL_JOB_VERSION:-3.4.0}
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot-xxl-smoke}-admin
+    depends_on:
+      xxl-job-mysql:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      TZ: ${XXL_JOB_TZ:-UTC}
+      PARAMS: >-
+        --spring.datasource.url=jdbc:mysql://xxl-job-mysql:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8&serverTimezone=${XXL_JOB_TZ:-UTC}&useSSL=false&allowPublicKeyRetrieval=true
+        --spring.datasource.username=root
+        --spring.datasource.password=${XXL_JOB_MYSQL_ROOT_PASSWORD:-xxl_job_root}
+        --xxl.job.accessToken=${XXL_JOB_ACCESS_TOKEN:-default_token}
+    ports:
+      - "${XXL_JOB_ADMIN_PORT:-18080}:8080"
+
+volumes:
+  xxl_job_mysql_data:
