@@ -415,6 +415,46 @@
       "resourceType": "function"
     },
     {
+      "code": "decision.policy.read",
+      "name": "Event Policy definition read",
+      "description": "Event Policy — list, view definitions and versions",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:policy",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "decision.policy.manage",
+      "name": "Event Policy definition manage",
+      "description": "Event Policy — create definitions and draft versions",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:policy",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "decision.policy.publish",
+      "name": "Event Policy definition publish",
+      "description": "Event Policy — validate and publish versions",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:policy",
+      "action": "publish",
+      "resourceType": "function"
+    },
+    {
+      "code": "decision.policy.run",
+      "name": "Event Policy run",
+      "description": "Event Policy — call /run endpoint to evaluate a published policy",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:policy",
+      "action": "run",
+      "resourceType": "function"
+    },
+    {
       "code": "automation.admin",
       "name": "Automation automation admin",
       "description": "Automation automation — admin",
