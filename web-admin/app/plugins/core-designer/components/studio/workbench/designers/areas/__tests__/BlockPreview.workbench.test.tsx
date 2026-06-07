@@ -42,5 +42,14 @@ describe('BlockPreview workbench blocks', () => {
 
     renderPreview('workbench-action-bar');
     expect(screen.getByText('Workbench Action Bar')).toBeInTheDocument();
+
+    renderPreview('evidence-panel');
+    expect(screen.getByText('Evidence Panel')).toBeInTheDocument();
+
+    renderPreview('artifact-timeline');
+    expect(screen.getByText('Artifact Timeline')).toBeInTheDocument();
+
+    renderPreview('review-drawer');
+    expect(screen.getByText('Review Drawer')).toBeInTheDocument();
   });
 });

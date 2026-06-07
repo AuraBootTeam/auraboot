@@ -19,6 +19,7 @@ export function GridLayoutRenderer({ layout, blocks, renderBlock }: GridLayoutRe
   const cols = layout.cols ?? DEFAULT_GRID_COLS;
   const colGap = layout.colGap ?? DEFAULT_COL_GAP;
   const rowGap = layout.rowGap ?? DEFAULT_ROW_GAP;
+  const columnTemplate = layout.gridTemplateColumns || layout.columnTemplate;
 
   const sorted = [...blocks].sort(
     (a, b) => (a.layout?.order ?? 0) - (b.layout?.order ?? 0),
@@ -28,8 +29,12 @@ export function GridLayoutRenderer({ layout, blocks, renderBlock }: GridLayoutRe
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+        gridTemplateColumns:
+          typeof columnTemplate === 'string' && columnTemplate.trim().length > 0
+            ? columnTemplate
+            : `repeat(${cols}, minmax(0, 1fr))`,
         gap: `${rowGap}px ${colGap}px`,
+        width: '100%',
       }}
       data-testid="grid-layout"
     >
@@ -45,6 +50,8 @@ export function GridLayoutRenderer({ layout, blocks, renderBlock }: GridLayoutRe
             style={{
               gridColumn: `${col + 1} / span ${colSpan}`,
               gridRow: `span ${rowSpan}`,
+              minWidth: 0,
+              maxWidth: '100%',
             }}
             data-testid={`grid-item-${block.id ?? ''}`}
           >

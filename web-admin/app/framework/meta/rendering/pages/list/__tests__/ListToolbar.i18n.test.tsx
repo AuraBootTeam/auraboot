@@ -95,6 +95,20 @@ describe('ListToolbar i18n', () => {
     expect(screen.queryByText(/\+ Add Filter/)).toBeNull();
   });
 
+  it('can hide generic list chrome for focused workbench entry pages', () => {
+    renderToolbar({
+      hideSort: true,
+      hideColumnSettings: true,
+      hideQuickFilters: true,
+      hideRowHeight: true,
+      hideFilterChips: true,
+    });
+    expect(screen.queryByTestId('sort-popover-trigger')).toBeNull();
+    expect(screen.queryByTestId('column-settings-btn')).toBeNull();
+    expect(screen.queryByTestId('quick-filters')).toBeNull();
+    expect(screen.queryByText(/\+ 添加筛选/)).toBeNull();
+  });
+
   it('falls back to English when translations missing (no provider keys)', () => {
     // Provider with empty translation map — fallback strings must surface.
     const noop = () => {};

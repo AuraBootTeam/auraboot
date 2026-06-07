@@ -9,5 +9,7 @@ describe('dslRegistryService fallback registry', () => {
     expect(blockTypes).toContain('record-inspector');
     expect(blockTypes).toContain('candidate-list');
     expect(blockTypes).toContain('workbench-action-bar');
+    expect(blockTypes).toContain('evidence-panel');
+    expect(blockTypes).toContain('artifact-timeline');
   });
 });

@@ -7,10 +7,16 @@ describe('block schema workbench block types', () => {
     expect(BLOCK_TYPES).toContain('record-inspector');
     expect(BLOCK_TYPES).toContain('candidate-list');
     expect(BLOCK_TYPES).toContain('workbench-action-bar');
+    expect(BLOCK_TYPES).toContain('evidence-panel');
+    expect(BLOCK_TYPES).toContain('artifact-timeline');
+    expect(BLOCK_TYPES).toContain('review-drawer');
 
     expect(blockTypeEnum.safeParse('metric-strip').success).toBe(true);
     expect(blockTypeEnum.safeParse('record-inspector').success).toBe(true);
     expect(blockTypeEnum.safeParse('candidate-list').success).toBe(true);
     expect(blockTypeEnum.safeParse('workbench-action-bar').success).toBe(true);
+    expect(blockTypeEnum.safeParse('evidence-panel').success).toBe(true);
+    expect(blockTypeEnum.safeParse('artifact-timeline').success).toBe(true);
+    expect(blockTypeEnum.safeParse('review-drawer').success).toBe(true);
   });
 });

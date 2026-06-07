@@ -113,6 +113,9 @@ export type BlockType =
   | 'record-inspector'
   | 'candidate-list'
   | 'workbench-action-bar'
+  | 'evidence-panel'
+  | 'artifact-timeline'
+  | 'review-drawer'
   | 'chart-card'
   | 'text';
 

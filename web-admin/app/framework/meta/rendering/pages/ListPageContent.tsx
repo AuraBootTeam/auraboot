@@ -505,6 +505,8 @@ function ListPageContentInner(props: PageContentProps) {
   const modelCode = schema?.modelCode || tableName;
   const pageKey = tableName;
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
+  const schemaExtension = (schema as any)?.extension ?? {};
+  const hideSavedViews = listExtensions?.hideSavedViews ?? Boolean(schemaExtension.hideSavedViews);
   const {
     views: savedViews,
     currentView,
@@ -516,7 +518,7 @@ function ListPageContentInner(props: PageContentProps) {
     duplicateView,
     reload: reloadViews,
     loading: viewsLoading,
-  } = useSavedViews({ modelCode, pageKey, autoLoad: !!schema && !listExtensions?.hideSavedViews });
+  } = useSavedViews({ modelCode, pageKey, autoLoad: !!schema && !hideSavedViews });
 
   // Resolve modelPid from modelCode for ViewManagePanel field operations
   const [modelPid, setModelPid] = useState<string | undefined>();
@@ -2570,7 +2572,7 @@ function ListPageContentInner(props: PageContentProps) {
               resetMemberImportState();
               setMemberImportDialogOpen(true);
             }}
-            hideSavedViews={listExtensions?.hideSavedViews}
+            hideSavedViews={hideSavedViews}
             hideBuiltInImport={
               listExtensions?.hideBuiltInImport ??
               (schema as any)?.extension?.hideBuiltInImport ??
@@ -3122,6 +3124,19 @@ function ListPageContentInner(props: PageContentProps) {
                   setChipFilters([]);
                   setActiveSorts([]);
                 }}
+                hideQuickFilters={
+                  listExtensions?.hideQuickFilters ?? Boolean(schemaExtension.hideQuickFilters)
+                }
+                hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
+                hideColumnSettings={
+                  listExtensions?.hideColumnSettings ?? Boolean(schemaExtension.hideColumnSettings)
+                }
+                hideRowHeight={
+                  listExtensions?.hideRowHeight ?? Boolean(schemaExtension.hideRowHeight)
+                }
+                hideFilterChips={
+                  listExtensions?.hideFilterChips ?? Boolean(schemaExtension.hideFilterChips)
+                }
               />
 
               {/* Table area — extracted to ListTable with DnD column reorder */}

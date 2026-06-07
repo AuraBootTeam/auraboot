@@ -13,7 +13,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, waitFor } from '@testing-library/react';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared BEFORE importing the SUT so the hook mock is in place
@@ -329,5 +329,63 @@ describe('TableBlockRenderer', () => {
 
     expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', row);
     expect(tableRow.className).toContain('bg-blue-50');
+  });
+
+  it('constrains table overflow when maxHeight is configured', () => {
+    const runtime = makeRuntimeWithData();
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        maxHeight: 360,
+        columns: baseColumns,
+      },
+    };
+
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    const tableBlock = getByTestId('table-block');
+
+    expect(tableBlock).toHaveClass('w-full', 'max-w-full', 'overflow-x-auto', 'overflow-y-auto');
+    expect(tableBlock).toHaveStyle({
+      maxHeight: '360px',
+      width: '100%',
+      maxWidth: '100%',
+    });
+  });
+
+  it('auto-selects the first visible row when selection.defaultFirst is enabled', async () => {
+    const runtime = makeRuntimeWithData() as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: { mode: 'single', bind: 'selectedLine', defaultFirst: true },
+        columns: baseColumns,
+      },
+    };
+
+    render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    await waitFor(() => {
+      expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', baseRow);
+    });
+  });
+
+  it('uses compact table density when configured', () => {
+    const runtime = makeRuntimeWithData();
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        density: 'compact',
+        columns: baseColumns,
+      },
+    };
+
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    expect(getByTestId('table-th-name')).toHaveClass('px-3', 'py-2');
+    expect(getByTestId('table-row-row-1').querySelector('td')).toHaveClass('px-3', 'py-2');
   });
 });

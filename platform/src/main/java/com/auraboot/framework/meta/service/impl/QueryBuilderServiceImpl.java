@@ -127,8 +127,14 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         return baseQuery.setLimit(pageSize).setOffset(offset);
     }
 
-    private static final Set<String> SEARCHABLE_DATA_TYPES = Set.of(
+    private static final Set<String> TEXT_SEARCHABLE_DATA_TYPES = Set.of(
         "string", "text", "enum", "dict"
+    );
+
+    private static final Set<String> EXPLICIT_SEARCHABLE_DATA_TYPES = Set.of(
+        "string", "text", "enum", "dict",
+        "integer", "int", "long", "bigint", "smallint",
+        "decimal", "number", "double", "float"
     );
 
     private static final int MAX_FALLBACK_SEARCHABLE_FIELDS = 5;
@@ -142,14 +148,14 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         // Collect explicitly searchable fields
         List<FieldDefinition> searchFields = modelDefinition.getFields().stream()
                 .filter(f -> f.isSearchable() && !f.isTransientField() && !f.isComputedReadonly())
-                .filter(f -> SEARCHABLE_DATA_TYPES.contains(f.getDataType() != null ? f.getDataType().toLowerCase(Locale.ROOT) : ""))
+                .filter(f -> EXPLICIT_SEARCHABLE_DATA_TYPES.contains(normalizeDataType(f)))
                 .toList();
 
         // Fallback: if no fields are marked searchable, use first N STRING/TEXT fields
         if (searchFields.isEmpty()) {
             searchFields = modelDefinition.getFields().stream()
                     .filter(f -> !f.isTransientField() && !f.isComputedReadonly() && !f.isJsonbVirtual())
-                    .filter(f -> SEARCHABLE_DATA_TYPES.contains(f.getDataType() != null ? f.getDataType().toLowerCase(Locale.ROOT) : ""))
+                    .filter(f -> TEXT_SEARCHABLE_DATA_TYPES.contains(normalizeDataType(f)))
                     .filter(f -> !SystemFieldConstants.QUERY_TRANSPARENT.contains(f.getCode()))
                     .filter(f -> !"pid".equals(f.getCode()))
                     .limit(MAX_FALLBACK_SEARCHABLE_FIELDS)
@@ -163,11 +169,7 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         // Resolve column expressions for each searchable field
         List<String> columnExprs = new ArrayList<>();
         for (FieldDefinition field : searchFields) {
-            if (field.isJsonbVirtual()) {
-                columnExprs.add(field.getJsonbColumn() + "->>'" + field.getJsonbPath() + "'");
-            } else {
-                columnExprs.add(field.getColumnName());
-            }
+            columnExprs.add(toKeywordColumnExpression(field));
         }
 
         String likeValue = "%" + escapeIlike(keyword) + "%";
@@ -821,6 +823,20 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
                 .replace("\\", "\\\\")
                 .replace("%", "\\%")
                 .replace("_", "\\_");
+    }
+
+    private static String normalizeDataType(FieldDefinition field) {
+        return field.getDataType() != null ? field.getDataType().toLowerCase(Locale.ROOT) : "";
+    }
+
+    private static String toKeywordColumnExpression(FieldDefinition field) {
+        if (field.isJsonbVirtual()) {
+            return field.getJsonbColumn() + "->>'" + field.getJsonbPath() + "'";
+        }
+        String columnName = field.getColumnName();
+        return TEXT_SEARCHABLE_DATA_TYPES.contains(normalizeDataType(field))
+                ? columnName
+                : "CAST(" + columnName + " AS TEXT)";
     }
 
     private boolean containsSqlInjectionPatterns(String sql) {

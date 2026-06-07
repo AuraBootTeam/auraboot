@@ -44,6 +44,7 @@ import { RecordComments } from '~/framework/meta/rendering/blocks/RecordComments
 import { NbaSuggestionBar } from '~/framework/meta/rendering/blocks/NbaSuggestionBar';
 import { BpmPanelBlock } from '~/framework/meta/rendering/blocks/BpmPanelBlock';
 import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
+import { LayoutRenderer } from '~/framework/meta/rendering/layout/LayoutRenderer';
 import { resolveRecordParams } from '~/framework/meta/rendering/blocks/ChartBlockRenderer';
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -223,6 +224,17 @@ export function resolveSubTableDataSourceConfig(
   }
 
   return schemaDataSources?.[dataSource] ?? dataSourceManager?.getConfig(dataSource) ?? dataSource;
+}
+
+export function resolveActiveDetailTab(
+  tabs: DetailTabConfig[],
+  activeTab: number,
+): { tab: DetailTabConfig; index: number } | null {
+  if (tabs.length === 0) return null;
+  if (activeTab >= 0 && activeTab < tabs.length) {
+    return { tab: tabs[activeTab], index: activeTab };
+  }
+  return { tab: tabs[0], index: 0 };
 }
 
 /**
@@ -495,6 +507,13 @@ export function DetailPageContent(props: PageContentProps) {
       ),
     [allBlocks],
   );
+  const headerMiscBlocks = useMemo(
+    () =>
+      directMiscBlocks.filter(
+        (b: BlockConfig) => (b as { detailPlacement?: string }).detailPlacement === 'header',
+      ),
+    [directMiscBlocks],
+  );
 
   // System tabs are injected by backend into dsl_schema. Filter out system tabs when no recordId (new record).
   const allTabs = (tabsBlock?.tabs || []) as DetailTabConfig[];
@@ -551,6 +570,7 @@ export function DetailPageContent(props: PageContentProps) {
     },
     [location.hash, location.pathname, location.search, routerNavigate, tabHashKeys],
   );
+  const activeDetailTab = resolveActiveDetailTab(tabs, activeTab);
 
   // Show loading while record is being fetched
   if (recordLoading) {
@@ -672,6 +692,19 @@ export function DetailPageContent(props: PageContentProps) {
         {/* Content: Tabs mode or Direct mode */}
         {tabs.length > 0 ? (
           <div>
+            {runtime && headerMiscBlocks.length > 0 && (
+              <div className="space-y-3 p-6 pb-0">
+                {headerMiscBlocks.map((block: BlockConfig, blockIndex: number) => (
+                  <BlockRenderer
+                    key={block.id || `misc-header-${blockIndex}`}
+                    block={resolveChartBlockRecordParams(block, recordData, recordId!)}
+                    runtime={runtime}
+                    areaId="detail-tabs-header"
+                  />
+                ))}
+              </div>
+            )}
+
             {/* Tab headers (hidden in print — only active tab content shows) */}
             <div className="print-hide border-b border-gray-200 px-6" data-print="hide">
               <nav className="-mb-px flex space-x-8" role="tablist" aria-label="Tabs">
@@ -699,25 +732,16 @@ export function DetailPageContent(props: PageContentProps) {
               </nav>
             </div>
 
-            {/* Tab content — render all tabs but hide inactive ones to prefetch sub-table data in parallel */}
-            {tabs.map((tab, tabIndex) => (
-              <div
-                key={tab.key || tabIndex}
-                className="p-6"
-                style={{ display: activeTab === tabIndex ? undefined : 'none' }}
-              >
-                {tab.blocks?.map((block: BlockConfig, blockIndex: number) => {
-                  // BPM panel includes a ReactFlow canvas; mounting it inside a
-                  // display:none tab produces an incorrect first fitView scale.
-                  // Keep other tab blocks pre-rendered, but defer bpm-panel
-                  // until its tab is actually active.
-                  if (activeTab !== tabIndex && block.blockType === 'bpm-panel') {
-                    return null;
-                  }
-
-                  return (
+            {/* Tab content — mount only the active tab. Workbench pages may reuse
+                the same row/test ids across tabs; hidden pre-rendered tabs create
+                duplicate DOM and unnecessary dataSource requests. */}
+            {activeDetailTab && (
+              <div key={activeDetailTab.tab.key || activeDetailTab.index} className="p-6">
+                <LayoutRenderer
+                  layout={(activeDetailTab.tab as any).layout}
+                  blocks={activeDetailTab.tab.blocks || []}
+                  renderBlock={(block: BlockConfig) => (
                     <DetailBlockRenderer
-                      key={block.id || `tab-${tabIndex}-block-${blockIndex}`}
                       block={block}
                       recordData={recordData}
                       recordId={recordId!}
@@ -733,10 +757,10 @@ export function DetailPageContent(props: PageContentProps) {
                       schemaDataSources={schema?.dataSources}
                       dataSourceManager={dataSourceManager}
                     />
-                  );
-                })}
+                  )}
+                />
               </div>
-            ))}
+            )}
             {/* Inline approval panel — shown when the record has an associated BPM process */}
             {recordData?.pid && <InlineApprovalPanel recordPid={recordData.pid} />}
           </div>

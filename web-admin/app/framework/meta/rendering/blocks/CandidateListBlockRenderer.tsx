@@ -15,6 +15,17 @@ export interface CandidateListBlockRendererProps {
   runtime: SchemaRuntime;
 }
 
+function formatCandidateValue(value: unknown): string {
+  if (value === undefined || value === null || value === '') return '-';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+function readCandidateDetail(row: any, fieldConfig: any): unknown {
+  const source = fieldConfig.sourceField ? readPath(row, fieldConfig.sourceField) : row;
+  return readPath(source, fieldConfig.field);
+}
+
 export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProps> = ({
   block,
   runtime,
@@ -27,9 +38,17 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
   useDataSourceSubscription(runtime, dataSourceId);
   const rows = readDataSourceRows(runtime, dataSourceId);
   const item = (block as any).item || {};
+  const detailFields = Array.isArray(item.detailFields) ? item.detailFields : [];
   const selection = (block as any).selection;
   const bindKey = selection?.bind;
   const actions = Array.isArray((block as any).actions) ? (block as any).actions : [];
+  const maxHeight = (block as any).maxHeight || item.maxHeight;
+  const containerStyle =
+    maxHeight === undefined
+      ? undefined
+      : {
+          maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : String(maxHeight),
+        };
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   if (rows.length === 0) {
@@ -44,8 +63,12 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
   }
 
   return (
-    <div className="space-y-3" data-testid="candidate-list">
-      <div className="space-y-2">
+    <div
+      className={`candidate-list flex flex-col gap-3 ${maxHeight ? 'min-h-0' : ''}`}
+      data-testid="candidate-list"
+      style={containerStyle}
+    >
+      <div className={`space-y-2 ${maxHeight ? 'min-h-0 flex-1 overflow-y-auto pr-1' : ''}`}>
         {rows.map((row: any, index: number) => {
           const rowKey = String(row.pid ?? row.id ?? index);
           const title = readPath(row, item.titleField) ?? rowKey;
@@ -78,7 +101,28 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
                   </span>
                 )}
               </div>
-              {description && <div className="mt-2 text-sm text-gray-600">{String(description)}</div>}
+              {detailFields.length > 0 ? (
+                <dl className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                  {detailFields.map((fieldConfig: any, fieldIndex: number) => {
+                    const fieldKey = String(fieldConfig.key || fieldConfig.field || fieldIndex);
+                    const label = getLocalizedText(fieldConfig.label || fieldKey, locale, t);
+                    const value = formatCandidateValue(readCandidateDetail(row, fieldConfig));
+                    const fullWidth = fieldConfig.span === 2 || fieldConfig.layout?.colSpan >= 12;
+                    return (
+                      <div
+                        key={fieldKey}
+                        className={fullWidth ? 'sm:col-span-2' : undefined}
+                        data-testid={`candidate-list-item-${rowKey}-field-${fieldKey}`}
+                      >
+                        <dt className="text-gray-500">{label}</dt>
+                        <dd className="mt-0.5 break-words text-gray-800">{value}</dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              ) : (
+                description && <div className="mt-2 break-words text-sm text-gray-600">{String(description)}</div>
+              )}
             </button>
           );
         })}

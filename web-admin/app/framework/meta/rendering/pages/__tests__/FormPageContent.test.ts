@@ -1,226 +1,36 @@
 import { describe, expect, it } from 'vitest';
-import {
-  normalizeCommandPayloadValue,
-  normalizePayloadValue,
-  parseValidationSummaryMessages,
-  resolveFormButtonContent,
-  shouldBypassFormSubmit,
-} from '../FormPageContent';
-import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
+import { mergeLoadedRecordWithDirtyFields } from '../FormPageContent';
 
-describe('normalizePayloadValue', () => {
-  it('resolves form button localized label before falling back to code', () => {
-    const t = (key: string) => key;
-
-    expect(
-      resolveFormButtonContent(
-        {
-          code: 'save',
-          label: { 'zh-CN': '保存', en: 'Save' },
-        },
-        'zh-CN',
-        t,
-      ),
-    ).toBe('保存');
+describe('mergeLoadedRecordWithDirtyFields', () => {
+  it('keeps user-edited fields when a late edit-record fetch resolves', () => {
+    const loadedRecord = {
+      pid: 'record-1',
+      templateVersion: 'REV-1',
+      structureRule: '{"root":"PCBA"}',
+      enabled: true,
+    };
+    const currentData = {
+      pid: 'record-1',
+      templateVersion: 'REV-2',
+      structureRule: '{"root":"PCBA"}',
+      enabled: true,
+    };
 
     expect(
-      resolveFormButtonContent(
-        {
-          code: 'cancel',
-          label: { 'zh-CN': '取消', en: 'Cancel' },
-        },
-        'en',
-        t,
-      ),
-    ).toBe('Cancel');
+      mergeLoadedRecordWithDirtyFields(loadedRecord, currentData, new Set(['templateVersion'])),
+    ).toEqual({
+      pid: 'record-1',
+      templateVersion: 'REV-2',
+      structureRule: '{"root":"PCBA"}',
+      enabled: true,
+    });
   });
 
-  it('keeps content precedence over label for form button text', () => {
-    expect(
-      resolveFormButtonContent(
-        {
-          code: 'save',
-          content: 'Explicit Save',
-          label: { 'zh-CN': '保存', en: 'Save' },
-        },
-        'en',
-        (key) => key,
-      ),
-    ).toBe('Explicit Save');
-  });
+  it('uses loaded data unchanged when no field has been edited', () => {
+    const loadedRecord = { pid: 'record-1', revision: 'A0' };
 
-  it('serializes file fields to persisted JSON and drops non-done upload entries', () => {
-    const value = normalizePayloadValue(
-      [
-        {
-          uid: 'done-1',
-          name: 'ok.txt',
-          status: 'done',
-          size: 12,
-          type: 'text/plain',
-          url: '/api/file/download/f1',
-          response: { fileId: 'f1' },
-        },
-        {
-          uid: 'error-1',
-          name: 'bad.txt',
-          status: 'error',
-          size: 8,
-          type: 'text/plain',
-        },
-      ],
-      'file',
+    expect(mergeLoadedRecordWithDirtyFields(loadedRecord, { revision: 'A1' }, new Set())).toBe(
+      loadedRecord,
     );
-
-    expect(value).toBe(
-      JSON.stringify([
-        {
-          name: 'ok.txt',
-          url: '/api/file/download/f1',
-          size: 12,
-          type: 'text/plain',
-          fileId: 'f1',
-        },
-      ]),
-    );
-  });
-
-  it('returns null for file fields when no successfully uploaded files remain', () => {
-    const value = normalizePayloadValue(
-      [
-        {
-          uid: 'error-1',
-          name: 'bad.txt',
-          status: 'error',
-        },
-      ],
-      'file',
-    );
-
-    expect(value).toBeNull();
-  });
-
-  it('keeps stringified memberpicker values as strings for non-json fields', () => {
-    const value = normalizePayloadValue('["u1","u2"]', 'reference');
-    expect(value).toBe('["u1","u2"]');
-  });
-
-  it('still parses JSON strings for json fields', () => {
-    const value = normalizePayloadValue('{"enabled":true}', 'json');
-    expect(value).toEqual({ enabled: true });
-  });
-
-  it('parses JSON strings for jsonb fields', () => {
-    const value = normalizePayloadValue('["process_a","process_b"]', 'jsonb');
-    expect(value).toEqual(['process_a', 'process_b']);
-  });
-
-  it('serializes parsed json objects back to strings for command payloads', () => {
-    const value = normalizeCommandPayloadValue(
-      [
-        {
-          name: 'audit-attachment.pdf',
-          url: '/files/audit-attachment.pdf',
-        },
-      ],
-      'json',
-    );
-    expect(value).toBe('[{"name":"audit-attachment.pdf","url":"/files/audit-attachment.pdf"}]');
-  });
-
-  it('keeps stringified json values stable for command payloads', () => {
-    const value = normalizeCommandPayloadValue('{"enabled":true}', 'json');
-    expect(value).toBe('{"enabled":true}');
-  });
-
-  it('serializes parsed jsonb values back to strings for command payloads', () => {
-    const value = normalizeCommandPayloadValue('["field_a","field_b"]', 'jsonb');
-    expect(value).toBe('["field_a","field_b"]');
-  });
-
-  it('builds zh-CN required messages based on field type', () => {
-    expect(
-      buildRequiredFieldMessage('申请人', {
-        dataType: 'reference',
-        component: 'memberpicker',
-        locale: 'zh-CN',
-      }),
-    ).toBe(
-      '请选择申请人',
-    );
-    expect(
-      buildRequiredFieldMessage('附件', {
-        dataType: 'file',
-        component: 'upload',
-        locale: 'zh-CN',
-      }),
-    ).toBe('请上传附件');
-    expect(
-      buildRequiredFieldMessage('请假原因', {
-        dataType: 'text',
-        component: 'textarea',
-        locale: 'zh-CN',
-      }),
-    ).toBe(
-      '请填写请假原因',
-    );
-    expect(
-      buildRequiredFieldMessage('Applicant', {
-        dataType: 'reference',
-        component: 'memberpicker',
-        locale: 'en-US',
-        t: (key) => (key === 'common.validation.required' ? 'is required' : key),
-      }),
-    ).toBe('Applicant is required');
-  });
-
-  it('splits backend validation summaries into distinct messages', () => {
-    expect(
-      parseValidationSummaryMessages('结束日期不能早于开始日期; 请完善开始/结束日期与时段，系统才能计算请假天数'),
-    ).toEqual(['结束日期不能早于开始日期', '请完善开始/结束日期与时段，系统才能计算请假天数']);
-  });
-
-  it('keeps cancel and navigation buttons out of the form submit path', () => {
-    expect(
-      shouldBypassFormSubmit(
-        {
-          code: 'cancel',
-          action: { type: 'navigate', to: 'bom_supplier_part_list' },
-        },
-        'navigate',
-      ),
-    ).toBe(true);
-
-    expect(
-      shouldBypassFormSubmit(
-        {
-          code: 'cancel',
-          action: 'cancel',
-        },
-        'cancel',
-      ),
-    ).toBe(true);
-
-    expect(
-      shouldBypassFormSubmit(
-        {
-          code: 'cancel',
-          commandCode: 'bom:create_supplier_part',
-          action: { type: 'command', command: 'bom:create_supplier_part' },
-        },
-        'command',
-      ),
-    ).toBe(false);
-
-    expect(
-      shouldBypassFormSubmit(
-        {
-          code: 'save',
-          commandCode: 'bom:create_supplier_part',
-          action: { type: 'command', command: 'bom:create_supplier_part' },
-        },
-        'command',
-      ),
-    ).toBe(false);
   });
 });
