@@ -146,6 +146,16 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState<Error | null>(null);
 
+  // Stable value-key for the api params: dataSource (and its params object) is a fresh object
+  // on every parent render, so depending on the object identity re-runs the fetch effect every
+  // render. With >=2 api widgets each fetch's setState re-renders the dashboard, re-creating the
+  // params objects, and the widgets fetch each other into an infinite refetch loop. Depend on the
+  // serialized value instead so the effect only re-runs when the params actually change.
+  const apiParamsKey = useMemo(
+    () => (useApiBranch ? JSON.stringify(dataSource?.params ?? {}) : ''),
+    [useApiBranch, dataSource?.params],
+  );
+
   useEffect(() => {
     if (!useApiBranch || !dataSource?.url) return;
     let cancelled = false;
@@ -176,7 +186,8 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [useApiBranch, dataSource?.url, dataSource?.params]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- apiParamsKey is the stable value-key for dataSource.params
+  }, [useApiBranch, dataSource?.url, apiParamsKey]);
 
   useEffect(() => {
     if (!useModelBranch || !modelCode) return;
