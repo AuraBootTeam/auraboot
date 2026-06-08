@@ -22,3 +22,18 @@ client + sample data.
 Component-level real-chrome golden with mock data + no app global CSS. The deeper full-app golden
 (real backend data + app styles + auth + routing at /decision-ops, which is build-verified into the
 production bundle) is the documented follow-on needing a dedicated full stack.
+
+## Full-app golden (real backend + auth + app CSS) — DONE 2026-06-08
+`golden-harness/fullapp-golden.mjs` drives the **real** web-admin app against a **real** backend:
+seals a `__session` cookie from a `/api/test/seed` JWT (same scheme as `tests/auth.setup.ts`,
+default dev secret) → navigates `/decision-ops` in real Chromium.
+
+Result: authenticated (no login redirect), `decisionops-console` mounts in the real app shell,
+**7/7 tabs**, Definitions tab shows **real backend decisions** (order_routing / sla_deadline) via
+chrome→vite→BFF→backend→DB, **0 console errors**. Caught + fixed a real bug: `decisionApi.ts`
+double-prefixed `/api` (ApiService baseURL is `/api`) → 404.
+
+Bringup (see also `aura-decision/docs/backlog/2026-06-08-decision-runtime-remaining-env-blocked.md`):
+`./dev.sh runtime allocate auraboot drt-golden --slot 8` + `infra ensure` → apply schema.sql to the
+runtime DB → `dev.sh run drt-golden -- AURA_ENV=test ./gradlew bootRun` → `pnpm dev:full` with
+`SPRING_BOOT_URL=<backend>` → `POST /api/test/seed` to /tmp/drt-golden-jwt.txt → `node golden-harness/fullapp-golden.mjs`.
