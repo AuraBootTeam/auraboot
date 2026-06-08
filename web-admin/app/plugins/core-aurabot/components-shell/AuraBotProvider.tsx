@@ -542,12 +542,25 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   const params = useParams();
   const formFillHandlerRef = useRef<FormFillHandler | null>(null);
 
+  // Live mirror of currentConversationId. refreshConversations is recreated as
+  // its deps change, so a captured copy can go stale: a refreshConversations
+  // created while no conversation was current can run AFTER a send has already
+  // created+selected one (ensureConversation writes LAST_CONVERSATION_KEY before
+  // the set_current_conversation dispatch commits). Reading the ref instead of
+  // the closed-over state value prevents the auto-restore below from hydrating a
+  // (server-empty) conversation over an in-flight one — which otherwise wipes the
+  // just-rendered result_contract / streamed turn. See ai-result-contract.spec.
+  const currentConversationIdRef = useRef(state.currentConversationId);
+  useEffect(() => {
+    currentConversationIdRef.current = state.currentConversationId;
+  }, [state.currentConversationId]);
+
   const refreshConversations = useCallback(async () => {
     try {
       const items = await auraBotApi.listConversations();
       const summaries = items.map(toSessionSummary);
       setSessions(summaries);
-      if (!state.currentConversationId && summaries.length > 0 && state.messages.length === 0) {
+      if (!currentConversationIdRef.current && summaries.length > 0 && state.messages.length === 0) {
         // Only auto-restore when we have an explicit remembered conversation id
         // that still exists on the server. Avoid arbitrarily resuming a random
         // historical conversation (breaks welcome-state UX and E2E tests that
@@ -575,7 +588,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     } catch {
       // Conversation history unavailable — keep in-memory state only
     }
-  }, [state.currentConversationId, state.messages.length]);
+    // currentConversationId is read via currentConversationIdRef (live value), not
+    // closed over, so it is intentionally not a dependency here.
+  }, [state.messages.length]);
 
   useEffect(() => {
     if (state.panelState !== 'expanded') return;

@@ -56,7 +56,10 @@ function ActionResultItem({ action }: { action: ActionResult }) {
   const actionLabel =
     st(ACTION_TYPE_I18N_KEYS[action.actionType] ?? '') || humanizeType(action.actionType);
   return (
-    <div className="flex items-start gap-2 px-3 py-1.5 text-sm">
+    <div
+      className="flex items-start gap-2 px-3 py-1.5 text-sm"
+      data-testid={`log-action-${action.actionType}`}
+    >
       <span className="w-5 shrink-0 text-right font-mono text-gray-400">{action.sequence}.</span>
       <span className="min-w-0 font-medium text-gray-700">{actionLabel}</span>
       <StatusBadge status={action.status} />

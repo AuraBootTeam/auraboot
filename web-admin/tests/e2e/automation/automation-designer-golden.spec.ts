@@ -31,6 +31,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
+import { acquireE2etOrderLock, releaseE2etOrderLock } from './_e2et-order-lock';
 import {
   dragNodeToCanvas,
   connectEdge,
@@ -175,6 +176,19 @@ async function setAutomationName(page: Page, name: string): Promise<void> {
 }
 
 // ───────────────────────── tests ─────────────────────────
+
+// Serialize against other e2et_order-mutating automation files. H1 leaves an enabled
+// on_record_create→update_record automation live across the serial H1→H2→H3 chain;
+// without this lock it corrupts automation-golden's records on a parallel worker.
+// See _e2et-order-lock.
+test.beforeAll(async () => {
+  // This hook blocks until the shared e2et_order lock is free, which can take the
+  // full duration of another automation spec. Disable the default 15s hook
+  // timeout so the wait isn't killed (acquireE2etOrderLock has its own cap).
+  test.setTimeout(0);
+  await acquireE2etOrderLock('automation-designer-golden');
+});
+test.afterAll(() => releaseE2etOrderLock('automation-designer-golden'));
 
 test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   test.describe.configure({ mode: 'serial', timeout: 120_000 });

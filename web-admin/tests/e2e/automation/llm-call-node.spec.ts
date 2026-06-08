@@ -779,12 +779,15 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
     const toggleButton = dialog.locator('button', { hasText: /success|failed/i }).first();
     await toggleButton.click();
 
-    // Both actionType labels must render (LogEntry → actions.map →
-    // ActionResultItem with `{action.actionType}` text).
-    await expect(dialog.getByText('llm_call').first()).toBeVisible({ timeout: 5_000 });
-    await expect(dialog.getByText('send_notification').first()).toBeVisible({
+    // Both actionType rows must render. ActionResultItem renders a humanized /
+    // i18n label (NOT the raw "llm_call" code — see automationTypeLabels), so we
+    // assert the stable per-actionType data-testid instead of the raw string.
+    await expect(dialog.locator('[data-testid="log-action-llm_call"]').first()).toBeVisible({
       timeout: 5_000,
     });
+    await expect(
+      dialog.locator('[data-testid="log-action-send_notification"]').first(),
+    ).toBeVisible({ timeout: 5_000 });
 
     // Each action row should have a "success" status badge — we expect
     // at least 2 success badges total (1 log + 2 actions = 3, depending
