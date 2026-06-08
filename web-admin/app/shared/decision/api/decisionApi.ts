@@ -45,8 +45,10 @@ export interface EvaluateRequest {
   context: ScopedContext;
 }
 
-const D = '/api/decision';
-const P = '/api/event-policy';
+// Paths are relative to the HttpClient's base. The platform ApiService prepends '/api', so endpoints
+// here must NOT include it (otherwise '/api/api/...' -> 404). Verified by the full-app browser golden.
+const D = '/decision';
+const P = '/event-policy';
 
 export function createDecisionApi(http: HttpClient) {
   return {
