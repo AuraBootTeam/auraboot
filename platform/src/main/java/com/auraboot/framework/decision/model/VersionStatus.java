@@ -15,13 +15,19 @@ import java.util.Map;
 public enum VersionStatus {
     DRAFT,
     VALIDATED,
+    PENDING_APPROVAL,
+    REJECTED,
     PUBLISHED,
     DEPRECATED,
     RETIRED;
 
+    // VALIDATED → PUBLISHED is the default (no-approval) path; VALIDATED → PENDING_APPROVAL → PUBLISHED
+    // is the opt-in 4-eyes governance path (M7); REJECTED returns to DRAFT for rework.
     private static final Map<VersionStatus, Set<VersionStatus>> ALLOWED = Map.of(
             DRAFT, Set.of(VALIDATED),
-            VALIDATED, Set.of(PUBLISHED, DRAFT),
+            VALIDATED, Set.of(PUBLISHED, DRAFT, PENDING_APPROVAL),
+            PENDING_APPROVAL, Set.of(PUBLISHED, REJECTED),
+            REJECTED, Set.of(DRAFT),
             PUBLISHED, Set.of(DEPRECATED),
             DEPRECATED, Set.of(RETIRED),
             RETIRED, Set.of()

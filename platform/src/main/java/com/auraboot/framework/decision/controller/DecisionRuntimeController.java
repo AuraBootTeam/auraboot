@@ -199,6 +199,35 @@ public class DecisionRuntimeController {
         return ApiResponse.success("Version published", result);
     }
 
+    @PostMapping("/versions/{pid}/submit-for-approval")
+    @Operation(summary = "Submit a validated version for approval (M7 governance)",
+            description = "Transitions VALIDATED → PENDING_APPROVAL for 4-eyes review")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_PUBLISH)
+    public ApiResponse<DrtVersionDTO> submitForApproval(
+            @Parameter(description = "Version PID") @PathVariable @NotBlank String pid) {
+        return ApiResponse.success("Submitted for approval", versionService.submitForApproval(pid));
+    }
+
+    @PostMapping("/versions/{pid}/approve")
+    @Operation(summary = "Approve + publish a pending version (M7 governance)",
+            description = "Transitions PENDING_APPROVAL → PUBLISHED; records the approver")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_APPROVE)
+    public ApiResponse<DrtVersionDTO> approveVersion(
+            @Parameter(description = "Version PID") @PathVariable @NotBlank String pid,
+            @RequestParam(required = false) String note) {
+        return ApiResponse.success("Version approved + published", versionService.approve(pid, note));
+    }
+
+    @PostMapping("/versions/{pid}/reject")
+    @Operation(summary = "Reject a pending version (M7 governance)",
+            description = "Transitions PENDING_APPROVAL → REJECTED; records the reason")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_APPROVE)
+    public ApiResponse<DrtVersionDTO> rejectVersion(
+            @Parameter(description = "Version PID") @PathVariable @NotBlank String pid,
+            @RequestParam(required = false) String note) {
+        return ApiResponse.success("Version rejected", versionService.reject(pid, note));
+    }
+
     @GetMapping("/versions/{pid}")
     @Operation(summary = "Get version by PID")
     @RequirePermission(MetaPermission.DRT_DEFINITION_READ)
