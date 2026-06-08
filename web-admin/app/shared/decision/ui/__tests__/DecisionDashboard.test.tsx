@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { DecisionDashboard, type DashboardSummary, type ExceptionItem } from '../DecisionDashboard';
 
@@ -23,7 +23,7 @@ describe('DecisionDashboard', () => {
     render(<DecisionDashboard summary={summary} exceptions={exceptions} />);
     const item = screen.getByTestId('dd-exc-t-1');
     expect(item).toHaveAttribute('data-status', 'FAILED_RETRYING');
-    expect(within(item).getByText('connector timeout')).toBeInTheDocument();
+    expect(item).toHaveTextContent('connector timeout');
   });
 
   it('shows empty match rate when no evaluations + empty exceptions', () => {
