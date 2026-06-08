@@ -22,7 +22,7 @@ describe('decisionApi client', () => {
     const { http, calls } = fakeHttp();
     const api = createDecisionApi(http);
     const res = await api.evaluate({ decisionCode: 'big', binding: 'LATEST', context: { record: { data: {} } } });
-    expect(calls[0]).toMatchObject({ method: 'post', endpoint: '/api/decision/evaluate' });
+    expect(calls[0]).toMatchObject({ method: 'post', endpoint: '/decision/evaluate' });
     expect((calls[0].body as { decisionCode: string }).decisionCode).toBe('big');
     expect(res).toMatchObject({ status: 'MATCHED', matched: true });
   });
@@ -31,7 +31,7 @@ describe('decisionApi client', () => {
     const { http, calls } = fakeHttp();
     const api = createDecisionApi(http);
     await api.batchEvaluate([{ decisionCode: 'a', context: {} }, { decisionCode: 'b', context: {} }]);
-    expect(calls[0].endpoint).toBe('/api/decision/batch-evaluate');
+    expect(calls[0].endpoint).toBe('/decision/batch-evaluate');
     expect((calls[0].body as unknown[]).length).toBe(2);
   });
 
@@ -40,15 +40,15 @@ describe('decisionApi client', () => {
     const api = createDecisionApi(http);
     await api.createDraftVersion('big', { kind: 'SIMPLE_CONDITION', runtimeAdapter: 'AST_EVALUATOR', contentJson: {} });
     await api.publishVersion('pid-123');
-    expect(calls[0].endpoint).toBe('/api/decision/definitions/big/versions');
-    expect(calls[1].endpoint).toBe('/api/decision/versions/pid-123/publish');
+    expect(calls[0].endpoint).toBe('/decision/definitions/big/versions');
+    expect(calls[1].endpoint).toBe('/decision/versions/pid-123/publish');
   });
 
   it('getLogs passes traceId as a query param', async () => {
     const { http, calls } = fakeHttp();
     const api = createDecisionApi(http);
     await api.getLogs('trace-xyz');
-    expect(calls[0]).toMatchObject({ method: 'get', endpoint: '/api/decision/logs' });
+    expect(calls[0]).toMatchObject({ method: 'get', endpoint: '/decision/logs' });
     expect(calls[0].params).toMatchObject({ traceId: 'trace-xyz' });
   });
 
@@ -56,6 +56,6 @@ describe('decisionApi client', () => {
     const { http, calls } = fakeHttp();
     const api = createDecisionApi(http);
     await api.runAndExecutePolicy({ eventType: 'FORM_SUBMITTED', targetType: 'FORM', targetKey: 'complaint', context: {} });
-    expect(calls[0].endpoint).toBe('/api/event-policy/run-and-execute');
+    expect(calls[0].endpoint).toBe('/event-policy/run-and-execute');
   });
 });
