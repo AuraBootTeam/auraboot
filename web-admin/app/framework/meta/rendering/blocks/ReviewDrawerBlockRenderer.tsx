@@ -241,8 +241,8 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const [selectedCandidateKey, setSelectedCandidateKey] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [position, setPosition] = useState({ left: 284, top: 112 });
-  const [size, setSize] = useState({ width: 1100, height: 680 });
+  const [position, setPosition] = useState({ left: 24, top: 24 });
+  const [size, setSize] = useState({ width: 1100, height: 640 });
   const [runningAction, setRunningAction] = useState<string | null>(null);
   const dragRef = useRef<PointerState | null>(null);
   const resizeRef = useRef<PointerState | null>(null);
@@ -487,9 +487,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
         ))}
       </div>
 
-      <div className="min-h-0 max-w-full overflow-auto bg-gray-50 p-4">
-        <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="min-w-0 space-y-3">
+      <div className="min-h-0 max-w-full overflow-hidden bg-gray-50 p-4">
+        <div className="grid h-full min-h-0 min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="min-h-0 min-w-0 space-y-3 overflow-auto pr-1">
             <div
               data-testid="review-drawer-tab-compare"
               className="grid min-w-0 gap-3 lg:grid-cols-2"
@@ -721,7 +721,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
 
           <aside
             data-testid="review-drawer-tab-candidates"
-            className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white"
+            className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white"
           >
             <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-3 py-2">
               <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">
