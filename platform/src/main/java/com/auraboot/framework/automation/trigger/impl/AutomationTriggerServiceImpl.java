@@ -394,7 +394,13 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             if (StringUtils.hasText(cfg.getDecisionBinding())) {
                 req.setBinding(com.auraboot.framework.decision.model.VersionBinding.valueOf(cfg.getDecisionBinding()));
             }
-            req.setContext(Map.of("record", Map.of("data", payload != null ? payload : Map.of())));
+            // the record's field data is the trigger payload's "record" entry (data/scheduled triggers
+            // wrap the record under that key); fall back to the whole payload. The decision AST reads
+            // record.data.<field>, so the record's fields must sit at record.data.
+            Object recordData = payload != null ? payload.get("record") : null;
+            Map<String, Object> data = recordData instanceof Map<?, ?> m
+                    ? castMap(m) : (payload != null ? payload : Map.of());
+            req.setContext(Map.of("record", Map.of("data", data)));
             com.auraboot.framework.decision.model.DecisionResult result = decisionEvaluationService.evaluate(req);
             enriched.put("decision", Map.of(
                     "matched", result.matched(),
@@ -407,6 +413,11 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                     e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), "outputs", Map.of()));
         }
         return enriched;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castMap(Map<?, ?> m) {
+        return (Map<String, Object>) m;
     }
 
 }
