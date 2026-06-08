@@ -31,6 +31,7 @@ CONTAINER_PLUGINS_PATH="/app/plugins"
 PLUGINS_TO_IMPORT=(
   core-meta
   core-bpm
+  core-decisionops
   core-aurabot
   page-manager
   platform-admin

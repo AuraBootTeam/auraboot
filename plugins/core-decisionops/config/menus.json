@@ -1,0 +1,21 @@
+[
+  {
+    "code": "decisionops_console",
+    "parentCode": null,
+    "name": "决策中心",
+    "name:zh-CN": "决策中心",
+    "name:en": "DecisionOps",
+    "path": "/decision-ops",
+    "component": null,
+    "icon": "partition",
+    "type": 1,
+    "permissionCode": "decision.definition.read",
+    "orderNo": 25,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  }
+]
