@@ -29,6 +29,11 @@ describe('shouldRenderDefaultDetailEditAction', () => {
 });
 
 describe('resolveDetailFieldComponent', () => {
+  it('maps json dataType to jsonviewer for read-only detail rendering', () => {
+    expect(resolveDetailFieldComponent({ dataType: 'json' })).toBe('jsonviewer');
+    expect(resolveDetailFieldComponent({ dataType: 'jsonb' })).toBe('jsonviewer');
+  });
+
   it('maps file dataType to fileattachment for read-only detail rendering', () => {
     expect(resolveDetailFieldComponent({ dataType: 'file' })).toBe('fileattachment');
   });
@@ -63,6 +68,27 @@ describe('resolveDetailFieldComponent', () => {
 });
 
 describe('enrichDetailField', () => {
+  it('uses jsonviewer for JSON field codes even when field-meta is unavailable', () => {
+    expect(
+      enrichDetailField({ field: 'bom_sfp_llm_policy_json', label: 'LLM 策略 JSON' } as any),
+    ).toMatchObject({
+      field: 'bom_sfp_llm_policy_json',
+      component: 'jsonviewer',
+    });
+  });
+
+  it('uses jsonviewer for field codes that explicitly store JSON strings', () => {
+    expect(
+      enrichDetailField({ field: 'bom_sfp_header_rule_json', label: '表头规则 JSON' } as any, {
+        code: 'bom_sfp_header_rule_json',
+        dataType: 'string',
+      }),
+    ).toMatchObject({
+      field: 'bom_sfp_header_rule_json',
+      component: 'jsonviewer',
+    });
+  });
+
   it('uses extension dictCode, renderComponent, and displayName from field-meta', () => {
     expect(
       enrichDetailField({ field: 'sc_cascade_category', label: 'SC_CASCADE_CATEGORY' } as any, {

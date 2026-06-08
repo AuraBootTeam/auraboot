@@ -244,6 +244,48 @@ describe('MetricStripBlockRenderer', () => {
     ]);
   });
 
+  it('hides conditional chip metrics until their visibleWhen state is true', () => {
+    const runtime = makeRuntime({
+      data: {
+        summary: {
+          reasonBreakdown: {
+            match_multi_candidate: 48,
+          },
+        },
+      },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'reason_filters',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      variant: 'chips',
+      metrics: [
+        {
+          key: 'multi',
+          label: 'Multiple Candidates',
+          valueField: 'reasonBreakdown.match_multi_candidate',
+        },
+        {
+          key: 'clear',
+          label: 'Clear Filter',
+          value: 'x',
+          align: 'end',
+          visibleWhen: 'state.reasonFilterCodes != null && state.reasonFilterCodes.length > 0',
+        },
+      ],
+    };
+
+    const { rerender } = render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip-item-multi')).toBeVisible();
+    expect(screen.queryByTestId('metric-strip-item-clear')).toBeNull();
+
+    runtime.getContext().state.reasonFilterCodes = ['match_multi_candidate'];
+    rerender(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip-item-clear')).toHaveClass('ml-auto');
+  });
+
   it('maps boolean metric values to configured display text', () => {
     const runtime = makeRuntime({
       data: {
@@ -628,10 +670,10 @@ describe('ReviewDrawerBlockRenderer', () => {
         candidates: [
           {
             pid: 'ME-1',
-            bom_me_material_code: 'D790000012300',
+            bom_me_material_code: 'D410000006100',
             bom_me_score: 92,
             bom_me_candidate_snapshot_json:
-              '{"materialName":"贴片 LED","spec":"绿色 0603 高亮 20mA","brand":"BrightLED","mpn":"BL-HG034A-TRB"}',
+              '{"materialCode":"D410000006100","materialName":"贴片电阻","specModel":"贴片电阻 240Ω ±1% 0201","brand":"","mpn":"","packageCode":"0201","attributes":{"resistance":"240Ω","tolerance_pct":0.01}}',
             bom_me_evidence_json: '{"matchSource":"mpn_exact"}',
           },
         ],
@@ -702,6 +744,29 @@ describe('ReviewDrawerBlockRenderer', () => {
         matchField: 'bom_raw_row_no',
         recordField: 'bom_std_raw_row_no',
       },
+      summary: {
+        items: [
+          {
+            key: 'profile',
+            label: 'Profile',
+            sourceField: 'bom_raw_extra_columns_json',
+            field: '__parse_evidence.profileCode',
+          },
+          {
+            key: 'composition',
+            label: '字段融合',
+            sourceField: 'bom_raw_extra_columns_json',
+            field: '__parse_evidence.composition.matchRule',
+          },
+          {
+            key: 'llm',
+            label: 'LLM',
+            sourceField: 'bom_raw_extra_columns_json',
+            field: '__parse_evidence.llm.confidence',
+            emptyText: '未调用',
+          },
+        ],
+      },
       cards: [
         {
           key: 'profile',
@@ -749,13 +814,40 @@ describe('ReviewDrawerBlockRenderer', () => {
             key: 'spec',
             label: '规格',
             sourceField: 'bom_me_candidate_snapshot_json',
-            field: 'spec',
+            field: 'specModel',
+          },
+          {
+            key: 'package',
+            label: '封装',
+            sourceField: 'bom_me_candidate_snapshot_json',
+            field: 'packageCode',
+          },
+          {
+            key: 'resistance',
+            label: '阻值',
+            sourceField: 'bom_me_candidate_snapshot_json',
+            field: 'attributes.resistance',
+          },
+          {
+            key: 'tolerance',
+            label: '误差',
+            sourceField: 'bom_me_candidate_snapshot_json',
+            field: 'attributes.tolerance_pct',
+            format: 'percent',
           },
           {
             key: 'brand',
             label: '品牌',
             sourceField: 'bom_me_candidate_snapshot_json',
             field: 'brand',
+            hideWhenEmpty: true,
+          },
+          {
+            key: 'mpn',
+            label: 'MPN',
+            sourceField: 'bom_me_candidate_snapshot_json',
+            field: 'mpn',
+            hideWhenEmpty: true,
           },
         ],
       },
@@ -788,15 +880,11 @@ describe('ReviewDrawerBlockRenderer', () => {
     },
     exportImpact: {
       dataSource: 'exports',
-      fields: [
-        { key: 'currentRevision', label: '当前导出版本', value: 'Rev 03' },
-        { key: 'nextRevision', label: '下一导出版本', value: 'Rev 04' },
-        { key: 'dirty', label: '导出状态', value: 'Dirty' },
-      ],
+      fields: [{ key: 'dirty', label: '导出状态', value: '确认/撤销后需重新生成' }],
       actions: [
         {
           code: 'download_new_bom',
-          label: '重新生成并下载 Rev 04',
+          label: '重新生成并下载',
           variant: 'primary',
           onClick: { action: 'dataSource.reload', args: { ids: ['exports'] } },
         },
@@ -818,20 +906,46 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByTestId('review-drawer-tab-compare')).toBeInTheDocument();
     expect(screen.getByTestId('review-drawer-tab-source')).toBeInTheDocument();
     expect(screen.getByTestId('review-drawer-tab-candidates')).toBeInTheDocument();
+    expect(screen.getByTestId('review-drawer-parse-summary')).toHaveTextContent(
+      'JIEJIA_WB_FLEX_MAIN_V1',
+    );
+    expect(screen.getByTestId('review-drawer-parse-summary')).toHaveTextContent(
+      'Description + Value + Footprint',
+    );
     expect(screen.getByText('Designator')).toBeInTheDocument();
     expect(screen.getByText('LED1')).toBeInTheDocument();
     expect(screen.getByText('待确认候选后写入')).toBeInTheDocument();
-    expect(screen.getByText('Profile Detector')).toBeInTheDocument();
-    expect(screen.getByText('JIEJIA_WB_FLEX_MAIN_V1')).toBeInTheDocument();
-    expect(screen.getByText('Description + Value + Footprint')).toBeInTheDocument();
-    expect(screen.getByText('0.88')).toBeInTheDocument();
-    expect(screen.getByText('LLM 辅助')).toBeInTheDocument();
-    expect(screen.getByText('generate_material_code')).toBeInTheDocument();
+    expect(screen.getByTestId('review-drawer-tab-source')).not.toHaveAttribute('open');
+    expect(screen.getByText('Profile Detector')).not.toBeVisible();
+    expect(screen.getByText('generate_material_code')).not.toBeVisible();
+    expect(screen.getByTestId('review-drawer-source-json')).not.toBeVisible();
+    expect(screen.getByTestId('review-drawer-export-action-download_new_bom')).toHaveTextContent(
+      '重新生成并下载',
+    );
+    expect(screen.queryByText('Rev 04')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '收起复核浮层' }));
     expect(screen.getByTestId('review-drawer-minimized')).toHaveTextContent('展开行级复核');
     fireEvent.click(screen.getByRole('button', { name: '展开复核浮层' }));
     expect(screen.getByTestId('review-drawer')).toHaveTextContent('Row 5 · LED1 · 待确认');
+  });
+
+  it('keeps long BOM refdes titles constrained so drawer actions remain visible', () => {
+    const longRefdes = Array.from({ length: 48 }, (_, index) => `C${1000 + index}`).join(',');
+    const runtime = makeReviewDrawerRuntime({
+      ...selectedLine,
+      bom_std_refdes: longRefdes,
+    });
+
+    render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+
+    const title = screen.getByRole('heading', {
+      name: new RegExp(`Row 5 · ${longRefdes}`),
+    });
+    expect(title).toHaveClass('flex-1', 'min-w-0', 'truncate');
+    expect(title).toHaveAttribute('title', `Row 5 · ${longRefdes} · 待确认`);
+    expect(screen.getByRole('button', { name: '下一行' })).toBeVisible();
+    expect(screen.getByTestId('review-drawer-tab-candidates')).toHaveClass('min-w-0');
   });
 
   it('keeps the workbench unobstructed until a row is selected', () => {
@@ -856,7 +970,16 @@ describe('ReviewDrawerBlockRenderer', () => {
 
     render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
 
-    expect(screen.getByTestId('review-drawer-candidate-ME-1')).toHaveTextContent('D790000012300');
+    const candidateCard = screen.getByTestId('review-drawer-candidate-ME-1');
+    expect(screen.getByTestId('review-drawer-candidate-list')).toHaveClass('flex-1');
+    expect(candidateCard).toHaveClass('block', 'p-2');
+    expect(candidateCard).toHaveTextContent('D410000006100');
+    expect(candidateCard).toHaveTextContent('贴片电阻 240Ω ±1% 0201');
+    expect(candidateCard).toHaveTextContent('0201');
+    expect(candidateCard).toHaveTextContent('240Ω');
+    expect(candidateCard).toHaveTextContent('1%');
+    expect(candidateCard).not.toHaveTextContent('品牌');
+    expect(candidateCard).not.toHaveTextContent('MPN');
     expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).toBeDisabled();
     expect(screen.getByTestId('review-drawer-candidate-action-undo_decision')).toBeDisabled();
 
@@ -866,7 +989,7 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(runtime.__updateState).toHaveBeenCalledWith(
       'scope-1',
       'selectedCandidate',
-      expect.objectContaining({ pid: 'ME-1', bom_me_material_code: 'D790000012300' }),
+      expect.objectContaining({ pid: 'ME-1', bom_me_material_code: 'D410000006100' }),
     );
     expect(
       screen.getByTestId('review-drawer-candidate-action-confirm_candidate'),
@@ -881,7 +1004,7 @@ describe('ReviewDrawerBlockRenderer', () => {
       ).not.toBeDisabled();
     });
 
-    expect(screen.getByText('下一导出版本')).toBeInTheDocument();
+    expect(screen.getByText('导出状态')).not.toBeVisible();
     fireEvent.click(screen.getByTestId('review-drawer-export-action-download_new_bom'));
     expect(runtime.__reload).toHaveBeenCalledWith(['exports']);
   });

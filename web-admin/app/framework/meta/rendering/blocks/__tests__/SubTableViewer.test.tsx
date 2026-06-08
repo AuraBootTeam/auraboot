@@ -231,4 +231,31 @@ describe('SubTableViewer', () => {
     );
     expect(screen.getByTestId('subtable-empty-action').textContent).toContain('添加联系人');
   });
+
+  it('uses configured action label for the add-row button when rows already exist', async () => {
+    fetchResultMock.mockResolvedValue({
+      code: '0',
+      data: {
+        records: [{ pid: 'row-1', taskName: 'Initial contact', status: 'active' }],
+      },
+    });
+
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          readOnly: false,
+          commands: { create: 'crm:create_contact' },
+          emptyState: {
+            actionLabel: { 'zh-CN': '添加联系人', 'en-US': 'Add Contact' },
+          },
+        }}
+        parentRecordId="record-1"
+        isEditable
+      />,
+    );
+
+    await expect(screen.findByTestId('sortable-row-row-1')).resolves.toBeInTheDocument();
+    expect(screen.getByTestId('subtable-add-row').textContent).toContain('添加联系人');
+  });
 });

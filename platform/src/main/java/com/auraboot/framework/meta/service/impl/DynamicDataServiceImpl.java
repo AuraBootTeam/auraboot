@@ -79,6 +79,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @SuppressWarnings("java/log-injection")
 public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDataService {
+    private static final String DEFAULT_LIST_SORT_COLUMN = "updated_at";
+    private static final String DEFAULT_LIST_SORT_DIRECTION = "DESC";
 
     private final MetaModelService metadataService;
     private final QueryBuilderService queryBuilderService;
@@ -160,9 +162,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         boolean useCursor = request.getCursor() != null;
 
         // 添加排序 (skipped in cursor mode — cursor pagination requires ORDER BY id ASC)
-        if (!useCursor && request.getSortFields() != null && !request.getSortFields().isEmpty()) {
-            List<SortField> mappedSortFields = mapSortFields(model, request.getSortFields());
-            queryBuilder = queryBuilderService.buildOrderQuery(queryBuilder, mappedSortFields, model);
+        if (!useCursor) {
+            if (request.getSortFields() != null && !request.getSortFields().isEmpty()) {
+                List<SortField> mappedSortFields = mapSortFields(model, request.getSortFields());
+                queryBuilder = queryBuilderService.buildOrderQuery(queryBuilder, mappedSortFields, model);
+            } else {
+                queryBuilder.addOrderBy(DEFAULT_LIST_SORT_COLUMN, DEFAULT_LIST_SORT_DIRECTION);
+            }
         }
 
         // 添加租户条件
