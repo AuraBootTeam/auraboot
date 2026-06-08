@@ -45,6 +45,15 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     private final AutomationLogMapper automationLogMapper;
     private final AutomationProcessRuntime automationProcessRuntime;
 
+    /**
+     * Optional DecisionRuntime integration (M4): when an automation's trigger_config has a
+     * decisionRef, the referenced decision is evaluated before the SpEL condition and injected as a
+     * {@code #decision} variable. Field injection (not constructor) keeps the existing constructor +
+     * unit tests unchanged; null when the decision module/bean is absent.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.decision.service.DecisionEvaluationService decisionEvaluationService;
+
     private final ExpressionParser spelParser = new SpelExpressionParser();
 
     /** Max concurrent executions per automation rule (prevents thread pool exhaustion from batch events) */
@@ -359,7 +368,45 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     private boolean shouldTrigger(Automation automation, Map<String, Object> payload) {
         String condition = automation.getTriggerCondition();
-        return evaluateCondition(condition, payload);
+        return evaluateCondition(condition, withDecision(automation, payload));
+    }
+
+    /**
+     * M4 — if the automation's trigger_config references a DecisionRuntime decision, evaluate it
+     * against the event record and inject the result as a {@code #decision} variable for the SpEL
+     * condition. Returns the payload unchanged when there is no decisionRef (or the decision module
+     * is absent). Package-private for unit testing.
+     *
+     * <p>A decision-evaluation failure degrades to {@code #decision.matched = false} with an error
+     * marker (rather than crashing automation dispatch) — the trigger condition can react, and the
+     * failure is logged (intentional controlled degradation, not a silent swallow).
+     */
+    Map<String, Object> withDecision(Automation automation, Map<String, Object> payload) {
+        TriggerConfig cfg = automation.getTriggerConfig();
+        if (decisionEvaluationService == null || cfg == null || !StringUtils.hasText(cfg.getDecisionRef())) {
+            return payload;
+        }
+        Map<String, Object> enriched = new java.util.HashMap<>(payload != null ? payload : Map.of());
+        try {
+            com.auraboot.framework.decision.dto.DrtEvaluateRequest req =
+                    new com.auraboot.framework.decision.dto.DrtEvaluateRequest();
+            req.setDecisionCode(cfg.getDecisionRef());
+            if (StringUtils.hasText(cfg.getDecisionBinding())) {
+                req.setBinding(com.auraboot.framework.decision.model.VersionBinding.valueOf(cfg.getDecisionBinding()));
+            }
+            req.setContext(Map.of("record", Map.of("data", payload != null ? payload : Map.of())));
+            com.auraboot.framework.decision.model.DecisionResult result = decisionEvaluationService.evaluate(req);
+            enriched.put("decision", Map.of(
+                    "matched", result.matched(),
+                    "status", result.status().name(),
+                    "outputs", result.outputs() != null ? result.outputs() : Map.of()));
+        } catch (RuntimeException e) {
+            log.warn("Decision '{}' evaluation failed for automation {}: {}",
+                    cfg.getDecisionRef(), automation.getId(), e.getMessage());
+            enriched.put("decision", Map.of("matched", false, "status", "ERROR", "error",
+                    e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), "outputs", Map.of()));
+        }
+        return enriched;
     }
 
 }
