@@ -1,19 +1,39 @@
 {
-  "include": ["**/*", "**/.server/**/*", "**/.client/**/*", ".react-router/types/**/*"],
-  "exclude": ["node_modules", "../plugins/**/frontend/**"],
+  "include": [
+    "**/*",
+    "**/.server/**/*",
+    "**/.client/**/*",
+    ".react-router/types/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "../plugins/**/frontend/**",
+    "golden-harness"
+  ],
   "compilerOptions": {
-    "lib": ["dom", "DOM.Iterable", "es2022"],
-    "types": ["node", "vite/client"],
+    "lib": [
+      "dom",
+      "DOM.Iterable",
+      "es2022"
+    ],
+    "types": [
+      "node",
+      "vite/client"
+    ],
     "target": "es2022",
     "module": "es2022",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "rootDirs": [".", "./.react-router/types"],
+    "rootDirs": [
+      ".",
+      "./.react-router/types"
+    ],
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./app/*"]
+      "~/*": [
+        "./app/*"
+      ]
     },
-
     "esModuleInterop": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
