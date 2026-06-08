@@ -20,7 +20,8 @@ public class EventPolicyExecutorConfig {
 
     @Bean
     public PolicyExecutor policyExecutor(ObjectProvider<ActionHandler> handlers, IdempotencyStore idempotencyStore) {
-        List<ActionHandler> all = handlers.stream().toList();
-        return new PolicyExecutor(all, idempotencyStore);
+        // resolve handlers lazily per execution (a snapshot at bean creation can miss handler beans
+        // depending on init order — this bit the test ActionHandler collection)
+        return new PolicyExecutor(() -> handlers.stream().collect(java.util.stream.Collectors.toList()), idempotencyStore);
     }
 }

@@ -27,11 +27,21 @@ public class PolicyExecutor {
         }
     }
 
-    private final List<ActionHandler> handlers;
+    private final java.util.function.Supplier<List<ActionHandler>> handlersSupplier;
     private final IdempotencyStore idempotencyStore;
 
+    /** Fixed handler list (unit tests / static wiring). */
     public PolicyExecutor(List<ActionHandler> handlers, IdempotencyStore idempotencyStore) {
-        this.handlers = handlers != null ? handlers : List.of();
+        this(() -> handlers != null ? handlers : List.<ActionHandler>of(), idempotencyStore);
+    }
+
+    /**
+     * Lazily-resolved handlers (Spring wiring): the supplier is invoked per execution so handlers
+     * registered after this executor was constructed are still seen — a fixed snapshot at bean
+     * creation can miss beans depending on init order.
+     */
+    public PolicyExecutor(java.util.function.Supplier<List<ActionHandler>> handlersSupplier, IdempotencyStore idempotencyStore) {
+        this.handlersSupplier = handlersSupplier != null ? handlersSupplier : List::of;
         this.idempotencyStore = idempotencyStore;
     }
 
@@ -105,6 +115,10 @@ public class PolicyExecutor {
     }
 
     private ActionHandler select(String type) {
+        List<ActionHandler> handlers = handlersSupplier.get();
+        if (handlers == null) {
+            return null;
+        }
         for (ActionHandler h : handlers) {
             if (h.supports(type)) {
                 return h;
