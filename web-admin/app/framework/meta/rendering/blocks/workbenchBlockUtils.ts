@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
+import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { fetchResult } from '~/shared/services/http-client';
 
 export function readDataSourceRows(runtime: SchemaRuntime, dataSource?: string): any[] {
@@ -154,6 +155,22 @@ function resolveDownloadUrl(commandResult: any, downloadConfig: any): string | u
   return `/api/file/download/${encodeURIComponent(String(fileId))}`;
 }
 
+function filenameFromContentDisposition(header: string | null): string | undefined {
+  if (!header) return undefined;
+  const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+  const quotedMatch = header.match(/filename="([^"]+)"/i);
+  if (quotedMatch?.[1]) return quotedMatch[1];
+  const plainMatch = header.match(/filename=([^;]+)/i);
+  return plainMatch?.[1]?.trim();
+}
+
 function openDownloadUrl(url: string): void {
   if (typeof window === 'undefined') return;
   if (typeof window.location?.assign === 'function') {
@@ -161,6 +178,36 @@ function openDownloadUrl(url: string): void {
     return;
   }
   window.location.href = url;
+}
+
+async function downloadWithAuth(url: string): Promise<void> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  const headers: Record<string, string> = {};
+  const token = window.localStorage?.getItem(JWT_TOKEN_KEY);
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+  }
+
+  const blob = await response.blob();
+  const objectUrl = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = filenameFromContentDisposition(response.headers.get('Content-Disposition')) || 'download';
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 0);
 }
 
 export async function executeSimpleWorkbenchAction(
@@ -211,7 +258,12 @@ export async function executeSimpleWorkbenchAction(
     await reloadDataSources(runtime, resolveReloadIds(args.reload));
     const downloadUrl = resolveDownloadUrl(result, args.download);
     if (downloadUrl) {
-      openDownloadUrl(downloadUrl);
+      try {
+        await downloadWithAuth(downloadUrl);
+      } catch (error) {
+        console.error('[workbench] authenticated download failed, falling back to direct navigation:', error);
+        openDownloadUrl(downloadUrl);
+      }
     }
   }
 }

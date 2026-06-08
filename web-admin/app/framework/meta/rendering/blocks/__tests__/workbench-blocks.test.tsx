@@ -900,6 +900,7 @@ describe('ReviewDrawerBlockRenderer', () => {
     const drawer = screen.getByTestId('review-drawer');
     expect(drawer).toHaveTextContent('Row 5 · LED1 · 待确认');
     expect(drawer).toHaveClass('fixed');
+    expect(drawer).toHaveStyle({ left: '24px', top: '24px', width: '1100px' });
     expect(screen.getByTestId('review-drawer-badge-profile')).toHaveTextContent('Profile');
     expect(screen.getByTestId('review-drawer-badge-profile')).toHaveTextContent('96%');
     expect(screen.queryByRole('tab', { name: '原始 vs 转换' })).not.toBeInTheDocument();
@@ -972,6 +973,7 @@ describe('ReviewDrawerBlockRenderer', () => {
 
     const candidateCard = screen.getByTestId('review-drawer-candidate-ME-1');
     expect(screen.getByTestId('review-drawer-candidate-list')).toHaveClass('flex-1');
+    expect(screen.getByTestId('review-drawer-tab-candidates')).toHaveClass('h-full');
     expect(candidateCard).toHaveClass('block', 'p-2');
     expect(candidateCard).toHaveTextContent('D410000006100');
     expect(candidateCard).toHaveTextContent('贴片电阻 240Ω ±1% 0201');

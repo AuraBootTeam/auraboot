@@ -134,19 +134,36 @@ describe('workbenchBlockUtils action runner', () => {
     expect(runtime.__reload).not.toHaveBeenCalled();
   });
 
-  it('opens the returned file download after executing a command', async () => {
+  it('downloads the returned file with browser auth after executing a command', async () => {
     const runtime = makeRuntime() as any;
-    const assign = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(new Blob(['xlsx'])),
+      headers: {
+        get: vi.fn().mockReturnValue('attachment; filename="standard-bom.xlsx"'),
+      },
+    });
+    const objectUrl = 'blob:http://localhost/export';
+    const createObjectURL = vi.fn().mockReturnValue(objectUrl);
+    const revokeObjectURL = vi.fn();
+    const click = vi.fn();
+    const appendChild = vi.spyOn(document.body, 'appendChild');
+    const createElement = vi.spyOn(document, 'createElement');
     fetchResultMock.mockResolvedValue({
       code: '0',
       data: {
         fileId: 'export-file-1',
       },
     });
-    vi.stubGlobal('window', {
-      location: {
-        assign,
-      },
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+    window.localStorage.setItem('jwtToken', 'token-1');
+    createElement.mockImplementation((tagName: string) => {
+      const element = document.createElementNS('http://www.w3.org/1999/xhtml', tagName) as HTMLAnchorElement;
+      if (tagName === 'a') {
+        element.click = click;
+      }
+      return element;
     });
 
     await executeSimpleWorkbenchAction(runtime, {
@@ -168,7 +185,16 @@ describe('workbenchBlockUtils action runner', () => {
         payload: {},
       },
     });
-    expect(assign).toHaveBeenCalledWith('/api/file/download/export-file-1');
+    expect(fetchMock).toHaveBeenCalledWith('/api/file/download/export-file-1', {
+      method: 'GET',
+      headers: {
+        Authorization: 'Bearer token-1',
+      },
+      credentials: 'include',
+    });
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(appendChild).toHaveBeenCalled();
+    expect(click).toHaveBeenCalled();
     expect(runtime.__reload).toHaveBeenCalledWith(['summary']);
   });
 });
