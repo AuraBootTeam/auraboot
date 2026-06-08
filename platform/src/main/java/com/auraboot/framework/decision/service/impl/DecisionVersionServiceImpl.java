@@ -168,6 +168,62 @@ public class DecisionVersionServiceImpl implements DecisionVersionService {
         return toDTO(entity);
     }
 
+    @Transactional
+    @Override
+    public DrtVersionDTO submitForApproval(String pid) {
+        DrtVersionEntity entity = loadOwned(pid);
+        VersionStatus current = VersionStatus.valueOf(entity.getStatus());
+        if (!current.canTransitionTo(VersionStatus.PENDING_APPROVAL)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Cannot submit for approval from status " + current + ". Must be VALIDATED first.");
+        }
+        entity.setStatus(VersionStatus.PENDING_APPROVAL.name());
+        versionMapper.updateById(entity);
+        log.info("Decision version submitted for approval: pid={}, code={}", pid, entity.getDecisionCode());
+        return toDTO(entity);
+    }
+
+    @Transactional
+    @Override
+    public DrtVersionDTO approve(String pid, String note) {
+        DrtVersionEntity entity = loadOwned(pid);
+        VersionStatus current = VersionStatus.valueOf(entity.getStatus());
+        if (current != VersionStatus.PENDING_APPROVAL) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Cannot approve from status " + current + ". Must be PENDING_APPROVAL (submit for approval first).");
+        }
+        String userPid = MetaContext.getCurrentUserPid();
+        Instant now = Instant.now();
+        entity.setStatus(VersionStatus.PUBLISHED.name());
+        entity.setApprovalBy(userPid);
+        entity.setApprovalAt(now);
+        entity.setApprovalNote(note);
+        entity.setPublishedBy(userPid);
+        entity.setPublishedAt(now);
+        versionMapper.updateById(entity);
+        log.info("Decision version approved + published: pid={}, code={}, by={}",
+                pid, entity.getDecisionCode(), userPid);
+        return toDTO(entity);
+    }
+
+    @Transactional
+    @Override
+    public DrtVersionDTO reject(String pid, String note) {
+        DrtVersionEntity entity = loadOwned(pid);
+        VersionStatus current = VersionStatus.valueOf(entity.getStatus());
+        if (!current.canTransitionTo(VersionStatus.REJECTED)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Cannot reject from status " + current + ". Must be PENDING_APPROVAL.");
+        }
+        entity.setStatus(VersionStatus.REJECTED.name());
+        entity.setApprovalBy(MetaContext.getCurrentUserPid());
+        entity.setApprovalAt(Instant.now());
+        entity.setApprovalNote(note);
+        versionMapper.updateById(entity);
+        log.info("Decision version rejected: pid={}, code={}", pid, entity.getDecisionCode());
+        return toDTO(entity);
+    }
+
     @Override
     public DrtVersionDTO findByPid(String pid) {
         Long tid = requireTenant();

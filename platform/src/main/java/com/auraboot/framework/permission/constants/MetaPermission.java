@@ -689,6 +689,12 @@ public final class MetaPermission {
     public static final String DRT_DEFINITION_PUBLISH = "decision.definition.publish";
 
     /**
+     * Decision Runtime version approval permission (M7 4-eyes governance: approve/reject a version
+     * submitted for approval). Distinct from publish so authoring and approval can be separated.
+     */
+    public static final String DRT_DEFINITION_APPROVE = "decision.definition.approve";
+
+    /**
      * Decision Runtime evaluate permission (call /evaluate and /test-run endpoints).
      */
     public static final String DRT_RUNTIME_EVALUATE = "decision.runtime.evaluate";

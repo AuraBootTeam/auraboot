@@ -9663,10 +9663,13 @@ CREATE TABLE IF NOT EXISTS ab_drt_version (
     effective_to        TIMESTAMPTZ,
     published_by        VARCHAR(26),
     published_at        TIMESTAMPTZ,
+    approval_by         VARCHAR(26),
+    approval_at         TIMESTAMPTZ,
+    approval_note       TEXT,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_drt_ver_tenant_code_ver UNIQUE (tenant_id, decision_code, version),
     CONSTRAINT chk_drt_ver_status CHECK (status IN (
-        'DRAFT', 'VALIDATED', 'PUBLISHED', 'DEPRECATED', 'RETIRED'
+        'DRAFT', 'VALIDATED', 'PENDING_APPROVAL', 'REJECTED', 'PUBLISHED', 'DEPRECATED', 'RETIRED'
     )),
     CONSTRAINT chk_drt_ver_kind CHECK (kind IN (
         'SIMPLE_CONDITION', 'CROSS_FIELD', 'DECISION_TABLE', 'DMN', 'DRL', 'TEMPLATE_MAPPING', 'CUSTOM'

@@ -405,6 +405,16 @@
       "resourceType": "function"
     },
     {
+      "code": "decision.definition.approve",
+      "name": "Decision Runtime version approval",
+      "description": "Decision Runtime — approve/reject versions submitted for 4-eyes approval (M7)",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:definition",
+      "action": "approve",
+      "resourceType": "function"
+    },
+    {
       "code": "decision.runtime.evaluate",
       "name": "Decision Runtime evaluate",
       "description": "Decision Runtime — call evaluate and test-run endpoints",
