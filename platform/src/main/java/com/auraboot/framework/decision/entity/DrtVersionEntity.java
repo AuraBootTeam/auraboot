@@ -109,6 +109,15 @@ public class DrtVersionEntity {
     @TableField("published_at")
     private Instant publishedAt;
 
+    @TableField("approval_by")
+    private String approvalBy;
+
+    @TableField("approval_at")
+    private Instant approvalAt;
+
+    @TableField("approval_note")
+    private String approvalNote;
+
     @TableField("created_at")
     private Instant createdAt;
 }
