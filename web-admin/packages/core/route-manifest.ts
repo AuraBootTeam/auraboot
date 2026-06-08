@@ -28,6 +28,7 @@ import { opsRoutes } from '../../app/plugins/core-ops/routes';
 import { dashboardRoutes } from '../../app/plugins/core-dashboard/routes';
 import { emailRoutes } from '../../app/plugins/core-email/routes';
 import { semanticRoutes } from '../../app/plugins/core-semantic/routes';
+import { decisionOpsRoutes } from '../../app/plugins/core-decisionops/routes';
 
 /**
  * Admin feature routes — included in the authenticated platform shell.
@@ -51,6 +52,7 @@ export function adminFeatureRoutes() {
     ...dashboardRoutes(),
     ...emailRoutes(),
     ...semanticRoutes(),
+    ...decisionOpsRoutes(),
   ];
 }
 

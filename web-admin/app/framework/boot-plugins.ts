@@ -27,6 +27,7 @@ import coreAdminPlugin from '~/plugins/core-admin'
 import coreOpsPlugin from '~/plugins/core-ops'
 import coreDashboardPlugin from '~/plugins/core-dashboard'
 import coreEmailPlugin from '~/plugins/core-email'
+import coreDecisionOpsPlugin from '~/plugins/core-decisionops'
 
 // Enterprise plugins — empty in OSS, populated by enterprise overlay
 // (see auraboot-enterprise/web-admin-ext/.../boot-plugins-ent.ts).
@@ -48,6 +49,7 @@ const CORE_PLUGINS = [
   coreOpsPlugin,
   coreDashboardPlugin,
   coreEmailPlugin,
+  coreDecisionOpsPlugin,
 ]
 
 let bootedOnce = false

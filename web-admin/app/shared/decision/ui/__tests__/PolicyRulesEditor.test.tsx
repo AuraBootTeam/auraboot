@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { PolicyRulesEditor, type PolicyRulesValue } from '../PolicyRulesEditor';
 import { type FieldOption } from '../ConditionBuilder';
@@ -32,9 +32,10 @@ describe('PolicyRulesEditor', () => {
   it('renders matchMode + a rule with its embedded ConditionBuilder', () => {
     render(<Harness />);
     expect(screen.getByLabelText('match-mode')).toHaveValue('COLLECT_ALL');
-    const rule = screen.getByTestId('pre-rule-0');
-    expect(within(rule).getByTestId('condition-builder')).toBeInTheDocument();
-    expect(within(rule).getByLabelText('rule-name-0')).toHaveValue('高优通知');
+    // single initial rule -> testids/labels are unique, query via screen
+    expect(screen.getByTestId('pre-rule-0')).toBeInTheDocument();
+    expect(screen.getByTestId('condition-builder')).toBeInTheDocument();
+    expect(screen.getByLabelText('rule-name-0')).toHaveValue('高优通知');
   });
 
   it('adds and deletes rules', () => {
@@ -63,8 +64,7 @@ describe('PolicyRulesEditor', () => {
 
   it('editing a rule condition via the embedded builder updates that rule', () => {
     render(<Harness />);
-    const rule = screen.getByTestId('pre-rule-0');
-    fireEvent.click(within(rule).getByTestId('cb-add')); // add a condition row to rule 0
+    fireEvent.click(screen.getByTestId('cb-add')); // single rule -> its builder add button is unique
     const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as PolicyRulesValue;
     expect(dump.rules[0].condition.children.length).toBe(2);
   });
