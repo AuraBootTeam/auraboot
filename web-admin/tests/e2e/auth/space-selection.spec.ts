@@ -135,11 +135,26 @@ test.describe('Tenant Switch in Avatar Menu', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('domcontentloaded');
 
+    // The header surfaces the current tenant either as an explicit name span OR,
+    // when the tenant name duplicates the env chip (e.g. "AuraBoot Dev" ending
+    // with a "Dev" chip), it is deduped into brand + env chip on purpose
+    // (Header.tsx tenantDuplicatesChip). Accept whichever rendering applies.
     const tenantName = page.locator('[data-testid="current-tenant-name"]');
-    await expect(tenantName).toBeVisible({ timeout: 10_000 });
-    const text = await tenantName.textContent();
-    expect(text).toBeTruthy();
-    expect(text!.length).toBeGreaterThan(0);
+    const envChip = page.locator('[data-testid="header-env-chip"]');
+    // Settle the avatar (proxy for header hydration) before deciding the branch.
+    await expect(page.locator('[data-testid="user-menu"] button').first()).toBeVisible({
+      timeout: 15_000,
+    });
+
+    if (await tenantName.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      const text = await tenantName.textContent();
+      expect(text?.trim().length ?? 0).toBeGreaterThan(0);
+    } else {
+      // Deduped path: the tenant is encoded by the brand + env chip.
+      await expect(envChip).toBeVisible({ timeout: 5_000 });
+      const chip = (await envChip.textContent())?.trim() ?? '';
+      expect(chip.length).toBeGreaterThan(0);
+    }
   });
 
   test('avatar menu shows tenant list and platform console', async ({ page }) => {

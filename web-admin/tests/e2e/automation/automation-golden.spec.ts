@@ -31,6 +31,7 @@
  */
 
 import { test, expect } from '../../fixtures';
+import { acquireE2etOrderLock, releaseE2etOrderLock } from './_e2et-order-lock';
 import { uniqueId } from '../helpers/index';
 
 const MODEL_CODE = 'e2et_order';
@@ -266,6 +267,17 @@ async function pollUntilLogCompletes(
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+// Serialize against other e2et_order-mutating automation files: a foreign enabled
+// record-mutating automation (e.g. designer-golden H1) would otherwise fire on this
+// file's records and corrupt the model-scoped trigger assertions. See _e2et-order-lock.
+test.beforeAll(async () => {
+  // Blocks until the shared e2et_order lock is free (can be another spec's full
+  // duration). Disable the default 15s hook timeout (the lock has its own cap).
+  test.setTimeout(0);
+  await acquireE2etOrderLock('automation-golden');
+});
+test.afterAll(() => releaseE2etOrderLock('automation-golden'));
 
 test.describe('Automation Golden — full user flow E2E (B1)', () => {
   test.describe.configure({ mode: 'serial', timeout: 60_000 });

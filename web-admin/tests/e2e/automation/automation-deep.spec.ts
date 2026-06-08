@@ -19,6 +19,7 @@
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 import { AutomationListPage } from '../../pages/AutomationListPage';
+import { acquireE2etOrderLock, releaseE2etOrderLock } from './_e2et-order-lock';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // ---------------------------------------------------------------------------
@@ -57,6 +58,16 @@ async function deleteAutomationViaApi(page: import('@playwright/test').Page, pid
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+// Serialize against other e2et_order-mutating automation files (see _e2et-order-lock).
+// Runs in the oss-deep phase (after oss), so the lock is normally uncontended here.
+test.beforeAll(async () => {
+  // Blocks until the shared e2et_order lock is free. Disable the default 15s hook
+  // timeout (the lock has its own cap). Normally uncontended in the deep phase.
+  test.setTimeout(0);
+  await acquireE2etOrderLock('automation-deep');
+});
+test.afterAll(() => releaseE2etOrderLock('automation-deep'));
 
 test.describe('Automation Deep', () => {
   test.describe.configure({ mode: 'serial', timeout: 30000 });
