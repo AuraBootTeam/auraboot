@@ -14,6 +14,7 @@
 
 import { test, expect } from '../../fixtures';
 import type { Locator, Page, Route } from '@playwright/test';
+import { openAuraBotPanel } from './_open-panel';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -26,40 +27,10 @@ async function gotoAppAndOpenPanel(page: Page) {
   await page.goto('/meta/models');
   await page.waitForLoadState('domcontentloaded');
 
-  const toggle = page.locator('[data-testid="ai-panel-toggle"]');
-  await expect(toggle).toBeVisible({ timeout: 10000 });
-  await expect(toggle).toBeEnabled({ timeout: 5000 });
-
-  const panel = page.locator('[data-testid="aurabot-panel"]');
-  if (!(await panel.isVisible().catch(() => false))) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      await toggle.click();
-      if (await panel.isVisible({ timeout: 2500 }).catch(() => false)) {
-        break;
-      }
-    }
-    if (!(await panel.isVisible({ timeout: 2000 }).catch(() => false))) {
-      await page.locator('body').click();
-      await page.keyboard.press('Meta+KeyJ').catch(() => null);
-    }
-    if (!(await panel.isVisible({ timeout: 2000 }).catch(() => false))) {
-      await page.reload({ waitUntil: 'domcontentloaded' });
-      await expect(toggle).toBeVisible({ timeout: 10000 });
-      await expect(toggle).toBeEnabled({ timeout: 5000 });
-      await toggle.click();
-    }
-    if (!(await panel.isVisible({ timeout: 2000 }).catch(() => false))) {
-      await page.reload({ waitUntil: 'domcontentloaded' });
-      await expect(toggle).toBeVisible({ timeout: 10000 });
-      await expect(toggle).toBeEnabled({ timeout: 5000 });
-      await page.locator('body').click();
-      await page.keyboard.press('Meta+KeyJ').catch(() => null);
-      if (!(await panel.isVisible({ timeout: 2000 }).catch(() => false))) {
-        await toggle.click();
-      }
-    }
-  }
-  await expect(panel).toBeVisible({ timeout: 10000 });
+  // The toggle FLIPS panel state, so a blind multi-click dance can land the
+  // panel CLOSED (the historical RC-01/02/03 flake). openAuraBotPanel re-checks
+  // visibility before every click and never toggles an open panel shut.
+  const panel = await openAuraBotPanel(page);
 
   const historyTrigger = page.getByTestId('aurabot-history-trigger');
   if (await historyTrigger.isVisible({ timeout: 3000 }).catch(() => false)) {

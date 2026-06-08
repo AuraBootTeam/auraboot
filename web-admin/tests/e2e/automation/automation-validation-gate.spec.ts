@@ -27,6 +27,29 @@ function propertyPanel(page: import('@playwright/test').Page) {
   return page.locator('.w-80.border-l').first();
 }
 
+/**
+ * Make the editor dirty and wait for the Save button to enable.
+ *
+ * The route loader's initialData effect can reset isDirty back to false shortly
+ * after the name input is populated — racing a single edit and leaving Save
+ * permanently disabled. Retry the dirtying keystroke until Save enables. Each
+ * attempt appends " edited" (pressSequentially, not fill, so React's controlled
+ * onChange fires per keystroke → setIsDirty(true)); the trailing token stays
+ * present so callers can still assert the name contains "edited".
+ */
+async function makeDirtyAndEnableSave(page: import('@playwright/test').Page) {
+  const save = saveButton(page);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await nameInput(page).click();
+    await nameInput(page).press('End');
+    await nameInput(page).pressSequentially(' edited');
+    if (await save.isEnabled({ timeout: 1500 }).catch(() => false)) return;
+    // initialData effect reset isDirty after our edit — settle then retry.
+    await page.waitForTimeout(400);
+  }
+  await expect(save).toBeEnabled({ timeout: 3000 });
+}
+
 /** Create an automation with an explicit flowConfig. When `titleEmpty`, the
  *  send-notification action omits the required `title` field. */
 async function createAutomation(
@@ -57,13 +80,20 @@ async function createAutomation(
             id: 't1',
             type: 'trigger-record-create',
             position: { x: 80, y: 80 },
-            data: { label: 'On create', config: { modelCode: 'e2et_order' } },
+            // data.config.triggerType is required by AutomationFlowTriggerDeriver
+            // (the create endpoint derives the trigger from flowConfig); omitting
+            // it yields 422 "trigger node data.config.triggerType is required".
+            data: {
+              type: 'trigger-record-create',
+              label: 'On create',
+              config: { triggerType: 'on_record_create', modelCode: 'e2et_order' },
+            },
           },
           {
             id: 'a1',
             type: 'action-send-notification',
             position: { x: 80, y: 280 },
-            data: { label: 'Notify', config: actionConfig },
+            data: { type: 'action-send-notification', label: 'Notify', config: actionConfig },
           },
         ],
         edges: [{ id: 'e1', source: 't1', target: 'a1' }],
@@ -108,13 +138,10 @@ test.describe('Automation Designer — validation gate (P0-4)', () => {
     // button would never enable.
     await expect(nameInput(page)).toHaveValue(auto.name, { timeout: 10000 });
 
-    // Make the editor dirty so the Save button enables. pressSequentially (not
-    // fill) so React's controlled onChange fires per keystroke → setIsDirty(true).
-    await nameInput(page).click();
-    await nameInput(page).press('End');
-    await nameInput(page).pressSequentially(' edited');
+    // Make the editor dirty so the Save button enables (retries through the
+    // initialData isDirty-reset race).
+    await makeDirtyAndEnableSave(page);
     const save = saveButton(page);
-    await expect(save).toBeEnabled({ timeout: 5000 });
     await save.click();
 
     // Gate blocks save → the errored node is auto-selected and its required
@@ -148,11 +175,8 @@ test.describe('Automation Designer — validation gate (P0-4)', () => {
     // button would never enable.
     await expect(nameInput(page)).toHaveValue(auto.name, { timeout: 10000 });
 
-    await nameInput(page).click();
-    await nameInput(page).press('End');
-    await nameInput(page).pressSequentially(' edited');
+    await makeDirtyAndEnableSave(page);
     const save = saveButton(page);
-    await expect(save).toBeEnabled({ timeout: 5000 });
     await save.click();
 
     // Valid flow passes the gate → persisted.
