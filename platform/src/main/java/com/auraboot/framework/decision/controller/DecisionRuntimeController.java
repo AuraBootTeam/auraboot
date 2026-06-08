@@ -85,6 +85,17 @@ public class DecisionRuntimeController {
         return ApiResponse.success(result);
     }
 
+    @PostMapping("/batch-evaluate")
+    @Operation(summary = "Batch-evaluate decisions",
+            description = "Evaluate many decisions in one call (SLA scheduler / bulk import). Each "
+                    + "entry is independent — a failing entry yields an ERROR result, not a failed batch.")
+    @RequirePermission(MetaPermission.DRT_RUNTIME_EVALUATE)
+    public ApiResponse<java.util.List<DecisionResult>> batchEvaluate(
+            @Valid @RequestBody java.util.List<DrtEvaluateRequest> requests) {
+        log.info("Decision batch-evaluate: {} entries", requests == null ? 0 : requests.size());
+        return ApiResponse.success(evaluationService.batchEvaluate(requests));
+    }
+
     // ==================== Definition CRUD ====================
 
     @PostMapping("/definitions")
