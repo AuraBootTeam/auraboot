@@ -410,6 +410,8 @@ dependencies {
     implementation "org.drools:drools-xml-support:${droolsVersion}"
     implementation "org.kie:kie-api:${droolsVersion}"
     implementation "org.kie:kie-internal:${droolsVersion}"
+    // DMN runtime for the DecisionOps DROOLS_DMN adapter (same KIE version as Drools above)
+    implementation "org.kie:kie-dmn-core:${droolsVersion}"
 }
 
 
