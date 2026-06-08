@@ -267,4 +267,47 @@ describe('DynamicField', () => {
     expect(screen.getByText('上海市 上海市 松江区 109 号示范园区 10 幢')).toBeInTheDocument();
     expect(screen.queryByText(/province/)).not.toBeInTheDocument();
   });
+
+  it('renders readonly jsonviewer strings as formatted JSON blocks', () => {
+    render(
+      <DynamicField
+        field={{
+          field: 'bom_sfp_header_rule_json',
+          label: '表头规则 JSON',
+          component: 'jsonviewer',
+        }}
+        value='{"requiredHeaders":["Designator","Quantity"],"minScore":80}'
+        onChange={vi.fn()}
+        readOnly
+      />,
+    );
+
+    expect(screen.getByTestId('readonly-json-bom_sfp_header_rule_json')).toHaveTextContent(
+      '"requiredHeaders": [',
+    );
+    expect(screen.getByTestId('readonly-json-bom_sfp_header_rule_json')).toHaveTextContent(
+      '"minScore": 80',
+    );
+  });
+
+  it('renders readonly field codes ending in json as formatted JSON blocks', () => {
+    render(
+      <DynamicField
+        field={{
+          field: 'bom_sfp_llm_policy_json',
+          label: 'LLM 策略 JSON',
+        }}
+        value='{"enabled":true,"allowedModes":["field_parse","attribute_extract"]}'
+        onChange={vi.fn()}
+        readOnly
+      />,
+    );
+
+    expect(screen.getByTestId('readonly-json-bom_sfp_llm_policy_json')).toHaveTextContent(
+      '"enabled": true',
+    );
+    expect(screen.getByTestId('readonly-json-bom_sfp_llm_policy_json')).toHaveTextContent(
+      '"allowedModes": [',
+    );
+  });
 });

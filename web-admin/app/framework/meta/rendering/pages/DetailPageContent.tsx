@@ -93,6 +93,9 @@ export function resolveDetailFieldComponent(meta?: {
   ).toLowerCase();
 
   switch (String(meta.dataType || '').toLowerCase()) {
+    case 'json':
+    case 'jsonb':
+      return 'jsonviewer';
     case 'boolean':
       return 'switch';
     case 'date':
@@ -125,10 +128,19 @@ function shouldReplaceGeneratedLabel(label: unknown, fieldCode: string): boolean
   return normalized === fieldCode || normalized === fieldCode.toUpperCase();
 }
 
-export function enrichDetailField(field: FieldConfig, meta?: Record<string, any>): FieldConfig {
-  if (!meta) return field;
+function isJsonFieldCode(fieldCode: string): boolean {
+  return /(^|_)json$/i.test(fieldCode.trim());
+}
 
+export function enrichDetailField(field: FieldConfig, meta?: Record<string, any>): FieldConfig {
   const enriched = { ...field } as any;
+  if (!meta) {
+    if (!enriched.component && isJsonFieldCode(field.field)) {
+      enriched.component = 'jsonviewer';
+    }
+    return enriched as FieldConfig;
+  }
+
   const extensionProps = getMetaExtension(meta);
   const refTarget = {
     ...(extensionProps.refTarget || {}),
@@ -154,6 +166,8 @@ export function enrichDetailField(field: FieldConfig, meta?: Record<string, any>
     const resolvedComponent = resolveDetailFieldComponent(meta);
     if (resolvedComponent) {
       enriched.component = resolvedComponent;
+    } else if (isJsonFieldCode(field.field)) {
+      enriched.component = 'jsonviewer';
     }
   }
 
@@ -516,7 +530,9 @@ export function DetailPageContent(props: PageContentProps) {
   );
 
   // System tabs are injected by backend into dsl_schema. Filter out system tabs when no recordId (new record).
-  const allTabs = (tabsBlock?.tabs || []) as DetailTabConfig[];
+  const tabsBlockVisible =
+    !tabsBlock?.visibleWhen || evaluateVisibleWhen(tabsBlock.visibleWhen);
+  const allTabs = tabsBlockVisible ? ((tabsBlock?.tabs || []) as DetailTabConfig[]) : [];
   const tabs = recordId ? allTabs : allTabs.filter((t) => !t.system);
   const [activeTab, setActiveTab] = useState(0);
 
@@ -1006,6 +1022,10 @@ function DetailBlockRenderer({
     },
     [modelCode, t],
   );
+
+  if (block.visibleWhen && evaluateEditableWhen && !evaluateEditableWhen(block.visibleWhen)) {
+    return null;
+  }
 
   if (block.blockType === 'form-section') {
     return (

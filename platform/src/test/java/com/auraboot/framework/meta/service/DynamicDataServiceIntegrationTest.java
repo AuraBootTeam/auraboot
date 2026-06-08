@@ -307,6 +307,44 @@ class DynamicDataServiceIntegrationTest {
         log.info("✓ Pagination successful: {} records, total {}", result.getRecords().size(), result.getTotal());
     }
 
+    @Test
+    @Order(21)
+    @DisplayName("默认列表排序按更新时间倒序")
+    void test02_defaultListSortsByUpdatedAtDesc() {
+        log.info("=== Test 2.1: Default list sort by updated_at desc ===");
+
+        List<String> pids = new ArrayList<>();
+        for (int i = 1; i <= 3; i++) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("name", "默认排序记录-" + i);
+            data.put("status", "active");
+
+            Map<String, Object> created = dynamicDataService.create(testModelCode, data);
+            String pid = created.get("pid").toString();
+            pids.add(pid);
+            createdRecordPids.add(pid);
+
+            try { Thread.sleep(20); } catch (InterruptedException ignored) {}
+        }
+
+        String latestUpdatedPid = pids.get(0);
+        Map<String, Object> updateData = new HashMap<>();
+        updateData.put("status", "published");
+        dynamicDataService.update(testModelCode, latestUpdatedPid, updateData);
+
+        DynamicQueryRequest request = DynamicQueryRequest.builder()
+                .pageNum(1)
+                .pageSize(10)
+                .build();
+
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list(testModelCode, request);
+
+        assertNotNull(result);
+        assertFalse(result.getRecords().isEmpty(), "Should return records");
+        assertEquals(latestUpdatedPid, result.getRecords().get(0).get("pid"),
+                "Records without explicit sort should show the most recently updated record first");
+    }
+
     // ==================== Test 3: Get by ID ====================
 
     @Test

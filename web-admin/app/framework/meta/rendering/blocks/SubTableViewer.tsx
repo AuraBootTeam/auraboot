@@ -1072,7 +1072,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             data-testid="subtable-add-row"
             className="w-full py-2 text-xs text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-500"
           >
-            + {t('common.addLine') !== 'common.addLine' ? t('common.addLine') : 'Add Line'}
+            + {emptyStateActionLabel}
           </button>
         </div>
       )}

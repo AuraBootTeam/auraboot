@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { LocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -71,14 +71,19 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
   const statusField = String((block as any).statusField || 'status');
   const errorField = String((block as any).errorField || 'errorMessage');
   const status = String(readPath(record, statusField) || '').trim();
-  const hideStatuses = new Set(asStringArray((block as any).hideStatuses));
-  const failedStatuses = new Set(asStringArray((block as any).failedStatuses));
+  const hideStatuses = useMemo(() => new Set(asStringArray((block as any).hideStatuses)), [block]);
+  const failedStatuses = useMemo(() => new Set(asStringArray((block as any).failedStatuses)), [block]);
   const polling = (block as any).poll || {};
-  const pollStatuses = new Set(asStringArray(polling.enabledWhenStatuses));
+  const pollStatuses = useMemo(() => new Set(asStringArray(polling.enabledWhenStatuses)), [polling]);
+  const refreshPageStatuses = useMemo(
+    () => new Set(asStringArray(polling.refreshPageWhenStatuses)),
+    [polling],
+  );
   const reloadDataSources = asStringArray(polling.reload);
   const pollIntervalMs = Number(polling.intervalMs || 3000);
   const manager = runtime.getDataSourceManager?.();
   const shouldPoll = Boolean(status && pollStatuses.has(status) && reloadDataSources.length > 0);
+  const previousStatusRef = useRef(status);
 
   useEffect(() => {
     if (!shouldPoll || !manager?.reload) return undefined;
@@ -87,6 +92,20 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
     }, Math.max(1000, pollIntervalMs));
     return () => window.clearInterval(intervalId);
   }, [manager, pollIntervalMs, reloadDataSources.join('|'), shouldPoll]);
+
+  useEffect(() => {
+    const previousStatus = previousStatusRef.current;
+    previousStatusRef.current = status;
+
+    if (
+      previousStatus &&
+      previousStatus !== status &&
+      pollStatuses.has(previousStatus) &&
+      refreshPageStatuses.has(status)
+    ) {
+      window.location.reload();
+    }
+  }, [pollStatuses, refreshPageStatuses, status]);
 
   if (status && hideStatuses.has(status)) {
     return null;

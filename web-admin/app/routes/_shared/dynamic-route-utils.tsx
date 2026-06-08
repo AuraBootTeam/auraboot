@@ -85,6 +85,31 @@ function formatAddressValue(value: unknown): string {
   return String(address).trim() || '-';
 }
 
+function formatJsonValue(value: unknown): string | null {
+  if (value == null || value === '') return null;
+
+  let jsonValue = value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    try {
+      jsonValue = JSON.parse(trimmed);
+    } catch {
+      return trimmed;
+    }
+  }
+
+  try {
+    return JSON.stringify(jsonValue, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function isJsonFieldCode(fieldCode: string): boolean {
+  return /(^|_)json$/i.test(fieldCode.trim());
+}
+
 /**
  * Build API endpoint with table name
  */
@@ -449,6 +474,24 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
           <div className="py-1 text-sm text-gray-900">
             {displayValue === '-' ? <span className="text-gray-400">&mdash;</span> : displayValue}
           </div>
+        );
+      }
+
+      if (
+        ['jsonviewer', 'json', 'jsonb'].includes(componentType) ||
+        isJsonFieldCode(field.field)
+      ) {
+        const formattedJson = formatJsonValue(value);
+        if (!formattedJson) {
+          return <span className="py-1 text-sm text-gray-400">&mdash;</span>;
+        }
+        return (
+          <pre
+            data-testid={`readonly-json-${field.field}`}
+            className="max-h-80 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-slate-900"
+          >
+            {formattedJson}
+          </pre>
         );
       }
 

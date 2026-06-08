@@ -8,6 +8,7 @@ import {
   readDataSourceState,
   readPath,
   useDataSourceSubscription,
+  useRuntimeStateSubscription,
 } from './workbenchBlockUtils';
 
 export interface MetricStripBlockRendererProps {
@@ -65,6 +66,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
   const t = context.t || ((key: string) => key);
   const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
   useDataSourceSubscription(runtime, dataSourceId);
+  useRuntimeStateSubscription(runtime);
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
   const record = readDataSourceRecord(runtime, dataSourceId);
   const metrics = Array.isArray((block as any).metrics) ? (block as any).metrics : [];
@@ -110,7 +112,11 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
     );
   }
 
-  const metricItems = metrics.map((metric: any) => {
+  const metricItems = metrics
+    .filter((metric: any) => {
+      return !metric.visibleWhen || evaluator.evaluateCondition(metric.visibleWhen, context);
+    })
+    .map((metric: any) => {
     const key = String(metric.key || metric.valueField || metric.label);
     const label = getLocalizedText(metric.label || key, locale, t);
     const value = metric.valueField ? readPath(record, metric.valueField) : metric.value;
@@ -137,7 +143,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
             toneClass[tone] || toneClass.default
           } ${active ? activeToneClass[tone] || activeToneClass.default : ''} ${
             clickable ? 'cursor-pointer hover:shadow-sm' : 'cursor-default'
-          }`}
+          } ${metric.align === 'end' ? 'ml-auto' : ''}`}
         >
           <span className="font-medium">{label}</span>
           <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-semibold">
