@@ -26,6 +26,19 @@ public class TriggerConfig {
      */
     private String modelCode;
 
+    // ==================== DecisionRuntime integration (M4) ====================
+
+    /**
+     * Optional reference to a DecisionRuntime decision (decision_code). When set, the trigger
+     * evaluates this decision against the event record before the SpEL condition and injects the
+     * result as a {@code #decision} variable (e.g. {@code #decision['matched']},
+     * {@code #decision['outputs']['route']}). Additive — null means no decision integration.
+     */
+    private String decisionRef;
+
+    /** Version binding for {@link #decisionRef} (LATEST by default). */
+    private String decisionBinding;
+
     // ==================== ON_RECORD_UPDATE specific ====================
 
     /**
