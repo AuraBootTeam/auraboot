@@ -49,7 +49,8 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
         @Bean
         ActionHandler notifyTestHandler() {
             return new ActionHandler() {
-                @Override public boolean supports(String type) { return "NOTIFY".equals(type); }
+                // test-specific action type so it doesn't shadow the production NotifyActionHandler (NOTIFY)
+                @Override public boolean supports(String type) { return "TEST_NOTIFY".equals(type); }
                 @Override public void execute(ResolvedActionPlan plan, DecisionContext ctx) {
                     NOTIFY_INVOCATIONS.incrementAndGet();
                 }
@@ -72,7 +73,7 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
               "condition":{"type":"compare",
                  "left":{"type":"path","scope":"record","path":"data.priority","dataType":"enum"},
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
-              "actions":[{"type":"NOTIFY","target":"ROLE:mgr","order":10,"payload":{},
+              "actions":[{"type":"TEST_NOTIFY","target":"ROLE:mgr","order":10,"payload":{},
                  "idempotencyKeyTemplate":"${record.entityCode}:${record.recordId}:${rule.ruleCode}:NOTIFY"}]}]
             """;
         JsonNode rulesJson = mapper.readTree(rules);
