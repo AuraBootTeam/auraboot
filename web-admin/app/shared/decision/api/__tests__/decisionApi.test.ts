@@ -3,16 +3,17 @@ import { createDecisionApi, type HttpClient } from '../decisionApi';
 
 function fakeHttp() {
   const calls: { method: string; endpoint: string; body?: unknown; params?: unknown }[] = [];
-  const http: HttpClient = {
-    get: vi.fn(async <T>(endpoint: string, params?: Record<string, unknown>) => {
+  // cast via unknown — a generic vi.fn isn't directly assignable to the generic HttpClient methods
+  const http = {
+    get: vi.fn((endpoint: string, params?: Record<string, unknown>) => {
       calls.push({ method: 'get', endpoint, params });
-      return { data: { ok: true, endpoint } as unknown as T };
+      return Promise.resolve({ data: { ok: true, endpoint } });
     }),
-    post: vi.fn(async <T>(endpoint: string, body?: unknown) => {
+    post: vi.fn((endpoint: string, body?: unknown) => {
       calls.push({ method: 'post', endpoint, body });
-      return { data: { status: 'MATCHED', matched: true } as unknown as T };
+      return Promise.resolve({ data: { status: 'MATCHED', matched: true } });
     }),
-  };
+  } as unknown as HttpClient;
   return { http, calls };
 }
 

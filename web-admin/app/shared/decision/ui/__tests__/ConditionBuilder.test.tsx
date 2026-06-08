@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { ConditionBuilder, type FieldOption } from '../ConditionBuilder';
 import { group, cmp, path, lit, type GroupNode } from '../../ast/conditionAst';
@@ -39,10 +39,10 @@ describe('ConditionBuilder', () => {
   it('changing field updates operator options to that data type', () => {
     render(<Harness initial={oneHighPriority()} />);
     // enum operators do NOT include GT
-    expect(within(screen.getByLabelText('operator-0') as HTMLElement).queryByText('GT')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('operator-0')).not.toHaveTextContent('GT');
     fireEvent.change(screen.getByLabelText('field-0'), { target: { value: 'record:data.amount' } });
     // decimal operators include GT now
-    expect(within(screen.getByLabelText('operator-0') as HTMLElement).getByText('GT')).toBeInTheDocument();
+    expect(screen.getByLabelText('operator-0')).toHaveTextContent('GT');
   });
 
   it('unary operator hides the value input', () => {

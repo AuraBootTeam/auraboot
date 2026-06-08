@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { ExecutionLogViewer, type ExecLogEntry } from '../ExecutionLogViewer';
 
@@ -39,9 +39,9 @@ describe('ExecutionLogViewer', () => {
   it('renders matched rules + action plans of a row', () => {
     render(<ExecutionLogViewer logs={logs} />);
     const row = screen.getByTestId('elv-row-trace-aaa');
-    expect(within(row).getByText('R-101')).toBeInTheDocument();
-    expect(within(row).getByText('NOTIFY')).toBeInTheDocument();
-    expect(within(row).getByText('120ms')).toBeInTheDocument();
+    expect(row).toHaveTextContent('R-101');
+    expect(row).toHaveTextContent('NOTIFY');
+    expect(row).toHaveTextContent('120ms');
   });
 
   it('honors initialStatus filter', () => {

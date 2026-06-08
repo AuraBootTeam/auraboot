@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { DataModelFieldViewer, type ModelField } from '../DataModelFieldViewer';
 
@@ -13,8 +13,8 @@ describe('DataModelFieldViewer', () => {
     render(<DataModelFieldViewer fields={fields} />);
     expect(screen.getByTestId('dmv-count')).toHaveTextContent('3');
     const row = screen.getByTestId('dmv-row-complaint.amount');
-    expect(within(row).getByText('影响金额')).toBeInTheDocument();
-    expect(within(row).getByText('是')).toBeInTheDocument(); // masked
+    expect(row).toHaveTextContent('影响金额');
+    expect(row).toHaveTextContent('是'); // masked
     expect(screen.getByTestId('dmv-refs-amount')).toHaveTextContent('12');
   });
 
