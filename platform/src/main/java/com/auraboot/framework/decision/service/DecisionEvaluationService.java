@@ -28,6 +28,13 @@ public interface DecisionEvaluationService {
     DecisionResult evaluate(DrtEvaluateRequest request);
 
     /**
+     * Batch evaluation (docs/1.md §9.2, §17.5) — SLA scheduler scans / bulk import. Each request is
+     * evaluated independently; a failing request yields an ERROR result for that entry without
+     * failing the batch. Returns one result per request, in order.
+     */
+    List<DecisionResult> batchEvaluate(List<DrtEvaluateRequest> requests);
+
+    /**
      * In-memory test-run against draft content — no log entry is written.
      * Useful for the designer "try it" flow.
      */

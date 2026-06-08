@@ -54,6 +54,25 @@ public class DefaultDecisionRuntime implements DecisionRuntime {
         return run(decision, context, options, true);
     }
 
+    @Override
+    public List<DecisionResult> batchEvaluate(List<BatchItem> items, DecisionEvaluateOptions options) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        List<DecisionResult> results = new java.util.ArrayList<>(items.size());
+        for (BatchItem item : items) {
+            if (item == null || item.decision() == null) {
+                results.add(DecisionResult.builder("__batch_invalid__")
+                        .traceId(traceIdSupplier.get()).status(DecisionStatus.ERROR).matched(false)
+                        .errors(List.of("batch item or its decision is null")).build());
+                continue;
+            }
+            // each item independent — evaluate() already maps adapter failures to an ERROR result
+            results.add(run(item.decision(), item.context(), options, true));
+        }
+        return results;
+    }
+
     private DecisionResult run(ResolvedDecision decision, DecisionContext context,
                                DecisionEvaluateOptions options, boolean authoritative) {
         String traceId = traceIdSupplier.get();

@@ -92,6 +92,28 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
     }
 
     @Override
+    public List<DecisionResult> batchEvaluate(List<DrtEvaluateRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return List.of();
+        }
+        List<DecisionResult> results = new java.util.ArrayList<>(requests.size());
+        for (DrtEvaluateRequest req : requests) {
+            try {
+                results.add(evaluate(req));
+            } catch (RuntimeException e) {
+                // one bad request must not fail the whole batch (docs/1.md §24.3)
+                String code = req != null ? req.getDecisionCode() : "__batch_invalid__";
+                results.add(DecisionResult.builder(code)
+                        .status(com.auraboot.framework.decision.model.DecisionStatus.ERROR)
+                        .matched(false)
+                        .errors(List.of(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()))
+                        .build());
+            }
+        }
+        return results;
+    }
+
+    @Override
     public DecisionResult testRun(DrtTestRunRequest request) {
         // In-memory only — no log, no resolved version from DB
         DecisionKind kind = parseEnum(DecisionKind.class, request.getKind(), "kind");
