@@ -50,6 +50,13 @@ public class StartProcessActionHandler implements ActionHandler {
         if (recordId != null) {
             variables.putIfAbsent("recordId", recordId);
         }
+        // the policy-initiated process's starter is the current user (drives 'starter' assignee
+        // resolution); set it when available unless the caller already provided one
+        Long userId = com.auraboot.framework.application.tenant.MetaContext.exists()
+                ? com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId() : null;
+        if (userId != null) {
+            variables.putIfAbsent("_startUserId", String.valueOf(userId));
+        }
         processEngineService.startProcess(String.valueOf(pdId), businessKey, variables);
     }
 
