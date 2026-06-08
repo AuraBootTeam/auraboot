@@ -1,0 +1,22 @@
+{
+  "pluginId": "com.auraboot.core-decisionops",
+  "namespace": "core-decisionops",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Core DecisionOps Navigation",
+  "displayName:zh-CN": "决策中心导航",
+  "displayName:en": "Core DecisionOps Navigation",
+  "description": "Navigation menu for the DecisionOps console (decision definitions, condition designer, execution logs, governance). Backend lives in framework.decision/eventpolicy; frontend route in web-admin core-decisionops.",
+  "author": "AuraBoot Team",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "resourceDirs": {
+    "menus": "config/menus.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": false,
+    "createResourcePermissions": false
+  }
+}

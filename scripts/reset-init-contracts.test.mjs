@@ -164,6 +164,7 @@ test('plugin import profiles use explicit semantic names and deprecate default',
   assert.deepEqual(profiles.core, [
     'core-meta',
     'core-bpm',
+    'core-decisionops',
     'core-aurabot',
     'page-manager',
     'org-management',
