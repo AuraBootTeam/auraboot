@@ -33,6 +33,15 @@ public class SlaActivationListener {
     private final SlaConfigService slaConfigService;
     private final SlaRecordService slaRecordService;
 
+    /**
+     * Optional DecisionRuntime integration (M5): when an SLA config uses {@code deadlineMode=RULE},
+     * the deadline minutes are computed by evaluating the decision named in {@code deadlineValue}.
+     * Field injection (not constructor) keeps the @RequiredArgsConstructor + existing tests unchanged;
+     * null when the decision bean is absent.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.decision.service.DecisionEvaluationService decisionEvaluationService;
+
     @EventListener
     public void onBpmEvent(BpmEvent event) {
         if (!"task_assigned".equals(event.getBpmEventType())) {
@@ -126,9 +135,60 @@ public class SlaActivationListener {
             }
         }
 
+        // M5: deadlineMode=RULE — the deadline minutes come from a DecisionRuntime decision (deadlineValue)
+        if ("RULE".equalsIgnoreCase(mode) && value != null && !value.isBlank()) {
+            Long minutes = resolveRuleDeadlineMinutes(config, value);
+            if (minutes != null && minutes > 0) {
+                return now.plus(Duration.ofMinutes(minutes));
+            }
+            log.warn("SLA decision '{}' did not yield deadlineMinutes for config={} — falling back to PT24H",
+                    value, config.getPid());
+        }
+
         // Fallback: 24 hours
         log.debug("SLA deadlineMode='{}' not handled or value missing — defaulting to PT24H for config={}",
                 mode, config.getPid());
         return now.plus(Duration.ofHours(24));
+    }
+
+    /**
+     * M5 — evaluate the decision named {@code decisionCode} to obtain the SLA deadline minutes
+     * (decision output {@code deadlineMinutes}). Returns null when the decision module is absent, the
+     * decision does not match, or no numeric deadlineMinutes is produced (caller falls back).
+     * Package-private for unit testing. Degrades on failure (logged) rather than crashing activation.
+     */
+    Long resolveRuleDeadlineMinutes(SlaConfigEntity config, String decisionCode) {
+        if (decisionEvaluationService == null) {
+            return null;
+        }
+        try {
+            com.auraboot.framework.decision.dto.DrtEvaluateRequest req =
+                    new com.auraboot.framework.decision.dto.DrtEvaluateRequest();
+            req.setDecisionCode(decisionCode);
+            java.util.Map<String, Object> sla = new java.util.HashMap<>();
+            sla.put("targetType", config.getTargetType());
+            sla.put("targetKey", config.getTargetKey());
+            req.setContext(java.util.Map.of("record", java.util.Map.of("data", sla)));
+            com.auraboot.framework.decision.model.DecisionResult result = decisionEvaluationService.evaluate(req);
+            if (!result.matched() || result.outputs() == null) {
+                return null;
+            }
+            Object m = result.outputs().get("deadlineMinutes");
+            if (m instanceof Number n) {
+                return n.longValue();
+            }
+            if (m != null) {
+                try {
+                    return Long.parseLong(String.valueOf(m).trim());
+                } catch (NumberFormatException ignore) {
+                    return null;
+                }
+            }
+            return null;
+        } catch (RuntimeException e) {
+            log.warn("SLA deadline decision '{}' evaluation failed for config={}: {}",
+                    decisionCode, config.getPid(), e.getMessage());
+            return null;
+        }
     }
 }
