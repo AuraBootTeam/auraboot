@@ -218,7 +218,7 @@ type QuickFilterKey = 'my_records' | 'created_today' | 'modified_this_week';
 // List Page Content Component
 function ListPageContentInner(props: PageContentProps) {
   const { schema, tableName, token, listExtensions } = props;
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
   const showToast = useCallback(
     (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
@@ -1202,6 +1202,13 @@ function ListPageContentInner(props: PageContentProps) {
       });
     },
     [],
+  );
+
+  const canUseButton = useCallback(
+    (button: ButtonConfig): boolean => {
+      return !button.permissionCode || hasPermission(button.permissionCode);
+    },
+    [hasPermission],
   );
 
   // Resolve button display label
@@ -2206,6 +2213,7 @@ function ListPageContentInner(props: PageContentProps) {
   // `recordCount == 0` (singleton "新建" button) work.
   const evaluateButtonVisible = useCallback(
     (button: ButtonConfig): boolean => {
+      if (!canUseButton(button)) return false;
       // If no visibleWhen expression, always visible
       if (!button.visibleWhen) return true;
       const conditionContext = buildToolbarConditionContext(
@@ -2214,7 +2222,7 @@ function ListPageContentInner(props: PageContentProps) {
       );
       return evaluateCondition(button.visibleWhen, conditionContext as any);
     },
-    [pagination.total, data, filters],
+    [canUseButton, pagination.total, data, filters],
   );
 
   // Build export filter conditions for toolbar
@@ -3162,6 +3170,7 @@ function ListPageContentInner(props: PageContentProps) {
                   renderCellContent(column, record, rowIndex)
                 }
                 evaluateVisibleWhen={evaluateVisibleWhen}
+                canUseButton={canUseButton}
                 resolveButtonLabel={resolveButtonLabel}
                 handleAction={handleAction}
                 resolveColumnLabel={resolveColumnLabel}

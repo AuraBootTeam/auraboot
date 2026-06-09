@@ -19,6 +19,8 @@ const componentCache = new Map<string, ComponentType<any>>();
 const nameResolutionCache = new Map<string, string>();
 let registryInitialized = false;
 
+const NON_RUNTIME_COMPONENT_PROP_NAMES = new Set(['uiSchema']);
+
 const EAGER_CORE_COMPONENTS: Record<string, ComponentType<any>> = {
   datepicker: DatePicker,
   smartdatepicker: DatePicker,
@@ -63,6 +65,12 @@ function ensureRegistryInitialized() {
     initializeComponentRegistry();
     registryInitialized = true;
   }
+}
+
+export function sanitizeRuntimeComponentProps<T extends Record<string, any>>(props: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(props).filter(([key]) => !NON_RUNTIME_COMPONENT_PROP_NAMES.has(key)),
+  ) as Partial<T>;
 }
 
 export interface ComponentLoaderProps {
@@ -213,7 +221,7 @@ export const ComponentLoader: React.FC<ComponentLoaderProps> = ({
     );
   }
 
-  return <Component {...props} />;
+  return <Component {...sanitizeRuntimeComponentProps(props)} />;
 };
 
 function resolveComponentName(name: string): string {
