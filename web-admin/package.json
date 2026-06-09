@@ -123,7 +123,7 @@
     "@tiptap/extension-link": "^3.25.0",
     "@tiptap/extension-placeholder": "^3.25.0",
     "@tiptap/pm": "^3.25.0",
-    "@tiptap/react": "^3.25.0",
+    "@tiptap/react": "^3.26.0",
     "@tiptap/starter-kit": "^3.25.0",
     "@types/busboy": "^1.5.4",
     "@types/compression": "^1.8.1",
