@@ -6,6 +6,7 @@ describe('sanitizeSmartDomProps', () => {
     const domProps = sanitizeSmartDomProps({
       dataSource: { type: 'api' },
       refTarget: { targetModel: 'sys_user' },
+      uiSchema: { component: 'input' },
       'placeholder:zh-CN': '负责人',
       multiline: true,
       showCount: true,

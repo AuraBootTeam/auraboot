@@ -161,8 +161,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 
     // Single-select mode: use Radix Select
     if (!multiple) {
-      const currentValue =
-        field.value != null && field.value !== '' ? String(field.value) : undefined;
+      const currentValue = field.value != null ? String(field.value) : '';
       const actionSelectLabel = (() => {
         const key = 'action.select';
         const translated = t(key);
@@ -234,7 +233,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       );
 
       // Hidden input for form submission
-      const hiddenInput = <input type="hidden" name={name} value={currentValue || ''} />;
+      const hiddenInput = <input type="hidden" name={name} value={currentValue} />;
 
       return (
         <FieldBase

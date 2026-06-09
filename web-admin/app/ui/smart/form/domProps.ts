@@ -13,6 +13,7 @@ const NON_DOM_SMART_PROP_NAMES = new Set([
   'options',
   'refTarget',
   'showCount',
+  'uiSchema',
   'validationRules',
   'visible',
 ]);

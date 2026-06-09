@@ -16,6 +16,7 @@ public class MetaContext {
     private static final ThreadLocal<Long> ENV_ID = new ThreadLocal<>();
     private static final ThreadLocal<Boolean> ENV_FILTER_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Boolean> LOCK_GUARD_BYPASSED = ThreadLocal.withInitial(() -> false);
+    private static final ThreadLocal<Boolean> DATA_PERMISSION_BYPASSED = ThreadLocal.withInitial(() -> false);
 
     @Getter
     private final Long tenantId;
@@ -81,6 +82,7 @@ public class MetaContext {
         ENV_ID.remove();
         ENV_FILTER_BYPASSED.remove();
         LOCK_GUARD_BYPASSED.remove();
+        DATA_PERMISSION_BYPASSED.remove();
     }
 
     // ---- env-layering extension (PoC) ----
@@ -159,6 +161,38 @@ public class MetaContext {
 
     public static void runWithoutLockGuard(Runnable action) {
         runWithoutLockGuard(() -> {
+            action.run();
+            return null;
+        });
+    }
+
+    /**
+     * @return true when platform-managed background work is reading/writing
+     *         tenant-scoped dynamic data and must not be projected through a
+     *         foreground user's row, domain, mask, or field permissions.
+     */
+    public static boolean isDataPermissionBypassed() {
+        return Boolean.TRUE.equals(DATA_PERMISSION_BYPASSED.get());
+    }
+
+    /**
+     * Run a block without dynamic-data permission projection. Intended for
+     * internal background components that already receive an explicit tenant
+     * id, for example plugin workers and scheduled jobs. Request handlers
+     * should not use this path.
+     */
+    public static <T> T runWithoutDataPermission(java.util.function.Supplier<T> action) {
+        Boolean prior = DATA_PERMISSION_BYPASSED.get();
+        DATA_PERMISSION_BYPASSED.set(true);
+        try {
+            return action.get();
+        } finally {
+            DATA_PERMISSION_BYPASSED.set(prior);
+        }
+    }
+
+    public static void runWithoutDataPermission(Runnable action) {
+        runWithoutDataPermission(() -> {
             action.run();
             return null;
         });

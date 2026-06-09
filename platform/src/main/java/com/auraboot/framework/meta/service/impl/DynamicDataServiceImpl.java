@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.meta.service.*;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.service.DataDomainService;
 import com.auraboot.framework.meta.service.FieldMaskService;
@@ -175,30 +176,34 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         Long tenantId = getCurrentTenantId();
         queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
 
-        // 添加数据权限行级过滤 — fail-secure: exception = deny all
-        try {
-            Long userId = getCurrentUserId();
-            String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
-            if (rowFilter != null && !rowFilter.isBlank()) {
-                queryBuilder.addRawCondition(rowFilter);
+        if (!MetaContext.isDataPermissionBypassed()) {
+            // 添加数据权限行级过滤 — fail-secure: exception = deny all
+            try {
+                Long userId = getCurrentUserId();
+                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
+                if (rowFilter != null && !rowFilter.isBlank()) {
+                    queryBuilder.addRawCondition(rowFilter);
+                }
+            } catch (Exception e) {
+                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+                log.error("Failed to apply row-level data permission for model {} — returning empty result for security", logSafe(modelCode), e);
+                throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
             }
-        } catch (Exception e) {
-            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-            log.error("Failed to apply row-level data permission for model {} — returning empty result for security", logSafe(modelCode), e);
-            throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
         }
 
-        // Apply data domain isolation filter (D5) — fail-secure
-        try {
-            Long userId = getCurrentUserId();
-            String domainFilter = dataDomainService.buildDomainFilter(modelCode, userId);
-            if (domainFilter != null && !domainFilter.isBlank()) {
-                queryBuilder.addRawCondition(domainFilter);
+        if (!MetaContext.isDataPermissionBypassed()) {
+            // Apply data domain isolation filter (D5) — fail-secure
+            try {
+                Long userId = getCurrentUserId();
+                String domainFilter = dataDomainService.buildDomainFilter(modelCode, userId);
+                if (domainFilter != null && !domainFilter.isBlank()) {
+                    queryBuilder.addRawCondition(domainFilter);
+                }
+            } catch (Exception e) {
+                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+                log.error("Failed to apply domain filter for model {} — returning empty result for security", logSafe(modelCode), e);
+                throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
             }
-        } catch (Exception e) {
-            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-            log.error("Failed to apply domain filter for model {} — returning empty result for security", logSafe(modelCode), e);
-            throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
         }
 
         // Add keyword search across searchable fields
@@ -241,30 +246,34 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 model, request.getConditions());
         countBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
 
-        // Apply the same row-level filter to count query for consistency — fail-secure
-        try {
-            Long countUserId = getCurrentUserId();
-            String countRowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, countUserId);
-            if (countRowFilter != null && !countRowFilter.isBlank()) {
-                countBuilder.addRawCondition(countRowFilter);
+        if (!MetaContext.isDataPermissionBypassed()) {
+            // Apply the same row-level filter to count query for consistency — fail-secure
+            try {
+                Long countUserId = getCurrentUserId();
+                String countRowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, countUserId);
+                if (countRowFilter != null && !countRowFilter.isBlank()) {
+                    countBuilder.addRawCondition(countRowFilter);
+                }
+            } catch (Exception e) {
+                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+                log.error("Failed to apply row-level data permission to count query for model {} — denying access", logSafe(modelCode), e);
+                throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
             }
-        } catch (Exception e) {
-            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-            log.error("Failed to apply row-level data permission to count query for model {} — denying access", logSafe(modelCode), e);
-            throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
         }
 
-        // Apply the same domain filter to count query for consistency (D5) — fail-secure
-        try {
-            Long countUserId = getCurrentUserId();
-            String countDomainFilter = dataDomainService.buildDomainFilter(modelCode, countUserId);
-            if (countDomainFilter != null && !countDomainFilter.isBlank()) {
-                countBuilder.addRawCondition(countDomainFilter);
+        if (!MetaContext.isDataPermissionBypassed()) {
+            // Apply the same domain filter to count query for consistency (D5) — fail-secure
+            try {
+                Long countUserId = getCurrentUserId();
+                String countDomainFilter = dataDomainService.buildDomainFilter(modelCode, countUserId);
+                if (countDomainFilter != null && !countDomainFilter.isBlank()) {
+                    countBuilder.addRawCondition(countDomainFilter);
+                }
+            } catch (Exception e) {
+                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+                log.error("Failed to apply domain filter to count query for model {} — denying access", logSafe(modelCode), e);
+                throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
             }
-        } catch (Exception e) {
-            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-            log.error("Failed to apply domain filter to count query for model {} — denying access", logSafe(modelCode), e);
-            throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
         }
 
         // Apply the same keyword search to count query for consistency
@@ -278,31 +287,37 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         Long total = dynamicDataMapper.countByQuery(countSql, countParamMap);
 
-        // 应用列级字段脱敏 (policy-based) — fail-secure: masking failure = deny access
-        try {
-            Long userId = getCurrentUserId();
-            List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, modelCode, userId);
-            if (maskRules != null && !maskRules.isEmpty()) {
-                records = dataPermissionEngine.applyFieldMasking(records, maskRules);
+        if (!MetaContext.isDataPermissionBypassed()) {
+            // 应用列级字段脱敏 (policy-based) — fail-secure: masking failure = deny access
+            try {
+                Long userId = getCurrentUserId();
+                List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, modelCode, userId);
+                if (maskRules != null && !maskRules.isEmpty()) {
+                    records = dataPermissionEngine.applyFieldMasking(records, maskRules);
+                }
+            } catch (Exception e) {
+                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+                log.error("Failed to apply field masking for model {} — returning empty result for security", logSafe(modelCode), e);
+                throw new MetaServiceException("Field masking evaluation failed for model: " + modelCode, e);
             }
-        } catch (Exception e) {
-            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-            log.error("Failed to apply field masking for model {} — returning empty result for security", logSafe(modelCode), e);
-            throw new MetaServiceException("Field masking evaluation failed for model: " + modelCode, e);
         }
 
-        // Apply configurable field masking (A9) — fail-secure
-        try {
-            Long userId = getCurrentUserId();
-            records = fieldMaskService.applyMaskingForList(modelCode, records, userId);
-        } catch (Exception e) {
-            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-            log.error("Failed to apply configurable field masking for model {} — returning empty result for security", logSafe(modelCode), e);
-            throw new MetaServiceException("Configurable field masking failed for model: " + modelCode, e);
+        if (!MetaContext.isDataPermissionBypassed()) {
+            // Apply configurable field masking (A9) — fail-secure
+            try {
+                Long userId = getCurrentUserId();
+                records = fieldMaskService.applyMaskingForList(modelCode, records, userId);
+            } catch (Exception e) {
+                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+                log.error("Failed to apply configurable field masking for model {} — returning empty result for security", logSafe(modelCode), e);
+                throw new MetaServiceException("Configurable field masking failed for model: " + modelCode, e);
+            }
         }
 
-        // Apply field-level permission filtering — remove hidden fields from results
-        records = applyFieldPermissionFilter(modelCode, records);
+        if (!MetaContext.isDataPermissionBypassed()) {
+            // Apply field-level permission filtering — remove hidden fields from results
+            records = applyFieldPermissionFilter(modelCode, records);
+        }
 
         records = enrichListRecords(modelCode, records);
 
@@ -340,8 +355,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             return records;
         }
         try {
-            Long userId = getCurrentUserId();
-            FieldPermissionSet fieldPerms = fieldPermissionService.getFieldPermissions(userId, modelCode);
+            Long memberId = currentMemberIdForFieldPermissions();
+            FieldPermissionSet fieldPerms = fieldPermissionService.getFieldPermissions(memberId, modelCode);
             if (fieldPerms.hiddenFields().isEmpty()) {
                 return records;
             }
@@ -364,8 +379,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             return record;
         }
         try {
-            Long userId = getCurrentUserId();
-            FieldPermissionSet fieldPerms = fieldPermissionService.getFieldPermissions(userId, modelCode);
+            Long memberId = currentMemberIdForFieldPermissions();
+            FieldPermissionSet fieldPerms = fieldPermissionService.getFieldPermissions(memberId, modelCode);
             if (fieldPerms.hiddenFields().isEmpty()) {
                 return record;
             }
@@ -374,6 +389,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             log.warn("Failed to apply field permission filter for model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
         }
         return record;
+    }
+
+    private Long currentMemberIdForFieldPermissions() {
+        Long memberId = MetaContext.getCurrentMemberId();
+        return memberId != null ? memberId : getCurrentUserId();
     }
 
     private List<Map<String, Object>> enrichListRecords(String modelCode, List<Map<String, Object>> records) {
@@ -739,55 +759,63 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         Map<String, Object> record = records.get(0);
 
-        // Apply row-level access check for single record — fail-secure: any
-        // non-MetaServiceException must surface as a 5xx, not be swallowed.
-        // Mirrors the list() pattern at lines 173 and 185.
-        try {
-            Long userId = getCurrentUserId();
-            if (!dataPermissionEngine.canAccessRecord(tenantId, modelCode, userId, record)) {
-                throw new MetaServiceException("Access denied: you do not have permission to view this record");
-            }
-        } catch (MetaServiceException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Failed to evaluate row-level access for model {} record {} — failing closed for security",
-                    logSafe(modelCode), logSafe(recordId), e);
-            throw new MetaServiceException(
-                    "Data permission evaluation failed for model: " + modelCode, e);
-        }
-
-        // Apply column-level field masking (policy-based) — fail-secure.
-        // Returning the unmasked record on internal error would leak the
-        // very fields the policy is configured to hide.
-        try {
-            Long userId = getCurrentUserId();
-            List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, modelCode, userId);
-            if (maskRules != null && !maskRules.isEmpty()) {
-                List<Map<String, Object>> masked = dataPermissionEngine.applyFieldMasking(List.of(record), maskRules);
-                if (masked != null && !masked.isEmpty()) {
-                    record = masked.get(0);
+        if (!MetaContext.isDataPermissionBypassed()) {
+            // Apply row-level access check for single record — fail-secure: any
+            // non-MetaServiceException must surface as a 5xx, not be swallowed.
+            // Mirrors the list() pattern at lines 173 and 185.
+            try {
+                Long userId = getCurrentUserId();
+                if (!dataPermissionEngine.canAccessRecord(tenantId, modelCode, userId, record)) {
+                    throw new MetaServiceException("Access denied: you do not have permission to view this record");
                 }
+            } catch (MetaServiceException e) {
+                throw e;
+            } catch (Exception e) {
+                log.error("Failed to evaluate row-level access for model {} record {} — failing closed for security",
+                        logSafe(modelCode), logSafe(recordId), e);
+                throw new MetaServiceException(
+                        "Data permission evaluation failed for model: " + modelCode, e);
             }
-        } catch (Exception e) {
-            log.error("Failed to apply field masking for model {} record {} — failing closed for security",
-                    logSafe(modelCode), logSafe(recordId), e);
-            throw new MetaServiceException(
-                    "Field masking evaluation failed for model: " + modelCode, e);
         }
 
-        // Apply configurable field masking for detail view (A9) — fail-secure.
-        try {
-            Long userId = getCurrentUserId();
-            record = fieldMaskService.applyMaskingForDetail(modelCode, record, userId);
-        } catch (Exception e) {
-            log.error("Failed to apply configurable field masking for model {} record {} — failing closed for security",
-                    logSafe(modelCode), logSafe(recordId), e);
-            throw new MetaServiceException(
-                    "Detail-view field masking failed for model: " + modelCode, e);
+        if (!MetaContext.isDataPermissionBypassed()) {
+            // Apply column-level field masking (policy-based) — fail-secure.
+            // Returning the unmasked record on internal error would leak the
+            // very fields the policy is configured to hide.
+            try {
+                Long userId = getCurrentUserId();
+                List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, modelCode, userId);
+                if (maskRules != null && !maskRules.isEmpty()) {
+                    List<Map<String, Object>> masked = dataPermissionEngine.applyFieldMasking(List.of(record), maskRules);
+                    if (masked != null && !masked.isEmpty()) {
+                        record = masked.get(0);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Failed to apply field masking for model {} record {} — failing closed for security",
+                        logSafe(modelCode), logSafe(recordId), e);
+                throw new MetaServiceException(
+                        "Field masking evaluation failed for model: " + modelCode, e);
+            }
         }
 
-        // Apply field-level permission filtering — remove hidden fields
-        record = applyFieldPermissionFilterSingle(modelCode, record);
+        if (!MetaContext.isDataPermissionBypassed()) {
+            // Apply configurable field masking for detail view (A9) — fail-secure.
+            try {
+                Long userId = getCurrentUserId();
+                record = fieldMaskService.applyMaskingForDetail(modelCode, record, userId);
+            } catch (Exception e) {
+                log.error("Failed to apply configurable field masking for model {} record {} — failing closed for security",
+                        logSafe(modelCode), logSafe(recordId), e);
+                throw new MetaServiceException(
+                        "Detail-view field masking failed for model: " + modelCode, e);
+            }
+        }
+
+        if (!MetaContext.isDataPermissionBypassed()) {
+            // Apply field-level permission filtering — remove hidden fields
+            record = applyFieldPermissionFilterSingle(modelCode, record);
+        }
 
         return record;
     }
@@ -942,6 +970,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      */
     private void stripNonWritableFields(String modelCode, Map<String, Object> data) {
         if (data == null || data.isEmpty()) {
+            return;
+        }
+        if (MetaContext.isDataPermissionBypassed()) {
             return;
         }
         Long tenantId = getCurrentTenantId();

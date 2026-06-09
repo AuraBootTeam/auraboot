@@ -10,8 +10,8 @@ auraboot:
       webhook-secret: whsec_your_secret_here
   performance:
     slow-query-threshold-ms: 20
-    sql-count-warn-threshold: 10
-    sql-count-error-threshold: 50
+    sql-count-warn-threshold: 50
+    sql-count-error-threshold: 100
 
 logging:
   level:

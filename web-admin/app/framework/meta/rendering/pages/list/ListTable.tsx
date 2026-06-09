@@ -60,6 +60,7 @@ export interface ListTableProps {
   onContextMenu: (e: React.MouseEvent, column: ColumnConfig) => void;
   renderCellContent: (record: any, column: ColumnConfig, rowIndex: number) => React.ReactNode;
   evaluateVisibleWhen: (expr: string | undefined, record?: Record<string, any>) => boolean;
+  canUseButton?: (button: ButtonConfig) => boolean;
   resolveButtonLabel: (button: ButtonConfig) => string;
   handleAction: (button: ButtonConfig, record?: Record<string, any>) => void;
   resolveColumnLabel: (column: ColumnConfig) => string;
@@ -94,6 +95,7 @@ export const ListTable = React.memo(function ListTable({
   onContextMenu,
   renderCellContent,
   evaluateVisibleWhen,
+  canUseButton = () => true,
   resolveButtonLabel,
   handleAction,
   resolveColumnLabel,
@@ -418,6 +420,7 @@ export const ListTable = React.memo(function ListTable({
                                 buttons={actionColumn.buttons || []}
                                 record={record}
                                 evaluateVisibleWhen={evaluateVisibleWhen}
+                                canUseButton={canUseButton}
                                 resolveButtonLabel={resolveButtonLabel}
                                 handleAction={handleAction}
                               />
@@ -527,6 +530,7 @@ export const ListTable = React.memo(function ListTable({
                                 buttons={actionColumn.buttons || []}
                                 record={record}
                                 evaluateVisibleWhen={evaluateVisibleWhen}
+                                canUseButton={canUseButton}
                                 resolveButtonLabel={resolveButtonLabel}
                                 handleAction={handleAction}
                               />
