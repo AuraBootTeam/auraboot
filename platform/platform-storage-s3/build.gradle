@@ -46,8 +46,8 @@ dependencies {
     testImplementation 'org.projectlombok:lombok:1.18.40'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.40'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.14.4'
-    testImplementation 'org.mockito:mockito-core:5.11.0'
-    testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
+    testImplementation 'org.mockito:mockito-core:5.23.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.23.0'
 }
 
 test {
