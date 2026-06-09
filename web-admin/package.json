@@ -141,7 +141,7 @@
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
-    "dayjs": "^1.11.20",
+    "dayjs": "^1.11.21",
     "dompurify": "^3.4.8",
     "dotenv": "^17.2.1",
     "echarts": "^6.0.0",
