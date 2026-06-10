@@ -75,4 +75,82 @@ class DecisionTableAnalysisServiceImplTest {
         assertThat(result.getMetrics().getGapCount()).isZero();
         assertThat(result.getMetrics().getUnreachableRuleCount()).isZero();
     }
+
+    @Test
+    void analyzeExplainsContinuousNumericCoverageGaps() {
+        DecisionTable table = new DecisionTable(HitPolicy.FIRST,
+                List.of(new DecisionTable.Input("amount", "Amount",
+                        new Operand.PathOperand(Scope.RECORD, "data.amount", DataType.DECIMAL))),
+                List.of(new DecisionTable.Output("route", "Route", DataType.STRING)),
+                List.of(
+                        new DecisionTable.Rule("low", 10,
+                                Map.of("amount", new DecisionTable.Cell(Operator.EQ, "", "< 10")),
+                                Map.of("route", "low")),
+                        new DecisionTable.Rule("high", 20,
+                                Map.of("amount", new DecisionTable.Cell(Operator.EQ, "", "> 20")),
+                                Map.of("route", "high"))),
+                Map.of());
+
+        DecisionTableAnalysisDTO result = service.analyze(mapper.valueToTree(table));
+
+        assertThat(result.getValid()).isTrue();
+        assertThat(result.getWarnings()).anyMatch(issue -> "DMN_CONTINUOUS_DOMAIN".equals(issue.getCode()));
+        DecisionTableAnalysisDTO.Issue gap = result.getWarnings().stream()
+                .filter(issue -> "DMN_CONTINUOUS_GAP".equals(issue.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(gap.getInputCombination()).containsEntry("input", "amount");
+        assertThat(gap.getMetadata()).containsEntry("input", "amount");
+        assertThat(String.valueOf(gap.getMetadata().get("gapRanges"))).contains("[10..20]");
+    }
+
+    @Test
+    void analyzeValidatesPriorityOutputValuesAgainstDeclaredOrder() {
+        DecisionTable table = new DecisionTable(HitPolicy.PRIORITY,
+                List.of(new DecisionTable.Input("flag", "Flag",
+                        new Operand.PathOperand(Scope.RECORD, "data.flag", DataType.BOOLEAN))),
+                List.of(new DecisionTable.Output("route", "Route", DataType.STRING,
+                        List.of("HIGH", "LOW"))),
+                List.of(
+                        new DecisionTable.Rule("allowed", 10,
+                                Map.of("flag", new DecisionTable.Cell(Operator.EQ, true)),
+                                Map.of("route", "HIGH")),
+                        new DecisionTable.Rule("missing-priority", 20,
+                                Map.of("flag", new DecisionTable.Cell(Operator.EQ, false)),
+                                Map.of("route", "MEDIUM"))),
+                Map.of());
+
+        DecisionTableAnalysisDTO result = service.analyze(mapper.valueToTree(table));
+
+        assertThat(result.getValid()).isFalse();
+        assertThat(result.getWarnings()).anyMatch(issue -> "DMN_PRIORITY_EXPLANATION".equals(issue.getCode())
+                && issue.getMetadata().get("priorityOrder").equals(List.of("HIGH", "LOW")));
+        assertThat(result.getErrors()).anyMatch(issue -> "DMN_PRIORITY_OUTPUT_VALUE".equals(issue.getCode())
+                && issue.getRuleIds().contains("missing-priority")
+                && "MEDIUM".equals(issue.getMetadata().get("value")));
+    }
+
+    @Test
+    void analyzeValidatesCollectAggregationNumericOutputs() {
+        DecisionTable table = new DecisionTable(HitPolicy.COLLECT, DecisionTable.CollectAggregation.SUM,
+                List.of(new DecisionTable.Input("flag", "Flag",
+                        new Operand.PathOperand(Scope.RECORD, "data.flag", DataType.BOOLEAN))),
+                List.of(new DecisionTable.Output("score", "Score", DataType.DECIMAL)),
+                List.of(
+                        new DecisionTable.Rule("numeric", 10,
+                                Map.of("flag", new DecisionTable.Cell(Operator.EQ, true)),
+                                Map.of("score", "3.5")),
+                        new DecisionTable.Rule("not-numeric", 20,
+                                Map.of("flag", new DecisionTable.Cell(Operator.EQ, false)),
+                                Map.of("score", "N/A"))),
+                Map.of());
+
+        DecisionTableAnalysisDTO result = service.analyze(mapper.valueToTree(table));
+
+        assertThat(result.getValid()).isFalse();
+        assertThat(result.getWarnings()).anyMatch(issue -> "DMN_COLLECT_AGGREGATION_EXPLANATION".equals(issue.getCode())
+                && "SUM".equals(issue.getMetadata().get("aggregation")));
+        assertThat(result.getErrors()).anyMatch(issue -> "DMN_COLLECT_AGGREGATION_VALUE".equals(issue.getCode())
+                && issue.getRuleIds().contains("not-numeric"));
+    }
 }

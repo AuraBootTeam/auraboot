@@ -38,6 +38,19 @@ const formatCombination = (issue: DecisionTableAnalysisIssue): string => {
   return entries.map(([key, val]) => `${key}=${String(val)}`).join(', ');
 };
 
+const formatMetadataValue = (value: unknown): string => {
+  if (Array.isArray(value)) return value.map((item) => String(item)).join(', ');
+  if (value && typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+};
+
+const formatMetadata = (issue: DecisionTableAnalysisIssue): string => {
+  const metadata = issue.metadata ?? {};
+  const entries = Object.entries(metadata);
+  if (entries.length === 0) return '';
+  return entries.map(([key, val]) => `${key}: ${formatMetadataValue(val)}`).join(' · ');
+};
+
 function move<T>(items: T[], from: number, to: number): T[] {
   if (to < 0 || to >= items.length) return items;
   const next = items.slice();
@@ -284,6 +297,9 @@ export function DecisionTableEditor({
                     {formatCombination(issue)}
                     {issue.ruleIds && issue.ruleIds.length > 0 ? ` · rules ${issue.ruleIds.join(',')}` : ''}
                   </small>
+                  {formatMetadata(issue) && (
+                    <small data-testid={`dt-analysis-metadata-${idx}`}>{formatMetadata(issue)}</small>
+                  )}
                 </li>
               ))}
             </ul>

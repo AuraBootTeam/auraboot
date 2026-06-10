@@ -237,6 +237,7 @@ export interface DecisionTableAnalysisIssue {
   severity?: 'ERROR' | 'WARNING' | string;
   ruleIds?: string[];
   inputCombination?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   message?: string;
 }
 

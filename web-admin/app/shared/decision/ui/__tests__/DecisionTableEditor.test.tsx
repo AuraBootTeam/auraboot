@@ -121,10 +121,11 @@ describe('DecisionTableEditor', () => {
             message: 'Rules produce different outputs',
           }],
           warnings: [{
-            code: 'DMN_GAP',
+            code: 'DMN_CONTINUOUS_GAP',
             severity: 'WARNING',
-            inputCombination: { amount: 0 },
-            message: 'No rule covers this input combination',
+            inputCombination: { input: 'amount' },
+            metadata: { gapRanges: ['[10..20]'], coveredRanges: ['(-inf..10)', '(20..+inf)'] },
+            message: 'Input amount has uncovered ranges',
           }],
         }}
       />,
@@ -138,7 +139,8 @@ describe('DecisionTableEditor', () => {
     expect(screen.getByTestId('dt-metric-conflict')).toHaveTextContent('Conflict 1');
     expect(screen.getByTestId('dt-analysis-issue-0')).toHaveTextContent('DMN_CONFLICT');
     expect(screen.getByTestId('dt-analysis-issue-0')).toHaveTextContent('rules r1,r2');
-    expect(screen.getByTestId('dt-analysis-issue-1')).toHaveTextContent('DMN_GAP');
+    expect(screen.getByTestId('dt-analysis-issue-1')).toHaveTextContent('DMN_CONTINUOUS_GAP');
+    expect(screen.getByTestId('dt-analysis-metadata-1')).toHaveTextContent('gapRanges: [10..20]');
   });
 
   it('edits DMN XML and triggers import/export/round-trip actions', () => {

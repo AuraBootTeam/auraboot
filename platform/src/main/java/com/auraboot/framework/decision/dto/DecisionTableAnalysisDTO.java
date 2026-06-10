@@ -26,15 +26,23 @@ public class DecisionTableAnalysisDTO {
         private String severity;
         private List<String> ruleIds = List.of();
         private Map<String, Object> inputCombination = Map.of();
+        private Map<String, Object> metadata = Map.of();
         private String message;
 
         public static Issue of(String code, String severity, List<String> ruleIds,
                                Map<String, Object> inputCombination, String message) {
+            return of(code, severity, ruleIds, inputCombination, Map.of(), message);
+        }
+
+        public static Issue of(String code, String severity, List<String> ruleIds,
+                               Map<String, Object> inputCombination, Map<String, Object> metadata,
+                               String message) {
             Issue issue = new Issue();
             issue.setCode(code);
             issue.setSeverity(severity);
             issue.setRuleIds(ruleIds == null ? List.of() : ruleIds);
             issue.setInputCombination(inputCombination == null ? Map.of() : inputCombination);
+            issue.setMetadata(metadata == null ? Map.of() : metadata);
             issue.setMessage(message);
             return issue;
         }
