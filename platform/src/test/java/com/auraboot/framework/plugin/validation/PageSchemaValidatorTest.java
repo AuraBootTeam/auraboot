@@ -579,6 +579,31 @@ class PageSchemaValidatorTest {
         assertNoError(validate(manifest), "S-PAGE-BLOCK-COL");
     }
 
+    @Test
+    void traceGraphBlockIsAccepted() {
+        // Regression: TraceGraphBlockRenderer (#450) registered the "trace-graph" block
+        // in the frontend BlockRegistry but left DslRegistry.BlockType untouched, so
+        // PageSchemaValidator rejected every page mounting it with S-PAGE-BLOCK-TYPE.
+        // Mirrors the pe_production_plan_detail consumption-trace mount.
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        PageSchemaDTO p = page("pe_order_detail", "detail", "pe_order", List.of(Map.of(
+                "id", "consumption_trace",
+                "blockType", "trace-graph",
+                "dataSource", "consumptionTrace",
+                "mode", "consumption")));
+        p.setDataSources(Map.of(
+                "consumptionTrace", Map.of(
+                        "type", "api",
+                        "endpoint", "/api/datasource/list",
+                        "method", "get",
+                        "params", Map.of(
+                                "datasourceId", "nq:pe_consumption_trace_by_lot",
+                                "format", "records",
+                                "workOrderId", "${$page.recordId}"))));
+        manifest.setPages(List.of(p));
+        assertNoError(validate(manifest), "S-PAGE-BLOCK-TYPE");
+    }
+
     private List<PluginValidationMessage> validate(PluginManifestExtended manifest) {
         PluginValidationContext ctx = PluginValidationContext.builder()
                 .pluginId("com.test.plugin")
