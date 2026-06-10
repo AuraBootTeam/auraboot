@@ -203,10 +203,15 @@ public class DynamicController {
      * <ol>
      *   <li>Normalize hyphens → underscores and lowercase the raw pageKey.</li>
      *   <li>If a model with that exact code exists → use it.</li>
+     *   <li>If a published page schema declares modelCode → use it.</li>
      *   <li>Otherwise → fall back to {@link PageKeyConverter#toModelCode} (strips suffix).</li>
      * </ol>
      */
     private String resolveModelCode(String pageKey) {
+        return resolveModelCode(pageKey, null);
+    }
+
+    private String resolveModelCode(String pageKey, PageSchemaDTO pageSchema) {
         String normalized = pageKey.replace("-", "_").toLowerCase();
         try {
             if (metaModelService.getModelDefinition(normalized).isPresent()) {
@@ -216,6 +221,12 @@ public class DynamicController {
             log.debug("Model lookup failed for normalized pageKey '{}', falling back to PageKeyConverter: {}",
                     logSafe(normalized), logSafe(e.getMessage()));
         }
+
+        String schemaModelCode = pageSchemaModelCode(pageSchema != null ? pageSchema : findPageSchemaQuietly(pageKey));
+        if (schemaModelCode != null) {
+            return schemaModelCode;
+        }
+
         return PageKeyConverter.toModelCode(pageKey);
     }
 
@@ -783,11 +794,15 @@ public class DynamicController {
             @Parameter(description = "页面Key") @PathVariable String pageKey) {
 
         log.info("Get rich meta: pageKey={}", logSafe(pageKey));
-        String modelCode = resolveModelCode(pageKey);
+        PageSchemaDTO pageSchema = findPageSchemaQuietly(pageKey);
+        String modelCode = resolveModelCode(pageKey, pageSchema);
 
         // 1. Resolve model definition
         Optional<ModelDefinition> modelOpt = metaModelService.getModelDefinition(modelCode);
         if (modelOpt.isEmpty()) {
+            if (isSchemaOnlyPage(pageSchema)) {
+                return ApiResponse.success(schemaOnlyMeta(pageKey, pageSchema, modelCode));
+            }
             return ApiResponse.error("Model not found: " + modelCode);
         }
         ModelDefinition model = modelOpt.get();
@@ -796,20 +811,10 @@ public class DynamicController {
         List<PageMetaResponse.FieldMeta> fieldMetas = buildFieldMetas(modelCode, model);
 
         // 3. Page schema (may be null for models without explicit page definition)
-        Map<String, Object> schemaJson = null;
+        Map<String, Object> schemaJson = schemaJson(pageSchema);
         List<String> availableViews = new ArrayList<>(List.of("table")); // default
-        try {
-            PageSchemaDTO pageSchema = pageSchemaService.findByPageKey(pageKey);
-            if (pageSchema != null) {
-                // Build a composite schema map from V2 flat fields
-                schemaJson = new LinkedHashMap<>();
-                if (pageSchema.getBlocks() != null) schemaJson.put("blocks", pageSchema.getBlocks());
-                if (pageSchema.getLayout() != null) schemaJson.put("layout", pageSchema.getLayout());
-                if (pageSchema.getTitle() != null) schemaJson.put("title", pageSchema.getTitle());
-                availableViews = deriveAvailableViews(pageSchema);
-            }
-        } catch (Exception e) {
-            log.debug("No page schema found for pageKey={}: {}", logSafe(pageKey), logSafe(e.getMessage()));
+        if (pageSchema != null) {
+            availableViews = deriveAvailableViews(pageSchema);
         }
 
         // 4. Permissions — check programmatically using resolved codes
@@ -982,13 +987,98 @@ public class DynamicController {
     @RequirePermission("model.{pageKey}.read")
     public ApiResponse<List<com.auraboot.framework.meta.dto.MetaFieldDTO>> getFieldMeta(
             @Parameter(description = "Page key") @PathVariable String pageKey) {
-        String modelCode = resolveModelCode(pageKey);
+        PageSchemaDTO pageSchema = findPageSchemaQuietly(pageKey);
+        String modelCode = resolveModelCode(pageKey, pageSchema);
         com.auraboot.framework.meta.dto.MetaModelDTO model = metaModelService.findByCode(modelCode);
         if (model == null) {
+            if (isSchemaOnlyPage(pageSchema)) {
+                return ApiResponse.success(Collections.emptyList());
+            }
             return ApiResponse.error("Model not found: " + modelCode);
         }
         List<com.auraboot.framework.meta.dto.MetaFieldDTO> fields = modelFieldBindingService.getModelFields(model.getPid());
         return ApiResponse.success(fields);
+    }
+
+    private PageSchemaDTO findPageSchemaQuietly(String pageKey) {
+        try {
+            return pageSchemaService.findByPageKey(pageKey);
+        } catch (Exception e) {
+            log.debug("No page schema found for pageKey={}: {}", logSafe(pageKey), logSafe(e.getMessage()));
+            return null;
+        }
+    }
+
+    private String pageSchemaModelCode(PageSchemaDTO pageSchema) {
+        if (pageSchema == null || pageSchema.getModelCode() == null || pageSchema.getModelCode().isBlank()) {
+            return null;
+        }
+        return pageSchema.getModelCode().replace("-", "_").toLowerCase();
+    }
+
+    private boolean isSchemaOnlyPage(PageSchemaDTO pageSchema) {
+        if (pageSchema == null || pageSchema.getExtension() == null) {
+            return false;
+        }
+        Map<String, Object> extension = pageSchema.getExtension();
+        if (Boolean.TRUE.equals(extension.get("skipFieldMeta"))
+                || Boolean.TRUE.equals(extension.get("customOnly"))) {
+            return true;
+        }
+        Object dataSource = extension.get("dataSource");
+        if (dataSource instanceof Map<?, ?> dataSourceMap) {
+            Object type = dataSourceMap.get("type");
+            return type != null && "api".equalsIgnoreCase(String.valueOf(type));
+        }
+        return false;
+    }
+
+    private PageMetaResponse schemaOnlyMeta(String pageKey, PageSchemaDTO pageSchema, String modelCode) {
+        return PageMetaResponse.builder()
+                .pageKey(pageKey)
+                .modelCode(modelCode)
+                .title(schemaTitle(pageSchema, modelCode))
+                .fields(Collections.emptyList())
+                .schema(schemaJson(pageSchema))
+                .permissions(resolvePermissions(pageKey))
+                .availableViews(pageSchema == null ? List.of("table") : deriveAvailableViews(pageSchema))
+                .build();
+    }
+
+    private Map<String, Object> schemaJson(PageSchemaDTO pageSchema) {
+        if (pageSchema == null) {
+            return null;
+        }
+        Map<String, Object> schemaJson = new LinkedHashMap<>();
+        if (pageSchema.getBlocks() != null) schemaJson.put("blocks", pageSchema.getBlocks());
+        if (pageSchema.getLayout() != null) schemaJson.put("layout", pageSchema.getLayout());
+        if (pageSchema.getTitle() != null) schemaJson.put("title", pageSchema.getTitle());
+        if (pageSchema.getExtension() != null) schemaJson.put("extension", pageSchema.getExtension());
+        return schemaJson;
+    }
+
+    private String schemaTitle(PageSchemaDTO pageSchema, String fallback) {
+        if (pageSchema == null) {
+            return fallback;
+        }
+        Map<String, Object> title = pageSchema.getTitle();
+        if (title != null && !title.isEmpty()) {
+            Object zh = title.get("zh-CN");
+            if (zh != null && !String.valueOf(zh).isBlank()) {
+                return String.valueOf(zh);
+            }
+            Object en = title.get("en-US");
+            if (en != null && !String.valueOf(en).isBlank()) {
+                return String.valueOf(en);
+            }
+            Object first = title.values().iterator().next();
+            if (first != null && !String.valueOf(first).isBlank()) {
+                return String.valueOf(first);
+            }
+        }
+        return pageSchema.getName() != null && !pageSchema.getName().isBlank()
+                ? pageSchema.getName()
+                : fallback;
     }
 
     /**

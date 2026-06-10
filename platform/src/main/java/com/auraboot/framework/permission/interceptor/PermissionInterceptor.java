@@ -1,6 +1,8 @@
 package com.auraboot.framework.permission.interceptor;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -54,6 +56,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class PermissionInterceptor implements HandlerInterceptor {
     
     private final UserPermissionService userPermissionService;
+    private final MenuMapper menuMapper;
     
     /**
      * Pre-handle method to check permission before request processing
@@ -109,6 +112,17 @@ public class PermissionInterceptor implements HandlerInterceptor {
                 if (hasPermission) {
                     log.debug("Permission check passed via raw pageKey fallback: userId={}, permission={}, endpoint={}",
                         userId, rawPermissionCode, request.getRequestURI());
+                }
+            }
+        }
+
+        if (!hasPermission && isReadOnlyModelPagePermission(permissionTemplate)) {
+            String menuPermissionCode = resolveMenuPermissionByPageKey(request);
+            if (menuPermissionCode != null && !menuPermissionCode.isBlank()) {
+                hasPermission = userPermissionService.hasPermission(userId, menuPermissionCode);
+                if (hasPermission) {
+                    log.debug("Permission check passed via page menu fallback: userId={}, permission={}, endpoint={}",
+                        userId, menuPermissionCode, request.getRequestURI());
                 }
             }
         }
@@ -271,6 +285,47 @@ public class PermissionInterceptor implements HandlerInterceptor {
         }
 
         return resolved.contains("{") ? template : resolved;
+    }
+
+    private boolean isReadOnlyModelPagePermission(String permissionTemplate) {
+        return "model.{pageKey}.read".equals(permissionTemplate);
+    }
+
+    private String resolveMenuPermissionByPageKey(HttpServletRequest request) {
+        if (!MetaContext.exists()) {
+            return null;
+        }
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            return null;
+        }
+
+        String pageKey = rawPageKey(request);
+        if (pageKey == null) {
+            return null;
+        }
+
+        return menuMapper.findPermissionCodeByPageKey(tenantId, pageKey);
+    }
+
+    private String rawPageKey(HttpServletRequest request) {
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, String> pathVariables =
+            (java.util.Map<String, String>) request.getAttribute(
+                org.springframework.web.servlet.HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE
+            );
+        if (pathVariables == null || pathVariables.isEmpty()) {
+            return null;
+        }
+
+        String value = pathVariables.get("pageKey");
+        if (value == null) {
+            return null;
+        }
+
+        value = value.replace("-", "_").toLowerCase();
+        return SAFE_IDENTIFIER.matcher(value).matches() ? value : null;
     }
 
     /**

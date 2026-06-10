@@ -164,6 +164,28 @@ public interface MenuMapper extends BaseMapper<Menu> {
     Menu findByPath(@Param("tenantId") Long tenantId, @Param("path") String path);
 
     /**
+     * Resolve the menu permission attached to a DSL page key.
+     *
+     * API-backed or custom-only DSL pages can use a business permission such as
+     * decision.definition.read instead of synthetic model.* permissions. Dynamic
+     * schema endpoints use this as a read-only fallback after the model permission
+     * check fails.
+     */
+    @Select("""
+        SELECT permission_code
+        FROM ab_menu
+        WHERE tenant_id = #{tenantId}
+          AND page_key = #{pageKey}
+          AND permission_code IS NOT NULL
+          AND permission_code <> ''
+          AND status = 'active'
+          AND deleted_flag = false
+        ORDER BY visible DESC NULLS LAST, type DESC, order_no ASC
+        LIMIT 1
+        """)
+    String findPermissionCodeByPageKey(@Param("tenantId") Long tenantId, @Param("pageKey") String pageKey);
+
+    /**
      * Auto-link menus to pages by matching page_key.
      * Updates page_pid for menus that have page_key set but no page_pid.
      *
