@@ -1,5 +1,6 @@
 package com.auraboot.framework.permission.service;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -8,8 +9,10 @@ import java.util.Map;
  * <p>Manages parameterized permission policies — configurable limits and constraints
  * beyond boolean granted/denied (e.g., max approval amount, discount limits).
  *
- * <p>Policy values are stored in {@code ab_role_permission.conditions} JSONB.
- * Policy schema (what parameters are configurable) is stored in {@code ab_permission.policy_schema} JSONB.
+ * <p>Policy values are stored in {@code ab_role_permission.conditions} JSONB (legacy config
+ * surface, still consumed by the permission matrix UI and policy admin APIs). The runtime
+ * guard, however, reads the materialized {@code ab_role_permission.condition_ast} JSONB via
+ * {@link #getConditionGuards} — see Permission Governance S1 Plan B.
  *
  * @author AuraBoot Platform
  * @since V4
@@ -17,7 +20,40 @@ import java.util.Map;
 public interface PermissionPolicyService {
 
     /**
+     * A single condition-AST guard attached to one active grant binding.
+     *
+     * @param grantId          ab_role_permission.id
+     * @param conditionAstJson materialized {@code condition_ast} as raw JSON, or {@code null}
+     *                         for an unconditional grant
+     */
+    record ConditionGuard(Long grantId, String conditionAstJson) {
+
+        /** An unconditional grant always satisfies the guard layer. */
+        public boolean unconditional() {
+            return conditionAstJson == null || conditionAstJson.isBlank()
+                    || "null".equals(conditionAstJson.trim());
+        }
+    }
+
+    /**
+     * Permission Governance S1 (Plan B): load the materialized condition-AST guards for every
+     * active GRANT binding a member holds on a permission.
+     *
+     * <p>This replaces the legacy {@code getEffectivePolicy} + {@code getPolicySchema} read path
+     * inside the runtime evaluator. The returned guards are evaluated under three-valued logic;
+     * see {@code PolicyEvaluator}.
+     *
+     * @param memberId       member (tenant member) ID
+     * @param permissionCode permission code (e.g. "model.order:approve")
+     * @return one guard per active grant binding (possibly empty; never null)
+     */
+    List<ConditionGuard> getConditionGuards(Long memberId, String permissionCode);
+
+    /**
      * Get effective policy for a member on a specific permission, merged across all roles.
+     *
+     * <p>Legacy config read surface (still used by the permission matrix UI and policy facade).
+     * NOT used by the runtime evaluator anymore — see {@link #getConditionGuards}.
      *
      * <p>Merge rules across multiple roles:
      * <ul>
@@ -35,6 +71,8 @@ public interface PermissionPolicyService {
 
     /**
      * Get policy schema for a permission (what parameters are configurable).
+     *
+     * <p>Legacy config read surface (permission matrix UI). NOT used by the runtime evaluator.
      *
      * @param permissionCode permission code
      * @return policy schema map parsed from ab_permission.policy_schema, or null if not defined

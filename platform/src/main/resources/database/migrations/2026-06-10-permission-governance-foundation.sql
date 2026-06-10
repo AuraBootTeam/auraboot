@@ -1,7 +1,8 @@
 -- Permission Governance S1 foundation (existing-DB increment; schema.sql is authoritative for fresh resets).
--- Additive only — the live evaluator keeps using the legacy `conditions` column until Plan B swaps
--- PolicyExpressionEvaluator -> ConditionAstEvaluator. The enterprise PermissionCompiler is the ONLY writer
--- of condition_ast / data_scope_ast / source_ref / snapshot_id and of ab_permission_snapshot.
+-- Additive only. As of Plan B the runtime guard (PolicyEvaluator) reads `condition_ast` via
+-- ConditionAstEvaluator; the legacy `conditions` column survives only as a policy-admin config surface.
+-- The enterprise PermissionCompiler is the ONLY writer of condition_ast / data_scope_ast / source_ref /
+-- snapshot_id and of ab_permission_snapshot.
 
 ALTER TABLE ab_role_permission ADD COLUMN IF NOT EXISTS condition_ast  JSONB;
 ALTER TABLE ab_role_permission ADD COLUMN IF NOT EXISTS data_scope_ast JSONB;
