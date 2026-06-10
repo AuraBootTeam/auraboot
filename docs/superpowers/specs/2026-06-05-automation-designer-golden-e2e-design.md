@@ -1,3 +1,10 @@
+---
+type: run-log
+status: closed
+created: 2026-06-05
+---
+<!-- no-precipitation: session run-log for automation designer E2E design spec; plan executed and merged into PRs #438/#448; no standalone reusable lesson -->
+
 # Automation 设计器端到端黄金 E2E — 设计
 
 > 日期:2026-06-05 · 状态:设计已与 owner 讨论并批准,待转 writing-plans

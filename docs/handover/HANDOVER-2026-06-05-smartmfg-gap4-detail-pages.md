@@ -1,3 +1,10 @@
+---
+type: handover
+status: closed
+created: 2026-06-05
+---
+<!-- no-precipitation: session handover; all slices merged into PRs; continuity captured in follow-on handover files -->
+
 # Session Handover - 2026-06-05 — smart-mfg golden, next = gap #4 (empty detail pages)
 
 > Focused on the **smart-mfg PCBA golden** task line only. Full prior-session detail (OEE + SPC) is in

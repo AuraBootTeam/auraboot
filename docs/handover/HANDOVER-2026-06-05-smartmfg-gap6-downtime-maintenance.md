@@ -1,3 +1,10 @@
+---
+type: handover
+status: closed
+created: 2026-06-05
+---
+<!-- no-precipitation: session handover; all slices merged into PRs; bring-up recipe is referenced by follow-on sessions -->
+
 # Session Handover — 2026-06-05 — smart-mfg gap#6 slice: equipment downtime/breakdown + maintenance
 
 > Continues the smart-mfg PCBA gap#6 action-point golden line.
