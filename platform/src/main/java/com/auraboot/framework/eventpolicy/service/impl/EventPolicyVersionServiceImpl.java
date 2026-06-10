@@ -36,8 +36,8 @@ import java.util.List;
  * EventPolicy version lifecycle service implementation.
  *
  * <p>State machine enforced by {@link VersionStatus#canTransitionTo}.
- * Validation deserializes rules_json into List&lt;PolicyRule&gt; and verifies each
- * rule's ConditionNode parses (ConditionNode is Jackson-polymorphic).
+ * Validation deserializes rules_json into List&lt;PolicyRule&gt; and verifies each rule has either
+ * a parseable ConditionNode or a decision binding.
  *
  * @author AuraBoot Team
  * @since 2.3.0
@@ -140,11 +140,17 @@ public class EventPolicyVersionServiceImpl implements EventPolicyVersionService 
                 throw new ValidationException(ResponseCode.CommonValidationFailed,
                         "Event policy version must have at least one rule");
             }
-            // Verify each rule has a parseable condition (non-null)
+            // Verify each rule has either a parseable condition or a decision binding.
             for (PolicyRule rule : rules) {
-                if (rule.condition() == null) {
+                if (rule.condition() == null && rule.decisionBinding() == null) {
                     throw new ValidationException(ResponseCode.CommonValidationFailed,
-                            "Rule '" + rule.ruleCode() + "' has no condition");
+                            "Rule '" + rule.ruleCode() + "' has no condition or decisionBinding");
+                }
+                if (rule.decisionBinding() != null
+                        && (rule.decisionBinding().decisionCode() == null
+                        || rule.decisionBinding().decisionCode().isBlank())) {
+                    throw new ValidationException(ResponseCode.CommonValidationFailed,
+                            "Rule '" + rule.ruleCode() + "' decisionBinding.decisionCode is required");
                 }
             }
         } catch (ValidationException ve) {

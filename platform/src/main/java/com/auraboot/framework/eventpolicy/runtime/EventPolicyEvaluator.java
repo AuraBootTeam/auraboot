@@ -24,10 +24,24 @@ public final class EventPolicyEvaluator {
 
     private final ConditionAstEvaluator conditionEvaluator;
     private final ActionPlanResolver resolver;
+    private final DecisionBindingMatcher decisionBindingMatcher;
 
     public EventPolicyEvaluator(ConditionAstEvaluator conditionEvaluator, ActionPlanResolver resolver) {
+        this(conditionEvaluator, resolver, (policy, rule, context) -> Truth.UNKNOWN);
+    }
+
+    public EventPolicyEvaluator(ConditionAstEvaluator conditionEvaluator,
+                                ActionPlanResolver resolver,
+                                DecisionBindingMatcher decisionBindingMatcher) {
         this.conditionEvaluator = conditionEvaluator;
         this.resolver = resolver;
+        this.decisionBindingMatcher = decisionBindingMatcher == null
+                ? (policy, rule, context) -> Truth.UNKNOWN
+                : decisionBindingMatcher;
+    }
+
+    public EventPolicyEvaluator(DecisionBindingMatcher decisionBindingMatcher) {
+        this(new ConditionAstEvaluator(), new ActionPlanResolver(), decisionBindingMatcher);
     }
 
     public EventPolicyEvaluator() {
@@ -52,9 +66,7 @@ public final class EventPolicyEvaluator {
                 skipped.add(rule.ruleCode());
                 continue;
             }
-            Truth t = rule.condition() == null
-                    ? Truth.UNKNOWN
-                    : conditionEvaluator.evaluate(rule.condition(), context).result();
+            Truth t = evaluateRule(policy, rule, context);
             if (t == Truth.TRUE) {
                 matched.add(new ActionPlanResolver.MatchedRuleActions(rule, rule.actions()));
                 if (policy.matchMode() == MatchMode.FIRST_MATCH
@@ -86,5 +98,40 @@ public final class EventPolicyEvaluator {
         List<ResolvedActionPlan> plans = res.plans();
         return new EventPolicyResult(policy.policyCode(), EventPolicyResult.Status.MATCHED,
                 matchedCodes, skipped, plans, List.of());
+    }
+
+    private Truth evaluateRule(EventPolicy policy, PolicyRule rule, DecisionContext context) {
+        Truth conditionTruth = rule.condition() == null
+                ? null
+                : conditionEvaluator.evaluate(rule.condition(), context).result();
+        Truth decisionTruth = rule.decisionBinding() == null
+                ? null
+                : decisionBindingMatcher.evaluate(policy, rule, context);
+
+        if (conditionTruth == null && decisionTruth == null) {
+            return Truth.UNKNOWN;
+        }
+        if (conditionTruth == null) {
+            return decisionTruth;
+        }
+        if (decisionTruth == null) {
+            return conditionTruth;
+        }
+        return and(conditionTruth, decisionTruth);
+    }
+
+    private Truth and(Truth left, Truth right) {
+        if (left == Truth.FALSE || right == Truth.FALSE) {
+            return Truth.FALSE;
+        }
+        if (left == Truth.TRUE && right == Truth.TRUE) {
+            return Truth.TRUE;
+        }
+        return Truth.UNKNOWN;
+    }
+
+    @FunctionalInterface
+    public interface DecisionBindingMatcher {
+        Truth evaluate(EventPolicy policy, PolicyRule rule, DecisionContext context);
     }
 }

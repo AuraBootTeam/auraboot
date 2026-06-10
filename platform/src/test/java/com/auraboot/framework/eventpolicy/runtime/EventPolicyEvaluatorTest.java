@@ -8,6 +8,8 @@ import com.auraboot.framework.decision.ast.Operand.LiteralOperand;
 import com.auraboot.framework.decision.ast.Operand.PathOperand;
 import com.auraboot.framework.decision.ast.Operator;
 import com.auraboot.framework.decision.ast.Scope;
+import com.auraboot.framework.decision.ast.Truth;
+import com.auraboot.framework.decision.rule.DecisionBinding;
 import com.auraboot.framework.eventpolicy.model.ConflictStrategy;
 import com.auraboot.framework.eventpolicy.model.DedupStrategy;
 import com.auraboot.framework.eventpolicy.model.EventPolicy;
@@ -47,6 +49,10 @@ class EventPolicyEvaluatorTest {
 
     private static PolicyRule rule(String code, int priority, ConditionNode cond, PolicyAction... actions) {
         return new PolicyRule(code, code, priority, true, cond, List.of(actions));
+    }
+
+    private static PolicyRule decisionRule(String code, int priority, DecisionBinding binding, PolicyAction... actions) {
+        return new PolicyRule(code, code, priority, true, null, binding, List.of(actions));
     }
 
     private EventPolicy policy(MatchMode mode, List<PolicyRule> rules) {
@@ -150,5 +156,65 @@ class EventPolicyEvaluatorTest {
         EventPolicy p = policy(MatchMode.COLLECT_ALL, List.of(rule("R-1", 100, gt("amount", 1), a1, a2)));
         EventPolicyResult r = evaluator.evaluate(p, complaintCtx(Map.of("amount", 20000)));
         assertThat(r.actionPlans()).extracting(ResolvedActionPlan::type).containsExactly("CREATE_SLA", "NOTIFY");
+    }
+
+    @Test
+    void decisionBindingOnlyRuleMatchesWhenInjectedMatcherReturnsTrue() {
+        EventPolicyEvaluator decisionEvaluator = new EventPolicyEvaluator((policy, rule, context) -> Truth.TRUE);
+        EventPolicy p = policy(MatchMode.COLLECT_ALL, List.of(
+                decisionRule("R-D", 100, decisionBinding("decision.large_amount"), notify("decision"))));
+
+        EventPolicyResult r = decisionEvaluator.evaluate(p, complaintCtx(Map.of("amount", 20000)));
+
+        assertThat(r.status()).isEqualTo(EventPolicyResult.Status.MATCHED);
+        assertThat(r.matchedRuleCodes()).containsExactly("R-D");
+        assertThat(r.actionPlans()).extracting(ResolvedActionPlan::type).containsExactly("NOTIFY");
+    }
+
+    @Test
+    void decisionBindingOnlyRuleDoesNotMatchWithoutRuntimeMatcher() {
+        EventPolicy p = policy(MatchMode.COLLECT_ALL, List.of(
+                decisionRule("R-D", 100, decisionBinding("decision.large_amount"), notify("decision"))));
+
+        EventPolicyResult r = evaluator.evaluate(p, complaintCtx(Map.of("amount", 20000)));
+
+        assertThat(r.status()).isEqualTo(EventPolicyResult.Status.NOT_MATCHED);
+        assertThat(r.matchedRuleCodes()).isEmpty();
+    }
+
+    @Test
+    void conditionAndDecisionBindingUseAndSemantics() {
+        EventPolicyEvaluator decisionEvaluator = new EventPolicyEvaluator((policy, rule, context) -> Truth.FALSE);
+        PolicyRule guarded = new PolicyRule(
+                "R-G",
+                "R-G",
+                100,
+                true,
+                gt("amount", 10000),
+                decisionBinding("decision.guard"),
+                List.of(notify("guarded")));
+        EventPolicy p = policy(MatchMode.COLLECT_ALL, List.of(guarded));
+
+        EventPolicyResult r = decisionEvaluator.evaluate(p, complaintCtx(Map.of("amount", 20000)));
+
+        assertThat(r.status()).isEqualTo(EventPolicyResult.Status.NOT_MATCHED);
+        assertThat(r.actionPlans()).isEmpty();
+    }
+
+    private static DecisionBinding decisionBinding(String code) {
+        return new DecisionBinding(
+                code,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                List.of(),
+                null,
+                null,
+                null,
+                true,
+                null,
+                null);
     }
 }
