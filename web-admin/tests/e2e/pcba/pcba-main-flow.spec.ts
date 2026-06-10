@@ -102,10 +102,10 @@ const DEMO_ENTRIES = {
   },
   salesOrder: {
     id: 'sales-order',
-    href: '/p/sl_sales_order',
+    href: '/p/sl_sales_order_common',
     label: /4\.\s*(销售订单|Sales Order)/i,
-    route: /\/p\/sl_sales_order(?:$|[?#])/,
-    modelCode: 'sl_sales_order',
+    route: /\/p\/sl_sales_order_common(?:$|[?#])/,
+    modelCode: 'sl_sales_order_common',
   },
   purchaseOrder: {
     id: 'purchase-order',
@@ -165,10 +165,10 @@ const DEMO_ENTRIES = {
   },
   shipment: {
     id: 'shipment',
-    href: '/p/sl_shipment',
+    href: '/p/sl_shipment_common',
     label: /14\.\s*(发运|Shipment)/i,
-    route: /\/p\/sl_shipment(?:$|[?#])/,
-    modelCode: 'sl_shipment',
+    route: /\/p\/sl_shipment_common(?:$|[?#])/,
+    modelCode: 'sl_shipment_common',
   },
 } satisfies Record<string, DemoEntry>;
 

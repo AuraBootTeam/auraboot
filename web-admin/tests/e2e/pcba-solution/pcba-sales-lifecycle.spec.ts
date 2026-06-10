@@ -2,9 +2,9 @@
  * PCBA Sales Lifecycle — E2E Tests
  *
  * Covers three sales-related models with full CRUD and status lifecycle:
- * - sl_shipment: draft -> confirmed | cancelled
- * - sl_sales_return: draft -> pending -> approved -> confirmed | cancelled
- * - sl_rma: AUTHORIZED -> RECEIVED -> INSPECTED -> DISPOSITION_DECIDED -> closed
+ * - sl_shipment_common: draft -> confirmed | cancelled
+ * - sl_sales_return_common: draft -> pending -> approved -> confirmed | cancelled
+ * - sl_rma_common: AUTHORIZED -> RECEIVED -> INSPECTED -> DISPOSITION_DECIDED -> closed
  *
  * Tests PSL-001 ~ PSL-031.
  *
@@ -358,7 +358,7 @@ test.describe('PCBA Sales Lifecycle — Shipment', () => {
     const p = await ctx.newPage();
 
     // Check if PCBA plugin is imported
-    const checkResp = await p.request.get('/api/dynamic/sl_shipment/list?pageSize=1');
+    const checkResp = await p.request.get('/api/dynamic/sl_shipment_common/list?pageSize=1');
     if (!checkResp.ok()) {
       pluginAvailable = false;
       await ctx.close();
@@ -366,7 +366,7 @@ test.describe('PCBA Sales Lifecycle — Shipment', () => {
     }
 
     // Query existing sales order, create one if missing
-    const soResp = await p.request.get('/api/dynamic/sl_sales_order/list?pageSize=1');
+    const soResp = await p.request.get('/api/dynamic/sl_sales_order_common/list?pageSize=1');
     const soBody = await soResp.json();
     salesOrderPid = soBody?.data?.records?.[0]?.pid;
     if (!salesOrderPid) {
@@ -509,7 +509,7 @@ test.describe('PCBA Sales Lifecycle — Shipment', () => {
     const searchText = String(record.sl_sh_code ?? remark);
 
     await page.goto(
-      `/p/sl_shipment/${result.recordId}/edit?commandCode=${encodeURIComponent(COMMANDS.updateShipment)}`,
+      `/p/sl_shipment_common/${result.recordId}/edit?commandCode=${encodeURIComponent(COMMANDS.updateShipment)}`,
       { waitUntil: 'domcontentloaded' },
     );
     await waitForFormReady(page);
@@ -821,7 +821,7 @@ test.describe('PCBA Sales Lifecycle — Sales Return', () => {
     const page = await ctx.newPage();
 
     // Check if PCBA plugin is imported
-    const checkResp = await page.request.get('/api/dynamic/sl_sales_return/list?pageSize=1');
+    const checkResp = await page.request.get('/api/dynamic/sl_sales_return_common/list?pageSize=1');
     if (!checkResp.ok()) {
       pluginAvailable = false;
       await ctx.close();

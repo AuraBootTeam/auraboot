@@ -1,7 +1,7 @@
 /**
  * Sales — Shipment Lifecycle E2E Tests
  *
- * Tests SL-SH-001 ~ SL-SH-009: Full lifecycle coverage for sl_shipment:
+ * Tests SL-SH-001 ~ SL-SH-009: Full lifecycle coverage for sl_shipment_common:
  * - Navigate via sidebar menu (Sales → 销售管理 → 发货管理)
  * - beforeAll: create a confirmed SO via API pipeline
  * - Create shipment linked to SO
@@ -15,7 +15,7 @@
  *   draft  --confirm--> confirmed
  *          --cancel-->  cancelled
  *
- * Prerequisites: sales plugin imported, sl_shipment model published.
+ * Prerequisites: sales plugin imported, sl_shipment_common model published.
  *
  * @since 10.0.0
  */
@@ -72,7 +72,7 @@ async function navigateToShipments(page: any) {
   await shipmentsLink.evaluate((el: HTMLElement) => el.click());
 
   await page.waitForResponse(
-    (r: any) => r.url().includes('/api/dynamic/sl_shipment/list') && r.status() === 200,
+    (r: any) => r.url().includes('/api/dynamic/sl_shipment_common/list') && r.status() === 200,
     { timeout: 15_000 },
   );
 }
@@ -176,7 +176,7 @@ test.describe('Sales — Shipment Lifecycle', () => {
       orderPid = soResult.recordId;
 
       // Fetch SO code
-      const soResp = await page.request.get(`/api/dynamic/sl_sales_order/${orderPid}`);
+      const soResp = await page.request.get(`/api/dynamic/sl_sales_order_common/${orderPid}`);
       const soBody = await soResp.json();
       orderCode = (soBody.data ?? soBody).sl_so_code ?? '';
 
@@ -240,7 +240,7 @@ test.describe('Sales — Shipment Lifecycle', () => {
     expect(orderCode, 'SO code must be auto-generated').toBeTruthy();
 
     // Layer 2: verify SO status is approved
-    const resp = await page.request.get(`/api/dynamic/sl_sales_order/${orderPid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_sales_order_common/${orderPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
@@ -276,7 +276,7 @@ test.describe('Sales — Shipment Lifecycle', () => {
     expect(shipmentPid, 'Shipment must be created').toBeTruthy();
 
     // Fetch auto-generated code
-    const resp = await page.request.get(`/api/dynamic/sl_shipment/${shipmentPid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_shipment_common/${shipmentPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
@@ -314,7 +314,7 @@ test.describe('Sales — Shipment Lifecycle', () => {
     expect(lineResult.recordId, 'Shipment line must be created').toBeTruthy();
 
     // Layer 3: total_qty updated via side effect
-    const resp = await page.request.get(`/api/dynamic/sl_shipment/${shipmentPid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_shipment_common/${shipmentPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
@@ -339,7 +339,7 @@ test.describe('Sales — Shipment Lifecycle', () => {
     expect(confirmResult.code, 'Confirm command must return code 0').toBe('0');
 
     // Layer 3: verify shipment is confirmed
-    const resp = await page.request.get(`/api/dynamic/sl_shipment/${shipmentPid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_shipment_common/${shipmentPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
@@ -381,7 +381,7 @@ test.describe('Sales — Shipment Lifecycle', () => {
     shipmentCancelPid = cancelShipResult.recordId;
     expect(shipmentCancelPid).toBeTruthy();
 
-    const resp0 = await page.request.get(`/api/dynamic/sl_shipment/${shipmentCancelPid}`);
+    const resp0 = await page.request.get(`/api/dynamic/sl_shipment_common/${shipmentCancelPid}`);
     const body0 = await resp0.json();
     shipmentCancelCode = (body0.data ?? body0).sl_sh_code ?? '';
 
@@ -396,7 +396,7 @@ test.describe('Sales — Shipment Lifecycle', () => {
     expect(cancelResult.code).toBe('0');
 
     // Layer 3: verify cancelled status
-    const resp = await page.request.get(`/api/dynamic/sl_shipment/${shipmentCancelPid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_shipment_common/${shipmentCancelPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
@@ -425,7 +425,7 @@ test.describe('Sales — Shipment Lifecycle', () => {
     );
 
     // Shipment must still exist
-    const resp = await page.request.get(`/api/dynamic/sl_shipment/${shipmentPid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_shipment_common/${shipmentPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
@@ -440,7 +440,7 @@ test.describe('Sales — Shipment Lifecycle', () => {
     expect(orderPid).toBeTruthy();
 
     // Verify the sales order still exists and is still in approved/delivered state
-    const resp = await page.request.get(`/api/dynamic/sl_sales_order/${orderPid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_sales_order_common/${orderPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;

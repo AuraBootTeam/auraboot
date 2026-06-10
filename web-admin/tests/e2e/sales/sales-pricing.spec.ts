@@ -2,8 +2,8 @@
  * Sales — Price List & Discount Rule E2E Tests
  *
  * Tests SP-001 ~ SP-007: Core lifecycle coverage for:
- * - sl_price_list: Navigation smoke, create via API, activate, deactivate
- * - sl_discount_rule: Navigation smoke, create via API, activate
+ * - sl_price_list_common: Navigation smoke, create via API, activate, deactivate
+ * - sl_discount_rule_common: Navigation smoke, create via API, activate
  * - i18n: Column headers render in Chinese, no raw field key leak
  * - Navigation: sidebar "价格与折扣" → child menu items
  *
@@ -45,7 +45,7 @@ const UID = uniqueId('SP');
  * interception issues with overlapping Ant-Design sidebar items.
  *
  * @param leafName    - Displayed name of the leaf menu item
- * @param modelCode   - Model code used in the dynamic list API URL (e.g. "sl_price_list")
+ * @param modelCode   - Model code used in the dynamic list API URL (e.g. "sl_price_list_common")
  */
 async function navigateToPricingMenu(
   page: import('@playwright/test').Page,
@@ -155,7 +155,7 @@ test.describe('Sales — Price List & Discount Rule', () => {
   // =========================================================================
 
   test('SP-001 @smoke: Price list menu navigation and list renders', async ({ page }) => {
-    await navigateToPricingMenu(page, '价格表', 'sl_price_list');
+    await navigateToPricingMenu(page, '价格表', 'sl_price_list_common');
 
     // Assert at least 1 data row is visible (the one we created in beforeAll)
     const rows = page.locator('tbody tr');
@@ -177,7 +177,7 @@ test.describe('Sales — Price List & Discount Rule', () => {
   // =========================================================================
 
   test('SP-002 @smoke: Discount rule menu navigation and list renders', async ({ page }) => {
-    await navigateToPricingMenu(page, '折扣规则', 'sl_discount_rule');
+    await navigateToPricingMenu(page, '折扣规则', 'sl_discount_rule_common');
 
     // Assert at least 1 data row is visible
     const rows = page.locator('tbody tr');
@@ -201,7 +201,7 @@ test.describe('Sales — Price List & Discount Rule', () => {
     expect(priceListPid, 'beforeAll must have created a price list').toBeTruthy();
 
     // Navigate to list via sidebar
-    await navigateToPricingMenu(page, '价格表', 'sl_price_list');
+    await navigateToPricingMenu(page, '价格表', 'sl_price_list_common');
 
     // Find the row by name (uniqueId makes it distinguishable)
     const row = await findRowInPaginatedList(page, priceListName);
@@ -234,14 +234,14 @@ test.describe('Sales — Price List & Discount Rule', () => {
     expect(result.recordId || result.code).toBeTruthy();
 
     // Verify status via direct record fetch (use model code, not page key)
-    const resp = await page.request.get(`/api/dynamic/sl_price_list/${priceListPid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_price_list_common/${priceListPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
     expect(record.sl_pl_status).toBe('active');
 
     // Verify the updated status is visible on the list page
-    await navigateToPricingMenu(page, '价格表', 'sl_price_list');
+    await navigateToPricingMenu(page, '价格表', 'sl_price_list_common');
     const row = await findRowInPaginatedList(page, priceListName);
     await expect(row).toBeVisible({ timeout: 5_000 });
     const rowText = await row.textContent();
@@ -260,7 +260,7 @@ test.describe('Sales — Price List & Discount Rule', () => {
   test('SP-005 @critical: Created discount rule appears in list', async ({ page }) => {
     expect(discountRulePid, 'beforeAll must have created a discount rule').toBeTruthy();
 
-    await navigateToPricingMenu(page, '折扣规则', 'sl_discount_rule');
+    await navigateToPricingMenu(page, '折扣规则', 'sl_discount_rule_common');
 
     const row = await findRowInPaginatedList(page, discountRuleName);
     expect(row).toBeTruthy();
@@ -291,14 +291,14 @@ test.describe('Sales — Price List & Discount Rule', () => {
     expect(result.recordId || result.code).toBeTruthy();
 
     // Verify status via direct record fetch (use model code, not page key)
-    const resp = await page.request.get(`/api/dynamic/sl_discount_rule/${discountRulePid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_discount_rule_common/${discountRulePid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
     expect(record.sl_dr_status).toBe('active');
 
     // Verify updated status on list page
-    await navigateToPricingMenu(page, '折扣规则', 'sl_discount_rule');
+    await navigateToPricingMenu(page, '折扣规则', 'sl_discount_rule_common');
     const row = await findRowInPaginatedList(page, discountRuleName);
     await expect(row).toBeVisible({ timeout: 5_000 });
     const rowText = await row.textContent();
@@ -328,14 +328,14 @@ test.describe('Sales — Price List & Discount Rule', () => {
     expect(result.recordId || result.code).toBeTruthy();
 
     // Verify status via direct record fetch (use model code, not page key)
-    const resp = await page.request.get(`/api/dynamic/sl_price_list/${priceListPid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_price_list_common/${priceListPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
     expect(record.sl_pl_status).toBe('inactive');
 
     // Verify the updated status is visible on the list page
-    await navigateToPricingMenu(page, '价格表', 'sl_price_list');
+    await navigateToPricingMenu(page, '价格表', 'sl_price_list_common');
     const row = await findRowInPaginatedList(page, priceListName);
     await expect(row).toBeVisible({ timeout: 5_000 });
     const rowText = await row.textContent();
@@ -348,7 +348,7 @@ test.describe('Sales — Price List & Discount Rule', () => {
 
     // Cross-verify via API query that data integrity is maintained
     // Use underscore model code to match the dynamic API endpoint format
-    const records = await queryFilteredList(page, 'sl_price_list', 'sl_pl_name', priceListName, {
+    const records = await queryFilteredList(page, 'sl_price_list_common', 'sl_pl_name', priceListName, {
       operator: 'like',
     });
     expect(records.length).toBeGreaterThanOrEqual(1);
