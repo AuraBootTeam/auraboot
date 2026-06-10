@@ -1484,9 +1484,21 @@ export function FormPageContent(props: PageContentProps) {
       token,
       locale,
       t,
+      getFieldValue: (fieldCode: string) => formData[fieldCode],
+      updateField: (fieldCode: string, value: unknown) => {
+        dirtyFieldsRef.current.add(fieldCode);
+        clearFieldError(fieldCode);
+        setFormData((prev) => {
+          if (prev[fieldCode] === value) return prev;
+          return {
+            ...prev,
+            [fieldCode]: value,
+          };
+        });
+      },
       getContext: () => ({ record: formData, pageContext }),
     }),
-    [formData, initialFormData, recordId, tableName, token, locale, t, pageContext],
+    [formData, initialFormData, recordId, tableName, token, locale, t, clearFieldError, pageContext],
   );
 
   // Null schema guard

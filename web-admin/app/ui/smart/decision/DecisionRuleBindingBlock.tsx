@@ -15,6 +15,13 @@ interface InputMapping {
   path: string;
 }
 
+interface RuleValueSourceDraft {
+  kind: 'FIELD' | 'LITERAL';
+  scope?: FieldOption['scope'];
+  path?: string;
+  value?: unknown;
+}
+
 interface DecisionBindingDraft {
   decisionCode: string;
   versionPolicy: DecisionVersionPolicy;
@@ -22,16 +29,56 @@ interface DecisionBindingDraft {
   fallbackMode: 'FAIL_CLOSED' | 'FAIL_OPEN' | 'DEFAULT_VALUE';
 }
 
+interface RuleConsumerBindingDraft {
+  consumerType?: string;
+  consumerCode?: string;
+  consumerNodeId?: string;
+  bindingKind: 'CONDITION' | 'DECISION_REF';
+  conditionSpec?: {
+    root: GroupNode;
+    decisionBindings: unknown[];
+  };
+  decisionBinding?: {
+    decisionCode: string;
+    versionPolicy: DecisionVersionPolicy;
+    inputMappings: Array<{
+      input: string;
+      source: RuleValueSourceDraft;
+    }>;
+    outputMappings: unknown[];
+    fallbackPolicy: {
+      mode: DecisionBindingDraft['fallbackMode'];
+    };
+    traceMode: 'SAMPLED' | 'ALWAYS' | 'NONE';
+    enabled: boolean;
+  };
+  enabled: boolean;
+}
+
+interface RuleBindingRuntime {
+  getFieldValue?: (fieldCode: string) => unknown;
+  updateField?: (fieldCode: string, value: unknown) => void;
+}
+
 interface DecisionRuleBindingBlockProps {
   block?: {
     props?: {
       mode?: 'condition' | 'decision' | 'combined';
+      valueField?: string;
+      value?: RuleConsumerBindingDraft | string;
+      initialValue?: RuleConsumerBindingDraft | string;
+      consumerType?: string;
+      consumerCode?: string;
+      consumerNodeId?: string;
       fields?: FieldOption[];
       decisions?: DecisionOption[];
       initialDecisionCode?: string;
       initialVersionPolicy?: DecisionVersionPolicy;
     };
   };
+  runtime?: RuleBindingRuntime;
+  value?: RuleConsumerBindingDraft | string;
+  onChange?: (next: RuleConsumerBindingDraft) => void;
 }
 
 const DEFAULT_FIELDS: FieldOption[] = [
@@ -66,28 +113,115 @@ function defaultCondition(): GroupNode {
   return group('AND', []);
 }
 
+function parseBindingValue(raw: unknown): RuleConsumerBindingDraft | undefined {
+  if (!raw) return undefined;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? (parsed as RuleConsumerBindingDraft) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return typeof raw === 'object' ? (raw as RuleConsumerBindingDraft) : undefined;
+}
+
+function mappingFromSource(input: string, source?: RuleValueSourceDraft): InputMapping | null {
+  if (!source || source.kind !== 'FIELD' || !source.scope || !source.path) {
+    return null;
+  }
+  return {
+    input,
+    scope: source.scope,
+    path: source.path,
+  };
+}
+
 function buildInitialBinding(
   decisions: DecisionOption[],
   initialDecisionCode?: string,
   initialVersionPolicy?: DecisionVersionPolicy,
+  initialValue?: RuleConsumerBindingDraft,
 ): DecisionBindingDraft {
+  const decisionBinding = initialValue?.decisionBinding;
   return {
-    decisionCode: initialDecisionCode || decisions[0]?.code || '',
-    versionPolicy: initialVersionPolicy || 'LATEST_PUBLISHED',
-    inputMappings: [],
-    fallbackMode: 'FAIL_CLOSED',
+    decisionCode: decisionBinding?.decisionCode || initialDecisionCode || decisions[0]?.code || '',
+    versionPolicy: decisionBinding?.versionPolicy || initialVersionPolicy || 'LATEST_PUBLISHED',
+    inputMappings:
+      decisionBinding?.inputMappings
+        ?.map((mapping) => mappingFromSource(mapping.input, mapping.source))
+        .filter((mapping): mapping is InputMapping => Boolean(mapping)) ?? [],
+    fallbackMode: decisionBinding?.fallbackPolicy?.mode || 'FAIL_CLOSED',
   };
 }
 
-export function DecisionRuleBindingBlock({ block }: DecisionRuleBindingBlockProps) {
+function buildRuleConsumerBinding(
+  condition: GroupNode,
+  binding: DecisionBindingDraft,
+  options: {
+    showCondition: boolean;
+    showDecision: boolean;
+    consumerType?: string;
+    consumerCode?: string;
+    consumerNodeId?: string;
+  },
+): RuleConsumerBindingDraft {
+  return {
+    consumerType: options.consumerType,
+    consumerCode: options.consumerCode,
+    consumerNodeId: options.consumerNodeId,
+    bindingKind: options.showDecision ? 'DECISION_REF' : 'CONDITION',
+    conditionSpec: options.showCondition
+      ? {
+          root: condition,
+          decisionBindings: [],
+        }
+      : undefined,
+    decisionBinding: options.showDecision
+      ? {
+          decisionCode: binding.decisionCode,
+          versionPolicy: binding.versionPolicy,
+          inputMappings: binding.inputMappings.map((mapping) => ({
+            input: mapping.input,
+            source: { kind: 'FIELD', scope: mapping.scope, path: mapping.path },
+          })),
+          outputMappings: [],
+          fallbackPolicy: { mode: binding.fallbackMode },
+          traceMode: 'SAMPLED',
+          enabled: true,
+        }
+      : undefined,
+    enabled: true,
+  };
+}
+
+export function DecisionRuleBindingBlock({
+  block,
+  runtime,
+  value,
+  onChange,
+}: DecisionRuleBindingBlockProps) {
   const props = block?.props ?? {};
   const mode = props.mode ?? 'combined';
   const fields = props.fields && props.fields.length > 0 ? props.fields : DEFAULT_FIELDS;
   const decisions =
     props.decisions && props.decisions.length > 0 ? props.decisions : DEFAULT_DECISIONS;
-  const [condition, setCondition] = useState<GroupNode>(() => defaultCondition());
+  const initialRuleBinding = parseBindingValue(
+    value ??
+      props.value ??
+      (props.valueField ? runtime?.getFieldValue?.(props.valueField) : undefined) ??
+      props.initialValue,
+  );
+  const [condition, setCondition] = useState<GroupNode>(() =>
+    initialRuleBinding?.conditionSpec?.root ?? defaultCondition(),
+  );
   const [binding, setBinding] = useState<DecisionBindingDraft>(() =>
-    buildInitialBinding(decisions, props.initialDecisionCode, props.initialVersionPolicy),
+    buildInitialBinding(
+      decisions,
+      props.initialDecisionCode,
+      props.initialVersionPolicy,
+      initialRuleBinding,
+    ),
   );
 
   const fieldByKey = useMemo(() => {
@@ -96,23 +230,50 @@ export function DecisionRuleBindingBlock({ block }: DecisionRuleBindingBlockProp
     return map;
   }, [fields]);
 
+  const showCondition = mode === 'condition' || mode === 'combined';
+  const showDecision = mode === 'decision' || mode === 'combined';
+
+  const emitChange = (nextCondition: GroupNode, nextBinding: DecisionBindingDraft) => {
+    const nextValue = buildRuleConsumerBinding(nextCondition, nextBinding, {
+      showCondition,
+      showDecision,
+      consumerType: props.consumerType ?? initialRuleBinding?.consumerType,
+      consumerCode: props.consumerCode ?? initialRuleBinding?.consumerCode,
+      consumerNodeId: props.consumerNodeId ?? initialRuleBinding?.consumerNodeId,
+    });
+    onChange?.(nextValue);
+    if (props.valueField) {
+      runtime?.updateField?.(props.valueField, nextValue);
+    }
+  };
+
   const addInputMapping = () => {
     const first = fields[0];
     if (!first) return;
-    setBinding((current) => ({
-      ...current,
-      inputMappings: [
-        ...current.inputMappings,
-        { input: `input${current.inputMappings.length + 1}`, scope: first.scope, path: first.path },
-      ],
-    }));
+    setBinding((current) => {
+      const next = {
+        ...current,
+        inputMappings: [
+          ...current.inputMappings,
+          {
+            input: `input${current.inputMappings.length + 1}`,
+            scope: first.scope,
+            path: first.path,
+          },
+        ],
+      };
+      emitChange(condition, next);
+      return next;
+    });
   };
 
   const updateMapping = (index: number, patch: Partial<InputMapping>) => {
     setBinding((current) => {
       const next = current.inputMappings.slice();
       next[index] = { ...next[index], ...patch };
-      return { ...current, inputMappings: next };
+      const nextBinding = { ...current, inputMappings: next };
+      emitChange(condition, nextBinding);
+      return nextBinding;
     });
   };
 
@@ -123,14 +284,20 @@ export function DecisionRuleBindingBlock({ block }: DecisionRuleBindingBlockProp
   };
 
   const removeMapping = (index: number) => {
-    setBinding((current) => ({
-      ...current,
-      inputMappings: current.inputMappings.filter((_, i) => i !== index),
-    }));
+    setBinding((current) => {
+      const next = {
+        ...current,
+        inputMappings: current.inputMappings.filter((_, i) => i !== index),
+      };
+      emitChange(condition, next);
+      return next;
+    });
   };
 
-  const showCondition = mode === 'condition' || mode === 'combined';
-  const showDecision = mode === 'decision' || mode === 'combined';
+  const updateCondition = (nextCondition: GroupNode) => {
+    setCondition(nextCondition);
+    emitChange(nextCondition, binding);
+  };
 
   return (
     <section className="decision-rule-binding-block" data-testid="decision-rule-binding-block">
@@ -140,7 +307,7 @@ export function DecisionRuleBindingBlock({ block }: DecisionRuleBindingBlockProp
             <strong>条件</strong>
             <span>{condition.children.length} 条</span>
           </div>
-          <ConditionBuilder value={condition} fields={fields} onChange={setCondition} />
+          <ConditionBuilder value={condition} fields={fields} onChange={updateCondition} />
         </div>
       )}
 
@@ -158,10 +325,14 @@ export function DecisionRuleBindingBlock({ block }: DecisionRuleBindingBlockProp
                 aria-label="decision-code"
                 value={binding.decisionCode}
                 onChange={(event) =>
-                  setBinding((current) => ({
-                    ...current,
-                    decisionCode: event.target.value,
-                  }))
+                  setBinding((current) => {
+                    const next = {
+                      ...current,
+                      decisionCode: event.target.value,
+                    };
+                    emitChange(condition, next);
+                    return next;
+                  })
                 }
               >
                 {decisions.map((decision) => (
@@ -178,10 +349,14 @@ export function DecisionRuleBindingBlock({ block }: DecisionRuleBindingBlockProp
                 aria-label="version-policy"
                 value={binding.versionPolicy}
                 onChange={(event) =>
-                  setBinding((current) => ({
-                    ...current,
-                    versionPolicy: event.target.value as DecisionVersionPolicy,
-                  }))
+                  setBinding((current) => {
+                    const next = {
+                      ...current,
+                      versionPolicy: event.target.value as DecisionVersionPolicy,
+                    };
+                    emitChange(condition, next);
+                    return next;
+                  })
                 }
               >
                 {VERSION_POLICIES.map((policy) => (
@@ -198,10 +373,14 @@ export function DecisionRuleBindingBlock({ block }: DecisionRuleBindingBlockProp
                 aria-label="fallback-mode"
                 value={binding.fallbackMode}
                 onChange={(event) =>
-                  setBinding((current) => ({
-                    ...current,
-                    fallbackMode: event.target.value as DecisionBindingDraft['fallbackMode'],
-                  }))
+                  setBinding((current) => {
+                    const next = {
+                      ...current,
+                      fallbackMode: event.target.value as DecisionBindingDraft['fallbackMode'],
+                    };
+                    emitChange(condition, next);
+                    return next;
+                  })
                 }
               >
                 <option value="FAIL_CLOSED">FAIL_CLOSED</option>
@@ -260,15 +439,15 @@ export function DecisionRuleBindingBlock({ block }: DecisionRuleBindingBlockProp
             {JSON.stringify(
               {
                 bindingKind: 'DECISION_REF',
-                decisionBinding: {
-                  decisionCode: binding.decisionCode,
-                  versionPolicy: binding.versionPolicy,
-                  inputMappings: binding.inputMappings.map((mapping) => ({
-                    input: mapping.input,
-                    source: { kind: 'field', scope: mapping.scope, path: mapping.path },
-                  })),
-                  fallbackPolicy: { mode: binding.fallbackMode },
-                },
+                  decisionBinding: {
+                    decisionCode: binding.decisionCode,
+                    versionPolicy: binding.versionPolicy,
+                    inputMappings: binding.inputMappings.map((mapping) => ({
+                      input: mapping.input,
+                      source: { kind: 'FIELD', scope: mapping.scope, path: mapping.path },
+                    })),
+                    fallbackPolicy: { mode: binding.fallbackMode },
+                  },
               },
               null,
               2,
