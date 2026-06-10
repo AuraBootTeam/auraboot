@@ -39,6 +39,12 @@ public class DrtEvaluateRequest {
     private String callerRef;
     private String correlationId;
 
+    /** Stable key for deterministic rollout bucketing. */
+    private String routingKey;
+
+    /** Optional segment/cohort label used by rollout eligibility rules. */
+    private String tenantSegment;
+
     /**
      * Context data keyed by {@link Scope} name (case-insensitive).
      * Each value is a map of field → value for that scope.

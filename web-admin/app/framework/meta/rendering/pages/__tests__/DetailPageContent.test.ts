@@ -15,6 +15,29 @@ describe('buildDetailRecordEndpoint', () => {
       '/api/dynamic/showcase_all_fields/01KPTMPKJEAC6QHW08PE9JE62W',
     );
   });
+
+  it('builds API data source detail endpoints from a template', () => {
+    expect(
+      buildDetailRecordEndpoint('decision_rollout_policy', '01KTPDRQ6TD9JAXRCPZ2KY3ZS7', {
+        dataSource: {
+          type: 'api',
+          endpoint: '/api/decision/rollouts',
+          detailEndpoint: '/api/decision/rollouts/{pid}',
+        },
+      } as any),
+    ).toBe('/api/decision/rollouts/01KTPDRQ6TD9JAXRCPZ2KY3ZS7');
+  });
+
+  it('falls back to appending the record id to an API data source endpoint', () => {
+    expect(
+      buildDetailRecordEndpoint('decision_rollout_policy', 'rollout-pid', {
+        dataSource: {
+          type: 'api',
+          endpoint: '/api/decision/rollouts/',
+        },
+      } as any),
+    ).toBe('/api/decision/rollouts/rollout-pid');
+  });
 });
 
 describe('shouldRenderDefaultDetailEditAction', () => {

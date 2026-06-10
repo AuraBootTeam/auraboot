@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.decision.model.VersionStatus;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
 import com.auraboot.framework.eventpolicy.model.ConflictStrategy;
@@ -48,6 +49,7 @@ public class EventPolicyVersionServiceImpl implements EventPolicyVersionService 
 
     private final DrtPolicyVersionMapper versionMapper;
     private final ObjectMapper objectMapper;
+    private final DecisionUsageIndexService usageIndexService;
 
     // ─── tenant guard ────────────────────────────────────────────────────────
 
@@ -154,6 +156,7 @@ public class EventPolicyVersionServiceImpl implements EventPolicyVersionService 
 
         entity.setStatus(VersionStatus.VALIDATED.name());
         versionMapper.updateById(entity);
+        usageIndexService.refreshSource("EVENT_POLICY", entity.getPid());
 
         log.info("EventPolicy version validated: pid={}", pid);
         return entity;
@@ -183,6 +186,7 @@ public class EventPolicyVersionServiceImpl implements EventPolicyVersionService 
         }
 
         versionMapper.updateById(entity);
+        usageIndexService.refreshSource("EVENT_POLICY", entity.getPid());
 
         log.info("EventPolicy version published: pid={}, code={}, version={}",
                 pid, entity.getPolicyCode(), entity.getVersion());

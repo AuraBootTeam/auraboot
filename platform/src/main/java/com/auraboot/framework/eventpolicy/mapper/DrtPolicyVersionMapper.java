@@ -34,6 +34,14 @@ public interface DrtPolicyVersionMapper extends BaseMapper<DrtPolicyVersionEntit
             @Param("policyCode") String policyCode);
 
     /**
+     * Find the latest version by version number for a (tenant, policy_code).
+     */
+    @Select("SELECT * FROM ab_drt_policy_version WHERE tenant_id = #{tenantId} AND policy_code = #{policyCode} ORDER BY version DESC LIMIT 1")
+    DrtPolicyVersionEntity findLatest(
+            @Param("tenantId") Long tenantId,
+            @Param("policyCode") String policyCode);
+
+    /**
      * Find a specific version by (tenant, policy_code, version number).
      */
     @Select("SELECT * FROM ab_drt_policy_version WHERE tenant_id = #{tenantId} AND policy_code = #{policyCode} AND version = #{version}")

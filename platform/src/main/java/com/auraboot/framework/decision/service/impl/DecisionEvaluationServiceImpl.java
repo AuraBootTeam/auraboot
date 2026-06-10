@@ -2,6 +2,7 @@ package com.auraboot.framework.decision.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.Scope;
@@ -14,6 +15,7 @@ import com.auraboot.framework.decision.entity.DrtVersionEntity;
 import com.auraboot.framework.decision.mapper.DrtLogMapper;
 import com.auraboot.framework.decision.mapper.DrtVersionMapper;
 import com.auraboot.framework.decision.model.DecisionEvaluateOptions;
+import com.auraboot.framework.decision.model.DecisionRolloutSelection;
 import com.auraboot.framework.decision.model.DecisionKind;
 import com.auraboot.framework.decision.model.DecisionResult;
 import com.auraboot.framework.decision.model.DecisionStatus;
@@ -25,7 +27,10 @@ import com.auraboot.framework.decision.runtime.DecisionRuntime;
 import com.auraboot.framework.decision.runtime.ResolvedDecision;
 import com.auraboot.framework.decision.runtime.VersionSelector;
 import com.auraboot.framework.decision.service.DecisionEvaluationService;
+import com.auraboot.framework.decision.service.DecisionRolloutService;
 import com.auraboot.framework.exception.ValidationException;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -62,6 +68,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
     private final DrtVersionMapper versionMapper;
     private final DrtLogMapper logMapper;
     private final DecisionRuntime decisionRuntime;
+    private final DecisionRolloutService rolloutService;
     private final ObjectMapper objectMapper;
 
     // ─── public API ──────────────────────────────────────────────────────────
@@ -71,7 +78,8 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
     public DecisionResult evaluate(DrtEvaluateRequest request) {
         Long tid = requireTenant();
 
-        DrtVersionEntity versionEntity = resolveVersion(tid, request);
+        Resolution resolution = resolveVersion(tid, request);
+        DrtVersionEntity versionEntity = resolution.version();
         DecisionContext ctx = buildContext(request.getContext());
         ResolvedDecision resolved = toResolved(versionEntity);
 
@@ -82,7 +90,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         // Log under the SAME traceId the runtime stamped on the result, so callers can correlate
         // result.traceId() -> ab_drt_log (the §22 audit contract). Generating a separate id here
         // would orphan the log from the returned result.
-        writelog(tid, result.traceId(), request, versionEntity, result, durationMs);
+        writelog(tid, result.traceId(), request, versionEntity, result, durationMs, resolution.rollout());
 
         log.info("Decision evaluated: code={}, version={}, matched={}, durationMs={}",
                 versionEntity.getDecisionCode(), versionEntity.getVersion(),
@@ -143,14 +151,64 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
 
     @Override
     public List<DrtLogDTO> findLogsByTraceId(String traceId) {
-        return logMapper.findByTraceId(traceId).stream()
+        Long tid = requireTenant();
+        return logMapper.findByTraceId(tid, traceId).stream()
                 .map(this::toLogDTO)
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public DrtLogDTO findLogByPid(String pid) {
+        Long tid = requireTenant();
+        return toLogDTO(logMapper.findByPid(tid, pid));
+    }
+
+    @Override
+    public PageResult<DrtLogDTO> findRecentLogs(
+            String keyword,
+            String decisionCode,
+            String status,
+            int page,
+            int size) {
+        Long tid = requireTenant();
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(1, Math.min(size, 100));
+
+        LambdaQueryWrapper<DrtLogEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DrtLogEntity::getTenantId, tid);
+        if (StringUtils.hasText(decisionCode)) {
+            wrapper.like(DrtLogEntity::getDecisionCode, decisionCode.trim());
+        }
+        if (StringUtils.hasText(status)) {
+            wrapper.eq(DrtLogEntity::getStatus, status.trim().toUpperCase());
+        }
+        if (StringUtils.hasText(keyword)) {
+            String q = keyword.trim();
+            wrapper.and(w -> w.like(DrtLogEntity::getTraceId, q)
+                    .or().like(DrtLogEntity::getDecisionCode, q)
+                    .or().like(DrtLogEntity::getStatus, q)
+                    .or().like(DrtLogEntity::getCallerType, q)
+                    .or().like(DrtLogEntity::getErrorMessage, q));
+        }
+        wrapper.orderByDesc(DrtLogEntity::getCreatedAt);
+
+        Page<DrtLogEntity> entityPage = logMapper.selectPage(new Page<>(safePage + 1L, safeSize), wrapper);
+        PageResult<DrtLogDTO> result = new PageResult<>();
+        result.setRecords(entityPage.getRecords().stream().map(this::toLogDTO).toList());
+        result.setTotal(entityPage.getTotal());
+        result.setSize(entityPage.getSize());
+        result.setCurrent(entityPage.getCurrent());
+        result.setPages(entityPage.getPages());
+        result.setHasPrevious(entityPage.hasPrevious());
+        result.setHasNext(entityPage.hasNext());
+        return result;
+    }
+
     // ─── version resolution ──────────────────────────────────────────────────
 
-    private DrtVersionEntity resolveVersion(Long tid, DrtEvaluateRequest request) {
+    private record Resolution(DrtVersionEntity version, DecisionRolloutSelection rollout) {}
+
+    private Resolution resolveVersion(Long tid, DrtEvaluateRequest request) {
         VersionBinding binding = request.getBinding() != null ? request.getBinding() : VersionBinding.LATEST;
 
         // Required-criteria checks per binding (clear error rather than a silent null/UNKNOWN).
@@ -170,6 +228,10 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         }
 
         java.util.List<DrtVersionEntity> candidates = versionMapper.findAllByCode(tid, request.getDecisionCode());
+        if (binding == VersionBinding.ROLLOUT) {
+            DecisionRolloutSelection selection = rolloutService.select(tid, request, candidates);
+            return new Resolution(selection.selectedVersion(), selection);
+        }
         DrtVersionEntity entity = VersionSelector.select(candidates, binding,
                 VersionSelector.Criteria.of(request.getFixedVersion(), request.getVersionTag(), request.getAsOf()));
 
@@ -183,7 +245,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Decision version is not bindable (status=" + status + ")");
         }
-        return entity;
+        return new Resolution(entity, null);
     }
 
     // ─── context building ────────────────────────────────────────────────────
@@ -221,7 +283,8 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
                           DrtEvaluateRequest request,
                           DrtVersionEntity ver,
                           DecisionResult result,
-                          long durationMs) {
+                          long durationMs,
+                          DecisionRolloutSelection rollout) {
         String logStatus = mapStatus(result.status());
 
         DrtLogEntity logEntry = new DrtLogEntity();
@@ -231,6 +294,14 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         logEntry.setCorrelationId(request.getCorrelationId());
         logEntry.setDecisionCode(ver.getDecisionCode());
         logEntry.setDecisionVersion(ver.getVersion());
+        logEntry.setSelectedVersion(ver.getVersion());
+        if (rollout != null) {
+            logEntry.setRolloutPolicyPid(rollout.policy().getPid());
+            logEntry.setRolloutBucket(rollout.bucket());
+            logEntry.setRolloutArm(rollout.arm().name());
+            logEntry.setRoutingKey(rollout.routingKey());
+            logEntry.setRolloutResultKey(rolloutResultKey(result));
+        }
         logEntry.setKind(ver.getKind());
         logEntry.setRuntimeAdapter(ver.getRuntimeAdapter());
         logEntry.setCallerType(request.getCallerType());
@@ -310,6 +381,12 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         dto.setCorrelationId(e.getCorrelationId());
         dto.setDecisionCode(e.getDecisionCode());
         dto.setDecisionVersion(e.getDecisionVersion());
+        dto.setSelectedVersion(e.getSelectedVersion());
+        dto.setRolloutPolicyPid(e.getRolloutPolicyPid());
+        dto.setRolloutBucket(e.getRolloutBucket());
+        dto.setRolloutArm(e.getRolloutArm());
+        dto.setRoutingKey(e.getRoutingKey());
+        dto.setRolloutResultKey(e.getRolloutResultKey());
         dto.setKind(e.getKind());
         dto.setRuntimeAdapter(e.getRuntimeAdapter());
         dto.setCallerType(e.getCallerType());
@@ -324,5 +401,19 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         dto.setErrorMessage(e.getErrorMessage());
         dto.setCreatedAt(e.getCreatedAt());
         return dto;
+    }
+
+    private String rolloutResultKey(DecisionResult result) {
+        if (result == null) {
+            return "null";
+        }
+        if (result.outputs() == null || result.outputs().isEmpty()) {
+            return result.status().name();
+        }
+        String key = result.outputs().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> entry.getKey() + "=" + String.valueOf(entry.getValue()))
+                .collect(Collectors.joining(","));
+        return key.length() <= 200 ? key : key.substring(0, 200);
     }
 }

@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.entity.SlaConfigEntity;
 import com.auraboot.framework.bpm.mapper.SlaConfigMapper;
 import com.auraboot.framework.common.util.UlidGenerator;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.plugin.dto.imports.SlaConfigDefinitionDTO;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import java.util.Set;
 public class SlaConfigService {
 
     private final SlaConfigMapper slaConfigMapper;
+    private final DecisionUsageIndexService usageIndexService;
 
     public List<SlaConfigEntity> list() {
         return slaConfigMapper.findAllEnabled(MetaContext.getCurrentTenantId());
@@ -85,6 +87,7 @@ public class SlaConfigService {
                 .deletedFlag(false)
                 .build();
         slaConfigMapper.insert(entity);
+        usageIndexService.refreshSource("SLA_RULE", entity.getPid());
         log.info("Created SLA config: pid={}, name={}", entity.getPid(), entity.getName());
         return entity;
     }
@@ -110,6 +113,7 @@ public class SlaConfigService {
         if (request.enabled() != null) entity.setEnabled(request.enabled());
         entity.setUpdatedAt(Instant.now());
         slaConfigMapper.updateById(entity);
+        usageIndexService.refreshSource("SLA_RULE", entity.getPid());
         log.info("Updated SLA config: pid={}", pid);
         return entity;
     }
@@ -121,6 +125,7 @@ public class SlaConfigService {
             throw new IllegalArgumentException("SLA config not found: " + pid);
         }
         slaConfigMapper.deleteById(entity.getId());
+        usageIndexService.deleteSource("SLA_RULE", entity.getPid());
         log.info("Deleted SLA config: pid={}", pid);
     }
 
@@ -166,6 +171,7 @@ public class SlaConfigService {
                     .deletedFlag(false)
                     .build();
             slaConfigMapper.insert(entity);
+            usageIndexService.refreshSource("SLA_RULE", entity.getPid());
             log.info("Imported SLA config (created): name={}, pid={}", entity.getName(), entity.getPid());
             return entity;
         }
@@ -184,6 +190,7 @@ public class SlaConfigService {
         if (dto.getEnabled() != null) existing.setEnabled(dto.getEnabled());
         existing.setUpdatedAt(now);
         slaConfigMapper.updateById(existing);
+        usageIndexService.refreshSource("SLA_RULE", existing.getPid());
         log.info("Imported SLA config (updated): name={}, pid={}", existing.getName(), existing.getPid());
         return existing;
     }

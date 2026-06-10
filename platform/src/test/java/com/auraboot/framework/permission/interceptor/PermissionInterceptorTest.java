@@ -2,6 +2,7 @@ package com.auraboot.framework.permission.interceptor;
 
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -65,6 +66,12 @@ class PermissionInterceptorTest {
 
         @RequirePermission(value = "needs.{missingVar}.x")
         public void unresolvedPlaceholder() {}
+
+        @RequirePermission(MetaPermission.DRT_DEFINITION_MANAGE)
+        public void decisionOpsManage() {}
+
+        @RequirePermission(MetaPermission.DRT_ROLLOUT_PROMOTE)
+        public void decisionRolloutPromote() {}
 
         public void noAnnotation() {}
     }
@@ -135,6 +142,28 @@ class PermissionInterceptorTest {
 
         assertThatThrownBy(() -> interceptor.preHandle(request, response, hm))
                 .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void preHandle_decisionOpsManagePermissionMissing_throwsAccessDenied() throws Exception {
+        HandlerMethod hm = handlerMethod(StaticHandler.class, "decisionOpsManage");
+        authenticate(7L);
+        when(userPermissionService.hasPermission(7L, MetaPermission.DRT_DEFINITION_MANAGE)).thenReturn(false);
+
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, hm))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("permissionCode: " + MetaPermission.DRT_DEFINITION_MANAGE);
+    }
+
+    @Test
+    void preHandle_decisionRolloutPromotePermissionMissing_throwsAccessDenied() throws Exception {
+        HandlerMethod hm = handlerMethod(StaticHandler.class, "decisionRolloutPromote");
+        authenticate(7L);
+        when(userPermissionService.hasPermission(7L, MetaPermission.DRT_ROLLOUT_PROMOTE)).thenReturn(false);
+
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, hm))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("permissionCode: " + MetaPermission.DRT_ROLLOUT_PROMOTE);
     }
 
     @Test

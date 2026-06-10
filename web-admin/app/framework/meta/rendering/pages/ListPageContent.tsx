@@ -94,6 +94,20 @@ export function buildListReferenceDisplayCacheKey(config: ListReferenceDisplayCo
   return `${config.field}|${config.modelCode}|${config.valueField}|${config.displayField}`;
 }
 
+export function resolveTableBlockRowActions(tableBlock: any): ButtonConfig[] {
+  const blockRowActions = Array.isArray(tableBlock?.rowActions) ? tableBlock.rowActions : [];
+  const tableRowActions = Array.isArray(tableBlock?.table?.rowActions)
+    ? tableBlock.table.rowActions
+    : [];
+  const rowActions = [...blockRowActions];
+  for (const action of tableRowActions) {
+    if (!rowActions.some((existing: any) => existing.code === action.code)) {
+      rowActions.push(action);
+    }
+  }
+  return rowActions;
+}
+
 function readRefTargetConfig(column: ColumnConfig, meta?: Record<string, any>): Record<string, any> {
   return {
     ...(meta?.extension?.refTarget || {}),
@@ -189,6 +203,39 @@ export function buildToolbarConditionContext(
   return { ...base, recordCount: list.records?.length ?? 0, total: list.total ?? 0 };
 }
 
+export function shouldSkipListData(schema: { blocks?: BlockConfig[]; extension?: Record<string, any> } | null | undefined): boolean {
+  if (!schema) return false;
+  const extension = schema.extension ?? {};
+  if (extension.skipListData === true || extension.customOnly === true) {
+    return true;
+  }
+  const blocks = Array.isArray(schema.blocks) ? schema.blocks : [];
+  if (blocks.length === 0) return false;
+  const hasTableBlock = blocks.some((block: any) => block.blockType === 'table');
+  const hasCustomBlock = blocks.some((block: any) => block.blockType === 'custom');
+  return hasCustomBlock && !hasTableBlock;
+}
+
+export function shouldSkipModelFieldMeta(
+  schema:
+    | { blocks?: BlockConfig[]; extension?: Record<string, any>; dataSource?: Record<string, any> }
+    | null
+    | undefined,
+  skipListData = shouldSkipListData(schema),
+): boolean {
+  if (skipListData) return true;
+  const extension = schema?.extension ?? {};
+  return extension.skipFieldMeta === true || extension.skipDynamicFieldMeta === true;
+}
+
+export type ListMiscBlocksPosition = 'beforeTable' | 'afterTable';
+
+export function resolveListMiscBlocksPosition(
+  schema: { extension?: Record<string, any> } | null | undefined,
+): ListMiscBlocksPosition {
+  return schema?.extension?.miscBlocksPosition === 'beforeTable' ? 'beforeTable' : 'afterTable';
+}
+
 interface InviteCodeData {
   code: string;
   expiredAt?: string;
@@ -282,6 +329,10 @@ function ListPageContentInner(props: PageContentProps) {
 
   // P2-1 fix: destructure state for convenience
   const { filters, pagination } = pageState;
+  const schemaExtension = (schema as any)?.extension ?? {};
+  const skipListData = shouldSkipListData(schema);
+  const skipModelFieldMeta = shouldSkipModelFieldMeta(schema, skipListData);
+  const miscBlocksPosition = resolveListMiscBlocksPosition(schema);
 
   // Read initial sorts, keyword, and view from URL search params
   const urlSorts = useMemo(() => decodeSorts(searchParams.get('sort')), [searchParams]);
@@ -505,8 +556,8 @@ function ListPageContentInner(props: PageContentProps) {
   const modelCode = schema?.modelCode || tableName;
   const pageKey = tableName;
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
-  const schemaExtension = (schema as any)?.extension ?? {};
-  const hideSavedViews = listExtensions?.hideSavedViews ?? Boolean(schemaExtension.hideSavedViews);
+  const hideSavedViews =
+    listExtensions?.hideSavedViews ?? Boolean(schemaExtension.hideSavedViews || skipListData);
   const {
     views: savedViews,
     currentView,
@@ -518,17 +569,20 @@ function ListPageContentInner(props: PageContentProps) {
     duplicateView,
     reload: reloadViews,
     loading: viewsLoading,
-  } = useSavedViews({ modelCode, pageKey, autoLoad: !!schema && !hideSavedViews });
+  } = useSavedViews({ modelCode, pageKey, autoLoad: !!schema && !hideSavedViews && !skipListData });
 
   // Resolve modelPid from modelCode for ViewManagePanel field operations
   const [modelPid, setModelPid] = useState<string | undefined>();
   useEffect(() => {
-    if (!modelCode) return;
+    if (!modelCode || skipModelFieldMeta) {
+      setModelPid(undefined);
+      return;
+    }
     modelService
       .findByCode(modelCode)
       .then((model) => setModelPid(model.pid))
       .catch(() => setModelPid(undefined));
-  }, [modelCode]);
+  }, [modelCode, skipModelFieldMeta]);
 
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
   const [referenceDisplayCache, setReferenceDisplayCache] = useState<
@@ -538,7 +592,7 @@ function ListPageContentInner(props: PageContentProps) {
   useEffect(() => {
     let cancelled = false;
     const pageKey = schema?.modelCode || tableName;
-    if (!pageKey) {
+    if (!pageKey || skipModelFieldMeta) {
       setModelFieldMap(new Map());
       return;
     }
@@ -571,7 +625,7 @@ function ListPageContentInner(props: PageContentProps) {
     return () => {
       cancelled = true;
     };
-  }, [schema?.modelCode, tableName, token]);
+  }, [schema?.modelCode, tableName, token, skipModelFieldMeta]);
 
   // Handle edit view (name, description, scope) via savedViewService + reload
   const handleEditView = useCallback(
@@ -829,7 +883,19 @@ function ListPageContentInner(props: PageContentProps) {
   // Load data from API - P2-1 fix: use destructured pagination
   const loadData = useCallback(
     async (params?: { page?: number; size?: number; filters?: Record<string, any> }) => {
-      if (!schema) return;
+      if (!schema || skipListData) {
+        setData([]);
+        setError(null);
+        setLoading(false);
+        setPageState((prev) => ({
+          ...prev,
+          pagination: {
+            ...prev.pagination,
+            total: 0,
+          },
+        }));
+        return;
+      }
 
       try {
         setLoading(true);
@@ -977,6 +1043,7 @@ function ListPageContentInner(props: PageContentProps) {
       tableBlock,
       activeSorts,
       chipFilters,
+      skipListData,
     ],
   );
 
@@ -1028,13 +1095,13 @@ function ListPageContentInner(props: PageContentProps) {
   // Initial data load - only execute once when schema is loaded
   // Pass current filters (which may include URL filter_* params) for the first load
   useEffect(() => {
-    if (schema) {
+    if (schema && !skipListData) {
       loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
     }
     // Intentionally only react to schema changes.
     // Pagination or filter updates are handled by explicit user actions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schema]);
+  }, [schema, skipListData]);
 
   useEffect(() => {
     listExtensions?.onDataChange?.(data);
@@ -1057,6 +1124,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Handle tab change - reload data with tab filter
   const handleTabChange = useCallback(
     (tabKey: string) => {
+      if (skipListData) return;
       setActiveTab(tabKey);
       const requestSeq = ++tabRequestSeqRef.current;
       // Compute tab filter directly (don't rely on getTabFilter since activeTab is stale in closure)
@@ -1189,6 +1257,7 @@ function ListPageContentInner(props: PageContentProps) {
       t,
       activeSorts,
       tableBlock,
+      skipListData,
     ],
   );
 
@@ -1359,14 +1428,14 @@ function ListPageContentInner(props: PageContentProps) {
   );
 
   useEffect(() => {
-    if (!schema) return;
+    if (!schema || skipListData) return;
     loadData({ page: 0, size: pagination.pageSize, filters });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSortFilterValues]);
+  }, [debouncedSortFilterValues, skipListData]);
 
   // Auto-save sorts to SavedView (debounced) + sync to URL
   useEffect(() => {
-    if (!schema) return;
+    if (!schema || skipListData) return;
     const encoded = encodeSorts(activeSorts);
     const currentEncoded = searchParams.get('sort');
     if ((encoded ?? null) !== (currentEncoded ?? null)) {
@@ -1401,6 +1470,7 @@ function ListPageContentInner(props: PageContentProps) {
     currentView?.viewConfig?.sorts,
     searchParams,
     setSearchParams,
+    skipListData,
   ]);
 
   const handleImportComplete = useCallback(() => {
@@ -1800,8 +1870,11 @@ function ListPageContentInner(props: PageContentProps) {
     const cols = (tableBlock as BlockConfig).table?.columns || tableBlock.columns;
     if (!Array.isArray(cols)) return [];
 
-    // If the block has rowActions defined at block level, synthesize an action column
-    const rowActions = tableBlock.rowActions;
+    // If the block has rowActions defined either at block level or under table,
+    // synthesize an action column. Backend PageSchemaDTO commonly keeps actions
+    // inside `table.rowActions`; dropping that path makes API-backed DSL pages
+    // render only generated defaults.
+    const rowActions = resolveTableBlockRowActions(tableBlock);
     let baseCols = cols as ColumnConfig[];
     if (rowActions && rowActions.length > 0) {
       const hasActionCol = cols.some((c: any) => c.isActionColumn);
@@ -2574,19 +2647,25 @@ function ListPageContentInner(props: PageContentProps) {
             }}
             hideSavedViews={hideSavedViews}
             hideBuiltInImport={
-              listExtensions?.hideBuiltInImport ??
-              (schema as any)?.extension?.hideBuiltInImport ??
-              (schema as any)?.extension?.hideToolbarMore
+              skipListData
+                ? true
+                : listExtensions?.hideBuiltInImport ??
+                  (schema as any)?.extension?.hideBuiltInImport ??
+                  (schema as any)?.extension?.hideToolbarMore
             }
             hideBuiltInExport={
-              listExtensions?.hideBuiltInExport ??
-              (schema as any)?.extension?.hideBuiltInExport ??
-              (schema as any)?.extension?.hideToolbarMore
+              skipListData
+                ? true
+                : listExtensions?.hideBuiltInExport ??
+                  (schema as any)?.extension?.hideBuiltInExport ??
+                  (schema as any)?.extension?.hideToolbarMore
             }
             hideBuiltInPrint={
-              listExtensions?.hideBuiltInPrint ??
-              (schema as any)?.extension?.hideBuiltInPrint ??
-              (schema as any)?.extension?.hideToolbarMore
+              skipListData
+                ? true
+                : listExtensions?.hideBuiltInPrint ??
+                  (schema as any)?.extension?.hideBuiltInPrint ??
+                  (schema as any)?.extension?.hideToolbarMore
             }
           />
 
@@ -3059,8 +3138,35 @@ function ListPageContentInner(props: PageContentProps) {
               </div>
             )}
 
-          {activeViewType === 'table' ? (
+          {skipListData ? (
+            miscListBlocks.length > 0 &&
+            runtime && (
+              <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
+                {miscListBlocks.map((block: any, idx: number) => (
+                  <BlockRenderer
+                    key={block.id || `misc-list-${idx}`}
+                    block={block}
+                    runtime={runtime}
+                    areaId="list-misc"
+                  />
+                ))}
+              </div>
+            )
+          ) : activeViewType === 'table' ? (
             <>
+              {miscBlocksPosition === 'beforeTable' && miscListBlocks.length > 0 && runtime && (
+                <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
+                  {miscListBlocks.map((block: any, idx: number) => (
+                    <BlockRenderer
+                      key={block.id || `misc-list-${idx}`}
+                      block={block}
+                      runtime={runtime}
+                      areaId="list-misc"
+                    />
+                  ))}
+                </div>
+              )}
+
               <ListToolbar
                 keyword={keyword}
                 onKeywordChange={setKeyword}
@@ -3184,7 +3290,7 @@ function ListPageContentInner(props: PageContentProps) {
               {/* G7 — misc blocks (chart / description / rich-text / divider /
                   stat-card / etc.) dispatched via BlockRenderer fallback
                   registry. Unknown block types surface a visible placeholder. */}
-              {miscListBlocks.length > 0 && runtime && (
+              {miscBlocksPosition === 'afterTable' && miscListBlocks.length > 0 && runtime && (
                 <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
                   {miscListBlocks.map((block: any, idx: number) => (
                     <BlockRenderer

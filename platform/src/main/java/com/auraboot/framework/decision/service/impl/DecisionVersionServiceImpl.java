@@ -3,6 +3,8 @@ package com.auraboot.framework.decision.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.decision.dto.DecisionImpactDTO;
+import com.auraboot.framework.decision.dto.DecisionImpactRiskDTO;
 import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionDTO;
 import com.auraboot.framework.decision.entity.DrtVersionEntity;
@@ -13,6 +15,9 @@ import com.auraboot.framework.decision.model.RuntimeAdapter;
 import com.auraboot.framework.decision.model.VersionStatus;
 import com.auraboot.framework.decision.runtime.DecisionRuntime;
 import com.auraboot.framework.decision.runtime.ResolvedDecision;
+import com.auraboot.framework.decision.service.DecisionImpactAckService;
+import com.auraboot.framework.decision.service.DecisionImpactService;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.decision.service.DecisionVersionService;
 import com.auraboot.framework.exception.ValidationException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -48,6 +53,9 @@ public class DecisionVersionServiceImpl implements DecisionVersionService {
     private final DrtVersionMapper versionMapper;
     private final DecisionRuntime decisionRuntime;
     private final ObjectMapper objectMapper;
+    private final DecisionImpactService impactService;
+    private final DecisionUsageIndexService usageIndexService;
+    private final DecisionImpactAckService impactAckService;
 
     // ─── tenant guard ────────────────────────────────────────────────────────
 
@@ -135,6 +143,7 @@ public class DecisionVersionServiceImpl implements DecisionVersionService {
             }
 
             versionMapper.updateById(entity);
+            refreshUsageIndex(entity.getPid());
             log.info("Decision version validated: pid={}", pid);
         } else {
             log.warn("Decision version validation failed: pid={}, errors={}", pid, result.errors());
@@ -146,6 +155,12 @@ public class DecisionVersionServiceImpl implements DecisionVersionService {
     @Transactional
     @Override
     public DrtVersionDTO publish(String pid) {
+        return publish(pid, false);
+    }
+
+    @Transactional
+    @Override
+    public DrtVersionDTO publish(String pid, boolean impactAcknowledged) {
         DrtVersionEntity entity = loadOwned(pid);
 
         VersionStatus current = VersionStatus.valueOf(entity.getStatus());
@@ -153,6 +168,8 @@ public class DecisionVersionServiceImpl implements DecisionVersionService {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Cannot publish from status " + current + ". Must be VALIDATED first.");
         }
+
+        DecisionImpactDTO impact = requireImpactAcknowledged(entity.getDecisionCode(), impactAcknowledged, "publish");
 
         String userPid = MetaContext.getCurrentUserPid();
         Instant now = Instant.now();
@@ -162,6 +179,8 @@ public class DecisionVersionServiceImpl implements DecisionVersionService {
         entity.setPublishedAt(now);
 
         versionMapper.updateById(entity);
+        recordImpactAcknowledgement("PUBLISH", entity, impact, null);
+        refreshUsageIndex(entity.getPid());
 
         log.info("Decision version published: pid={}, code={}, version={}",
                 pid, entity.getDecisionCode(), entity.getVersion());
@@ -186,12 +205,19 @@ public class DecisionVersionServiceImpl implements DecisionVersionService {
     @Transactional
     @Override
     public DrtVersionDTO approve(String pid, String note) {
+        return approve(pid, note, false);
+    }
+
+    @Transactional
+    @Override
+    public DrtVersionDTO approve(String pid, String note, boolean impactAcknowledged) {
         DrtVersionEntity entity = loadOwned(pid);
         VersionStatus current = VersionStatus.valueOf(entity.getStatus());
         if (current != VersionStatus.PENDING_APPROVAL) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Cannot approve from status " + current + ". Must be PENDING_APPROVAL (submit for approval first).");
         }
+        DecisionImpactDTO impact = requireImpactAcknowledged(entity.getDecisionCode(), impactAcknowledged, "approve");
         String userPid = MetaContext.getCurrentUserPid();
         Instant now = Instant.now();
         entity.setStatus(VersionStatus.PUBLISHED.name());
@@ -201,6 +227,8 @@ public class DecisionVersionServiceImpl implements DecisionVersionService {
         entity.setPublishedBy(userPid);
         entity.setPublishedAt(now);
         versionMapper.updateById(entity);
+        recordImpactAcknowledgement("APPROVE", entity, impact, note);
+        refreshUsageIndex(entity.getPid());
         log.info("Decision version approved + published: pid={}, code={}, by={}",
                 pid, entity.getDecisionCode(), userPid);
         return toDTO(entity);
@@ -222,6 +250,66 @@ public class DecisionVersionServiceImpl implements DecisionVersionService {
         versionMapper.updateById(entity);
         log.info("Decision version rejected: pid={}, code={}", pid, entity.getDecisionCode());
         return toDTO(entity);
+    }
+
+    @Transactional
+    @Override
+    public DrtVersionDTO deprecate(String pid, String note, boolean impactAcknowledged) {
+        DrtVersionEntity entity = loadOwned(pid);
+        VersionStatus current = VersionStatus.valueOf(entity.getStatus());
+        if (!current.canTransitionTo(VersionStatus.DEPRECATED)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Cannot deprecate from status " + current + ". Must be PUBLISHED.");
+        }
+        DecisionImpactDTO impact = requireImpactAcknowledged(entity.getDecisionCode(), impactAcknowledged, "deprecate");
+        entity.setStatus(VersionStatus.DEPRECATED.name());
+        entity.setApprovalBy(MetaContext.getCurrentUserPid());
+        entity.setApprovalAt(Instant.now());
+        entity.setApprovalNote(note);
+        versionMapper.updateById(entity);
+        recordImpactAcknowledgement("DEPRECATE", entity, impact, note);
+        refreshUsageIndex(entity.getPid());
+        log.info("Decision version deprecated: pid={}, code={}", pid, entity.getDecisionCode());
+        return toDTO(entity);
+    }
+
+    @Transactional
+    @Override
+    public DrtVersionDTO retire(String pid, String note, boolean impactAcknowledged) {
+        DrtVersionEntity entity = loadOwned(pid);
+        VersionStatus current = VersionStatus.valueOf(entity.getStatus());
+        if (!current.canTransitionTo(VersionStatus.RETIRED)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Cannot retire from status " + current + ". Must be DEPRECATED.");
+        }
+        DecisionImpactDTO impact = requireImpactAcknowledged(entity.getDecisionCode(), impactAcknowledged, "retire");
+        entity.setStatus(VersionStatus.RETIRED.name());
+        entity.setApprovalBy(MetaContext.getCurrentUserPid());
+        entity.setApprovalAt(Instant.now());
+        entity.setApprovalNote(note);
+        versionMapper.updateById(entity);
+        recordImpactAcknowledgement("RETIRE", entity, impact, note);
+        refreshUsageIndex(entity.getPid());
+        log.info("Decision version retired: pid={}, code={}", pid, entity.getDecisionCode());
+        return toDTO(entity);
+    }
+
+    @Transactional
+    @Override
+    public DrtVersionDTO delete(String pid) {
+        DrtVersionEntity entity = loadOwned(pid);
+        VersionStatus current = VersionStatus.valueOf(entity.getStatus());
+        if (current.isImmutable()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Cannot delete version in status " + current + ". Use deprecate/retire for published versions.");
+        }
+
+        DrtVersionDTO deleted = toDTO(entity);
+        usageIndexService.deleteSource("DECISION_VERSION", entity.getPid());
+        versionMapper.deleteById(entity.getId());
+        log.info("Decision version deleted: pid={}, code={}, status={}",
+                pid, entity.getDecisionCode(), current);
+        return deleted;
     }
 
     @Override
@@ -295,6 +383,39 @@ public class DecisionVersionServiceImpl implements DecisionVersionService {
             // SHA-256 is guaranteed by the JVM spec
             throw new IllegalStateException("SHA-256 not available", e);
         }
+    }
+
+    private DecisionImpactDTO requireImpactAcknowledged(String decisionCode, boolean impactAcknowledged, String action) {
+        DecisionImpactDTO impact = impactService.getDecisionImpact(decisionCode);
+        DecisionImpactRiskDTO risk = impact != null ? impact.getRisk() : null;
+        if (risk != null && Boolean.TRUE.equals(risk.getBlocking()) && !impactAcknowledged) {
+            String summary = risk.getSummary() == null || risk.getSummary().isBlank()
+                    ? "downstream consumers exist"
+                    : risk.getSummary();
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Impact acknowledgement required before " + action + ": " + summary);
+        }
+        return impact;
+    }
+
+    private void recordImpactAcknowledgement(String actionType, DrtVersionEntity entity, DecisionImpactDTO impact, String note) {
+        DecisionImpactRiskDTO risk = impact != null ? impact.getRisk() : null;
+        if (risk == null || !Boolean.TRUE.equals(risk.getBlocking())) {
+            return;
+        }
+        impactAckService.recordAcknowledgement(
+                actionType,
+                "DECISION_VERSION",
+                entity.getDecisionCode(),
+                entity.getPid(),
+                null,
+                risk.getSummary(),
+                impact,
+                note);
+    }
+
+    private void refreshUsageIndex(String versionPid) {
+        usageIndexService.refreshDecisionVersion(versionPid);
     }
 
     private DrtVersionDTO toDTO(DrtVersionEntity e) {

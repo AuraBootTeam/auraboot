@@ -528,6 +528,8 @@ export interface PageDataSourceConfig {
   version?: number | null;
   /** API endpoint (when type = "api") */
   endpoint?: string;
+  /** Optional detail endpoint template, e.g. "/api/items/{pid}" */
+  detailEndpoint?: string;
   /** HTTP method (when type = "api", default: "get") */
   method?: 'get' | 'post';
   /** Whether the API supports pagination (default: true) */

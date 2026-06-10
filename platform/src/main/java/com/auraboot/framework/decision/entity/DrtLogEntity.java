@@ -44,6 +44,24 @@ public class DrtLogEntity {
     @TableField("decision_version")
     private Integer decisionVersion;
 
+    @TableField("selected_version")
+    private Integer selectedVersion;
+
+    @TableField("rollout_policy_pid")
+    private String rolloutPolicyPid;
+
+    @TableField("rollout_bucket")
+    private Integer rolloutBucket;
+
+    @TableField("rollout_arm")
+    private String rolloutArm;
+
+    @TableField("routing_key")
+    private String routingKey;
+
+    @TableField("rollout_result_key")
+    private String rolloutResultKey;
+
     @TableField("kind")
     private String kind;
 

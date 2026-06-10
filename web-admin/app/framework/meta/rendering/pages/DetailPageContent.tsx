@@ -113,8 +113,37 @@ export function resolveDetailFieldComponent(meta?: {
   }
 }
 
-export function buildDetailRecordEndpoint(tableName: string, recordId: string): string {
+function applyRecordEndpointTemplate(template: string, recordId: string): string {
+  const encoded = encodeURIComponent(recordId);
+  return template
+    .replace(/\{pid\}/g, encoded)
+    .replace(/\{recordId\}/g, encoded)
+    .replace(/\{id\}/g, encoded);
+}
+
+export function buildDetailRecordEndpoint(
+  tableName: string,
+  recordId: string,
+  schema?: { dataSource?: Record<string, any> } | null,
+): string {
+  const dataSource = schema?.dataSource;
+  if (dataSource?.type === 'api') {
+    const template = dataSource.detailEndpoint || dataSource.recordEndpoint;
+    if (typeof template === 'string' && template.trim()) {
+      return applyRecordEndpointTemplate(template.trim(), recordId);
+    }
+    if (typeof dataSource.endpoint === 'string' && dataSource.endpoint.trim()) {
+      return `${dataSource.endpoint.replace(/\/+$/, '')}/${encodeURIComponent(recordId)}`;
+    }
+  }
   return buildApiEndpoint(tableName, recordId);
+}
+
+export function shouldSkipDetailModelFieldMeta(
+  schema: { extension?: Record<string, any> } | null | undefined,
+): boolean {
+  const extension = schema?.extension ?? {};
+  return extension.skipFieldMeta === true || extension.skipDynamicFieldMeta === true;
 }
 
 function getMetaExtension(meta?: { extension?: Record<string, any> }): Record<string, any> {
@@ -279,7 +308,7 @@ export function DetailPageContent(props: PageContentProps) {
       // Use /api/dynamic/{pageKey}/field-meta which requires model-level read permission
       // instead of /api/meta/models/{pid}/fields which requires management permission
       const pageKey = schema?.modelCode || tableName;
-      if (!pageKey) return;
+      if (!pageKey || shouldSkipDetailModelFieldMeta(schema)) return;
       const fieldsRes = await fetchResult<any[]>(`/api/dynamic/${pageKey}/field-meta`, {
         method: 'get',
         token: token || undefined,
@@ -294,7 +323,7 @@ export function DetailPageContent(props: PageContentProps) {
     }
 
     async function loadRecord(): Promise<void> {
-      const endpoint = buildDetailRecordEndpoint(recordModelCode, recordId!);
+      const endpoint = buildDetailRecordEndpoint(recordModelCode, recordId!, schema);
       const result = await fetchResult<RecordData>(endpoint, {
         method: 'get',
         token: token || undefined,
@@ -317,18 +346,18 @@ export function DetailPageContent(props: PageContentProps) {
     return () => {
       cancelled = true;
     };
-  }, [recordId, tableName, recordModelCode, schema?.modelCode, token]);
+  }, [recordId, tableName, recordModelCode, schema, token]);
 
   // Stable callback to reload the parent record (used after sub-table command execution)
   const reloadRecord = useCallback(() => {
     if (!recordId || !tableName) return;
-    const endpoint = buildDetailRecordEndpoint(recordModelCode, recordId);
+    const endpoint = buildDetailRecordEndpoint(recordModelCode, recordId, schema);
     fetchResult<RecordData>(endpoint, { method: 'get', token: token || undefined })
       .then((result) => {
         if (ResultHelper.isSuccess(result) && result.data) setRecordData(result.data);
       })
       .catch(() => {});
-  }, [recordId, tableName, recordModelCode, token]);
+  }, [recordId, tableName, recordModelCode, schema, token]);
 
   // Enrich a page-schema field with model field metadata (dictCode, component, dataType)
   const enrichField = useCallback(

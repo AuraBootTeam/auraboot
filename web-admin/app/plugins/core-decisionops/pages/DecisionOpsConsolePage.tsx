@@ -23,6 +23,7 @@ export default function DecisionOpsConsolePage() {
   const http: HttpClient = {
     get: <T,>(endpoint: string, params?: Record<string, unknown>) => svc.get<T>(endpoint, params),
     post: <T,>(endpoint: string, body?: unknown) => svc.post<T>(endpoint, body),
+    delete: <T,>(endpoint: string) => svc.delete<T>(endpoint),
   }
   const api = createDecisionApi(http)
   return <DecisionOpsConsole api={api} fields={DEFAULT_FIELDS} />

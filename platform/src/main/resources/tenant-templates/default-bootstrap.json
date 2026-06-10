@@ -425,6 +425,36 @@
       "resourceType": "function"
     },
     {
+      "code": "decision.rollout.manage",
+      "name": "Decision Runtime rollout manage",
+      "description": "Decision Runtime — create, activate and pause rollout policies",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:rollout",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "decision.rollout.promote",
+      "name": "Decision Runtime rollout promote",
+      "description": "Decision Runtime — promote candidate rollout versions to full serving traffic",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:rollout",
+      "action": "promote",
+      "resourceType": "function"
+    },
+    {
+      "code": "decision.rollout.rollback",
+      "name": "Decision Runtime rollout rollback",
+      "description": "Decision Runtime — roll rollout serving traffic back to the baseline version",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:rollout",
+      "action": "rollback",
+      "resourceType": "function"
+    },
+    {
       "code": "decision.policy.read",
       "name": "Event Policy definition read",
       "description": "Event Policy — list, view definitions and versions",

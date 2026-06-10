@@ -771,6 +771,85 @@ export const DISPLAY_COMPONENT_CONFIGS: ComponentConfig[] = [
     ],
     tags: ['table', 'data', 'grid', 'display'],
   },
+  {
+    type: 'decisionrolloutmonitor',
+    name: 'Decision Rollout Monitor',
+    category: 'display',
+    icon: 'split',
+    description: 'DecisionOps rollout policy monitor and promote/rollback control for DSL pages.',
+    defaultProps: {
+      initialDecisionCode: 'complaint_sla_deadline',
+    },
+    propertySchema: [
+      {
+        key: 'initialDecisionCode',
+        label: 'Initial decision code',
+        type: 'string',
+        group: 'basic',
+        description: 'Decision code loaded when the rollout monitor custom block mounts.',
+      },
+    ],
+    tags: ['decisionops', 'rollout', 'governance', 'custom-block'],
+  },
+  {
+    type: 'decisionfieldimpact',
+    name: 'Decision Field Impact',
+    category: 'display',
+    icon: 'git-branch',
+    description: 'DecisionOps field impact graph and schema-change preflight for DSL pages.',
+    defaultProps: {
+      initialFieldRef: 'record.data.priority',
+      initialCurrentDataType: 'string',
+    },
+    propertySchema: [
+      {
+        key: 'initialFieldRef',
+        label: 'Initial field ref',
+        type: 'string',
+        group: 'basic',
+        description: 'Field reference loaded when the field-impact custom block mounts.',
+      },
+      {
+        key: 'initialCurrentDataType',
+        label: 'Initial current data type',
+        type: 'string',
+        group: 'basic',
+        description: 'Current field data type used by preflight requests.',
+      },
+    ],
+    tags: ['decisionops', 'impact', 'field', 'governance', 'custom-block'],
+  },
+  {
+    type: 'decisionintegrationimpact',
+    name: 'Decision Integration Impact',
+    category: 'display',
+    icon: 'network',
+    description: 'DecisionOps connector/webhook impact graph for DSL detail pages.',
+    defaultProps: {
+      targetType: 'CONNECTOR',
+    },
+    propertySchema: [
+      {
+        key: 'targetType',
+        label: 'Target type',
+        type: 'select',
+        options: [
+          { label: 'Connector', value: 'CONNECTOR' },
+          { label: 'Webhook', value: 'WEBHOOK' },
+        ],
+        group: 'basic',
+        description: 'Integration target family.',
+      },
+      {
+        key: 'targetCode',
+        label: 'Target code',
+        type: 'string',
+        group: 'basic',
+        description: 'Optional explicit target code. Detail pages can omit this and use route recordId.',
+      },
+    ],
+    tags: ['decisionops', 'impact', 'integration', 'connector', 'webhook', 'custom-block'],
+  },
 ];
 
 export const INTERACTION_COMPONENT_CONFIGS: ComponentConfig[] = [

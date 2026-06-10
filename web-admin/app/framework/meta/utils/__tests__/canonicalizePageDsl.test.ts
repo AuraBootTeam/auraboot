@@ -62,6 +62,12 @@ describe('canonicalizePageSchemaDto', () => {
                 valueType: 'meta_model_code',
               },
             ],
+            rowActions: [
+              {
+                code: 'detail',
+                navigateTo: '/p/meta_models/view/{code}',
+              },
+            ],
           },
         },
       ],
@@ -85,6 +91,18 @@ describe('canonicalizePageSchemaDto', () => {
       cellRenderer: 'meta_model_code',
     });
     expect((schema.blocks[0] as any).table.columns[0].valueType).toBeUndefined();
+    expect((schema.blocks[0] as any).rowActions[0]).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/meta_models/view/{code}',
+      },
+    });
+    expect((schema.blocks[0] as any).table.rowActions[0]).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/meta_models/view/{code}',
+      },
+    });
     expect(schema.dataSource).toEqual({
       type: 'api',
       endpoint: '/api/meta/models',
@@ -349,5 +367,34 @@ describe('canonicalizePageSchemaDto', () => {
     );
 
     expect(failures).toEqual([]);
+  });
+
+  it('keeps DecisionOps connector row actions as governance and platform-management links', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const page = readPages(pagesFile).find((candidate) => candidate.pageKey === 'decisionops_connectors_list');
+
+    expect(page).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(page!);
+    const rowActions = (schema.blocks[0] as any).table.rowActions;
+    const detailAction = rowActions.find((action: any) => action.code === 'detail');
+    const manageAction = rowActions.find((action: any) => action.code === 'manage');
+
+    expect(rowActions.map((action: any) => action.code)).not.toEqual(
+      expect.arrayContaining(['test', 'delete']),
+    );
+    expect(detailAction).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/decisionops_connectors/view/{pid}',
+      },
+    });
+    expect(manageAction).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/api_connector',
+      },
+    });
   });
 });

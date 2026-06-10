@@ -117,4 +117,28 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   addressfield: runtime('picker', 'AddressField', {
     aliases: ['AddressField', 'address_field', 'address'],
   }),
+  decisionrolloutmonitor: runtime('decision', 'DecisionRolloutMonitorBlock', {
+    aliases: [
+      'DecisionRolloutMonitorBlock',
+      'decision-rollout-monitor',
+      'decision_rollout_monitor',
+      'decisionrolloutmonitor',
+    ],
+  }),
+  decisionfieldimpact: runtime('decision', 'DecisionFieldImpactBlock', {
+    aliases: [
+      'DecisionFieldImpactBlock',
+      'decision-field-impact',
+      'decision_field_impact',
+      'decisionfieldimpact',
+    ],
+  }),
+  decisionintegrationimpact: runtime('decision', 'DecisionIntegrationImpactBlock', {
+    aliases: [
+      'DecisionIntegrationImpactBlock',
+      'decision-integration-impact',
+      'decision_integration_impact',
+      'decisionintegrationimpact',
+    ],
+  }),
 };

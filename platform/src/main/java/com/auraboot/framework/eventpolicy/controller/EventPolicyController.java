@@ -1,7 +1,10 @@
 package com.auraboot.framework.eventpolicy.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.eventpolicy.dto.EventPolicyDefinitionCopyRequest;
 import com.auraboot.framework.eventpolicy.dto.EventPolicyDefinitionCreateRequest;
+import com.auraboot.framework.eventpolicy.dto.EventPolicyDefinitionEnabledRequest;
+import com.auraboot.framework.eventpolicy.dto.EventPolicyDefinitionSummary;
 import com.auraboot.framework.eventpolicy.dto.EventPolicyRunRequest;
 import com.auraboot.framework.eventpolicy.dto.EventPolicyVersionCreateRequest;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyDefinitionEntity;
@@ -74,17 +77,42 @@ public class EventPolicyController {
         return ApiResponse.success(result);
     }
 
+    @PostMapping("/definitions/{code}/enabled")
+    @Operation(summary = "Enable or disable event policy definition")
+    @RequirePermission(MetaPermission.POLICY_DEFINITION_MANAGE)
+    public ApiResponse<DrtPolicyDefinitionEntity> setDefinitionEnabled(
+            @Parameter(description = "Policy code") @PathVariable @NotBlank String code,
+            @Valid @RequestBody EventPolicyDefinitionEnabledRequest request) {
+        log.info("Setting event policy definition enabled: code={}, enabled={}", code, request.getEnabled());
+        DrtPolicyDefinitionEntity result = definitionService.setEnabled(code, request.getEnabled());
+        return ApiResponse.success(result);
+    }
+
+    @PostMapping("/definitions/{code}/copy")
+    @Operation(summary = "Copy event policy definition")
+    @RequirePermission(MetaPermission.POLICY_DEFINITION_MANAGE)
+    public ApiResponse<DrtPolicyDefinitionEntity> copyDefinition(
+            @Parameter(description = "Source policy code") @PathVariable @NotBlank String code,
+            @Valid @RequestBody EventPolicyDefinitionCopyRequest request) {
+        log.info("Copying event policy definition: source={}, copy={}", code, request.getPolicyCode());
+        DrtPolicyDefinitionEntity result =
+                definitionService.copy(code, request.getPolicyCode(), request.getPolicyName());
+        return ApiResponse.success("Event policy definition copied", result);
+    }
+
     @GetMapping("/definitions")
-    @Operation(summary = "List event policy definitions by event type and target")
+    @Operation(summary = "List event policy definitions")
     @RequirePermission(MetaPermission.POLICY_DEFINITION_READ)
-    public ApiResponse<List<DrtPolicyDefinitionEntity>> listDefinitions(
-            @Parameter(description = "Event type filter") @RequestParam @NotBlank String eventType,
-            @Parameter(description = "Target type filter") @RequestParam @NotBlank String targetType,
-            @Parameter(description = "Target key filter") @RequestParam @NotBlank String targetKey) {
-        log.info("Listing event policy definitions: eventType={}, targetType={}, targetKey={}",
-                eventType, targetType, targetKey);
-        List<DrtPolicyDefinitionEntity> result =
-                definitionService.findByEventAndTarget(eventType, targetType, targetKey);
+    public ApiResponse<List<EventPolicyDefinitionSummary>> listDefinitions(
+            @Parameter(description = "Keyword filter") @RequestParam(required = false) String keyword,
+            @Parameter(description = "Event type filter") @RequestParam(required = false) String eventType,
+            @Parameter(description = "Target type filter") @RequestParam(required = false) String targetType,
+            @Parameter(description = "Target key filter") @RequestParam(required = false) String targetKey,
+            @Parameter(description = "Latest version status filter") @RequestParam(required = false) String status) {
+        log.info("Listing event policy definitions: keyword={}, eventType={}, targetType={}, targetKey={}, status={}",
+                keyword, eventType, targetType, targetKey, status);
+        List<EventPolicyDefinitionSummary> result =
+                definitionService.listDefinitions(keyword, eventType, targetType, targetKey, status);
         return ApiResponse.success(result);
     }
 

@@ -6,27 +6,282 @@ import { type FieldOption } from '../ConditionBuilder';
 import type { DecisionApi } from '../../api/decisionApi';
 
 const FIELDS: FieldOption[] = [
-  { scope: 'record', path: 'data.priority', label: '优先级', dataType: 'enum', options: ['HIGH', 'LOW'] },
+  {
+    scope: 'record',
+    path: 'data.priority',
+    label: '优先级',
+    dataType: 'enum',
+    options: ['HIGH', 'LOW'],
+  },
 ];
 
-function api(): DecisionApi {
+function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
   return {
-    listDefinitions: vi.fn(async () => [{ decisionCode: 'big', decisionName: 'Big', enabled: true }]),
+    listDefinitions: vi.fn(async () => [
+      { decisionCode: 'big', decisionName: 'Big', enabled: true },
+    ]),
+    listPolicies: vi.fn(async () => [
+      {
+        policyCode: 'p1',
+        policyName: 'Policy One',
+        eventType: 'FORM_SUBMITTED',
+        status: 'PUBLISHED',
+        enabled: true,
+      },
+    ]),
+    listPolicyVersions: vi.fn(async () => []),
     validate: vi.fn(async () => ({ valid: true })),
+    getLogs: vi.fn(async () => []),
+    analyzeTable: vi.fn(async () => ({
+      valid: true,
+      metrics: {
+        ruleCount: 0,
+        gapCount: 0,
+        overlapCount: 0,
+        conflictCount: 0,
+        unreachableRuleCount: 0,
+        finiteCombinationCount: 0,
+        finiteDomainComplete: true,
+      },
+      errors: [],
+      warnings: [],
+    })),
+    exportTableDmn: vi.fn(async () => ({
+      valid: true,
+      dmnXml: '<definitions><decisionTable /></definitions>',
+      model: undefined,
+      errors: [],
+      warnings: [],
+    })),
+    importTableDmn: vi.fn(async () => ({
+      valid: true,
+      dmnXml: '<definitions><decisionTable /></definitions>',
+      model: {
+        hitPolicy: 'FIRST',
+        inputs: [
+          {
+            id: 'amount',
+            label: 'Amount',
+            scope: 'record',
+            path: 'data.amount',
+            dataType: 'decimal',
+          },
+        ],
+        outputs: [{ id: 'route', label: 'Route', dataType: 'string' }],
+        rules: [
+          {
+            ruleId: 'high',
+            priority: 10,
+            when: { amount: { operator: 'EQ', value: '', feel: '> 10000' } },
+            then: { route: 'director' },
+          },
+        ],
+      },
+      errors: [],
+      warnings: [],
+    })),
+    roundTripTableDmn: vi.fn(async () => ({
+      valid: true,
+      dmnXml: '<definitions><decisionTable /></definitions>',
+      model: {
+        hitPolicy: 'FIRST',
+        inputs: [
+          {
+            id: 'amount',
+            label: 'Amount',
+            scope: 'record',
+            path: 'data.amount',
+            dataType: 'decimal',
+          },
+        ],
+        outputs: [{ id: 'route', label: 'Route', dataType: 'string' }],
+        rules: [
+          {
+            ruleId: 'high',
+            priority: 10,
+            when: { amount: { operator: 'EQ', value: '', feel: '> 10000' } },
+            then: { route: 'director' },
+          },
+        ],
+      },
+      errors: [],
+      warnings: [],
+    })),
+    listRollouts: vi.fn(async () => []),
+    getRolloutMetrics: vi.fn(async () => ({
+      policyPid: 'rollout-1',
+      baseline: {
+        version: 1,
+        evaluations: 0,
+        matched: 0,
+        errors: 0,
+        matchedRate: 0,
+        errorRate: 0,
+        resultDistribution: {},
+      },
+      candidate: {
+        version: 2,
+        evaluations: 0,
+        matched: 0,
+        errors: 0,
+        matchedRate: 0,
+        errorRate: 0,
+        resultDistribution: {},
+      },
+    })),
+    createRollout: vi.fn(async () => ({ pid: 'rollout-new', status: 'DRAFT' })),
+    activateRollout: vi.fn(async () => ({ pid: 'rollout-new', status: 'ACTIVE' })),
+    pauseRollout: vi.fn(async () => ({ pid: 'rollout-new', status: 'PAUSED' })),
+    promoteRollout: vi.fn(async () => ({ pid: 'rollout-new', status: 'PROMOTED' })),
+    rollbackRollout: vi.fn(async () => ({ pid: 'rollout-new', status: 'ROLLED_BACK' })),
+    ...overrides,
   } as unknown as DecisionApi;
 }
 
-function renderConsole(initialTab?: Parameters<typeof DecisionOpsConsole>[0]['initialTab']) {
+function renderConsole(
+  initialTab?: Parameters<typeof DecisionOpsConsole>[0]['initialTab'],
+  apiOverrides: Partial<DecisionApi> = {},
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const apiInstance = api(apiOverrides);
   return render(
     <QueryClientProvider client={client}>
       <DecisionOpsConsole
-        api={api()} fields={FIELDS} initialTab={initialTab}
-        modelFields={[{ entityCode: 'complaint', path: 'priority', label: '优先级', dataType: 'enum', refs: 3 }]}
+        api={apiInstance}
+        fields={FIELDS}
+        initialTab={initialTab}
+        modelFields={[
+          { entityCode: 'complaint', path: 'priority', label: '优先级', dataType: 'enum', refs: 3 },
+        ]}
         logs={[{ traceId: 't1', policyCode: 'p1', status: 'SUCCESS' }]}
-        connectors={[{ code: 'c1', name: 'Hook', type: 'WEBHOOK', health: 'HEALTHY', enabled: true }]}
+        connectors={[
+          { code: 'c1', name: 'Hook', type: 'WEBHOOK', health: 'HEALTHY', enabled: true },
+        ]}
         permissionGrants={[{ role: '管理员', caps: { view: true, publish: true } }]}
-        dashboard={{ summary: { definitions: 5, policies: 2, evaluationsToday: 10, matched: 8, failed: 0, retrying: 0 }, exceptions: [] }}
+        dashboard={{
+          summary: {
+            definitions: 5,
+            policies: 2,
+            evaluationsToday: 10,
+            matched: 8,
+            failed: 0,
+            retrying: 0,
+          },
+          exceptions: [],
+        }}
+      />
+    </QueryClientProvider>,
+  );
+}
+
+function renderConsoleWithoutDashboard(apiOverrides: Partial<DecisionApi> = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const apiInstance = api(apiOverrides);
+  return render(
+    <QueryClientProvider client={client}>
+      <DecisionOpsConsole
+        api={apiInstance}
+        fields={FIELDS}
+        modelFields={[
+          { entityCode: 'complaint', path: 'priority', label: '优先级', dataType: 'enum', refs: 3 },
+        ]}
+        logs={[{ traceId: 't1', policyCode: 'p1', status: 'SUCCESS' }]}
+        connectors={[
+          { code: 'c1', name: 'Hook', type: 'WEBHOOK', health: 'HEALTHY', enabled: true },
+        ]}
+        permissionGrants={[{ role: '管理员', caps: { view: true, publish: true } }]}
+      />
+    </QueryClientProvider>,
+  );
+}
+
+function renderConsoleWithoutModelFields(apiOverrides: Partial<DecisionApi> = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const apiInstance = api(apiOverrides);
+  return render(
+    <QueryClientProvider client={client}>
+      <DecisionOpsConsole
+        api={apiInstance}
+        fields={FIELDS}
+        initialTab="model"
+        logs={[{ traceId: 't1', policyCode: 'p1', status: 'SUCCESS' }]}
+        connectors={[
+          { code: 'c1', name: 'Hook', type: 'WEBHOOK', health: 'HEALTHY', enabled: true },
+        ]}
+        permissionGrants={[{ role: '管理员', caps: { view: true, publish: true } }]}
+        dashboard={{
+          summary: {
+            definitions: 5,
+            policies: 2,
+            evaluationsToday: 10,
+            matched: 8,
+            failed: 0,
+            retrying: 0,
+          },
+          exceptions: [],
+        }}
+      />
+    </QueryClientProvider>,
+  );
+}
+
+function renderConsoleWithoutConnectors(apiOverrides: Partial<DecisionApi> = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const apiInstance = api(apiOverrides);
+  return render(
+    <QueryClientProvider client={client}>
+      <DecisionOpsConsole
+        api={apiInstance}
+        fields={FIELDS}
+        initialTab="connectors"
+        modelFields={[
+          { entityCode: 'complaint', path: 'priority', label: '优先级', dataType: 'enum', refs: 3 },
+        ]}
+        logs={[{ traceId: 't1', policyCode: 'p1', status: 'SUCCESS' }]}
+        permissionGrants={[{ role: '管理员', caps: { view: true, publish: true } }]}
+        dashboard={{
+          summary: {
+            definitions: 5,
+            policies: 2,
+            evaluationsToday: 10,
+            matched: 8,
+            failed: 0,
+            retrying: 0,
+          },
+          exceptions: [],
+        }}
+      />
+    </QueryClientProvider>,
+  );
+}
+
+function renderConsoleWithoutPermissionGrants(apiOverrides: Partial<DecisionApi> = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const apiInstance = api(apiOverrides);
+  return render(
+    <QueryClientProvider client={client}>
+      <DecisionOpsConsole
+        api={apiInstance}
+        fields={FIELDS}
+        initialTab="permissions"
+        modelFields={[
+          { entityCode: 'complaint', path: 'priority', label: '优先级', dataType: 'enum', refs: 3 },
+        ]}
+        logs={[{ traceId: 't1', policyCode: 'p1', status: 'SUCCESS' }]}
+        connectors={[
+          { code: 'c1', name: 'Hook', type: 'WEBHOOK', health: 'HEALTHY', enabled: true },
+        ]}
+        dashboard={{
+          summary: {
+            definitions: 5,
+            policies: 2,
+            evaluationsToday: 10,
+            matched: 8,
+            failed: 0,
+            retrying: 0,
+          },
+          exceptions: [],
+        }}
       />
     </QueryClientProvider>,
   );
@@ -40,16 +295,258 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('dd-card-definitions')).toHaveTextContent('5');
   });
 
+  it('loads the default dashboard from the API when no host dashboard is provided', async () => {
+    const getDashboard = vi.fn(async () => ({
+      summary: {
+        definitions: 7,
+        policies: 4,
+        evaluationsToday: 20,
+        matched: 15,
+        failed: 1,
+        retrying: 1,
+        p95LatencyMs: 42,
+      },
+      exceptions: [
+        {
+          traceId: 'trace-dash',
+          code: 'complaint_sla_deadline',
+          status: 'ERROR',
+          error: 'adapter timeout',
+          time: '2026-06-08T14:00:00Z',
+        },
+      ],
+    }));
+    renderConsoleWithoutDashboard({ getDashboard } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() => expect(getDashboard).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByTestId('dd-card-definitions')).toHaveTextContent('7'));
+    expect(screen.getByTestId('dd-card-policies')).toHaveTextContent('4');
+    expect(screen.getByTestId('dd-card-p95')).toHaveTextContent('42ms');
+    expect(screen.getByTestId('dd-exc-trace-dash')).toHaveTextContent('complaint_sla_deadline');
+    expect(screen.getByTestId('dd-exc-trace-dash')).toHaveTextContent('adapter timeout');
+  });
+
+  it('loads data model fields from the API when no host field catalogue is provided', async () => {
+    const getModelFields = vi.fn(async () => [
+      { entityCode: 'record', path: 'data.amount', label: 'amount', dataType: 'decimal', refs: 2 },
+      { entityCode: 'record', path: 'data.priority', label: 'priority', dataType: 'enum', refs: 1 },
+    ]);
+    renderConsoleWithoutModelFields({ getModelFields } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() => expect(getModelFields).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.getByTestId('dmv-row-record.data.amount')).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('dmv-refs-data.amount')).toHaveTextContent('2');
+  });
+
+  it('loads connectors from the API when no host connector registry is provided', async () => {
+    const listConnectors = vi.fn(async () => [
+      {
+        code: 'conn-crm',
+        name: 'CRM API',
+        type: 'REST',
+        endpoint: 'https://crm.example.com/api',
+        authMode: 'APIKEY',
+        health: 'UNKNOWN',
+        enabled: true,
+      },
+    ]);
+    renderConsoleWithoutConnectors({ listConnectors } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() => expect(listConnectors).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByTestId('cl-row-conn-crm')).toBeInTheDocument());
+    expect(screen.getByTestId('cl-row-conn-crm')).toHaveTextContent('CRM API');
+    expect(screen.getByTestId('cl-row-conn-crm')).toHaveAttribute('data-health', 'UNKNOWN');
+  });
+
+  it('loads permission governance grants from the API when no host matrix is provided', async () => {
+    const getPermissionMatrix = vi.fn(async () => ({
+      roles: [
+        {
+          role: '运营管理员',
+          caps: { view: true, test: true, publish: false, approve: true, field: false },
+        },
+      ],
+    }));
+    renderConsoleWithoutPermissionGrants({
+      getPermissionMatrix,
+    } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() => expect(getPermissionMatrix).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByTestId('pm-row-运营管理员')).toBeInTheDocument());
+    expect(screen.getByLabelText('运营管理员-view')).toHaveAttribute('data-granted', 'true');
+    expect(screen.getByLabelText('运营管理员-publish')).toHaveAttribute('data-granted', 'false');
+    expect(screen.getByLabelText('运营管理员-approve')).toHaveAttribute('data-granted', 'true');
+  });
+
   it('switches to Definitions (F5, self-fetching) tab', async () => {
     renderConsole();
     fireEvent.click(screen.getByTestId('doc-tab-definitions'));
     await waitFor(() => expect(screen.getByTestId('ddl-row-big')).toBeInTheDocument());
   });
 
-  it('switches to Designer (F3) tab and shows the condition builder', () => {
+  it('switches to Event Policy (F2, self-fetching) tab', async () => {
+    renderConsole();
+    fireEvent.click(screen.getByTestId('doc-tab-policies'));
+    await waitFor(() => expect(screen.getByTestId('epl-row-p1')).toBeInTheDocument());
+  });
+
+  it('opens the designer with the selected Event Policy context', async () => {
+    renderConsole();
+    fireEvent.click(screen.getByTestId('doc-tab-policies'));
+    await waitFor(() => expect(screen.getByTestId('epl-row-p1')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('epl-open-designer-p1'));
+
+    expect(screen.getByTestId('doc-panel-designer')).toBeInTheDocument();
+    expect(screen.getByTestId('epd-workflow')).toBeInTheDocument();
+    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('Policy One');
+    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('p1');
+    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('FORM_SUBMITTED');
+  });
+
+  it('switches to Designer (F3) tab and shows the workflow stepper', () => {
     renderConsole();
     fireEvent.click(screen.getByTestId('doc-tab-designer'));
-    expect(screen.getByTestId('condition-designer')).toBeInTheDocument();
+    expect(screen.getByTestId('epd-workflow')).toBeInTheDocument();
+    expect(screen.getByTestId('epd-step-trigger')).toBeInTheDocument();
+    expect(screen.getByTestId('epd-step-rules')).toBeInTheDocument();
+    expect(screen.getByTestId('epd-step-actions')).toBeInTheDocument();
+    expect(screen.getByTestId('epd-step-publish')).toBeInTheDocument();
+  });
+
+  it('switches to Decision Tables tab and edits the DMN table draft', () => {
+    renderConsole();
+    fireEvent.click(screen.getByTestId('doc-tab-tables'));
+    expect(screen.getByTestId('decision-table-editor')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('hit-policy'), { target: { value: 'COLLECT' } });
+    fireEvent.change(screen.getByLabelText('collect-aggregation'), { target: { value: 'SUM' } });
+    fireEvent.click(screen.getByTestId('dt-add-rule'));
+    fireEvent.change(screen.getByLabelText('feel-0-amount'), { target: { value: '> 10000' } });
+    fireEvent.change(screen.getByLabelText('out-0-route'), { target: { value: 'director' } });
+    expect(screen.getByLabelText('feel-0-amount')).toHaveValue('> 10000');
+    expect(screen.getByLabelText('out-0-route')).toHaveValue('director');
+  });
+
+  it('runs DMN table analysis from the Decision Tables tab and renders issue metrics', async () => {
+    const analyzeTable = vi.fn(async () => ({
+      valid: false,
+      metrics: {
+        ruleCount: 1,
+        gapCount: 1,
+        overlapCount: 1,
+        conflictCount: 0,
+        unreachableRuleCount: 0,
+        finiteCombinationCount: 4,
+        finiteDomainComplete: false,
+      },
+      errors: [],
+      warnings: [
+        {
+          code: 'DMN_GAP',
+          severity: 'WARNING',
+          ruleIds: [],
+          inputCombination: { amount: 0 },
+          message: 'No rule covers this input combination',
+        },
+      ],
+    }));
+    renderConsole('tables', { analyzeTable } as unknown as Partial<DecisionApi>);
+
+    fireEvent.click(screen.getByTestId('dt-add-rule'));
+    fireEvent.change(screen.getByLabelText('feel-0-amount'), { target: { value: '> 10000' } });
+    fireEvent.click(screen.getByTestId('dt-analyze'));
+
+    await waitFor(() => expect(analyzeTable).toHaveBeenCalledOnce());
+    expect(analyzeTable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hitPolicy: 'FIRST',
+        inputs: expect.arrayContaining([
+          expect.objectContaining({ id: 'amount', path: 'data.amount' }),
+        ]),
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('dt-analysis-panel')).toHaveTextContent('DMN_GAP'),
+    );
+    expect(screen.getByTestId('dt-metric-gap')).toHaveTextContent('Gap 1');
+    expect(screen.getByTestId('dt-analysis-summary')).toHaveTextContent('规则 1');
+  });
+
+  it('switches to Release Governance tab and renders the rollout monitor', async () => {
+    const listRollouts = vi.fn(async () => [
+      {
+        pid: 'rollout-console',
+        decisionCode: 'complaint_sla_deadline',
+        baselineVersion: 1,
+        candidateVersion: 2,
+        status: 'ACTIVE',
+        percentage: 10,
+      },
+    ]);
+    renderConsole('rollouts', { listRollouts } as unknown as Partial<DecisionApi>);
+
+    expect(screen.getByTestId('decision-rollout-monitor')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('rollout-row-rollout-console')).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('rollout-row-rollout-console')).toHaveTextContent('10%');
+  });
+
+  it('exports and round-trips DMN XML from the Decision Tables tab', async () => {
+    const exportTableDmn = vi.fn(async () => ({
+      valid: true,
+      dmnXml: '<definitions id="exported"><decisionTable /></definitions>',
+      errors: [],
+      warnings: [],
+    }));
+    const roundTripTableDmn = vi.fn(async () => ({
+      valid: true,
+      dmnXml: '<definitions id="roundtrip"><decisionTable /></definitions>',
+      model: {
+        hitPolicy: 'FIRST',
+        inputs: [
+          {
+            id: 'amount',
+            label: 'Amount',
+            scope: 'record',
+            path: 'data.amount',
+            dataType: 'decimal',
+          },
+        ],
+        outputs: [{ id: 'route', label: 'Route', dataType: 'string' }],
+        rules: [
+          {
+            ruleId: 'high',
+            priority: 10,
+            when: { amount: { operator: 'EQ', value: '', feel: '> 10000' } },
+            then: { route: 'director' },
+          },
+        ],
+      },
+      errors: [],
+      warnings: [],
+    }));
+    renderConsole('tables', {
+      exportTableDmn,
+      roundTripTableDmn,
+    } as unknown as Partial<DecisionApi>);
+
+    fireEvent.click(screen.getByTestId('dt-export-dmn'));
+    await waitFor(() => expect(exportTableDmn).toHaveBeenCalledOnce());
+    expect(screen.getByLabelText('dmn-xml')).toHaveValue(
+      '<definitions id="exported"><decisionTable /></definitions>',
+    );
+    expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('DMN XML 已导出');
+
+    fireEvent.click(screen.getByTestId('dt-roundtrip-dmn'));
+    await waitFor(() => expect(roundTripTableDmn).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByLabelText('feel-0-amount')).toHaveValue('> 10000'));
+    expect(screen.getByLabelText('dmn-xml')).toHaveValue(
+      '<definitions id="roundtrip"><decisionTable /></definitions>',
+    );
+    expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('Round-trip 通过');
   });
 
   it('switches to Logs / Model / Permissions / Connectors tabs', () => {
@@ -62,6 +559,29 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('permission-matrix')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('doc-tab-connectors'));
     expect(screen.getByTestId('connector-list')).toBeInTheDocument();
+  });
+
+  it('queries execution logs by traceId from the logs tab', async () => {
+    const getLogs = vi.fn(async () => [
+      {
+        traceId: 'trace-live',
+        decisionCode: 'complaint_sla_deadline',
+        status: 'MATCHED',
+        matchedRulesJson: [{ ruleId: 'R-101' }],
+        durationMs: 18,
+        createdAt: '2026-06-08T14:10:00Z',
+      },
+    ]);
+    renderConsole('logs', { getLogs } as unknown as Partial<DecisionApi>);
+
+    fireEvent.change(screen.getByLabelText('log-trace-id'), { target: { value: 'trace-live' } });
+    fireEvent.click(screen.getByTestId('elq-fetch'));
+
+    await waitFor(() => expect(getLogs).toHaveBeenCalledWith('trace-live'));
+    expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('complaint_sla_deadline');
+    expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('MATCHED');
+    expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('R-101');
+    expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('18ms');
   });
 
   it('honors initialTab', () => {
