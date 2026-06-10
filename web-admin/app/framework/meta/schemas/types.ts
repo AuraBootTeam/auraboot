@@ -97,6 +97,10 @@ export interface DataSourceConfig {
   queryCode?: string; // Named query code
   searchField?: string; // Field for keyword search
   maxItems?: number; // Max items to return (default: 200)
+  // 'records' returns raw query rows (multi-column aggregate rows) instead of the default
+  // option format ({key,value,label} for dropdowns). Use for metric-strip / KPI sources that
+  // read raw columns via valueField (e.g. SELECT COUNT(*) AS total_devices ...).
+  format?: 'records' | 'options'; // Default: options
 }
 
 // Handler 配置

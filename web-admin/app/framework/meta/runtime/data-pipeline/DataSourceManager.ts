@@ -458,6 +458,10 @@ export class DataSourceManager {
       labelField: config.labelField || 'name',
       ...(config.searchField ? { searchField: config.searchField } : {}),
       ...(config.maxItems ? { maxItems: String(config.maxItems) } : {}),
+      // format: 'records' asks the backend for raw query rows (multi-column aggregate rows)
+      // instead of the default {key,value,label} option format — required for metric-strip / KPI
+      // data sources that read raw columns (e.g. total_devices) via valueField.
+      ...(config.format ? { format: config.format } : {}),
       ...extraParams,
     };
 
