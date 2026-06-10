@@ -7,11 +7,14 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.decision.dto.DecisionRolloutActionRequest;
 import com.auraboot.framework.decision.dto.DecisionRolloutCreateRequest;
 import com.auraboot.framework.decision.dto.DecisionRolloutDTO;
+import com.auraboot.framework.decision.dto.DecisionRolloutMetricAggregateRow;
+import com.auraboot.framework.decision.dto.DecisionRolloutMetricDistributionRow;
+import com.auraboot.framework.decision.dto.DecisionRolloutMetricWindowRow;
 import com.auraboot.framework.decision.dto.DecisionRolloutMetricsDTO;
 import com.auraboot.framework.decision.dto.DrtEvaluateRequest;
 import com.auraboot.framework.decision.entity.DecisionRolloutPolicyEntity;
-import com.auraboot.framework.decision.entity.DrtLogEntity;
 import com.auraboot.framework.decision.entity.DrtVersionEntity;
+import com.auraboot.framework.decision.event.DecisionRolloutPolicyChangedEvent;
 import com.auraboot.framework.decision.mapper.DecisionRolloutPolicyMapper;
 import com.auraboot.framework.decision.mapper.DrtLogMapper;
 import com.auraboot.framework.decision.mapper.DrtVersionMapper;
@@ -20,6 +23,7 @@ import com.auraboot.framework.decision.model.DecisionRolloutSelection;
 import com.auraboot.framework.decision.model.DecisionRolloutStatus;
 import com.auraboot.framework.decision.model.VersionStatus;
 import com.auraboot.framework.decision.service.DecisionRolloutService;
+import com.auraboot.framework.event.AuraEventBus;
 import com.auraboot.framework.exception.ValidationException;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -27,6 +31,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -34,13 +39,14 @@ import org.springframework.util.StringUtils;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -48,12 +54,14 @@ import java.util.concurrent.ConcurrentMap;
 @RequiredArgsConstructor
 public class DecisionRolloutServiceImpl implements DecisionRolloutService {
 
-    private static final Duration SERVING_POLICY_CACHE_TTL = Duration.ofSeconds(30);
+    private static final int ROLLOUT_METRICS_WINDOW_HOURS = 6;
+    private static final int ROLLOUT_METRICS_WINDOW_BUCKET_SECONDS = 30 * 60;
 
     private final DecisionRolloutPolicyMapper rolloutMapper;
     private final DrtVersionMapper versionMapper;
     private final DrtLogMapper logMapper;
     private final ObjectMapper objectMapper;
+    private final AuraEventBus eventBus;
     private final ConcurrentMap<ServingPolicyCacheKey, ServingPolicyCacheEntry> servingPolicyCache =
             new ConcurrentHashMap<>();
 
@@ -85,7 +93,7 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
         rolloutMapper.insert(entity);
-        invalidateServingPolicyCache(tid, decisionCode);
+        invalidateAndPublishServingPolicyChange(entity);
         return toDTO(entity);
     }
 
@@ -172,7 +180,7 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
         entity.setStartedAt(entity.getStartedAt() == null ? Instant.now() : entity.getStartedAt());
         touchAudit(entity, "ACTIVATE", note(request));
         rolloutMapper.updateById(entity);
-        invalidateServingPolicyCache(entity.getTenantId(), entity.getDecisionCode());
+        invalidateAndPublishServingPolicyChange(entity);
         return toDTO(entity);
     }
 
@@ -187,7 +195,7 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
         entity.setStatus(DecisionRolloutStatus.PAUSED.name());
         touchAudit(entity, "PAUSE", note(request));
         rolloutMapper.updateById(entity);
-        invalidateServingPolicyCache(entity.getTenantId(), entity.getDecisionCode());
+        invalidateAndPublishServingPolicyChange(entity);
         return toDTO(entity);
     }
 
@@ -205,7 +213,7 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
         entity.setEndedAt(Instant.now());
         touchAudit(entity, "PROMOTE", note(request));
         rolloutMapper.updateById(entity);
-        invalidateServingPolicyCache(entity.getTenantId(), entity.getDecisionCode());
+        invalidateAndPublishServingPolicyChange(entity);
         return toDTO(entity);
     }
 
@@ -223,7 +231,7 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
         entity.setEndedAt(Instant.now());
         touchAudit(entity, "ROLLBACK", note(request));
         rolloutMapper.updateById(entity);
-        invalidateServingPolicyCache(entity.getTenantId(), entity.getDecisionCode());
+        invalidateAndPublishServingPolicyChange(entity);
         return toDTO(entity);
     }
 
@@ -235,11 +243,11 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
         dto.getBaseline().setVersion(policy.getBaselineVersion());
         dto.getCandidate().setVersion(policy.getCandidateVersion());
 
-        List<DrtLogEntity> logs = logMapper.findByRolloutPolicy(policy.getTenantId(), policy.getPid());
-        fillMetrics(dto.getBaseline(), logs.stream()
-                .filter(log -> DecisionRolloutArm.BASELINE.name().equals(log.getRolloutArm())).toList());
-        fillMetrics(dto.getCandidate(), logs.stream()
-                .filter(log -> DecisionRolloutArm.CANDIDATE.name().equals(log.getRolloutArm())).toList());
+        logMapper.aggregateByRolloutPolicy(policy.getTenantId(), policy.getPid())
+                .forEach(row -> applyAggregate(dto, row));
+        logMapper.aggregateDistributionByRolloutPolicy(policy.getTenantId(), policy.getPid())
+                .forEach(row -> applyDistribution(dto, row));
+        dto.setWindows(metricWindows(policy));
         return dto;
     }
 
@@ -269,13 +277,13 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
 
     private DecisionRolloutPolicyEntity findServingPolicy(Long tenantId, String decisionCode) {
         ServingPolicyCacheKey key = new ServingPolicyCacheKey(tenantId, decisionCode);
-        Instant now = Instant.now();
+        Instant servingUpdatedAt = rolloutMapper.findServingUpdatedAt(tenantId, decisionCode);
         ServingPolicyCacheEntry cached = servingPolicyCache.get(key);
-        if (cached != null && cached.isFresh(now)) {
+        if (cached != null && cached.matches(servingUpdatedAt)) {
             return cached.policy();
         }
         DecisionRolloutPolicyEntity policy = rolloutMapper.findServing(tenantId, decisionCode);
-        servingPolicyCache.put(key, new ServingPolicyCacheEntry(policy, now));
+        servingPolicyCache.put(key, new ServingPolicyCacheEntry(policy, servingUpdatedAt));
         return policy;
     }
 
@@ -284,6 +292,17 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
             return;
         }
         servingPolicyCache.remove(new ServingPolicyCacheKey(tenantId, decisionCode));
+    }
+
+    private void invalidateAndPublishServingPolicyChange(DecisionRolloutPolicyEntity entity) {
+        invalidateServingPolicyCache(entity.getTenantId(), entity.getDecisionCode());
+        eventBus.publishAfterCommit(new DecisionRolloutPolicyChangedEvent(
+                entity.getTenantId(), entity.getPid(), entity.getDecisionCode()));
+    }
+
+    @EventListener
+    public void onRolloutPolicyChanged(DecisionRolloutPolicyChangedEvent event) {
+        invalidateServingPolicyCache(event.getTenantId(), event.getDecisionCode());
     }
 
     private DecisionRolloutArm selectArm(DecisionRolloutPolicyEntity policy, String routingKey, int bucket, String tenantSegment) {
@@ -300,31 +319,83 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
                 : DecisionRolloutArm.BASELINE;
     }
 
-    private void fillMetrics(DecisionRolloutMetricsDTO.ArmMetrics metrics, List<DrtLogEntity> logs) {
-        metrics.setEvaluations(logs.size());
-        metrics.setMatched(logs.stream().filter(log -> Boolean.TRUE.equals(log.getMatched())).count());
-        metrics.setErrors(logs.stream().filter(log -> "ERROR".equals(log.getStatus())).count());
-        metrics.setMatchedRate(logs.isEmpty() ? 0.0 : (double) metrics.getMatched() / logs.size());
-        metrics.setErrorRate(logs.isEmpty() ? 0.0 : (double) metrics.getErrors() / logs.size());
-        metrics.setP95LatencyMs(p95(logs));
-        Map<String, Long> distribution = logs.stream().collect(java.util.stream.Collectors.groupingBy(
-                log -> log.getRolloutResultKey() == null ? String.valueOf(log.getStatus()) : log.getRolloutResultKey(),
-                java.util.LinkedHashMap::new,
-                java.util.stream.Collectors.counting()));
-        metrics.setResultDistribution(distribution);
+    private void applyAggregate(DecisionRolloutMetricsDTO dto, DecisionRolloutMetricAggregateRow row) {
+        DecisionRolloutMetricsDTO.ArmMetrics metrics = armMetrics(dto, row.getRolloutArm());
+        if (metrics == null) {
+            return;
+        }
+        applyAggregate(metrics, row.getEvaluations(), row.getMatched(), row.getErrors(), row.getP95LatencyMs());
     }
 
-    private Long p95(List<DrtLogEntity> logs) {
-        List<Long> values = logs.stream()
-                .map(DrtLogEntity::getDurationMs)
-                .filter(v -> v != null && v >= 0)
-                .sorted()
-                .toList();
-        if (values.isEmpty()) {
-            return null;
+    private void applyDistribution(DecisionRolloutMetricsDTO dto, DecisionRolloutMetricDistributionRow row) {
+        DecisionRolloutMetricsDTO.ArmMetrics metrics = armMetrics(dto, row.getRolloutArm());
+        if (metrics == null || row.getResultKey() == null) {
+            return;
         }
-        int index = (int) Math.ceil(values.size() * 0.95) - 1;
-        return values.get(Math.max(0, Math.min(index, values.size() - 1)));
+        metrics.getResultDistribution().put(row.getResultKey(), safeLong(row.getItemCount()));
+    }
+
+    private List<DecisionRolloutMetricsDTO.WindowMetrics> metricWindows(DecisionRolloutPolicyEntity policy) {
+        Instant since = Instant.now().minusSeconds(ROLLOUT_METRICS_WINDOW_HOURS * 60L * 60L);
+        List<DecisionRolloutMetricWindowRow> rows = logMapper.aggregateWindowsByRolloutPolicy(
+                policy.getTenantId(), policy.getPid(), since, ROLLOUT_METRICS_WINDOW_BUCKET_SECONDS);
+        Map<Instant, DecisionRolloutMetricsDTO.WindowMetrics> byWindow = new LinkedHashMap<>();
+        for (DecisionRolloutMetricWindowRow row : rows) {
+            if (row.getWindowStart() == null) {
+                continue;
+            }
+            DecisionRolloutMetricsDTO.WindowMetrics window = byWindow.computeIfAbsent(row.getWindowStart(), key -> {
+                DecisionRolloutMetricsDTO.WindowMetrics created = new DecisionRolloutMetricsDTO.WindowMetrics();
+                created.setWindowStart(key);
+                created.getBaseline().setVersion(policy.getBaselineVersion());
+                created.getCandidate().setVersion(policy.getCandidateVersion());
+                return created;
+            });
+            DecisionRolloutMetricsDTO.ArmMetrics metrics = armMetrics(window, row.getRolloutArm());
+            if (metrics != null) {
+                applyAggregate(metrics, row.getEvaluations(), row.getMatched(), row.getErrors(), row.getP95LatencyMs());
+            }
+        }
+        return new ArrayList<>(byWindow.values());
+    }
+
+    private void applyAggregate(
+            DecisionRolloutMetricsDTO.ArmMetrics metrics,
+            Long evaluations,
+            Long matched,
+            Long errors,
+            Long p95LatencyMs) {
+        long evals = safeLong(evaluations);
+        metrics.setEvaluations(evals);
+        metrics.setMatched(safeLong(matched));
+        metrics.setErrors(safeLong(errors));
+        metrics.setMatchedRate(evals == 0 ? 0.0 : (double) metrics.getMatched() / evals);
+        metrics.setErrorRate(evals == 0 ? 0.0 : (double) metrics.getErrors() / evals);
+        metrics.setP95LatencyMs(p95LatencyMs);
+    }
+
+    private DecisionRolloutMetricsDTO.ArmMetrics armMetrics(DecisionRolloutMetricsDTO dto, String rolloutArm) {
+        if (DecisionRolloutArm.BASELINE.name().equals(rolloutArm)) {
+            return dto.getBaseline();
+        }
+        if (DecisionRolloutArm.CANDIDATE.name().equals(rolloutArm)) {
+            return dto.getCandidate();
+        }
+        return null;
+    }
+
+    private DecisionRolloutMetricsDTO.ArmMetrics armMetrics(DecisionRolloutMetricsDTO.WindowMetrics window, String rolloutArm) {
+        if (DecisionRolloutArm.BASELINE.name().equals(rolloutArm)) {
+            return window.getBaseline();
+        }
+        if (DecisionRolloutArm.CANDIDATE.name().equals(rolloutArm)) {
+            return window.getCandidate();
+        }
+        return null;
+    }
+
+    private long safeLong(Long value) {
+        return value == null ? 0L : value;
     }
 
     private DecisionRolloutPolicyEntity load(String pid) {
@@ -543,10 +614,9 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
 
     private record ServingPolicyCacheKey(Long tenantId, String decisionCode) {}
 
-    private record ServingPolicyCacheEntry(DecisionRolloutPolicyEntity policy, Instant loadedAt) {
-        boolean isFresh(Instant now) {
-            return loadedAt != null
-                    && Duration.between(loadedAt, now).compareTo(SERVING_POLICY_CACHE_TTL) < 0;
+    private record ServingPolicyCacheEntry(DecisionRolloutPolicyEntity policy, Instant servingUpdatedAt) {
+        boolean matches(Instant currentServingUpdatedAt) {
+            return Objects.equals(servingUpdatedAt, currentServingUpdatedAt);
         }
     }
 }

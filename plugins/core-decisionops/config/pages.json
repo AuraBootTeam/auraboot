@@ -787,17 +787,6 @@
                 "type": "navigate",
                 "to": "/p/decisionops_model_fields_impact?fieldRef={entityCode}.{path}&currentDataType={dataType}"
               }
-            },
-            {
-              "code": "console",
-              "label": {
-                "zh-CN": "控制台",
-                "en-US": "Console"
-              },
-              "action": {
-                "type": "navigate",
-                "to": "/decision-ops"
-              }
             }
           ],
           "defaultSort": {
@@ -954,17 +943,6 @@
               "action": {
                 "type": "navigate",
                 "to": "/p/api_connector"
-              }
-            },
-            {
-              "code": "console",
-              "label": {
-                "zh-CN": "控制台",
-                "en-US": "Console"
-              },
-              "action": {
-                "type": "navigate",
-                "to": "/decision-ops"
               }
             }
           ],

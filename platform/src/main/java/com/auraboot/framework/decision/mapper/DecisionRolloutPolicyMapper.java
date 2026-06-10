@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.Instant;
 import java.util.List;
 
 @Mapper
@@ -47,6 +48,16 @@ public interface DecisionRolloutPolicyMapper extends BaseMapper<DecisionRolloutP
             LIMIT 1
             """)
     DecisionRolloutPolicyEntity findServing(
+            @Param("tenantId") Long tenantId,
+            @Param("decisionCode") String decisionCode);
+
+    @Select("""
+            SELECT MAX(updated_at) FROM ab_drt_rollout_policy
+            WHERE tenant_id = #{tenantId}
+              AND decision_code = #{decisionCode}
+              AND status IN ('ACTIVE', 'PROMOTED', 'ROLLED_BACK')
+            """)
+    Instant findServingUpdatedAt(
             @Param("tenantId") Long tenantId,
             @Param("decisionCode") String decisionCode);
 

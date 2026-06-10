@@ -5,7 +5,7 @@
     "name": "决策中心",
     "name:zh-CN": "决策中心",
     "name:en": "DecisionOps",
-    "path": "/decision-ops",
+    "path": "/p/decisionops_rollouts",
     "component": null,
     "icon": "partition",
     "type": 1,

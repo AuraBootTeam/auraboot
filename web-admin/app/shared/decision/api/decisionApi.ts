@@ -339,10 +339,17 @@ export interface DecisionRolloutArmMetrics {
   resultDistribution?: Record<string, number>;
 }
 
+export interface DecisionRolloutWindowMetrics {
+  windowStart?: string;
+  baseline: DecisionRolloutArmMetrics;
+  candidate: DecisionRolloutArmMetrics;
+}
+
 export interface DecisionRolloutMetrics {
   policyPid: string;
   baseline: DecisionRolloutArmMetrics;
   candidate: DecisionRolloutArmMetrics;
+  windows?: DecisionRolloutWindowMetrics[];
 }
 
 export type DecisionConnectorType = 'WEBHOOK' | 'REST' | 'KAFKA' | 'MQ' | 'SCRIPT';

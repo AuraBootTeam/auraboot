@@ -6,6 +6,7 @@ import type {
   DecisionRollout,
   DecisionRolloutActionRequest,
   DecisionRolloutArmMetrics,
+  DecisionRolloutWindowMetrics,
 } from '../api/decisionApi';
 
 export interface DecisionRolloutMonitorProps {
@@ -75,6 +76,23 @@ function distributionEntries(arm: DecisionRolloutArmMetrics): [string, number][]
   return Object.entries(arm.resultDistribution ?? {})
     .sort((left, right) => right[1] - left[1])
     .slice(0, 4);
+}
+
+function windowLabel(value?: string): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function maxWindowEvaluations(windows: DecisionRolloutWindowMetrics[]): number {
+  return Math.max(
+    1,
+    ...windows.flatMap((window) => [
+      window.baseline?.evaluations ?? 0,
+      window.candidate?.evaluations ?? 0,
+    ]),
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -156,6 +174,47 @@ function metricSummary(label: string, arm: DecisionRolloutArmMetrics, testId: st
           </dl>
         </div>
       )}
+    </div>
+  );
+}
+
+function windowTrend(windows: DecisionRolloutWindowMetrics[] = []) {
+  const visible = windows.slice(-8);
+  if (visible.length === 0) {
+    return null;
+  }
+  const maxEvaluations = maxWindowEvaluations(visible);
+
+  return (
+    <div className="rollout-window-trend" data-testid="rollout-window-trend">
+      <h4>窗口趋势</h4>
+      <div className="rollout-window-list">
+        {visible.map((window) => {
+          const baselineEval = window.baseline?.evaluations ?? 0;
+          const candidateEval = window.candidate?.evaluations ?? 0;
+          const baselineWidth = `${Math.max(3, (baselineEval / maxEvaluations) * 100)}%`;
+          const candidateWidth = `${Math.max(3, (candidateEval / maxEvaluations) * 100)}%`;
+
+          return (
+            <div className="rollout-window-row" key={window.windowStart ?? `${baselineEval}-${candidateEval}`}>
+              <time>{windowLabel(window.windowStart)}</time>
+              <div className="rollout-window-bars">
+                <span
+                  className="rollout-window-bar is-baseline"
+                  style={{ width: baselineWidth }}
+                  title={`Baseline ${baselineEval}`}
+                />
+                <span
+                  className="rollout-window-bar is-candidate"
+                  style={{ width: candidateWidth }}
+                  title={`Candidate ${candidateEval}`}
+                />
+              </div>
+              <strong>{baselineEval}/{candidateEval}</strong>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -526,6 +585,7 @@ export function DecisionRolloutMonitor({
                     'rollout-metrics-candidate',
                   )}
                 </div>
+                {windowTrend(metricsQuery.data.windows)}
               </div>
             ) : (
               <div className="decisionops-empty" data-testid="rollout-metrics-empty">

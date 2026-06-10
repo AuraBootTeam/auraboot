@@ -66,6 +66,31 @@ function rolloutApi(overrides: Partial<DecisionApi> = {}): Partial<DecisionApi> 
         p95LatencyMs: 18,
         resultDistribution: { APPROVE: 8, REVIEW: 2 },
       },
+      windows: [
+        {
+          windowStart: '2026-06-10T01:00:00Z',
+          baseline: {
+            version: 1,
+            evaluations: 9,
+            matched: 6,
+            errors: 0,
+            matchedRate: 0.6667,
+            errorRate: 0,
+            p95LatencyMs: 20,
+            resultDistribution: {},
+          },
+          candidate: {
+            version: 2,
+            evaluations: 1,
+            matched: 1,
+            errors: 0,
+            matchedRate: 1,
+            errorRate: 0,
+            p95LatencyMs: 12,
+            resultDistribution: {},
+          },
+        },
+      ],
     })),
     createRollout: vi.fn(async () => ({
       pid: 'rollout-new',
@@ -107,6 +132,7 @@ describe('DecisionRolloutMonitor', () => {
       'REVIEW',
     );
     expect(screen.getByTestId('rollout-metrics-candidate-distribution')).toHaveTextContent('2');
+    expect(screen.getByTestId('rollout-window-trend')).toHaveTextContent('9/1');
   });
 
   it('creates a rollout policy from the inline configuration form', async () => {

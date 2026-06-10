@@ -382,8 +382,9 @@ describe('canonicalizePageSchemaDto', () => {
     const manageAction = rowActions.find((action: any) => action.code === 'manage');
 
     expect(rowActions.map((action: any) => action.code)).not.toEqual(
-      expect.arrayContaining(['test', 'delete']),
+      expect.arrayContaining(['test', 'delete', 'console']),
     );
+    expect(JSON.stringify(page)).not.toContain('/decision-ops');
     expect(detailAction).toMatchObject({
       action: {
         type: 'navigate',
@@ -396,6 +397,26 @@ describe('canonicalizePageSchemaDto', () => {
         to: '/p/api_connector',
       },
     });
+  });
+
+  it('keeps DecisionOps data-model row actions scoped to field impact', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const page = readPages(pagesFile).find((candidate) => candidate.pageKey === 'decisionops_model_fields_list');
+
+    expect(page).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(page!);
+    const rowActions = (schema.blocks[0] as any).table.rowActions;
+
+    expect(rowActions.map((action: any) => action.code)).toEqual(['impact']);
+    expect(rowActions[0]).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/decisionops_model_fields_impact?fieldRef={entityCode}.{path}&currentDataType={dataType}',
+      },
+    });
+    expect(JSON.stringify(page)).not.toContain('/decision-ops');
   });
 
   it('keeps DecisionOps webhook row actions as governance and platform-management links', () => {

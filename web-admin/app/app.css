@@ -1211,6 +1211,64 @@
   color: #0f172a;
 }
 
+.rollout-window-trend {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rollout-window-trend h4 {
+  margin: 0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.rollout-window-list {
+  display: grid;
+  gap: 6px;
+}
+
+.rollout-window-row {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: 52px minmax(0, 1fr) 52px;
+}
+
+.rollout-window-row time,
+.rollout-window-row strong {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.rollout-window-row strong {
+  color: #0f172a;
+  text-align: right;
+}
+
+.rollout-window-bars {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rollout-window-bar {
+  display: block;
+  height: 5px;
+  max-width: 100%;
+  border-radius: 999px;
+}
+
+.rollout-window-bar.is-baseline {
+  background: #64748b;
+}
+
+.rollout-window-bar.is-candidate {
+  background: #2563eb;
+}
+
 .rollout-message {
   padding: 12px;
 }
