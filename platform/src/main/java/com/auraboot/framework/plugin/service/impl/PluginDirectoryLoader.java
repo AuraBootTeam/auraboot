@@ -388,8 +388,15 @@ public class PluginDirectoryLoader {
                 JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
                 return objectMapper.readValue(path.toFile(), listType);
             } catch (IOException e) {
-                log.warn("Failed to load resources from file {}: {}", path, e.getMessage());
-                return List.of();
+                // Fail loud: the file EXISTS (checked above) but failed to parse. Silently returning
+                // an empty list here makes a single field-type mismatch in one entry drop the WHOLE
+                // resource list (e.g. all of commands.json) while the import still reports success,
+                // which is effectively impossible to diagnose. Surface it as an import failure with
+                // the offending file + target type so the operator sees exactly what to fix.
+                log.error("Failed to parse plugin resource file {} as List<{}>: {}",
+                        path, clazz.getSimpleName(), e.getMessage());
+                throw new IOException("Plugin resource file " + path + " failed to parse as List<"
+                        + clazz.getSimpleName() + ">: " + e.getMessage(), e);
             }
         } else if (Files.isDirectory(path)) {
             // Load from directory of JSON files
