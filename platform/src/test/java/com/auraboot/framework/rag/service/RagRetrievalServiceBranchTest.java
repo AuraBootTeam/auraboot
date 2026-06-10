@@ -34,7 +34,8 @@ class RagRetrievalServiceBranchTest {
 
     @BeforeEach
     void setUp() {
-        service = new RagRetrievalService(embeddingService, kbService, queryRewriteService, jdbcTemplate);
+        service = new RagRetrievalService(embeddingService, kbService, queryRewriteService, jdbcTemplate,
+                new RagRetrievalMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
     }
 
     @Test

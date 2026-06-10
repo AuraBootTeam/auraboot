@@ -40,6 +40,8 @@ public class RagContextProviderImpl implements RagContextProvider {
         int maxTokens = d7KnowledgeProperties.getContextMaxTokens();
         if (!d7KnowledgeProperties.isEnabled()) {
             List<RetrievalResult> results = ragRetrievalService.retrieve(tenantId, query, kbPids, 5, null);
+            // G6: trace the raw-only path too (writer no-ops unless tracing is enabled)
+            d7RetrievalTraceWriter.recordRetrieval(tenantId, query, List.of(), results);
             // Same budgeted renderer, raw-only (G4)
             return d7ContextAssembler.buildFusedContext(
                     D7RagFusion.fuse(List.of(), results,

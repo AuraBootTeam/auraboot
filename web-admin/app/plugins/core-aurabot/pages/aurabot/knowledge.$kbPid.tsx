@@ -494,12 +494,18 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
     if (!query.trim()) return;
     setSearching(true);
     try {
-      const res = await post<RetrievalResult[]>('/api/ai/knowledge/retrieve', {
-        query,
-        knowledgeBaseIds: [kbPid],
-        topK: 5,
-      });
-      setResults(res?.data ?? []);
+      const res = await post<{ results: RetrievalResult[]; warnings: string[] }>(
+        '/api/ai/knowledge/retrieve',
+        {
+          query,
+          knowledgeBaseIds: [kbPid],
+          topK: 5,
+        },
+      );
+      setResults(res?.data?.results ?? []);
+      for (const w of res?.data?.warnings ?? []) {
+        toast.showErrorToast(w);
+      }
     } catch {
       toast.showErrorToast('Retrieval failed');
     } finally {

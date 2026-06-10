@@ -1,5 +1,6 @@
 package com.auraboot.framework.rag.service;
 
+import com.auraboot.framework.rag.dto.RetrievalOutcome;
 import com.auraboot.framework.rag.dto.RetrievalResult;
 import com.auraboot.framework.rag.entity.KnowledgeBase;
 import com.auraboot.framework.rag.util.CjkBigramSegmenter;
@@ -26,6 +27,7 @@ public class RagRetrievalService {
     private final KnowledgeBaseService kbService;
     private final QueryRewriteService queryRewriteService;
     private final JdbcTemplate jdbcTemplate;
+    private final RagRetrievalMetrics metrics;
 
     private static final int DEFAULT_TOP_K = 5;
     private static final double DEFAULT_THRESHOLD = 0.8;
@@ -44,7 +46,18 @@ public class RagRetrievalService {
      */
     public List<RetrievalResult> retrieve(Long tenantId, String query,
                                             List<String> kbPids, Integer topK, Double threshold) {
-        if (query == null || query.isBlank()) return List.of();
+        return retrieveWithDiagnostics(tenantId, query, kbPids, topK, threshold).getResults();
+    }
+
+    /**
+     * Same as {@link #retrieve} but also returns user-visible warnings about
+     * silently-degraded recall (G8), and records retrieval metrics (G6).
+     */
+    public RetrievalOutcome retrieveWithDiagnostics(Long tenantId, String query,
+                                            List<String> kbPids, Integer topK, Double threshold) {
+        List<String> warnings = new ArrayList<>();
+        long startedAt = System.currentTimeMillis();
+        if (query == null || query.isBlank()) return new RetrievalOutcome(List.of(), warnings);
 
         // Query expansion for short/domain-specific queries
         QueryRewriteService.QueryRewriteResult rewrite = queryRewriteService.rewrite(query);
@@ -57,7 +70,7 @@ public class RagRetrievalService {
         List<String> targetKbs = resolveTargetKbs(tenantId, kbPids);
         if (targetKbs.isEmpty()) {
             log.debug("No active knowledge bases found for tenant {}", tenantId);
-            return List.of();
+            return new RetrievalOutcome(List.of(), warnings);
         }
 
         // Get embedding provider from the first KB.
@@ -70,7 +83,7 @@ public class RagRetrievalService {
         // behavior was zero results or confusing SQL error. Per deep-review
         // P3-1: drop incompatible KBs + log.
         KnowledgeBase firstKb = kbService.findKbByPid(targetKbs.get(0));
-        if (firstKb == null) return List.of();
+        if (firstKb == null) return new RetrievalOutcome(List.of(), warnings);
         if (targetKbs.size() > 1) {
             String firstProvider = firstKb.getEmbeddingProvider();
             List<String> compatibleKbs = new ArrayList<>();
@@ -88,8 +101,12 @@ public class RagRetrievalService {
                 log.warn("retrieve: dropping {} KB(s) with embedding provider != {} to avoid pgvector "
                                 + "dimension mismatch: kept={} dropped={}",
                         incompatibleKbs.size(), firstProvider, compatibleKbs, incompatibleKbs);
+                metrics.recordKbDropped(incompatibleKbs.size());
+                warnings.add("Skipped " + incompatibleKbs.size() + " knowledge base(s) whose embedding "
+                        + "provider differs from '" + firstProvider + "' (vector dimension mismatch): "
+                        + incompatibleKbs + ". Search them separately or re-embed with one provider.");
                 targetKbs = compatibleKbs;
-                if (targetKbs.isEmpty()) return List.of();
+                if (targetKbs.isEmpty()) return new RetrievalOutcome(List.of(), warnings);
             }
         }
 
@@ -99,13 +116,20 @@ public class RagRetrievalService {
             queryEmbedding = embeddingService.embed(tenantId, query, firstKb.getEmbeddingProvider());
         } catch (Exception e) {
             log.warn("Embedding failed, falling back to keyword search: {}", e.getMessage());
+            metrics.recordDegraded("embedding_failed");
         }
 
+        List<RetrievalResult> results;
+        String path;
         if (queryEmbedding != null) {
-            return rerankedResults(hybridSearch(queryEmbedding, searchQuery, targetKbs, k, dist), query, k);
+            path = "hybrid";
+            results = rerankedResults(hybridSearch(queryEmbedding, searchQuery, targetKbs, k, dist), query, k);
         } else {
-            return rerankedResults(keywordSearch(searchQuery, targetKbs, k), query, k);
+            path = "keyword";
+            results = rerankedResults(keywordSearch(searchQuery, targetKbs, k), query, k);
         }
+        metrics.recordRetrieval(path, System.currentTimeMillis() - startedAt, results.size());
+        return new RetrievalOutcome(results, warnings);
     }
 
     /**
@@ -156,6 +180,7 @@ public class RagRetrievalService {
             return rows.stream().map(this::mapRow).toList();
         } catch (Exception e) {
             log.error("Hybrid search failed, falling back to vector-only: {}", e.getMessage());
+            metrics.recordDegraded("hybrid_sql_failed");
             return vectorOnlySearch(queryEmbedding, targetKbs, topK, threshold);
         }
     }

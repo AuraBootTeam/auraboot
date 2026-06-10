@@ -324,7 +324,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
         String context = ragContextProvider.retrieveContext(
                 getTestTenant().getId(), "plugin architecture", List.of(kb.getPid()));
 
-        assertThat(context).contains("Reference Knowledge");
+        assertThat(context).contains("Retrieved Knowledge");
         assertThat(context).contains("Plugin system overview content");
     }
 

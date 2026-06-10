@@ -221,7 +221,8 @@ test.describe('RAG Knowledge Base', () => {
     expect(resp.ok()).toBeTruthy();
     const body = await resp.json();
     // Without embedding config, results will be empty — but API should not error
-    expect(Array.isArray(body.data)).toBeTruthy();
+    expect(Array.isArray(body.data.results)).toBeTruthy();
+    expect(Array.isArray(body.data.warnings)).toBeTruthy();
   });
 
   test('should update KB counters after processing', async ({ page }) => {

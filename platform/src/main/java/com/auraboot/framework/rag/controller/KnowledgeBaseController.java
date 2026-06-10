@@ -178,7 +178,7 @@ public class KnowledgeBaseController {
 
     @PostMapping("/retrieve")
     @RequirePermission(MetaPermission.AI_KNOWLEDGE_RETRIEVE)
-    public ApiResponse<List<RetrievalResult>> retrieve(@RequestBody Map<String, Object> request) {
+    public ApiResponse<com.auraboot.framework.rag.dto.RetrievalOutcome> retrieve(@RequestBody Map<String, Object> request) {
         Long tenantId = MetaContext.getCurrentTenantId();
         String query = (String) request.get("query");
         @SuppressWarnings("unchecked")
@@ -186,8 +186,8 @@ public class KnowledgeBaseController {
         Integer topK = request.get("topK") != null ? ((Number) request.get("topK")).intValue() : null;
         Double threshold = request.get("threshold") != null ? ((Number) request.get("threshold")).doubleValue() : null;
 
-        List<RetrievalResult> results = ragRetrievalService.retrieve(tenantId, query, kbPids, topK, threshold);
-        return ApiResponse.success(results);
+        return ApiResponse.success(
+                ragRetrievalService.retrieveWithDiagnostics(tenantId, query, kbPids, topK, threshold));
     }
 
 

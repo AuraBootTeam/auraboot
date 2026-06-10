@@ -103,7 +103,9 @@ class RagContextProviderImplTest {
         assertThat(context).contains("[Source: raw-doc, Chunk 0]");
         assertThat(context).contains("raw only");
         verify(ragRetrievalService).retrieve(1L, "query", List.of("kb1"), 5, null);
-        verifyNoInteractions(d7Service, traceWriter);
+        // G6: the raw-only path now records a trace too (no-op unless tracing enabled)
+        verify(traceWriter).recordRetrieval(1L, "query", List.of(), rawResults);
+        verifyNoInteractions(d7Service);
     }
 
     @Test
