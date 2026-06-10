@@ -7,6 +7,7 @@ import com.auraboot.framework.decision.model.DecisionStatus;
 import com.auraboot.framework.decision.rule.DecisionBinding;
 import com.auraboot.framework.decision.rule.DecisionVersionPolicy;
 import com.auraboot.framework.decision.rule.RuleBindingKind;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import com.auraboot.framework.decision.rule.RuleEvaluationContext;
 import com.auraboot.framework.decision.rule.RuleEvaluationService;
 import com.auraboot.framework.decision.rule.RuleEvaluationTrace;
@@ -104,6 +105,71 @@ class SlaDecisionDeadlineTest {
         verify(ruleEvaluationService).evaluateDecisionBinding(any(DecisionBinding.class), context.capture());
         assertThat(context.getValue().consumerType()).isEqualTo("SLA");
         assertThat(context.getValue().consumerCode()).isEqualTo("sla-1");
+    }
+
+    @Test
+    void computeDeadlinePrefersRuleConsumerBindingWhenPresent() {
+        when(ruleEvaluationService.evaluateDecisionBinding(any(DecisionBinding.class), any(RuleEvaluationContext.class)))
+                .thenReturn(new RuleEvaluationTrace(
+                        "decision-trace-sla",
+                        "SLA",
+                        "sla-binding-1",
+                        "approve_task",
+                        RuleBindingKind.DECISION_REF,
+                        "complaint_sla_deadline",
+                        1,
+                        DecisionVersionPolicy.LATEST_PUBLISHED,
+                        null,
+                        DecisionStatus.MATCHED,
+                        true,
+                        Map.of("targetKey", "approve_task"),
+                        Map.of("deadlineMinutes", 30),
+                        false,
+                        2,
+                        null,
+                        List.of(),
+                        List.of(),
+                        List.of("record.data.targetKey"),
+                        List.of("complaint_sla_deadline")));
+        SlaConfigEntity cfg = config();
+        cfg.setPid("sla-binding-1");
+        cfg.setDeadlineMode("FIXED");
+        cfg.setDeadlineValue("PT24H");
+        cfg.setRuleBinding(new RuleConsumerBinding(
+                "SLA",
+                "sla-binding-1",
+                "deadline",
+                RuleBindingKind.DECISION_REF,
+                null,
+                new DecisionBinding(
+                        "complaint_sla_deadline",
+                        DecisionVersionPolicy.LATEST_PUBLISHED,
+                        null,
+                        null,
+                        null,
+                        List.of(new DecisionBinding.InputMapping(
+                                "targetKey",
+                                com.auraboot.framework.decision.rule.RuleValueSource.field(
+                                        com.auraboot.framework.decision.ast.Scope.RECORD,
+                                        "data.targetKey"))),
+                        List.of(),
+                        DecisionBinding.FallbackPolicy.failClosed(),
+                        200,
+                        DecisionBinding.TraceMode.SAMPLED,
+                        true,
+                        null,
+                        null),
+                true));
+
+        java.time.Instant before = java.time.Instant.now();
+        java.time.Instant deadline = org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+                listenerWithRuleEvaluation(), "computeDeadline", cfg);
+
+        assertThat(deadline).isNotNull();
+        assertThat(java.time.Duration.between(before, deadline).toMinutes()).isBetween(29L, 30L);
+        ArgumentCaptor<DecisionBinding> binding = ArgumentCaptor.forClass(DecisionBinding.class);
+        verify(ruleEvaluationService).evaluateDecisionBinding(binding.capture(), any(RuleEvaluationContext.class));
+        assertThat(binding.getValue().decisionCode()).isEqualTo("complaint_sla_deadline");
     }
 
     @Test

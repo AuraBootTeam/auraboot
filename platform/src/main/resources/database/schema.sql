@@ -3534,6 +3534,9 @@ CREATE TABLE IF NOT EXISTS ab_sla_config (
     -- Warning rules (JSONB array)
     warning_rules JSONB DEFAULT '[]',
 
+    -- Unified rule-center binding for decision-backed SLA policies
+    rule_binding JSONB,
+
     -- Model field association
     model_code VARCHAR(64),
     deadline_field VARCHAR(64),
@@ -3770,6 +3773,9 @@ COMMENT ON COLUMN ab_automation_debug_session.action_results IS 'Results from ex
 -- SLA suspend policy support: pause/resume SLA timers when process is suspended
 
 ALTER TABLE ab_sla_config ADD COLUMN IF NOT EXISTS suspend_policy VARCHAR(20) DEFAULT 'pause';
+ALTER TABLE ab_sla_config ADD COLUMN IF NOT EXISTS rule_binding JSONB;
+CREATE INDEX IF NOT EXISTS idx_sla_config_rule_binding_gin
+  ON ab_sla_config USING GIN (rule_binding);
 
 ALTER TABLE ab_sla_record ADD COLUMN IF NOT EXISTS paused_at TIMESTAMPTZ;
 ALTER TABLE ab_sla_record ADD COLUMN IF NOT EXISTS total_paused_ms BIGINT DEFAULT 0;

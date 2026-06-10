@@ -9,6 +9,7 @@
   { "key": "model.sla_config.business_calendar.label", "zh-CN": "使用工作日历", "en-US": "Use Business Calendar", "source": "import", "refType": "field" },
   { "key": "model.sla_config.suspend_policy.label", "zh-CN": "暂停策略", "en-US": "Suspend Policy", "source": "import", "refType": "field" },
   { "key": "model.sla_config.warning_rules.label", "zh-CN": "预警规则", "en-US": "Warning Rules", "source": "import", "refType": "field" },
+  { "key": "model.sla_config.rule_binding.label", "zh-CN": "规则中心绑定", "en-US": "Rule Center Binding", "source": "import", "refType": "field" },
   { "key": "model.sla_config.model_code.label", "zh-CN": "关联模型", "en-US": "Model Code", "source": "import", "refType": "field" },
   { "key": "model.sla_config.deadline_field.label", "zh-CN": "截止字段", "en-US": "Deadline Field", "source": "import", "refType": "field" },
   { "key": "model.sla_config.priority_field.label", "zh-CN": "优先级字段", "en-US": "Priority Field", "source": "import", "refType": "field" },

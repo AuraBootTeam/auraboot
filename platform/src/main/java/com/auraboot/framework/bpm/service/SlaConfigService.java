@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.entity.SlaConfigEntity;
 import com.auraboot.framework.bpm.mapper.SlaConfigMapper;
 import com.auraboot.framework.common.util.UlidGenerator;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.plugin.dto.imports.SlaConfigDefinitionDTO;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -77,6 +78,7 @@ public class SlaConfigService {
                 .deadlineValue(request.deadlineValue())
                 .businessCalendar(request.businessCalendar() != null ? request.businessCalendar() : false)
                 .warningRules(request.warningRules())
+                .ruleBinding(request.ruleBinding())
                 .modelCode(request.modelCode())
                 .deadlineField(request.deadlineField())
                 .priorityField(request.priorityField())
@@ -106,6 +108,7 @@ public class SlaConfigService {
         if (request.deadlineValue() != null) entity.setDeadlineValue(request.deadlineValue());
         if (request.businessCalendar() != null) entity.setBusinessCalendar(request.businessCalendar());
         if (request.warningRules() != null) entity.setWarningRules(request.warningRules());
+        if (request.ruleBinding() != null) entity.setRuleBinding(request.ruleBinding());
         if (request.modelCode() != null) entity.setModelCode(request.modelCode());
         if (request.deadlineField() != null) entity.setDeadlineField(request.deadlineField());
         if (request.priorityField() != null) entity.setPriorityField(request.priorityField());
@@ -133,6 +136,7 @@ public class SlaConfigService {
             String name, String targetType, String targetKey, String domainCode,
             String deadlineMode, String deadlineValue, Boolean businessCalendar,
             List<Map<String, Object>> warningRules,
+            RuleConsumerBinding ruleBinding,
             String modelCode, String deadlineField, String priorityField,
             String suspendPolicy) {}
 
@@ -161,6 +165,7 @@ public class SlaConfigService {
                     .deadlineValue(dto.getDeadlineValue())
                     .businessCalendar(dto.getBusinessCalendar() != null ? dto.getBusinessCalendar() : Boolean.FALSE)
                     .warningRules(dto.getWarningRules())
+                    .ruleBinding(dto.getRuleBinding())
                     .modelCode(dto.getModelCode())
                     .deadlineField(dto.getDeadlineField())
                     .priorityField(dto.getPriorityField())
@@ -183,6 +188,7 @@ public class SlaConfigService {
         existing.setDeadlineValue(dto.getDeadlineValue());
         if (dto.getBusinessCalendar() != null) existing.setBusinessCalendar(dto.getBusinessCalendar());
         existing.setWarningRules(dto.getWarningRules());
+        existing.setRuleBinding(dto.getRuleBinding());
         existing.setModelCode(dto.getModelCode());
         existing.setDeadlineField(dto.getDeadlineField());
         existing.setPriorityField(dto.getPriorityField());
@@ -199,6 +205,7 @@ public class SlaConfigService {
             String name, String targetType, String targetKey, String domainCode,
             String deadlineMode, String deadlineValue, Boolean businessCalendar,
             List<Map<String, Object>> warningRules,
+            RuleConsumerBinding ruleBinding,
             String modelCode, String deadlineField, String priorityField,
             String suspendPolicy, Boolean enabled) {}
 }

@@ -350,14 +350,27 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     }
 
     private List<DecisionUsageRefEntity> refsForSlaRule(Long tenantId, SlaConfigEntity sla) {
-        if (!"RULE".equalsIgnoreCase(nullToBlank(sla.getDeadlineMode()))
-                || nullToBlank(sla.getDeadlineValue()).isBlank()) {
-            return List.of();
+        List<DecisionUsageRefEntity> refs = new ArrayList<>();
+        RuleReferenceSet ruleRefs = RuleReferenceCollector.collect(sla.getRuleBinding());
+        Map<String, Object> baseMetadata = metadata("sourceName", sla.getName(),
+                "targetType", sla.getTargetType(), "targetKey", sla.getTargetKey(),
+                "enabled", sla.getEnabled());
+        for (String decisionRef : ruleRefs.decisionRefs()) {
+            refs.add(ref(tenantId, "SLA_RULE", sla.getPid(), null, sla.getPid(),
+                    "DECISION", decisionRef, null, "RULE_BINDING", baseMetadata));
         }
-        return List.of(ref(tenantId, "SLA_RULE", sla.getPid(), null, sla.getPid(),
-                "DECISION", sla.getDeadlineValue(), null, "LATEST",
-                metadata("sourceName", sla.getName(), "targetType", sla.getTargetType(),
-                        "targetKey", sla.getTargetKey(), "enabled", sla.getEnabled())));
+        for (String fieldRef : ruleRefs.fieldRefs()) {
+            refs.add(ref(tenantId, "SLA_RULE", sla.getPid(), null, sla.getPid(),
+                    "FIELD", null, fieldRef, "RULE_BINDING", baseMetadata));
+        }
+
+        if ("RULE".equalsIgnoreCase(nullToBlank(sla.getDeadlineMode()))
+                && !nullToBlank(sla.getDeadlineValue()).isBlank()) {
+            refs.add(ref(tenantId, "SLA_RULE", sla.getPid(), null, sla.getPid(),
+                    "DECISION", sla.getDeadlineValue(), null, "LATEST",
+                    baseMetadata));
+        }
+        return refs;
     }
 
     private List<DecisionUsageRefEntity> scanEventPolicies(Long tenantId) {

@@ -12,6 +12,8 @@ import com.auraboot.framework.decision.rule.RuleEvaluationContext;
 import com.auraboot.framework.decision.rule.RuleEvaluationService;
 import com.auraboot.framework.decision.rule.RuleEvaluationTrace;
 import com.auraboot.framework.decision.rule.RuleValueSource;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.decision.rule.RuleBindingKind;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -136,6 +138,20 @@ public class SlaActivationListener {
         String mode = config.getDeadlineMode();
         String value = config.getDeadlineValue();
 
+        RuleConsumerBinding ruleBinding = config.getRuleBinding();
+        if (ruleEvaluationService != null
+                && ruleBinding != null
+                && ruleBinding.active()
+                && ruleBinding.bindingKind() == RuleBindingKind.DECISION_REF
+                && ruleBinding.decisionBinding() != null) {
+            Long minutes = resolveRuleDeadlineMinutesWithBinding(config, ruleBinding.decisionBinding());
+            if (minutes != null && minutes > 0) {
+                return now.plus(Duration.ofMinutes(minutes));
+            }
+            log.warn("SLA rule binding did not yield deadlineMinutes for config={} — falling back to legacy/default",
+                    config.getPid());
+        }
+
         if ("FIXED".equalsIgnoreCase(mode) && value != null && !value.isBlank()) {
             try {
                 Duration duration = Duration.parse(value);
@@ -197,30 +213,38 @@ public class SlaActivationListener {
     }
 
     private Long resolveRuleDeadlineMinutesWithBinding(SlaConfigEntity config, String decisionCode) {
+        DecisionBinding binding = new DecisionBinding(
+                decisionCode,
+                DecisionVersionPolicy.LATEST_PUBLISHED,
+                null,
+                null,
+                null,
+                List.of(
+                        new DecisionBinding.InputMapping(
+                                "targetType",
+                                RuleValueSource.field(Scope.RECORD, "data.targetType")),
+                        new DecisionBinding.InputMapping(
+                                "targetKey",
+                                RuleValueSource.field(Scope.RECORD, "data.targetKey"))),
+                List.of(),
+                DecisionBinding.FallbackPolicy.failClosed(),
+                200,
+                DecisionBinding.TraceMode.SAMPLED,
+                true,
+                null,
+                null);
+        return resolveRuleDeadlineMinutesWithBinding(config, binding);
+    }
+
+    private Long resolveRuleDeadlineMinutesWithBinding(SlaConfigEntity config, DecisionBinding binding) {
         try {
-            DecisionBinding binding = new DecisionBinding(
-                    decisionCode,
-                    DecisionVersionPolicy.LATEST_PUBLISHED,
-                    null,
-                    null,
-                    null,
-                    List.of(
-                            new DecisionBinding.InputMapping(
-                                    "targetType",
-                                    RuleValueSource.field(Scope.RECORD, "data.targetType")),
-                            new DecisionBinding.InputMapping(
-                                    "targetKey",
-                                    RuleValueSource.field(Scope.RECORD, "data.targetKey"))),
-                    List.of(),
-                    DecisionBinding.FallbackPolicy.failClosed(),
-                    200,
-                    DecisionBinding.TraceMode.SAMPLED,
-                    true,
-                    null,
-                    null);
             Map<String, Object> sla = new java.util.HashMap<>();
             sla.put("targetType", config.getTargetType());
             sla.put("targetKey", config.getTargetKey());
+            sla.put("deadlineMode", config.getDeadlineMode());
+            sla.put("deadlineValue", config.getDeadlineValue());
+            sla.put("domainCode", config.getDomainCode());
+            sla.put("modelCode", config.getModelCode());
             RuleEvaluationTrace trace = ruleEvaluationService.evaluateDecisionBinding(
                     binding,
                     new RuleEvaluationContext(
@@ -237,7 +261,7 @@ public class SlaActivationListener {
             return parseDeadlineMinutes(trace.outputSnapshot().get("deadlineMinutes"));
         } catch (RuntimeException e) {
             log.warn("SLA rule binding decision '{}' evaluation failed for config={}: {}",
-                    decisionCode, config.getPid(), e.getMessage());
+                    binding == null ? null : binding.decisionCode(), config.getPid(), e.getMessage());
             return null;
         }
     }

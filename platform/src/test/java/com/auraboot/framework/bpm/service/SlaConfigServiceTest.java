@@ -3,6 +3,12 @@ package com.auraboot.framework.bpm.service;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.entity.SlaConfigEntity;
 import com.auraboot.framework.bpm.mapper.SlaConfigMapper;
+import com.auraboot.framework.decision.ast.Scope;
+import com.auraboot.framework.decision.rule.DecisionBinding;
+import com.auraboot.framework.decision.rule.DecisionVersionPolicy;
+import com.auraboot.framework.decision.rule.RuleBindingKind;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.decision.rule.RuleValueSource;
 import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +47,7 @@ class SlaConfigServiceTest {
     void createRefreshesDecisionUsageIndexSource() {
         assertThatCode(() -> service.create(new SlaConfigService.CreateSlaConfigRequest(
                 "SLA", "PROCESS", "complaint", null, "RULE", "sla_deadline",
-                false, List.of(), null, null, null, "pause"))).doesNotThrowAnyException();
+                false, List.of(), ruleBinding(), null, null, null, "pause"))).doesNotThrowAnyException();
 
         verify(slaConfigMapper).insert(any(SlaConfigEntity.class));
         verify(usageIndexService).refreshSource(org.mockito.ArgumentMatchers.eq("SLA_RULE"), org.mockito.ArgumentMatchers.anyString());
@@ -54,7 +60,7 @@ class SlaConfigServiceTest {
 
         assertThatCode(() -> service.update("sla-1", new SlaConfigService.UpdateSlaConfigRequest(
                 null, null, null, null, "RULE", "sla_deadline_v2",
-                null, null, null, null, null, null, null))).doesNotThrowAnyException();
+                null, null, ruleBinding(), null, null, null, null, null))).doesNotThrowAnyException();
 
         verify(slaConfigMapper).updateById(entity);
         verify(usageIndexService).refreshSource("SLA_RULE", "sla-1");
@@ -82,5 +88,31 @@ class SlaConfigServiceTest {
                 .enabled(true)
                 .deletedFlag(false)
                 .build();
+    }
+
+    private RuleConsumerBinding ruleBinding() {
+        return new RuleConsumerBinding(
+                "SLA",
+                "sla-1",
+                "deadline",
+                RuleBindingKind.DECISION_REF,
+                null,
+                new DecisionBinding(
+                        "complaint_sla_deadline",
+                        DecisionVersionPolicy.LATEST_PUBLISHED,
+                        null,
+                        null,
+                        null,
+                        List.of(new DecisionBinding.InputMapping(
+                                "targetKey",
+                                RuleValueSource.field(Scope.RECORD, "data.targetKey"))),
+                        List.of(),
+                        DecisionBinding.FallbackPolicy.failClosed(),
+                        200,
+                        DecisionBinding.TraceMode.SAMPLED,
+                        true,
+                        null,
+                        null),
+                true);
     }
 }

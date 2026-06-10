@@ -185,6 +185,74 @@ class DecisionUsageIndexServiceImplTest {
     }
 
     @Test
+    void rebuildIndexesSlaRuleBindingDecisionAndFieldRefs() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        when(versionMapper.selectList(any())).thenReturn(List.of());
+        when(automationMapper.selectList(any())).thenReturn(List.of());
+        when(policyVersionMapper.selectList(any())).thenReturn(List.of());
+        when(namedQueryMapper.selectList(any())).thenReturn(List.of());
+        when(bpmProcessDefinitionMapper.selectList(any())).thenReturn(List.of());
+
+        com.auraboot.framework.bpm.entity.SlaConfigEntity sla = com.auraboot.framework.bpm.entity.SlaConfigEntity.builder()
+                .pid("sla-rule-1")
+                .tenantId(10L)
+                .name("Complaint SLA")
+                .targetType("NODE")
+                .targetKey("approve_task")
+                .deadlineMode("FIXED")
+                .deadlineValue("PT24H")
+                .enabled(true)
+                .deletedFlag(false)
+                .ruleBinding(new RuleConsumerBinding(
+                        "SLA",
+                        "sla-rule-1",
+                        "deadline",
+                        RuleBindingKind.DECISION_REF,
+                        null,
+                        new DecisionBinding(
+                                "complaint_sla_deadline",
+                                DecisionVersionPolicy.LATEST_PUBLISHED,
+                                null,
+                                null,
+                                null,
+                                List.of(new DecisionBinding.InputMapping(
+                                        "targetKey",
+                                        RuleValueSource.field(Scope.RECORD, "data.targetKey"))),
+                                List.of(),
+                                DecisionBinding.FallbackPolicy.failClosed(),
+                                200,
+                                DecisionBinding.TraceMode.SAMPLED,
+                                true,
+                                RuleValueSource.field(Scope.RECORD, "data.priority"),
+                                null),
+                        true))
+                .build();
+        when(slaConfigMapper.selectList(any())).thenReturn(List.of(sla));
+
+        DecisionUsageIndexRebuildDTO summary = service.rebuild();
+
+        ArgumentCaptor<DecisionUsageRefEntity> captor = ArgumentCaptor.forClass(DecisionUsageRefEntity.class);
+        verify(usageRefMapper).deleteByTenant(10L);
+        verify(usageRefMapper, times(3)).insert(captor.capture());
+        assertThat(summary.getConsumerRefs()).isEqualTo(1);
+        assertThat(summary.getFieldRefs()).isEqualTo(2);
+        assertThat(captor.getAllValues())
+                .extracting(DecisionUsageRefEntity::getSourceType, DecisionUsageRefEntity::getSourceCode,
+                        DecisionUsageRefEntity::getTargetType, DecisionUsageRefEntity::getTargetCode,
+                        DecisionUsageRefEntity::getTargetPath, DecisionUsageRefEntity::getBinding)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(
+                                "SLA_RULE", "sla-rule-1", "DECISION",
+                                "complaint_sla_deadline", null, "RULE_BINDING"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "SLA_RULE", "sla-rule-1", "FIELD",
+                                null, "record.data.targetKey", "RULE_BINDING"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "SLA_RULE", "sla-rule-1", "FIELD",
+                                null, "record.data.priority", "RULE_BINDING"));
+    }
+
+    @Test
     void findTargetRefsReturnsIntegrationConsumers() {
         MetaContext.setContext(10L, 20L, "tester", "Tester");
         DecisionUsageRefEntity ref = new DecisionUsageRefEntity();

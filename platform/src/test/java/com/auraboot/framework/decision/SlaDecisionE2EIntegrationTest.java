@@ -94,7 +94,7 @@ class SlaDecisionE2EIntegrationTest extends BaseIntegrationTest {
 
         var cfg = slaConfigService.create(new SlaConfigService.CreateSlaConfigRequest(
                 "M5 SLA " + System.nanoTime(), "NODE", activityId, null,
-                "RULE", decisionCode, null, null, null, null, null, null));
+                "RULE", decisionCode, null, null, null, null, null, null, null));
         slaConfigPid = cfg.getPid();
 
         // publish the task_assigned BpmEvent the SlaActivationListener consumes (synchronous)

@@ -185,6 +185,32 @@
         ]
       },
       {
+        "id": "sla_rule_binding",
+        "blockType": "custom",
+        "component": "DecisionRuleBindingBlock",
+        "props": {
+          "mode": "decision",
+          "valueField": "rule_binding",
+          "consumerType": "SLA",
+          "showImpactPreview": true,
+          "showTestRunner": true,
+          "initialDecisionCode": "complaint_sla_deadline",
+          "initialContextJson": "{\n  \"record\": {\n    \"data\": {\n      \"targetType\": \"NODE\",\n      \"targetKey\": \"approve_task\",\n      \"priority\": \"HIGH\"\n    }\n  }\n}",
+          "fields": [
+            { "scope": "record", "path": "data.targetType", "label": "目标类型", "dataType": "enum", "options": ["PROCESS", "NODE", "TASK"] },
+            { "scope": "record", "path": "data.targetKey", "label": "目标键", "dataType": "string" },
+            { "scope": "record", "path": "data.domainCode", "label": "域编码", "dataType": "string" },
+            { "scope": "record", "path": "data.modelCode", "label": "关联模型", "dataType": "string" },
+            { "scope": "record", "path": "data.priority", "label": "优先级", "dataType": "enum", "options": ["HIGH", "NORMAL", "LOW"] }
+          ],
+          "decisions": [
+            { "code": "complaint_sla_deadline", "name": "投诉 SLA 截止时间" },
+            { "code": "sla_deadline", "name": "SLA 截止时间" },
+            { "code": "approval_routing", "name": "审批路由" }
+          ]
+        }
+      },
+      {
         "id": "buttons",
         "blockType": "form-buttons",
         "buttons": [

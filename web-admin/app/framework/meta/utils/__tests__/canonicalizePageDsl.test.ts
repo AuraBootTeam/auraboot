@@ -492,6 +492,30 @@ describe('canonicalizePageSchemaDto', () => {
     });
   });
 
+  it('hosts SLA rule-center binding in the platform-admin DSL form', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/platform-admin/config/pages.json');
+    const pages = readPages(pagesFile);
+    const formPage = pages.find((candidate) => candidate.pageKey === 'sla_config_form');
+
+    expect(formPage).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(formPage!);
+    expect(validateStructure(schema)).toEqual([]);
+    const ruleBlock = schema.blocks.find((block: any) => block.id === 'sla_rule_binding') as any;
+
+    expect(ruleBlock).toMatchObject({
+      blockType: 'custom',
+      component: 'DecisionRuleBindingBlock',
+      props: {
+        mode: 'decision',
+        valueField: 'rule_binding',
+        consumerType: 'SLA',
+        initialDecisionCode: 'complaint_sla_deadline',
+      },
+    });
+  });
+
   it('hosts the visual decision-table editor in a DSL custom workbench block', () => {
     const root = resolve(process.cwd(), '..');
     const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
