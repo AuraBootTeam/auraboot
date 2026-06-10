@@ -732,6 +732,12 @@ public final class MetaPermission {
      */
     public static final String BILLING_CATALOG_READ = "billing.catalog.read";
 
+    /**
+     * Quota bucket balance read permission.
+     * Used by {@code QuotaBucketController} GET /api/billing/quota/buckets.
+     */
+    public static final String BILLING_QUOTA_READ = "billing.quota.read";
+
     // ==================== Private Constructor ====================
 
     /**
