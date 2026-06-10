@@ -22,6 +22,7 @@ not by mock-heavy unit tests chasing a line number (that would violate AGENTS.md
 |---|---|---|
 | Backend `platform` (curated set) | 1170 test files; ~5000 tests run | **LINE 80.1%** (33671/42043), **BRANCH 34.5%** (14708/42575), INSTRUCTION 52.6%, METHOD 46.5%, CLASS 95.6% |
 | Frontend `web-admin` | 285 spec files / 2099 tests, all pass | **LINE 19.08%** (13631/71413), Stmts 18.79%, Funcs 16.43%, Branches 16.44% |
+| Frontend `web-admin` (after Phase 1, 2026-06-11) | 327 spec files / 2905 tests | **LINE 22.48%** (15904/70716), Stmts 22.09%, Funcs 19.61%, Branches 18.54% — +814 tests via #529/#531/#532/#533/#534 (services+hooks+server/stores); ratchet floor raised to 22 |
 | Infra subprojects | 1–7 tests each | not yet measured (need Docker for testcontainers) |
 
 **Headline finding — the goal is half-met and half-mis-stated:**

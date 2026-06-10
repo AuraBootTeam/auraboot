@@ -55,10 +55,13 @@ export default defineConfig({
         '**/types/**',
       ],
       thresholds: {
-        lines: 19,
-        statements: 18,
-        functions: 16,
-        branches: 16,
+        // Ratchet — raised 2026-06-11 after coverage PRs #529/#531/#532/#533/#534
+        // (services + hooks + server/stores). Measured: lines 22.48 / stmts 22.09 /
+        // funcs 19.61 / branches 18.54. Floors sit just under measured for flaky margin.
+        lines: 22,
+        statements: 21,
+        functions: 19,
+        branches: 18,
       },
     },
     // 禁用 watch 模式的交互提示
