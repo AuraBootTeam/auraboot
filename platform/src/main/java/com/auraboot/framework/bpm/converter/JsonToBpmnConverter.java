@@ -313,9 +313,11 @@ public class JsonToBpmnConverter {
                     writeServiceTask(writer, nodeId, label, data,
                             BpmServiceTaskConstants.NODE_TYPE_RECORD_UPDATE_TASK);
             case "receiveTask" -> writeReceiveTask(writer, nodeId, label, config);
-            case "exclusiveGateway" -> writeExclusiveGateway(writer, nodeId, label, gatewayDefaultFlows.get(nodeId));
+            case "exclusiveGateway" -> writeExclusiveGateway(writer, nodeId, label, config,
+                    gatewayDefaultFlows.get(nodeId));
             case "parallelGateway" -> writeParallelGateway(writer, nodeId, label, gatewayDefaultFlows.get(nodeId));
-            case "inclusiveGateway" -> writeInclusiveGateway(writer, nodeId, label, gatewayDefaultFlows.get(nodeId));
+            case "inclusiveGateway" -> writeInclusiveGateway(writer, nodeId, label, config,
+                    gatewayDefaultFlows.get(nodeId));
             case "callActivity" -> writeCallActivity(writer, nodeId, label, config);
             default -> {
                 log.warn("Unknown node type '{}' for node '{}', skipping", nodeType, nodeId);
@@ -350,6 +352,9 @@ public class JsonToBpmnConverter {
                 && multiInstance.path("enabled").asBoolean(false);
         // Collect node-level aura extension properties (requiredPermissions, ccPolicyOverride).
         Map<String, String> auraProps = collectUserTaskAuraProperties(config);
+        addSerializedJsonProperty(auraProps, BpmExtensionKeys.RULE_BINDING,
+                config == null ? null : config.path("assignmentRuleBinding"),
+                "userTask '" + id + "' assignmentRuleBinding");
         boolean hasAuraExtensions = !auraProps.isEmpty();
         // Collect node-level hook descriptors (config.hooks[]) for GAP-254 compilation.
         // Hooks are emitted as <smart:hook> children inside <extensionElements> alongside
@@ -960,16 +965,31 @@ public class JsonToBpmnConverter {
         writer.writeCharacters("\n");
     }
 
-    private void writeExclusiveGateway(XMLStreamWriter writer, String id, String name, String defaultFlowId)
+    private void writeExclusiveGateway(XMLStreamWriter writer, String id, String name, JsonNode config,
+                                       String defaultFlowId)
             throws XMLStreamException {
         writer.writeCharacters("\n    ");
-        writer.writeEmptyElement("exclusiveGateway");
+        Map<String, String> auraProps = collectGatewayAuraProperties(config, id);
+        if (auraProps.isEmpty()) {
+            writer.writeEmptyElement("exclusiveGateway");
+        } else {
+            writer.writeStartElement("exclusiveGateway");
+        }
         writer.writeAttribute("id", id);
         if (name != null) {
             writer.writeAttribute("name", name);
         }
         if (defaultFlowId != null) {
             writer.writeAttribute("default", defaultFlowId);
+        }
+        if (!auraProps.isEmpty()) {
+            writer.writeCharacters("\n      ");
+            writer.writeStartElement("extensionElements");
+            writeSmartProperties(writer, auraProps, "        ");
+            writer.writeCharacters("\n      ");
+            writer.writeEndElement();
+            writer.writeCharacters("\n    ");
+            writer.writeEndElement();
         }
         writer.writeCharacters("\n");
     }
@@ -988,10 +1008,16 @@ public class JsonToBpmnConverter {
         writer.writeCharacters("\n");
     }
 
-    private void writeInclusiveGateway(XMLStreamWriter writer, String id, String name, String defaultFlowId)
+    private void writeInclusiveGateway(XMLStreamWriter writer, String id, String name, JsonNode config,
+                                       String defaultFlowId)
             throws XMLStreamException {
         writer.writeCharacters("\n    ");
-        writer.writeEmptyElement("inclusiveGateway");
+        Map<String, String> auraProps = collectGatewayAuraProperties(config, id);
+        if (auraProps.isEmpty()) {
+            writer.writeEmptyElement("inclusiveGateway");
+        } else {
+            writer.writeStartElement("inclusiveGateway");
+        }
         writer.writeAttribute("id", id);
         if (name != null) {
             writer.writeAttribute("name", name);
@@ -999,7 +1025,42 @@ public class JsonToBpmnConverter {
         if (defaultFlowId != null) {
             writer.writeAttribute("default", defaultFlowId);
         }
+        if (!auraProps.isEmpty()) {
+            writer.writeCharacters("\n      ");
+            writer.writeStartElement("extensionElements");
+            writeSmartProperties(writer, auraProps, "        ");
+            writer.writeCharacters("\n      ");
+            writer.writeEndElement();
+            writer.writeCharacters("\n    ");
+            writer.writeEndElement();
+        }
         writer.writeCharacters("\n");
+    }
+
+    private Map<String, String> collectGatewayAuraProperties(JsonNode config, String id) {
+        Map<String, String> result = new LinkedHashMap<>();
+        addSerializedJsonProperty(result, BpmExtensionKeys.RULE_BINDING,
+                config == null ? null : config.path("ruleBinding"),
+                "gateway '" + id + "' ruleBinding");
+        return result;
+    }
+
+    private void addSerializedJsonProperty(
+            Map<String, String> props,
+            String key,
+            JsonNode value,
+            String description) {
+        if (value == null || value.isMissingNode() || value.isNull()) {
+            return;
+        }
+        if (value.isObject() && value.isEmpty()) {
+            return;
+        }
+        try {
+            props.put(key, objectMapper.writeValueAsString(value));
+        } catch (JsonProcessingException e) {
+            throw new BpmnConversionException("Failed to serialize " + description, e);
+        }
     }
 
     private void writeCallActivity(XMLStreamWriter writer, String id, String name, JsonNode config)

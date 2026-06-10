@@ -10,11 +10,16 @@ import com.auraboot.smart.framework.engine.constant.AssigneeTypeConstant;
 import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
 import com.auraboot.smart.framework.engine.context.ExecutionContext;
 import com.auraboot.smart.framework.engine.model.assembly.Activity;
+import com.auraboot.smart.framework.engine.model.assembly.ExtensionElementContainer;
 import com.auraboot.smart.framework.engine.model.assembly.impl.AbstractActivity;
 import com.auraboot.smart.framework.engine.model.instance.TaskAssigneeCandidateInstance;
+import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
+import com.auraboot.framework.bpm.extension.BpmExtensionAccessor;
 import com.auraboot.framework.bpm.service.AssigneeResolverService;
+import com.auraboot.framework.bpm.service.BpmRuleBindingRuntimeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,12 +35,23 @@ import org.springframework.stereotype.Component;
 public class IdAndGroupTaskAssigneeDispatcher implements TaskAssigneeDispatcher {
 
     private final AssigneeResolverService assigneeResolverService;
+    private final ObjectProvider<BpmExtensionAccessor> extensionAccessorProvider;
+    private final ObjectProvider<BpmRuleBindingRuntimeService> ruleBindingRuntimeServiceProvider;
 
     @Override
     public List<TaskAssigneeCandidateInstance> getTaskAssigneeCandidateInstance(
             Activity activity, ExecutionContext context) {
         List<TaskAssigneeCandidateInstance> candidates = new ArrayList<>();
         Map<String, Object> request = context != null ? context.getRequest() : Map.of();
+        List<String> ruleAssignees = resolveRuleBindingAssignees(activity, context, request);
+        if (!ruleAssignees.isEmpty()) {
+            for (int i = 0; i < ruleAssignees.size(); i++) {
+                addCandidate(candidates, ruleAssignees.get(i), AssigneeTypeConstant.USER, i + 1);
+            }
+            log.debug("Rule-center assignment resolved for activity {}: count={}",
+                    activity.getId(), candidates.size());
+            return candidates;
+        }
 
         // 1. Read assignee config from BPMN extension attributes
         Map<String, String> properties = getActivityProperties(activity);
@@ -110,6 +126,38 @@ public class IdAndGroupTaskAssigneeDispatcher implements TaskAssigneeDispatcher 
         }
 
         return candidates;
+    }
+
+    private List<String> resolveRuleBindingAssignees(
+            Activity activity,
+            ExecutionContext context,
+            Map<String, Object> request) {
+        if (!(activity instanceof ExtensionElementContainer extensionContainer)) {
+            return List.of();
+        }
+        BpmExtensionAccessor extensionAccessor = extensionAccessorProvider.getIfAvailable();
+        BpmRuleBindingRuntimeService ruleBindingRuntimeService =
+                ruleBindingRuntimeServiceProvider.getIfAvailable();
+        if (extensionAccessor == null || ruleBindingRuntimeService == null) {
+            return List.of();
+        }
+        String processKey = processKey(context);
+        String processInstanceId = processInstanceId(context);
+        return extensionAccessor
+                .getRuleConsumerBinding(extensionContainer, processKey, activity.getId())
+                .map(binding -> ruleBindingRuntimeService.resolveTaskAssignees(
+                        binding, processKey, activity.getId(), processInstanceId, request))
+                .orElse(List.of());
+    }
+
+    private String processKey(ExecutionContext context) {
+        ProcessInstance instance = context == null ? null : context.getProcessInstance();
+        return instance == null ? null : instance.getProcessDefinitionId();
+    }
+
+    private String processInstanceId(ExecutionContext context) {
+        ProcessInstance instance = context == null ? null : context.getProcessInstance();
+        return instance == null ? null : instance.getInstanceId();
     }
 
     private Map<String, String> getActivityProperties(Activity activity) {

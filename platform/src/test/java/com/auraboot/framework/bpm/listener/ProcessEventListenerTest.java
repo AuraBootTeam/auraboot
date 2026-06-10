@@ -1,8 +1,10 @@
 package com.auraboot.framework.bpm.listener;
 
 import com.auraboot.framework.bpm.audit.BpmAuditService;
+import com.auraboot.framework.bpm.extension.BpmExtensionAccessor;
 import com.auraboot.framework.bpm.event.EventBusService;
 import com.auraboot.framework.bpm.service.BpmNodeHookService;
+import com.auraboot.framework.bpm.service.BpmRuleBindingRuntimeService;
 import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
 import com.auraboot.smart.framework.engine.context.ExecutionContext;
 import com.auraboot.smart.framework.engine.model.instance.ExecutionInstance;
@@ -16,6 +18,18 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class ProcessEventListenerTest {
+
+    private ProcessEventListener listener(
+            BpmAuditService auditService,
+            EventBusService eventBusService,
+            BpmNodeHookService hookService) {
+        return new ProcessEventListener(
+                auditService,
+                eventBusService,
+                hookService,
+                mock(BpmExtensionAccessor.class),
+                mock(BpmRuleBindingRuntimeService.class));
+    }
 
     @Test
     void rootProcessStartPublishesEventWithoutDuplicateProcessEventAudit() {
@@ -32,7 +46,7 @@ class ProcessEventListenerTest {
         when(context.getProcessInstance()).thenReturn(processInstance);
         when(processInstance.getInstanceId()).thenReturn("pi-1");
 
-        ProcessEventListener listener = new ProcessEventListener(auditService, eventBusService, hookService);
+        ProcessEventListener listener = listener(auditService, eventBusService, hookService);
 
         listener.execute(EventConstant.PROCESS_START, context);
 
@@ -44,7 +58,7 @@ class ProcessEventListenerTest {
     }
 
     @Test
-    void activityEndRunsHooksWithoutActivityAuditOrUnkeyedActivityEvent() {
+    void activityEndRunsHooksAndRecordsActivityAuditWithoutUnkeyedActivityEvent() {
         BpmAuditService auditService = mock(BpmAuditService.class);
         EventBusService eventBusService = mock(EventBusService.class);
         BpmNodeHookService hookService = mock(BpmNodeHookService.class);
@@ -60,12 +74,13 @@ class ProcessEventListenerTest {
         when(context.getExecutionInstance()).thenReturn(executionInstance);
         when(executionInstance.getProcessDefinitionActivityId()).thenReturn("serviceTask1");
 
-        ProcessEventListener listener = new ProcessEventListener(auditService, eventBusService, hookService);
+        ProcessEventListener listener = listener(auditService, eventBusService, hookService);
 
         listener.execute(EventConstant.ACTIVITY_END, context);
 
-        verify(auditService, never()).recordActivityEvent(
-                anyString(), anyString(), eq("activity_end"), anyString(), any(), anyString());
+        verify(auditService).recordActivityEvent(
+                eq("pi-2"), eq("serviceTask1"), eq("activity_end"),
+                anyString(), isNull(), eq("1"));
         verify(hookService).executePostActions(eq("proc-key"), eq("serviceTask1"), anyMap());
         verify(eventBusService, never()).publishProcessEvent(
                 eq("activity_completed"), any(), any(), anyMap());
@@ -88,7 +103,7 @@ class ProcessEventListenerTest {
         when(context.getExecutionInstance()).thenReturn(executionInstance);
         when(executionInstance.getProcessDefinitionActivityId()).thenReturn("serviceTask1");
 
-        ProcessEventListener listener = new ProcessEventListener(auditService, eventBusService, hookService);
+        ProcessEventListener listener = listener(auditService, eventBusService, hookService);
 
         listener.execute(EventConstant.PROCESS_START, context);
 
@@ -109,7 +124,7 @@ class ProcessEventListenerTest {
         when(context.getProcessInstance()).thenReturn(processInstance);
         when(processInstance.getInstanceId()).thenReturn("pi-4");
 
-        ProcessEventListener listener = new ProcessEventListener(auditService, eventBusService, hookService);
+        ProcessEventListener listener = listener(auditService, eventBusService, hookService);
 
         listener.execute(EventConstant.PROCESS_END, context);
 
