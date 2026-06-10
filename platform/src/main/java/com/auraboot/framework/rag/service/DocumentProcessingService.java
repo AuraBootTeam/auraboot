@@ -28,8 +28,7 @@ public class DocumentProcessingService {
     private final KbDocumentMapper docMapper;
     private final KnowledgeBaseService kbService;
     private final DocumentParserService parserService;
-    private final ChunkingService chunkingService;
-    private final EmbeddingService embeddingService;
+    private final KbChunkIngestPipeline ingestPipeline;
     private final FileService fileService;
     private final JdbcTemplate jdbcTemplate;
 
@@ -66,63 +65,22 @@ public class DocumentProcessingService {
                 return;
             }
 
-            // 2. Chunk: split text into pieces
-            List<ChunkingService.ChunkResult> chunks = chunkingService.chunk(
-                    text, kb.getChunkSize(), kb.getChunkOverlap());
-            if (chunks.isEmpty()) {
+            // 2-4. Chunk → store → embed via the shared pipeline (G9)
+            KbChunkIngestPipeline.IngestOutcome outcome = ingestPipeline.ingestChunks(
+                    doc.getTenantId(), kbPid, docPid, text,
+                    kb.getChunkSize(), kb.getChunkOverlap(), kb.getEmbeddingProvider(), null);
+            if (outcome.chunkCount() == 0) {
                 markFailed(docPid, "Chunking produced no results");
                 return;
             }
 
-            // 3. Store chunks (without embeddings first)
-            List<String> chunkPids = new ArrayList<>();
-            List<String> chunkTexts = new ArrayList<>();
-            for (ChunkingService.ChunkResult chunk : chunks) {
-                String chunkPid = UniqueIdGenerator.generate();
-                chunkPids.add(chunkPid);
-                chunkTexts.add(chunk.content());
-
-                jdbcTemplate.update(
-                        "INSERT INTO ab_kb_chunk (pid, tenant_id, kb_id, doc_id, chunk_index, "
-                        + "content, char_count, token_count, tsv, embedding_status, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, to_tsvector('simple', ?), 'pending', NOW(), NOW())",
-                        chunkPid, doc.getTenantId(), kbPid, docPid,
-                        chunk.index(), chunk.content(), chunk.charCount(), chunk.tokenCount(),
-                        chunk.content());
-            }
-
-            // 4. Embed: batch call embedding API
-            int embeddedCount = 0;
-            try {
-                List<float[]> embeddings = embeddingService.embedBatch(
-                        doc.getTenantId(), chunkTexts, kb.getEmbeddingProvider());
-
-                for (int i = 0; i < embeddings.size() && i < chunkPids.size(); i++) {
-                    float[] emb = embeddings.get(i);
-                    if (emb != null) {
-                        jdbcTemplate.update(
-                                "UPDATE ab_kb_chunk SET embedding = ?::vector, embedding_status = 'completed', "
-                                + "updated_at = NOW() WHERE pid = ?",
-                                VectorUtils.toVectorString(emb), chunkPids.get(i));
-                        embeddedCount++;
-                    } else {
-                        jdbcTemplate.update(
-                                "UPDATE ab_kb_chunk SET embedding_status = 'failed', updated_at = NOW() WHERE pid = ?",
-                                chunkPids.get(i));
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("Embedding failed for doc {}, chunks stored without vectors: {}", docPid, e.getMessage());
-                // Chunks are still stored — embedding can be retried later
-            }
-
             // 5. Update document and KB counters
             kbService.updateDocumentAfterProcessing(docPid, "completed",
-                    text.length(), chunks.size(), null);
+                    text.length(), outcome.chunkCount(), null);
             kbService.refreshKbCounters(kbPid);
 
             log.info("Document processed: doc={}, chars={}, chunks={}, embedded={}",
-                    docPid, text.length(), chunks.size(), embeddedCount);
+                    docPid, text.length(), outcome.chunkCount(), outcome.embeddedCount());
 
         } catch (Exception e) {
             log.error("Document processing failed: doc={}", docPid, e);

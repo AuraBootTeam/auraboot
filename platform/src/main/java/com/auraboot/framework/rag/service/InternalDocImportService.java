@@ -34,8 +34,7 @@ public class InternalDocImportService {
     private final KnowledgeBaseService kbService;
     private final KbDocumentMapper docMapper;
     private final DocumentParserService parserService;
-    private final ChunkingService chunkingService;
-    private final EmbeddingService embeddingService;
+    private final KbChunkIngestPipeline ingestPipeline;
     private final JdbcTemplate jdbcTemplate;
 
     private static final String INTERNAL_KB_NAME = "AuraBoot System Documentation";
@@ -130,57 +129,22 @@ public class InternalDocImportService {
      * Process document content: chunk → embed → store chunks.
      */
     private void processContent(KbDocument doc, String content, String kbPid, Long tenantId) {
-        // 1. Chunk
-        List<ChunkingService.ChunkResult> chunks = chunkingService.chunk(content, 500, 50);
-        if (chunks.isEmpty()) {
+        var kb = kbService.findKbByPid(kbPid);
+        String provider = kb != null ? kb.getEmbeddingProvider() : "openai";
+        Integer chunkSize = kb != null ? kb.getChunkSize() : null;
+        Integer chunkOverlap = kb != null ? kb.getChunkOverlap() : null;
+        String escapedName = doc.getDocName().replace("\"", "\\\"");
+
+        KbChunkIngestPipeline.IngestOutcome outcome = ingestPipeline.ingestChunks(
+                tenantId, kbPid, doc.getPid(), content, chunkSize, chunkOverlap, provider,
+                chunk -> String.format("{\"filePath\":\"%s\",\"chunkIndex\":%d}", escapedName, chunk.index()));
+        if (outcome.chunkCount() == 0) {
             kbService.updateDocumentAfterProcessing(doc.getPid(), "failed", 0, 0, "No chunks produced");
             return;
         }
 
-        // 2. Store chunks
-        List<String> chunkPids = new ArrayList<>();
-        List<String> chunkTexts = new ArrayList<>();
-        for (ChunkingService.ChunkResult chunk : chunks) {
-            String chunkPid = UniqueIdGenerator.generate();
-            chunkPids.add(chunkPid);
-            chunkTexts.add(chunk.content());
-
-            // Store metadata with file path and section info
-            String metadata = String.format("{\"filePath\":\"%s\",\"chunkIndex\":%d}",
-                    doc.getDocName().replace("\"", "\\\""), chunk.index());
-
-            jdbcTemplate.update(
-                    "INSERT INTO ab_kb_chunk (pid, tenant_id, kb_id, doc_id, chunk_index, "
-                    + "content, char_count, token_count, metadata, tsv, embedding_status, created_at, updated_at) "
-                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, to_tsvector('simple', ?), 'pending', NOW(), NOW())",
-                    chunkPid, tenantId, kbPid, doc.getPid(),
-                    chunk.index(), chunk.content(), chunk.charCount(), chunk.tokenCount(),
-                    metadata, chunk.content());
-        }
-
-        // 3. Embed (best-effort — store chunks even if embedding fails)
-        try {
-            // Find KB to get embedding provider
-            var kb = kbService.findKbByPid(kbPid);
-            String provider = kb != null ? kb.getEmbeddingProvider() : "openai";
-
-            List<float[]> embeddings = embeddingService.embedBatch(tenantId, chunkTexts, provider);
-            for (int i = 0; i < embeddings.size() && i < chunkPids.size(); i++) {
-                float[] emb = embeddings.get(i);
-                if (emb != null) {
-                    jdbcTemplate.update(
-                            "UPDATE ab_kb_chunk SET embedding = ?::vector, embedding_status = 'completed', "
-                            + "updated_at = NOW() WHERE pid = ?",
-                            VectorUtils.toVectorString(emb), chunkPids.get(i));
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Embedding failed for doc {}: {}", doc.getDocName(), e.getMessage());
-        }
-
-        // 4. Update document status
         kbService.updateDocumentAfterProcessing(doc.getPid(), "completed",
-                content.length(), chunks.size(), null);
+                content.length(), outcome.chunkCount(), null);
     }
 
     private KnowledgeBaseDTO ensureInternalKb(Long tenantId, Long userId) {
