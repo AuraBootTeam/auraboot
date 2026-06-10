@@ -227,6 +227,19 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
     }
   };
 
+  const [reindexing, setReindexing] = useState(false);
+  const handleReindex = async () => {
+    setReindexing(true);
+    try {
+      const res = await post<{ reindexedChunks: number }>(`/api/ai/knowledge/${kbPid}/reindex`, {});
+      toast.showSuccessToast(`Reindexed ${res?.data?.reindexedChunks ?? 0} chunks`);
+    } catch {
+      toast.showErrorToast('Reindex failed');
+    } finally {
+      setReindexing(false);
+    }
+  };
+
   const handleDelete = async (doc: KbDocument) => {
     if (!confirm(`Delete "${doc.docName}"?`)) return;
     try {
@@ -243,6 +256,18 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Documents</h2>
+        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          data-testid="kb-reindex-button"
+          onClick={handleReindex}
+          disabled={reindexing}
+          className={`flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm transition-colors dark:border-gray-600 ${
+            reindexing ? 'cursor-not-allowed text-gray-400' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800'
+          }`}
+        >
+          {reindexing ? 'Reindexing...' : 'Reindex'}
+        </button>
         <label
           className={`flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 transition-colors ${
             uploading ? 'cursor-not-allowed bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
@@ -260,6 +285,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
             disabled={uploading}
           />
         </label>
+        </div>
       </div>
 
       {loading ? (

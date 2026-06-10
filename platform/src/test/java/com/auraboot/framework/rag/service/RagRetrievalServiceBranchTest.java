@@ -184,17 +184,17 @@ class RagRetrievalServiceBranchTest {
     }
 
     @Test
-    @DisplayName("buildTsQuery splits each CJK character into a separate term")
+    @DisplayName("buildTsQuery expands CJK runs into overlapping bigrams (G2)")
     void buildTsQueryCjk() {
-        String out = RagRetrievalService.buildTsQuery("你好");
-        assertEquals("你 | 好", out);
+        String out = RagRetrievalService.buildTsQuery("命令执行");
+        assertEquals("命令 | 令执 | 执行", out);
     }
 
     @Test
-    @DisplayName("buildTsQuery flushes Latin buffer before CJK char")
+    @DisplayName("buildTsQuery flushes Latin buffer before CJK run")
     void buildTsQueryMixed() {
-        String out = RagRetrievalService.buildTsQuery("foo你bar");
-        assertEquals("foo | 你 | bar", out);
+        String out = RagRetrievalService.buildTsQuery("foo权限bar");
+        assertEquals("foo | 权限 | bar", out);
     }
 
     @Test

@@ -24,7 +24,7 @@ package com.auraboot.framework.permission.constants;
  */
 public final class MetaPermission {
 
-    // ==================== MODEL permissions ====================
+    // ==================== MODEL permissions =============
 
     /**
      * Model management permission (create, update, delete)
@@ -743,6 +743,24 @@ public final class MetaPermission {
      * Used by {@code UsageEventController} GET /api/billing/usage/events.
      */
     public static final String BILLING_USAGE_READ = "billing.usage.read";
+=======
+    // ==================== AI / RAG Knowledge Base permissions ====================
+
+    /**
+     * Knowledge base read permission (list KBs, view documents and chunks).
+     */
+    public static final String AI_KNOWLEDGE_READ = "ai.knowledge.read";
+
+    /**
+     * Knowledge base management permission (create/update/delete KBs, upload and
+     * delete documents, reindex, import internal docs, generate docs).
+     */
+    public static final String AI_KNOWLEDGE_MANAGE = "ai.knowledge.manage";
+
+    /**
+     * Knowledge retrieval permission (run retrieval queries / playground).
+     */
+    public static final String AI_KNOWLEDGE_RETRIEVE = "ai.knowledge.retrieve";
 
     // ==================== Private Constructor ====================
 

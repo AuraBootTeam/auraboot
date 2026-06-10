@@ -2,6 +2,7 @@ package com.auraboot.framework.rag.service;
 
 import com.auraboot.framework.rag.dto.RetrievalResult;
 import com.auraboot.framework.rag.entity.KnowledgeBase;
+import com.auraboot.framework.rag.util.CjkBigramSegmenter;
 import com.auraboot.framework.rag.util.VectorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -263,39 +264,12 @@ public class RagRetrievalService {
 
     /**
      * Build a tsquery string from user input. Splits into terms joined with '|' (OR).
-     * Handles CJK characters by treating each character as a separate term.
+     * CJK runs are expanded into overlapping bigrams matching the index-time
+     * segmentation in {@code KbChunkIngestPipeline} (G2) — see
+     * {@link com.auraboot.framework.rag.util.CjkBigramSegmenter}.
      */
     static String buildTsQuery(String query) {
-        if (query == null || query.isBlank()) return "";
-        List<String> terms = new ArrayList<>();
-        StringBuilder currentTerm = new StringBuilder();
-
-        for (int i = 0; i < query.length(); i++) {
-            char ch = query.charAt(i);
-            if (Character.isWhitespace(ch)) {
-                if (currentTerm.length() > 0) {
-                    terms.add(currentTerm.toString());
-                    currentTerm.setLength(0);
-                }
-            } else if (Character.UnicodeScript.of(ch) == Character.UnicodeScript.HAN
-                    || Character.UnicodeScript.of(ch) == Character.UnicodeScript.HIRAGANA
-                    || Character.UnicodeScript.of(ch) == Character.UnicodeScript.KATAKANA
-                    || Character.UnicodeScript.of(ch) == Character.UnicodeScript.HANGUL) {
-                // CJK: flush any Latin buffer, then add single char as term
-                if (currentTerm.length() > 0) {
-                    terms.add(currentTerm.toString());
-                    currentTerm.setLength(0);
-                }
-                terms.add(String.valueOf(ch));
-            } else if (Character.isLetterOrDigit(ch) || ch == '_') {
-                currentTerm.append(ch);
-            }
-            // Skip punctuation
-        }
-        if (currentTerm.length() > 0) {
-            terms.add(currentTerm.toString());
-        }
-
+        List<String> terms = CjkBigramSegmenter.tsQueryTerms(query);
         if (terms.isEmpty()) return "";
         return String.join(" | ", terms);
     }

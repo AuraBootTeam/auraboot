@@ -1,6 +1,7 @@
 package com.auraboot.framework.rag.service;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.rag.util.CjkBigramSegmenter;
 import com.auraboot.framework.rag.util.VectorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -73,7 +74,7 @@ public class KbChunkIngestPipeline {
                     + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, to_tsvector('simple', ?), 'pending', NOW(), NOW())",
                     chunkPid, tenantId, kbPid, docPid,
                     chunk.index(), chunk.content(), chunk.charCount(), chunk.tokenCount(),
-                    metadata, chunk.content());
+                    metadata, CjkBigramSegmenter.segment(chunk.content()));
         }
 
         int embedded = 0;
