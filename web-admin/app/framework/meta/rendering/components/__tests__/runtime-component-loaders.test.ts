@@ -33,4 +33,9 @@ describe('runtime component loaders', () => {
     expect(getRuntimeComponentEntry('ExecutionLogTraceBlock')).toBeDefined();
     expect(getRuntimeComponentEntry('decision-execution-log-trace')).toBeDefined();
   });
+
+  it('registers the DecisionOps decision-table workbench custom block', () => {
+    expect(getRuntimeComponentEntry('DecisionTableWorkbenchBlock')).toBeDefined();
+    expect(getRuntimeComponentEntry('decision-table-workbench')).toBeDefined();
+  });
 });

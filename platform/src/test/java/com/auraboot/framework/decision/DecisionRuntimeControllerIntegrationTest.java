@@ -195,6 +195,55 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void httpAnalyzeDecisionTableReportsUnsupportedFeelAndContinuousDomains() throws Exception {
+        String table = """
+            { "hitPolicy":"FIRST",
+              "inputs":[
+                {"id":"dueDate","label":"Due date","scope":"record","path":"data.dueDate","dataType":"string"},
+                {"id":"amount","label":"Amount","scope":"record","path":"data.amount","dataType":"decimal"}],
+              "outputs":[{"id":"route","label":"Route","dataType":"string"}],
+              "rules":[
+                {"ruleId":"date-fn","when":{"dueDate":{"operator":"EQ","value":"","feel":"date(2026, 06, 10)"}},"then":{"route":"director"}}] }
+            """;
+
+        String body = mockMvc.perform(post("/api/decision/tables/analyze").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("model", json.readTree(table)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.valid").value(true))
+                .andExpect(jsonPath("$.data.metrics.finiteDomainComplete").value(false))
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode warnings = json.readTree(body).path("data").path("warnings");
+        assertTrue(hasIssueCode(warnings, "DMN_UNSUPPORTED_FEEL"));
+        assertTrue(hasIssueCode(warnings, "DMN_CONTINUOUS_DOMAIN"));
+    }
+
+    @Test
+    void httpDecisionTableTestRunAcceptsEditorModelShape() throws Exception {
+        String table = """
+            { "hitPolicy":"FIRST",
+              "inputs":[
+                {"id":"amount","label":"Amount","scope":"record","path":"data.amount","dataType":"decimal"}],
+              "outputs":[{"id":"route","label":"Route","dataType":"string"}],
+              "rules":[
+                {"ruleId":"high","priority":10,"when":{"amount":{"operator":"EQ","value":"","feel":"> 10000"}},"then":{"route":"director"}},
+                {"ruleId":"fallback","priority":20,"when":{"amount":{"operator":"EQ","value":"","feel":"-"}},"then":{"route":"manager"}}] }
+            """;
+
+        mockMvc.perform(post("/api/decision/test-run").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "kind", "DECISION_TABLE",
+                                "runtimeAdapter", "PLATFORM_DECISION_TABLE",
+                                "contentJson", json.readTree(table),
+                                "context", Map.of("record", Map.of("data", Map.of("amount", 20000)))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("MATCHED"))
+                .andExpect(jsonPath("$.data.matched").value(true))
+                .andExpect(jsonPath("$.data.outputs.route").value("director"))
+                .andExpect(jsonPath("$.data.matchedRules[0].ruleId").value("high"));
+    }
+
+    @Test
     void httpDecisionTableDmnXmlRoundTripExportsAndImportsModel() throws Exception {
         String table = """
             { "hitPolicy":"FIRST",
@@ -216,6 +265,18 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.model.inputs[0].path").value("data.amount"))
                 .andExpect(jsonPath("$.data.model.rules[0].when.amount.feel").value("> 10000"))
                 .andExpect(jsonPath("$.data.model.rules[0].then.route").value("director"));
+    }
+
+    private boolean hasIssueCode(JsonNode issues, String code) {
+        if (!issues.isArray()) {
+            return false;
+        }
+        for (JsonNode issue : issues) {
+            if (code.equals(issue.path("code").asText())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Test

@@ -1877,6 +1877,168 @@
   font-weight: 600;
 }
 
+.decision-table-workbench-block {
+  display: grid;
+  gap: 14px;
+  max-width: 1280px;
+  color: #111827;
+  font-size: 13px;
+}
+
+.dtw-header,
+.dtw-runtime-panel,
+.dtw-diagnostics,
+.dtw-message {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.dtw-header {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(160px, 220px);
+  align-items: end;
+  padding: 14px;
+}
+
+.dtw-identity {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(160px, 0.8fr);
+}
+
+.dtw-identity label,
+.dtw-runtime-panel label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dtw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dtw-actions [data-testid='dtw-save-draft'] {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.dtw-actions [data-testid='dtw-test-run'] {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+  font-weight: 700;
+}
+
+.dtw-version-card {
+  display: grid;
+  gap: 3px;
+  border-left: 3px solid #2563eb;
+  background: #f8fafc;
+  padding: 8px 10px;
+}
+
+.dtw-version-card span,
+.dtw-version-card small {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.dtw-version-card strong {
+  color: #111827;
+  font-size: 14px;
+}
+
+.dtw-message {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  padding: 10px 12px;
+}
+
+.dtw-message.is-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.dtw-diagnostics {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.dtw-diagnostics div {
+  display: grid;
+  gap: 3px;
+  border-left: 3px solid #f59e0b;
+  background: #fffbeb;
+  padding: 8px 10px;
+}
+
+.dtw-diagnostics div[data-severity='ERROR'] {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+
+.dtw-diagnostics strong,
+.dtw-diagnostics span {
+  font-size: 12px;
+}
+
+.dtw-runtime-panel {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(260px, 1fr);
+  padding: 14px;
+}
+
+.dtw-runtime-panel textarea {
+  width: 100%;
+  min-height: 150px;
+  resize: vertical;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #e5e7eb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 10px;
+}
+
+.dtw-result {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dtw-result strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.dtw-result pre {
+  min-height: 118px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #111827;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+  padding: 10px;
+}
+
 .execution-log-trace-block {
   display: grid;
   gap: 12px;
@@ -2151,6 +2313,17 @@
 
   .decisionops-editor-panel {
     grid-template-columns: 1fr;
+  }
+
+  .dtw-header,
+  .dtw-identity,
+  .dtw-runtime-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .dtw-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .decisionops-shell .dt-column-manager {

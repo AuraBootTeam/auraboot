@@ -9,10 +9,11 @@ import com.auraboot.framework.decision.model.DecisionStatus;
 import com.auraboot.framework.decision.service.DecisionTableAnalysisService;
 import com.auraboot.framework.decision.table.DecisionTable;
 import com.auraboot.framework.decision.table.DecisionTableEvaluator;
+import com.auraboot.framework.decision.table.DecisionTableFeel;
+import com.auraboot.framework.decision.table.DecisionTableJson;
 import com.auraboot.framework.decision.table.HitPolicy;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -47,7 +48,7 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
         DecisionTableAnalysisDTO dto = new DecisionTableAnalysisDTO();
         DecisionTable table;
         try {
-            table = mapper.treeToValue(normalize(model), DecisionTable.class);
+            table = mapper.treeToValue(DecisionTableJson.normalizeEditorModel(mapper, model), DecisionTable.class);
         } catch (Exception e) {
             dto.addError(DecisionTableAnalysisDTO.Issue.of("DMN_TABLE_PARSE", "ERROR", List.of(), Map.of(),
                     "Invalid decision table model: " + e.getMessage()));
@@ -55,8 +56,10 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
         }
 
         dto.getMetrics().setRuleCount(table.rules().size());
+        addFeelDiagnostics(table, dto);
         Map<String, List<Object>> domains = finiteDomains(table);
         boolean finiteComplete = domains.size() == table.inputs().size() && !domains.isEmpty();
+        addDomainDiagnostics(table, domains, dto);
         List<Map<String, Object>> combinations = finiteComplete ? combinations(domains) : List.of();
         if (combinations.size() > MAX_FINITE_COMBINATIONS) {
             finiteComplete = false;
@@ -118,27 +121,95 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
         return dto;
     }
 
-    private JsonNode normalize(JsonNode model) {
-        if (model == null || !model.isObject()) {
-            return model;
+    private void addFeelDiagnostics(DecisionTable table, DecisionTableAnalysisDTO dto) {
+        Map<String, DecisionTable.Input> inputs = new LinkedHashMap<>();
+        for (DecisionTable.Input input : table.inputs()) {
+            inputs.put(input.id(), input);
         }
-        ObjectNode copy = model.deepCopy();
-        JsonNode inputs = copy.path("inputs");
-        if (inputs.isArray()) {
-            for (JsonNode node : inputs) {
-                if (node instanceof ObjectNode input && !input.has("expr")
-                        && input.has("scope") && input.has("path")) {
-                    ObjectNode expr = mapper.createObjectNode();
-                    expr.put("type", "path");
-                    expr.put("scope", input.path("scope").asText("record"));
-                    expr.put("path", input.path("path").asText());
-                    expr.put("dataType", input.path("dataType").asText("string"));
-                    input.set("expr", expr);
-                    input.remove(List.of("scope", "path", "dataType"));
+        for (DecisionTable.Rule rule : table.rules()) {
+            for (Map.Entry<String, DecisionTable.Cell> entry : rule.when().entrySet()) {
+                DecisionTable.Cell cell = entry.getValue();
+                if (!DecisionTableFeel.hasText(cell)) {
+                    continue;
+                }
+                DecisionTable.Input input = inputs.get(entry.getKey());
+                DataType dataType = inputDataType(input);
+                try {
+                    DecisionTableFeel.parse(cell.feel(), dataType);
+                } catch (IllegalArgumentException e) {
+                    dto.addError(DecisionTableAnalysisDTO.Issue.of("DMN_FEEL_PARSE", "ERROR",
+                            List.of(rule.ruleId()), Map.of("input", entry.getKey()), e.getMessage()));
+                    continue;
+                }
+                if (looksUnsupportedFeel(cell.feel())) {
+                    dto.addWarning(DecisionTableAnalysisDTO.Issue.of("DMN_UNSUPPORTED_FEEL", "WARNING",
+                            List.of(rule.ruleId()), Map.of("input", entry.getKey()),
+                            "FEEL cell uses expressions outside the platform unary-test subset; convert it to -, null, comparison, range, or comma-list syntax before relying on runtime equality semantics"));
                 }
             }
         }
-        return copy;
+    }
+
+    private void addDomainDiagnostics(DecisionTable table, Map<String, List<Object>> domains,
+                                      DecisionTableAnalysisDTO dto) {
+        for (DecisionTable.Input input : table.inputs()) {
+            if (domains.containsKey(input.id())) {
+                continue;
+            }
+            DataType dataType = inputDataType(input);
+            if (dataType != null && (dataType.isNumeric()
+                    || dataType == DataType.DATE
+                    || dataType == DataType.TIME
+                    || dataType == DataType.DATETIME
+                    || dataType == DataType.DURATION)) {
+                dto.addWarning(DecisionTableAnalysisDTO.Issue.of("DMN_CONTINUOUS_DOMAIN", "WARNING",
+                        List.of(), Map.of("input", input.id()),
+                        "Input '" + input.id() + "' is " + dataType.code()
+                                + " without allowedValues, so completeness/gap analysis is non-exhaustive"));
+            }
+        }
+    }
+
+    private DataType inputDataType(DecisionTable.Input input) {
+        if (input != null && input.expr() instanceof Operand.PathOperand path) {
+            return path.dataType();
+        }
+        return null;
+    }
+
+    private boolean looksUnsupportedFeel(String feel) {
+        String text = feel == null ? "" : feel.trim();
+        if (text.isEmpty() || "-".equals(text)) {
+            return false;
+        }
+        String lower = text.toLowerCase();
+        if ("null".equals(lower) || "not(null)".equals(lower) || "not null".equals(lower)) {
+            return false;
+        }
+        if (text.matches("^\\[\\s*(.+?)\\s*\\.\\.\\s*(.+?)\\s*]$")) {
+            return false;
+        }
+        java.util.regex.Matcher comparison = java.util.regex.Pattern.compile("^(>=|<=|>|<|!=|=)\\s*(.+)$").matcher(text);
+        if (comparison.matches()) {
+            return looksLikeFeelExpression(comparison.group(2));
+        }
+        if (text.contains(",")) {
+            for (String part : text.split(",")) {
+                if (looksLikeFeelExpression(part)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return looksLikeFeelExpression(text);
+    }
+
+    private boolean looksLikeFeelExpression(String text) {
+        String candidate = text == null ? "" : text.trim();
+        String lower = candidate.toLowerCase();
+        return candidate.contains("(")
+                || candidate.contains(")")
+                || lower.matches(".*\\b(if|then|else|and|or|between|date|time|duration|not)\\b.*");
     }
 
     private Map<String, List<Object>> finiteDomains(DecisionTable table) {

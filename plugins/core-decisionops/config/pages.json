@@ -276,6 +276,41 @@
     ]
   },
   {
+    "pageKey": "decisionops_tables_list",
+    "name:zh-CN": "决策表",
+    "name:en": "Decision Tables",
+    "modelCode": "decision_definition",
+    "kind": "list",
+    "profile": "admin",
+    "schemaVersion": 4,
+    "title": {
+      "zh-CN": "决策表",
+      "en-US": "Decision Tables"
+    },
+    "layout": {
+      "type": "stack",
+      "gap": 12
+    },
+    "extension": {
+      "customOnly": true,
+      "skipFieldMeta": true,
+      "hideSavedViews": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true
+    },
+    "blocks": [
+      {
+        "id": "decision_table_workbench",
+        "blockType": "custom",
+        "component": "DecisionTableWorkbenchBlock",
+        "props": {
+          "mode": "workbench"
+        }
+      }
+    ]
+  },
+  {
     "pageKey": "decisionops_event_policies_list",
     "name:zh-CN": "Event Policy",
     "name:en": "Event Policy",

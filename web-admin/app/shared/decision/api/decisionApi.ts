@@ -523,8 +523,19 @@ export function createDecisionApi(http: HttpClient) {
 
     createDraftVersion: (
       code: string,
-      req: { kind: string; runtimeAdapter: string; contentJson: unknown },
-    ) => http.post<{ pid: string }>(`${D}/definitions/${code}/versions`, req).then((r) => r.data),
+      req: {
+        kind: string;
+        runtimeAdapter: string;
+        versionTag?: string;
+        contentJson: unknown;
+        inputSchemaJson?: unknown;
+        outputSchemaJson?: unknown;
+        contextSchemaJson?: unknown;
+      },
+    ) =>
+      http
+        .post<DecisionVersionSummary>(`${D}/definitions/${code}/versions`, req)
+        .then((r) => r.data),
 
     listVersions: (code: string) =>
       http.get<DecisionVersionSummary[]>(`${D}/definitions/${code}/versions`).then((r) => r.data),

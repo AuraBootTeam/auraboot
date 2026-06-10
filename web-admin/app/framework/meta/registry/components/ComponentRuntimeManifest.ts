@@ -173,4 +173,12 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
       'decisionexecutionlogtrace',
     ],
   }),
+  decisiontableworkbench: runtime('decision', 'DecisionTableWorkbenchBlock', {
+    aliases: [
+      'DecisionTableWorkbenchBlock',
+      'decision-table-workbench',
+      'decision_table_workbench',
+      'decisiontableworkbench',
+    ],
+  }),
 };

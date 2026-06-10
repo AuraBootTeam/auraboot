@@ -471,6 +471,27 @@ describe('canonicalizePageSchemaDto', () => {
     });
   });
 
+  it('hosts the visual decision-table editor in a DSL custom workbench block', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const pages = readPages(pagesFile);
+    const tablePage = pages.find((candidate) => candidate.pageKey === 'decisionops_tables_list');
+
+    expect(tablePage).toBeDefined();
+    expect((tablePage!.extension as any).customOnly).toBe(true);
+    expect(JSON.stringify(tablePage)).not.toContain('/decision-ops');
+
+    const schema = canonicalizePageSchemaDto(tablePage!);
+    expect(schema.blocks).toHaveLength(1);
+    expect(schema.blocks[0]).toMatchObject({
+      blockType: 'custom',
+      component: 'DecisionTableWorkbenchBlock',
+      props: {
+        mode: 'workbench',
+      },
+    });
+  });
+
   it('hosts EventPolicy actions and designer in DSL custom blocks instead of console row actions', () => {
     const root = resolve(process.cwd(), '..');
     const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');

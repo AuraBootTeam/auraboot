@@ -12,6 +12,7 @@ import com.auraboot.framework.decision.model.RuntimeAdapter;
 import com.auraboot.framework.decision.runtime.ResolvedDecision;
 import com.auraboot.framework.decision.table.DecisionTable;
 import com.auraboot.framework.decision.table.DecisionTableFeel;
+import com.auraboot.framework.decision.table.DecisionTableJson;
 import com.auraboot.framework.decision.table.DecisionTableEvaluator;
 import com.auraboot.framework.decision.table.HitPolicy;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -163,7 +164,7 @@ public class DecisionTableAdapter implements DecisionAdapter {
 
     private DecisionTable parse(JsonNode content) {
         try {
-            return mapper.treeToValue(content, DecisionTable.class);
+            return mapper.treeToValue(DecisionTableJson.normalizeEditorModel(mapper, content), DecisionTable.class);
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid decision table content: " + e.getMessage(), e);
         }

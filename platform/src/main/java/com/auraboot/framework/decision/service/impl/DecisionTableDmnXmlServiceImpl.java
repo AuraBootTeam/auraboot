@@ -14,6 +14,7 @@ import com.auraboot.framework.decision.model.VersionStatus;
 import com.auraboot.framework.decision.runtime.ResolvedDecision;
 import com.auraboot.framework.decision.service.DecisionTableDmnXmlService;
 import com.auraboot.framework.decision.table.DecisionTable;
+import com.auraboot.framework.decision.table.DecisionTableJson;
 import com.auraboot.framework.decision.table.HitPolicy;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -108,30 +109,7 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
     }
 
     private DecisionTable readTable(JsonNode model) throws Exception {
-        return mapper.treeToValue(normalize(model), DecisionTable.class);
-    }
-
-    private JsonNode normalize(JsonNode model) {
-        if (model == null || !model.isObject()) {
-            return model;
-        }
-        ObjectNode copy = model.deepCopy();
-        JsonNode inputs = copy.path("inputs");
-        if (inputs.isArray()) {
-            for (JsonNode node : inputs) {
-                if (node instanceof ObjectNode input && !input.has("expr")
-                        && input.has("scope") && input.has("path")) {
-                    ObjectNode expr = mapper.createObjectNode();
-                    expr.put("type", "path");
-                    expr.put("scope", input.path("scope").asText("record"));
-                    expr.put("path", input.path("path").asText());
-                    expr.put("dataType", input.path("dataType").asText("string"));
-                    input.set("expr", expr);
-                    input.remove(List.of("scope", "path", "dataType"));
-                }
-            }
-        }
-        return copy;
+        return mapper.treeToValue(DecisionTableJson.normalizeEditorModel(mapper, model), DecisionTable.class);
     }
 
     private String toDmnXml(DecisionTable table, String decisionId, String decisionName, String namespace,

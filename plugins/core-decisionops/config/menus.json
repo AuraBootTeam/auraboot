@@ -40,6 +40,30 @@
     }
   },
   {
+    "code": "decisionops_tables",
+    "parentCode": "decisionops_console",
+    "name": "决策表",
+    "name:zh-CN": "决策表",
+    "name:en": "Decision Tables",
+    "path": "/p/decisionops_tables",
+    "pageKey": "decisionops_tables_list",
+    "component": null,
+    "icon": "table",
+    "type": 1,
+    "permissionCode": "decision.definition.manage",
+    "orderNo": 25,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ],
+      "implementation": "dsl",
+      "customBlocks": [
+        "DecisionTableWorkbenchBlock"
+      ]
+    }
+  },
+  {
     "code": "decisionops_event_policies",
     "parentCode": "decisionops_console",
     "name": "Event Policy",
@@ -51,7 +75,7 @@
     "icon": "bolt",
     "type": 1,
     "permissionCode": "decision.policy.read",
-    "orderNo": 25,
+    "orderNo": 26,
     "visible": true,
     "extension": {
       "platforms": [
@@ -72,7 +96,7 @@
     "icon": "split",
     "type": 1,
     "permissionCode": "decision.definition.read",
-    "orderNo": 26,
+    "orderNo": 27,
     "visible": true,
     "extension": {
       "platforms": [
@@ -96,7 +120,7 @@
     "icon": "activity",
     "type": 1,
     "permissionCode": "decision.definition.read",
-    "orderNo": 27,
+    "orderNo": 28,
     "visible": true,
     "extension": {
       "platforms": [
@@ -117,7 +141,7 @@
     "icon": "database",
     "type": 1,
     "permissionCode": "decision.definition.read",
-    "orderNo": 28,
+    "orderNo": 29,
     "visible": true,
     "extension": {
       "platforms": [
@@ -138,7 +162,7 @@
     "icon": "plug",
     "type": 1,
     "permissionCode": "sys.connector.update",
-    "orderNo": 29,
+    "orderNo": 30,
     "visible": true,
     "extension": {
       "platforms": [
@@ -159,7 +183,7 @@
     "icon": "webhook",
     "type": 1,
     "permissionCode": "admin_webhook",
-    "orderNo": 30,
+    "orderNo": 31,
     "visible": true,
     "extension": {
       "platforms": [
