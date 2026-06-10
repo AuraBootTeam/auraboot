@@ -6,6 +6,7 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +37,8 @@ public class AgentCollaborationService {
     private final AgentDispatchHandler dispatchHandler;
     private final AgentObservationService observationService;
     private final ObjectMapper objectMapper;
+    private final TaskJoinService taskJoinService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Delegate a sub-task to another agent.
@@ -294,10 +297,11 @@ public class AgentCollaborationService {
                 }
             }
 
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            // Event-driven wait replaces blind sleep: a completion signal wakes
+            // the next poll immediately; a missed signal (cross-instance
+            // completion) degrades to the same 2s cadence as before.
+            taskJoinService.awaitCompletion(taskPid, 2000);
+            if (Thread.currentThread().isInterrupted()) {
                 break;
             }
         }
@@ -316,7 +320,7 @@ public class AgentCollaborationService {
     public void checkDelegationTimeouts() {
         try {
             // Scheduled threads don't pass through JwtAuthFilter — use tenant-bypassing query
-            String selectSql = "SELECT pid, tenant_id FROM ab_agent_task " +
+            String selectSql = "SELECT pid, tenant_id, parent_id FROM ab_agent_task " +
                     "WHERE task_status IN ('todo', 'in_progress') " +
                     "AND parent_id IS NOT NULL " +
                     "AND created_at < NOW() - INTERVAL '5 minutes' " +
@@ -335,6 +339,8 @@ public class AgentCollaborationService {
                     updateData.put("task_status", "failed");
                     updateData.put("updated_at", LocalDateTime.now());
                     dynamicDataMapper.update("ab_agent_task", updateData, Map.of("pid", pid));
+                    eventPublisher.publishEvent(new AgentTaskCompletedEvent(
+                            tenantId, pid, (String) task.get("parent_id"), "failed"));
                 } finally {
                     MetaContext.clear();
                 }

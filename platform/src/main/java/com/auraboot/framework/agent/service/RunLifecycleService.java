@@ -12,6 +12,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ public class RunLifecycleService {
     private final AgentObservationService observationService;
     private final LlmProviderFactory providerFactory;
     private final JdbcTemplate jdbcTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     static final int DEFAULT_MAX_CONCURRENT_RUNS = 3;
     static final int HEARTBEAT_INTERVAL_SECONDS = 30;
@@ -102,7 +104,23 @@ public class RunLifecycleService {
         }
         dynamicDataMapper.update("ab_agent_task", taskUpdate, Map.of("pid", taskPid));
 
+        publishTaskCompleted(tenantId, taskPid, result.success ? "done" : "blocked");
+
         return result.success;
+    }
+
+    /**
+     * Publish the task-level terminal signal (collaboration protocol
+     * CHILD_TASK_COMPLETED). Listeners are non-throwing latch/log consumers
+     * ({@link TaskJoinService}); the publish is synchronous and in-process —
+     * pollers stay authoritative for cross-instance completion.
+     */
+    void publishTaskCompleted(Long tenantId, String taskPid, String status) {
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(
+                "SELECT parent_id FROM ab_agent_task WHERE pid = #{params.pid}",
+                Map.of("pid", taskPid));
+        String parentTaskPid = rows.isEmpty() ? null : (String) rows.get(0).get("parent_id");
+        eventPublisher.publishEvent(new AgentTaskCompletedEvent(tenantId, taskPid, parentTaskPid, status));
     }
 
     // =========================================================================
@@ -147,6 +165,8 @@ public class RunLifecycleService {
         taskUpdate.put("updated_at", LocalDateTime.now());
         dynamicDataMapper.update("ab_agent_task", taskUpdate, Map.of("pid", taskPid));
 
+        publishTaskCompleted(tenantId, taskPid, "blocked");
+
         // Cancel pending child tasks when parent fails
         cancelChildTasks(tenantId, taskPid);
     }
@@ -171,6 +191,8 @@ public class RunLifecycleService {
             String childPid = (String) child.get("pid");
             Map<String, Object> cancelUpdate = Map.of("task_status", "cancelled", "updated_at", now);
             dynamicDataMapper.update("ab_agent_task", cancelUpdate, Map.of("pid", childPid));
+            eventPublisher.publishEvent(
+                    new AgentTaskCompletedEvent(tenantId, childPid, parentTaskPid, "cancelled"));
         }
     }
 

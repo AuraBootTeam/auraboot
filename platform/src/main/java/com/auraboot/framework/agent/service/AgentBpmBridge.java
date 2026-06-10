@@ -31,6 +31,7 @@ public class AgentBpmBridge {
     private final AgentDispatchHandler dispatchHandler;
     private final AgentObservationService observationService;
     private final ObjectMapper objectMapper;
+    private final TaskJoinService taskJoinService;
 
     // ==================== Direction 1: BPM → Agent ====================
 
@@ -215,10 +216,11 @@ public class AgentBpmBridge {
                 break;
             }
             sleep = Math.min(sleep, remaining);
-            try {
-                Thread.sleep(sleep);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            // Event-driven wait: the task-completed signal wakes the next poll
+            // immediately; without a signal this degrades to the same backoff
+            // cadence (events are in-process only — the poll stays authoritative).
+            taskJoinService.awaitCompletion(taskPid, sleep);
+            if (Thread.currentThread().isInterrupted()) {
                 break;
             }
             attempt++;

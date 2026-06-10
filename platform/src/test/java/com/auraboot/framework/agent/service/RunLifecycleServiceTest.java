@@ -29,6 +29,7 @@ class RunLifecycleServiceTest {
     @Mock private LlmProviderFactory providerFactory;
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private LlmProvider provider;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     private RunLifecycleService service;
 
@@ -40,7 +41,8 @@ class RunLifecycleServiceTest {
                 memoryService,
                 observationService,
                 providerFactory,
-                jdbcTemplate);
+                jdbcTemplate,
+                eventPublisher);
     }
 
     @Test
