@@ -1,3 +1,10 @@
+---
+type: handover
+status: closed
+created: 2026-06-05
+---
+<!-- no-precipitation: session handover; all slices merged into PRs; continuity captured in follow-on handover files -->
+
 # Session Handover - 2026-06-05 — smart-mfg gap#4 (detail pages) + gap#6 lifecycle slice
 
 > Continues the smart-mfg PCBA golden line. Prior session: `HANDOVER-2026-06-05-smartmfg-gap4-detail-pages.md`

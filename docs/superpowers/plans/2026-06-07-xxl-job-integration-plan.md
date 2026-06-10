@@ -1,10 +1,12 @@
 ---
 type: run-log
-status: completed
+status: closed
 created: 2026-06-07
 relates_to:
   - docs/superpowers/specs/2026-06-07-xxl-job-integration-design.md
 ---
+<!-- no-precipitation: session run-log for XXL-JOB integration plan execution; conclusions embedded in code/PRs, no standalone reusable lesson beyond what's in the spec -->
+
 
 # XXL-JOB Integration Implementation Plan
 
