@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DecisionRuleBindingBlock } from '../DecisionRuleBindingBlock';
 
@@ -153,5 +153,114 @@ describe('DecisionRuleBindingBlock', () => {
       },
     });
     expect(onChange).toHaveBeenCalledWith(value);
+  });
+
+  it('loads decision impact preview on demand', async () => {
+    const api = {
+      getDecisionImpact: vi.fn(async () => ({
+        decisionCode: 'approval_routing',
+        incoming: [{ sourceType: 'AUTOMATION', sourcePid: 'auto-1', binding: 'RULE_BINDING' }],
+        outgoing: [{ targetType: 'FIELD', targetPath: 'record.data.amount' }],
+        risk: {
+          blocking: true,
+          summary: 'Used by 1 automation',
+        },
+      })),
+      evaluate: vi.fn(),
+    };
+
+    render(
+      <DecisionRuleBindingBlock
+        api={api}
+        block={{
+          props: {
+            mode: 'decision',
+            initialDecisionCode: 'approval_routing',
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('decision-impact-empty')).toHaveTextContent('尚未加载影响');
+    fireEvent.click(screen.getByLabelText('refresh-impact'));
+
+    await waitFor(() =>
+      expect(api.getDecisionImpact).toHaveBeenCalledWith('approval_routing'),
+    );
+    expect(screen.getByTestId('decision-impact-summary')).toHaveTextContent(
+      'Used by 1 automation',
+    );
+    expect(screen.getByTestId('decision-impact-summary')).toHaveTextContent('2 个引用');
+    expect(screen.getByTestId('decision-impact-summary')).toHaveTextContent('需确认');
+  });
+
+  it('evaluates the selected published decision with mock context', async () => {
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(async () => ({
+        status: 'MATCHED' as const,
+        matched: true,
+        traceId: 'trace-1',
+        outputs: { route: 'DIRECTOR' },
+      })),
+    };
+
+    render(
+      <DecisionRuleBindingBlock
+        api={api}
+        block={{
+          props: {
+            mode: 'decision',
+            initialDecisionCode: 'approval_routing',
+            initialVersionPolicy: 'ROLLOUT',
+            consumerType: 'AUTOMATION',
+            consumerCode: 'auto-1',
+            initialContextJson: '{"record":{"data":{"amount":20000}}}',
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('run-decision-test'));
+
+    await waitFor(() =>
+      expect(api.evaluate).toHaveBeenCalledWith({
+        decisionCode: 'approval_routing',
+        binding: 'ROLLOUT',
+        callerType: 'AUTOMATION',
+        callerRef: 'auto-1',
+        context: { record: { data: { amount: 20000 } } },
+      }),
+    );
+    expect(screen.getByTestId('decision-test-result')).toHaveTextContent('"status": "MATCHED"');
+    expect(screen.getByTestId('decision-test-result')).toHaveTextContent('"traceId": "trace-1"');
+    expect(screen.getByTestId('decision-test-result')).toHaveTextContent('"route": "DIRECTOR"');
+  });
+
+  it('shows a test-run error for invalid mock context JSON', async () => {
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+    };
+
+    render(
+      <DecisionRuleBindingBlock
+        api={api}
+        block={{
+          props: {
+            mode: 'decision',
+            initialDecisionCode: 'approval_routing',
+          },
+        }}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('test-run-context'), {
+      target: { value: '{invalid' },
+    });
+    fireEvent.click(screen.getByLabelText('run-decision-test'));
+
+    await waitFor(() => expect(screen.getByTestId('decision-test-error')).toBeInTheDocument());
+    expect(api.evaluate).not.toHaveBeenCalled();
   });
 });

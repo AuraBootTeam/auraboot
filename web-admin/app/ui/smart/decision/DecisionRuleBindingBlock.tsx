@@ -1,6 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ConditionBuilder, type FieldOption } from '~/shared/decision/ui/ConditionBuilder';
 import { group, type GroupNode } from '~/shared/decision/ast/conditionAst';
+import { getApiService } from '~/shared/services/ApiService';
+import {
+  createDecisionApi,
+  type DecisionImpact,
+  type DecisionResult,
+  type HttpClient,
+  type ScopedContext,
+} from '~/shared/decision/api/decisionApi';
 
 type DecisionVersionPolicy = 'LATEST_PUBLISHED' | 'FIXED_VERSION' | 'VERSION_TAG' | 'ROLLOUT';
 
@@ -58,6 +66,23 @@ interface RuleConsumerBindingDraft {
 interface RuleBindingRuntime {
   getFieldValue?: (fieldCode: string) => unknown;
   updateField?: (fieldCode: string, value: unknown) => void;
+  getContext?: () => {
+    record?: Record<string, unknown>;
+    row?: Record<string, unknown>;
+    data?: Record<string, unknown>;
+  };
+}
+
+interface RuleBindingDecisionApi {
+  getDecisionImpact: (decisionCode: string) => Promise<DecisionImpact>;
+  evaluate: (request: {
+    decisionCode: string;
+    binding?: 'LATEST' | 'FIXED_VERSION' | 'VERSION_TAG' | 'ROLLOUT';
+    callerType?: string;
+    callerRef?: string;
+    routingKey?: string;
+    context: ScopedContext;
+  }) => Promise<DecisionResult>;
 }
 
 interface DecisionRuleBindingBlockProps {
@@ -70,6 +95,9 @@ interface DecisionRuleBindingBlockProps {
       consumerType?: string;
       consumerCode?: string;
       consumerNodeId?: string;
+      showImpactPreview?: boolean;
+      showTestRunner?: boolean;
+      initialContextJson?: string;
       fields?: FieldOption[];
       decisions?: DecisionOption[];
       initialDecisionCode?: string;
@@ -79,6 +107,7 @@ interface DecisionRuleBindingBlockProps {
   runtime?: RuleBindingRuntime;
   value?: RuleConsumerBindingDraft | string;
   onChange?: (next: RuleConsumerBindingDraft) => void;
+  api?: RuleBindingDecisionApi;
 }
 
 const DEFAULT_FIELDS: FieldOption[] = [
@@ -111,6 +140,16 @@ function fieldKey(field: Pick<FieldOption, 'scope' | 'path'>): string {
 
 function defaultCondition(): GroupNode {
   return group('AND', []);
+}
+
+function defaultDecisionApi(): RuleBindingDecisionApi {
+  const service = getApiService();
+  const http: HttpClient = {
+    get: <T,>(endpoint: string, params?: Record<string, unknown>) => service.get<T>(endpoint, params),
+    post: <T,>(endpoint: string, body?: unknown) => service.post<T>(endpoint, body),
+    delete: <T,>(endpoint: string) => service.delete<T>(endpoint),
+  };
+  return createDecisionApi(http);
 }
 
 function parseBindingValue(raw: unknown): RuleConsumerBindingDraft | undefined {
@@ -195,17 +234,59 @@ function buildRuleConsumerBinding(
   };
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return '请求失败';
+}
+
+function versionPolicyToEvaluateBinding(
+  policy: DecisionVersionPolicy,
+): 'LATEST' | 'FIXED_VERSION' | 'VERSION_TAG' | 'ROLLOUT' {
+  if (policy === 'LATEST_PUBLISHED') return 'LATEST';
+  return policy;
+}
+
+function recordDataFromRuntime(runtime?: RuleBindingRuntime): Record<string, unknown> {
+  const context = runtime?.getContext?.();
+  const record = context?.record ?? context?.row ?? context?.data ?? {};
+  if (record.data && typeof record.data === 'object' && !Array.isArray(record.data)) {
+    return record.data as Record<string, unknown>;
+  }
+  return record;
+}
+
+function buildInitialContextJson(runtime?: RuleBindingRuntime, initialContextJson?: string): string {
+  if (initialContextJson && initialContextJson.trim()) {
+    return initialContextJson;
+  }
+  return JSON.stringify({ record: { data: recordDataFromRuntime(runtime) } }, null, 2);
+}
+
+function parseContextJson(raw: string): ScopedContext {
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Context must be a JSON object');
+  }
+  return parsed as ScopedContext;
+}
+
+function impactCount(impact: DecisionImpact | null): number {
+  return (impact?.incoming?.length ?? 0) + (impact?.outgoing?.length ?? 0);
+}
+
 export function DecisionRuleBindingBlock({
   block,
   runtime,
   value,
   onChange,
+  api,
 }: DecisionRuleBindingBlockProps) {
   const props = block?.props ?? {};
   const mode = props.mode ?? 'combined';
   const fields = props.fields && props.fields.length > 0 ? props.fields : DEFAULT_FIELDS;
   const decisions =
     props.decisions && props.decisions.length > 0 ? props.decisions : DEFAULT_DECISIONS;
+  const defaultApiRef = useRef<RuleBindingDecisionApi | null>(null);
   const initialRuleBinding = parseBindingValue(
     value ??
       props.value ??
@@ -223,6 +304,15 @@ export function DecisionRuleBindingBlock({
       initialRuleBinding,
     ),
   );
+  const [impact, setImpact] = useState<DecisionImpact | null>(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [impactError, setImpactError] = useState('');
+  const [contextJson, setContextJson] = useState(() =>
+    buildInitialContextJson(runtime, props.initialContextJson),
+  );
+  const [testResult, setTestResult] = useState<DecisionResult | null>(null);
+  const [testRunning, setTestRunning] = useState(false);
+  const [testError, setTestError] = useState('');
 
   const fieldByKey = useMemo(() => {
     const map = new Map<string, FieldOption>();
@@ -232,6 +322,8 @@ export function DecisionRuleBindingBlock({
 
   const showCondition = mode === 'condition' || mode === 'combined';
   const showDecision = mode === 'decision' || mode === 'combined';
+  const showImpactPreview = showDecision && props.showImpactPreview !== false;
+  const showTestRunner = showDecision && props.showTestRunner !== false;
 
   const emitChange = (nextCondition: GroupNode, nextBinding: DecisionBindingDraft) => {
     const nextValue = buildRuleConsumerBinding(nextCondition, nextBinding, {
@@ -297,6 +389,54 @@ export function DecisionRuleBindingBlock({
   const updateCondition = (nextCondition: GroupNode) => {
     setCondition(nextCondition);
     emitChange(nextCondition, binding);
+  };
+
+  const getDecisionApi = () => {
+    if (api) return api;
+    if (!defaultApiRef.current) {
+      defaultApiRef.current = defaultDecisionApi();
+    }
+    return defaultApiRef.current;
+  };
+
+  const refreshImpact = async () => {
+    if (!binding.decisionCode) {
+      setImpactError('请选择决策');
+      return;
+    }
+    setImpactLoading(true);
+    setImpactError('');
+    try {
+      setImpact(await getDecisionApi().getDecisionImpact(binding.decisionCode));
+    } catch (error) {
+      setImpactError(errorMessage(error));
+    } finally {
+      setImpactLoading(false);
+    }
+  };
+
+  const runDecisionTest = async () => {
+    if (!binding.decisionCode) {
+      setTestError('请选择决策');
+      return;
+    }
+    setTestRunning(true);
+    setTestError('');
+    setTestResult(null);
+    try {
+      const result = await getDecisionApi().evaluate({
+        decisionCode: binding.decisionCode,
+        binding: versionPolicyToEvaluateBinding(binding.versionPolicy),
+        callerType: props.consumerType ?? 'RULE_BINDING_PREVIEW',
+        callerRef: props.consumerCode,
+        context: parseContextJson(contextJson),
+      });
+      setTestResult(result);
+    } catch (error) {
+      setTestError(errorMessage(error));
+    } finally {
+      setTestRunning(false);
+    }
   };
 
   return (
@@ -453,6 +593,83 @@ export function DecisionRuleBindingBlock({
               2,
             )}
           </pre>
+
+          {showImpactPreview && (
+            <div className="decision-rule-binding-section" data-testid="decision-impact-preview">
+              <div className="decision-rule-binding-heading">
+                <strong>影响预览</strong>
+                <button
+                  type="button"
+                  aria-label="refresh-impact"
+                  disabled={impactLoading}
+                  onClick={refreshImpact}
+                >
+                  {impactLoading ? '加载中' : '刷新'}
+                </button>
+              </div>
+              {impactError ? (
+                <div className="decision-rule-error" data-testid="decision-impact-error">
+                  {impactError}
+                </div>
+              ) : impact ? (
+                <div className="decision-rule-impact-summary" data-testid="decision-impact-summary">
+                  <strong>{impact.risk?.summary ?? '无影响摘要'}</strong>
+                  <span>{impactCount(impact)} 个引用</span>
+                  <span>{impact.risk?.blocking ? '需确认' : '可继续'}</span>
+                </div>
+              ) : (
+                <div className="decision-rule-empty" data-testid="decision-impact-empty">
+                  尚未加载影响
+                </div>
+              )}
+            </div>
+          )}
+
+          {showTestRunner && (
+            <div className="decision-rule-binding-section" data-testid="decision-test-runner">
+              <div className="decision-rule-binding-heading">
+                <strong>测试运行</strong>
+                <button
+                  type="button"
+                  aria-label="run-decision-test"
+                  disabled={testRunning}
+                  onClick={runDecisionTest}
+                >
+                  {testRunning ? '运行中' : '运行'}
+                </button>
+              </div>
+              <label className="decision-rule-context-editor">
+                Context JSON
+                <textarea
+                  aria-label="test-run-context"
+                  value={contextJson}
+                  onChange={(event) => setContextJson(event.target.value)}
+                />
+              </label>
+              {testError ? (
+                <div className="decision-rule-error" data-testid="decision-test-error">
+                  {testError}
+                </div>
+              ) : testResult ? (
+                <pre className="decision-rule-binding-preview" data-testid="decision-test-result">
+                  {JSON.stringify(
+                    {
+                      status: testResult.status,
+                      matched: testResult.matched,
+                      traceId: testResult.traceId,
+                      outputs: testResult.outputs ?? {},
+                    },
+                    null,
+                    2,
+                  )}
+                </pre>
+              ) : (
+                <div className="decision-rule-empty" data-testid="decision-test-empty">
+                  尚未运行
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </section>

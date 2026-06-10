@@ -401,7 +401,9 @@ export interface EvaluateRequest {
   versionTag?: string;
   asOf?: string;
   callerType?: string;
+  callerRef?: string;
   routingKey?: string;
+  tenantSegment?: string;
   segment?: string;
   context: ScopedContext;
 }
