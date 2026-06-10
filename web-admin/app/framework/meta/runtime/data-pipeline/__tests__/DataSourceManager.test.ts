@@ -61,6 +61,51 @@ describe('DataSourceManager', () => {
     ]);
   });
 
+  it('passes format=records for namedQuery sources so metric-strip gets raw aggregate rows', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: { list: [{ total_devices: 5, online_devices: 2 }], total: 1 },
+    } as any);
+
+    const manager = new DataSourceManager(createExpressionContext({} as any));
+    manager.register('fleetKpi', {
+      type: 'namedQuery',
+      queryCode: 'iot_dashboard_kpi',
+      format: 'records',
+      autoFetch: false,
+    });
+
+    await manager.fetch('fleetKpi');
+
+    expect(mockedFetchResult).toHaveBeenCalledWith(
+      '/api/datasource/list',
+      expect.objectContaining({
+        method: 'get',
+        params: expect.objectContaining({
+          datasourceId: 'nq:iot_dashboard_kpi',
+          format: 'records',
+        }),
+      }),
+    );
+  });
+
+  it('omits format for namedQuery sources by default (option/dropdown format)', async () => {
+    mockedFetchResult.mockResolvedValueOnce({ code: '0', data: [] } as any);
+
+    const manager = new DataSourceManager(createExpressionContext({} as any));
+    manager.register('statusOptions', {
+      type: 'namedQuery',
+      queryCode: 'iot_dashboard_device_status',
+      autoFetch: false,
+    });
+
+    await manager.fetch('statusOptions');
+
+    const params = mockedFetchResult.mock.calls[0][1]?.params as Record<string, any>;
+    expect(params.datasourceId).toBe('nq:iot_dashboard_device_status');
+    expect(params.format).toBeUndefined();
+  });
+
   it('keeps updated page context available after binding a schema state manager', async () => {
     mockedFetchResult.mockResolvedValueOnce({
       code: '0',
