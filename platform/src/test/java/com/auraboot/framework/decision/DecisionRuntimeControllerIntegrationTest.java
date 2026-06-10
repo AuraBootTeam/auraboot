@@ -7,12 +7,19 @@ import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.bpm.entity.SlaConfigEntity;
 import com.auraboot.framework.bpm.mapper.SlaConfigMapper;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.decision.entity.DecisionImpactAckEntity;
 import com.auraboot.framework.decision.entity.DecisionUsageRefEntity;
 import com.auraboot.framework.decision.entity.DrtLogEntity;
 import com.auraboot.framework.decision.mapper.DecisionImpactAckMapper;
 import com.auraboot.framework.decision.mapper.DecisionUsageRefMapper;
 import com.auraboot.framework.decision.mapper.DrtLogMapper;
+import com.auraboot.framework.decision.rule.DecisionBinding;
+import com.auraboot.framework.decision.rule.DecisionVersionPolicy;
+import com.auraboot.framework.decision.rule.RuleBindingKind;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.decision.rule.RuleMappingTarget;
+import com.auraboot.framework.decision.rule.RuleValueSource;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyDefinitionEntity;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyDefinitionMapper;
@@ -647,6 +654,88 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         assertTrue(data.path("references").findValuesAsText("sourceType").contains("DECISION_VERSION"));
         assertTrue(data.path("references").findValuesAsText("sourceCode").contains(fixture.decisionCode()));
         assertTrue(data.path("references").findValuesAsText("targetPath").contains("record.data.amount"));
+    }
+
+    @Test
+    void httpDecisionImpactIncludesAutomationRuleBindingRefs() throws Exception {
+        String code = "it_rule_binding_impact_" + System.nanoTime();
+        createDefinition(code);
+        createPublishedVersion(code);
+
+        Automation automation = new Automation();
+        automation.setPid(UniqueIdGenerator.generate());
+        automation.setTenantId(getTestTenant().getId());
+        automation.setName("Rule Binding Impact Automation");
+        automation.setDescription("Automation using platform RuleConsumerBinding");
+        automation.setModelCode("complaint");
+        automation.setTriggerType("on_record_create");
+        automation.setTriggerConfig(TriggerConfig.builder()
+                .modelCode("complaint")
+                .ruleBinding(new RuleConsumerBinding(
+                        "AUTOMATION",
+                        "auto-rule-binding-impact",
+                        "trigger",
+                        RuleBindingKind.DECISION_REF,
+                        null,
+                        new DecisionBinding(
+                                code,
+                                DecisionVersionPolicy.ROLLOUT,
+                                null,
+                                null,
+                                null,
+                                List.of(new DecisionBinding.InputMapping(
+                                        "amount",
+                                        RuleValueSource.field(Scope.RECORD, "data.amount"))),
+                                List.of(new DecisionBinding.OutputMapping(
+                                        "route",
+                                        new RuleMappingTarget(RuleMappingTarget.Kind.ACTION_PARAM, "route"))),
+                                DecisionBinding.FallbackPolicy.failClosed(),
+                                200,
+                                DecisionBinding.TraceMode.ALWAYS,
+                                true,
+                                RuleValueSource.field(Scope.RECORD, "data.recordId"),
+                                null),
+                        true))
+                .build());
+        automation.setEnabled(true);
+        automation.setActions(List.of());
+        automation.setTriggerCount(0L);
+        automation.setDeletedFlag(false);
+        automation.setCreatedAt(Instant.now());
+        automation.setUpdatedAt(Instant.now());
+        automation.setCreatedBy(getTestUser().getPid());
+        automation.setUpdatedBy(getTestUser().getPid());
+        automationMapper.insertAutomation(automation);
+
+        mockMvc.perform(post("/api/decision/usage-index/rebuild"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.consumerRefs").value(
+                        org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.data.fieldRefs").value(
+                        org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
+
+        String impactBody = mockMvc.perform(get("/api/decision/definitions/" + code + "/impact"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.decisionCode").value(code))
+                .andExpect(jsonPath("$.data.risk.blocking").value(true))
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode impact = json.readTree(impactBody).path("data");
+        assertTrue(impact.path("incoming").findValuesAsText("sourceType").contains("AUTOMATION"));
+        assertTrue(impact.path("incoming").findValuesAsText("sourcePid").contains(automation.getPid()));
+        assertTrue(impact.path("incoming").findValuesAsText("binding").contains("RULE_BINDING"));
+
+        String fieldBody = mockMvc.perform(get("/api/decision/fields/impact")
+                        .param("fieldRef", "record.data.recordId"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.fieldRef").value("record.data.recordId"))
+                .andExpect(jsonPath("$.data.risk.blocking").value(true))
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode fieldImpact = json.readTree(fieldBody).path("data");
+        assertTrue(fieldImpact.path("references").findValuesAsText("sourceType").contains("AUTOMATION"));
+        assertTrue(fieldImpact.path("references").findValuesAsText("sourcePid").contains(automation.getPid()));
+        assertTrue(fieldImpact.path("references").findValuesAsText("binding").contains("RULE_BINDING"));
     }
 
     @Test
