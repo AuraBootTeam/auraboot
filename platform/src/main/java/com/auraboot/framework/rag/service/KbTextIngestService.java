@@ -44,8 +44,7 @@ public class KbTextIngestService {
 
     private final KnowledgeBaseService kbService;
     private final KbDocumentMapper docMapper;
-    private final ChunkingService chunkingService;
-    private final EmbeddingService embeddingService;
+    private final KbChunkIngestPipeline ingestPipeline;
     private final JdbcTemplate jdbcTemplate;
     private final PlatformTransactionManager txManager;
 
@@ -102,46 +101,19 @@ public class KbTextIngestService {
                     .build();
             docMapper.insert(doc);
 
-            List<ChunkingService.ChunkResult> chunks = chunkingService.chunk(text, 500, 50);
-            if (chunks.isEmpty()) {
+            KbChunkIngestPipeline.IngestOutcome outcome = ingestPipeline.ingestChunks(
+                    tenantId, kbPid, docPid, text,
+                    kb.getChunkSize(), kb.getChunkOverlap(), provider, null);
+            if (outcome.chunkCount() == 0) {
                 kbService.updateDocumentAfterProcessing(docPid, "failed", 0, 0, "No chunks");
                 return docPid;
             }
 
-            List<String> chunkPids = new ArrayList<>();
-            List<String> chunkTexts = new ArrayList<>();
-            for (ChunkingService.ChunkResult chunk : chunks) {
-                String chunkPid = UniqueIdGenerator.generate();
-                chunkPids.add(chunkPid);
-                chunkTexts.add(chunk.content());
-                jdbcTemplate.update(
-                        "INSERT INTO ab_kb_chunk (pid, tenant_id, kb_id, doc_id, chunk_index, "
-                        + "content, char_count, token_count, tsv, embedding_status, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, to_tsvector('simple', ?), 'pending', NOW(), NOW())",
-                        chunkPid, tenantId, kbPid, docPid, chunk.index(), chunk.content(),
-                        chunk.charCount(), chunk.tokenCount(), chunk.content());
-            }
-
-            try {
-                List<float[]> embeddings = embeddingService.embedBatch(tenantId, chunkTexts, provider);
-                for (int i = 0; i < embeddings.size() && i < chunkPids.size(); i++) {
-                    float[] emb = embeddings.get(i);
-                    if (emb != null) {
-                        jdbcTemplate.update(
-                                "UPDATE ab_kb_chunk SET embedding = ?::vector, embedding_status = 'completed', "
-                                + "updated_at = NOW() WHERE pid = ?",
-                                VectorUtils.toVectorString(emb), chunkPids.get(i));
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("[kb-ingest] embedding failed kb={} source={}:{}: {}",
-                        kbPid, sourceType, sourceId, e.getMessage());
-            }
-
-            kbService.updateDocumentAfterProcessing(docPid, "completed", text.length(), chunks.size(), null);
+            kbService.updateDocumentAfterProcessing(docPid, "completed", text.length(),
+                    outcome.chunkCount(), null);
             kbService.refreshKbCounters(kbPid);
-            log.info("[kb-ingest] ingested {}:{} -> kb {} ({} chunks)",
-                    sourceType, sourceId, kbPid, chunks.size());
+            log.info("[kb-ingest] ingested {}:{} -> kb {} ({} chunks, {} embedded)",
+                    sourceType, sourceId, kbPid, outcome.chunkCount(), outcome.embeddedCount());
             return docPid;
         });
     }

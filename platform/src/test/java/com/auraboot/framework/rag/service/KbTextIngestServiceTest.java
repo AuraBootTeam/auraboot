@@ -53,8 +53,10 @@ class KbTextIngestServiceTest {
         jdbcTemplate = mock(JdbcTemplate.class);
         txManager = mock(PlatformTransactionManager.class);
         when(txManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
-        svc = new KbTextIngestService(kbService, docMapper, chunkingService, embeddingService,
-                jdbcTemplate, txManager);
+        // Real pipeline wired with the same mocks — preserves chunk/embed assertions (G9)
+        KbChunkIngestPipeline pipeline =
+                new KbChunkIngestPipeline(chunkingService, embeddingService, jdbcTemplate);
+        svc = new KbTextIngestService(kbService, docMapper, pipeline, jdbcTemplate, txManager);
         svc.initTx();
     }
 
@@ -90,7 +92,7 @@ class KbTextIngestServiceTest {
     void happyPath_verifyWrites() {
         stubKb("KB1", "zhipu");
         when(docMapper.selectList(any())).thenReturn(List.of());
-        when(chunkingService.chunk(any(), eq(500), eq(50)))
+        when(chunkingService.chunk(anyString(), anyInt(), anyInt()))
                 .thenReturn(List.of(chunk(0, "hello"), chunk(1, "world")));
         when(embeddingService.embedBatch(anyLong(), anyList(), anyString()))
                 .thenReturn(List.of(new float[]{0.1f}, new float[]{0.2f}));
@@ -199,8 +201,9 @@ class KbTextIngestServiceTest {
         String docPid = svc.ingestText(1L, "KB1", "crawler", "u1", "Doc", "x");
 
         org.junit.jupiter.api.Assertions.assertNotNull(docPid);
-        // no embedding UPDATE, but doc still completed (chunks remain pending)
-        verify(jdbcTemplate, never()).update(contains("UPDATE ab_kb_chunk SET embedding"), any(), any());
+        // no embedding vector written; chunk marked 'failed' (retry pickup state), doc still completed
+        verify(jdbcTemplate, never()).update(contains("SET embedding = ?::vector"), anyString(), anyString());
+        verify(jdbcTemplate).update(contains("embedding_status = 'failed'"), any(Object.class));
         verify(kbService).updateDocumentAfterProcessing(anyString(), eq("completed"), anyInt(), anyInt(), eq(null));
     }
 }
