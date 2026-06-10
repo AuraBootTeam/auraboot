@@ -110,10 +110,6 @@ public class DecisionImpactServiceImpl implements DecisionImpactService {
     public DecisionIntegrationImpactDTO getIntegrationImpact(String targetType, String targetCode) {
         String normalizedTargetType = normalizeTargetType(targetType);
         List<DecisionImpactRefDTO> refs = usageIndexService.findTargetRefs(normalizedTargetType, targetCode);
-        if (refs.isEmpty()) {
-            usageIndexService.rebuild();
-            refs = usageIndexService.findTargetRefs(normalizedTargetType, targetCode);
-        }
 
         DecisionIntegrationImpactDTO dto = new DecisionIntegrationImpactDTO();
         dto.setTargetType(normalizedTargetType);

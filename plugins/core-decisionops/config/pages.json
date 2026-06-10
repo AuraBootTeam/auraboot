@@ -1027,6 +1027,268 @@
     ]
   },
   {
+    "pageKey": "decisionops_webhooks_list",
+    "name:zh-CN": "Webhook 治理",
+    "name:en": "Webhook Governance",
+    "modelCode": "webhook",
+    "kind": "list",
+    "profile": "admin",
+    "schemaVersion": 4,
+    "title": {
+      "zh-CN": "Webhook 治理",
+      "en-US": "Webhook Governance"
+    },
+    "layout": {
+      "type": "stack",
+      "gap": 12
+    },
+    "extension": {
+      "options": {
+        "detailNavigation": "detail",
+        "detailUrl": "/p/decisionops_webhooks/view/{pid}"
+      },
+      "hideSavedViews": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true
+    },
+    "blocks": [
+      {
+        "id": "decision_webhook_table",
+        "blockType": "table",
+        "table": {
+          "columns": [
+            {
+              "field": "name",
+              "label": {
+                "zh-CN": "Webhook",
+                "en-US": "Webhook"
+              },
+              "width": 220
+            },
+            {
+              "field": "event_type",
+              "label": {
+                "zh-CN": "事件类型",
+                "en-US": "Event Type"
+              },
+              "width": 160,
+              "renderType": "tag",
+              "dictCode": "webhook_event_type"
+            },
+            {
+              "field": "target_url",
+              "label": {
+                "zh-CN": "目标 URL",
+                "en-US": "Target URL"
+              },
+              "width": 320
+            },
+            {
+              "field": "model_code",
+              "label": {
+                "zh-CN": "关联模型",
+                "en-US": "Model"
+              },
+              "width": 140
+            },
+            {
+              "field": "enabled",
+              "label": {
+                "zh-CN": "启用",
+                "en-US": "Enabled"
+              },
+              "width": 100
+            },
+            {
+              "field": "created_at",
+              "label": {
+                "zh-CN": "创建时间",
+                "en-US": "Created At"
+              },
+              "width": 180,
+              "format": "YYYY-MM-DD HH:mm"
+            }
+          ],
+          "rowActions": [
+            {
+              "code": "detail",
+              "label": {
+                "zh-CN": "详情",
+                "en-US": "Detail"
+              },
+              "action": {
+                "type": "navigate",
+                "to": "/p/decisionops_webhooks/view/{pid}"
+              }
+            },
+            {
+              "code": "manage",
+              "label": {
+                "zh-CN": "平台管理",
+                "en-US": "Manage"
+              },
+              "action": {
+                "type": "navigate",
+                "to": "/p/webhook"
+              }
+            }
+          ],
+          "defaultSort": {
+            "field": "created_at",
+            "order": "desc"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "decisionops_webhooks_detail",
+    "name:zh-CN": "Webhook 治理详情",
+    "name:en": "Webhook Governance Detail",
+    "modelCode": "webhook",
+    "kind": "detail",
+    "profile": "admin",
+    "schemaVersion": 4,
+    "title": {
+      "zh-CN": "Webhook 治理详情",
+      "en-US": "Webhook Governance Detail"
+    },
+    "layout": {
+      "type": "stack",
+      "gap": 12
+    },
+    "extension": {
+      "showEdit": false
+    },
+    "blocks": [
+      {
+        "id": "decision_webhook_impact",
+        "blockType": "custom",
+        "component": "DecisionIntegrationImpactBlock",
+        "detailPlacement": "header",
+        "props": {
+          "targetType": "WEBHOOK",
+          "modelCode": "webhook",
+          "targetCodeField": "event_type"
+        }
+      },
+      {
+        "id": "decision_webhook_overview",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "Webhook 概览",
+          "en-US": "Webhook Overview"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "name",
+            "label": {
+              "zh-CN": "Webhook",
+              "en-US": "Webhook"
+            }
+          },
+          {
+            "field": "pid",
+            "label": {
+              "zh-CN": "PID",
+              "en-US": "PID"
+            }
+          },
+          {
+            "field": "event_type",
+            "label": {
+              "zh-CN": "事件类型",
+              "en-US": "Event Type"
+            }
+          },
+          {
+            "field": "enabled",
+            "label": {
+              "zh-CN": "启用",
+              "en-US": "Enabled"
+            },
+            "component": "switch"
+          }
+        ]
+      },
+      {
+        "id": "decision_webhook_delivery",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "投递配置",
+          "en-US": "Delivery Configuration"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "target_url",
+            "label": {
+              "zh-CN": "目标 URL",
+              "en-US": "Target URL"
+            }
+          },
+          {
+            "field": "model_code",
+            "label": {
+              "zh-CN": "关联模型",
+              "en-US": "Model"
+            }
+          },
+          {
+            "field": "filter_expression",
+            "label": {
+              "zh-CN": "过滤表达式",
+              "en-US": "Filter Expression"
+            }
+          },
+          {
+            "field": "max_retries",
+            "label": {
+              "zh-CN": "最大重试",
+              "en-US": "Max Retries"
+            }
+          },
+          {
+            "field": "timeout_ms",
+            "label": {
+              "zh-CN": "超时(ms)",
+              "en-US": "Timeout (ms)"
+            }
+          }
+        ]
+      },
+      {
+        "id": "decision_webhook_audit",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "审计",
+          "en-US": "Audit"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "created_at",
+            "label": {
+              "zh-CN": "创建时间",
+              "en-US": "Created At"
+            },
+            "component": "datetime"
+          },
+          {
+            "field": "updated_at",
+            "label": {
+              "zh-CN": "更新时间",
+              "en-US": "Updated At"
+            },
+            "component": "datetime"
+          }
+        ]
+      }
+    ]
+  },
+  {
     "pageKey": "decisionops_execution_logs_list",
     "name:zh-CN": "执行日志",
     "name:en": "Execution Logs",

@@ -146,5 +146,27 @@
       ],
       "implementation": "dsl"
     }
+  },
+  {
+    "code": "decisionops_webhooks",
+    "parentCode": "decisionops_console",
+    "name": "Webhook 治理",
+    "name:zh-CN": "Webhook 治理",
+    "name:en": "Webhook Governance",
+    "path": "/p/decisionops_webhooks",
+    "pageKey": "decisionops_webhooks_list",
+    "component": null,
+    "icon": "webhook",
+    "type": 1,
+    "permissionCode": "admin_webhook",
+    "orderNo": 30,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ],
+      "implementation": "dsl",
+      "manageUrl": "/p/webhook"
+    }
   }
 ]

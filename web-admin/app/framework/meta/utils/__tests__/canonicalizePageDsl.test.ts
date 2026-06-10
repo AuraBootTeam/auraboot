@@ -397,4 +397,43 @@ describe('canonicalizePageSchemaDto', () => {
       },
     });
   });
+
+  it('keeps DecisionOps webhook row actions as governance and platform-management links', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const pages = readPages(pagesFile);
+    const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_webhooks_list');
+    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_webhooks_detail');
+
+    expect(listPage).toBeDefined();
+    expect(detailPage).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(listPage!);
+    const rowActions = (schema.blocks[0] as any).table.rowActions;
+    const detailAction = rowActions.find((action: any) => action.code === 'detail');
+    const manageAction = rowActions.find((action: any) => action.code === 'manage');
+
+    expect(rowActions.map((action: any) => action.code)).not.toEqual(
+      expect.arrayContaining(['create', 'edit', 'delete']),
+    );
+    expect(detailAction).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/decisionops_webhooks/view/{pid}',
+      },
+    });
+    expect(manageAction).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/webhook',
+      },
+    });
+    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+      component: 'DecisionIntegrationImpactBlock',
+      props: {
+        targetType: 'WEBHOOK',
+        targetCodeField: 'event_type',
+      },
+    });
+  });
 });

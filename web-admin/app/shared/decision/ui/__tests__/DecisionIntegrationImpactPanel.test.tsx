@@ -42,4 +42,44 @@ describe('DecisionIntegrationImpactPanel', () => {
     expect(screen.getByTestId('integration-impact-ref-0')).toHaveTextContent('enrich');
     expect(screen.getByTestId('integration-impact-manage')).toHaveAttribute('href', '/p/api_connector');
   });
+
+  it('loads webhook event impact and links back to the platform webhook page', async () => {
+    const getIntegrationImpact = vi.fn(async () => ({
+      targetType: 'WEBHOOK',
+      targetCode: 'case.closed',
+      manageUrl: '/p/webhook',
+      references: [
+        {
+          sourceType: 'EVENT_POLICY',
+          sourceCode: 'case_closed_policy',
+          sourceName: 'Case Closed Policy',
+          sourceVersion: '2',
+          targetType: 'WEBHOOK',
+          targetCode: 'case.closed',
+          targetPath: 'case.closed',
+          binding: 'VERSION_RULES',
+          metadata: { actionType: 'WEBHOOK' },
+        },
+      ],
+      risk: {
+        blocking: true,
+        summary: 'Used by 1 EventPolicy',
+        counts: { EVENT_POLICY: 1 },
+      },
+    }));
+
+    render(
+      <DecisionIntegrationImpactPanel
+        api={{ getIntegrationImpact }}
+        targetType="WEBHOOK"
+        targetCode="case.closed"
+      />,
+    );
+
+    await waitFor(() => expect(getIntegrationImpact).toHaveBeenCalledWith('WEBHOOK', 'case.closed'));
+    expect(screen.getByTestId('integration-impact-risk')).toHaveTextContent('Used by 1 EventPolicy');
+    expect(screen.getByTestId('integration-impact-ref-0')).toHaveTextContent('Case Closed Policy');
+    expect(screen.getByTestId('integration-impact-ref-0')).toHaveTextContent('case.closed');
+    expect(screen.getByTestId('integration-impact-manage')).toHaveAttribute('href', '/p/webhook');
+  });
 });

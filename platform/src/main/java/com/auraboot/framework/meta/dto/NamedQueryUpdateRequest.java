@@ -36,6 +36,18 @@ public class NamedQueryUpdateRequest {
     private String fromSql;
 
     /**
+     * External API connector PID. When set, query delegates to the connector instead of SQL.
+     * Mutually exclusive with fromSql.
+     */
+    private String connectorPid;
+
+    /**
+     * Endpoint code within the external connector.
+     * Required when connectorPid is set.
+     */
+    private String connectorEndpointCode;
+
+    /**
      * 基础WHERE条件
      */
     private JsonNode baseWhere;

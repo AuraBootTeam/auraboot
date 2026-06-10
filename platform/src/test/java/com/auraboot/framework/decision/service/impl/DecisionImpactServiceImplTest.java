@@ -11,6 +11,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DecisionImpactServiceImplTest {
@@ -41,5 +43,20 @@ class DecisionImpactServiceImplTest {
         assertThat(impact.getRisk().getBlocking()).isTrue();
         assertThat(impact.getRisk().getCounts()).containsEntry("AUTOMATION", 1);
         assertThat(impact.getRisk().getSummary()).isEqualTo("Used by 1 automation");
+    }
+
+    @Test
+    void getIntegrationImpactDoesNotRebuildWhenTargetHasNoConsumers() {
+        when(usageIndexService.findTargetRefs("WEBHOOK", "wh-1")).thenReturn(List.of());
+
+        DecisionIntegrationImpactDTO impact = service.getIntegrationImpact("webhook", "wh-1");
+
+        assertThat(impact.getTargetType()).isEqualTo("WEBHOOK");
+        assertThat(impact.getTargetCode()).isEqualTo("wh-1");
+        assertThat(impact.getManageUrl()).isEqualTo("/p/webhook");
+        assertThat(impact.getReferences()).isEmpty();
+        assertThat(impact.getRisk().getBlocking()).isFalse();
+        assertThat(impact.getRisk().getSummary()).isEqualTo("No integration consumers");
+        verify(usageIndexService, never()).rebuild();
     }
 }
