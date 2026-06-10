@@ -106,7 +106,25 @@ public class RolePermission {
      */
     @TableField(typeHandler = JacksonTypeHandler.class)
     private Object conditions;
-    
+
+    // ========================================================================
+    // Permission Governance S1: materialized fields (written by enterprise PermissionCompiler)
+    // ========================================================================
+
+    /** Materialized condition AST (decision ConditionNode JSON). Replaces `conditions` in Plan B. */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private Object conditionAst;
+
+    /** Materialized data-scope AST (decision ConditionNode JSON). */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private Object dataScopeAst;
+
+    /** Provenance: which package/override produced this grant (explainer/audit). */
+    private String sourceRef;
+
+    /** Owning publish snapshot id (ab_permission_snapshot.id). */
+    private Long snapshotId;
+
     // ========================================================================
     // Status
     // ========================================================================
