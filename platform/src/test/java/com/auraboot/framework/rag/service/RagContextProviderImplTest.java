@@ -183,7 +183,6 @@ class RagContextProviderImplTest {
         when(d7Service.retrieve(1L, "How should D7 trace retrieval?", 3)).thenReturn(List.of(match));
         when(ragRetrievalService.retrieve(1L, "How should D7 trace retrieval?", List.of("kb1"), 5, null))
                 .thenReturn(List.of());
-        when(ragRetrievalService.buildRagContext(List.of())).thenReturn("");
 
         RagContextProviderImpl provider = new RagContextProviderImpl(
                 ragRetrievalService,

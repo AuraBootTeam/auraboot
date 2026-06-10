@@ -143,33 +143,8 @@ class RagRetrievalServiceBranchTest {
         assertThrows(RuntimeException.class, () -> service.hasActiveKnowledgeBases(1L));
     }
 
-    @Test
-    @DisplayName("buildRagContext returns empty for null input")
-    void buildRagContextNull() {
-        assertEquals("", service.buildRagContext(null));
-    }
 
-    @Test
-    @DisplayName("buildRagContext returns empty for empty list")
-    void buildRagContextEmpty() {
-        assertEquals("", service.buildRagContext(List.of()));
-    }
 
-    @Test
-    @DisplayName("buildRagContext formats results into reference section")
-    void buildRagContextFormats() {
-        RetrievalResult r = RetrievalResult.builder()
-                .chunkPid("c1")
-                .docName("doc-A")
-                .chunkIndex(7)
-                .content("body content")
-                .build();
-        String out = service.buildRagContext(List.of(r));
-        assertTrue(out.contains("## Reference Knowledge"));
-        assertTrue(out.contains("Source: doc-A"));
-        assertTrue(out.contains("Chunk 7"));
-        assertTrue(out.contains("body content"));
-    }
 
     @Test
     @DisplayName("buildTsQuery returns empty for null/blank")

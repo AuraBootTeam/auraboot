@@ -8,35 +8,6 @@ import java.util.List;
 @Component
 public class D7ContextAssembler {
 
-    public String buildAuraBotContext(List<D7CompiledKnowledgeMatch> matches, String rawContext) {
-        boolean hasMatches = matches != null && !matches.isEmpty();
-        boolean hasRawContext = rawContext != null && !rawContext.isBlank();
-        if (!hasMatches) {
-            return hasRawContext ? rawContext : "";
-        }
-
-        StringBuilder sb = new StringBuilder("\n\n## Compiled Knowledge\n");
-        sb.append("Use these reviewed knowledge pages before raw chunks. ");
-        sb.append("Keep citations traceable to the listed source paths.\n\n");
-
-        for (D7CompiledKnowledgeMatch match : matches) {
-            D7CompiledKnowledgePage page = match.getPage();
-            sb.append("### [Compiled: ").append(nonBlank(page.getTitle(), page.getId())).append("]\n");
-            sb.append("- Page ID: `").append(page.getId()).append("`\n");
-            sb.append("- Type: `").append(nonBlank(page.getType(), "unknown")).append("`\n");
-            sb.append("- Stale status: `").append(nonBlank(page.getStaleStatus(), "unknown")).append("`\n");
-            sb.append("- Requires raw evidence: ").append(match.isRequiresRawEvidence()).append("\n");
-            appendSources(sb, page.getSourceRefs());
-            appendSection(sb, "Summary", page.getSummary());
-            appendSection(sb, "Body", page.getBody());
-            sb.append("\n---\n\n");
-        }
-
-        if (hasRawContext) {
-            sb.append(rawContext);
-        }
-        return sb.toString();
-    }
 
     /**
      * Render RRF-fused compiled pages and raw chunks in fused order under a
