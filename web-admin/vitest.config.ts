@@ -31,6 +31,36 @@ export default defineConfig({
     outputFile: {
       json: './test-results/results.json',
     },
+    // ── Coverage (v8) ──
+    // Baseline 2026-06-10: lines 19.08% / statements 18.79% / functions 16.43% /
+    // branches 16.44% across app + packages (285 spec files, 2099 tests).
+    // Thresholds act as a no-regression ratchet — raise them in lockstep as the
+    // coverage initiative adds tests toward the 80% target. UI presentation code
+    // stays covered by Playwright E2E; vitest targets hooks / utils / renderers /
+    // registries / pure decision logic.
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'json-summary', 'html'],
+      reportsDirectory: './coverage',
+      all: true,
+      include: ['app/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
+      exclude: [
+        'node_modules',
+        'build',
+        'tests',
+        '**/__tests__/**',
+        '**/*.test.{ts,tsx}',
+        '**/*.d.ts',
+        '**/*.config.{ts,js,mts}',
+        '**/types/**',
+      ],
+      thresholds: {
+        lines: 19,
+        statements: 18,
+        functions: 16,
+        branches: 16,
+      },
+    },
     // 禁用 watch 模式的交互提示
     watch: false, // 禁用 watch 模式
     // 或者如果需要 watch 模式但不要提示，可以使用：

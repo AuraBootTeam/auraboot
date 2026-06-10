@@ -476,6 +476,16 @@ test {
     testTmpDir.mkdirs()
     systemProperty 'java.io.tmpdir', testTmpDir.absolutePath
 
+    // Bound Spring's TestContext cache. The full suite has dozens of distinct
+    // @SpringBootTest context configurations; Spring caches each one with its
+    // own HikariCP pool kept alive, and the accumulated pools exhaust the
+    // shared PostgreSQL max_connections (observed: a full run pinned all 400
+    // connections and broke concurrent sessions). Evicting the LRU context on
+    // overflow closes its pool and releases connections. Override with
+    // -PspringTestContextCacheMaxSize=N.
+    systemProperty 'spring.test.context.cache.maxSize',
+        (project.findProperty('springTestContextCacheMaxSize') ?: '8')
+
     // Allow callers to override the Testcontainers hub mirror per-task.
     // Used by IoT TSDB IT to bypass the daocloud mirror (403 today) and
     // pull tdengine directly from Docker Hub. Set via:
@@ -685,13 +695,35 @@ jacocoTestCoverageVerification {
         }))
     }
     violationRules {
+        // No-regression ratchet. Measured curated baseline 2026-06-10: LINE 80.1%
+        // (33671/42043), BRANCH 34.5%. The prior 0.50 floor left the whole 80%
+        // achievement unprotected — any PR could silently regress it. This floor
+        // (0.78) locks the line-coverage goal with a small margin for flaky-test
+        // variance; raise toward 0.80 as the sub-80% packages are filled in, and
+        // add a BRANCH floor once branch coverage is lifted from its 34.5% start.
         rule {
             enabled = true
             element = 'BUNDLE'
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.50
+                minimum = 0.78
+            }
+        }
+        // Lock the already-strong security/identity domains so they cannot rot.
+        rule {
+            enabled = true
+            element = 'PACKAGE'
+            includes = [
+                'com.auraboot.framework.permission.service.impl',
+                'com.auraboot.framework.auth.service.impl',
+                'com.auraboot.framework.tenant.service.impl',
+                'com.auraboot.framework.rbac.service.impl',
+            ]
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.84
             }
         }
     }
