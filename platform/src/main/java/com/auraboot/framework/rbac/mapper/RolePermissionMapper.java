@@ -502,4 +502,56 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
         public String getConditionsJson() { return conditionsJson; }
         public void setConditionsJson(String conditionsJson) { this.conditionsJson = conditionsJson; }
     }
+
+    /**
+     * Permission Governance S1 (Plan B): load the materialized {@code condition_ast} of every
+     * active GRANT binding for a member's roles on a single permission.
+     *
+     * <p>Returns the binding id and its {@code condition_ast} as raw JSON text (bypassing the
+     * JacksonTypeHandler, mirroring {@link #getConditionsById}). A row with a NULL
+     * {@code condition_ast} represents an unconditional grant; it is still returned so the
+     * evaluator can short-circuit to ALLOW. DENY bindings are excluded — DENY semantics are
+     * resolved by the upstream RBAC step, not by this guard layer.
+     *
+     * @param roleIds      the member's role ids
+     * @param permissionId target permission id
+     * @return one row per active grant binding (condition_ast may be null)
+     */
+    @Select("""
+        <script>
+        SELECT id, condition_ast::text AS condition_ast_json
+        FROM ab_role_permission
+        WHERE permission_id = #{permissionId}
+          AND grant_type = 'grant'
+          AND deleted_flag = false
+          AND status = 'active'
+          AND role_id IN
+        <foreach collection="roleIds" item="id" open="(" separator="," close=")">
+          #{id}
+        </foreach>
+          AND (effective_date IS NULL OR effective_date &lt;= CURRENT_DATE)
+          AND (expiry_date IS NULL OR expiry_date &gt;= CURRENT_DATE)
+        </script>
+        """)
+    @Results({
+        @Result(property = "id", column = "id"),
+        @Result(property = "conditionAstJson", column = "condition_ast_json")
+    })
+    List<RolePermissionConditionAstRow> findConditionAstGrants(
+        @Param("roleIds") List<Long> roleIds,
+        @Param("permissionId") Long permissionId
+    );
+
+    /**
+     * Row type for the condition-AST guard query.
+     */
+    class RolePermissionConditionAstRow {
+        private Long id;
+        private String conditionAstJson;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getConditionAstJson() { return conditionAstJson; }
+        public void setConditionAstJson(String conditionAstJson) { this.conditionAstJson = conditionAstJson; }
+    }
 }
