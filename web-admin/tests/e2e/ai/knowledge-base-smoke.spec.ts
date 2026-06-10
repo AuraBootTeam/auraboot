@@ -221,7 +221,8 @@ test.describe('RAG Knowledge Base', () => {
     expect(resp.ok()).toBeTruthy();
     const body = await resp.json();
     // Without embedding config, results will be empty — but API should not error
-    expect(Array.isArray(body.data)).toBeTruthy();
+    expect(Array.isArray(body.data.results)).toBeTruthy();
+    expect(Array.isArray(body.data.warnings)).toBeTruthy();
   });
 
   test('should update KB counters after processing', async ({ page }) => {
@@ -230,6 +231,19 @@ test.describe('RAG Knowledge Base', () => {
     const body = await resp.json();
     expect(body.data.docCount).toBe(1);
     expect(body.data.chunkCount).toBeGreaterThan(0);
+  });
+
+  test('should reindex chunk tsv via UI button', async ({ page }) => {
+    await page.goto(`/aurabot/knowledge/${kbPid}`);
+    const btn = page.getByTestId('kb-reindex-button');
+    await expect(btn).toBeVisible();
+    const respPromise = page.waitForResponse((r) =>
+      r.url().includes(`/api/ai/knowledge/${kbPid}/reindex`) && r.request().method() === 'POST');
+    await btn.click();
+    const resp = await respPromise;
+    expect(resp.ok()).toBeTruthy();
+    const body = await resp.json();
+    expect(body.data.reindexedChunks).toBeGreaterThan(0);
   });
 
   test('should delete document', async ({ page }) => {

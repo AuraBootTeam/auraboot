@@ -275,9 +275,9 @@ export function CommandPalette() {
           method: 'post',
           params: { query: query.trim(), topK: 5 },
         });
-        if (ResultHelper.isSuccess(resp) && resp.data?.length > 0) {
+        if (ResultHelper.isSuccess(resp) && resp.data?.results?.length > 0) {
           setDocResults(
-            resp.data.map((r: any) => ({
+            resp.data.results.map((r: any) => ({
               chunkPid: r.chunkPid,
               docName: r.docName || 'Unknown',
               kbName: r.kbName || '',

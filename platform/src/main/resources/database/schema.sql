@@ -5924,11 +5924,13 @@ CREATE TABLE IF NOT EXISTS ab_kb_chunk (
     -- Embedding
     embedding_status VARCHAR(20) DEFAULT 'pending',
     embedding        vector(1536),
+    -- Bounded retry bookkeeping for failed embeddings (G6); 'failed_permanent' = retries exhausted
+    embedding_retry_count INT NOT NULL DEFAULT 0,
 
     created_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT chk_chunk_emb_status CHECK (embedding_status IN ('pending', 'completed', 'failed'))
+    CONSTRAINT chk_chunk_emb_status CHECK (embedding_status IN ('pending', 'completed', 'failed', 'failed_permanent'))
 );
 CREATE INDEX IF NOT EXISTS idx_kb_chunk_doc ON ab_kb_chunk (doc_id);
 CREATE INDEX IF NOT EXISTS idx_kb_chunk_kb ON ab_kb_chunk (kb_id);

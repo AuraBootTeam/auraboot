@@ -1423,6 +1423,36 @@
       "resource": "iot:data-point",
       "action": "read",
       "resourceType": "function"
+    },
+    {
+      "code": "ai.knowledge.read",
+      "name": "知识库读取",
+      "description": "查看知识库、文档与分块",
+      "type": "function",
+      "module": "ai",
+      "resource": "ai:knowledge",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "ai.knowledge.manage",
+      "name": "知识库管理",
+      "description": "创建、更新、删除知识库,上传/删除文档,重建索引,导入内部文档",
+      "type": "function",
+      "module": "ai",
+      "resource": "ai:knowledge",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "ai.knowledge.retrieve",
+      "name": "知识检索",
+      "description": "执行知识库检索查询(含检索测试)",
+      "type": "function",
+      "module": "ai",
+      "resource": "ai:knowledge",
+      "action": "retrieve",
+      "resourceType": "function"
     }
   ],
   "roles": [
