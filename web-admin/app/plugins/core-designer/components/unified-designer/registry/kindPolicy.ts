@@ -1,4 +1,5 @@
 import type { DslBlockV3, PageSchemaV3Kind } from '../types';
+import { isCustomBlockAllowedForKind } from './customBlockRegistry';
 
 /**
  * Per-kind block policy.
@@ -92,5 +93,8 @@ export function getKindPolicy(kind: PageSchemaV3Kind): KindPolicy {
 /** Whether a block type may appear in the palette / be inserted for this kind. */
 export function isBlockTypeAllowedForKind(kind: PageSchemaV3Kind, blockType: string): boolean {
   const policy = getKindPolicy(kind);
-  return policy.allowedBlockTypes ? policy.allowedBlockTypes.has(blockType) : true;
+  if (!policy.allowedBlockTypes) return true;
+  if (policy.allowedBlockTypes.has(blockType)) return true;
+  // Plugin-contributed custom blocks may opt into specific kinds (see customBlockRegistry).
+  return isCustomBlockAllowedForKind(kind, blockType);
 }
