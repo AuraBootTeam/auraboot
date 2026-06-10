@@ -103,17 +103,22 @@ public final class CjkBigramSegmenter {
         return true;
     }
 
-    /** Expand a CJK run into overlapping bigrams (unigram when run length is 1) and clear it. */
+    /**
+     * Expand a CJK run into overlapping bigrams (unigram when run length is 1) and
+     * clear it. Indexed by code point, not UTF-16 char — supplementary-plane CJK
+     * (e.g. U+20BB7) is a surrogate pair and char-based slicing would emit lone
+     * surrogates that break the {@code ?::tsquery} cast at runtime.
+     */
     private static void flushBigrams(List<String> terms, StringBuilder cjkRun) {
-        int n = cjkRun.length();
-        if (n == 0) {
+        if (cjkRun.length() == 0) {
             return;
         }
-        if (n == 1) {
-            terms.add(cjkRun.toString());
+        int[] cps = cjkRun.codePoints().toArray();
+        if (cps.length == 1) {
+            terms.add(new String(cps, 0, 1));
         } else {
-            for (int i = 0; i < n - 1; i++) {
-                terms.add(cjkRun.substring(i, i + 2));
+            for (int i = 0; i < cps.length - 1; i++) {
+                terms.add(new String(cps, i, 2));
             }
         }
         cjkRun.setLength(0);
@@ -121,7 +126,9 @@ public final class CjkBigramSegmenter {
 
     private static void flushWord(List<String> terms, StringBuilder wordRun) {
         if (wordRun.length() > 0) {
-            terms.add(wordRun.toString());
+            // 'simple' tsvector lowercases at index time; the ?::tsquery cast does not —
+            // normalize here so query lexemes line up.
+            terms.add(wordRun.toString().toLowerCase(java.util.Locale.ROOT));
             wordRun.setLength(0);
         }
     }

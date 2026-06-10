@@ -228,6 +228,7 @@ public class RagRetrievalService {
             return rows.stream().map(this::mapRow).toList();
         } catch (Exception e) {
             log.error("Keyword search failed: {}", e.getMessage());
+            metrics.recordDegraded("keyword_sql_failed");
             return List.of();
         }
     }

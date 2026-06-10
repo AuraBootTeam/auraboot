@@ -49,7 +49,7 @@ Test baseline: 22 backend test files / ~183 @Test methods (incl. RagPipelineInte
 |---|-----|----------|--------|
 | G1 | **All 13 `KnowledgeBaseController` endpoints lack permission annotations** (create/delete KB, upload, retrieve, import-internal-docs, generate-docs — any authenticated user can delete a whole KB; only tenant isolation) | verified: `grep RequirePermission` exit=1 on `rag/controller/KnowledgeBaseController.java`; violates `permission-code-naming.md` | **DONE** (commit fd57e63e5: @RequirePermission ×14, codes seeded, gate green, 403 IT) |
 | G2 | **Chinese BM25 path is near-useless**: 4 ingest sites use `to_tsvector('simple', …)`; query side splits CJK into per-char OR. 30% hybrid weight is noise for Chinese | verified: KbTextIngestService:120, DocumentProcessingService:88, RagDocumentSyncListener:194, InternalDocImportService:155; self-flagged as "CJK tokenization P0 / Spike-5 BLOCKED" in spike-1 docs | **DONE** (fd57e63e5: CjkBigramSegmenter index+query, reindex endpoint+UI button, IT proves zh hit on BM25 leg) |
-| G3 | **Evaluation set too small**: 12 golden queries with recall@5=1.0 means the set is too easy; cannot claim production-grade quality. Spike-1 Phase 3 (expand to 50-100 incl. CJK, multi-hop, no-answer; latency) planned but not started | `rag-golden-query-report.md`, `2026-05-28-spike-1-phase-2-analysis.md` | IN_PROGRESS (S6: expanding to ≥52 incl. zh/multi-hop/no-answer) |
+| G3 | **Evaluation set too small**: 12 golden queries with recall@5=1.0 means the set is too easy; cannot claim production-grade quality. Spike-1 Phase 3 (expand to 50-100 incl. CJK, multi-hop, no-answer; latency) planned but not started | `rag-golden-query-report.md`, `2026-05-28-spike-1-phase-2-analysis.md` | **DONE** (b40fd845f: 15→52, all ground truth existence-verified, harness green) |
 
 ### P1 — quality & operability
 
@@ -119,8 +119,10 @@ Endgame docs for this remediation run (existing canonical docs, not rewritten):
 | S3 | G1 permission annotations + codes + sad-path tests | DONE fd57e63e5 |
 | S4 | G4 token budget + G5 RRF fusion | DONE 24b35ee61 |
 | S5 | G6 metrics/trace/retry + G8 dimension-mismatch surfacing | DONE d99005802 |
-| S6 | G3 golden queries ≥50 + harness green | IN_PROGRESS |
+| S6 | G3 golden queries ≥50 + harness green | DONE b40fd845f |
 
 ## 8. Progress log
 
 - 2026-06-10: Review completed; tracker created. Remediation started (this session, /aura-endgame). P0-P4 done: worktree `feat/rag-gap-remediation`@925eb530c, facts verified (permission pattern/harness/trace/scheduler/E2E auth), decisions D1-D5 recorded.
+- 2026-06-11: S1-S6 all landed (see §7). Pre-completion review `docs/retro/2026-06-11-rag-remediation-review.md`: KB E2E 32/1skip/0fail on isolated slot-23 stack, full OSS suite 924 passed ×2, /e2e-truth 8/10. Code review found+fixed: CommandPalette doc-search broken by {results,warnings} shape (P0), supplementary-plane CJK lone-surrogate bigrams (P1), missing existing-DB migration for embedding_retry_count (P1, added 2026-06-11-rag-embedding-retry.sql), latin tsquery terms not lowercased (P2), keyword_sql_failed metric unwired (P2).
+- **Block points to backfill with a live embedding API key (LLM-key class)**: Phase-2 live eval of the 52-query golden set; real-provider embedding smoke for retry task.

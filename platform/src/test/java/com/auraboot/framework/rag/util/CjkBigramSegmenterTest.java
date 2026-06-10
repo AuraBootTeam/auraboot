@@ -59,12 +59,38 @@ class CjkBigramSegmenterTest {
     @Test
     void tsQueryTerms_mixedQuery_yieldsWordsAndBigrams() {
         assertThat(CjkBigramSegmenter.tsQueryTerms("如何配置 BPM workflow"))
-                .containsExactly("如何", "何配", "配置", "BPM", "workflow");
+                .containsExactly("如何", "何配", "配置", "bpm", "workflow");
     }
 
     @Test
     void tsQueryTerms_dropsPunctuation() {
         assertThat(CjkBigramSegmenter.tsQueryTerms("权限? (admin)"))
                 .containsExactly("权限", "admin");
+    }
+
+    @Test
+    void supplementaryPlaneCjk_neverEmitsLoneSurrogates() {
+        // U+20BB7 (𠮷) is HAN in the supplementary plane — a lone surrogate in a
+        // bigram would break the ?::tsquery cast at runtime.
+        for (String term : CjkBigramSegmenter.tsQueryTerms("\uD842\uDFB7田中")) {
+            assertThat(term.codePoints().toArray().length).isBetween(1, 2);
+            for (int i = 0; i < term.length(); i++) {
+                if (Character.isHighSurrogate(term.charAt(i))) {
+                    assertThat(i + 1).isLessThan(term.length());
+                    assertThat(Character.isLowSurrogate(term.charAt(i + 1))).isTrue();
+                } else if (Character.isLowSurrogate(term.charAt(i))) {
+                    assertThat(i).isGreaterThan(0);
+                    assertThat(Character.isHighSurrogate(term.charAt(i - 1))).isTrue();
+                }
+            }
+        }
+        assertThat(CjkBigramSegmenter.tsQueryTerms("\uD842\uDFB7田中"))
+                .containsExactly("\uD842\uDFB7田", "田中");
+    }
+
+    @Test
+    void latinQueryTerms_areLowercased_toMatchSimpleTsvector() {
+        assertThat(CjkBigramSegmenter.tsQueryTerms("Hello BPM"))
+                .containsExactly("hello", "bpm");
     }
 }
