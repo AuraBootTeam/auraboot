@@ -738,6 +738,12 @@ public final class MetaPermission {
      */
     public static final String BILLING_QUOTA_READ = "billing.quota.read";
 
+    /**
+     * Usage event read permission.
+     * Used by {@code UsageEventController} GET /api/billing/usage/events.
+     */
+    public static final String BILLING_USAGE_READ = "billing.usage.read";
+
     // ==================== Private Constructor ====================
 
     /**
