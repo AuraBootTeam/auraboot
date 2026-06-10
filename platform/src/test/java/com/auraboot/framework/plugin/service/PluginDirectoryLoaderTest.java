@@ -186,6 +186,21 @@ class PluginDirectoryLoaderTest {
                 .containsExactly("valid_model", "another_valid");
     }
 
+    @Test
+    @DisplayName("Should fail loud when a single resource file fails to parse, not silently drop it")
+    void shouldFailLoudWhenSingleResourceFileFailsToParse() throws IOException {
+        // Regression: a parse error in a single resource file (e.g. one entry in commands.json with a
+        // field-type mismatch) used to be swallowed (warn + return empty), dropping the WHOLE list while
+        // the import still reported success — effectively impossible to diagnose. It must now fail loud.
+        writePluginJson(tempDir, "config/models.json");
+        Path configDir = tempDir.resolve("config");
+        Files.createDirectories(configDir);
+        Files.writeString(configDir.resolve("models.json"), "this is not valid json {{{");
+
+        assertThatThrownBy(() -> loader.loadFromDirectory(tempDir))
+                .hasMessageContaining("models.json");
+    }
+
     // ==================== Validation Tests ====================
 
     @Test
