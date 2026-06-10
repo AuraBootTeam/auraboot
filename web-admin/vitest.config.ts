@@ -55,13 +55,17 @@ export default defineConfig({
         '**/types/**',
       ],
       thresholds: {
-        // Ratchet — raised 2026-06-11 after coverage PRs #529/#531/#532/#533/#534
-        // (services + hooks + server/stores). Measured: lines 22.48 / stmts 22.09 /
-        // funcs 19.61 / branches 18.54. Floors sit just under measured for flaky margin.
-        lines: 22,
-        statements: 21,
-        functions: 19,
-        branches: 18,
+        // Ratchet — raised 2026-06-11 (round 2) after coverage PRs #540/#541/#542/#543
+        // (designer runtime engines + studio/plugin hooks + useTaskCenter/useDslForm).
+        // Measured: lines 25.61 / stmts 25.13 / funcs 22.35 / branches 19.9. Floors sit
+        // just under measured for flaky margin. NOTE: vitest covers logic (services /
+        // hooks / engines / utils); React presentation components are covered by
+        // Playwright E2E, so the vitest line ceiling is ~30% — reaching 80% line needs
+        // E2E coverage merge, not more component unit tests (see tracker §7).
+        lines: 25,
+        statements: 24,
+        functions: 22,
+        branches: 19,
       },
     },
     // 禁用 watch 模式的交互提示
