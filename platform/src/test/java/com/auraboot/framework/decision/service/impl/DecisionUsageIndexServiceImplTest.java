@@ -3,6 +3,8 @@ package com.auraboot.framework.decision.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.AutomationAction;
+import com.auraboot.framework.automation.entity.TriggerConfig;
+import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.bpm.mapper.SlaConfigMapper;
 import com.auraboot.framework.decision.dto.DecisionImpactRefDTO;
@@ -10,6 +12,11 @@ import com.auraboot.framework.decision.dto.DecisionUsageIndexRebuildDTO;
 import com.auraboot.framework.decision.entity.DecisionUsageRefEntity;
 import com.auraboot.framework.decision.mapper.DecisionUsageRefMapper;
 import com.auraboot.framework.decision.mapper.DrtVersionMapper;
+import com.auraboot.framework.decision.rule.DecisionBinding;
+import com.auraboot.framework.decision.rule.DecisionVersionPolicy;
+import com.auraboot.framework.decision.rule.RuleBindingKind;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.decision.rule.RuleValueSource;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyDefinitionMapper;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
@@ -110,6 +117,67 @@ class DecisionUsageIndexServiceImplTest {
                     assertThat(ref.getMetadataJson().get("sourceName").asText()).isEqualTo("Escalation Flow");
                     assertThat(ref.getMetadataJson().get("actionType").asText()).isEqualTo("call_api");
                 });
+    }
+
+    @Test
+    void rebuildIndexesAutomationRuleBindingDecisionAndFieldRefs() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        when(versionMapper.selectList(any())).thenReturn(List.of());
+        when(slaConfigMapper.selectList(any())).thenReturn(List.of());
+        when(policyVersionMapper.selectList(any())).thenReturn(List.of());
+        when(namedQueryMapper.selectList(any())).thenReturn(List.of());
+
+        TriggerConfig config = new TriggerConfig();
+        config.setRuleBinding(new RuleConsumerBinding(
+                "AUTOMATION",
+                "auto-rule-1",
+                "trigger",
+                RuleBindingKind.DECISION_REF,
+                null,
+                new DecisionBinding(
+                        "approval_routing",
+                        DecisionVersionPolicy.ROLLOUT,
+                        null,
+                        null,
+                        null,
+                        List.of(new DecisionBinding.InputMapping(
+                                "amount",
+                                RuleValueSource.field(Scope.RECORD, "data.amount"))),
+                        List.of(),
+                        DecisionBinding.FallbackPolicy.failClosed(),
+                        200,
+                        DecisionBinding.TraceMode.SAMPLED,
+                        true,
+                        RuleValueSource.field(Scope.RECORD, "data.recordId"),
+                        null),
+                true));
+        Automation automation = new Automation();
+        automation.setPid("auto-rule-1");
+        automation.setTenantId(10L);
+        automation.setName("Rule Center Automation");
+        automation.setModelCode("case");
+        automation.setTriggerType("on_record_create");
+        automation.setEnabled(true);
+        automation.setTriggerConfig(config);
+        when(automationMapper.selectList(any())).thenReturn(List.of(automation));
+
+        DecisionUsageIndexRebuildDTO summary = service.rebuild();
+
+        ArgumentCaptor<DecisionUsageRefEntity> captor = ArgumentCaptor.forClass(DecisionUsageRefEntity.class);
+        verify(usageRefMapper).deleteByTenant(10L);
+        verify(usageRefMapper, times(3)).insert(captor.capture());
+        assertThat(summary.getConsumerRefs()).isEqualTo(1);
+        assertThat(summary.getFieldRefs()).isEqualTo(2);
+        assertThat(captor.getAllValues())
+                .extracting(DecisionUsageRefEntity::getTargetType, DecisionUsageRefEntity::getTargetCode,
+                        DecisionUsageRefEntity::getTargetPath, DecisionUsageRefEntity::getBinding)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(
+                                "DECISION", "approval_routing", null, "RULE_BINDING"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "FIELD", null, "record.data.amount", "RULE_BINDING"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "FIELD", null, "record.data.recordId", "RULE_BINDING"));
     }
 
     @Test

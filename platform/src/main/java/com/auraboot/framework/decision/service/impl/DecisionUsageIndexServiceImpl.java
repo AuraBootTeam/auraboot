@@ -260,11 +260,26 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     private List<DecisionUsageRefEntity> refsForAutomation(Long tenantId, Automation automation) {
         List<DecisionUsageRefEntity> refs = new ArrayList<>();
         TriggerConfig config = automation.getTriggerConfig();
-        if (config != null && !nullToBlank(config.getDecisionRef()).isBlank()) {
-            refs.add(ref(tenantId, "AUTOMATION", automation.getPid(), null, automation.getPid(),
-                    "DECISION", config.getDecisionRef(), null, defaultBinding(config.getDecisionBinding()),
-                    metadata("sourceName", automation.getName(), "modelCode", automation.getModelCode(),
-                            "triggerType", automation.getTriggerType(), "enabled", automation.getEnabled())));
+        if (config != null) {
+            RuleReferenceSet ruleRefs = RuleReferenceCollector.collect(config.getRuleBinding());
+            for (String decisionRef : ruleRefs.decisionRefs()) {
+                refs.add(ref(tenantId, "AUTOMATION", automation.getPid(), null, automation.getPid(),
+                        "DECISION", decisionRef, null, "RULE_BINDING",
+                        metadata("sourceName", automation.getName(), "modelCode", automation.getModelCode(),
+                                "triggerType", automation.getTriggerType(), "enabled", automation.getEnabled())));
+            }
+            for (String fieldRef : ruleRefs.fieldRefs()) {
+                refs.add(ref(tenantId, "AUTOMATION", automation.getPid(), null, automation.getPid(),
+                        "FIELD", null, fieldRef, "RULE_BINDING",
+                        metadata("sourceName", automation.getName(), "modelCode", automation.getModelCode(),
+                                "triggerType", automation.getTriggerType(), "enabled", automation.getEnabled())));
+            }
+            if (!nullToBlank(config.getDecisionRef()).isBlank()) {
+                refs.add(ref(tenantId, "AUTOMATION", automation.getPid(), null, automation.getPid(),
+                        "DECISION", config.getDecisionRef(), null, defaultBinding(config.getDecisionBinding()),
+                        metadata("sourceName", automation.getName(), "modelCode", automation.getModelCode(),
+                                "triggerType", automation.getTriggerType(), "enabled", automation.getEnabled())));
+            }
         }
         refs.addAll(refsForAutomationActions(tenantId, automation));
         return refs;

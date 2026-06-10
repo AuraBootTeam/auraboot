@@ -13,6 +13,13 @@ import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.automation.util.SpelSafetyGuard;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.decision.ast.Scope;
+import com.auraboot.framework.decision.rule.DecisionBinding;
+import com.auraboot.framework.decision.rule.RuleBindingKind;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.decision.rule.RuleEvaluationContext;
+import com.auraboot.framework.decision.rule.RuleEvaluationService;
+import com.auraboot.framework.decision.rule.RuleEvaluationTrace;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.expression.Expression;
@@ -53,6 +60,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
      */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.decision.service.DecisionEvaluationService decisionEvaluationService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RuleEvaluationService ruleEvaluationService;
 
     private final ExpressionParser spelParser = new SpelExpressionParser();
 
@@ -383,7 +393,18 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
      */
     Map<String, Object> withDecision(Automation automation, Map<String, Object> payload) {
         TriggerConfig cfg = automation.getTriggerConfig();
-        if (decisionEvaluationService == null || cfg == null || !StringUtils.hasText(cfg.getDecisionRef())) {
+        if (cfg == null) {
+            return payload;
+        }
+        RuleConsumerBinding ruleBinding = cfg.getRuleBinding();
+        if (ruleEvaluationService != null
+                && ruleBinding != null
+                && ruleBinding.active()
+                && ruleBinding.bindingKind() == RuleBindingKind.DECISION_REF
+                && ruleBinding.decisionBinding() != null) {
+            return withRuleDecisionBinding(automation, payload, ruleBinding.decisionBinding());
+        }
+        if (decisionEvaluationService == null || !StringUtils.hasText(cfg.getDecisionRef())) {
             return payload;
         }
         Map<String, Object> enriched = new java.util.HashMap<>(payload != null ? payload : Map.of());
@@ -413,6 +434,55 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                     e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), "outputs", Map.of()));
         }
         return enriched;
+    }
+
+    private Map<String, Object> withRuleDecisionBinding(
+            Automation automation,
+            Map<String, Object> payload,
+            DecisionBinding binding) {
+        Map<String, Object> enriched = new java.util.HashMap<>(payload != null ? payload : Map.of());
+        try {
+            RuleEvaluationTrace trace = ruleEvaluationService.evaluateDecisionBinding(
+                    binding,
+                    buildRuleEvaluationContext(automation, payload));
+            enriched.put("decision", Map.of(
+                    "matched", trace.matched(),
+                    "status", trace.decisionStatus() == null ? "UNKNOWN" : trace.decisionStatus().name(),
+                    "outputs", trace.outputSnapshot(),
+                    "traceId", trace.traceId() == null ? "" : trace.traceId(),
+                    "fallbackApplied", trace.fallbackApplied()));
+        } catch (RuntimeException e) {
+            log.warn("Rule binding decision '{}' evaluation failed for automation {}: {}",
+                    binding.decisionCode(), automation.getId(), e.getMessage());
+            enriched.put("decision", Map.of("matched", false, "status", "ERROR", "error",
+                    e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), "outputs", Map.of()));
+        }
+        return enriched;
+    }
+
+    private RuleEvaluationContext buildRuleEvaluationContext(Automation automation, Map<String, Object> payload) {
+        Map<Scope, Map<String, Object>> scopes = new EnumMap<>(Scope.class);
+        Object recordData = payload != null ? payload.get("record") : null;
+        Map<String, Object> data = recordData instanceof Map<?, ?> m
+                ? castMap(m) : (payload != null ? payload : Map.of());
+        scopes.put(Scope.RECORD, Map.of("data", data));
+        if (payload != null && payload.get("before") instanceof Map<?, ?> before) {
+            scopes.put(Scope.BEFORE, castMap(before));
+        }
+        if (payload != null && payload.get("after") instanceof Map<?, ?> after) {
+            scopes.put(Scope.AFTER, castMap(after));
+        }
+        if (payload != null && payload.get("event") != null) {
+            scopes.put(Scope.EVENT, Map.of("type", payload.get("event")));
+        }
+        return new RuleEvaluationContext(
+                scopes,
+                "AUTOMATION",
+                automation.getPid() != null ? automation.getPid() : String.valueOf(automation.getId()),
+                "trigger",
+                null,
+                null,
+                null);
     }
 
     @SuppressWarnings("unchecked")
