@@ -290,6 +290,7 @@
         "pagination": true
       },
       "skipFieldMeta": true,
+      "miscBlocksPosition": "beforeTable",
       "hideSavedViews": true,
       "hideBuiltInImport": true,
       "hideBuiltInExport": true,
@@ -300,6 +301,17 @@
       }
     },
     "blocks": [
+      {
+        "id": "event_policy_actions",
+        "blockType": "custom",
+        "component": "EventPolicyActionsBlock",
+        "props": {
+          "mode": "list",
+          "detailUrl": "/p/decisionops_event_policies/view/{policyCode}",
+          "designerUrl": "/p/decisionops_event_policy_designer?policyCode={policyCode}",
+          "logsUrl": "/p/decisionops_execution_logs?policyCode={policyCode}"
+        }
+      },
       {
         "id": "event_policy_table",
         "blockType": "table",
@@ -407,14 +419,25 @@
               }
             },
             {
-              "code": "console",
+              "code": "design",
               "label": {
-                "zh-CN": "控制台",
-                "en-US": "Console"
+                "zh-CN": "设计",
+                "en-US": "Design"
               },
               "action": {
                 "type": "navigate",
-                "to": "/decision-ops"
+                "to": "/p/decisionops_event_policy_designer?policyCode={policyCode}"
+              }
+            },
+            {
+              "code": "logs",
+              "label": {
+                "zh-CN": "日志",
+                "en-US": "Logs"
+              },
+              "action": {
+                "type": "navigate",
+                "to": "/p/decisionops_execution_logs?policyCode={policyCode}"
               }
             }
           ],
@@ -453,6 +476,18 @@
       "showEdit": false
     },
     "blocks": [
+      {
+        "id": "event_policy_definition_actions",
+        "blockType": "custom",
+        "component": "EventPolicyActionsBlock",
+        "detailPlacement": "header",
+        "props": {
+          "mode": "detail",
+          "detailUrl": "/p/decisionops_event_policies/view/{policyCode}",
+          "designerUrl": "/p/decisionops_event_policy_designer?policyCode={policyCode}",
+          "logsUrl": "/p/decisionops_execution_logs?policyCode={policyCode}"
+        }
+      },
       {
         "id": "event_policy_definition_overview",
         "blockType": "form-section",
@@ -562,6 +597,38 @@
             "component": "datetime"
           }
         ]
+      }
+    ]
+  },
+  {
+    "pageKey": "decisionops_event_policy_designer",
+    "name:zh-CN": "策略设计器",
+    "name:en": "Event Policy Designer",
+    "modelCode": "event_policy_definition",
+    "kind": "list",
+    "profile": "admin",
+    "schemaVersion": 4,
+    "title": {
+      "zh-CN": "策略设计器",
+      "en-US": "Event Policy Designer"
+    },
+    "layout": {
+      "type": "stack",
+      "gap": 12
+    },
+    "extension": {
+      "customOnly": true,
+      "skipFieldMeta": true,
+      "hideSavedViews": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true
+    },
+    "blocks": [
+      {
+        "id": "event_policy_designer",
+        "blockType": "custom",
+        "component": "EventPolicyDesignerBlock"
       }
     ]
   },

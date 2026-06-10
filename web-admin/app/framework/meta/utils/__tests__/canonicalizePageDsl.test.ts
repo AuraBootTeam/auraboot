@@ -436,4 +436,44 @@ describe('canonicalizePageSchemaDto', () => {
       },
     });
   });
+
+  it('hosts EventPolicy actions and designer in DSL custom blocks instead of console row actions', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const pages = readPages(pagesFile);
+    const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policies_list');
+    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policies_detail');
+    const designerPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policy_designer');
+
+    expect(listPage).toBeDefined();
+    expect(detailPage).toBeDefined();
+    expect(designerPage).toBeDefined();
+
+    const listSchema = canonicalizePageSchemaDto(listPage!);
+    const tableBlock = listSchema.blocks.find((block: any) => block.blockType === 'table') as any;
+    const rowActions = tableBlock.table.rowActions;
+
+    expect(listSchema.blocks[0]).toMatchObject({
+      component: 'EventPolicyActionsBlock',
+      props: { mode: 'list' },
+    });
+    expect(rowActions.map((action: any) => action.code)).toEqual(['detail', 'design', 'logs']);
+    expect(rowActions.find((action: any) => action.code === 'design')).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/decisionops_event_policy_designer?policyCode={policyCode}',
+      },
+    });
+    expect(rowActions.map((action: any) => action.action?.to)).not.toEqual(
+      expect.arrayContaining(['/decision-ops']),
+    );
+    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+      component: 'EventPolicyActionsBlock',
+      props: { mode: 'detail' },
+    });
+    expect((designerPage!.blocks?.[0] as any)).toMatchObject({
+      component: 'EventPolicyDesignerBlock',
+    });
+    expect((designerPage!.extension as any).customOnly).toBe(true);
+  });
 });
