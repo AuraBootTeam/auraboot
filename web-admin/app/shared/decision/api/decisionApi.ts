@@ -487,6 +487,10 @@ export function createDecisionApi(http: HttpClient) {
       http.post<ValidateResult>(`${D}/versions/${pid}/validate`).then((r) => r.data),
     publishVersion: (pid: string, req?: DecisionVersionTransitionRequest) =>
       http.post<unknown>(`${D}/versions/${pid}/publish`, req).then((r) => r.data),
+    submitVersionForApproval: (pid: string, req?: Pick<DecisionVersionTransitionRequest, 'note'>) =>
+      http
+        .post<DecisionVersionSummary>(`${D}/versions/${pid}/submit-for-approval`, req)
+        .then((r) => r.data),
     approveVersion: (pid: string, req?: DecisionVersionTransitionRequest) =>
       http.post<DecisionVersionSummary>(`${D}/versions/${pid}/approve`, req).then((r) => r.data),
     rejectVersion: (pid: string, req?: Pick<DecisionVersionTransitionRequest, 'note'>) =>

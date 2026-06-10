@@ -141,6 +141,14 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
       'decisionintegrationimpact',
     ],
   }),
+  decisiondefinitionactions: runtime('decision', 'DecisionDefinitionActionsBlock', {
+    aliases: [
+      'DecisionDefinitionActionsBlock',
+      'decision-definition-actions',
+      'decision_definition_actions',
+      'decisiondefinitionactions',
+    ],
+  }),
   decisioneventpolicyactions: runtime('decision', 'EventPolicyActionsBlock', {
     aliases: [
       'EventPolicyActionsBlock',

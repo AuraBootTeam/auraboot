@@ -17,6 +17,11 @@ describe('runtime component loaders', () => {
     expect(getRuntimeComponentEntry('decision-integration-impact')).toBeDefined();
   });
 
+  it('registers the DecisionOps definition action custom block', () => {
+    expect(getRuntimeComponentEntry('DecisionDefinitionActionsBlock')).toBeDefined();
+    expect(getRuntimeComponentEntry('decision-definition-actions')).toBeDefined();
+  });
+
   it('registers the DecisionOps EventPolicy action and designer custom blocks', () => {
     expect(getRuntimeComponentEntry('EventPolicyActionsBlock')).toBeDefined();
     expect(getRuntimeComponentEntry('decision-event-policy-actions')).toBeDefined();

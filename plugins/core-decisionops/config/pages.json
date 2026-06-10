@@ -101,14 +101,14 @@
               }
             },
             {
-              "code": "console",
+              "code": "rollout",
               "label": {
-                "zh-CN": "控制台",
-                "en-US": "Console"
+                "zh-CN": "灰度",
+                "en-US": "Rollout"
               },
               "action": {
                 "type": "navigate",
-                "to": "/decision-ops"
+                "to": "/p/decisionops_rollouts?decisionCode={decisionCode}"
               }
             }
           ],
@@ -147,6 +147,15 @@
       "showEdit": false
     },
     "blocks": [
+      {
+        "id": "decision_definition_actions",
+        "blockType": "custom",
+        "component": "DecisionDefinitionActionsBlock",
+        "props": {
+          "mode": "detail",
+          "rolloutUrl": "/p/decisionops_rollouts?decisionCode={decisionCode}&baselineVersion={baselineVersion}&candidateVersion={candidateVersion}"
+        }
+      },
       {
         "id": "decision_definition_overview",
         "blockType": "form-section",

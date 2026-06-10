@@ -437,6 +437,40 @@ describe('canonicalizePageSchemaDto', () => {
     });
   });
 
+  it('hosts DecisionDefinition impact and lifecycle actions in a DSL custom block', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const pages = readPages(pagesFile);
+    const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_definitions_list');
+    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_definitions_detail');
+
+    expect(listPage).toBeDefined();
+    expect(detailPage).toBeDefined();
+
+    const listSchema = canonicalizePageSchemaDto(listPage!);
+    const tableBlock = listSchema.blocks.find((block: any) => block.blockType === 'table') as any;
+    const rowActions = tableBlock.table.rowActions;
+
+    expect(rowActions.map((action: any) => action.code)).toEqual(['detail', 'rollout']);
+    expect(rowActions.find((action: any) => action.code === 'rollout')).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/decisionops_rollouts?decisionCode={decisionCode}',
+      },
+    });
+    expect(rowActions.map((action: any) => action.action?.to)).not.toEqual(
+      expect.arrayContaining(['/decision-ops']),
+    );
+    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+      component: 'DecisionDefinitionActionsBlock',
+      props: {
+        mode: 'detail',
+        rolloutUrl:
+          '/p/decisionops_rollouts?decisionCode={decisionCode}&baselineVersion={baselineVersion}&candidateVersion={candidateVersion}',
+      },
+    });
+  });
+
   it('hosts EventPolicy actions and designer in DSL custom blocks instead of console row actions', () => {
     const root = resolve(process.cwd(), '..');
     const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
