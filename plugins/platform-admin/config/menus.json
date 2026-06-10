@@ -113,6 +113,24 @@
     }
   },
   {
+    "code": "qr_admin",
+    "parentCode": "system_management",
+    "name:zh-CN": "活码管理",
+    "name:en": "QR Codes",
+    "path": "/qr-admin",
+    "component": null,
+    "icon": "IconQrcode",
+    "type": 1,
+    "permissionCode": "meta.qr.manage",
+    "orderNo": 55,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
     "code": "admin_scheduled_task",
     "parentCode": "system_management",
     "name:zh-CN": "定时任务",
