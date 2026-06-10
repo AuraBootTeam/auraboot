@@ -24,7 +24,7 @@ package com.auraboot.framework.permission.constants;
  */
 public final class MetaPermission {
 
-    // ==================== MODEL permissions =============
+    // ==================== MODEL permissions ====================
 
     /**
      * Model management permission (create, update, delete)
@@ -743,7 +743,6 @@ public final class MetaPermission {
      * Used by {@code UsageEventController} GET /api/billing/usage/events.
      */
     public static final String BILLING_USAGE_READ = "billing.usage.read";
-=======
     // ==================== AI / RAG Knowledge Base permissions ====================
 
     /**
