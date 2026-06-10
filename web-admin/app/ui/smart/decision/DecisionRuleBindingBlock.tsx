@@ -10,34 +10,34 @@ import {
   type ScopedContext,
 } from '~/shared/decision/api/decisionApi';
 
-type DecisionVersionPolicy = 'LATEST_PUBLISHED' | 'FIXED_VERSION' | 'VERSION_TAG' | 'ROLLOUT';
+export type DecisionVersionPolicy = 'LATEST_PUBLISHED' | 'FIXED_VERSION' | 'VERSION_TAG' | 'ROLLOUT';
 
-interface DecisionOption {
+export interface DecisionOption {
   code: string;
   name?: string;
 }
 
-interface InputMapping {
+export interface InputMapping {
   input: string;
   scope: FieldOption['scope'];
   path: string;
 }
 
-interface RuleValueSourceDraft {
+export interface RuleValueSourceDraft {
   kind: 'FIELD' | 'LITERAL';
   scope?: FieldOption['scope'];
   path?: string;
   value?: unknown;
 }
 
-interface DecisionBindingDraft {
+export interface DecisionBindingDraft {
   decisionCode: string;
   versionPolicy: DecisionVersionPolicy;
   inputMappings: InputMapping[];
   fallbackMode: 'FAIL_CLOSED' | 'FAIL_OPEN' | 'DEFAULT_VALUE';
 }
 
-interface RuleConsumerBindingDraft {
+export interface RuleConsumerBindingDraft {
   consumerType?: string;
   consumerCode?: string;
   consumerNodeId?: string;

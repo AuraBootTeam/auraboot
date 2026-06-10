@@ -162,6 +162,8 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
         {nodeType === BPMNNodeType.USER_TASK && (
           <UserTaskEditor
             config={selectedNode.data.config as UserTaskConfig}
+            processKey={processMetadata?.processKey}
+            nodeId={selectedNode.id}
             onChange={handleConfigChange}
           />
         )}
@@ -185,6 +187,8 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
             config={selectedNode.data.config as ExclusiveGatewayConfig}
             onChange={handleConfigChange}
             outgoingEdges={outgoingEdges}
+            processKey={processMetadata?.processKey}
+            nodeId={selectedNode.id}
           />
         )}
 
@@ -200,6 +204,8 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
             config={selectedNode.data.config as InclusiveGatewayConfig}
             onChange={handleConfigChange}
             outgoingEdges={outgoingEdges}
+            processKey={processMetadata?.processKey}
+            nodeId={selectedNode.id}
           />
         )}
 
