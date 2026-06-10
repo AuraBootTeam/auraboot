@@ -259,7 +259,11 @@ export function TraceGraphCanvas({ nodes, edges }: TraceGraphCanvasProps) {
   return (
     <div
       data-testid="trace-graph-canvas"
-      className="min-h-[420px] w-full overflow-hidden rounded border border-gray-200 bg-white"
+      // Explicit height (not just min-height): @xyflow/react's pane is height:100%,
+      // which only resolves against a parent with a *definite* height. A
+      // min-height-only parent leaves the pane at 0px → no nodes render (caught
+      // by the browser golden; unit tests mock @xyflow/react and miss this).
+      className="h-[420px] w-full overflow-hidden rounded border border-gray-200 bg-white"
     >
       <ReactFlowProvider>
         <TraceGraphInner nodes={nodes} edges={edges} />
