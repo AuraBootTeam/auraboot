@@ -89,7 +89,6 @@ class RagContextProviderImplTest {
                 .build());
 
         when(ragRetrievalService.retrieve(1L, "query", List.of("kb1"), 5, null)).thenReturn(rawResults);
-        when(ragRetrievalService.buildRagContext(rawResults)).thenReturn("## Reference Knowledge\nraw only");
 
         RagContextProviderImpl provider = new RagContextProviderImpl(
                 ragRetrievalService,
@@ -100,7 +99,9 @@ class RagContextProviderImplTest {
 
         String context = provider.retrieveContext(1L, "query", List.of("kb1"));
 
-        assertThat(context).isEqualTo("## Reference Knowledge\nraw only");
+        assertThat(context).contains("## Retrieved Knowledge");
+        assertThat(context).contains("[Source: raw-doc, Chunk 0]");
+        assertThat(context).contains("raw only");
         verify(ragRetrievalService).retrieve(1L, "query", List.of("kb1"), 5, null);
         verifyNoInteractions(d7Service, traceWriter);
     }
@@ -136,7 +137,6 @@ class RagContextProviderImplTest {
 
         when(d7Service.retrieve(1L, "query", 2)).thenReturn(List.of(match));
         when(ragRetrievalService.retrieve(1L, "query", List.of("kb1"), 4, null)).thenReturn(rawResults);
-        when(ragRetrievalService.buildRagContext(rawResults)).thenReturn("## Reference Knowledge\nraw content");
 
         RagContextProviderImpl provider = new RagContextProviderImpl(
                 ragRetrievalService,
@@ -147,10 +147,12 @@ class RagContextProviderImplTest {
 
         String context = provider.retrieveContext(1L, "query", List.of("kb1"));
 
-        assertThat(context).contains("## Compiled Knowledge");
-        assertThat(context).contains("## Reference Knowledge");
-        assertThat(context.indexOf("## Compiled Knowledge"))
-                .isLessThan(context.indexOf("## Reference Knowledge"));
+        assertThat(context).contains("## Retrieved Knowledge");
+        assertThat(context).contains("[Compiled: D7 retrieval decision]");
+        assertThat(context).contains("[Source: raw-doc, Chunk 1]");
+        // RRF with compiled weight 1.5: top compiled page precedes top raw chunk
+        assertThat(context.indexOf("[Compiled: D7 retrieval decision]"))
+                .isLessThan(context.indexOf("[Source: raw-doc, Chunk 1]"));
         verify(d7Service).retrieve(1L, "query", 2);
         verify(ragRetrievalService).retrieve(1L, "query", List.of("kb1"), 4, null);
         verify(traceWriter).recordRetrieval(1L, "query", List.of(match), rawResults);

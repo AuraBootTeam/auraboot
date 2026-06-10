@@ -5,6 +5,7 @@ import com.auraboot.framework.rag.d7.D7CompiledKnowledgeMatch;
 import com.auraboot.framework.rag.d7.D7CompiledKnowledgeService;
 import com.auraboot.framework.rag.d7.D7ContextAssembler;
 import com.auraboot.framework.rag.d7.D7KnowledgeProperties;
+import com.auraboot.framework.rag.d7.D7RagFusion;
 import com.auraboot.framework.rag.d7.D7RetrievalTraceWriter;
 import com.auraboot.framework.rag.dto.RetrievalResult;
 import lombok.RequiredArgsConstructor;
@@ -36,9 +37,14 @@ public class RagContextProviderImpl implements RagContextProvider {
 
     @Override
     public String retrieveContext(Long tenantId, String query, List<String> kbPids) {
+        int maxTokens = d7KnowledgeProperties.getContextMaxTokens();
         if (!d7KnowledgeProperties.isEnabled()) {
             List<RetrievalResult> results = ragRetrievalService.retrieve(tenantId, query, kbPids, 5, null);
-            return ragRetrievalService.buildRagContext(results);
+            // Same budgeted renderer, raw-only (G4)
+            return d7ContextAssembler.buildFusedContext(
+                    D7RagFusion.fuse(List.of(), results,
+                            d7KnowledgeProperties.getRrfK(), d7KnowledgeProperties.getCompiledRrfWeight()),
+                    maxTokens);
         }
 
         int rawTopK = d7KnowledgeProperties.getRawTopK() > 0 ? d7KnowledgeProperties.getRawTopK() : 5;
@@ -49,7 +55,10 @@ public class RagContextProviderImpl implements RagContextProvider {
                 d7CompiledKnowledgeService.retrieve(tenantId, query, compiledTopK);
         List<RetrievalResult> rawResults = ragRetrievalService.retrieve(tenantId, query, kbPids, rawTopK, null);
         d7RetrievalTraceWriter.recordRetrieval(tenantId, query, compiledMatches, rawResults);
-        String rawContext = ragRetrievalService.buildRagContext(rawResults);
-        return d7ContextAssembler.buildAuraBotContext(compiledMatches, rawContext);
+        // G5 (DDR-A option A1): RRF fusion replaces "compiled always first"
+        return d7ContextAssembler.buildFusedContext(
+                D7RagFusion.fuse(compiledMatches, rawResults,
+                        d7KnowledgeProperties.getRrfK(), d7KnowledgeProperties.getCompiledRrfWeight()),
+                maxTokens);
     }
 }
