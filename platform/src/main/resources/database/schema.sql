@@ -329,8 +329,9 @@ CREATE TABLE IF NOT EXISTS ab_role_permission (
     expiry_date DATE,
     conditions JSONB,
     -- Permission Governance S1: materialized condition AST (ConditionNode JSON) written by the
-    -- enterprise PermissionCompiler at publish time. Legacy `conditions` (key-value) is retired by
-    -- Plan B when PolicyExpressionEvaluator is replaced by ConditionAstEvaluator.
+    -- enterprise PermissionCompiler at publish time. The runtime guard (PolicyEvaluator) reads
+    -- condition_ast via ConditionAstEvaluator (Plan B). Legacy `conditions` (key-value) remains
+    -- only as a policy-admin config surface and is no longer consulted by the evaluator.
     condition_ast JSONB,
     data_scope_ast JSONB,
     source_ref TEXT,        -- provenance: which package/override produced this grant (explainer/audit)
