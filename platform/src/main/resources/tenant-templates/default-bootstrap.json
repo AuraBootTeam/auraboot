@@ -1453,6 +1453,36 @@
       "resource": "ai:knowledge",
       "action": "retrieve",
       "resourceType": "function"
+    },
+    {
+      "code": "billing.catalog.read",
+      "name": "计费资源目录读取",
+      "description": "查看计费资源目录条目",
+      "type": "function",
+      "module": "billing",
+      "resource": "billing:catalog",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "billing.quota.read",
+      "name": "配额余额读取",
+      "description": "查看配额桶余额",
+      "type": "function",
+      "module": "billing",
+      "resource": "billing:quota",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "billing.usage.read",
+      "name": "用量事件读取",
+      "description": "查看计量用量事件",
+      "type": "function",
+      "module": "billing",
+      "resource": "billing:usage",
+      "action": "read",
+      "resourceType": "function"
     }
   ],
   "roles": [

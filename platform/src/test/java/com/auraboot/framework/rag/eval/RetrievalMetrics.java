@@ -56,6 +56,28 @@ public final class RetrievalMetrics {
     }
 
     /**
+     * Reciprocal rank = 1 / (1-based rank of the first relevant item), 0 if no
+     * relevant item appears in {@code retrievedTopK}. Averaging this across
+     * queries yields MRR@K (caller controls K by truncating the list).
+     *
+     * @throws IllegalArgumentException if expected is empty (rank undefined)
+     */
+    public static double reciprocalRank(List<String> retrievedTopK, Collection<String> expected) {
+        if (expected == null || expected.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "reciprocalRank undefined for empty expected set; use noAnswerRate for expected=neither queries");
+        }
+        Set<String> expectedSet = new HashSet<>(expected);
+        List<String> retrieved = safe(retrievedTopK);
+        for (int i = 0; i < retrieved.size(); i++) {
+            if (expectedSet.contains(retrieved.get(i))) {
+                return 1.0 / (i + 1);
+            }
+        }
+        return 0.0;
+    }
+
+    /**
      * For expected=neither queries: did the retriever correctly return empty?
      *
      * @return true if retrieved is empty (correct NoAnswer)
