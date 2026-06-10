@@ -139,7 +139,7 @@ test.describe('PCBA ERP - Sales Order Mainline and Branch', () => {
 
   test.beforeEach(async ({ page }) => {
     // Check if PCBA plugin is imported by verifying the sales order model exists
-    const resp = await page.request.get('/api/dynamic/sl_sales_order/list?pageSize=1');
+    const resp = await page.request.get('/api/dynamic/sl_sales_order_common/list?pageSize=1');
     if (!resp.ok()) {
       test.skip(true, 'PCBA sales plugin not imported — sl-sales-order model unavailable');
     }
