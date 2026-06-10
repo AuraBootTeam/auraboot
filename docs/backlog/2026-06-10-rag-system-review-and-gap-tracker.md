@@ -47,20 +47,20 @@ Test baseline: 22 backend test files / ~183 @Test methods (incl. RagPipelineInte
 
 | # | Gap | Evidence | Status |
 |---|-----|----------|--------|
-| G1 | **All 13 `KnowledgeBaseController` endpoints lack permission annotations** (create/delete KB, upload, retrieve, import-internal-docs, generate-docs — any authenticated user can delete a whole KB; only tenant isolation) | verified: `grep RequirePermission` exit=1 on `rag/controller/KnowledgeBaseController.java`; violates `permission-code-naming.md` | TODO |
-| G2 | **Chinese BM25 path is near-useless**: 4 ingest sites use `to_tsvector('simple', …)`; query side splits CJK into per-char OR. 30% hybrid weight is noise for Chinese | verified: KbTextIngestService:120, DocumentProcessingService:88, RagDocumentSyncListener:194, InternalDocImportService:155; self-flagged as "CJK tokenization P0 / Spike-5 BLOCKED" in spike-1 docs | TODO |
-| G3 | **Evaluation set too small**: 12 golden queries with recall@5=1.0 means the set is too easy; cannot claim production-grade quality. Spike-1 Phase 3 (expand to 50-100 incl. CJK, multi-hop, no-answer; latency) planned but not started | `rag-golden-query-report.md`, `2026-05-28-spike-1-phase-2-analysis.md` | TODO |
+| G1 | **All 13 `KnowledgeBaseController` endpoints lack permission annotations** (create/delete KB, upload, retrieve, import-internal-docs, generate-docs — any authenticated user can delete a whole KB; only tenant isolation) | verified: `grep RequirePermission` exit=1 on `rag/controller/KnowledgeBaseController.java`; violates `permission-code-naming.md` | **DONE** (commit fd57e63e5: @RequirePermission ×14, codes seeded, gate green, 403 IT) |
+| G2 | **Chinese BM25 path is near-useless**: 4 ingest sites use `to_tsvector('simple', …)`; query side splits CJK into per-char OR. 30% hybrid weight is noise for Chinese | verified: KbTextIngestService:120, DocumentProcessingService:88, RagDocumentSyncListener:194, InternalDocImportService:155; self-flagged as "CJK tokenization P0 / Spike-5 BLOCKED" in spike-1 docs | **DONE** (fd57e63e5: CjkBigramSegmenter index+query, reindex endpoint+UI button, IT proves zh hit on BM25 leg) |
+| G3 | **Evaluation set too small**: 12 golden queries with recall@5=1.0 means the set is too easy; cannot claim production-grade quality. Spike-1 Phase 3 (expand to 50-100 incl. CJK, multi-hop, no-answer; latency) planned but not started | `rag-golden-query-report.md`, `2026-05-28-spike-1-phase-2-analysis.md` | IN_PROGRESS (S6: expanding to ≥52 incl. zh/multi-hop/no-answer) |
 
 ### P1 — quality & operability
 
 | # | Gap | Evidence | Status |
 |---|-----|----------|--------|
-| G4 | No token budget: RAG context (top-5 chunks + full D7 page bodies) concatenated into system prompt without truncation | `AuraBotChatService.buildSystemPrompt()` L486-566 | TODO |
-| G5 | D7 and RAG have no joint ranking: keyword-rank pages always precede hybrid-scored chunks; deferred **DDR-A** decision (soft recommendation A1: upper-layer fusion / RRF) never ratified | `D7ContextAssembler` L10-38; spike-1 phase-2 analysis | TODO |
-| G6 | Zero observability on RAG side: D7 has RetrievalTraceWriter, RAG has none (no latency/hit-rate/zero-result metrics); `embedding_status='failed'` chunks have no retry & no alert (stuck forever) | `RagRetrievalService` logs only | TODO |
-| G7 | No feedback loop: no signal whether retrieved chunks were used/helpful | one-way consumption chain | TODO |
-| G8 | Cross-KB embedding dimension mismatch silently drops KBs (recall loss invisible to user) | `RagRetrievalService` L73-90 | TODO |
-| G9 | Ingest logic mirrored 3× (DocumentProcessingService / KbTextIngestService / RagDocumentSyncListener) — chunking changes must be applied in 3 places | identical INSERT statements, comment-acknowledged | TODO |
+| G4 | No token budget: RAG context (top-5 chunks + full D7 page bodies) concatenated into system prompt without truncation | `AuraBotChatService.buildSystemPrompt()` L486-566 | **DONE** (24b35ee61: contextMaxTokens budget in fused renderer, both paths) |
+| G5 | D7 and RAG have no joint ranking: keyword-rank pages always precede hybrid-scored chunks; deferred **DDR-A** decision (soft recommendation A1: upper-layer fusion / RRF) never ratified | `D7ContextAssembler` L10-38; spike-1 phase-2 analysis | **DONE** (24b35ee61: DDR-A ratified as A1, D7RagFusion RRF k=60 w=1.5) |
+| G6 | Zero observability on RAG side: D7 has RetrievalTraceWriter, RAG has none (no latency/hit-rate/zero-result metrics); `embedding_status='failed'` chunks have no retry & no alert (stuck forever) | `RagRetrievalService` logs only | **DONE** (d99005802: RagRetrievalMetrics + sys-rag-embedding-retry bounded retry + failed_permanent + raw-path trace) |
+| G7 | No feedback loop: no signal whether retrieved chunks were used/helpful | one-way consumption chain | PARTIAL — trace+metrics foundation landed (G6); interactive feedback UI deferred to P2 list (§4 absorption map) |
+| G8 | Cross-KB embedding dimension mismatch silently drops KBs (recall loss invisible to user) | `RagRetrievalService` L73-90 | **DONE** (d99005802: /retrieve returns {results,warnings} + playground toast + metric) |
+| G9 | Ingest logic mirrored 3× (DocumentProcessingService / KbTextIngestService / RagDocumentSyncListener) — chunking changes must be applied in 3 places | identical INSERT statements, comment-acknowledged | **DONE** (a22d882bb: KbChunkIngestPipeline, 4 paths consolidated, completed/failed exit invariant) |
 
 ### P2 — advanced capability deficit (defer until G3 baseline exists)
 
@@ -114,12 +114,12 @@ Endgame docs for this remediation run (existing canonical docs, not rewritten):
 
 | Slice | Gaps | Status |
 |---|---|---|
-| S1 | G9 ingest pipeline consolidation | TODO |
-| S2 | G2 CJK bigram (ingest+query+reindex endpoint+UI button) | TODO |
-| S3 | G1 permission annotations + codes + sad-path tests | TODO |
-| S4 | G4 token budget + G5 RRF fusion | TODO |
-| S5 | G6 metrics/trace/retry + G8 dimension-mismatch surfacing | TODO |
-| S6 | G3 golden queries ≥50 + harness green + eval rerun | TODO |
+| S1 | G9 ingest pipeline consolidation | DONE a22d882bb |
+| S2 | G2 CJK bigram (ingest+query+reindex endpoint+UI button) | DONE fd57e63e5 |
+| S3 | G1 permission annotations + codes + sad-path tests | DONE fd57e63e5 |
+| S4 | G4 token budget + G5 RRF fusion | DONE 24b35ee61 |
+| S5 | G6 metrics/trace/retry + G8 dimension-mismatch surfacing | DONE d99005802 |
+| S6 | G3 golden queries ≥50 + harness green | IN_PROGRESS |
 
 ## 8. Progress log
 
