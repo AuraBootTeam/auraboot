@@ -59,5 +59,15 @@ public interface DecisionEvaluationService {
     /**
      * Query newest tenant-scoped evaluation logs for API-backed DSL list pages.
      */
-    PageResult<DrtLogDTO> findRecentLogs(String keyword, String decisionCode, String status, int page, int size);
+    PageResult<DrtLogDTO> findRecentLogs(
+            String keyword,
+            String decisionCode,
+            String status,
+            String callerType,
+            Boolean matched,
+            String rolloutArm,
+            Long minDurationMs,
+            Long maxDurationMs,
+            int page,
+            int size);
 }

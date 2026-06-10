@@ -28,4 +28,9 @@ describe('runtime component loaders', () => {
     expect(getRuntimeComponentEntry('EventPolicyDesignerBlock')).toBeDefined();
     expect(getRuntimeComponentEntry('decision-event-policy-designer')).toBeDefined();
   });
+
+  it('registers the DecisionOps execution-log trace custom block', () => {
+    expect(getRuntimeComponentEntry('ExecutionLogTraceBlock')).toBeDefined();
+    expect(getRuntimeComponentEntry('decision-execution-log-trace')).toBeDefined();
+  });
 });

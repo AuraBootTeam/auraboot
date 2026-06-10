@@ -545,11 +545,20 @@ public class DecisionRuntimeController {
             @Parameter(description = "Keyword search") @RequestParam(required = false) String keyword,
             @Parameter(description = "Decision code filter") @RequestParam(required = false) String decisionCode,
             @Parameter(description = "Status filter") @RequestParam(required = false) String status,
+            @Parameter(description = "Caller type filter") @RequestParam(required = false) String callerType,
+            @Parameter(description = "Matched result filter") @RequestParam(required = false) Boolean matched,
+            @Parameter(description = "Rollout arm filter") @RequestParam(required = false) String rolloutArm,
+            @Parameter(description = "Minimum duration in milliseconds") @RequestParam(required = false) Long minDurationMs,
+            @Parameter(description = "Maximum duration in milliseconds") @RequestParam(required = false) Long maxDurationMs,
             @Parameter(description = "Zero-based page index") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
-        log.info("Listing recent decision logs: keyword={}, decisionCode={}, status={}, page={}, size={}",
-                keyword, decisionCode, status, page, size);
-        return ApiResponse.success(evaluationService.findRecentLogs(keyword, decisionCode, status, page, size));
+        log.info("Listing recent decision logs: keyword={}, decisionCode={}, status={}, callerType={}, " +
+                        "matched={}, rolloutArm={}, minDurationMs={}, maxDurationMs={}, page={}, size={}",
+                keyword, decisionCode, status, callerType, matched, rolloutArm,
+                minDurationMs, maxDurationMs, page, size);
+        return ApiResponse.success(evaluationService.findRecentLogs(
+                keyword, decisionCode, status, callerType, matched, rolloutArm,
+                minDurationMs, maxDurationMs, page, size));
     }
 
     @GetMapping("/logs/{pid}")

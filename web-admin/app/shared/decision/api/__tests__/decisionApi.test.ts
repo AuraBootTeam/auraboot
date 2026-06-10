@@ -92,6 +92,43 @@ describe('decisionApi client', () => {
     expect(calls[0].params).toMatchObject({ traceId: 'trace-xyz' });
   });
 
+  it('getRecentLogs passes only populated advanced filters', async () => {
+    const { http, calls } = fakeHttp();
+    const api = createDecisionApi(http);
+    await api.getRecentLogs({
+      keyword: 'trace-xyz',
+      decisionCode: '',
+      status: 'MATCHED',
+      callerType: 'AUTOMATION',
+      matched: true,
+      rolloutArm: 'CANDIDATE',
+      minDurationMs: 10,
+      maxDurationMs: '',
+      page: 0,
+      size: 50,
+    });
+    expect(calls[0]).toMatchObject({ method: 'get', endpoint: '/decision/logs/recent' });
+    expect(calls[0].params).toMatchObject({
+      keyword: 'trace-xyz',
+      status: 'MATCHED',
+      callerType: 'AUTOMATION',
+      matched: true,
+      rolloutArm: 'CANDIDATE',
+      minDurationMs: 10,
+      page: 0,
+      size: 50,
+    });
+    expect(calls[0].params).not.toHaveProperty('decisionCode');
+    expect(calls[0].params).not.toHaveProperty('maxDurationMs');
+  });
+
+  it('getLogByPid fetches one DSL detail record', async () => {
+    const { http, calls } = fakeHttp();
+    const api = createDecisionApi(http);
+    await api.getLogByPid('log-pid-1');
+    expect(calls[0]).toMatchObject({ method: 'get', endpoint: '/decision/logs/log-pid-1' });
+  });
+
   it('getDashboard fetches the DecisionOps dashboard summary', async () => {
     const { http, calls } = fakeHttp();
     const api = createDecisionApi(http) as unknown as { getDashboard: () => Promise<unknown> };

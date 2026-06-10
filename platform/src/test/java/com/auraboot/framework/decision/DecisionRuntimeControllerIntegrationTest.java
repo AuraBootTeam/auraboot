@@ -363,6 +363,7 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         older.setKind("SIMPLE_CONDITION");
         older.setRuntimeAdapter("AST_EVALUATOR");
         older.setCallerType("API");
+        older.setRolloutArm("BASELINE");
         older.setMatched(false);
         older.setStatus("NOT_MATCHED");
         older.setDurationMs(31L);
@@ -377,7 +378,8 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         newest.setDecisionVersion(2);
         newest.setKind("SIMPLE_CONDITION");
         newest.setRuntimeAdapter("AST_EVALUATOR");
-        newest.setCallerType("API");
+        newest.setCallerType("AUTOMATION");
+        newest.setRolloutArm("CANDIDATE");
         newest.setMatched(true);
         newest.setStatus("MATCHED");
         newest.setDurationMs(12L);
@@ -392,6 +394,21 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.records[0].decisionCode").value(newest.getDecisionCode()))
                 .andExpect(jsonPath("$.data.records[0].status").value("MATCHED"))
                 .andExpect(jsonPath("$.data.total").isNumber());
+
+        mockMvc.perform(get("/api/decision/logs/recent")
+                        .param("keyword", suffix)
+                        .param("callerType", "automation")
+                        .param("matched", "true")
+                        .param("rolloutArm", "candidate")
+                        .param("minDurationMs", "10")
+                        .param("maxDurationMs", "20")
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records.length()").value(1))
+                .andExpect(jsonPath("$.data.records[0].traceId").value(newest.getTraceId()))
+                .andExpect(jsonPath("$.data.records[0].callerType").value("AUTOMATION"))
+                .andExpect(jsonPath("$.data.records[0].rolloutArm").value("CANDIDATE"));
     }
 
     @Test

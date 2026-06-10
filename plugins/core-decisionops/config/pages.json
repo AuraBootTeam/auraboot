@@ -1380,139 +1380,22 @@
       "type": "stack",
       "gap": 12
     },
-      "extension": {
-        "dataSource": {
-          "type": "api",
-          "endpoint": "/api/decision/logs/recent",
-          "method": "get",
-          "pagination": true
-        },
-        "options": {
-          "detailNavigation": "detail",
-          "detailUrl": "/p/decisionops_execution_logs/view/{pid}"
-        },
-        "skipFieldMeta": true,
-        "hideSavedViews": true,
-        "hideBuiltInImport": true,
-        "hideBuiltInExport": true,
-        "hideBuiltInPrint": true
+    "extension": {
+      "customOnly": true,
+      "skipFieldMeta": true,
+      "hideSavedViews": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true
     },
     "blocks": [
       {
-        "id": "decision_execution_log_table",
-        "blockType": "table",
-        "table": {
-          "columns": [
-            {
-              "field": "traceId",
-              "label": {
-                "zh-CN": "Trace ID",
-                "en-US": "Trace ID"
-              },
-              "width": 240
-            },
-            {
-              "field": "decisionCode",
-              "label": {
-                "zh-CN": "决策编码",
-                "en-US": "Decision Code"
-              },
-              "width": 220
-            },
-            {
-              "field": "selectedVersion",
-              "label": {
-                "zh-CN": "命中版本",
-                "en-US": "Selected Version"
-              },
-              "width": 110
-            },
-            {
-              "field": "status",
-              "label": {
-                "zh-CN": "状态",
-                "en-US": "Status"
-              },
-              "width": 130
-            },
-            {
-              "field": "matched",
-              "label": {
-                "zh-CN": "命中",
-                "en-US": "Matched"
-              },
-              "width": 100
-            },
-            {
-              "field": "durationMs",
-              "label": {
-                "zh-CN": "耗时(ms)",
-                "en-US": "Duration (ms)"
-              },
-              "width": 120
-            },
-            {
-              "field": "callerType",
-              "label": {
-                "zh-CN": "调用方",
-                "en-US": "Caller"
-              },
-              "width": 130
-            },
-            {
-              "field": "rolloutArm",
-              "label": {
-                "zh-CN": "灰度分支",
-                "en-US": "Rollout Arm"
-              },
-              "width": 130
-            },
-            {
-              "field": "createdAt",
-              "label": {
-                "zh-CN": "创建时间",
-                "en-US": "Created At"
-              },
-              "width": 180,
-              "format": "YYYY-MM-DD HH:mm"
-            },
-            {
-              "field": "errorMessage",
-              "label": {
-                "zh-CN": "错误信息",
-                "en-US": "Error Message"
-              },
-              "width": 260
-            }
-          ],
-          "rowActions": [
-            {
-              "code": "detail",
-              "label": {
-                "zh-CN": "详情",
-                "en-US": "Detail"
-              },
-              "action": {
-                "type": "navigate",
-                "to": "/p/decisionops_execution_logs/view/{pid}"
-              }
-            },
-            {
-              "code": "console",
-              "label": {
-                "zh-CN": "控制台",
-                "en-US": "Console"
-              },
-              "action": {
-                "type": "navigate",
-                "to": "/decision-ops"
-              }
-            }
-          ],
-          "defaultSort": {
-            "field": "createdAt",
-            "order": "desc"
-          }
+        "id": "decision_execution_log_trace_explorer",
+        "blockType": "custom",
+        "component": "ExecutionLogTraceBlock",
+        "props": {
+          "mode": "list",
+          "pageSize": 50
         }
       }
     ]
@@ -1544,6 +1427,14 @@
       "showEdit": false
     },
     "blocks": [
+      {
+        "id": "decision_execution_log_trace_chain",
+        "blockType": "custom",
+        "component": "ExecutionLogTraceBlock",
+        "props": {
+          "mode": "detail"
+        }
+      },
       {
         "id": "decision_execution_log_trace",
         "blockType": "form-section",

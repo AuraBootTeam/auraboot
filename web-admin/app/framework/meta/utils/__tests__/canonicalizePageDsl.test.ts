@@ -510,4 +510,31 @@ describe('canonicalizePageSchemaDto', () => {
     });
     expect((designerPage!.extension as any).customOnly).toBe(true);
   });
+
+  it('hosts ExecutionLog advanced filters and trace chain in DSL custom blocks', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const pages = readPages(pagesFile);
+    const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_execution_logs_list');
+    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_execution_logs_detail');
+
+    expect(listPage).toBeDefined();
+    expect(detailPage).toBeDefined();
+
+    const listSchema = canonicalizePageSchemaDto(listPage!);
+    expect((listPage!.extension as any).customOnly).toBe(true);
+    expect(listSchema.blocks).toHaveLength(1);
+    expect(listSchema.blocks[0]).toMatchObject({
+      component: 'ExecutionLogTraceBlock',
+      props: {
+        mode: 'list',
+        pageSize: 50,
+      },
+    });
+    expect(JSON.stringify(listPage)).not.toContain('/decision-ops');
+    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+      component: 'ExecutionLogTraceBlock',
+      props: { mode: 'detail' },
+    });
+  });
 });

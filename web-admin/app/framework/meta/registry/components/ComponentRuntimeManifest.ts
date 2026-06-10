@@ -165,4 +165,12 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
       'decisioneventpolicydesigner',
     ],
   }),
+  decisionexecutionlogtrace: runtime('decision', 'ExecutionLogTraceBlock', {
+    aliases: [
+      'ExecutionLogTraceBlock',
+      'decision-execution-log-trace',
+      'decision_execution_log_trace',
+      'decisionexecutionlogtrace',
+    ],
+  }),
 };

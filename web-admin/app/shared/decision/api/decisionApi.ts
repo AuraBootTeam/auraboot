@@ -33,13 +33,53 @@ export interface DecisionResult {
 }
 
 export interface DecisionLogRecord {
+  pid?: string;
   traceId?: string;
+  correlationId?: string;
   decisionCode?: string;
+  decisionVersion?: number;
+  selectedVersion?: number;
+  rolloutPolicyPid?: string;
+  rolloutBucket?: number;
+  rolloutArm?: string;
+  routingKey?: string;
+  rolloutResultKey?: string;
+  kind?: string;
+  runtimeAdapter?: string;
+  callerType?: string;
+  callerRef?: string;
+  inputDigest?: string;
+  resultDigest?: string;
+  matched?: boolean;
   status?: string;
   matchedRulesJson?: unknown;
   durationMs?: number;
+  errorCode?: string;
   errorMessage?: string;
   createdAt?: string;
+}
+
+export interface DecisionLogFilters {
+  keyword?: string;
+  decisionCode?: string;
+  status?: string;
+  callerType?: string;
+  matched?: boolean | '';
+  rolloutArm?: string;
+  minDurationMs?: number | '';
+  maxDurationMs?: number | '';
+  page?: number;
+  size?: number;
+}
+
+export interface DecisionPageResult<T> {
+  records: T[];
+  total?: number;
+  size?: number;
+  current?: number;
+  pages?: number;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
 }
 
 export interface DecisionDashboardSummary {
@@ -443,6 +483,12 @@ export function createDecisionApi(http: HttpClient) {
         ([, value]) => value !== undefined && value !== null && value !== '',
       ),
     );
+  const compactParams = (filters: object): Record<string, unknown> =>
+    Object.fromEntries(
+      Object.entries(filters).filter(
+        ([, value]) => value !== undefined && value !== null && value !== '',
+      ),
+    );
 
   return {
     // ── Decision Runtime ──
@@ -503,6 +549,12 @@ export function createDecisionApi(http: HttpClient) {
       http.delete<DecisionVersionSummary>(`${D}/versions/${pid}`).then((r) => r.data),
     getLogs: (traceId: string) =>
       http.get<DecisionLogRecord[]>(`${D}/logs`, { traceId }).then((r) => r.data),
+    getRecentLogs: (filters: DecisionLogFilters = {}) =>
+      http
+        .get<DecisionPageResult<DecisionLogRecord>>(`${D}/logs/recent`, compactParams(filters))
+        .then((r) => r.data),
+    getLogByPid: (pid: string) =>
+      http.get<DecisionLogRecord>(`${D}/logs/${encodeURIComponent(pid)}`).then((r) => r.data),
     getDashboard: () =>
       http.get<DecisionDashboardResponse>(`${D}/dashboard/summary`).then((r) => r.data),
     getModelFields: () => http.get<DecisionModelField[]>(`${D}/model/fields`).then((r) => r.data),

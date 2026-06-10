@@ -168,6 +168,11 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
             String keyword,
             String decisionCode,
             String status,
+            String callerType,
+            Boolean matched,
+            String rolloutArm,
+            Long minDurationMs,
+            Long maxDurationMs,
             int page,
             int size) {
         Long tid = requireTenant();
@@ -182,12 +187,31 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         if (StringUtils.hasText(status)) {
             wrapper.eq(DrtLogEntity::getStatus, status.trim().toUpperCase());
         }
+        if (StringUtils.hasText(callerType)) {
+            wrapper.eq(DrtLogEntity::getCallerType, callerType.trim().toUpperCase());
+        }
+        if (matched != null) {
+            wrapper.eq(DrtLogEntity::getMatched, matched);
+        }
+        if (StringUtils.hasText(rolloutArm)) {
+            wrapper.eq(DrtLogEntity::getRolloutArm, rolloutArm.trim().toUpperCase());
+        }
+        if (minDurationMs != null) {
+            wrapper.ge(DrtLogEntity::getDurationMs, Math.max(0L, minDurationMs));
+        }
+        if (maxDurationMs != null) {
+            wrapper.le(DrtLogEntity::getDurationMs, Math.max(0L, maxDurationMs));
+        }
         if (StringUtils.hasText(keyword)) {
             String q = keyword.trim();
             wrapper.and(w -> w.like(DrtLogEntity::getTraceId, q)
+                    .or().like(DrtLogEntity::getCorrelationId, q)
                     .or().like(DrtLogEntity::getDecisionCode, q)
                     .or().like(DrtLogEntity::getStatus, q)
                     .or().like(DrtLogEntity::getCallerType, q)
+                    .or().like(DrtLogEntity::getCallerRef, q)
+                    .or().like(DrtLogEntity::getRolloutArm, q)
+                    .or().like(DrtLogEntity::getRoutingKey, q)
                     .or().like(DrtLogEntity::getErrorMessage, q));
         }
         wrapper.orderByDesc(DrtLogEntity::getCreatedAt);
