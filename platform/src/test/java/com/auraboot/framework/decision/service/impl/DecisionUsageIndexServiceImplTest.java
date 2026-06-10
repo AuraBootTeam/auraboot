@@ -22,6 +22,8 @@ import com.auraboot.framework.eventpolicy.mapper.DrtPolicyDefinitionMapper;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
+import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
+import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +48,7 @@ class DecisionUsageIndexServiceImplTest {
     private final DrtPolicyVersionMapper policyVersionMapper = mock(DrtPolicyVersionMapper.class);
     private final DrtPolicyDefinitionMapper policyDefinitionMapper = mock(DrtPolicyDefinitionMapper.class);
     private final NamedQueryMapper namedQueryMapper = mock(NamedQueryMapper.class);
+    private final BpmProcessDefinitionMapper bpmProcessDefinitionMapper = mock(BpmProcessDefinitionMapper.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final DecisionUsageIndexServiceImpl service = new DecisionUsageIndexServiceImpl(
@@ -56,6 +59,7 @@ class DecisionUsageIndexServiceImplTest {
             policyVersionMapper,
             policyDefinitionMapper,
             namedQueryMapper,
+            bpmProcessDefinitionMapper,
             objectMapper);
 
     @AfterEach
@@ -314,5 +318,146 @@ class DecisionUsageIndexServiceImplTest {
                                 "EVENT_POLICY", "DECISION", "approval_routing", null, "VERSION_RULES"),
                         org.assertj.core.groups.Tuple.tuple(
                                 "EVENT_POLICY", "FIELD", null, "record.data.amount", "VERSION_RULES"));
+    }
+
+    @Test
+    void rebuildIndexesBpmDesignerNodeAndEdgeRuleRefs() throws Exception {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        when(versionMapper.selectList(any())).thenReturn(List.of());
+        when(automationMapper.selectList(any())).thenReturn(List.of());
+        when(slaConfigMapper.selectList(any())).thenReturn(List.of());
+        when(policyVersionMapper.selectList(any())).thenReturn(List.of());
+        when(namedQueryMapper.selectList(any())).thenReturn(List.of());
+
+        BpmProcessDefinition process = new BpmProcessDefinition();
+        process.setPid("bpm-proc-1");
+        process.setTenantId(10L);
+        process.setProcessKey("approval_process");
+        process.setProcessName("Approval Process");
+        process.setStatus("draft");
+        process.setVersion(4);
+        process.setIsCurrent(true);
+        process.setDeletedFlag(false);
+        process.setExtension(Map.of("designerJson", """
+                {
+                  "key": "approval_process",
+                  "nodes": [
+                    {
+                      "id": "gateway_route",
+                      "type": "exclusiveGateway",
+                      "data": {
+                        "type": "exclusiveGateway",
+                        "label": "Route",
+                        "config": {
+                          "ruleBinding": {
+                            "consumerType": "BPM",
+                            "consumerCode": "approval_process",
+                            "consumerNodeId": "gateway_route",
+                            "bindingKind": "DECISION_REF",
+                            "decisionBinding": {
+                              "decisionCode": "approval_routing",
+                              "versionPolicy": "ROLLOUT",
+                              "inputMappings": [
+                                {
+                                  "input": "amount",
+                                  "source": { "kind": "field", "scope": "record", "path": "amount" }
+                                }
+                              ],
+                              "correlationKey": { "kind": "field", "scope": "record", "path": "requestId" }
+                            },
+                            "enabled": true
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "task_assign",
+                      "type": "userTask",
+                      "data": {
+                        "type": "userTask",
+                        "label": "Approve",
+                        "config": {
+                          "assignee": {
+                            "type": "decision",
+                            "decisionBinding": {
+                              "decisionCode": "task_assignee",
+                              "versionPolicy": "LATEST_PUBLISHED",
+                              "inputMappings": [
+                                {
+                                  "input": "department",
+                                  "source": { "kind": "field", "scope": "record", "path": "requester.departmentId" }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "edge_high_amount",
+                      "source": "gateway_route",
+                      "target": "task_assign",
+                      "data": {
+                        "label": "High amount",
+                        "conditionSpec": {
+                          "root": {
+                            "type": "compare",
+                            "left": { "type": "path", "scope": "record", "path": "amount", "dataType": "decimal" },
+                            "operator": "GTE",
+                            "right": { "type": "literal", "value": 1000, "dataType": "decimal" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+                """));
+        when(bpmProcessDefinitionMapper.selectList(any())).thenReturn(List.of(process));
+
+        DecisionUsageIndexRebuildDTO summary = service.rebuild();
+
+        ArgumentCaptor<DecisionUsageRefEntity> captor = ArgumentCaptor.forClass(DecisionUsageRefEntity.class);
+        verify(usageRefMapper).deleteByTenant(10L);
+        verify(usageRefMapper, times(6)).insert(captor.capture());
+        assertThat(summary.getConsumerRefs()).isEqualTo(2);
+        assertThat(summary.getFieldRefs()).isEqualTo(4);
+        assertThat(captor.getAllValues())
+                .extracting(DecisionUsageRefEntity::getSourceType, DecisionUsageRefEntity::getSourceCode,
+                        DecisionUsageRefEntity::getSourceVersion, DecisionUsageRefEntity::getTargetType,
+                        DecisionUsageRefEntity::getTargetCode, DecisionUsageRefEntity::getTargetPath,
+                        DecisionUsageRefEntity::getBinding)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(
+                                "BPM_PROCESS", "approval_process", "4",
+                                "DECISION", "approval_routing", null, "DESIGNER_NODE"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "BPM_PROCESS", "approval_process", "4",
+                                "DECISION", "task_assignee", null, "DESIGNER_NODE"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "BPM_PROCESS", "approval_process", "4",
+                                "FIELD", null, "record.amount", "DESIGNER_NODE"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "BPM_PROCESS", "approval_process", "4",
+                                "FIELD", null, "record.requestId", "DESIGNER_NODE"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "BPM_PROCESS", "approval_process", "4",
+                                "FIELD", null, "record.requester.departmentId", "DESIGNER_NODE"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "BPM_PROCESS", "approval_process", "4",
+                                "FIELD", null, "record.amount", "DESIGNER_EDGE"));
+        assertThat(captor.getAllValues())
+                .anySatisfy(ref -> {
+                    assertThat(ref.getTargetCode()).isEqualTo("approval_routing");
+                    assertThat(ref.getMetadataJson().get("nodeId").asText()).isEqualTo("gateway_route");
+                    assertThat(ref.getMetadataJson().get("nodeType").asText()).isEqualTo("exclusiveGateway");
+                })
+                .anySatisfy(ref -> {
+                    assertThat(ref.getBinding()).isEqualTo("DESIGNER_EDGE");
+                    assertThat(ref.getMetadataJson().get("edgeId").asText()).isEqualTo("edge_high_amount");
+                    assertThat(ref.getMetadataJson().get("sourceNodeId").asText()).isEqualTo("gateway_route");
+                    assertThat(ref.getMetadataJson().get("targetNodeId").asText()).isEqualTo("task_assign");
+                });
     }
 }

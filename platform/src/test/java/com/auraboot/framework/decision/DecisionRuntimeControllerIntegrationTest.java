@@ -28,6 +28,8 @@ import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
+import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
 import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -75,6 +77,7 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private DrtPolicyVersionMapper policyVersionMapper;
     @Autowired private AutomationMapper automationMapper;
     @Autowired private SlaConfigMapper slaConfigMapper;
+    @Autowired private BpmProcessDefinitionMapper bpmProcessDefinitionMapper;
 
     private final ObjectMapper json = new ObjectMapper();
     private MockMvc mockMvc;
@@ -776,6 +779,131 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void httpDecisionImpactIncludesBpmDesignerNodeRefs() throws Exception {
+        String code = "it_bpm_rule_binding_impact_" + System.nanoTime();
+        createDefinition(code);
+        createPublishedVersion(code);
+
+        String processPid = UniqueIdGenerator.generate();
+        String processKey = "bpm_rule_center_" + System.nanoTime();
+        BpmProcessDefinition process = BpmProcessDefinition.builder()
+                .pid(processPid)
+                .tenantId(getTestTenant().getId())
+                .processKey(processKey)
+                .processName("BPM Rule Center Impact")
+                .category("test")
+                .bpmnContent("")
+                .formBindings(Map.of())
+                .businessDataBindings(Map.of())
+                .extension(Map.of("designerJson", """
+                        {
+                          "key": "%s",
+                          "name": "BPM Rule Center Impact",
+                          "nodes": [
+                            {
+                              "id": "gateway_route",
+                              "type": "exclusiveGateway",
+                              "data": {
+                                "type": "exclusiveGateway",
+                                "label": "Route",
+                                "config": {
+                                  "ruleBinding": {
+                                    "consumerType": "BPM",
+                                    "consumerCode": "%s",
+                                    "consumerNodeId": "gateway_route",
+                                    "bindingKind": "DECISION_REF",
+                                    "decisionBinding": {
+                                      "decisionCode": "%s",
+                                      "versionPolicy": "ROLLOUT",
+                                      "inputMappings": [
+                                        {
+                                          "input": "amount",
+                                          "source": { "kind": "field", "scope": "record", "path": "amount" }
+                                        }
+                                      ]
+                                    },
+                                    "enabled": true
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "id": "task_assign",
+                              "type": "userTask",
+                              "data": { "type": "userTask", "label": "Approve" }
+                            }
+                          ],
+                          "edges": [
+                            {
+                              "id": "edge_high_amount",
+                              "source": "gateway_route",
+                              "target": "task_assign",
+                              "data": {
+                                "label": "High amount",
+                                "conditionSpec": {
+                                  "root": {
+                                    "type": "compare",
+                                    "left": {
+                                      "type": "path",
+                                      "scope": "record",
+                                      "path": "amount",
+                                      "dataType": "decimal"
+                                    },
+                                    "operator": "GTE",
+                                    "right": { "type": "literal", "value": 1000, "dataType": "decimal" }
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                        """.formatted(processKey, processKey, code)))
+                .status("draft")
+                .version(1)
+                .isCurrent(true)
+                .deletedFlag(false)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .createdBy(getTestUser().getId())
+                .updatedBy(getTestUser().getId())
+                .build();
+        bpmProcessDefinitionMapper.insert(process);
+
+        mockMvc.perform(post("/api/decision/usage-index/rebuild"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.consumerRefs").value(
+                        org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.data.fieldRefs").value(
+                        org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+
+        String impactBody = mockMvc.perform(get("/api/decision/definitions/" + code + "/impact"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.decisionCode").value(code))
+                .andExpect(jsonPath("$.data.risk.blocking").value(true))
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode impact = json.readTree(impactBody).path("data");
+        assertTrue(impact.path("incoming").findValuesAsText("sourceType").contains("BPM_PROCESS"));
+        assertTrue(impact.path("incoming").findValuesAsText("sourcePid").contains(processPid));
+        assertTrue(impact.path("incoming").findValuesAsText("binding").contains("DESIGNER_NODE"));
+        assertTrue(hasReferenceWithMetadata(
+                impact.path("incoming"), "BPM_PROCESS", processPid, "nodeId", "gateway_route"));
+
+        String fieldBody = mockMvc.perform(get("/api/decision/fields/impact")
+                        .param("fieldRef", "record.amount"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.fieldRef").value("record.amount"))
+                .andExpect(jsonPath("$.data.risk.blocking").value(true))
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode fieldImpact = json.readTree(fieldBody).path("data");
+        assertTrue(fieldImpact.path("references").findValuesAsText("sourceType").contains("BPM_PROCESS"));
+        assertTrue(fieldImpact.path("references").findValuesAsText("sourcePid").contains(processPid));
+        assertTrue(hasReferenceWithMetadata(
+                fieldImpact.path("references"), "BPM_PROCESS", processPid, "edgeId", "edge_high_amount"));
+    }
+
+    @Test
     void httpFieldChangePreflightBlocksReferencedFieldUntilAcknowledged() throws Exception {
         seedDecisionImpactFixture();
 
@@ -1170,6 +1298,21 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         log.setCreatedAt(Instant.now());
         logMapper.insert(log);
         return log;
+    }
+
+    private boolean hasReferenceWithMetadata(
+            JsonNode references, String sourceType, String sourcePid, String metadataKey, String metadataValue) {
+        if (references == null || !references.isArray()) {
+            return false;
+        }
+        for (JsonNode reference : references) {
+            if (sourceType.equals(reference.path("sourceType").asText())
+                    && sourcePid.equals(reference.path("sourcePid").asText())
+                    && metadataValue.equals(reference.path("metadata").path(metadataKey).asText())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private record ImpactFixture(

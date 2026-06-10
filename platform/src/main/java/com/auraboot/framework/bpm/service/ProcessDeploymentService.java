@@ -7,6 +7,7 @@ import com.auraboot.framework.bpm.converter.JsonToBpmnConverter;
 import com.auraboot.framework.bpm.entity.BpmNodeHook;
 import com.auraboot.framework.bpm.mapper.BpmNodeHookMapper;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
@@ -41,6 +42,7 @@ public class ProcessDeploymentService {
     private final JsonToBpmnConverter jsonToBpmnConverter;
     private final BpmNodeHookService bpmNodeHookService;
     private final BpmNodeHookMapper bpmNodeHookMapper;
+    private final DecisionUsageIndexService decisionUsageIndexService;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private static final String EXTENSION_KEY_DESIGNER_JSON = "designerJson";
 
@@ -234,6 +236,7 @@ public class ProcessDeploymentService {
                 .build();
 
         processDefinitionMapper.insert(definition);
+        refreshDecisionUsageIndex(pid);
         log.info("Created process definition: processKey={}, pid={}", request.processKey(), pid);
 
         return definition;
@@ -305,6 +308,7 @@ public class ProcessDeploymentService {
                             .set("bpmn_content", generatedBpmnContent)
                             .set("updated_at", existing.getUpdatedAt()));
         }
+        refreshDecisionUsageIndex(pid);
 
         log.info("Updated process definition: pid={}", pid);
         return existing;
@@ -367,6 +371,8 @@ public class ProcessDeploymentService {
                 .build();
 
         processDefinitionMapper.insert(newVersion);
+        deleteDecisionUsageIndexSource(current.getPid());
+        refreshDecisionUsageIndex(newPid);
         log.info("Created new version: processKey={}, version={}", processKey, nextVersion);
 
         return newVersion;
@@ -601,6 +607,7 @@ public class ProcessDeploymentService {
 
         // Use MyBatis Plus deleteById which respects @TableLogic for soft delete
         processDefinitionMapper.deleteById(definition.getId());
+        deleteDecisionUsageIndexSource(pid);
 
         log.info("Process deleted: pid={}", pid);
     }
@@ -620,6 +627,7 @@ public class ProcessDeploymentService {
         definition.setFormBindings(formBindings);
         definition.setUpdatedAt(Instant.now());
         processDefinitionMapper.updateById(definition);
+        refreshDecisionUsageIndex(pid);
 
         log.info("Updated form bindings: pid={}", pid);
         return definition;
@@ -654,6 +662,14 @@ public class ProcessDeploymentService {
 
     private String getCurrentUserId() {
         return com.auraboot.framework.bpm.util.BpmSecurityUtil.getCurrentUserId();
+    }
+
+    private void refreshDecisionUsageIndex(String processPid) {
+        decisionUsageIndexService.refreshSource("BPM_PROCESS", processPid);
+    }
+
+    private void deleteDecisionUsageIndexSource(String processPid) {
+        decisionUsageIndexService.deleteSource("BPM_PROCESS", processPid);
     }
 
     /**
