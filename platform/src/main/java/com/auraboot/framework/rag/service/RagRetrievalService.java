@@ -324,23 +324,6 @@ public class RagRetrievalService {
                 .build();
     }
 
-    /**
-     * Build a formatted RAG context section for injection into the LLM system prompt.
-     */
-    public String buildRagContext(List<RetrievalResult> results) {
-        if (results == null || results.isEmpty()) return "";
-
-        StringBuilder sb = new StringBuilder("\n\n## Reference Knowledge\n");
-        sb.append("Use the following information to answer the user's question. ");
-        sb.append("Cite sources using [Source: docName, Chunk N] format.\n\n");
-
-        for (RetrievalResult r : results) {
-            sb.append("### [Source: ").append(r.getDocName())
-              .append(", Chunk ").append(r.getChunkIndex()).append("]\n");
-            sb.append(r.getContent()).append("\n\n---\n\n");
-        }
-        return sb.toString();
-    }
 
     /**
      * Check if a tenant has any active knowledge bases with embedded chunks.
