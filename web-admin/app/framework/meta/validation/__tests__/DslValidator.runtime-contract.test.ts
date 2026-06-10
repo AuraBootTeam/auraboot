@@ -176,6 +176,35 @@ describe('DslValidator runtime contract compatibility', () => {
     expect(messages).toEqual([]);
   });
 
+  it('accepts DecisionOps rule binding custom block for DSL-hosted rule-center consumers', () => {
+    const messages = validateStructure({
+      kind: 'form',
+      version: '1.0.0',
+      id: 'automation_rule_binding_form',
+      title: 'Rule Binding',
+      layout: {
+        type: 'stack',
+      },
+      extension: {
+        customOnly: true,
+        skipFieldMeta: true,
+      },
+      blocks: [
+        {
+          id: 'rule_binding',
+          blockType: 'custom',
+          component: 'DecisionRuleBindingBlock',
+          props: {
+            mode: 'combined',
+            initialDecisionCode: 'approval_routing',
+          },
+        },
+      ],
+    });
+
+    expect(messages).toEqual([]);
+  });
+
   it('accepts API-backed detail pages with record endpoint templates', () => {
     const messages = validateStructure({
       kind: 'detail',

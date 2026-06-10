@@ -38,4 +38,9 @@ describe('runtime component loaders', () => {
     expect(getRuntimeComponentEntry('DecisionTableWorkbenchBlock')).toBeDefined();
     expect(getRuntimeComponentEntry('decision-table-workbench')).toBeDefined();
   });
+
+  it('registers the DecisionOps rule binding custom block', () => {
+    expect(getRuntimeComponentEntry('DecisionRuleBindingBlock')).toBeDefined();
+    expect(getRuntimeComponentEntry('decision-rule-binding')).toBeDefined();
+  });
 });

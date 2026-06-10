@@ -181,4 +181,12 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
       'decisiontableworkbench',
     ],
   }),
+  decisionrulebinding: runtime('decision', 'DecisionRuleBindingBlock', {
+    aliases: [
+      'DecisionRuleBindingBlock',
+      'decision-rule-binding',
+      'decision_rule_binding',
+      'decisionrulebinding',
+    ],
+  }),
 };

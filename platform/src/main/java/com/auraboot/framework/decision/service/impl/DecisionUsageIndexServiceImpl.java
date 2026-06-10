@@ -15,6 +15,8 @@ import com.auraboot.framework.decision.entity.DecisionUsageRefEntity;
 import com.auraboot.framework.decision.entity.DrtVersionEntity;
 import com.auraboot.framework.decision.mapper.DecisionUsageRefMapper;
 import com.auraboot.framework.decision.mapper.DrtVersionMapper;
+import com.auraboot.framework.decision.rule.RuleReferenceCollector;
+import com.auraboot.framework.decision.rule.RuleReferenceSet;
 import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyDefinitionEntity;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
@@ -236,9 +238,8 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
                     metadata("status", version.getStatus(), "kind", version.getKind(),
                             "runtimeAdapter", version.getRuntimeAdapter())));
         }
-        Set<String> subDecisionRefs = new LinkedHashSet<>();
-        collectDecisionRefs(version.getContentJson(), subDecisionRefs);
-        for (String subDecision : subDecisionRefs) {
+        RuleReferenceSet ruleRefs = RuleReferenceCollector.collect(version.getContentJson());
+        for (String subDecision : ruleRefs.decisionRefs()) {
             refs.add(ref(tenantId, "DECISION_VERSION", version.getDecisionCode(), versionNumber(version),
                     version.getPid(), "DECISION", subDecision, null, "VERSION",
                     metadata("status", version.getStatus(), "kind", version.getKind(),
@@ -335,11 +336,11 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     }
 
     private List<DecisionUsageRefEntity> refsForEventPolicyVersion(Long tenantId, DrtPolicyVersionEntity version) {
-        Set<String> decisionRefs = new LinkedHashSet<>();
-        collectDecisionRefs(version.getRulesJson(), decisionRefs);
+        RuleReferenceSet ruleRefs = RuleReferenceCollector.collect(version.getRulesJson());
+        Set<String> decisionRefs = new LinkedHashSet<>(ruleRefs.decisionRefs());
         Set<String> webhookEventTypes = new LinkedHashSet<>();
         collectWebhookEventTypes(version.getRulesJson(), webhookEventTypes);
-        if (decisionRefs.isEmpty() && webhookEventTypes.isEmpty()) {
+        if (decisionRefs.isEmpty() && ruleRefs.fieldRefs().isEmpty() && webhookEventTypes.isEmpty()) {
             return List.of();
         }
         DrtPolicyDefinitionEntity def = policyDefinitionMapper.findByTenantAndCode(tenantId, version.getPolicyCode());
@@ -348,6 +349,12 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         for (String decisionRef : decisionRefs) {
             refs.add(ref(tenantId, "EVENT_POLICY", version.getPolicyCode(), versionNumber(version),
                     version.getPid(), "DECISION", decisionRef, null, "VERSION_RULES",
+                    metadata("sourceName", sourceName, "status", version.getStatus(), "phase", version.getPhase(),
+                            "matchMode", version.getMatchMode())));
+        }
+        for (String fieldRef : ruleRefs.fieldRefs()) {
+            refs.add(ref(tenantId, "EVENT_POLICY", version.getPolicyCode(), versionNumber(version),
+                    version.getPid(), "FIELD", null, fieldRef, "VERSION_RULES",
                     metadata("sourceName", sourceName, "status", version.getStatus(), "phase", version.getPhase(),
                             "matchMode", version.getMatchMode())));
         }
@@ -494,21 +501,6 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
             }
         }
         return refs;
-    }
-
-    private void collectDecisionRefs(JsonNode node, Set<String> refs) {
-        if (node == null || node.isNull()) {
-            return;
-        }
-        if (node.isObject()) {
-            JsonNode decisionRef = node.get("decisionRef");
-            if (decisionRef != null && decisionRef.isTextual() && !decisionRef.asText().isBlank()) {
-                refs.add(decisionRef.asText());
-            }
-            node.properties().forEach(entry -> collectDecisionRefs(entry.getValue(), refs));
-        } else if (node.isArray()) {
-            node.forEach(child -> collectDecisionRefs(child, refs));
-        }
     }
 
     private void collectWebhookEventTypes(JsonNode node, Set<String> refs) {

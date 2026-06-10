@@ -845,10 +845,58 @@ export const DISPLAY_COMPONENT_CONFIGS: ComponentConfig[] = [
         label: 'Target code',
         type: 'string',
         group: 'basic',
-        description: 'Optional explicit target code. Detail pages can omit this and use route recordId.',
+        description:
+          'Optional explicit target code. Detail pages can omit this and use route recordId.',
       },
     ],
     tags: ['decisionops', 'impact', 'integration', 'connector', 'webhook', 'custom-block'],
+  },
+  {
+    type: 'decisionrulebinding',
+    name: 'Decision Rule Binding',
+    category: 'display',
+    icon: 'git-branch',
+    description: 'Rule-center condition and decision binding editor for DSL-hosted consumers.',
+    defaultProps: {
+      mode: 'combined',
+      initialDecisionCode: 'approval_routing',
+      initialVersionPolicy: 'LATEST_PUBLISHED',
+    },
+    propertySchema: [
+      {
+        key: 'mode',
+        label: 'Mode',
+        type: 'select',
+        options: [
+          { label: 'Condition + decision', value: 'combined' },
+          { label: 'Condition only', value: 'condition' },
+          { label: 'Decision only', value: 'decision' },
+        ],
+        group: 'basic',
+        description: 'Editor sections rendered by the block.',
+      },
+      {
+        key: 'initialDecisionCode',
+        label: 'Initial decision code',
+        type: 'string',
+        group: 'basic',
+        description: 'Decision code selected when the block mounts.',
+      },
+      {
+        key: 'initialVersionPolicy',
+        label: 'Initial version policy',
+        type: 'select',
+        options: [
+          { label: 'Latest published', value: 'LATEST_PUBLISHED' },
+          { label: 'Fixed version', value: 'FIXED_VERSION' },
+          { label: 'Version tag', value: 'VERSION_TAG' },
+          { label: 'Rollout', value: 'ROLLOUT' },
+        ],
+        group: 'basic',
+        description: 'Version policy selected when the block mounts.',
+      },
+    ],
+    tags: ['decisionops', 'rule-center', 'condition', 'decision-binding', 'custom-block'],
   },
 ];
 

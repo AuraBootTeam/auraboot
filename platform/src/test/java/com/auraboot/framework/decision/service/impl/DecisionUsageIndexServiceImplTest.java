@@ -188,4 +188,63 @@ class DecisionUsageIndexServiceImplTest {
                         org.assertj.core.groups.Tuple.tuple("NAMED_QUERY", "CONNECTOR", "api-nq", "lookup"),
                         org.assertj.core.groups.Tuple.tuple("EVENT_POLICY", "WEBHOOK", "case.closed", "case.closed"));
     }
+
+    @Test
+    void rebuildIndexesEventPolicyDecisionBindingAndConditionFieldRefs() throws Exception {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        when(versionMapper.selectList(any())).thenReturn(List.of());
+        when(automationMapper.selectList(any())).thenReturn(List.of());
+        when(slaConfigMapper.selectList(any())).thenReturn(List.of());
+        when(namedQueryMapper.selectList(any())).thenReturn(List.of());
+
+        DrtPolicyVersionEntity policyVersion = new DrtPolicyVersionEntity();
+        policyVersion.setPid("policy-version-rule-center");
+        policyVersion.setTenantId(10L);
+        policyVersion.setPolicyCode("case_routing_policy");
+        policyVersion.setVersion(3);
+        policyVersion.setStatus("PUBLISHED");
+        policyVersion.setPhase("AFTER_COMMIT");
+        policyVersion.setMatchMode("COLLECT_ALL");
+        policyVersion.setRulesJson(objectMapper.readTree("""
+                [{
+                  "ruleCode": "route-high-value",
+                  "conditionSpec": {
+                    "root": {
+                      "type": "compare",
+                      "left": { "type": "path", "scope": "record", "path": "data.amount", "dataType": "decimal" },
+                      "operator": "GTE",
+                      "right": { "type": "literal", "value": 1000, "dataType": "decimal" }
+                    }
+                  },
+                  "actions": [{
+                    "type": "ROUTE",
+                    "decisionBinding": {
+                      "decisionCode": "approval_routing",
+                      "versionPolicy": "ROLLOUT",
+                      "inputMappings": [
+                        { "input": "amount", "source": { "kind": "field", "scope": "record", "path": "data.amount" } }
+                      ]
+                    }
+                  }]
+                }]
+                """));
+        when(policyVersionMapper.selectList(any())).thenReturn(List.of(policyVersion));
+
+        DecisionUsageIndexRebuildDTO summary = service.rebuild();
+
+        ArgumentCaptor<DecisionUsageRefEntity> captor = ArgumentCaptor.forClass(DecisionUsageRefEntity.class);
+        verify(usageRefMapper).deleteByTenant(10L);
+        verify(usageRefMapper, times(2)).insert(captor.capture());
+        assertThat(summary.getConsumerRefs()).isEqualTo(1);
+        assertThat(summary.getFieldRefs()).isEqualTo(1);
+        assertThat(captor.getAllValues())
+                .extracting(DecisionUsageRefEntity::getSourceType, DecisionUsageRefEntity::getTargetType,
+                        DecisionUsageRefEntity::getTargetCode, DecisionUsageRefEntity::getTargetPath,
+                        DecisionUsageRefEntity::getBinding)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(
+                                "EVENT_POLICY", "DECISION", "approval_routing", null, "VERSION_RULES"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "EVENT_POLICY", "FIELD", null, "record.data.amount", "VERSION_RULES"));
+    }
 }
