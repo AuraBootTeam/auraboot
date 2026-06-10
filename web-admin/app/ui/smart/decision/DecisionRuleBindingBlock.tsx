@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConditionBuilder, type FieldOption } from '~/shared/decision/ui/ConditionBuilder';
 import { group, type GroupNode } from '~/shared/decision/ast/conditionAst';
 import { getApiService } from '~/shared/services/ApiService';
@@ -313,6 +313,7 @@ export function DecisionRuleBindingBlock({
   const [testResult, setTestResult] = useState<DecisionResult | null>(null);
   const [testRunning, setTestRunning] = useState(false);
   const [testError, setTestError] = useState('');
+  const initialValueWrittenRef = useRef(false);
 
   const fieldByKey = useMemo(() => {
     const map = new Map<string, FieldOption>();
@@ -338,6 +339,14 @@ export function DecisionRuleBindingBlock({
       runtime?.updateField?.(props.valueField, nextValue);
     }
   };
+
+  useEffect(() => {
+    if (initialValueWrittenRef.current || !props.valueField) return;
+    initialValueWrittenRef.current = true;
+    const currentValue = runtime?.getFieldValue?.(props.valueField);
+    if (currentValue !== undefined && currentValue !== null && currentValue !== '') return;
+    emitChange(condition, binding);
+  }, [binding, condition, props.valueField, runtime]);
 
   const addInputMapping = () => {
     const first = fields[0];

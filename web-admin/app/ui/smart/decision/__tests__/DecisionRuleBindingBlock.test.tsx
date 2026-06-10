@@ -155,6 +155,69 @@ describe('DecisionRuleBindingBlock', () => {
     expect(onChange).toHaveBeenCalledWith(value);
   });
 
+  it('writes the initial RuleConsumerBinding value to a DSL form valueField on mount', async () => {
+    const updateField = vi.fn();
+
+    render(
+      <DecisionRuleBindingBlock
+        runtime={{ getFieldValue: () => undefined, updateField }}
+        block={{
+          props: {
+            mode: 'decision',
+            valueField: 'rule_binding',
+            consumerType: 'SLA',
+            initialDecisionCode: 'complaint_sla_deadline',
+            initialVersionPolicy: 'LATEST_PUBLISHED',
+          },
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(updateField).toHaveBeenCalled());
+    expect(updateField).toHaveBeenCalledWith(
+      'rule_binding',
+      expect.objectContaining({
+        consumerType: 'SLA',
+        bindingKind: 'DECISION_REF',
+        decisionBinding: expect.objectContaining({
+          decisionCode: 'complaint_sla_deadline',
+          versionPolicy: 'LATEST_PUBLISHED',
+        }),
+      }),
+    );
+  });
+
+  it('does not overwrite an existing DSL form valueField value on mount', async () => {
+    const updateField = vi.fn();
+
+    render(
+      <DecisionRuleBindingBlock
+        runtime={{
+          getFieldValue: () => ({
+            bindingKind: 'DECISION_REF',
+            decisionBinding: { decisionCode: 'existing_decision' },
+            enabled: true,
+          }),
+          updateField,
+        }}
+        block={{
+          props: {
+            mode: 'decision',
+            valueField: 'rule_binding',
+            initialDecisionCode: 'complaint_sla_deadline',
+          },
+        }}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('decision-binding-preview')).toHaveTextContent(
+        '"decisionCode": "existing_decision"',
+      ),
+    );
+    expect(updateField).not.toHaveBeenCalled();
+  });
+
   it('loads decision impact preview on demand', async () => {
     const api = {
       getDecisionImpact: vi.fn(async () => ({
