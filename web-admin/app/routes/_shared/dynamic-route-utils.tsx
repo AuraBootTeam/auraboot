@@ -118,6 +118,54 @@ export function buildApiEndpoint(tableName: string, recordId?: string): string {
   return recordId ? `${base}/${recordId}` : base;
 }
 
+export interface RouteLocationLike {
+  pathname: string;
+  search?: string;
+  hash?: string;
+}
+
+export type LocalMenuRedirectResolution =
+  | { shouldRedirect: true; target: string; error?: undefined }
+  | { shouldRedirect: false; target?: undefined; error?: string };
+
+/**
+ * Resolve menu.redirect into a same-origin app route.
+ * Menu redirects are stored in tenant-scoped DB config, so keep them local-only
+ * and reject self-redirects before the catch-all route calls navigate().
+ */
+export function resolveLocalMenuRedirect(
+  redirect: unknown,
+  location: RouteLocationLike,
+): LocalMenuRedirectResolution {
+  const raw = typeof redirect === 'string' ? redirect.trim() : '';
+  if (!raw) return { shouldRedirect: false };
+
+  if (!raw.startsWith('/') || raw.startsWith('//')) {
+    return { shouldRedirect: false, error: 'Menu redirect must be an app-local path' };
+  }
+
+  let targetUrl: URL;
+  try {
+    targetUrl = new URL(raw, 'http://auraboot.local');
+  } catch {
+    return { shouldRedirect: false, error: 'Menu redirect is not a valid route' };
+  }
+
+  if (targetUrl.origin !== 'http://auraboot.local') {
+    return { shouldRedirect: false, error: 'Menu redirect must stay within the current app' };
+  }
+
+  const targetSearch = targetUrl.search || location.search || '';
+  const targetHash = targetUrl.hash || location.hash || '';
+  const target = `${targetUrl.pathname}${targetSearch}${targetHash}`;
+  const current = `${location.pathname}${location.search || ''}${location.hash || ''}`;
+  if (target === current) {
+    return { shouldRedirect: false, error: 'Menu redirect points to the current route' };
+  }
+
+  return { shouldRedirect: true, target };
+}
+
 // ============================================
 // DynamicField Component for legacy pages
 // ============================================

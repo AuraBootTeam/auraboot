@@ -28,6 +28,8 @@ import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry'
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
+import { confirmDialog } from '~/utils/confirmDialog';
 import {
   AsyncTaskModalProvider,
   AsyncTaskModalHost,
@@ -174,6 +176,11 @@ const SYSTEM_FIELD_I18N_KEYS: Record<string, string> = {
 
 export function getSystemFieldI18nKey(fieldCode: string): string | undefined {
   return SYSTEM_FIELD_I18N_KEYS[fieldCode];
+}
+
+function translateOrFallback(t: (key: string) => string, key: string, fallback: string): string {
+  const resolved = t(key);
+  return resolved && resolved !== key ? resolved : fallback;
 }
 
 /**
@@ -394,6 +401,12 @@ function ListPageContentInner(props: PageContentProps) {
     if (!schema?.blocks) return null;
     return schema.blocks.find((block: any) => block.blockType === 'table') || null;
   }, [schema]);
+  const tableBulkActions = useMemo<ButtonConfig[]>(() => {
+    const configured =
+      (tableBlock as any)?.table?.bulkActions ?? (tableBlock as any)?.bulkActions ?? [];
+    return Array.isArray(configured) ? configured : [];
+  }, [tableBlock]);
+  const selectedIdList = useMemo(() => Array.from(selectedIds), [selectedIds]);
 
   // G7 dispatch — list pages hardcode table/filters/toolbar/tabs/form-buttons
   // in the layout above, but any additional block types in the schema
@@ -1448,6 +1461,131 @@ function ListPageContentInner(props: PageContentProps) {
     [schema?.modelCode, tableName, token, loadData, pagination.pageSize, filters],
   );
 
+  const handleBulkAction = useCallback(
+    async (button: ButtonConfig, ids: string[]) => {
+      if (ids.length === 0) return;
+      if (!canUseButton(button)) return;
+
+      const actionDef = button.action && typeof button.action === 'object' ? button.action : null;
+      const actionType = (actionDef as any)?.type;
+      const command = (actionDef as any)?.command || button.commandCode;
+      if (!command) {
+        showToast(
+          translateOrFallback(
+            t,
+            'list.bulkAction.missingCommand',
+            'Bulk action is missing a command',
+          ),
+          'error',
+        );
+        return;
+      }
+
+      const confirmKey = button.confirm || button.confirmMessageKey;
+      if (confirmKey) {
+        const { title, content } = resolveConfirmDialog(confirmKey, t);
+        const confirmed = await confirmDialog({
+          title,
+          content,
+          variant: button.danger || button.variant === 'danger' ? 'danger' : 'default',
+        });
+        if (!confirmed) return;
+      }
+
+      const label = resolveButtonLabel(button);
+      let successCount = 0;
+      const failures: string[] = [];
+
+      if (actionType === 'bulk_state_transition') {
+        for (const id of ids) {
+          try {
+            const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+              method: 'post',
+              params: {
+                targetRecordId: id,
+                payload: {},
+                operationType: 'UPDATE',
+              },
+              token: token || undefined,
+            });
+            if (ResultHelper.isSuccess(result)) {
+              successCount += 1;
+            } else {
+              failures.push((result as any).desc || (result as any).message || id);
+            }
+          } catch (error) {
+            failures.push(error instanceof Error ? error.message : String(error));
+          }
+        }
+      } else if (actionType === 'bulk_command') {
+        const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+          method: 'post',
+          params: {
+            payload: {
+              recordIds: ids,
+              selectedIds: ids,
+              modelCode,
+            },
+          },
+          token: token || undefined,
+        });
+        if (ResultHelper.isSuccess(result)) {
+          successCount = ids.length;
+        } else {
+          failures.push((result as any).desc || (result as any).message || command);
+        }
+      } else {
+        showToast(
+          translateOrFallback(
+            t,
+            'list.bulkAction.unsupported',
+            `Unsupported bulk action type: ${actionType || 'unknown'}`,
+          ),
+          'error',
+        );
+        return;
+      }
+
+      if (successCount > 0) {
+        setSelectedIds(new Set());
+        await loadData({ page: 0, size: pagination.pageSize, filters });
+      }
+
+      if (failures.length === 0) {
+        showToast(
+          translateOrFallback(
+            t,
+            'list.bulkAction.success',
+            `${label} completed for ${successCount} records`,
+          ),
+          'success',
+        );
+      } else if (successCount > 0) {
+        showToast(
+          translateOrFallback(
+            t,
+            'list.bulkAction.partial',
+            `${label} completed for ${successCount} records; ${failures.length} failed`,
+          ),
+          'warning',
+        );
+      } else {
+        showToast(failures[0] || `${label} failed`, 'error');
+      }
+    },
+    [
+      canUseButton,
+      filters,
+      loadData,
+      modelCode,
+      pagination.pageSize,
+      resolveButtonLabel,
+      showToast,
+      t,
+      token,
+    ],
+  );
+
   const handleBulkEditComplete = useCallback(() => {
     setBulkEditOpen(false);
     setSelectedIds(new Set());
@@ -2224,6 +2362,29 @@ function ListPageContentInner(props: PageContentProps) {
     },
     [canUseButton, pagination.total, data, filters],
   );
+
+  const visibleBulkActions = useMemo(() => {
+    return tableBulkActions.filter((button) => {
+      if (!canUseButton(button)) return false;
+      if (!button.visibleWhen) return true;
+      const selectedIdsArray = selectedIdList;
+      const conditionContext = {
+        ...buildToolbarConditionContext(
+          { total: pagination.total, records: data },
+          createExpressionContext({
+            state: {
+              filters,
+              selectedIds: selectedIdsArray,
+              selectedCount: selectedIdsArray.length,
+            },
+          }),
+        ),
+        selectedIds: selectedIdsArray,
+        selectedCount: selectedIdsArray.length,
+      };
+      return evaluateCondition(button.visibleWhen, conditionContext as any);
+    });
+  }, [canUseButton, data, filters, pagination.total, selectedIdList, tableBulkActions]);
 
   // Build export filter conditions for toolbar
   const exportFilterConditions = useMemo(() => {
@@ -3215,10 +3376,13 @@ function ListPageContentInner(props: PageContentProps) {
                 onPageSizeChange={handlePageSizeChange}
                 t={t}
                 selectedCount={selectedIds.size}
-                selectedIds={Array.from(selectedIds)}
+                selectedIds={selectedIdList}
                 modelCode={modelCode}
                 onBulkEdit={() => setBulkEditOpen(true)}
                 onBulkDelete={handleBulkDelete}
+                bulkActions={visibleBulkActions}
+                onBulkAction={handleBulkAction}
+                resolveBulkActionLabel={resolveButtonLabel}
                 onClearSelection={() => setSelectedIds(new Set())}
               />
             </>
