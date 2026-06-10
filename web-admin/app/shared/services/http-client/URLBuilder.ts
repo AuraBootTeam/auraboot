@@ -52,7 +52,7 @@ export function buildRequest(
   url: string;
   init: RequestInit;
 } {
-  const { method = 'get', params = {}, timeout, apiConfig } = options;
+  const { method = 'get', params = {}, timeout, apiConfig, signal } = options;
 
   // Step 1: Replace PathVariables and separate params
   const { processedPath, remainingParams } = replacePathVariables(path, params);
@@ -114,10 +114,24 @@ export function buildRequest(
     }
   }
 
-  // Step 7: Add timeout signal (if supported)
+  // Step 7: Add cancellation signals (caller abort + timeout when supported)
+  const abortSignals: AbortSignal[] = [];
+  if (signal) {
+    abortSignals.push(signal);
+  }
   if (timeout && typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
     // @ts-ignore - AbortSignal.timeout is not in all TypeScript versions
-    init.signal = AbortSignal.timeout(timeout);
+    abortSignals.push(AbortSignal.timeout(timeout));
+  }
+  if (abortSignals.length === 1) {
+    init.signal = abortSignals[0];
+  } else if (
+    abortSignals.length > 1 &&
+    typeof AbortSignal !== 'undefined' &&
+    'any' in AbortSignal
+  ) {
+    // @ts-ignore - AbortSignal.any is not in all TypeScript versions
+    init.signal = AbortSignal.any(abortSignals);
   }
 
   return { url: fullUrl, init };

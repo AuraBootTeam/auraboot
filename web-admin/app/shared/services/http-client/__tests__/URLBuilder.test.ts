@@ -228,6 +228,13 @@ describe('buildRequest', () => {
     }
   });
 
+  it('should pass caller abort signal to fetch init', () => {
+    const controller = new AbortController();
+    const options: FetchOptions = { method: 'get', signal: controller.signal };
+    const { init } = buildRequest('/api/users', options, serverContext);
+    expect(init.signal).toBe(controller.signal);
+  });
+
   it('should handle empty params for GET request', () => {
     const options: FetchOptions = { method: 'get', params: {} };
     const { url } = buildRequest('/api/users', options, serverContext);

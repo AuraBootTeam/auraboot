@@ -2197,7 +2197,10 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Auto-save view config — delegates upsert logic to backend
   const ensureViewAndUpdateConfig = useCallback(
-    async (config: Partial<import('~/framework/smart/types/savedView').ViewConfig>) => {
+    async (
+      config: Partial<import('~/framework/smart/types/savedView').ViewConfig>,
+      options?: { isStale?: () => boolean; rethrow?: boolean },
+    ) => {
       try {
         if (currentView) {
           await updateViewConfig(config);
@@ -2214,16 +2217,33 @@ function ListPageContentInner(props: PageContentProps) {
           }
         }
       } catch (err) {
+        if (options?.isStale?.()) {
+          return;
+        }
         console.error('[ListPageContent] Failed to save view config:', err);
+        if (options?.rethrow) {
+          throw err;
+        }
       }
     },
     [currentView, updateViewConfig, modelCode, pageKey, selectView],
   );
 
+  const autoSaveMountedRef = useRef(true);
+  useEffect(() => {
+    autoSaveMountedRef.current = true;
+    return () => {
+      autoSaveMountedRef.current = false;
+    };
+  }, []);
+
   const { autoSave } = useAutoSaveView({
     currentView,
     updateViewConfig: async (config) => {
-      await ensureViewAndUpdateConfig(config);
+      await ensureViewAndUpdateConfig(config, {
+        isStale: () => !autoSaveMountedRef.current,
+        rethrow: true,
+      });
       return currentView!;
     },
   });

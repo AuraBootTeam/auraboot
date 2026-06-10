@@ -519,7 +519,7 @@ describe('canonicalizePageSchemaDto', () => {
     const pages = readPages(pagesFile);
     const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policies_list');
     const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policies_detail');
-    const designerPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policy_designer');
+    const designerPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policy_designer_list');
 
     expect(listPage).toBeDefined();
     expect(detailPage).toBeDefined();

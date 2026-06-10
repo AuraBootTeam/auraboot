@@ -94,6 +94,15 @@ export interface FetchOptions {
   timeout?: number;
 
   /**
+   * Optional caller-owned abort signal.
+   *
+   * Used by React hooks to cancel in-flight client requests when a page
+   * unmounts or a route changes. Timeout handling may combine this signal
+   * with AbortSignal.timeout when both are provided.
+   */
+  signal?: AbortSignal;
+
+  /**
    * API configuration overrides
    *
    * Allows per-request customization of API settings

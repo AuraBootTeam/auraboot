@@ -27,6 +27,23 @@ export interface UserEngagement {
 const ENGAGEMENT_TYPE_FAVORITE = 'favorite';
 const ENGAGEMENT_TYPE_RECENT_VIEW = 'recent_view';
 const TARGET_TYPE_PAGE = 'page';
+const MAX_TARGET_ID_LENGTH = 64;
+
+function hashString(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function recentVisitTargetId(path: string): string {
+  if (path.length <= MAX_TARGET_ID_LENGTH) {
+    return path;
+  }
+  return `page:${hashString(path)}`;
+}
 
 // ---------------------------------------------------------------------------
 // Promise dedup — concurrent identical requests share one in-flight promise
@@ -125,9 +142,9 @@ export async function recordRecentVisit(visit: {
   modelCode?: string;
   icon?: string;
 }): Promise<void> {
-  await post<UserEngagement>('/api/user-engagement', {
+  const payload = {
     targetType: TARGET_TYPE_PAGE,
-    targetId: visit.path,
+    targetId: recentVisitTargetId(visit.path),
     targetLabel: visit.title,
     targetContext: {
       path: visit.path,
@@ -135,5 +152,25 @@ export async function recordRecentVisit(visit: {
       icon: visit.icon,
     },
     engagementType: ENGAGEMENT_TYPE_RECENT_VIEW,
-  });
+  };
+
+  if (typeof window !== 'undefined' && typeof fetch === 'function') {
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+      if (navigator.sendBeacon('/api/user-engagement', blob)) {
+        return;
+      }
+    }
+
+    await fetch('/api/user-engagement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      credentials: 'same-origin',
+      keepalive: true,
+    });
+    return;
+  }
+
+  await post<UserEngagement>('/api/user-engagement', payload);
 }

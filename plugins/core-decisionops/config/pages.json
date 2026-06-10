@@ -645,7 +645,7 @@
     ]
   },
   {
-    "pageKey": "decisionops_event_policy_designer",
+    "pageKey": "decisionops_event_policy_designer_list",
     "name:zh-CN": "策略设计器",
     "name:en": "Event Policy Designer",
     "modelCode": "event_policy_definition",

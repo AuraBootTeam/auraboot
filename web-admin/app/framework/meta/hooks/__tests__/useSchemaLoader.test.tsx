@@ -58,10 +58,14 @@ describe('useSchemaLoader', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(mockFetchResult).toHaveBeenCalledWith('/api/pages/key/loader_contract_list', {
-      method: 'get',
-      token: undefined,
-    });
+    expect(mockFetchResult).toHaveBeenCalledWith(
+      '/api/pages/key/loader_contract_list',
+      expect.objectContaining({
+        method: 'get',
+        token: undefined,
+        signal: expect.any(AbortSignal),
+      }),
+    );
     expect(result.current.error).toBeNull();
     expect(result.current.schema).toMatchObject({
       id: 'loader_contract_list',
@@ -122,5 +126,39 @@ describe('useSchemaLoader', () => {
 
     expect(mockFetchResult).toHaveBeenCalledTimes(2);
     expect(second.result.current.schema?.title).toBe('Fresh schema');
+  });
+
+  it('aborts in-flight schema requests when the hook unmounts', async () => {
+    let capturedSignal: AbortSignal | undefined;
+    mockFetchResult.mockImplementation((_, options: any) => {
+      capturedSignal = options.signal;
+      return new Promise(() => {
+        // Keep the request pending so unmount cleanup owns the cancellation.
+      });
+    });
+
+    const hook = renderHook(() => useSchemaLoader({ pageKey: 'abort_contract_list' }));
+    await waitFor(() => expect(capturedSignal).toBeDefined());
+
+    expect(capturedSignal?.aborted).toBe(false);
+    hook.unmount();
+    expect(capturedSignal?.aborted).toBe(true);
+  });
+
+  it('keeps transient navigation fetch failures out of console errors', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockFetchResult.mockResolvedValue({
+      code: 'network_error',
+      desc: 'Network error: Failed to fetch',
+      message: 'Network error: Failed to fetch',
+      data: null,
+    } as any);
+
+    const { result } = renderHook(() => useSchemaLoader({ pageKey: 'transient_contract_list' }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.error?.message).toBe('Network error: Failed to fetch');
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 });
