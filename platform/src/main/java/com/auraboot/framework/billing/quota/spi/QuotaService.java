@@ -3,6 +3,7 @@ package com.auraboot.framework.billing.quota.spi;
 import com.auraboot.framework.billing.quota.model.QuotaBucket;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * SPI for the Quota subsystem — reserve, commit, and release quota from buckets.
@@ -98,4 +99,56 @@ public interface QuotaService {
      * @return ordered list of active buckets; empty if no quota configured
      */
     List<QuotaBucket> listActiveBuckets(Long accountId, String resourceCode);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Provision (GRANT)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Provision (grant) a new quota bucket for an account/subscription.
+     *
+     * <p>This is the subscription→quota-bucket seam: when a subscription is activated
+     * the billing layer calls {@code provision} for each resource entitlement, and the
+     * resulting bucket becomes the target for future {@link #authorize} calls.
+     *
+     * <h3>What this does</h3>
+     * <ol>
+     *   <li>Validates {@code resourceCode} via {@code ResourceCatalogService.isRegistered}.
+     *   <li>Idempotency check: if a bucket was already provisioned with the same
+     *       {@code idempotencyKey} for this account, returns the original bucket
+     *       without creating duplicates.
+     *   <li>Finds or creates a {@code quota_pool} for
+     *       {@code (accountId, resourceCode, scopeType=ACCOUNT, poolType=DEDICATED)}.
+     *   <li>Creates a new {@code quota_bucket} with
+     *       {@code total=amount, used=0, reserved=0, status=ACTIVE, version=0}.
+     *   <li>Writes a single {@code GRANT} ledger entry with
+     *       {@code amount=req.amount, balance_after=req.amount}.
+     * </ol>
+     *
+     * <p>All steps execute in a single transaction.
+     *
+     * @param req grant parameters (see {@link QuotaGrantRequest})
+     * @return the newly created bucket, or the existing one on idempotent replay
+     * @throws IllegalArgumentException if {@code resourceCode} is not registered,
+     *                                  or {@code amount} is not positive
+     */
+    QuotaBucket provision(QuotaGrantRequest req);
+
+    /**
+     * Batch-provision multiple quota buckets in a single transaction.
+     *
+     * <p>Useful when activating a subscription that covers several resource types
+     * (e.g. AI_TOKEN + API_CALL + STORAGE_GB in one go).  Each request is processed
+     * independently — one failure rolls back the entire batch.
+     *
+     * <p>Each element uses its own {@link QuotaGrantRequest#getIdempotencyKey()} for
+     * deduplication; already-provisioned buckets are returned as-is.
+     *
+     * @param reqs list of grant requests (must not be null; may be empty)
+     * @return list of buckets in the same order as the input requests
+     * @throws IllegalArgumentException if any request fails validation
+     */
+    default List<QuotaBucket> provisionAll(List<QuotaGrantRequest> reqs) {
+        return reqs.stream().map(this::provision).collect(Collectors.toList());
+    }
 }

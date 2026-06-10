@@ -64,6 +64,131 @@ public class QuotaServiceImpl implements QuotaService {
     private final BillingQuotaProperties  billingQuotaProperties;
 
     // ─────────────────────────────────────────────────────────────────────────
+    // provision (GRANT)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public QuotaBucket provision(QuotaGrantRequest req) {
+
+        // ── input validation ──────────────────────────────────────────────────
+        if (req.getAmount() == null || req.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException(
+                    "[quota-provision] amount must be positive, got: " + req.getAmount());
+        }
+        if (!resourceCatalogService.isRegistered(req.getResourceCode())) {
+            throw new IllegalArgumentException(
+                    "[quota-provision] resource not registered: " + req.getResourceCode());
+        }
+
+        // ── idempotency: query GRANT ledger by (accountId, idempotencyKey) ────
+        // Using ledger as the idempotency store avoids an extra unique index on
+        // quota_bucket (bucket rows are recycled across periods; the ledger is
+        // append-only and never recycled).
+        QuotaLedger existingLedger = ledgerMapper.selectOne(
+                new LambdaQueryWrapper<QuotaLedger>()
+                        .eq(QuotaLedger::getAccountId, req.getAccountId())
+                        .eq(QuotaLedger::getIdempotencyKey, req.getIdempotencyKey())
+                        .eq(QuotaLedger::getOperationType, OperationType.GRANT.name())
+                        .last("LIMIT 1")
+        );
+        if (existingLedger != null) {
+            log.debug("[quota-provision] idempotent hit — returning existing bucket id={}",
+                    existingLedger.getBucketId());
+            return requireBucket(existingLedger.getBucketId());
+        }
+
+        // ── find or create quota_pool ─────────────────────────────────────────
+        // Pool key: (accountId, resourceCode, scopeType=ACCOUNT, poolType=DEDICATED).
+        // Workspace/user-scoped pools are out of scope for OSS (TODO gap G5).
+        QuotaPool pool = quotaPoolMapper.selectOne(
+                new LambdaQueryWrapper<QuotaPool>()
+                        .eq(QuotaPool::getAccountId, req.getAccountId())
+                        .eq(QuotaPool::getResourceCode, req.getResourceCode())
+                        .eq(QuotaPool::getScopeType, ScopeType.ACCOUNT.name())
+                        .eq(QuotaPool::getPoolType, PoolType.DEDICATED.name())
+                        .last("LIMIT 1")
+        );
+        if (pool == null) {
+            pool = QuotaPool.builder()
+                    .poolCode("pool-" + UUID.randomUUID().toString().replace("-", ""))
+                    .accountId(req.getAccountId())
+                    .workspaceId(req.getWorkspaceId())
+                    .subscriptionId(req.getSubscriptionId() != null ? req.getSubscriptionId() : 0L)
+                    .resourceCode(req.getResourceCode())
+                    .scopeType(ScopeType.ACCOUNT.name())
+                    .poolType(PoolType.DEDICATED.name())
+                    .status(BucketStatus.ACTIVE.name())
+                    .build();
+            quotaPoolMapper.insert(pool);
+            log.debug("[quota-provision] created pool id={} for account={} resource={}",
+                    pool.getId(), req.getAccountId(), req.getResourceCode());
+        }
+
+        // ── create quota_bucket ───────────────────────────────────────────────
+        int priority      = req.getPriority()      != null ? req.getPriority()      : 100;
+        OveragePolicy ovp = req.getOveragePolicy()  != null ? req.getOveragePolicy() : OveragePolicy.HARD_LIMIT;
+
+        QuotaBucket bucket = QuotaBucket.builder()
+                .bucketCode("bucket-" + UUID.randomUUID().toString().replace("-", ""))
+                .poolId(pool.getId())
+                .accountId(req.getAccountId())
+                .userId(req.getUserId())
+                .subscriptionId(req.getSubscriptionId() != null ? req.getSubscriptionId() : 0L)
+                .resourceCode(req.getResourceCode())
+                .totalAmount(req.getAmount())
+                .usedAmount(BigDecimal.ZERO)
+                .reservedAmount(BigDecimal.ZERO)
+                .unit(req.getUnit())
+                .periodStart(req.getPeriodStart())
+                .periodEnd(req.getPeriodEnd())
+                .sourceType(req.getSourceType().name())
+                .priority(priority)
+                .overagePolicy(ovp.name())
+                .status(BucketStatus.ACTIVE.name())
+                .version(0L)
+                .build();
+        quotaBucketMapper.insert(bucket);
+        log.info("[quota-provision] created bucket id={} account={} resource={} amount={} unit={}",
+                bucket.getId(), req.getAccountId(), req.getResourceCode(),
+                req.getAmount(), req.getUnit());
+
+        // ── write GRANT ledger entry ──────────────────────────────────────────
+        // balance_after = amount (bucket is brand new: total - used - reserved = amount)
+        QuotaLedger grantEntry = QuotaLedger.builder()
+                .ledgerCode("LED-" + java.util.UUID.randomUUID().toString().replace("-", "").toUpperCase())
+                .bucketId(bucket.getId())
+                .reservationId(null)        // GRANT is not associated with a reservation
+                .accountId(req.getAccountId())
+                .subscriptionId(req.getSubscriptionId() != null ? req.getSubscriptionId() : 0L)
+                .operationType(OperationType.GRANT.name())
+                .amount(req.getAmount())
+                .balanceAfter(req.getAmount())
+                .idempotencyKey(req.getIdempotencyKey())
+                .occurredAt(Instant.now())
+                .build();
+        ledgerMapper.insert(grantEntry);
+        log.info("[quota-provision] wrote GRANT ledger id={} bucket={} amount={}",
+                grantEntry.getId(), bucket.getId(), req.getAmount());
+
+        return bucket;
+    }
+
+    /**
+     * Override the SPI default to wrap the entire batch in a single transaction,
+     * so that a failure on any element rolls back all previously provisioned buckets.
+     */
+    @Override
+    @Transactional
+    public List<QuotaBucket> provisionAll(List<QuotaGrantRequest> reqs) {
+        List<QuotaBucket> results = new ArrayList<>(reqs.size());
+        for (QuotaGrantRequest req : reqs) {
+            results.add(provision(req));
+        }
+        return results;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // authorize
     // ─────────────────────────────────────────────────────────────────────────
 
