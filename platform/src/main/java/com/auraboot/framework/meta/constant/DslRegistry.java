@@ -292,6 +292,7 @@ public final class DslRegistry {
         ARTIFACT_TIMELINE("artifact-timeline", "Artifact timeline block", "1.4"),
         REVIEW_DRAWER("review-drawer", "Review drawer block", "1.4"),
         STATUS_BANNER("status-banner", "Status banner block", "1.4"),
+        TRACE_GRAPH("trace-graph", "Trace graph block (digital-thread lineage visualization)", "1.4"),
         CUSTOM("custom", "Custom block", "1.0");
 
         private final String code, label, since;
