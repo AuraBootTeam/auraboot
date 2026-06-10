@@ -724,6 +724,26 @@ public final class MetaPermission {
      */
     public static final String POLICY_RUNTIME_RUN = "decision.policy.run";
 
+    // ==================== BILLING permissions ====================
+
+    /**
+     * Billing resource catalog read permission (list all active catalog entries).
+     * Used by {@code ResourceCatalogController} GET /api/billing/resource-catalog.
+     */
+    public static final String BILLING_CATALOG_READ = "billing.catalog.read";
+
+    /**
+     * Quota bucket balance read permission.
+     * Used by {@code QuotaBucketController} GET /api/billing/quota/buckets.
+     */
+    public static final String BILLING_QUOTA_READ = "billing.quota.read";
+
+    /**
+     * Usage event read permission.
+     * Used by {@code UsageEventController} GET /api/billing/usage/events.
+     */
+    public static final String BILLING_USAGE_READ = "billing.usage.read";
+
     // ==================== Private Constructor ====================
 
     /**
