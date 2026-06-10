@@ -1,6 +1,7 @@
 package com.auraboot.framework.billing.quota.service;
 
 import com.auraboot.framework.billing.catalog.spi.ResourceCatalogService;
+import com.auraboot.framework.billing.quota.config.BillingQuotaProperties;
 import com.auraboot.framework.billing.quota.mapper.*;
 import com.auraboot.framework.billing.quota.model.*;
 import com.auraboot.framework.billing.quota.spi.*;
@@ -23,18 +24,24 @@ import java.util.UUID;
  *
  * <h3>Supported features (OSS)</h3>
  * <ul>
- *   <li>FIFO single/multi-bucket RESERVE by priority ascending (simple).
- *   <li>Hard-limit enforcement only — DENY when available {@literal <} estimated.
+ *   <li>Multi-bucket RESERVE with true consumption priority (P0-10 rules):
+ *       expiry-preemption → explicit bucket.priority → source-type business order
+ *       → period_end → id.
+ *   <li>Hard-limit enforcement only — DENY when total available {@literal <} estimated.
+ *   <li>Greedy multi-bucket allocation: each bucket gets a
+ *       {@link QuotaReservationLine}; commit/release processed line-by-line.
  *   <li>Commit with actual {@literal ≤} estimated; proportional rollback of difference.
  *   <li>Idempotent authorize via DB UNIQUE(account_id, idempotency_key).
- *   <li>Optimistic locking with retry (up to {@value #MAX_RETRY} attempts).
+ *   <li>Optimistic locking with retry (up to {@value #MAX_RETRY} attempts per bucket).
+ *   <li>Expiry-preempt threshold configurable via
+ *       {@code auraboot.billing.quota.expiry-preempt-days} (default 7).
  * </ul>
  *
  * <h3>TODO / Enterprise gaps</h3>
  * <ul>
  *   <li><b>G2-01</b>: OveragePolicy != HARD_LIMIT enforcement (SOFT_LIMIT / OVERAGE_CHARGE).
  *   <li><b>G2-02</b>: Commit with actual {@literal >} estimated (top-up deduction).
- *   <li><b>G5</b>: Shared-pool routing, consumption priority strategies (THROTTLE / DOWNGRADE).
+ *   <li><b>G5</b>: Shared-pool routing (THROTTLE / DOWNGRADE strategies).
  * </ul>
  */
 @Slf4j
@@ -48,12 +55,13 @@ public class QuotaServiceImpl implements QuotaService {
     private static final Duration DEFAULT_RESERVATION_TTL = Duration.ofMinutes(30);
     private static final String STATUS_ACTIVE = BucketStatus.ACTIVE.name();
 
-    private final ResourceCatalogService resourceCatalogService;
-    private final QuotaPoolMapper        quotaPoolMapper;
-    private final QuotaBucketMapper      quotaBucketMapper;
+    private final ResourceCatalogService  resourceCatalogService;
+    private final QuotaPoolMapper         quotaPoolMapper;
+    private final QuotaBucketMapper       quotaBucketMapper;
     private final QuotaReservationMapper     reservationMapper;
     private final QuotaReservationLineMapper reservationLineMapper;
-    private final QuotaLedgerMapper      ledgerMapper;
+    private final QuotaLedgerMapper       ledgerMapper;
+    private final BillingQuotaProperties  billingQuotaProperties;
 
     // ─────────────────────────────────────────────────────────────────────────
     // authorize
@@ -84,7 +92,7 @@ public class QuotaServiceImpl implements QuotaService {
             // Fall through to create a new reservation
         }
 
-        // 3. Load ACTIVE buckets ordered by priority asc (FIFO)
+        // 3. Load ACTIVE buckets ordered by consumption priority (P0-10 rules)
         List<QuotaBucket> buckets = listActiveBucketsForReserve(
                 request.getAccountId(), request.getResourceCode());
 
@@ -102,8 +110,8 @@ public class QuotaServiceImpl implements QuotaService {
             return QuotaDecision.deny("INSUFFICIENT_QUOTA");
         }
 
-        // 5. Distribute reservation across buckets (FIFO, priority asc)
-        List<BucketTake> takes = allocateFifo(buckets, request.getEstimatedQuantity());
+        // 5. Distribute reservation across buckets (greedy, consumption priority order)
+        List<BucketTake> takes = allocateGreedy(buckets, request.getEstimatedQuantity());
 
         // 6. Apply optimistic-lock updates to each bucket + write lines
         Duration ttl = request.getReservationTtl() != null
@@ -273,25 +281,40 @@ public class QuotaServiceImpl implements QuotaService {
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Load ACTIVE buckets within the valid period, ordered by priority ascending.
+     * Load ACTIVE buckets whose valid period covers {@code now}, then sort them
+     * by the multi-key consumption priority defined in {@link BucketConsumptionComparator}:
+     * <ol>
+     *   <li>Expiry-soon buckets first (threshold from
+     *       {@code auraboot.billing.quota.expiry-preempt-days}, default 7).
+     *   <li>Within expiring group: period_end ascending (soonest expiry first).
+     *   <li>Explicit bucket.priority ascending.
+     *   <li>Source-type business order ({@link BucketSourceType#consumptionOrder()}).
+     *   <li>Period-end ascending.
+     *   <li>Bucket id ascending (stable tie-breaker).
+     * </ol>
      */
     private List<QuotaBucket> listActiveBucketsForReserve(Long accountId, String resourceCode) {
         Instant now = Instant.now();
-        return quotaBucketMapper.selectList(
+        List<QuotaBucket> buckets = quotaBucketMapper.selectList(
                 new LambdaQueryWrapper<QuotaBucket>()
                         .eq(QuotaBucket::getAccountId, accountId)
                         .eq(QuotaBucket::getResourceCode, resourceCode)
                         .eq(QuotaBucket::getStatus, STATUS_ACTIVE)
                         .le(QuotaBucket::getPeriodStart, now)
                         .ge(QuotaBucket::getPeriodEnd, now)
-                        .orderByAsc(QuotaBucket::getPriority)
         );
+        buckets.sort(new BucketConsumptionComparator(now, billingQuotaProperties.getExpiryPreemptDays()));
+        return buckets;
     }
 
     /**
-     * FIFO allocation: fill each bucket in priority order until the request is satisfied.
+     * Greedy multi-bucket allocation: consume from buckets in consumption-priority order
+     * until the full {@code needed} amount is satisfied.
+     *
+     * <p>Each participating bucket produces exactly one {@link BucketTake}.
+     * Callers write a {@link QuotaReservationLine} for each take.
      */
-    private List<BucketTake> allocateFifo(List<QuotaBucket> buckets, BigDecimal needed) {
+    private List<BucketTake> allocateGreedy(List<QuotaBucket> buckets, BigDecimal needed) {
         List<BucketTake> takes = new ArrayList<>();
         BigDecimal remaining = needed;
         for (QuotaBucket bucket : buckets) {
