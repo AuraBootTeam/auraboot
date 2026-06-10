@@ -103,4 +103,38 @@ class RetrievalMetricsTest {
         assertFalse(RetrievalMetrics.falsePositive(List.of()));
         assertTrue(RetrievalMetrics.falsePositive(List.of("anything")));
     }
+
+    @Test
+    @DisplayName("reciprocalRank throws when expected is empty")
+    void reciprocalRankThrowsOnEmptyExpected() {
+        assertThrows(IllegalArgumentException.class,
+                () -> RetrievalMetrics.reciprocalRank(List.of("a"), Set.of()));
+    }
+
+    @Test
+    @DisplayName("reciprocalRank = 1.0 when first item is relevant")
+    void reciprocalRankFirst() {
+        assertEquals(1.0,
+                RetrievalMetrics.reciprocalRank(List.of("a", "x"), Set.of("a")),
+                1e-9);
+    }
+
+    @Test
+    @DisplayName("reciprocalRank = 1/3 when first relevant item is at rank 3")
+    void reciprocalRankThird() {
+        assertEquals(1.0 / 3,
+                RetrievalMetrics.reciprocalRank(List.of("x", "y", "b"), Set.of("a", "b")),
+                1e-9);
+    }
+
+    @Test
+    @DisplayName("reciprocalRank = 0.0 when no relevant item retrieved (or retrieved null)")
+    void reciprocalRankMiss() {
+        assertEquals(0.0,
+                RetrievalMetrics.reciprocalRank(List.of("x", "y"), Set.of("a")),
+                1e-9);
+        assertEquals(0.0,
+                RetrievalMetrics.reciprocalRank(null, Set.of("a")),
+                1e-9);
+    }
 }

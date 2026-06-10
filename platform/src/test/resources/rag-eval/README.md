@@ -26,16 +26,25 @@ cd platform
 ./gradlew test --tests '*RagEvaluationHarness*'  # goldenQueriesParse passes
 ```
 
-**Phase 2** (follow-up — full eval):
+**Phase 2** (`RagEvaluationPhase2IT` — full live eval, env-gated):
 
 ```bash
 cd platform
-./gradlew test --tests '*RagEvaluationHarness*' -PragEval=true
-# Emits results-<ts>-*.json + report-<ts>.md to
-# ../../auraboot-enterprise/docs/system-reference/runtime-traces/rag-evaluation/
+RAG_EVAL_DOCS_PATH=/abs/path/auraboot-enterprise/docs/system-reference \
+RAG_EVAL_D7_PAGES_PATH=/abs/path/auraboot-enterprise/docs/system-reference/compiled-knowledge/pages \
+./gradlew :test --tests '*RagEvaluationPhase2IT*'
+# Emits results-<ts>-path-a.json + results-<ts>-path-b.json + report-<ts>.md
+# to build/rag-eval-output/ (override with RAG_EVAL_OUTPUT_DIR)
 ```
 
-Phase 2 requires:
-- Postgres with `pgvector` + populated `ab_kb_*` fixtures
-- D7 compiled-knowledge pages already present in `auraboot-enterprise/docs/system-reference/compiled-knowledge/pages/`
-- `RagRetrievalService` + `D7CompiledKnowledgeService` reachable via `@SpringBootTest`
+Phase 2 notes:
+- Skips (does not fail) when `RAG_EVAL_DOCS_PATH` / `RAG_EVAL_D7_PAGES_PATH` are unset
+- Imports the docs dir into a KB via `InternalDocImportService` inside the test
+  transaction (rolled back); points `D7KnowledgeProperties.pageDirectory` at the
+  pages dir for Path B (restored after the run)
+- EmbeddingService is NOT mocked — without a configured embedding key the stack
+  degrades to its BM25/keyword leg; the actual mode is recorded in the report
+  as `embeddingMode: live|keyword-fallback`
+- Measurement, not a gate: no recall/MRR threshold assertions; only harness
+  integrity (all queries executed, artifacts written and parseable)
+- First-run report: `docs/backlog/2026-06-11-rag-eval-phase2-first-run.md`
