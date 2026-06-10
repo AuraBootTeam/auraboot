@@ -570,6 +570,43 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void httpDefinitionLifecyclePublishActionsRequirePublishPermission() throws Exception {
+        revoke("decision.definition.publish");
+
+        mockMvc.perform(post("/api/decision/versions/no_publish_permission/publish"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.context").value(org.hamcrest.Matchers.containsString(
+                        "decision.definition.publish")));
+
+        mockMvc.perform(post("/api/decision/versions/no_publish_permission/submit-for-approval"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.context").value(org.hamcrest.Matchers.containsString(
+                        "decision.definition.publish")));
+
+        mockMvc.perform(post("/api/decision/versions/no_publish_permission/deprecate"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.context").value(org.hamcrest.Matchers.containsString(
+                        "decision.definition.publish")));
+    }
+
+    @Test
+    void httpDefinitionLifecycleApprovalActionsRequireApprovePermission() throws Exception {
+        revoke("decision.definition.approve");
+
+        mockMvc.perform(post("/api/decision/versions/no_approve_permission/approve")
+                        .param("note", "approve attempt"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.context").value(org.hamcrest.Matchers.containsString(
+                        "decision.definition.approve")));
+
+        mockMvc.perform(post("/api/decision/versions/no_approve_permission/reject")
+                        .param("note", "reject attempt"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.context").value(org.hamcrest.Matchers.containsString(
+                        "decision.definition.approve")));
+    }
+
+    @Test
     void httpRolloutListAndDetailExposeDslApiDatasourceShape() throws Exception {
         grant("decision.rollout.manage", "decision", "rollout", "manage", "Decision Rollout Manage");
         userPermissionService.evictUserPermissions(getTestUser().getId());
@@ -1171,5 +1208,16 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         rp.setCreatedAt(Instant.now());
         rp.setUpdatedAt(Instant.now());
         rolePermissionMapper.insert(rp);
+    }
+
+    private void revoke(String code) {
+        Permission permission = permissionMapper.findByCode(code);
+        if (permission == null) {
+            return;
+        }
+        rolePermissionMapper.delete(new LambdaQueryWrapper<RolePermission>()
+                .eq(RolePermission::getRoleId, getTestRole().getId())
+                .eq(RolePermission::getPermissionId, permission.getId()));
+        userPermissionService.evictUserPermissions(getTestUser().getId());
     }
 }

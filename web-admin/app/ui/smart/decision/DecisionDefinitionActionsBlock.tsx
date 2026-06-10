@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
+import { useAuth } from '~/contexts/AuthContext';
 import { getApiService } from '~/shared/services/ApiService';
 import {
   createDecisionApi,
@@ -29,17 +30,21 @@ interface DecisionDefinitionActionsProps {
   mode?: 'detail';
   rolloutUrl?: string;
   initialDecisionCode?: string;
+  permissionCodes?: string[];
 }
 
 type VersionAction = {
   code: string;
   label: string;
   testId: string;
+  permissionCode?: string;
   requiresImpactAck?: boolean;
   run: () => Promise<unknown>;
 };
 
 const ROLLOUT_BINDABLE_STATUSES = new Set(['PUBLISHED', 'DEPRECATED']);
+const PUBLISH_PERMISSION = 'decision.definition.publish';
+const APPROVE_PERMISSION = 'decision.definition.approve';
 const DEFAULT_ROLLOUT_URL =
   '/p/decisionops_rollouts?decisionCode={decisionCode}&baselineVersion={baselineVersion}&candidateVersion={candidateVersion}';
 
@@ -114,6 +119,18 @@ function errorMessage(error: unknown): string {
   return '操作失败';
 }
 
+function emitErrorToast(message: string) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(
+    new CustomEvent('aura:toast', {
+      detail: {
+        message,
+        variant: 'error',
+      },
+    }),
+  );
+}
+
 function versionLabel(version: DecisionVersionSummary): string {
   return typeof version.version === 'number' ? `v${version.version}` : version.versionTag || version.pid;
 }
@@ -125,6 +142,7 @@ export function DecisionDefinitionActionsBlock({
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
+  const auth = useAuth();
   const api = useMemo(() => createApi(), []);
   const props = block?.props ?? {};
   const record = recordFromRuntime(runtime);
@@ -142,6 +160,20 @@ export function DecisionDefinitionActionsBlock({
   const [impactAcknowledged, setImpactAcknowledged] = useState(false);
   const [transitioningPid, setTransitioningPid] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+
+  const hasActionPermission = useCallback(
+    (permissionCode?: string) => {
+      if (!permissionCode) return true;
+      if (Array.isArray(props.permissionCodes)) {
+        return props.permissionCodes.includes(permissionCode);
+      }
+      if (!auth.isAuthenticated && auth.permissions == null) {
+        return true;
+      }
+      return auth.hasPermission(permissionCode);
+    },
+    [auth, props.permissionCodes],
+  );
 
   const refresh = useCallback(async () => {
     if (!decisionCode) return;
@@ -170,8 +202,20 @@ export function DecisionDefinitionActionsBlock({
   }, [refresh]);
 
   const impactBlocking = Boolean(impact?.risk?.blocking);
+  const disabledReason = (action: VersionAction, pid: string) => {
+    if (transitioningPid === pid) {
+      return '操作执行中';
+    }
+    if (!hasActionPermission(action.permissionCode)) {
+      return `缺少权限 ${action.permissionCode}`;
+    }
+    if (action.requiresImpactAck && impactBlocking && !impactAcknowledged) {
+      return '请先确认影响面';
+    }
+    return '';
+  };
   const transitionDisabled = (action: VersionAction, pid: string) =>
-    transitioningPid === pid || Boolean(action.requiresImpactAck && impactBlocking && !impactAcknowledged);
+    Boolean(disabledReason(action, pid));
 
   const runAction = async (version: DecisionVersionSummary, action: VersionAction) => {
     if (transitionDisabled(action, version.pid)) return;
@@ -182,7 +226,9 @@ export function DecisionDefinitionActionsBlock({
       setMessage(`${action.label}成功`);
       await refresh();
     } catch (error) {
-      setMessage(errorMessage(error));
+      const msg = errorMessage(error);
+      setMessage(msg);
+      emitErrorToast(msg);
     } finally {
       setTransitioningPid(null);
     }
@@ -217,12 +263,14 @@ export function DecisionDefinitionActionsBlock({
             code: 'submit',
             label: '提交审批',
             testId: `dda-submit-${version.pid}`,
+            permissionCode: PUBLISH_PERMISSION,
             run: () => api.submitVersionForApproval(version.pid),
           },
           {
             code: 'publish',
             label: '发布',
             testId: `dda-publish-${version.pid}`,
+            permissionCode: PUBLISH_PERMISSION,
             requiresImpactAck: true,
             run: () => api.publishVersion(version.pid, impactReq),
           },
@@ -239,6 +287,7 @@ export function DecisionDefinitionActionsBlock({
             code: 'approve',
             label: '审批通过',
             testId: `dda-approve-${version.pid}`,
+            permissionCode: APPROVE_PERMISSION,
             requiresImpactAck: true,
             run: () => api.approveVersion(version.pid, impactReq),
           },
@@ -246,6 +295,7 @@ export function DecisionDefinitionActionsBlock({
             code: 'reject',
             label: '驳回',
             testId: `dda-reject-${version.pid}`,
+            permissionCode: APPROVE_PERMISSION,
             run: () => api.rejectVersion(version.pid, { note: 'Rejected from DecisionOps DSL action' }),
           },
           {
@@ -261,6 +311,7 @@ export function DecisionDefinitionActionsBlock({
             code: 'deprecate',
             label: '废弃',
             testId: `dda-deprecate-${version.pid}`,
+            permissionCode: PUBLISH_PERMISSION,
             requiresImpactAck: true,
             run: () => api.deprecateVersion(version.pid, impactReq),
           },
@@ -271,6 +322,7 @@ export function DecisionDefinitionActionsBlock({
             code: 'retire',
             label: '退役',
             testId: `dda-retire-${version.pid}`,
+            permissionCode: PUBLISH_PERMISSION,
             requiresImpactAck: true,
             run: () => api.retireVersion(version.pid, impactReq),
           },
@@ -370,17 +422,32 @@ export function DecisionDefinitionActionsBlock({
                       <span className="decisionops-badge is-neutral">{version.status ?? '-'}</span>
                     </div>
                     <div className="decisionops-row-actions">
-                      {actions.map((action) => (
-                        <button
-                          key={action.code}
-                          type="button"
-                          data-testid={action.testId}
-                          disabled={transitionDisabled(action, version.pid)}
-                          onClick={() => void runAction(version, action)}
-                        >
-                          {action.label}
-                        </button>
-                      ))}
+                      {actions.map((action) => {
+                        const reason = disabledReason(action, version.pid);
+                        return (
+                          <span key={action.code} className="dda-action">
+                            <button
+                              type="button"
+                              data-testid={action.testId}
+                              disabled={Boolean(reason)}
+                              title={reason || undefined}
+                              aria-describedby={reason ? `${action.testId}-disabled-reason` : undefined}
+                              onClick={() => void runAction(version, action)}
+                            >
+                              {action.label}
+                            </button>
+                            {reason && (
+                              <span
+                                id={`${action.testId}-disabled-reason`}
+                                data-testid={`${action.testId}-disabled-reason`}
+                                className="dda-disabled-reason"
+                              >
+                                {reason}
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })}
                       {rolloutHref && (
                         <button
                           type="button"

@@ -70,10 +70,10 @@ function mockDefinitionApi(options: {
   http.delete.mockResolvedValue({ data: {} });
 }
 
-function renderAtDetail() {
+function renderAtDetail(props?: { permissionCodes?: string[] }) {
   return render(
     <MemoryRouter initialEntries={['/p/decisionops_definitions/view/sla_deadline']}>
-      <DecisionDefinitionActionsBlock />
+      <DecisionDefinitionActionsBlock block={props ? { props } : undefined} />
     </MemoryRouter>,
   );
 }
@@ -128,6 +128,76 @@ describe('DecisionDefinitionActionsBlock', () => {
       }),
     );
     await waitFor(() => expect(screen.getByTestId('dda-message')).toHaveTextContent('发布成功'));
+  });
+
+  it('shows permission disabled reasons for publish and approval lifecycle actions', async () => {
+    mockDefinitionApi({
+      versions: [
+        { pid: 'version-pid-validated', decisionCode: 'sla_deadline', version: 2, status: 'VALIDATED' },
+        {
+          pid: 'version-pid-pending',
+          decisionCode: 'sla_deadline',
+          version: 3,
+          status: 'PENDING_APPROVAL',
+        },
+      ],
+    });
+
+    renderAtDetail({ permissionCodes: ['decision.definition.read'] });
+
+    const submit = await screen.findByTestId('dda-submit-version-pid-validated');
+    const publish = screen.getByTestId('dda-publish-version-pid-validated');
+    const approve = screen.getByTestId('dda-approve-version-pid-pending');
+    const reject = screen.getByTestId('dda-reject-version-pid-pending');
+
+    expect(submit).toBeDisabled();
+    expect(publish).toBeDisabled();
+    expect(approve).toBeDisabled();
+    expect(reject).toBeDisabled();
+    expect(screen.getByTestId('dda-submit-version-pid-validated-disabled-reason')).toHaveTextContent(
+      '缺少权限 decision.definition.publish',
+    );
+    expect(screen.getByTestId('dda-publish-version-pid-validated-disabled-reason')).toHaveTextContent(
+      '缺少权限 decision.definition.publish',
+    );
+    expect(screen.getByTestId('dda-approve-version-pid-pending-disabled-reason')).toHaveTextContent(
+      '缺少权限 decision.definition.approve',
+    );
+    expect(screen.getByTestId('dda-reject-version-pid-pending-disabled-reason')).toHaveTextContent(
+      '缺少权限 decision.definition.approve',
+    );
+
+    fireEvent.click(publish);
+    fireEvent.click(approve);
+
+    expect(http.post).not.toHaveBeenCalled();
+  });
+
+  it('emits a clear error toast when a lifecycle action is rejected by backend permission guard', async () => {
+    mockDefinitionApi({
+      versions: [
+        { pid: 'version-pid-validated', decisionCode: 'sla_deadline', version: 2, status: 'VALIDATED' },
+      ],
+    });
+    const toastEvents: string[] = [];
+    const handler = (event: Event) => {
+      toastEvents.push((event as CustomEvent<{ message: string }>).detail.message);
+    };
+    window.addEventListener('aura:toast', handler);
+    http.post.mockRejectedValueOnce(new Error('缺少权限 decision.definition.publish'));
+
+    try {
+      renderAtDetail({ permissionCodes: ['decision.definition.publish'] });
+
+      fireEvent.click(await screen.findByTestId('dda-publish-version-pid-validated'));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('dda-message')).toHaveTextContent('缺少权限 decision.definition.publish'),
+      );
+      expect(toastEvents).toContain('缺少权限 decision.definition.publish');
+    } finally {
+      window.removeEventListener('aura:toast', handler);
+    }
   });
 
   it('wires the version lifecycle endpoints without returning to the old console page', async () => {
