@@ -91,18 +91,15 @@ Real gaps cluster in three areas: **LLM-backed features stuck at keyword/TODO st
 
 ## 2. Verified structural debt
 
-### B1 — Capability sync inlined in `PluginImportServiceImpl` (3196 lines) 🟠 P1
+### B1 — ~~Capability sync inlined in `PluginImportServiceImpl`~~ WITHDRAWN: already extracted
 
-- Evidence: `plugin/service/impl/PluginImportServiceImpl.java` = 3196 lines; the components
-  the affordance docs name (`CapabilitySyncService`, `AgentToolAutoGenerator`) do not exist
-  as classes — derivation logic is inlined, untestable in isolation, and emits no
-  completion signal (`CapabilitySyncCompletedEvent` planned, absent).
-- Fix (this round, minimal-risk slice): extract the capability-sync block into a dedicated
-  `CapabilitySyncService` `@Service` with an explicit interface, delegation-preserving
-  (no behavior change), plus unit tests for the extracted hash/upsert/derivation logic.
-  Full `AgentToolAutoGenerator`/`Selector` extraction stays on the tracker.
-- Acceptance: existing plugin-import ITs green; new unit tests for sync paths; line count
-  of import impl drops accordingly.
+- Live verification (2026-06-11): `PluginImportServiceImpl` (3196 lines) contains **no**
+  capability-sync logic (single grep hit, a comment). Sync lives in
+  `CapabilityViewService.syncCapabilities()` (write-path materialization to
+  `ab_capability`) and is event-triggered via `CapabilitySyncListener` — the
+  affordance doc's "inlined in PluginImportServiceImpl / CapabilitySyncService
+  尚未独立抽取" claims are stale (→ C1). The remaining concern is only that
+  `CapabilityViewService` mixes write/read/graph paths — tracked under B2.
 
 ### B2 — Six god classes ≥1000 lines (7099 total) 🟡 P2 (tracked, not this round)
 
@@ -111,14 +108,18 @@ Real gaps cluster in three areas: **LLM-backed features stuck at keyword/TODO st
 - Splitting these wholesale in one PR is regression-prone; do it opportunistically when
   each area is next touched. B1 is the first slice.
 
-### B3 — `@RequirePermission` nearly absent in agent controllers 🟠 P1 (this round: audit + annotate)
+### B3 — `@RequirePermission` nearly absent in agent controllers 🟠 P1 (partial this round)
 
-- Evidence: 2 grep hits across the whole agent package; controllers rely on manual
-  `MetaContext.getCurrentTenantId()` (tenant scoping, not permission enforcement).
-- Fix: audit `AgentRunController` + agent-facing controllers; annotate mutating endpoints
-  with `@RequirePermission` using codes per `permission-code-naming.md`; verify codes pass
-  `validate-permission-codes.mjs`.
-- Acceptance: every mutating agent endpoint carries an explicit permission; gate script green.
+- Evidence: 2 grep hits across the whole agent package (`AgentRuntimeController`
+  approve/reject with `ACP_AGENT_APPROVAL`); 16 controllers in `agent/controller/`
+  rely on manual `MetaContext` tenant scoping only. `MetaPermission` has **no**
+  `acp.agent.run/manage`-style codes to annotate with.
+- This round (zero-new-codes slice): legacy ChatBI `/api/ai/chat-bi/query` now requires
+  `META_CHATBI_USE` (same code as ChatBI v2 — consistent, already seeded).
+- Remainder: agent-run/memory/profile admin endpoints need NEW `acp.agent.*` permission
+  codes + bootstrap seeds + role grants — this must ride the active permission-governance
+  (RBAC) project rather than be invented ad-hoc here, otherwise existing roles 403.
+  Owner: permission-governance tracker (`perm-gov-ent/docs/backlog/2026-06-10-permission-governance-gap.md`).
 
 ### B4 — `service ↔ runtime` package cycle smell 🟡 P2 (tracked)
 
@@ -151,12 +152,12 @@ Real gaps cluster in three areas: **LLM-backed features stuck at keyword/TODO st
 
 | Wave | Item | Status |
 |------|------|--------|
-| 1 | A1 ChatBI LLM path + fallback + tests | pending |
-| 1 | A2 Eval LLM mode + tests | pending |
-| 1 | A3 `AgentTaskCompletedEvent` + listener + IT | pending |
-| 2 | B1 extract `CapabilitySyncService` | pending |
-| 2 | B3 permission annotations + gate | pending |
-| 3 | C1 doc alignment (enterprise PR) | pending |
+| 1 | A1 ChatBI LLM path + fallback + tests | **done** — `ChatBiLlmParser` + parseMode + parameterized filters, 15 unit tests green |
+| 1 | A2 Eval LLM mode + tests | **done** — `LlmToolSelectionService`, truthful mode degradation, hallucination scoring, 10 unit tests green |
+| 1 | A3 task-completion events + event-driven waits | **done** — `AgentTaskCompletedEvent` at all 4 terminal transitions, `TaskJoinService` latch, both delegation wait loops upgraded, 8 tests green |
+| 2 | B1 extract `CapabilitySyncService` | **withdrawn** — already extracted (see B1); split of `CapabilityViewService` stays in B2 |
+| 2 | B3 permission annotations | **partial** — legacy ChatBI now `META_CHATBI_USE`; agent-run codes deferred to permission-governance project (see B3) |
+| 3 | C1 doc alignment (enterprise PR) | **done** — affordance/collaboration docs updated + `acp-implementation-map.md` added |
 | — | A4/A5/A6/B2/B4/C2 | deferred, tracked above with owners/preconditions |
 
 ## 5. Claims from earlier reviews verified as ALREADY FIXED (do not re-open)
