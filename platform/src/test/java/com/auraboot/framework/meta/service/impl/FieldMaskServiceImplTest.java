@@ -14,4 +14,15 @@ class FieldMaskServiceImplTest {
 
         assertThat(masked).isEqualTo("**b aab");
     }
+
+    @Test
+    void hashMaskProducesDeterministicHexDigest() {
+        String masked = service.maskValue("customer@example.com", "hash", null, "*");
+        String maskedAgain = service.maskValue("customer@example.com", "hash", null, "*");
+
+        assertThat(masked).hasSize(16);
+        assertThat(masked).matches("[0-9a-f]{16}");
+        assertThat(masked).isEqualTo(maskedAgain);
+        assertThat(masked).isNotEqualTo("customer@example.com");
+    }
 }

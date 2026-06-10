@@ -267,6 +267,8 @@ export interface ColumnConfig {
 export type ActionDef =
   | { type: 'command'; command: string }
   | { type: 'state_transition'; command: string }
+  | { type: 'bulk_command'; command: string }
+  | { type: 'bulk_state_transition'; command: string }
   | { type: 'navigate'; to: string; command?: string }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }
@@ -401,6 +403,11 @@ export interface SubTableConfig {
   actions?: ButtonConfig[];
   summary?: SummaryConfig;
   resolveVia?: ResolveViaConfig;
+  /**
+   * Values merged into create payloads before editable row input.
+   * String values support the same `${recordId}` / `${record.field}` templates as sub-table data sources.
+   */
+  defaultValues?: Record<string, unknown>;
   addCommandCode?: string;
   /** Custom add button configuration */
   addButton?: ButtonConfig | boolean;

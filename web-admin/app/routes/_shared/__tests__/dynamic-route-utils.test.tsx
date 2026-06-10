@@ -1,6 +1,58 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DynamicField } from '../dynamic-route-utils';
+import { DynamicField, resolveLocalMenuRedirect } from '../dynamic-route-utils';
+
+describe('resolveLocalMenuRedirect', () => {
+  it('resolves app-local menu redirects and preserves current query/hash when target omits them', () => {
+    expect(
+      resolveLocalMenuRedirect('/dashboards/view/crawler_overview', {
+        pathname: '/crawler',
+        search: '?tenant=demo',
+        hash: '#top',
+      }),
+    ).toEqual({
+      shouldRedirect: true,
+      target: '/dashboards/view/crawler_overview?tenant=demo#top',
+    });
+  });
+
+  it('keeps explicit query/hash from the target redirect', () => {
+    expect(
+      resolveLocalMenuRedirect('/reports/view/sales?tab=chart#summary', {
+        pathname: '/legacy-sales',
+        search: '?tenant=demo',
+        hash: '#old',
+      }),
+    ).toEqual({
+      shouldRedirect: true,
+      target: '/reports/view/sales?tab=chart#summary',
+    });
+  });
+
+  it('rejects external and protocol-relative redirects', () => {
+    expect(resolveLocalMenuRedirect('https://example.com', { pathname: '/crawler' })).toMatchObject({
+      shouldRedirect: false,
+      error: expect.stringContaining('app-local'),
+    });
+    expect(resolveLocalMenuRedirect('//example.com/app', { pathname: '/crawler' })).toMatchObject({
+      shouldRedirect: false,
+      error: expect.stringContaining('app-local'),
+    });
+  });
+
+  it('rejects redirects that point back to the current route', () => {
+    expect(
+      resolveLocalMenuRedirect('/crawler?tenant=demo#top', {
+        pathname: '/crawler',
+        search: '?tenant=demo',
+        hash: '#top',
+      }),
+    ).toMatchObject({
+      shouldRedirect: false,
+      error: expect.stringContaining('current route'),
+    });
+  });
+});
 
 describe('DynamicField', () => {
   const originalFetch = globalThis.fetch;
