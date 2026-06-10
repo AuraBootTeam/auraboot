@@ -18,7 +18,7 @@ export { AuraBotChat } from '../components-internal/AuraBotChat';
 
 // Services
 export { auraBotApi } from '../services/auraBotApi';
-export type { SSEEvent, SSEEventType, ChatStreamCallbacks } from '../services/auraBotApi';
+export type { AuraBotSseEventName } from '../services/auraBotApi';
 
 // Types
 export type {
