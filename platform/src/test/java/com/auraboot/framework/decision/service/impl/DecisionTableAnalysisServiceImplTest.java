@@ -10,10 +10,12 @@ import com.auraboot.framework.decision.table.HitPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeout;
 
 class DecisionTableAnalysisServiceImplTest {
 
@@ -105,6 +107,64 @@ class DecisionTableAnalysisServiceImplTest {
     }
 
     @Test
+    void analyzeExplainsContinuousDateCoverageGaps() {
+        DecisionTable table = new DecisionTable(HitPolicy.FIRST,
+                List.of(new DecisionTable.Input("submittedOn", "Submitted On",
+                        new Operand.PathOperand(Scope.RECORD, "data.submittedOn", DataType.DATE))),
+                List.of(new DecisionTable.Output("route", "Route", DataType.STRING)),
+                List.of(
+                        new DecisionTable.Rule("early", 10,
+                                Map.of("submittedOn", new DecisionTable.Cell(Operator.EQ, "", "< 2026-06-01")),
+                                Map.of("route", "early")),
+                        new DecisionTable.Rule("late", 20,
+                                Map.of("submittedOn", new DecisionTable.Cell(Operator.EQ, "", ">= 2026-06-10")),
+                                Map.of("route", "late"))),
+                Map.of());
+
+        DecisionTableAnalysisDTO result = service.analyze(mapper.valueToTree(table));
+
+        assertThat(result.getValid()).isTrue();
+        DecisionTableAnalysisDTO.Issue gap = result.getWarnings().stream()
+                .filter(issue -> "DMN_CONTINUOUS_GAP".equals(issue.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(gap.getMetadata()).containsEntry("dataType", "date");
+        assertThat(String.valueOf(gap.getMetadata().get("gapRanges")))
+                .contains("[2026-06-01..2026-06-10)");
+    }
+
+    @Test
+    void analyzeReportsComplexMultiInputProofModeForFiniteAndContinuousInputs() {
+        DecisionTable table = new DecisionTable(HitPolicy.FIRST,
+                List.of(
+                        new DecisionTable.Input("tier", "Tier",
+                                new Operand.PathOperand(Scope.RECORD, "data.tier", DataType.ENUM),
+                                List.of("GOLD", "SILVER")),
+                        new DecisionTable.Input("submittedAt", "Submitted At",
+                                new Operand.PathOperand(Scope.RECORD, "data.submittedAt", DataType.DATETIME))),
+                List.of(new DecisionTable.Output("route", "Route", DataType.STRING)),
+                List.of(
+                        new DecisionTable.Rule("gold-before-cutoff", 10,
+                                Map.of("tier", new DecisionTable.Cell(Operator.EQ, "GOLD"),
+                                        "submittedAt", new DecisionTable.Cell(Operator.EQ, "", "< 2026-06-10T00:00:00Z")),
+                                Map.of("route", "expedite")),
+                        new DecisionTable.Rule("silver-after-cutoff", 20,
+                                Map.of("tier", new DecisionTable.Cell(Operator.EQ, "SILVER"),
+                                        "submittedAt", new DecisionTable.Cell(Operator.EQ, "", ">= 2026-06-10T00:00:00Z")),
+                                Map.of("route", "standard"))),
+                Map.of());
+
+        DecisionTableAnalysisDTO result = service.analyze(mapper.valueToTree(table));
+
+        assertThat(result.getMetrics().getFiniteInputCount()).isEqualTo(1);
+        assertThat(result.getMetrics().getContinuousInputCount()).isEqualTo(1);
+        assertThat(result.getWarnings()).anyMatch(issue -> "DMN_COMPLEX_INPUT_PROOF".equals(issue.getCode())
+                && "FINITE_CARTESIAN_PLUS_PER_AXIS_INTERVALS".equals(issue.getMetadata().get("proofMode"))
+                && String.valueOf(issue.getMetadata().get("finiteInputs")).contains("tier")
+                && String.valueOf(issue.getMetadata().get("continuousInputs")).contains("submittedAt"));
+    }
+
+    @Test
     void analyzeValidatesPriorityOutputValuesAgainstDeclaredOrder() {
         DecisionTable table = new DecisionTable(HitPolicy.PRIORITY,
                 List.of(new DecisionTable.Input("flag", "Flag",
@@ -152,5 +212,28 @@ class DecisionTableAnalysisServiceImplTest {
                 && "SUM".equals(issue.getMetadata().get("aggregation")));
         assertThat(result.getErrors()).anyMatch(issue -> "DMN_COLLECT_AGGREGATION_VALUE".equals(issue.getCode())
                 && issue.getRuleIds().contains("not-numeric"));
+    }
+
+    @Test
+    void analyzeLargeContinuousTableStaysLinearAndReportsPerformanceMetrics() {
+        List<DecisionTable.Rule> rules = java.util.stream.IntStream.range(0, 1200)
+                .mapToObj(i -> new DecisionTable.Rule("bucket-" + i, i,
+                        Map.of("amount", new DecisionTable.Cell(Operator.BETWEEN, List.of(i, i + 1))),
+                        Map.of("route", "bucket-" + i)))
+                .toList();
+        DecisionTable table = new DecisionTable(HitPolicy.FIRST,
+                List.of(new DecisionTable.Input("amount", "Amount",
+                        new Operand.PathOperand(Scope.RECORD, "data.amount", DataType.DECIMAL))),
+                List.of(new DecisionTable.Output("route", "Route", DataType.STRING)),
+                rules,
+                Map.of());
+
+        DecisionTableAnalysisDTO result = assertTimeout(Duration.ofSeconds(2),
+                () -> service.analyze(mapper.valueToTree(table)));
+
+        assertThat(result.getMetrics().getRuleCount()).isEqualTo(1200);
+        assertThat(result.getMetrics().getContinuousInputCount()).isEqualTo(1);
+        assertThat(result.getMetrics().getAnalysisDurationMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.getWarnings()).noneMatch(issue -> "DMN_ANALYSIS_LIMIT".equals(issue.getCode()));
     }
 }

@@ -360,6 +360,24 @@ test.describe.serial('DecisionOps full-app golden', () => {
     });
     await expect(page.getByTestId('dt-analysis-panel')).toContainText('[5000..10000]');
     await capture(page, testInfo, 'decisionops-dmn-gap');
+
+    await page.getByTestId('dt-add-input').click();
+    await page.getByLabel('input-label-1').fill('Submitted On');
+    await page.getByLabel('input-path-1').fill('data.submittedOn');
+    await page.getByLabel('input-data-type-1').selectOption('date');
+    const dateInputTestId = await page.locator('[data-testid^="dt-in-"]').nth(1).getAttribute('data-testid');
+    expect(dateInputTestId).toBeTruthy();
+    const dateInputId = dateInputTestId!.replace('dt-in-', '');
+    await page.getByLabel(`feel-0-${dateInputId}`).fill('< 2026-06-01');
+    await page.getByLabel(`feel-1-${dateInputId}`).fill('>= 2026-06-10');
+    await page.getByTestId('dt-analyze').click();
+    await expect(page.getByTestId('dt-analysis-panel')).toContainText('DMN_COMPLEX_INPUT_PROOF', {
+      timeout: 15000,
+    });
+    await expect(page.getByTestId('dt-analysis-panel')).toContainText('dataType: date');
+    await expect(page.getByTestId('dt-analysis-panel')).toContainText('[2026-06-01..2026-06-10)');
+    await expect(page.getByTestId('dt-analysis-panel')).toContainText(/continuous inputs [2-9]/);
+    await capture(page, testInfo, 'decisionops-dmn-complex-date-gap');
     await expectNoLegacyConsoleLinks(page);
 
     await page.goto(

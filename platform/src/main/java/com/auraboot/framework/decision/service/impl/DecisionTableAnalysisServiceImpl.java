@@ -18,6 +18,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -27,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Finite-domain decision-table analysis for DMN V2. Free-form numeric/string domains remain
@@ -48,6 +57,7 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
 
     @Override
     public DecisionTableAnalysisDTO analyze(JsonNode model) {
+        long startedAt = System.nanoTime();
         DecisionTableAnalysisDTO dto = new DecisionTableAnalysisDTO();
         DecisionTable table;
         try {
@@ -55,6 +65,7 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
         } catch (Exception e) {
             dto.addError(DecisionTableAnalysisDTO.Issue.of("DMN_TABLE_PARSE", "ERROR", List.of(), Map.of(),
                     "Invalid decision table model: " + e.getMessage()));
+            dto.getMetrics().setAnalysisDurationMs(elapsedMillis(startedAt));
             return dto;
         }
 
@@ -62,8 +73,11 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
         addFeelDiagnostics(table, dto);
         addHitPolicyDiagnostics(table, dto);
         Map<String, List<Object>> domains = finiteDomains(table);
+        dto.getMetrics().setFiniteInputCount(domains.size());
+        dto.getMetrics().setContinuousInputCount(continuousInputs(table, domains).size());
         boolean finiteComplete = domains.size() == table.inputs().size() && !domains.isEmpty();
         addDomainDiagnostics(table, domains, dto);
+        addComplexInputProofDiagnostics(table, domains, finiteComplete, dto);
         List<Map<String, Object>> combinations = finiteComplete ? combinations(domains) : List.of();
         if (combinations.size() > MAX_FINITE_COMBINATIONS) {
             finiteComplete = false;
@@ -122,6 +136,7 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
             }
         }
         dto.getMetrics().setUnreachableRuleCount(unreachableRuleCount);
+        dto.getMetrics().setAnalysisDurationMs(elapsedMillis(startedAt));
         return dto;
     }
 
@@ -237,20 +252,53 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
                 continue;
             }
             DataType dataType = inputDataType(input);
-            if (dataType != null && (dataType.isNumeric()
-                    || dataType == DataType.DATE
-                    || dataType == DataType.TIME
-                    || dataType == DataType.DATETIME
-                    || dataType == DataType.DURATION)) {
+            if (isContinuous(dataType)) {
                 dto.addWarning(DecisionTableAnalysisDTO.Issue.of("DMN_CONTINUOUS_DOMAIN", "WARNING",
                         List.of(), Map.of("input", input.id()),
                         "Input '" + input.id() + "' is " + dataType.code()
                                 + " without allowedValues, so completeness/gap analysis is non-exhaustive"));
-                if (dataType.isNumeric()) {
-                    addContinuousCoverageDiagnostics(table, input, dataType, dto);
-                }
+                addContinuousCoverageDiagnostics(table, input, dataType, dto);
             }
         }
+    }
+
+    private void addComplexInputProofDiagnostics(DecisionTable table, Map<String, List<Object>> domains,
+                                                 boolean finiteComplete, DecisionTableAnalysisDTO dto) {
+        if (table.inputs().size() < 2) {
+            return;
+        }
+        List<String> finiteInputs = table.inputs().stream()
+                .map(DecisionTable.Input::id)
+                .filter(domains::containsKey)
+                .toList();
+        List<String> continuousInputs = continuousInputs(table, domains).stream()
+                .map(DecisionTable.Input::id)
+                .toList();
+        if (continuousInputs.isEmpty() && finiteComplete) {
+            return;
+        }
+        String proofMode = continuousInputs.isEmpty()
+                ? "FINITE_CARTESIAN_PARTIAL"
+                : finiteInputs.isEmpty()
+                ? "PER_AXIS_INTERVALS_ONLY"
+                : "FINITE_CARTESIAN_PLUS_PER_AXIS_INTERVALS";
+        dto.addWarning(DecisionTableAnalysisDTO.Issue.of("DMN_COMPLEX_INPUT_PROOF", "WARNING", List.of(), Map.of(),
+                Map.of(
+                        "inputCount", table.inputs().size(),
+                        "finiteInputs", finiteInputs,
+                        "continuousInputs", continuousInputs,
+                        "finiteCombinationUpperBound", combinationUpperBound(domains),
+                        "maxFiniteCombinations", MAX_FINITE_COMBINATIONS,
+                        "proofMode", proofMode
+                ),
+                "Complex multi-input analysis uses finite Cartesian enumeration plus per-input continuous interval coverage; correlated cross-input FEEL constraints remain non-exhaustive"));
+    }
+
+    private List<DecisionTable.Input> continuousInputs(DecisionTable table, Map<String, List<Object>> domains) {
+        return table.inputs().stream()
+                .filter(input -> !domains.containsKey(input.id()))
+                .filter(input -> isContinuous(inputDataType(input)))
+                .toList();
     }
 
     private void addContinuousCoverageDiagnostics(DecisionTable table, DecisionTable.Input input, DataType dataType,
@@ -277,16 +325,16 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
         if (gaps.isEmpty()) {
             return;
         }
-        List<String> gapRanges = gaps.stream().map(ContinuousInterval::format).toList();
+        List<String> gapRanges = gaps.stream().map(interval -> interval.format(dataType)).toList();
         dto.addWarning(DecisionTableAnalysisDTO.Issue.of("DMN_CONTINUOUS_GAP", "WARNING", List.of(),
                 Map.of("input", input.id()),
                 Map.of("input", input.id(),
                         "inputLabel", input.label(),
                         "dataType", dataType.code(),
-                        "coveredRanges", merged.stream().map(ContinuousInterval::format).toList(),
+                        "coveredRanges", merged.stream().map(interval -> interval.format(dataType)).toList(),
                         "gapRanges", gapRanges,
                         "unparsedCells", unparsedCells),
-                "Input '" + input.id() + "' has uncovered continuous numeric ranges: "
+                "Input '" + input.id() + "' has uncovered continuous " + dataType.code() + " ranges: "
                         + String.join(", ", gapRanges)));
     }
 
@@ -344,7 +392,7 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
                 }
                 List<ContinuousInterval> intervals = new ArrayList<>();
                 for (DecisionTableFeel.ParsedTest test : tests) {
-                    List<ContinuousInterval> parsed = intervalsForOperator(test.operator(), test.value());
+                    List<ContinuousInterval> parsed = intervalsForOperator(test.operator(), test.value(), dataType);
                     if (parsed == null) {
                         return null;
                     }
@@ -358,10 +406,10 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
         if (cell.operator() == null) {
             return null;
         }
-        return intervalsForOperator(cell.operator(), cell.value());
+        return intervalsForOperator(cell.operator(), cell.value(), dataType);
     }
 
-    private List<ContinuousInterval> intervalsForOperator(Operator operator, Object value) {
+    private List<ContinuousInterval> intervalsForOperator(Operator operator, Object value, DataType dataType) {
         if (operator == Operator.IS_NULL || operator == Operator.IS_NOT_NULL) {
             return null;
         }
@@ -371,7 +419,7 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
             }
             List<ContinuousInterval> intervals = new ArrayList<>();
             for (Object item : values) {
-                BigDecimal point = toBigDecimal(item);
+                BigDecimal point = toAxisValue(item, dataType);
                 if (point == null) {
                     return null;
                 }
@@ -383,8 +431,8 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
             if (!(value instanceof List<?> values) || values.size() != 2) {
                 return null;
             }
-            BigDecimal lower = toBigDecimal(values.get(0));
-            BigDecimal upper = toBigDecimal(values.get(1));
+            BigDecimal lower = toAxisValue(values.get(0), dataType);
+            BigDecimal upper = toAxisValue(values.get(1), dataType);
             if (lower == null || upper == null) {
                 return null;
             }
@@ -395,7 +443,7 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
             }
             return List.of(new ContinuousInterval(lower, true, upper, true));
         }
-        BigDecimal boundary = toBigDecimal(value);
+        BigDecimal boundary = toAxisValue(value, dataType);
         if (boundary == null) {
             return null;
         }
@@ -487,6 +535,21 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
         return result;
     }
 
+    private long combinationUpperBound(Map<String, List<Object>> domains) {
+        long count = 1;
+        for (List<Object> values : domains.values()) {
+            int size = Math.max(values.size(), 1);
+            if (count > Long.MAX_VALUE / size) {
+                return Long.MAX_VALUE;
+            }
+            count *= size;
+            if (count > MAX_FINITE_COMBINATIONS) {
+                return count;
+            }
+        }
+        return count;
+    }
+
     private List<DecisionTable.Rule> matchedRules(DecisionTable table, Map<String, Object> combination,
                                                   DecisionTableAnalysisDTO dto) {
         DecisionContext context = contextFor(table, combination);
@@ -553,6 +616,84 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
         return dataType == DataType.INTEGER || dataType == DataType.DECIMAL;
     }
 
+    private boolean isContinuous(DataType dataType) {
+        return dataType != null && (dataType.isNumeric()
+                || dataType == DataType.DATE
+                || dataType == DataType.TIME
+                || dataType == DataType.DATETIME
+                || dataType == DataType.DURATION);
+    }
+
+    private static long elapsedMillis(long startedAt) {
+        return Math.max(0, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt));
+    }
+
+    private BigDecimal toAxisValue(Object value, DataType dataType) {
+        if (dataType == null || dataType.isNumeric()) {
+            return toBigDecimal(value);
+        }
+        String text = stripLiteralQuotes(value);
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        try {
+            return switch (dataType) {
+                case DATE -> BigDecimal.valueOf(LocalDate.parse(text).toEpochDay());
+                case TIME -> BigDecimal.valueOf(LocalTime.parse(text).toNanoOfDay());
+                case DATETIME -> BigDecimal.valueOf(parseInstant(text).toEpochMilli());
+                case DURATION -> BigDecimal.valueOf(Duration.parse(text).toNanos());
+                default -> toBigDecimal(value);
+            };
+        } catch (DateTimeParseException | ArithmeticException e) {
+            return null;
+        }
+    }
+
+    private static String stripLiteralQuotes(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        if (text.length() >= 2 && ((text.startsWith("\"") && text.endsWith("\""))
+                || (text.startsWith("'") && text.endsWith("'")))) {
+            return text.substring(1, text.length() - 1);
+        }
+        return text;
+    }
+
+    private static Instant parseInstant(String text) {
+        try {
+            return Instant.parse(text);
+        } catch (DateTimeParseException ignored) {
+            // fall through
+        }
+        try {
+            return OffsetDateTime.parse(text).toInstant();
+        } catch (DateTimeParseException ignored) {
+            // fall through
+        }
+        return LocalDateTime.parse(text).toInstant(ZoneOffset.UTC);
+    }
+
+    private static String formatAxisValue(BigDecimal value, DataType dataType) {
+        if (value == null) {
+            return "";
+        }
+        if (dataType == DataType.DATE) {
+            return LocalDate.ofEpochDay(value.longValue()).toString();
+        }
+        if (dataType == DataType.TIME) {
+            return LocalTime.ofNanoOfDay(value.longValue()).toString();
+        }
+        if (dataType == DataType.DATETIME) {
+            return Instant.ofEpochMilli(value.longValue()).toString();
+        }
+        if (dataType == DataType.DURATION) {
+            return Duration.ofNanos(value.longValue()).toString();
+        }
+        return value.stripTrailingZeros().toPlainString();
+    }
+
     private BigDecimal toBigDecimal(Object value) {
         if (value == null) {
             return null;
@@ -613,11 +754,11 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
             return new ContinuousInterval(lower, lowerInclusive, upper, upperInclusive || next.upperInclusive);
         }
 
-        String format() {
+        String format(DataType dataType) {
             String left = lowerInclusive ? "[" : "(";
             String right = upperInclusive ? "]" : ")";
-            String from = lower == null ? "-inf" : lower.stripTrailingZeros().toPlainString();
-            String to = upper == null ? "+inf" : upper.stripTrailingZeros().toPlainString();
+            String from = lower == null ? "-inf" : formatAxisValue(lower, dataType);
+            String to = upper == null ? "+inf" : formatAxisValue(upper, dataType);
             return left + from + ".." + to + right;
         }
     }

@@ -249,6 +249,9 @@ export interface DecisionTableAnalysisMetrics {
   unreachableRuleCount: number;
   finiteCombinationCount: number;
   finiteDomainComplete: boolean;
+  finiteInputCount?: number;
+  continuousInputCount?: number;
+  analysisDurationMs?: number;
 }
 
 export interface DecisionTableAnalysis {

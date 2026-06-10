@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import axios, { type AxiosResponse } from 'axios';
+import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios';
 import * as http from 'http';
 import * as https from 'https';
 import { config } from '~/server/utils/config';
@@ -36,6 +36,11 @@ const noProxyHttpsAgent = new https.Agent({
  */
 export function isBinaryDownloadPath(path: string): boolean {
   return /\/download(?:\/|\?|$)/.test(path);
+}
+
+export function shouldForwardRequestBody(method: string): boolean {
+  const normalized = method.toUpperCase();
+  return normalized !== 'GET' && normalized !== 'HEAD';
 }
 
 type ResponseHeaderValue = string | number | readonly string[];
@@ -181,16 +186,18 @@ export class BffProxyService {
       const timeout = isLongRunning ? longRunningTimeout : 30000;
 
       // 准备请求配置
-      const axiosConfig = {
+      const axiosConfig: AxiosRequestConfig = {
         method: req.method.toLowerCase() as any,
         url: backendUrl,
         headers: await this.sanitizeHeaders(req),
-        data: req.body,
         timeout,
         httpAgent: noProxyHttpAgent,
         httpsAgent: noProxyHttpsAgent,
         proxy: false as const, // Disable axios built-in proxy detection
       };
+      if (shouldForwardRequestBody(req.method)) {
+        axiosConfig.data = req.body;
+      }
 
       // 发送请求到后端
       const response = await axios(axiosConfig);

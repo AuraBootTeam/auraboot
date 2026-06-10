@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { BffProxyService, isBinaryDownloadPath } from '../BffProxyService';
+import {
+  BffProxyService,
+  isBinaryDownloadPath,
+  shouldForwardRequestBody,
+} from '../BffProxyService';
 
 describe('isBinaryDownloadPath', () => {
   it('detects /download/{id} as a mid-path segment (the file-download endpoint)', () => {
@@ -23,6 +27,14 @@ describe('isBinaryDownloadPath', () => {
 });
 
 describe('BffProxyService', () => {
+  it('does not forward empty JSON bodies on GET or HEAD requests', () => {
+    expect(shouldForwardRequestBody('GET')).toBe(false);
+    expect(shouldForwardRequestBody('head')).toBe(false);
+    expect(shouldForwardRequestBody('POST')).toBe(true);
+    expect(shouldForwardRequestBody('PUT')).toBe(true);
+    expect(shouldForwardRequestBody('DELETE')).toBe(true);
+  });
+
   it('does not forward browser CORS headers to the Spring backend', async () => {
     const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
     const headers = await (

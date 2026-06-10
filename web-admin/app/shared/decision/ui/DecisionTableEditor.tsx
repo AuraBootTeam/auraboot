@@ -278,7 +278,11 @@ export function DecisionTableEditor({
             <span>
               有限域 {analysis.metrics.finiteDomainComplete ? '完整' : '不完整'} ·
               组合 {analysis.metrics.finiteCombinationCount} ·
+              continuous inputs {analysis.metrics.continuousInputCount ?? 0} ·
               unreachable {analysis.metrics.unreachableRuleCount}
+              {typeof analysis.metrics.analysisDurationMs === 'number'
+                ? ` · ${analysis.metrics.analysisDurationMs}ms`
+                : ''}
             </span>
           </div>
           <div className="dt-analysis-metrics">

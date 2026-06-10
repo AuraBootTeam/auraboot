@@ -57,6 +57,9 @@ public class DecisionTableAnalysisDTO {
         private int unreachableRuleCount;
         private int finiteCombinationCount;
         private boolean finiteDomainComplete;
+        private int finiteInputCount;
+        private int continuousInputCount;
+        private long analysisDurationMs;
     }
 
     public void addError(Issue issue) {

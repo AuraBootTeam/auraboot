@@ -112,6 +112,8 @@ describe('DecisionTableEditor', () => {
             unreachableRuleCount: 1,
             finiteCombinationCount: 4,
             finiteDomainComplete: false,
+            continuousInputCount: 1,
+            analysisDurationMs: 12,
           },
           errors: [{
             code: 'DMN_CONFLICT',
@@ -141,6 +143,8 @@ describe('DecisionTableEditor', () => {
     expect(screen.getByTestId('dt-analysis-issue-0')).toHaveTextContent('rules r1,r2');
     expect(screen.getByTestId('dt-analysis-issue-1')).toHaveTextContent('DMN_CONTINUOUS_GAP');
     expect(screen.getByTestId('dt-analysis-metadata-1')).toHaveTextContent('gapRanges: [10..20]');
+    expect(screen.getByTestId('dt-analysis-panel')).toHaveTextContent('continuous inputs 1');
+    expect(screen.getByTestId('dt-analysis-panel')).toHaveTextContent('12ms');
   });
 
   it('edits DMN XML and triggers import/export/round-trip actions', () => {
