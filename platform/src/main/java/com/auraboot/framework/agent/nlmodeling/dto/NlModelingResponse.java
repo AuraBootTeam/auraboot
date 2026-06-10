@@ -48,6 +48,8 @@ public class NlModelingResponse {
         private List<Map<String, Object>> menus;
         private List<Map<String, Object>> i18n;
         private List<Map<String, Object>> permissions;
+        /** Dictionary definitions (enum value sets) referenced by ENUM-typed fields. */
+        private List<Map<String, Object>> dicts;
     }
 
     @Data
