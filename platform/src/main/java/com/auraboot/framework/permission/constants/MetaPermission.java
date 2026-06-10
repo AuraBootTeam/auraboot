@@ -724,6 +724,14 @@ public final class MetaPermission {
      */
     public static final String POLICY_RUNTIME_RUN = "decision.policy.run";
 
+    // ==================== BILLING permissions ====================
+
+    /**
+     * Billing resource catalog read permission (list all active catalog entries).
+     * Used by {@code ResourceCatalogController} GET /api/billing/resource-catalog.
+     */
+    public static final String BILLING_CATALOG_READ = "billing.catalog.read";
+
     // ==================== Private Constructor ====================
 
     /**
