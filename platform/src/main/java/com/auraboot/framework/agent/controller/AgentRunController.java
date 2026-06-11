@@ -2,8 +2,6 @@ package com.auraboot.framework.agent.controller;
 
 import com.auraboot.framework.agent.dto.replay.AgentActionItem;
 import com.auraboot.framework.agent.dto.replay.AgentBifSummary;
-import com.auraboot.framework.agent.dto.replay.AgentApprovalAuditItem;
-import com.auraboot.framework.agent.dto.replay.AgentAuthorizationDecisionItem;
 import com.auraboot.framework.agent.dto.replay.AgentConversationMessageItem;
 import com.auraboot.framework.agent.dto.replay.AgentConversationTurnReplay;
 import com.auraboot.framework.agent.dto.replay.AgentInterruptItem;
@@ -11,14 +9,12 @@ import com.auraboot.framework.agent.dto.replay.AgentResultContractItem;
 import com.auraboot.framework.agent.dto.replay.AgentRunDetail;
 import com.auraboot.framework.agent.dto.replay.AgentRunListItem;
 import com.auraboot.framework.agent.dto.replay.AgentRunPage;
-import com.auraboot.framework.agent.dto.replay.AgentRuntimeAuditTrail;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,16 +23,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 
@@ -65,6 +55,12 @@ import com.auraboot.framework.permission.constants.MetaPermission;
  * <p><b>Read-only contract.</b> No write endpoints, no time-travel, no
  * fork-from-step, no replay buttons. Those remain future product
  * enhancements. The controller never mutates {@code ab_agent_*} tables.
+ *
+ * <p>This controller serves the run list + run detail endpoints; the sibling
+ * {@link AgentRunAuditController} ({@code /audit}) and
+ * {@link AgentRunOpsController} ({@code /runtime-ops}) controllers carry the
+ * remaining endpoints of the same {@code /api/admin/agent-runs} surface, with
+ * shared loaders in {@link AgentRunQuerySupport}.
  */
 @Slf4j
 @RestController
@@ -75,9 +71,6 @@ public class AgentRunController {
     /** Hard cap on page size to keep payload + admin SQL bounded. */
     private static final int MAX_PAGE_SIZE = 200;
 
-    /** Hard cap on returned actions per run — interactive review only. */
-    private static final int MAX_ACTIONS = 1000;
-
     /** Hard cap on returned interrupts per run. */
     private static final int MAX_INTERRUPTS = 200;
 
@@ -87,16 +80,16 @@ public class AgentRunController {
     /** Hard cap on returned messages per reconstructed conversation turn. */
     private static final int MAX_CONVERSATION_MESSAGES = 50;
 
-    /** Hard cap on runtime ops diagnostic rows per section. */
-    private static final int MAX_RUNTIME_OPS_ROWS = 200;
-
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final AgentRunQuerySupport querySupport;
 
     @Autowired
-    public AgentRunController(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public AgentRunController(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper,
+                              AgentRunQuerySupport querySupport) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.querySupport = querySupport;
     }
 
     // =========================================================================
@@ -187,7 +180,7 @@ public class AgentRunController {
         pageArgs.add(safeSize);
         pageArgs.add((long) safePage * safeSize);
 
-        List<AgentRunListItem> items = jdbcTemplate.query(sql, RUN_ROW_MAPPER, pageArgs.toArray());
+        List<AgentRunListItem> items = jdbcTemplate.query(sql, AgentRunQuerySupport.RUN_ROW_MAPPER, pageArgs.toArray());
 
         return ApiResponse.ok(AgentRunPage.builder()
                 .items(items)
@@ -195,105 +188,6 @@ public class AgentRunController {
                 .page(safePage)
                 .size(safeSize)
                 .build());
-    }
-
-    // =========================================================================
-    // GET /audit — runtime evidence bundle
-    // =========================================================================
-
-    /**
-     * {@code GET /api/admin/agent-runs/audit}
-     *
-     * <p>Read-only incident triage projection over the existing runtime audit
-     * tables. The endpoint intentionally does not mutate, retry, or repair any
-     * agent state; it only collects evidence by tenant-scoped run/conversation/tool.
-     */
-    @GetMapping("/audit")
-    public ApiResponse<AgentRuntimeAuditTrail> audit(
-            @RequestParam(required = false) String runId,
-            @RequestParam(required = false) Long conversationId,
-            @RequestParam(required = false) String toolName) {
-        if ((runId == null || runId.isBlank()) && conversationId == null) {
-            return ApiResponse.error(400, "runId_or_conversationId_required");
-        }
-
-        Long tenantId = MetaContext.getCurrentTenantId();
-        String resolvedRunId = normalizeBlank(runId);
-        if (resolvedRunId == null && conversationId != null) {
-            resolvedRunId = resolveRunIdByConversation(tenantId, conversationId);
-        }
-        if (resolvedRunId == null) {
-            return ApiResponse.error(404, "agent_run_not_found");
-        }
-
-        AgentRunListItem run = loadRun(tenantId, resolvedRunId);
-        if (run == null) {
-            return ApiResponse.error(404, "agent_run_not_found");
-        }
-
-        String normalizedTool = normalizeBlank(toolName);
-        List<AgentActionItem> actions = loadActions(tenantId, resolvedRunId).stream()
-                .filter(action -> toolMatches(action, normalizedTool))
-                .toList();
-        List<AgentResultContractItem> resultContracts = buildResultContracts(actions);
-        List<AgentAuthorizationDecisionItem> authorizationDecisions =
-                loadAuthorizationDecisions(tenantId, resolvedRunId, normalizedTool);
-        List<AgentApprovalAuditItem> approvals =
-                loadApprovals(tenantId, resolvedRunId, normalizedTool, approvalIds(authorizationDecisions));
-
-        return ApiResponse.ok(AgentRuntimeAuditTrail.builder()
-                .runId(resolvedRunId)
-                .conversationId(conversationId)
-                .toolName(normalizedTool)
-                .actions(actions)
-                .authorizationDecisions(authorizationDecisions)
-                .approvals(approvals)
-                .resultContracts(resultContracts)
-                .build());
-    }
-
-    // =========================================================================
-    // GET /runtime-ops — pending/approval/durable execution diagnostics
-    // =========================================================================
-
-    /**
-     * {@code GET /api/admin/agent-runs/runtime-ops}
-     *
-     * <p>Read-only operational projection for pending confirmations, approval
-     * requests, durable side-effect execution ledger rows, and workflow
-     * checkpoints. It intentionally does not retry, compensate, approve, or
-     * mutate any runtime state.
-     */
-    @GetMapping("/runtime-ops")
-    public ApiResponse<Map<String, Object>> runtimeOps(
-            @RequestParam(required = false) String runId,
-            @RequestParam(defaultValue = "50") int limit) {
-        Long tenantId = MetaContext.getCurrentTenantId();
-        String normalizedRunId = normalizeBlank(runId);
-        int safeLimit = Math.min(Math.max(1, limit), MAX_RUNTIME_OPS_ROWS);
-        List<Map<String, Object>> approvals = loadRuntimeApprovals(tenantId, normalizedRunId, safeLimit);
-        List<Map<String, Object>> pendingToolExecutions = loadRuntimeIdempotencyRows(
-                tenantId,
-                "agent.pending_tool_execution:%",
-                null,
-                safeLimit);
-        List<Map<String, Object>> durableToolExecutions = loadRuntimeIdempotencyRows(
-                tenantId,
-                "agent.tool_execution:%",
-                normalizedRunId,
-                safeLimit);
-        List<Map<String, Object>> checkpoints = loadRuntimeCheckpoints(tenantId, normalizedRunId, safeLimit);
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("runId", normalizedRunId);
-        result.put("limit", safeLimit);
-        result.put("summary", runtimeOpsSummary(approvals, pendingToolExecutions, durableToolExecutions, checkpoints));
-        result.put("approvals", approvals);
-        result.put("pendingToolExecutions", pendingToolExecutions);
-        result.put("pendingToolExecutionScope", "tenant");
-        result.put("durableToolExecutions", durableToolExecutions);
-        result.put("checkpoints", checkpoints);
-        return ApiResponse.ok(result);
     }
 
     // =========================================================================
@@ -315,17 +209,17 @@ public class AgentRunController {
         }
         Long tenantId = MetaContext.getCurrentTenantId();
 
-        AgentRunListItem run = loadRun(tenantId, runId);
+        AgentRunListItem run = querySupport.loadRun(tenantId, runId);
         if (run == null) {
             return ApiResponse.error(404, "agent_run_not_found");
         }
 
-        List<AgentActionItem> actions = loadActions(tenantId, runId);
+        List<AgentActionItem> actions = querySupport.loadActions(tenantId, runId);
         List<AgentInterruptItem> interrupts = loadInterrupts(tenantId, runId);
         List<AgentRunListItem> children = loadChildRuns(tenantId, runId);
         AgentBifSummary bif = loadBif(tenantId, runId);
         String traceId = loadTraceId(tenantId, runId);
-        List<AgentResultContractItem> resultContracts = buildResultContracts(actions);
+        List<AgentResultContractItem> resultContracts = querySupport.buildResultContracts(actions);
         AgentConversationTurnReplay conversationTurn =
                 loadConversationTurn(tenantId, runId, resultContracts);
 
@@ -345,274 +239,6 @@ public class AgentRunController {
     // =========================================================================
     // Private loaders
     // =========================================================================
-
-    private String resolveRunIdByConversation(Long tenantId, Long conversationId) {
-        String sql = "SELECT r.pid AS run_id, r.metadata, t.input_data " +
-                "  FROM ab_agent_run r " +
-                "  LEFT JOIN ab_agent_task t ON t.tenant_id = r.tenant_id AND t.pid = r.task_id " +
-                " WHERE r.tenant_id = ? " +
-                " ORDER BY r.created_at DESC " +
-                " LIMIT 500";
-        List<RunConversationSeed> rows = jdbcTemplate.query(sql, (rs, rowNum) -> new RunConversationSeed(
-                rs.getString("run_id"),
-                rs.getString("metadata"),
-                rs.getString("input_data")), tenantId);
-        for (RunConversationSeed row : rows) {
-            JsonNode metadata = parseJsonObject(row.metadata());
-            JsonNode input = parseJsonObject(row.inputData());
-            Long rowConversationId = firstLong(input, "conversationId", metadata, "conversationId");
-            if (conversationId.equals(rowConversationId)) {
-                return row.runId();
-            }
-        }
-        return null;
-    }
-
-    private AgentRunListItem loadRun(Long tenantId, String runId) {
-        String sql = "SELECT r.pid, r.agent_id, r.run_status, r.parent_run_id, " +
-                "       r.subtask_origin, r.total_cost, " +
-                "       r.child_aggregate_cost, r.child_aggregate_tokens, " +
-                "       r.duration_ms, " +
-                "       r.created_at, r.completed_at, " +
-                "       (SELECT b.intent FROM ab_agent_bif b " +
-                "         WHERE b.run_id = r.pid AND b.tenant_id = r.tenant_id " +
-                "         ORDER BY b.created_at ASC LIMIT 1) AS intent_summary " +
-                "  FROM ab_agent_run r " +
-                " WHERE r.tenant_id = ? AND r.pid = ? " +
-                " LIMIT 1";
-        List<AgentRunListItem> rows = jdbcTemplate.query(sql, RUN_ROW_MAPPER, tenantId, runId);
-        return rows.isEmpty() ? null : rows.get(0);
-    }
-
-    private List<Map<String, Object>> loadRuntimeApprovals(Long tenantId, String runId, int limit) {
-        StringBuilder sql = new StringBuilder("""
-                SELECT pid, run_id, task_id, approval_type, approval_status,
-                       policy_id, idempotency_key, expires_at, created_at, approved_at
-                  FROM ab_agent_approval
-                 WHERE tenant_id = ?
-                """);
-        List<Object> args = new ArrayList<>();
-        args.add(tenantId);
-        if (runId != null) {
-            sql.append(" AND run_id = ?");
-            args.add(runId);
-        }
-        sql.append(" ORDER BY created_at DESC LIMIT ?");
-        args.add(limit);
-        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("pid", rs.getString("pid"));
-            row.put("runId", rs.getString("run_id"));
-            row.put("taskId", rs.getString("task_id"));
-            row.put("approvalType", rs.getString("approval_type"));
-            row.put("approvalStatus", rs.getString("approval_status"));
-            row.put("policyId", rs.getString("policy_id"));
-            row.put("idempotencyKey", rs.getString("idempotency_key"));
-            row.put("expiresAt", timestampString(rs, "expires_at"));
-            row.put("createdAt", timestampString(rs, "created_at"));
-            row.put("approvedAt", timestampString(rs, "approved_at"));
-            return row;
-        }, args.toArray());
-    }
-
-    private Map<String, Object> runtimeOpsSummary(List<Map<String, Object>> approvals,
-                                                  List<Map<String, Object>> pendingToolExecutions,
-                                                  List<Map<String, Object>> durableToolExecutions,
-                                                  List<Map<String, Object>> checkpoints) {
-        Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("approvalPending", countByStatus(approvals, "approvalStatus", "pending"));
-        summary.put("approvalTerminal", countMatching(approvals, row ->
-                isStatus(row.get("approvalStatus"), "approved")
-                        || isStatus(row.get("approvalStatus"), "rejected")
-                        || isStatus(row.get("approvalStatus"), "expired")));
-        summary.put("pendingToolRunning", countByStatus(pendingToolExecutions, "status", "RUNNING"));
-        summary.put("pendingToolSucceeded", countByStatus(pendingToolExecutions, "status", "SUCCEEDED"));
-        summary.put("pendingToolFailed", countByStatus(pendingToolExecutions, "status", "FAILED"));
-        summary.put("durableRunning", countByStatus(durableToolExecutions, "status", "RUNNING"));
-        summary.put("durableSucceeded", countByStatus(durableToolExecutions, "status", "SUCCEEDED"));
-        summary.put("durableFailed", countByStatus(durableToolExecutions, "status", "FAILED"));
-        summary.put("durableCompensationRequired", countByStatus(
-                durableToolExecutions, "status", "COMPENSATION_REQUIRED"));
-        summary.put("durableCompensated", countByStatus(durableToolExecutions, "status", "COMPENSATED"));
-        summary.put("checkpointCount", checkpoints == null ? 0 : checkpoints.size());
-        return summary;
-    }
-
-    private int countByStatus(List<Map<String, Object>> rows, String key, String status) {
-        return countMatching(rows, row -> isStatus(row.get(key), status));
-    }
-
-    private int countMatching(List<Map<String, Object>> rows,
-                              java.util.function.Predicate<Map<String, Object>> predicate) {
-        if (rows == null || rows.isEmpty()) {
-            return 0;
-        }
-        int count = 0;
-        for (Map<String, Object> row : rows) {
-            if (row != null && predicate.test(row)) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    private boolean isStatus(Object actual, String expected) {
-        return actual != null && expected != null
-                && expected.equalsIgnoreCase(String.valueOf(actual));
-    }
-
-    private List<Map<String, Object>> loadRuntimeIdempotencyRows(Long tenantId,
-                                                                 String commandCodePattern,
-                                                                 String runId,
-                                                                 int limit) {
-        StringBuilder sql = new StringBuilder("""
-                SELECT client_request_id, request_hash, command_code, status,
-                       outcome::text AS outcome, expires_at, created_at
-                  FROM ab_idempotency_record
-                 WHERE tenant_id = ?
-                   AND command_code LIKE ?
-                   AND expires_at > NOW()
-                """);
-        List<Object> args = new ArrayList<>();
-        args.add(tenantId);
-        args.add(commandCodePattern);
-        if (runId != null) {
-            sql.append(" AND outcome->'request'->>'runPid' = ?");
-            args.add(runId);
-        }
-        sql.append(" ORDER BY created_at DESC LIMIT ?");
-        args.add(limit);
-        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("clientRequestId", rs.getString("client_request_id"));
-            row.put("requestHash", rs.getString("request_hash"));
-            row.put("commandCode", rs.getString("command_code"));
-            row.put("status", rs.getString("status"));
-            row.put("outcome", rs.getString("outcome"));
-            row.put("expiresAt", timestampString(rs, "expires_at"));
-            row.put("createdAt", timestampString(rs, "created_at"));
-            return row;
-        }, args.toArray());
-    }
-
-    private List<Map<String, Object>> loadRuntimeCheckpoints(Long tenantId, String runId, int limit) {
-        if (runId == null) {
-            return List.of();
-        }
-        String sql = """
-                SELECT pid, run_pid, checkpoint_type, step_index, reason,
-                       plan_snapshot::text AS plan_snapshot,
-                       state_snapshot::text AS state_snapshot,
-                       created_at
-                  FROM ab_agent_run_checkpoint
-                 WHERE tenant_id = ?
-                   AND run_pid = ?
-                 ORDER BY created_at DESC
-                 LIMIT ?
-                """;
-        try {
-            return jdbcTemplate.query(sql, (rs, rowNum) -> {
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("pid", rs.getString("pid"));
-                row.put("runPid", rs.getString("run_pid"));
-                row.put("checkpointType", rs.getString("checkpoint_type"));
-                row.put("stepIndex", getInteger(rs, "step_index"));
-                row.put("reason", rs.getString("reason"));
-                row.put("planSnapshot", rs.getString("plan_snapshot"));
-                row.put("stateSnapshot", rs.getString("state_snapshot"));
-                row.put("createdAt", timestampString(rs, "created_at"));
-                return row;
-            }, tenantId, runId, limit);
-        } catch (DataAccessException e) {
-            log.debug("Agent workflow checkpoint diagnostics unavailable: {}", e.getMessage());
-            return List.of();
-        }
-    }
-
-    private List<AgentActionItem> loadActions(Long tenantId, String runId) {
-        String sql = "SELECT pid, step_index, tool_call_index, action_code, action_type, " +
-                "       intent_summary, target_model, target_record_id, " +
-                "       before_snapshot::text AS before_snapshot, " +
-                "       after_snapshot::text  AS after_snapshot, " +
-                "       field_changes::text   AS field_changes, " +
-                "       command_code, command_result, " +
-                "       risk_level, estimated_risk, risk_deviation, reversal_mode, " +
-                "       action_status, error_message, cost_usd, token_usage, " +
-                "       fidelity, skill_code, parallel_group_id, parallel_index, executed_at " +
-                "  FROM ab_agent_action " +
-                " WHERE tenant_id = ? AND run_id = ? " +
-                " ORDER BY executed_at ASC, step_index ASC NULLS LAST, " +
-                "          parallel_index ASC NULLS LAST " +
-                " LIMIT ?";
-        return jdbcTemplate.query(sql, ACTION_ROW_MAPPER, tenantId, runId, MAX_ACTIONS);
-    }
-
-    private List<AgentAuthorizationDecisionItem> loadAuthorizationDecisions(
-            Long tenantId, String runId, String toolName) {
-        StringBuilder sql = new StringBuilder("SELECT pid, run_id, decision_kind, tool_ref, skill_code, " +
-                "       blast_radius, requested_effects::text AS requested_effects, " +
-                "       granted_effects::text AS granted_effects, " +
-                "       rejected_effects::text AS rejected_effects, " +
-                "       require_approval, approval_id, policy_id, policy_version, " +
-                "       decision_reason, decision_at " +
-                "  FROM ab_agent_authorization_decision " +
-                " WHERE tenant_id = ? AND run_id = ?");
-        List<Object> args = new ArrayList<>();
-        args.add(tenantId);
-        args.add(runId);
-        if (toolName != null) {
-            sql.append(" AND (tool_ref = ? OR skill_code = ?)");
-            args.add(toolName);
-            args.add(toolName);
-        }
-        sql.append(" ORDER BY decision_at ASC");
-        return jdbcTemplate.query(sql.toString(), AUTHORIZATION_DECISION_ROW_MAPPER, args.toArray());
-    }
-
-    private List<AgentApprovalAuditItem> loadApprovals(
-            Long tenantId, String runId, String toolName, List<String> approvalIds) {
-        StringBuilder sql = new StringBuilder("SELECT pid, run_id, approval_type, approval_title, " +
-                "       approval_description, request_data, approval_status, policy_id, " +
-                "       approver_id, created_at, approved_at " +
-                "  FROM ab_agent_approval " +
-                " WHERE tenant_id = ? AND run_id = ?");
-        List<Object> args = new ArrayList<>();
-        args.add(tenantId);
-        args.add(runId);
-        boolean hasToolFilter = toolName != null;
-        boolean hasLinkedApprovals = approvalIds != null && !approvalIds.isEmpty();
-        if (hasToolFilter || hasLinkedApprovals) {
-            sql.append(" AND (");
-        }
-        if (hasToolFilter) {
-            String like = "%" + toolName.toLowerCase() + "%";
-            sql.append("(LOWER(COALESCE(approval_title, '')) LIKE ? " +
-                    "OR LOWER(COALESCE(approval_description, '')) LIKE ? " +
-                    "OR LOWER(COALESCE(request_data, '')) LIKE ?)");
-            args.add(like);
-            args.add(like);
-            args.add(like);
-        }
-        if (hasLinkedApprovals) {
-            if (hasToolFilter) {
-                sql.append(" OR ");
-            }
-            sql.append("pid IN (");
-            for (int i = 0; i < approvalIds.size(); i++) {
-                if (i > 0) {
-                    sql.append(", ");
-                }
-                sql.append("?");
-                args.add(approvalIds.get(i));
-            }
-            sql.append(")");
-        }
-        if (hasToolFilter || hasLinkedApprovals) {
-            sql.append(")");
-        }
-        sql.append(" ORDER BY created_at ASC");
-        return jdbcTemplate.query(sql.toString(), this::mapApprovalAuditRow, args.toArray());
-    }
 
     private List<AgentInterruptItem> loadInterrupts(Long tenantId, String runId) {
         // Surface both directions: interrupts that hit this run AND interrupts
@@ -643,7 +269,7 @@ public class AgentRunController {
                 " WHERE r.tenant_id = ? AND r.parent_run_id = ? " +
                 " ORDER BY r.created_at ASC " +
                 " LIMIT ?";
-        return jdbcTemplate.query(sql, RUN_ROW_MAPPER, tenantId, runId, MAX_CHILD_RUNS);
+        return jdbcTemplate.query(sql, AgentRunQuerySupport.RUN_ROW_MAPPER, tenantId, runId, MAX_CHILD_RUNS);
     }
 
     private AgentBifSummary loadBif(Long tenantId, String runId) {
@@ -725,15 +351,15 @@ public class AgentRunController {
         }
 
         TurnSeed seed = rows.get(0);
-        JsonNode metadata = parseJsonObject(seed.metadata());
-        JsonNode input = parseJsonObject(seed.inputData());
-        JsonNode output = parseJsonObject(seed.outputData());
+        JsonNode metadata = querySupport.parseJsonObject(seed.metadata());
+        JsonNode input = querySupport.parseJsonObject(seed.inputData());
+        JsonNode output = querySupport.parseJsonObject(seed.outputData());
 
-        String turnId = firstText(input, "turnId", metadata, "turnId");
-        Long conversationId = firstLong(input, "conversationId", metadata, "conversationId");
-        Long inboundMessageId = firstLong(input, "inboundMessageId", metadata, "inboundMessageId");
-        String triageBucket = firstText(input, "triageBucket", metadata, "triageBucket");
-        String userMessage = firstText(input, "userMessage", metadata, "userMessage");
+        String turnId = AgentRunQuerySupport.firstText(input, "turnId", metadata, "turnId");
+        Long conversationId = AgentRunQuerySupport.firstLong(input, "conversationId", metadata, "conversationId");
+        Long inboundMessageId = AgentRunQuerySupport.firstLong(input, "inboundMessageId", metadata, "inboundMessageId");
+        String triageBucket = AgentRunQuerySupport.firstText(input, "triageBucket", metadata, "triageBucket");
+        String userMessage = AgentRunQuerySupport.firstText(input, "userMessage", metadata, "userMessage");
         boolean hasTurnIdentity = (turnId != null && !turnId.isBlank())
                 || conversationId != null
                 || inboundMessageId != null;
@@ -760,7 +386,8 @@ public class AgentRunController {
         }
         String triageConfidence = inbound != null ? inbound.getTriageConfidence() : null;
         String triageReasonCodes = inbound != null ? inbound.getTriageReasonCodes() : null;
-        String finalResponse = outbound != null ? outbound.getContent() : firstText(output, "finalResponse", metadata, "finalResponse");
+        String finalResponse = outbound != null ? outbound.getContent()
+                : AgentRunQuerySupport.firstText(output, "finalResponse", metadata, "finalResponse");
 
         List<String> resultContractIds = resultContracts == null
                 ? List.of()
@@ -855,332 +482,9 @@ public class AgentRunController {
                 tenantId, conversationId, minSeq, maxSeq, MAX_CONVERSATION_MESSAGES);
     }
 
-    private List<AgentResultContractItem> buildResultContracts(List<AgentActionItem> actions) {
-        if (actions == null || actions.isEmpty()) {
-            return List.of();
-        }
-        return actions.stream()
-                .map(this::buildResultContract)
-                .toList();
-    }
-
-    private AgentResultContractItem buildResultContract(AgentActionItem action) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("actionPid", action.getPid());
-        data.put("actionCode", action.getActionCode());
-        data.put("actionType", action.getActionType());
-        data.put("targetModel", action.getTargetModel());
-        data.put("targetRecordId", action.getTargetRecordId());
-        data.put("targetRecordPid", action.getTargetRecordPid());
-        data.put("commandCode", action.getCommandCode());
-        data.put("commandResult", action.getCommandResult());
-        data.put("riskLevel", action.getRiskLevel());
-        data.put("estimatedRisk", action.getEstimatedRisk());
-        data.put("fidelity", action.getFidelity());
-        if (action.getBeforeSnapshot() != null) {
-            data.put("beforeSnapshot", parseJsonValueOrRaw(action.getBeforeSnapshot()));
-        }
-        if (action.getAfterSnapshot() != null) {
-            data.put("afterSnapshot", parseJsonValueOrRaw(action.getAfterSnapshot()));
-        }
-        if (action.getFieldChanges() != null) {
-            data.put("fieldChanges", parseJsonValueOrRaw(action.getFieldChanges()));
-        }
-
-        boolean readOnly = "read".equalsIgnoreCase(action.getActionType());
-        String status = normalizeResultContractStatus(action.getActionStatus(), action.getCommandResult());
-        String renderHint = (action.getBeforeSnapshot() != null || action.getAfterSnapshot() != null
-                || action.getFieldChanges() != null) ? "card" : "summary";
-        String outputType = readOnly ? "structured_result"
-                : ("failed".equals(status) ? "text" : "action_proposal");
-        String skillCode = firstNonBlank(action.getSkillCode(), action.getCommandCode(), action.getActionCode());
-
-        Map<String, Object> contract = new LinkedHashMap<>();
-        contract.put("outputType", outputType);
-        contract.put("renderHint", renderHint);
-        contract.put("actionability", readOnly ? "read_only" : "execute");
-        contract.put("data", data);
-        contract.put("textSummary", buildContractSummary(action, status));
-        contract.put("skillCode", skillCode);
-        contract.put("durationMs", 0L);
-        contract.put("status", status);
-
-        return AgentResultContractItem.builder()
-                .contractId(contractIdForAction(action.getPid()))
-                .actionPid(action.getPid())
-                .source("ab_agent_action")
-                .contract(contract)
-                .emittedAt(action.getExecutedAt())
-                .build();
-    }
-
-    private String buildContractSummary(AgentActionItem action, String status) {
-        if (action.getIntentSummary() != null && !action.getIntentSummary().isBlank()) {
-            return action.getIntentSummary();
-        }
-        String code = firstNonBlank(action.getCommandCode(), action.getActionCode(), "action");
-        return code + " " + status;
-    }
-
-    private String normalizeResultContractStatus(String actionStatus, String commandResult) {
-        String raw = firstNonBlank(commandResult, actionStatus, "unknown").toLowerCase();
-        if (raw.equals("success") || raw.equals("succeeded")) {
-            return "success";
-        }
-        if (raw.equals("failed") || raw.equals("error")) {
-            return "failed";
-        }
-        if (raw.equals("partial_success")) {
-            return "partial_success";
-        }
-        return "unknown";
-    }
-
-    private JsonNode parseJsonObject(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        try {
-            JsonNode node = objectMapper.readTree(raw);
-            return node != null && node.isObject() ? node : null;
-        } catch (Exception e) {
-            log.debug("Ignoring malformed replay JSON object: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    private Object parseJsonValueOrRaw(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return raw;
-        }
-        try {
-            return objectMapper.convertValue(objectMapper.readTree(raw), Object.class);
-        } catch (Exception e) {
-            return raw;
-        }
-    }
-
-    private static String firstText(JsonNode first, String firstField, JsonNode second, String secondField) {
-        String v = text(first, firstField);
-        return v != null ? v : text(second, secondField);
-    }
-
-    private static String text(JsonNode node, String field) {
-        if (node == null || field == null) {
-            return null;
-        }
-        JsonNode value = node.get(field);
-        if (value == null || value.isNull()) {
-            return null;
-        }
-        if (value.isTextual()) {
-            String s = value.asText();
-            return s == null || s.isBlank() ? null : s.trim();
-        }
-        if (value.isNumber() || value.isBoolean()) {
-            return value.asText();
-        }
-        return null;
-    }
-
-    private static Long firstLong(JsonNode first, String firstField, JsonNode second, String secondField) {
-        Long v = longValue(first, firstField);
-        return v != null ? v : longValue(second, secondField);
-    }
-
-    private static Long longValue(JsonNode node, String field) {
-        if (node == null || field == null) {
-            return null;
-        }
-        JsonNode value = node.get(field);
-        if (value == null || value.isNull()) {
-            return null;
-        }
-        if (value.isIntegralNumber()) {
-            return value.asLong();
-        }
-        if (value.isTextual()) {
-            try {
-                return Long.parseLong(value.asText());
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private static String firstNonBlank(String... values) {
-        if (values == null) {
-            return null;
-        }
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private static String normalizeBlank(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    private static boolean toolMatches(AgentActionItem action, String toolName) {
-        if (toolName == null) {
-            return true;
-        }
-        return equalsTrimmed(toolName, action.getActionCode())
-                || equalsTrimmed(toolName, action.getCommandCode())
-                || equalsTrimmed(toolName, action.getSkillCode())
-                || equalsTrimmed(toolName, action.getResultContractId());
-    }
-
-    private static boolean equalsTrimmed(String expected, String actual) {
-        return expected != null && actual != null && expected.equals(actual.trim());
-    }
-
-    private static List<String> approvalIds(List<AgentAuthorizationDecisionItem> decisions) {
-        if (decisions == null || decisions.isEmpty()) {
-            return List.of();
-        }
-        return decisions.stream()
-                .map(AgentAuthorizationDecisionItem::getApprovalId)
-                .filter(id -> id != null && !id.isBlank())
-                .distinct()
-                .toList();
-    }
-
-    private AgentApprovalAuditItem mapApprovalAuditRow(ResultSet rs, int rowNum) throws SQLException {
-        Timestamp createdAt = rs.getTimestamp("created_at");
-        Timestamp approvedAt = rs.getTimestamp("approved_at");
-        String requestData = rs.getString("request_data");
-        return AgentApprovalAuditItem.builder()
-                .pid(rs.getString("pid"))
-                .runId(rs.getString("run_id"))
-                .approvalType(rs.getString("approval_type"))
-                .approvalTitle(rs.getString("approval_title"))
-                .approvalDescription(rs.getString("approval_description"))
-                .requestData(requestData)
-                .targetPid(extractTargetPidFromApprovalData(requestData))
-                .approvalStatus(rs.getString("approval_status"))
-                .policyId(rs.getString("policy_id"))
-                .approverId(getLong(rs, "approver_id"))
-                .createdAt(createdAt == null ? null : createdAt.toInstant())
-                .approvedAt(approvedAt == null ? null : approvedAt.toInstant())
-                .build();
-    }
-
-    private String extractTargetPidFromApprovalData(String requestData) {
-        JsonNode node = parseJsonObject(requestData);
-        return extractTargetPid(node);
-    }
-
-    private String extractTargetPid(JsonNode node) {
-        if (node == null) {
-            return null;
-        }
-        String direct = firstNonBlank(
-                text(node, "targetPid"),
-                text(node, "targetRecordPid"),
-                text(node, "recordPid"),
-                text(node, "targetRecordId"),
-                text(node, "recordId"),
-                text(node, "pid"));
-        if (direct != null) {
-            return direct;
-        }
-        for (String container : List.of("args", "input", "payload", "parameters")) {
-            JsonNode nested = node.get(container);
-            if (nested != null && nested.isObject()) {
-                String nestedPid = extractTargetPid(nested);
-                if (nestedPid != null) {
-                    return nestedPid;
-                }
-            }
-        }
-        return null;
-    }
-
-    private static String contractIdForAction(String actionPid) {
-        return actionPid == null ? null : "rc-" + actionPid;
-    }
-
     // =========================================================================
     // RowMappers
     // =========================================================================
-
-    private static final RowMapper<AgentRunListItem> RUN_ROW_MAPPER = (rs, rowNum) -> {
-        Timestamp createdAt = rs.getTimestamp("created_at");
-        Timestamp completedAt = rs.getTimestamp("completed_at");
-
-        // duration_ms preferred (set explicitly when run terminates); when it's
-        // NULL but completed_at is set, derive from the timestamp delta.
-        // Cast to Number (not Long) so the same code works for both BIGINT and
-        // INTEGER columns — historic dev DBs have schema drift where
-        // duration_ms was created as INTEGER and PG JDBC returns Integer there,
-        // which would otherwise CCE on a hard (Long) cast.
-        Number storedDurationNum = (Number) rs.getObject("duration_ms");
-        long durationMs;
-        if (storedDurationNum != null) {
-            durationMs = storedDurationNum.longValue();
-        } else if (completedAt != null && createdAt != null) {
-            durationMs = Duration.between(createdAt.toInstant(), completedAt.toInstant()).toMillis();
-        } else {
-            durationMs = 0L;
-        }
-
-        return AgentRunListItem.builder()
-                .runId(rs.getString("pid"))
-                .agentCode(rs.getString("agent_id"))
-                .runStatus(rs.getString("run_status"))
-                .parentRunId(rs.getString("parent_run_id"))
-                .subtaskOrigin(rs.getString("subtask_origin"))
-                .costUsd(getBigDecimal(rs, "total_cost"))
-                .childAggregateCostUsd(getBigDecimal(rs, "child_aggregate_cost"))
-                .childAggregateTokens(rs.getObject("child_aggregate_tokens") == null
-                        ? 0L : ((Number) rs.getObject("child_aggregate_tokens")).longValue())
-                .durationMs(durationMs)
-                .createdAt(createdAt == null ? null : createdAt.toInstant())
-                .completedAt(completedAt == null ? null : completedAt.toInstant())
-                .intentSummary(rs.getString("intent_summary"))
-                .build();
-    };
-
-    private static final RowMapper<AgentActionItem> ACTION_ROW_MAPPER = (rs, rowNum) -> {
-        Timestamp executedAt = rs.getTimestamp("executed_at");
-        Boolean riskDeviation = (Boolean) rs.getObject("risk_deviation");
-        String pid = rs.getString("pid");
-        return AgentActionItem.builder()
-                .pid(pid)
-                .resultContractId(contractIdForAction(pid))
-                .stepIndex(getInteger(rs, "step_index"))
-                .toolCallIndex(getInteger(rs, "tool_call_index"))
-                .actionCode(rs.getString("action_code"))
-                .actionType(rs.getString("action_type"))
-                .intentSummary(rs.getString("intent_summary"))
-                .targetModel(rs.getString("target_model"))
-                .targetRecordId(rs.getString("target_record_id"))
-                .targetRecordPid(rs.getString("target_record_id"))
-                .beforeSnapshot(rs.getString("before_snapshot"))
-                .afterSnapshot(rs.getString("after_snapshot"))
-                .fieldChanges(rs.getString("field_changes"))
-                .commandCode(rs.getString("command_code"))
-                .commandResult(rs.getString("command_result"))
-                .riskLevel(rs.getString("risk_level"))
-                .estimatedRisk(rs.getString("estimated_risk"))
-                .riskDeviation(riskDeviation)
-                .reversalMode(rs.getString("reversal_mode"))
-                .actionStatus(rs.getString("action_status"))
-                .errorMessage(rs.getString("error_message"))
-                .costUsd(getBigDecimal(rs, "cost_usd"))
-                .tokenUsage(getInteger(rs, "token_usage"))
-                .fidelity(rs.getString("fidelity"))
-                .skillCode(rs.getString("skill_code"))
-                .parallelGroupId(rs.getString("parallel_group_id"))
-                .parallelIndex(getInteger(rs, "parallel_index"))
-                .executedAt(executedAt == null ? null : executedAt.toInstant())
-                .build();
-    };
 
     private static final RowMapper<AgentConversationMessageItem> CONVERSATION_MESSAGE_ROW_MAPPER = (rs, rowNum) -> {
         Timestamp createdAt = rs.getTimestamp("created_at");
@@ -1203,27 +507,6 @@ public class AgentRunController {
                 .build();
     };
 
-    private static final RowMapper<AgentAuthorizationDecisionItem> AUTHORIZATION_DECISION_ROW_MAPPER = (rs, rowNum) -> {
-        Timestamp decisionAt = rs.getTimestamp("decision_at");
-        return AgentAuthorizationDecisionItem.builder()
-                .pid(rs.getString("pid"))
-                .runId(rs.getString("run_id"))
-                .decisionKind(rs.getString("decision_kind"))
-                .toolRef(rs.getString("tool_ref"))
-                .skillCode(rs.getString("skill_code"))
-                .blastRadius(rs.getString("blast_radius"))
-                .requestedEffects(rs.getString("requested_effects"))
-                .grantedEffects(rs.getString("granted_effects"))
-                .rejectedEffects(rs.getString("rejected_effects"))
-                .requireApproval(rs.getBoolean("require_approval"))
-                .approvalId(rs.getString("approval_id"))
-                .policyId(rs.getString("policy_id"))
-                .policyVersion(getInteger(rs, "policy_version"))
-                .decisionReason(rs.getString("decision_reason"))
-                .decisionAt(decisionAt == null ? null : decisionAt.toInstant())
-                .build();
-    };
-
     private static final RowMapper<AgentInterruptItem> INTERRUPT_ROW_MAPPER = (rs, rowNum) -> {
         Timestamp createdAt = rs.getTimestamp("created_at");
         return AgentInterruptItem.builder()
@@ -1233,7 +516,7 @@ public class AgentRunController {
                 .newMessageExcerpt(rs.getString("new_message_excerpt"))
                 .subPolicy(rs.getString("sub_policy"))
                 .classifierTier(rs.getString("classifier_tier"))
-                .confidence(getBigDecimal(rs, "confidence"))
+                .confidence(AgentRunQuerySupport.getBigDecimal(rs, "confidence"))
                 .reason(rs.getString("reason"))
                 .actionTaken(rs.getString("action_taken"))
                 .subtaskRunId(rs.getString("subtask_run_id"))
@@ -1250,28 +533,6 @@ public class AgentRunController {
                     .dispatchedSkill(rs.getString("dispatched_skill"))
                     .channel(rs.getString("channel"))
                     .build();
-
-    private static Integer getInteger(ResultSet rs, String col) throws SQLException {
-        int v = rs.getInt(col);
-        return rs.wasNull() ? null : v;
-    }
-
-    private static BigDecimal getBigDecimal(ResultSet rs, String col) throws SQLException {
-        BigDecimal v = rs.getBigDecimal(col);
-        return rs.wasNull() ? null : v;
-    }
-
-    private static Long getLong(ResultSet rs, String col) throws SQLException {
-        long v = rs.getLong(col);
-        return rs.wasNull() ? null : v;
-    }
-
-    private static String timestampString(ResultSet rs, String col) throws SQLException {
-        Timestamp timestamp = rs.getTimestamp(col);
-        return timestamp == null ? null : timestamp.toInstant().toString();
-    }
-
-    private record RunConversationSeed(String runId, String metadata, String inputData) {}
 
     private record TurnSeed(String runId, String taskId, String runStatus,
                             Timestamp startedAt, Timestamp completedAt,
