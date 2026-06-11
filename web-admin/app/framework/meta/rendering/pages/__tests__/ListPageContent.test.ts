@@ -21,7 +21,7 @@ describe('collectListReferenceDisplayConfigs', () => {
             dataType: 'reference',
             extension: {
               refTarget: {
-                modelCode: 'bom_project',
+                modelCode: 'req_requirement_set_pcba_bom',
                 displayField: 'bom_project_name',
               },
             },
@@ -33,14 +33,14 @@ describe('collectListReferenceDisplayConfigs', () => {
     expect(configs).toEqual([
       {
         field: 'bom_task_project_id',
-        modelCode: 'bom_project',
+        modelCode: 'req_requirement_set_pcba_bom',
         valueField: 'pid',
         displayField: 'bom_project_name',
         displayKey: 'bom_task_project_id_display',
       },
     ]);
     expect(buildListReferenceDisplayCacheKey(configs[0])).toBe(
-      'bom_task_project_id|bom_project|pid|bom_project_name',
+      'bom_task_project_id|req_requirement_set_pcba_bom|pid|bom_project_name',
     );
   });
 });
