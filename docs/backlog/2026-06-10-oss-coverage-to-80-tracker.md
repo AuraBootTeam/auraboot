@@ -121,6 +121,16 @@ floors at 0.84 for `permission/auth/tenant/rbac .service.impl`. Verified passing
 real report (`:jacocoTestCoverageVerification` BUILD SUCCESSFUL). Next: raise global → 0.80
 as sub-80% packages land; add a `BRANCH` floor once branch coverage is lifted from 34.5%.
 
+**Backend — 2026-06-11 (dict-domain real-stack IT, #8/#9 phase 2):** added
+`DictServiceImplIntegrationTest` (19 tests) + `DictCascadeServiceImplIntegrationTest`
+(11 tests) exercising the dictionary services against the real DB (no mocked
+mappers/bridges). Lift: `DictServiceImpl` 26.7%→**79.0%** line (52.7% branch),
+`DictCascadeServiceImpl` 1.8%→**77.2%** line (59.3% branch) — ~+480 covered lines in
+`meta/service/impl` (47.0%→~49.8%). Bundle LINE 70.2%→**71.5%**; **BUNDLE floor raised
+0.68 → 0.69** (preserves the original ~2pt flaky margin), verified passing on the full
+suite report. Next dict-domain targets if continued: `DictVersionServiceImpl` (36.7%),
+then the larger gaps `DynamicDataServiceImpl` (34%), `NamedQueryServiceImpl` (47%).
+
 **Frontend** — wired in `web-admin/vitest.config.ts` `coverage.thresholds` (lines 19 /
 stmts 18 / funcs 16 / branches 16 today). Raise in lockstep with new tests.
 
