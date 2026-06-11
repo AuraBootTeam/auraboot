@@ -151,6 +151,12 @@ export interface FieldConfig {
   validation?: ValidationRule[];
   dataSource?: string | DataSourceConfig; // 支持直接引用 dataSource ID
   dependOn?: string[];
+  /**
+   * Mirror this field's value to a page state key (e.g. `statusFilter`) so data
+   * sources that read `${state.<bindState>}` (filter/search inputs feeding a
+   * list query) receive it. Without this the value only lives in form scope.
+   */
+  bindState?: string;
   optionsWhen?: string;
   visibleWhen?: string;
   enableWhen?: string;
