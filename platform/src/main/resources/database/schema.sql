@@ -1965,7 +1965,10 @@ CREATE TABLE IF NOT EXISTS ab_data_change_log (
     model_code        VARCHAR(64) NOT NULL,
     record_id         VARCHAR(64) NOT NULL,
     operation         VARCHAR(16) NOT NULL,          -- CREATE / UPDATE / DELETE
-    changed_by        BIGINT NOT NULL,
+    changed_by        BIGINT,                        -- nullable: system/automation-triggered
+                                                     -- writes (webhook/scheduled automations,
+                                                     -- setSystemTenantContext) have no acting
+                                                     -- user; matches ab_mobile_config_audit.
     changed_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     command_code      VARCHAR(64),
     client_request_id VARCHAR(64),
