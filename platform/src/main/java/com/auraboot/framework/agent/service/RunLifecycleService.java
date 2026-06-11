@@ -119,7 +119,11 @@ public class RunLifecycleService {
         List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(
                 "SELECT parent_id FROM ab_agent_task WHERE pid = #{params.pid}",
                 Map.of("pid", taskPid));
-        String parentTaskPid = rows.isEmpty() ? null : (String) rows.get(0).get("parent_id");
+        // A root task has parent_id NULL; selectByQuery then maps the all-null
+        // row to a null element, so the list is non-empty but rows.get(0) is null.
+        // Guard the element too — otherwise failing a root task NPEs here.
+        Map<String, Object> first = rows.isEmpty() ? null : rows.get(0);
+        String parentTaskPid = first == null ? null : (String) first.get("parent_id");
         eventPublisher.publishEvent(new AgentTaskCompletedEvent(tenantId, taskPid, parentTaskPid, status));
     }
 
