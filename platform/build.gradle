@@ -719,13 +719,22 @@ jacocoTestCoverageVerification {
         // original ~2pt flaky margin — full-suite IT has run-to-run flake). Keep raising
         // it as more of meta/service/impl lands. The number went DOWN from the old
         // narrow 80% but the SCOPE went UP — this is more rigorous, not less.
+        // 2026-06-11 wave 2: real-stack IT for six more near-zero meta/service/impl
+        // classes — EdiService 0.3->96%, QueryAuditServiceImpl 8.5->82%,
+        // SecureQueryExecutorImpl 16->74%, SchemaAccessProjectorImpl 0.4->57%,
+        // FieldForkServiceImpl 1->87%, FieldImpactAnalysisServiceImpl 1->100%
+        // (+249 tests, ~+1600 covered lines). meta/service/impl 56.1->65.4%; the
+        // gate-denominator bundle now reads ~0.75, so the floor is raised 0.71->0.73
+        // (same ~2pt flaky margin). Two of the six surfaced live jsonb-persistence
+        // bugs (fixed in-band); behavioral findings are in
+        // docs/backlog/2026-06-11-meta-impl-coverage-product-findings.md.
         rule {
             enabled = true
             element = 'BUNDLE'
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.71
+                minimum = 0.73
             }
         }
         // Lock the already-strong security/identity domains so they cannot rot.
