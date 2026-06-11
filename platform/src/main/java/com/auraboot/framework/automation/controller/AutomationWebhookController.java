@@ -65,17 +65,26 @@ public class AutomationWebhookController {
 
         // Validate webhook security against the raw body bytes — not a re-serialized Map.
         // HashMap.toString() key ordering is non-canonical and would break HMAC verification.
+        //
+        // FAIL-CLOSED: this endpoint is JWT-exempt (whitelisted for external services), so an
+        // automation without a properly configured validation mode + secret must NEVER execute
+        // from an unauthenticated request.
         TriggerConfig config = automation.getTriggerConfig();
-        if (config != null) {
-            String validationMode = config.getValidationMode();
-            if ("signature".equals(validationMode)) {
-                if (!validateSignature(rawBody, signature, config.getSecret())) {
-                    return ApiResponse.error("Invalid webhook signature");
-                }
-            } else if ("token".equals(validationMode)) {
-                if (!validateToken(token, config.getSecret())) {
-                    return ApiResponse.error("Invalid webhook token");
-                }
+        String validationMode = config == null ? null : config.getValidationMode();
+        String secret = config == null ? null : config.getSecret();
+        boolean modeSupported = "signature".equals(validationMode) || "token".equals(validationMode);
+        if (!modeSupported || secret == null || secret.isBlank()) {
+            log.warn("Refusing webhook for automation {}: validation not configured (mode={})",
+                    automationPid, validationMode);
+            return ApiResponse.error("Webhook validation not configured; refusing unauthenticated trigger");
+        }
+        if ("signature".equals(validationMode)) {
+            if (!validateSignature(rawBody, signature, secret)) {
+                return ApiResponse.error("Invalid webhook signature");
+            }
+        } else {
+            if (!validateToken(token, secret)) {
+                return ApiResponse.error("Invalid webhook token");
             }
         }
 

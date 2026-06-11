@@ -40,6 +40,10 @@ public class WhiteList {
             "/api/payment/webhook/**",
             "/api/marketplace/paid/webhooks/stripe",
 
+            // Automation webhook receiver (no auth — controller enforces per-automation
+            // signature/token validation and fails closed when none is configured)
+            "/api/automations/webhooks/**",
+
             // CRM public inbound endpoint (no auth — adapters perform their own verification)
             "/api/crm/inbound/**",
             "/api/crm/forms/**",
