@@ -48,7 +48,8 @@ public class EdiPartner {
     private String authType;
 
     /** Auth credentials (encrypted reference), stored as JSONB */
-    @TableField("auth_config")
+    @TableField(value = "auth_config",
+            typeHandler = com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler.class)
     private String authConfig;
 
     @TableField("sender_id")

@@ -50,7 +50,8 @@ public class EdiTransaction {
     private String rawContent;
 
     /** Parsed structured data, stored as JSONB */
-    @TableField("parsed_data")
+    @TableField(value = "parsed_data",
+            typeHandler = com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler.class)
     private String parsedData;
 
     @TableField("error_message")
