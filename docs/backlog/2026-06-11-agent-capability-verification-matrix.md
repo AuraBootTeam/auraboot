@@ -144,6 +144,8 @@ created: 2026-06-11
 
 ## 4b. 第 2 轮:13 个失败逐条定性(crm-seeded clone + fix,2026-06-11)
 
+> ⚠️ **本节(第 2 轮)的部分定性已被 TL;DR 的最终结论推翻,保留作误判证据**:下表把 8 个 `CapabilityRouter` 失败判为「test-tenant capability 同步 / 更深 env(非路由 bug)」、把 `loadPlanFromRun` PGobject 判为「待跟进 / env-config 差异」——**第 3 轮根因深挖证明二者都是真 PGobject 生产 bug**(`CapabilityRouter.parseJsonList` = **#589**,JSONB 返 PGobject 时路由层整体返空;`PlanService.loadPlanFromRun` = **#586**)。最终结论以 §TL;DR 为准:3 真 bug(#580/#586/#589)+ 5 env + 0 残留产品 bug。**教训(同 §15)**:失败现象是「返空 / 解析失败」时先 root-cause 再分类,别从「失败在 crm 域 / 路由空」就推 env——本会话两度误判,owner 坚持「根因解决」才纠正。系统性根因已固化 canonical `auraboot-enterprise/docs/agent-rules/engineering-gotchas/backend-spring-db.md` §「读 JSONB 列经通用查询返 PGobject」。
+
 把 crm-a4 库 `auraboot_11`(有 crm)只读 `pg_dump` 还原到独立 `auraboot_32`(`mt_crm_account` 在 + 231 crm caps),用 `SPRING_DATASOURCE_URL` env 覆盖让 testAgent 跑 crm-seeded 库 + 我的 failRun fix:
 
 | 原失败 | 数 | 第 2 轮结果 | 定性 |
