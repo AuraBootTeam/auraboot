@@ -20,7 +20,8 @@ not by mock-heavy unit tests chasing a line number (that would violate AGENTS.md
 
 | Module | Tests | Coverage baseline |
 |---|---|---|
-| Backend `platform` (curated set) | 1170 test files; ~5000 tests run | **LINE 80.1%** (33671/42043), **BRANCH 34.5%** (14708/42575), INSTRUCTION 52.6%, METHOD 46.5%, CLASS 95.6% |
+| Backend `platform` (curated, meta/service/impl excluded) | 1170 test files; ~5000 tests run | **LINE 80.1%** (33671/42043), BRANCH 34.5% — *artificially narrow: hid the command pipeline* |
+| Backend `platform` (honest, 2026-06-11: meta/service/impl MEASURED) | same suite | **LINE 70.2%** (42826/61002), BRANCH 31.1% — orchestration core un-excluded; gate floor set to 0.68. Measured full-logic (only controllers + data-layer excluded) = 70.1%; meta/service/impl itself is 47%, pipeline phases 62%, agent/runtime 87%, aps/engine 92% — the low areas are controllers (E2E-covered: meta 18.8%, bpm 10.2%, email 2.7%) |
 | Frontend `web-admin` | 285 spec files / 2099 tests, all pass | **LINE 19.08%** (13631/71413), Stmts 18.79%, Funcs 16.43%, Branches 16.44% |
 | Frontend `web-admin` (after Phase 1, 2026-06-11) | 327 spec files / 2905 tests | **LINE 22.48%** (15904/70716) — +814 tests via #529/#531/#532/#533/#534 (services+hooks+server/stores); ratchet floor 22 |
 | Frontend `web-admin` (after Phase 1 round 2, 2026-06-11) | 351 spec files / 3599 tests | **LINE 25.61%** (18112/70716), Stmts 25.13%, Funcs 22.35%, Branches 19.9% — +697 tests via #540/#541/#542/#543 (designer runtime engines + studio/plugin hooks + useTaskCenter/useDslForm); ratchet floor raised to 25 |
