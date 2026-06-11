@@ -129,6 +129,31 @@ class BackgroundDataAccessorImplTest {
     }
 
     @Test
+    void query_bypassesForegroundDataProjection_andRestoresPriorMemberContext() {
+        MetaContext.setContext(7L, 99L, "user-pid", "operator", java.util.Set.of(11L));
+        MetaContext.setMemberId(123L);
+        PaginationResult<Map<String, Object>> page = new PaginationResult<>();
+        page.setRecords(List.of(Map.of("id", "x1", "cr_cj_status", "RUNNING")));
+        when(dds.list(eq("cr_crawl_job"), any(DynamicQueryRequest.class))).thenAnswer(inv -> {
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
+            assertThat(MetaContext.getCurrentUserId()).isEqualTo(0L);
+            assertThat(MetaContext.getCurrentMemberId()).isNull();
+            assertThat(MetaContext.isDataPermissionBypassed()).isTrue();
+            return page;
+        });
+
+        List<Map<String, Object>> result = accessor.query(42L, "cr_crawl_job", Map.of());
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).containsEntry("cr_cj_status", "RUNNING");
+        assertThat(MetaContext.getCurrentTenantId()).isEqualTo(7L);
+        assertThat(MetaContext.getCurrentUserId()).isEqualTo(99L);
+        assertThat(MetaContext.getCurrentMemberId()).isEqualTo(123L);
+        assertThat(MetaContext.isDataPermissionBypassed()).isFalse();
+        assertThat(MetaContext.getCurrentRoleIds()).containsExactly(11L);
+    }
+
+    @Test
     void delete_returnsNullSafely_andClearsContext() {
         doThrow(new RuntimeException("no")).when(dds).delete(anyString(), anyString());
 

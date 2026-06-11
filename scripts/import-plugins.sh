@@ -18,6 +18,8 @@ EDITION="auto"
 BACKEND_URL="${BACKEND_URL:-}"
 PLUGIN_ROOT="${PLUGIN_ROOT:-${PLUGINS_DIR:-}}"
 ENTERPRISE_PLUGIN_ROOT="${ENTERPRISE_PLUGIN_ROOT:-${ENTERPRISE_PLUGINS_DIR:-}}"
+EXTRA_PLUGIN_ROOTS_RAW="${EXTRA_PLUGIN_ROOTS:-${EXTRA_PLUGINS_DIRS:-}}"
+EXTRA_PLUGIN_ROOTS=()
 PLUGINS=()
 
 usage() {
@@ -38,11 +40,14 @@ Options:
                                    path in --slug Docker mode.
   --enterprise-plugin-root=<path>  Enterprise plugin root. Host path in host mode;
                                    container path in --slug Docker mode.
+  --extra-plugin-root=<path>       Additional plugin root. Can be passed multiple times.
+                                   Host path in host mode; container path in --slug Docker mode.
 
 Environment:
   ADMIN_EMAIL        default: admin@auraboot.com
   ADMIN_PASSWORD     default: Test2026x
   IMPORT_ATTEMPTS    default: 2
+  EXTRA_PLUGIN_ROOTS colon-separated additional plugin roots
 USAGE
 }
 
@@ -54,6 +59,7 @@ for arg in "$@"; do
         --backend-url=*) BACKEND_URL="${arg#--backend-url=}" ;;
         --plugin-root=*) PLUGIN_ROOT="${arg#--plugin-root=}" ;;
         --enterprise-plugin-root=*) ENTERPRISE_PLUGIN_ROOT="${arg#--enterprise-plugin-root=}" ;;
+        --extra-plugin-root=*) EXTRA_PLUGIN_ROOTS+=("${arg#--extra-plugin-root=}") ;;
         --help|-h) usage; exit 0 ;;
         --*) echo "ERROR: unknown argument: $arg" >&2; usage; exit 2 ;;
         *) PLUGINS+=("$arg") ;;
@@ -94,6 +100,22 @@ else
     PLUGIN_ROOT="${PLUGIN_ROOT:-$PROJECT_ROOT/plugins}"
     if [ -z "$ENTERPRISE_PLUGIN_ROOT" ] && [ -n "${AURA_ENTERPRISE_ROOT:-}" ]; then
         ENTERPRISE_PLUGIN_ROOT="$AURA_ENTERPRISE_ROOT/plugins"
+    fi
+fi
+
+if [ -n "$EXTRA_PLUGIN_ROOTS_RAW" ]; then
+    IFS=':' read -r -a env_extra_roots <<< "$EXTRA_PLUGIN_ROOTS_RAW"
+    for root in "${env_extra_roots[@]}"; do
+        if [ -n "$root" ]; then
+            EXTRA_PLUGIN_ROOTS+=("$root")
+        fi
+    done
+fi
+
+if [ -z "$SLUG" ]; then
+    DEFAULT_AURA_QUOTE_PLUGIN_ROOT="$(cd "$PROJECT_ROOT/.." 2>/dev/null && pwd)/aura-quote/plugin-aura"
+    if [ -d "$DEFAULT_AURA_QUOTE_PLUGIN_ROOT" ]; then
+        EXTRA_PLUGIN_ROOTS+=("$DEFAULT_AURA_QUOTE_PLUGIN_ROOT")
     fi
 fi
 
@@ -143,6 +165,9 @@ echo "Profile: $PROFILE; edition: $EDITION"
 echo "Plugin root: $PLUGIN_ROOT"
 if [ -n "$ENTERPRISE_PLUGIN_ROOT" ]; then
     echo "Enterprise plugin root: $ENTERPRISE_PLUGIN_ROOT"
+fi
+if [ "${#EXTRA_PLUGIN_ROOTS[@]}" -gt 0 ]; then
+    echo "Extra plugin roots: ${EXTRA_PLUGIN_ROOTS[*]}"
 fi
 echo "Plugins (${#PLUGINS[@]}): ${PLUGINS[*]}"
 
@@ -221,6 +246,11 @@ container_plugin_path() {
     local plugin="$1"
     local candidate
 
+    if path_has_plugin "$plugin"; then
+        printf '%s\n' "$plugin"
+        return 0
+    fi
+
     case "$EDITION" in
         oss)
             candidate="$PLUGIN_ROOT/$plugin"
@@ -244,6 +274,14 @@ container_plugin_path() {
             fi
             ;;
     esac
+
+    for root in "${EXTRA_PLUGIN_ROOTS[@]}"; do
+        candidate="$root/$plugin"
+        if path_has_plugin "$candidate"; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
     return 1
 }
 

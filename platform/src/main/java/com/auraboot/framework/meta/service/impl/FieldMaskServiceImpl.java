@@ -12,6 +12,9 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -131,6 +134,8 @@ public class FieldMaskServiceImpl implements FieldMaskService {
                 return maskPartial(value, maskPattern, rc);
             case "full":
                 return rc.repeat(Math.min(value.length(), 10));
+            case "hash":
+                return maskHash(value);
             case "custom":
                 return maskCustom(value, maskPattern, rc);
             default:
@@ -366,5 +371,20 @@ public class FieldMaskServiceImpl implements FieldMaskService {
         }
         masked.append(value, fromIndex, value.length());
         return masked.toString();
+    }
+
+    private String maskHash(String value) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(16);
+            for (int i = 0; i < 8; i++) {
+                sb.append(String.format("%02x", hash[i]));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            log.error("SHA-256 not available for hash masking", e);
+            return "********";
+        }
     }
 }

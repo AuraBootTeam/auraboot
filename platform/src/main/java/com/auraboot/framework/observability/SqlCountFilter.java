@@ -43,8 +43,8 @@ public class SqlCountFilter extends OncePerRequestFilter {
 
     public SqlCountFilter(
             MeterRegistry meterRegistry,
-            @Value("${auraboot.performance.sql-count-warn-threshold:10}") int warnThreshold,
-            @Value("${auraboot.performance.sql-count-error-threshold:50}") int errorThreshold,
+            @Value("${auraboot.performance.sql-count-warn-threshold:50}") int warnThreshold,
+            @Value("${auraboot.performance.sql-count-error-threshold:100}") int errorThreshold,
             @Value("${auraboot.performance.sql-count-header-enabled:true}") boolean headerEnabled) {
         this.warnThreshold = warnThreshold;
         this.errorThreshold = errorThreshold;
@@ -97,6 +97,11 @@ public class SqlCountFilter extends OncePerRequestFilter {
                         .record(count);
             }
 
+            if (!shouldLogSqlCountSeverity(request.getRequestURI())) {
+                SqlCountHolder.reset();
+                return;
+            }
+
             if (count >= errorThreshold) {
                 log.error("Excessive SQL count: {} queries for {} {}",
                         count, request.getMethod(), request.getRequestURI());
@@ -124,5 +129,9 @@ public class SqlCountFilter extends OncePerRequestFilter {
         // Replace pure numeric IDs (whole path segments only)
         normalized = normalized.replaceAll("/\\d+(?=/|$)", "/{id}");
         return normalized;
+    }
+
+    static boolean shouldLogSqlCountSeverity(String uri) {
+        return uri == null || !uri.startsWith("/api/test/");
     }
 }

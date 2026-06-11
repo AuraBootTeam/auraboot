@@ -4,6 +4,7 @@ import com.auraboot.framework.common.util.PathSafetyUtils;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
+import com.auraboot.framework.plugin.pf4j.BackgroundComponentRegistry;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.pf4j.PluginExtensionRegistryBridge;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.*;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
 /**
@@ -46,6 +49,7 @@ public class PluginHotloadController {
     private final AuraPluginManager pluginManager;
     private final ExtensionRegistry extensionRegistry;
     private final PluginExtensionRegistryBridge pluginExtensionRegistryBridge;
+    private final BackgroundComponentRegistry backgroundComponentRegistry;
 
     /**
      * Upload and hot-load a plugin JAR.
@@ -67,10 +71,28 @@ public class PluginHotloadController {
                     HotloadResult.failure("Invalid file type", "Only JAR files are accepted"));
         }
 
+        Path uploadPath = null;
         try {
-            // Save file to plugins directory
+            uploadPath = Files.createTempFile(pluginManager.getPluginsRoot(), "plugin-upload-", ".jar");
+            Files.copy(file.getInputStream(), uploadPath, StandardCopyOption.REPLACE_EXISTING);
+            String uploadedPluginId = readPluginIdFromJar(uploadPath);
+
             Path targetPath = PathSafetyUtils.requireSafeChild(pluginManager.getPluginsRoot(), filename, "plugin upload target");
-            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+            String existingPluginId = uploadedPluginId != null
+                    ? uploadedPluginId
+                    : findLoadedPluginByPath(targetPath).orElse(null);
+            if (existingPluginId != null && pluginManager.isPluginLoaded(existingPluginId)) {
+                backgroundComponentRegistry.unregister(existingPluginId);
+                extensionRegistry.removePluginFromCache(existingPluginId);
+                boolean unloaded = pluginManager.hotUnloadPlugin(existingPluginId);
+                if (!unloaded) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                            HotloadResult.failure("Unload failed", "Failed to unload the existing plugin"));
+                }
+            }
+
+            Files.move(uploadPath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            uploadPath = null;
             log.info("Saved plugin JAR to: {}", targetPath);
 
             // Hot-load the plugin
@@ -82,6 +104,7 @@ public class PluginHotloadController {
             }
 
             refreshPluginRegistries(pluginId);
+            backgroundComponentRegistry.register(pluginId);
 
             // Get plugin info
             PluginWrapper wrapper = pluginManager.getPluginWrapper(pluginId);
@@ -94,6 +117,14 @@ public class PluginHotloadController {
             log.error("Failed to save plugin file", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     HotloadResult.failure("IO error", e.getMessage()));
+        } finally {
+            if (uploadPath != null) {
+                try {
+                    Files.deleteIfExists(uploadPath);
+                } catch (IOException e) {
+                    log.warn("Failed to delete temporary plugin upload: {}", uploadPath, e);
+                }
+            }
         }
     }
 
@@ -108,6 +139,7 @@ public class PluginHotloadController {
             return ResponseEntity.notFound().build();
         }
 
+        backgroundComponentRegistry.unregister(pluginId);
         boolean success = pluginManager.hotReloadPlugin(pluginId);
         if (!success) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
@@ -115,6 +147,7 @@ public class PluginHotloadController {
         }
 
         refreshPluginRegistries(pluginId);
+        backgroundComponentRegistry.register(pluginId);
 
         PluginWrapper wrapper = pluginManager.getPluginWrapper(pluginId);
         PluginInfo info = toPluginInfo(wrapper);
@@ -138,6 +171,7 @@ public class PluginHotloadController {
         }
 
         Path pluginPath = wrapper.getPluginPath();
+        backgroundComponentRegistry.unregister(pluginId);
         boolean success = pluginManager.hotUnloadPlugin(pluginId);
         if (!success) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
@@ -212,6 +246,7 @@ public class PluginHotloadController {
         }
 
         refreshPluginRegistries(pluginId);
+        backgroundComponentRegistry.register(pluginId);
         return ResponseEntity.ok(HotloadResult.success("start", pluginId, toPluginInfo(wrapper)));
     }
 
@@ -231,6 +266,7 @@ public class PluginHotloadController {
             return ResponseEntity.ok(HotloadResult.success("stop", pluginId, toPluginInfo(wrapper)));
         }
 
+        backgroundComponentRegistry.unregister(pluginId);
         PluginState state = pluginManager.stopPlugin(pluginId);
         if (state != PluginState.STOPPED) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
@@ -286,6 +322,29 @@ public class PluginHotloadController {
                 pluginExtensionRegistryBridge.bridgePluginCommandHandlers();
         log.info("Plugin registries refreshed: {} command handlers registered, {} skipped",
                 result.registered(), result.skipped());
+    }
+
+    private Optional<String> findLoadedPluginByPath(Path targetPath) {
+        Path normalizedTarget = targetPath.toAbsolutePath().normalize();
+        return Optional.ofNullable(pluginManager.getAllPlugins()).orElse(List.of()).stream()
+                .filter(wrapper -> wrapper.getPluginPath() != null)
+                .filter(wrapper -> wrapper.getPluginPath().toAbsolutePath().normalize().equals(normalizedTarget))
+                .map(PluginWrapper::getPluginId)
+                .findFirst();
+    }
+
+    private String readPluginIdFromJar(Path jarPath) {
+        try (JarFile jarFile = new JarFile(jarPath.toFile())) {
+            Manifest manifest = jarFile.getManifest();
+            if (manifest == null) {
+                return null;
+            }
+            String pluginId = manifest.getMainAttributes().getValue("Plugin-Id");
+            return pluginId == null || pluginId.isBlank() ? null : pluginId;
+        } catch (IOException e) {
+            log.warn("Failed to read Plugin-Id from uploaded JAR: {}", jarPath, e);
+            return null;
+        }
     }
 
     // ========== Response DTOs ==========

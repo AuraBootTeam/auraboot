@@ -2,7 +2,7 @@
  * Sales — Order & Quotation Lifecycle E2E Tests
  *
  * Tests SL-ORD-001 ~ SL-ORD-011: Full lifecycle coverage for:
- * - sl_sales_order: Create, list, add lines, state transitions (draft→pending→approved)
+ * - sl_sales_order_common: Create, list, add lines, state transitions (draft→pending→approved)
  * - sl_sales_quotation: Create, list, add lines, send (draft→SENT)
  * - i18n: Verify Chinese column headers render correctly
  * - Navigation: Verify sidebar menu → list page flow
@@ -122,13 +122,13 @@ test.describe('Sales — Order & Quotation Lifecycle', () => {
     await page.waitForResponse(() => true, { timeout: 3_000 }).catch(() => null);
 
     // Sales order link
-    const orderLink = nav.locator('a[href="/p/sl_sales_order"]').first();
+    const orderLink = nav.locator('a[href="/p/sl_sales_order_common"]').first();
     await orderLink.scrollIntoViewIfNeeded();
     await orderLink.evaluate((el: HTMLElement) => el.click());
 
     // Wait for list API to respond
     await page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/sl_sales_order/list') && r.status() === 200,
+      (r) => r.url().includes('/api/dynamic/sl_sales_order_common/list') && r.status() === 200,
       { timeout: 15_000 },
     );
 
@@ -170,7 +170,7 @@ test.describe('Sales — Order & Quotation Lifecycle', () => {
     expect(orderPid).toBeTruthy();
 
     // Fetch the created record to get the auto-generated code
-    const resp = await page.request.get(`/api/dynamic/sl_sales_order/${orderPid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_sales_order_common/${orderPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
@@ -216,7 +216,7 @@ test.describe('Sales — Order & Quotation Lifecycle', () => {
     expect(orderLinePid).toBeTruthy();
 
     // Verify the order total was updated via side effect aggregation
-    const resp = await page.request.get(`/api/dynamic/sl_sales_order/${orderPid}`);
+    const resp = await page.request.get(`/api/dynamic/sl_sales_order_common/${orderPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
@@ -239,7 +239,7 @@ test.describe('Sales — Order & Quotation Lifecycle', () => {
     expect(submitResult.recordId || submitResult.code).toBeTruthy();
 
     // Verify status changed to pending
-    let resp = await page.request.get(`/api/dynamic/sl_sales_order/${orderPid}`);
+    let resp = await page.request.get(`/api/dynamic/sl_sales_order_common/${orderPid}`);
     expect(resp.ok()).toBe(true);
     let body = await resp.json();
     let record = body.data ?? body;
@@ -256,7 +256,7 @@ test.describe('Sales — Order & Quotation Lifecycle', () => {
     expect(approveResult.recordId || approveResult.code).toBeTruthy();
 
     // Verify status changed to approved
-    resp = await page.request.get(`/api/dynamic/sl_sales_order/${orderPid}`);
+    resp = await page.request.get(`/api/dynamic/sl_sales_order_common/${orderPid}`);
     expect(resp.ok()).toBe(true);
     body = await resp.json();
     record = body.data ?? body;

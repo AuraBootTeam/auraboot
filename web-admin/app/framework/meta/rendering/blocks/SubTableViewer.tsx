@@ -14,7 +14,9 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router';
 import type {
+  ButtonConfig,
   ColumnConfig,
   SubTableConfig,
   ValidationRule,
@@ -36,6 +38,7 @@ import {
   resolveTemporalFormat,
   type DateTimeFormatPreferences,
 } from '~/shared/services/dateTimeFormatService';
+import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from '~/framework/meta/rendering/pages/utils/visibleWhen';
 
 export interface SubTableViewerProps {
   config: SubTableConfig;
@@ -58,6 +61,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   isEditable = false,
   onDataChange,
 }) => {
+  const navigate = useNavigate();
   const { timezone, formats } = useTimezone();
   const [rows, setRows] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +74,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   const [addErrors, setAddErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [rowActionLoadingKey, setRowActionLoadingKey] = useState<string | null>(null);
 
   // Inline edit state
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
@@ -126,6 +131,30 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     },
     [parentRecordData, parentRecordId],
   );
+
+  const resolveDefaultValue = useCallback(
+    (raw: unknown): unknown => {
+      if (typeof raw === 'string') return interpolateRecordValue(raw);
+      if (Array.isArray(raw)) return raw.map((item) => resolveDefaultValue(item));
+      if (raw && typeof raw === 'object') {
+        return Object.fromEntries(
+          Object.entries(raw as Record<string, unknown>).map(([key, value]) => [
+            key,
+            resolveDefaultValue(value),
+          ]),
+        );
+      }
+      return raw;
+    },
+    [interpolateRecordValue],
+  );
+
+  const resolvedDefaultValues = useMemo(() => {
+    if (!config.defaultValues) return {};
+    return Object.fromEntries(
+      Object.entries(config.defaultValues).map(([key, value]) => [key, resolveDefaultValue(value)]),
+    );
+  }, [config.defaultValues, resolveDefaultValue]);
 
   useEffect(() => {
     if (!parentRecordId) return;
@@ -413,8 +442,9 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     setAddErrors({});
     try {
       const payload: Record<string, any> = {
-        [config.parentField]: parentRecordId,
+        ...resolvedDefaultValues,
         ...newRowData,
+        [config.parentField]: parentRecordId,
       };
 
       const result = await fetchResult(`/api/meta/commands/execute/${config.commands.create}`, {
@@ -439,7 +469,16 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     } finally {
       setSaving(false);
     }
-  }, [config, newRowData, parentRecordId, token, reloadRows, onDataChange, resolveColumnLabel]);
+  }, [
+    config,
+    newRowData,
+    parentRecordId,
+    token,
+    reloadRows,
+    onDataChange,
+    resolvedDefaultValues,
+    resolveColumnLabel,
+  ]);
 
   // Delete command handler
   const handleDeleteRow = useCallback(
@@ -470,6 +509,163 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       }
     },
     [config.commands, token, reloadRows, onDataChange],
+  );
+
+  const resolveButtonLabel = useCallback(
+    (button: ButtonConfig): string => {
+      if (button.content) return getLocalizedText(button.content, locale, t);
+      if (button.label) return getLocalizedText(button.label, locale, t);
+      if (button.commandCode && button.commandCode.includes(':')) {
+        const [ns, actionCode] = button.commandCode.split(':');
+        const namespaced = `${ns}.action.${actionCode}`;
+        const translated = t(namespaced);
+        if (translated && translated !== namespaced) return translated;
+      }
+      if (button.action && typeof button.action === 'string') {
+        const key = `action.${button.action}`;
+        const translated = t(key);
+        if (translated && translated !== key) return translated;
+      }
+      const codeKey = `action.${button.code}`;
+      const codeTranslated = t(codeKey);
+      if (codeTranslated && codeTranslated !== codeKey) return codeTranslated;
+      return button.code;
+    },
+    [locale, t],
+  );
+
+  const resolveRowActionCommand = useCallback((button: ButtonConfig): string | null => {
+    const actionDef = button.action && typeof button.action === 'object' ? button.action : null;
+    const command = (actionDef as any)?.command || button.commandCode;
+    return typeof command === 'string' && command.length > 0 ? command : null;
+  }, []);
+
+  const interpolateRowPath = useCallback((raw: string, row: Record<string, any>): string => {
+    const rowId = row.pid || row.id || '';
+    let value = raw.replace(/\{(\w+)\}/g, (_: string, field: string) => {
+      if (field === 'pid' || field === 'id') return encodeURIComponent(String(rowId));
+      return encodeURIComponent(String(row[field] ?? ''));
+    });
+    value = value.replace(/\$\{row\.(\w+)\}/g, (_: string, field: string) => {
+      return encodeURIComponent(String(row[field] ?? ''));
+    });
+    value = value.replace(/\$\{(\w+)\}/g, (_: string, field: string) => {
+      if (field === 'pid' || field === 'id') return encodeURIComponent(String(rowId));
+      return encodeURIComponent(String(row[field] ?? ''));
+    });
+    return value;
+  }, []);
+
+  const resolveNavigatePath = useCallback(
+    (target: string, row: Record<string, any>): string => {
+      const rowId = row.pid || row.id;
+      if (target.startsWith('/')) return interpolateRowPath(target, row);
+
+      const lastUnderscoreIdx = target.lastIndexOf('_');
+      if (lastUnderscoreIdx === -1) return `/p/${target}`;
+
+      const suffix = target.substring(lastUnderscoreIdx + 1);
+      const modelCodePart = target.substring(0, lastUnderscoreIdx);
+      switch (suffix) {
+        case 'form':
+          return rowId ? `/p/${modelCodePart}/edit/${rowId}` : `/p/${modelCodePart}/new`;
+        case 'detail':
+        case 'view':
+          return `/p/${modelCodePart}/view/${rowId}`;
+        case 'list':
+          return `/p/${modelCodePart}`;
+        default:
+          return `/p/${modelCodePart}`;
+      }
+    },
+    [interpolateRowPath],
+  );
+
+  const evaluateRowCondition = useCallback(
+    (expression: string | undefined, row: Record<string, any>) => {
+      return evaluateVisibleWhenExpression(expression, {
+        record: row,
+        row,
+        form: parentRecordData || {},
+      });
+    },
+    [parentRecordData],
+  );
+
+  const isRowActionVisible = useCallback(
+    (button: ButtonConfig, row: Record<string, any>) =>
+      evaluateRowCondition(button.visibleWhen, row),
+    [evaluateRowCondition],
+  );
+
+  const isRowActionDisabled = useCallback(
+    (button: ButtonConfig, row: Record<string, any>) => {
+      if (button.disabled) return true;
+      if (button.disableWhen && evaluateRowCondition(button.disableWhen, row)) return true;
+      if (button.enableWhen && !evaluateRowCondition(button.enableWhen, row)) return true;
+      return false;
+    },
+    [evaluateRowCondition],
+  );
+
+  const handleRowAction = useCallback(
+    async (button: ButtonConfig, row: Record<string, any>, rowIndex: number) => {
+      const rowPid = row.pid || row.id;
+      const actionDef = button.action && typeof button.action === 'object' ? button.action : null;
+      const actionType = (actionDef as any)?.type || (button.commandCode ? 'command' : null);
+      if (actionType === 'navigate') {
+        const target = (actionDef as any)?.to || button.navigateTo;
+        if (!target) return;
+        const path = resolveNavigatePath(String(target), row);
+        const command = (actionDef as any)?.command || button.commandCode;
+        if (command) {
+          const sep = path.includes('?') ? '&' : '?';
+          navigate(`${path}${sep}commandCode=${encodeURIComponent(command)}`);
+        } else {
+          navigate(path);
+        }
+        return;
+      }
+
+      const command = resolveRowActionCommand(button);
+      if (!rowPid || !command) return;
+
+      if (actionType && !['command', 'state_transition'].includes(actionType)) {
+        setEditErrors({
+          _form: `Unsupported sub-table row action type: ${actionType}`,
+        });
+        return;
+      }
+
+      const loadingKey = `${rowPid}:${button.code}:${rowIndex}`;
+      setRowActionLoadingKey(loadingKey);
+      setEditErrors({});
+      try {
+        const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+          method: 'post',
+          params: {
+            targetRecordId: rowPid,
+            payload: row,
+            operationType: actionType === 'state_transition' ? 'UPDATE' : 'update',
+          },
+          token,
+        });
+
+        if (!ResultHelper.isSuccess(result)) {
+          throw new Error(result.desc || result.message || `Command ${command} failed`);
+        }
+
+        reloadRows();
+        onDataChange?.();
+      } catch (err) {
+        setEditErrors({
+          _form: err instanceof Error ? err.message : `Command ${command} failed`,
+        });
+      } finally {
+        setRowActionLoadingKey(null);
+      }
+    },
+    [navigate, onDataChange, reloadRows, resolveNavigatePath, resolveRowActionCommand, token],
   );
 
   // Enter edit mode for a row
@@ -629,8 +825,10 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     [handleSaveEdit, handleCancelEdit, editableFields],
   );
 
+  const hasConfiguredRowActions = Boolean(config.actions && config.actions.length > 0);
   const hasActions =
-    isEditable && (config.commands?.create || config.commands?.delete || canInlineEdit);
+    hasConfiguredRowActions ||
+    (isEditable && (config.commands?.create || config.commands?.delete || canInlineEdit));
   const isSortable = config.sortable && isEditable;
   const sortField = config.sortField || 'sort_order';
   const totalCols = config.columns.length + (hasActions ? 1 : 0) + (isSortable ? 1 : 0);
@@ -775,7 +973,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
               </th>
             ))}
             {hasActions && (
-              <th className="w-20 px-4 py-2.5 text-center text-xs font-medium text-gray-500">
+              <th className="w-28 px-4 py-2.5 text-center text-xs font-medium text-gray-500">
                 {t('common.actions') !== 'common.actions' ? t('common.actions') : 'Actions'}
               </th>
             )}
@@ -888,6 +1086,30 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                           </>
                         ) : (
                           <div className="flex items-center justify-center gap-2">
+                            {config.actions
+                              ?.filter((button) => isRowActionVisible(button, row))
+                              .map((button) => {
+                                const loadingKey = `${row.pid || row.id}:${button.code}:${rowIndex}`;
+                                const isLoading = rowActionLoadingKey === loadingKey;
+                                const disabled =
+                                  !!editingRowId || isLoading || isRowActionDisabled(button, row);
+                                return (
+                                  <button
+                                    key={button.code}
+                                    onClick={() => handleRowAction(button, row, rowIndex)}
+                                    disabled={disabled}
+                                    data-testid={`subtable-row-action-${button.code}-${rowIndex}`}
+                                    className={`text-xs disabled:cursor-not-allowed disabled:opacity-40 ${
+                                      button.danger || button.variant === 'danger'
+                                        ? 'text-red-500 hover:text-red-700'
+                                        : 'text-blue-500 hover:text-blue-700'
+                                    }`}
+                                    title={resolveButtonLabel(button)}
+                                  >
+                                    {isLoading ? '...' : resolveButtonLabel(button)}
+                                  </button>
+                                );
+                              })}
                             {canInlineEdit && (
                               <button
                                 onClick={() => handleStartEdit(row)}

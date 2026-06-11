@@ -189,7 +189,7 @@ test.describe('CRM M1 Value Chain (L4 UI)', () => {
     // --- Step 5: navigate to Sales Orders via menu click ---
     await clickSidebarMenu(page, '销售订单');
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await expect(page).toHaveURL(/sales-orders|sl_sales_order/i, { timeout: 10000 });
+    await expect(page).toHaveURL(/sales-orders|sl_sales_order_common/i, { timeout: 10000 });
     await page.screenshot({ path: `${SHOT}/j1-5-order-list.png`, fullPage: true });
 
     // The generated draft order's code == opportunity code (sl_so_code = OPP-...).
@@ -238,11 +238,11 @@ test.describe('CRM M1 Value Chain (L4 UI)', () => {
     await page.waitForTimeout(700);
     await page.screenshot({ path: `${SHOT}/j1-6b-order-lines.png`, fullPage: true });
 
-    // Order lines sub-table: childModel sl_sales_order_line, FK parentField
+    // Order lines sub-table: childModel sl_sales_order_line_common, FK parentField
     // sl_sol_order_id, with the 单位成本 (sl_sol_unit_cost) column.
     //
     // The earlier raw-code leak on these sub-table column headers (sl_sol_*) was
-    // fixed on this branch (sl_sales_order_line field i18n labels), so the headers
+    // fixed on this branch (sl_sales_order_line_common field i18n labels), so the headers
     // now render the localized displayNames: 商品 / 数量 / 单价 / 单位成本 / 行毛利
     // / 金额. Pin the table by the localized 单位成本 header and assert the data.
     const orderLinesTable = page
