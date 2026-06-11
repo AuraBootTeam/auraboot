@@ -46,7 +46,8 @@ public class EdiMessageType {
     private String modelCode;
 
     /** Field mapping configuration, stored as JSONB */
-    @TableField("mapping_template")
+    @TableField(value = "mapping_template",
+            typeHandler = com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler.class)
     private String mappingTemplate;
 
     /** Optional XSLT transform for XML-based protocols */
@@ -54,7 +55,8 @@ public class EdiMessageType {
     private String xsltTemplate;
 
     /** Validation rules, stored as JSONB */
-    @TableField("validation_rules")
+    @TableField(value = "validation_rules",
+            typeHandler = com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler.class)
     private String validationRules;
 
     @TableField("enabled")

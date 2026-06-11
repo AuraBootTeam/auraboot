@@ -164,6 +164,33 @@ pre-existing/unrelated to these IT, which were 0-failure in every run). Verified
 meta/service/impl near-zero classes: `SecureQueryExecutorImpl` (16%), `QueryAuditServiceImpl`
 (8.5%), `EdiService` (0.3%), `SchemaAccessProjectorImpl` (0.4%), `DictCascade`-style wins.
 
+**Ratchet bump (2026-06-11 wave 2 — all six near-zero classes above, parallel sub-agents):**
+real-stack IT for the remaining near-zero `meta/service/impl` classes (each a dedicated
+worktree/branch, cherry-picked into one consolidation branch + verified together):
+
+| Class | LINE before→after | Tests |
+|---|---|---|
+| EdiService | 0.3% → **96.3%** (315/327) | 35 |
+| QueryAuditServiceImpl | 8.5% → **82.1%** (800/975) | 36 |
+| SecureQueryExecutorImpl | 16% → **74.3%** (326/439) | 88 |
+| SchemaAccessProjectorImpl | 0.4% → **57.2%** (139/243, structural ceiling) | 39 |
+| FieldForkServiceImpl | 1% → **87.2%** (102/117) | 23 |
+| FieldImpactAnalysisServiceImpl | 1% → **100%** (104/104) | 28 |
+
++249 tests, ~+1600 covered lines. `meta/service/impl` **56.1%→65.4%** (11420/17476);
+gate-denominator bundle **73.2%→~75%** (raw report 46850/61885 = 75.7%; gate-curated read
+`0.75`). **BUNDLE LINE floor raised 0.71→0.73** (same ~2pt flaky margin), verified
+`:jacocoTestCoverageVerification` BUILD SUCCESSFUL on the full-suite report. Full suite had
+43 pre-existing/unrelated failures (acp/crm/eventpolicy/rag-embedding/bpm — shared-DB
+concurrent-session flake; **0** of the 6 new IT classes failed). **Two live jsonb-persistence
+bugs were found + fixed in-band** (EDI controller writes 500'd / query-audit logging was
+silently non-functional — both jsonb columns missing `JsonbStringTypeHandler`); three
+behavioral findings (SecureQuery cache-read / timeout-context, SchemaProjector stub) are
+characterized in `docs/backlog/2026-06-11-meta-impl-coverage-product-findings.md`. This
+clears the handover's "near-zero backend classes" high-ROI list. Next: `DynamicDataServiceImpl`
+deeper (executeCustomAction/saveWithRelations), frontend #14 (GA E2E V8 coverage), #3 (Docker
+testcontainers).
+
 **Frontend** — wired in `web-admin/vitest.config.ts` `coverage.thresholds` (lines 19 /
 stmts 18 / funcs 16 / branches 16 today). Raise in lockstep with new tests.
 
