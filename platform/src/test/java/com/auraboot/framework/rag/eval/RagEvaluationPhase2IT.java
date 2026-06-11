@@ -8,6 +8,7 @@ import com.auraboot.framework.rag.dto.RetrievalResult;
 import com.auraboot.framework.rag.service.EmbeddingService;
 import com.auraboot.framework.rag.service.InternalDocImportService;
 import com.auraboot.framework.rag.service.RagRetrievalService;
+import com.auraboot.framework.rag.util.KeywordCoverage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -101,7 +102,16 @@ class RagEvaluationPhase2IT extends BaseIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    /** Per-query evaluation row for one path. Serialized into results JSON. */
+    /**
+     * Per-query evaluation row for one path. Serialized into results JSON.
+     *
+     * <p>{@code topSignal} / {@code topSimilarity} are the rejection-floor
+     * calibration signals (G10): for Path A {@code topSignal} is the max
+     * {@link KeywordCoverage} over returned chunks and {@code topSimilarity} the
+     * max vector similarity; for Path B {@code topSignal} is the max D7 match
+     * score (similarity unused). Comparing these across {@code neither} vs
+     * answerable queries is how the floor thresholds are chosen from data.
+     */
     record QueryResult(
             String id,
             String language,
@@ -112,7 +122,9 @@ class RagEvaluationPhase2IT extends BaseIntegrationTest {
             List<String> expected,
             Double recallAt5,
             Double rr,
-            boolean countedForMetrics
+            boolean countedForMetrics,
+            double topSignal,
+            double topSimilarity
     ) {}
 
     @Test
@@ -178,16 +190,21 @@ class RagEvaluationPhase2IT extends BaseIntegrationTest {
         try {
             for (GoldenQuery q : queries) {
                 // Path A — KB retrieval; dedupe chunk hits to doc granularity, rank order kept
-                List<String> rankedDocs = dedupe(
-                        ragRetrievalService.retrieve(tenantId, q.query(), kbPids, TOP_K, null)
-                                .stream().map(RetrievalResult::getDocName).toList());
+                List<RetrievalResult> rawA = ragRetrievalService.retrieve(tenantId, q.query(), kbPids, TOP_K, null);
+                List<String> rankedDocs = dedupe(rawA.stream().map(RetrievalResult::getDocName).toList());
+                double covA = rawA.stream()
+                        .mapToDouble(r -> KeywordCoverage.coverage(q.query(), r.getContent())).max().orElse(0.0);
+                double simA = rawA.stream().mapToDouble(RetrievalResult::getSimilarity).max().orElse(0.0);
                 pathAResults.add(score(q, rankedDocs, canonicalizeDocNames(rankedDocs, q.expectedKbPages()),
-                        q.expectedKbPages()));
+                        q.expectedKbPages(), covA, simA));
 
                 // Path B — D7 compiled-knowledge retrieval; page ids matched exactly
-                List<String> rankedPages = d7Service.retrieve(tenantId, q.query(), TOP_K)
-                        .stream().map((D7CompiledKnowledgeMatch m) -> m.getPage().getId()).toList();
-                pathBResults.add(score(q, rankedPages, rankedPages, q.expectedD7Pages()));
+                List<D7CompiledKnowledgeMatch> rawB = d7Service.retrieve(tenantId, q.query(), TOP_K);
+                List<String> rankedPages = rawB.stream()
+                        .map((D7CompiledKnowledgeMatch m) -> m.getPage().getId()).toList();
+                double scoreB = rawB.stream()
+                        .mapToDouble(D7CompiledKnowledgeMatch::getScore).max().orElse(0.0);
+                pathBResults.add(score(q, rankedPages, rankedPages, q.expectedD7Pages(), scoreB, 0.0));
             }
         } finally {
             d7Properties.setPageDirectory(previousPageDir);
@@ -227,7 +244,7 @@ class RagEvaluationPhase2IT extends BaseIntegrationTest {
      * {@code expected_path=neither} they feed the no-answer matrix instead.
      */
     private QueryResult score(GoldenQuery q, List<String> ranked, List<String> canonicalRanked,
-                              List<String> expected) {
+                              List<String> expected, double topSignal, double topSimilarity) {
         Double recall = null;
         Double rr = null;
         boolean counted = !expected.isEmpty();
@@ -237,7 +254,7 @@ class RagEvaluationPhase2IT extends BaseIntegrationTest {
             rr = RetrievalMetrics.reciprocalRank(canonicalRanked, expected);
         }
         return new QueryResult(q.id(), q.language(), q.lengthClass(), q.expectedPath(), q.query(),
-                ranked, expected, recall, rr, counted);
+                ranked, expected, recall, rr, counted, topSignal, topSimilarity);
     }
 
     /**
@@ -301,9 +318,13 @@ class RagEvaluationPhase2IT extends BaseIntegrationTest {
         sb.append("\n## No-answer behavior (expected_path = neither)\n\n");
         appendNoAnswerMatrix(sb, pathA, pathB);
 
+        sb.append("\n## Rejection-floor calibration signals (G10)\n\n");
+        appendFloorCalibration(sb, pathA, pathB);
+
         sb.append("\n## Per-query results\n\n");
-        sb.append("| id | lang | expected_path | A recall@5 | A rr@10 | B recall@5 | B rr@10 | no-answer |\n");
-        sb.append("|---|---|---|---|---|---|---|---|\n");
+        sb.append("| id | lang | expected_path | A recall@5 | A rr@10 | B recall@5 | B rr@10 "
+                + "| A_cov | A_sim | B_score | no-answer |\n");
+        sb.append("|---|---|---|---|---|---|---|---|---|---|---|\n");
         for (int i = 0; i < pathA.size(); i++) {
             QueryResult a = pathA.get(i);
             QueryResult b = pathB.get(i);
@@ -317,6 +338,9 @@ class RagEvaluationPhase2IT extends BaseIntegrationTest {
                     .append(" | ").append(fmt(a.rr()))
                     .append(" | ").append(fmt(b.recallAt5()))
                     .append(" | ").append(fmt(b.rr()))
+                    .append(" | ").append(String.format("%.3f", a.topSignal()))
+                    .append(" | ").append(String.format("%.3f", a.topSimilarity()))
+                    .append(" | ").append(String.format("%.3f", b.topSignal()))
                     .append(" | ").append(noAnswer)
                     .append(" |\n");
         }
@@ -388,6 +412,70 @@ class RagEvaluationPhase2IT extends BaseIntegrationTest {
                 .append(falsePositives.isEmpty() ? "none" : String.join(", ", falsePositives)).append(" |\n");
         sb.append("| wrong rejections (expected hits but both empty) | ")
                 .append(wrongRejections.isEmpty() ? "none" : String.join(", ", wrongRejections)).append(" |\n");
+    }
+
+    /**
+     * Floor calibration (G10): a usable threshold must sit ABOVE every neither
+     * query's top signal (so they are rejected) and BELOW every answerable
+     * true-hit's top signal (so recall is kept). This prints both distributions
+     * so the gap — if any — is visible and the floor is chosen from data, not
+     * guessed.
+     */
+    private void appendFloorCalibration(StringBuilder sb, List<QueryResult> pathA, List<QueryResult> pathB) {
+        List<Double> neitherCovA = new ArrayList<>();
+        List<Double> neitherScoreB = new ArrayList<>();
+        List<Double> hitCovA = new ArrayList<>();
+        List<Double> hitScoreB = new ArrayList<>();
+        for (int i = 0; i < pathA.size(); i++) {
+            QueryResult a = pathA.get(i);
+            QueryResult b = pathB.get(i);
+            if ("neither".equals(a.expectedPath())) {
+                neitherCovA.add(a.topSignal());
+                neitherScoreB.add(b.topSignal());
+            } else {
+                // Answerable: only count the path the query is expected to (and did) hit.
+                if (a.countedForMetrics() && a.recallAt5() != null && a.recallAt5() > 0) {
+                    hitCovA.add(a.topSignal());
+                }
+                if (b.countedForMetrics() && b.recallAt5() != null && b.recallAt5() > 0) {
+                    hitScoreB.add(b.topSignal());
+                }
+            }
+        }
+        sb.append("| signal | neither max | neither mean | answerable-hit min | answerable-hit mean |\n");
+        sb.append("|---|---|---|---|---|\n");
+        appendCalibrationRow(sb, "Path A keyword coverage", neitherCovA, hitCovA);
+        appendCalibrationRow(sb, "Path B D7 match score", neitherScoreB, hitScoreB);
+        sb.append("\nA floor strictly between `neither max` and `answerable-hit min` rejects every "
+                + "off-topic query without dropping any true hit. If they overlap, the floor trades "
+                + "a few false-positives for a few rejections — pick by product tolerance.\n");
+        sb.append("\nNeither-query signals (sorted desc, the values the floor must exceed):\n\n");
+        sb.append("| id | query | A_cov | B_score |\n|---|---|---|---|\n");
+        List<QueryResult> neithers = new ArrayList<>();
+        for (int i = 0; i < pathA.size(); i++) {
+            if ("neither".equals(pathA.get(i).expectedPath())) neithers.add(pathA.get(i));
+        }
+        neithers.sort((x, y) -> Double.compare(y.topSignal(), x.topSignal()));
+        for (QueryResult n : neithers) {
+            QueryResult b = pathB.stream().filter(r -> r.id().equals(n.id())).findFirst().orElse(n);
+            sb.append("| ").append(n.id()).append(" | ").append(n.query())
+                    .append(" | ").append(String.format("%.3f", n.topSignal()))
+                    .append(" | ").append(String.format("%.3f", b.topSignal())).append(" |\n");
+        }
+    }
+
+    private void appendCalibrationRow(StringBuilder sb, String label,
+                                      List<Double> neither, List<Double> hits) {
+        sb.append("| ").append(label)
+                .append(" | ").append(neither.isEmpty() ? "n/a"
+                        : String.format("%.3f", neither.stream().mapToDouble(d -> d).max().orElse(0)))
+                .append(" | ").append(neither.isEmpty() ? "n/a"
+                        : String.format("%.3f", neither.stream().mapToDouble(d -> d).average().orElse(0)))
+                .append(" | ").append(hits.isEmpty() ? "n/a"
+                        : String.format("%.3f", hits.stream().mapToDouble(d -> d).min().orElse(0)))
+                .append(" | ").append(hits.isEmpty() ? "n/a"
+                        : String.format("%.3f", hits.stream().mapToDouble(d -> d).average().orElse(0)))
+                .append(" |\n");
     }
 
     private static String fmt(Double v) {

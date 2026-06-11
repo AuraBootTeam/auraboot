@@ -1,9 +1,11 @@
 package com.auraboot.framework.rag.service;
 
+import com.auraboot.framework.rag.config.RagRetrievalProperties;
 import com.auraboot.framework.rag.dto.RetrievalOutcome;
 import com.auraboot.framework.rag.dto.RetrievalResult;
 import com.auraboot.framework.rag.entity.KnowledgeBase;
 import com.auraboot.framework.rag.util.CjkBigramSegmenter;
+import com.auraboot.framework.rag.util.KeywordCoverage;
 import com.auraboot.framework.rag.util.VectorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,7 @@ public class RagRetrievalService {
     private final QueryRewriteService queryRewriteService;
     private final JdbcTemplate jdbcTemplate;
     private final RagRetrievalMetrics metrics;
+    private final RagRetrievalProperties retrievalProperties;
 
     private static final int DEFAULT_TOP_K = 5;
     private static final double DEFAULT_THRESHOLD = 0.8;
@@ -128,6 +131,8 @@ public class RagRetrievalService {
             path = "keyword";
             results = rerankedResults(keywordSearch(searchQuery, targetKbs, k), query, k);
         }
+        // G10: drop results below the relevance floor so off-topic queries return empty.
+        results = applyRejectionFloor(results, query);
         metrics.recordRetrieval(path, System.currentTimeMillis() - startedAt, results.size());
         return new RetrievalOutcome(results, warnings);
     }
@@ -302,6 +307,50 @@ public class RagRetrievalService {
 
     private List<RetrievalResult> rerankedResults(List<RetrievalResult> results, String query, int maxK) {
         return queryRewriteService.rerank(results, query, maxK);
+    }
+
+    /**
+     * G10 relevance-rejection floor — a query-level no-answer gate: if <em>no</em>
+     * returned chunk clears the relevance bar the whole result set is dropped, so
+     * an off-topic query degrades to an empty result (a trustworthy "no relevant
+     * knowledge" signal) instead of returning chunks that merely share an
+     * incidental term. If the best chunk passes, the top-k is returned unchanged.
+     *
+     * <p>The gate is best-match, not per-chunk, on purpose: filtering individual
+     * chunks would discard a relevant-but-low-coverage chunk whenever some other
+     * chunk scored higher, returning the wrong chunk and dropping the right one
+     * (measured: per-chunk filtering regressed Path-A recall 0.600→0.300 on the
+     * golden set while a best-match gate held it at 0.600). The floor's job is "is
+     * any match good enough", not reranking.
+     *
+     * <p>Per chunk the mode-appropriate signal decides: when a real embedding
+     * distance is present (hybrid mode, {@code distance < 1.0}) vector similarity
+     * gates — a chunk that only matched the keyword OR-branch still carries its
+     * true (low) cosine similarity, so vocabulary-overlap off-topic queries are
+     * rejected while vector-found paraphrases survive. Otherwise (keyword-fallback,
+     * {@code distance == 1.0}, no vector signal) keyword coverage gates. Coverage
+     * uses the original user {@code query}, never the synonym-expanded one, so
+     * expansion can't dilute the denominator.
+     *
+     * @see RagRetrievalProperties
+     */
+    private List<RetrievalResult> applyRejectionFloor(List<RetrievalResult> results, String query) {
+        if (!retrievalProperties.isRejectionFloorEnabled() || results.isEmpty()) {
+            return results;
+        }
+        double minSim = retrievalProperties.getMinVectorSimilarity();
+        double minCov = retrievalProperties.getMinKeywordCoverage();
+        boolean anyRelevant = results.stream().anyMatch(r -> {
+            boolean hasVector = r.getDistance() < 1.0;
+            return hasVector
+                    ? r.getSimilarity() >= minSim
+                    : KeywordCoverage.coverage(query, r.getContent()) >= minCov;
+        });
+        if (anyRelevant) {
+            return results;
+        }
+        metrics.recordRejectionFloor(results.size());
+        return List.of();
     }
 
     private RetrievalResult mapRow(Map<String, Object> row) {

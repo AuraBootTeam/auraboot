@@ -47,15 +47,26 @@ public class D7CompiledKnowledgeService {
         }
 
         int limit = maxResults > 0 ? maxResults : properties.getMaxCompiledPages();
-        return pages.stream()
+        double minMatchScore = properties.getMinMatchScore();
+        List<D7CompiledKnowledgeMatch> candidates = pages.stream()
                 .filter(page -> isRetrievablePage(page, tenantId))
                 .map(page -> toMatch(page, queryTerms))
                 .filter(match -> match.getScore() > 0)
                 .sorted(Comparator.comparing(D7CompiledKnowledgeMatch::isRequiresRawEvidence)
                         .thenComparing(D7CompiledKnowledgeMatch::getScore, Comparator.reverseOrder())
                         .thenComparing(match -> match.getPage().getId(), Comparator.nullsLast(String::compareTo)))
-                .limit(limit)
                 .toList();
+
+        // G10 query-level no-answer gate: if even the best-covered page is below the
+        // floor the query has no relevant compiled knowledge — return empty rather
+        // than a page sharing one incidental term. Gating on pre-penalty coverage so
+        // a genuinely relevant stale page (whose score is multiplied by 0.25) counts.
+        boolean anyRelevant = candidates.stream()
+                .anyMatch(match -> rawCoverage(match.getPage(), queryTerms) >= minMatchScore);
+        if (!anyRelevant) {
+            return List.of();
+        }
+        return candidates.stream().limit(limit).toList();
     }
 
     public List<String> toRankedSourcePaths(List<D7CompiledKnowledgeMatch> matches) {
@@ -74,20 +85,31 @@ public class D7CompiledKnowledgeService {
     }
 
     private D7CompiledKnowledgeMatch toMatch(D7CompiledKnowledgePage page, Set<String> queryTerms) {
+        double score = rawCoverage(page, queryTerms);
+        boolean requiresRawEvidence = "stale".equalsIgnoreCase(safe(page.getStaleStatus()));
+        if (requiresRawEvidence) {
+            score *= 0.25;
+        }
+        return new D7CompiledKnowledgeMatch(page, score, requiresRawEvidence);
+    }
+
+    /**
+     * Pre-penalty term coverage (matched query terms / total) of a page against
+     * its searchable text — the raw relevance signal the G10 floor gates on,
+     * before the stale-page 0.25 ranking penalty is applied in {@link #toMatch}.
+     */
+    private double rawCoverage(D7CompiledKnowledgePage page, Set<String> queryTerms) {
+        if (queryTerms.isEmpty()) {
+            return 0.0;
+        }
         String searchable = String.join(" ",
                 safe(page.getId()),
                 safe(page.getType()),
                 safe(page.getTitle()),
                 safe(page.getSummary()),
                 safe(page.getBody())).toLowerCase(Locale.ROOT);
-
         long hits = queryTerms.stream().filter(searchable::contains).count();
-        double score = (double) hits / queryTerms.size();
-        boolean requiresRawEvidence = "stale".equalsIgnoreCase(safe(page.getStaleStatus()));
-        if (requiresRawEvidence) {
-            score *= 0.25;
-        }
-        return new D7CompiledKnowledgeMatch(page, score, requiresRawEvidence);
+        return (double) hits / queryTerms.size();
     }
 
     private boolean isRetrievablePage(D7CompiledKnowledgePage page, Long tenantId) {
