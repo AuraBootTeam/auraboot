@@ -147,7 +147,7 @@ docs-governance。真正缺的是两类**没有门禁覆盖的面**:
 
 | # | 改进 | 类型 | 状态 |
 |---|------|------|------|
-| I-1 | `acp-implementation-map.md` 升级为脚本门禁:map 中的类名/方法名 grep 现行代码必须命中,push 前跑 | 门禁 | 待做(本 retro 立项,owner=下次触碰 agent 域的会话) |
+| I-1 | `acp-implementation-map.md` 升级为脚本门禁:map 中的类名/方法名 grep 现行代码必须命中,push 前跑 | 门禁 | ✅ 已做(ENT #404,`scripts/check-acp-implementation-map.mjs` + 单测;首跑即抓真漂移:map 写 `ab_agent_step` 实为 `ab_agent_action`,已修)。跨仓本地门禁,OSS checkout 缺失时跳过 |
 | I-2 | review/deep-review/backlog finding 文档加 status 生命周期(open/fixed/withdrawn + 修复 PR 回链);修 finding 的 PR 必须回标原报告 | 流程 | 规则已固化(见 §四);存量报告不回溯 |
 | I-3 | review/审计类 dispatch prompt 模板:必含 §14 verify_protocol + 「历史结论一律 hypothesis,引用前 grep 现行代码」 | 提示词 | 已固化(见 §四) |
 | I-4 | 批量脚本编辑三件套(断言/revert-before-retry/diff-stat 核对) | 执行纪律 | 已固化(见 §四) |
