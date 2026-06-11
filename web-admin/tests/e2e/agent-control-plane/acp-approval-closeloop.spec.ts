@@ -127,20 +127,31 @@ test.describe('A5: Agent approval close-loop (golden)', () => {
         return;
       }
       const adminId: string = admin.rows[0].id;
-      // The approval list and the approve command both run in the admin's active
-      // tenant; seed there so the row is visible and the tenant guard passes.
-      const tenant = await client.query(
-        `SELECT tm.tenant_id FROM ab_tenant_member tm
-           WHERE tm.user_id = $1 AND tm.status = 'active' AND tm.deleted_flag = FALSE
-           ORDER BY tm.tenant_id LIMIT 1`,
-        [adminId],
-      );
+      // Seed into the admin's *login* tenant (the tenant the UI/command run in),
+      // resolved from the login JWT — NOT the lowest ab_tenant_member row, which
+      // is the system tenant and is not what the approval list/page shows.
+      const loginResp = await fetch(`${process.env.BACKEND_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'admin@auraboot.com', password: 'Test2026x' }),
+      });
+      const loginBody = await loginResp.json().catch(() => null);
+      const jwt: string | undefined = loginBody?.data?.jwt;
       const model = await client.query(`SELECT 1 FROM ab_meta_model WHERE code = 'agent_approval' LIMIT 1`);
-      if (tenant.rows.length === 0 || model.rows.length === 0) {
-        acpReady = false; // agent-control-plane not imported — environment gap
+      if (!jwt || model.rows.length === 0) {
+        acpReady = false; // not logged in / agent-control-plane not imported — environment gap
         return;
       }
-      const tenantId: string = tenant.rows[0].tenant_id;
+      // Extract tenantId from the JWT payload as a STRING via regex — tenant ids
+      // exceed 2^53, so JSON.parse would silently lose precision (…104 -> …100)
+      // and the seed would land in the wrong tenant (row never shows in the UI).
+      const payloadJson = Buffer.from(jwt.split('.')[1], 'base64url').toString();
+      const tenantMatch = payloadJson.match(/"tenantId"\s*:\s*"?(\d+)"?/);
+      if (!tenantMatch) {
+        acpReady = false;
+        return;
+      }
+      const tenantId: string = tenantMatch[1];
 
       // Policy authorizing the admin as approver (fail-secure requirement).
       await client.query(
