@@ -265,3 +265,11 @@ test('checker-stale: governance doc schema_version mismatch -> warning', () => {
   const result = auditRepo(root);
   assert.ok(codes(result).includes('S-DOCS-CHECKER-STALE'));
 });
+
+test('baseline_allowlist /** matches NESTED subdirs, not only direct children', () => {
+  const root = makeRepo({ baseline_allowlist: ['docs/archive/**'] });
+  write(root, 'docs/archive/backlog/2026-05/legacy.md', '# legacy ledger, no frontmatter\n');
+  const result = auditRepo(root, { addedSince: new Set(['docs/archive/backlog/2026-05/legacy.md']) });
+  assert.ok(!bySeverity(result, 'error').includes('S-DOCS-FM-MISSING'),
+    'nested doc under a /** allowlist must be grandfathered, not error');
+});
