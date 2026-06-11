@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.util.JsonbColumns;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -100,16 +101,12 @@ public class CapabilityMappingSupport {
     }
 
     /**
-     * Convert a value that may be a String or a Map/List (from JSONB) to a JSON string.
+     * Convert a value read for a JSONB column (String / driver PGobject /
+     * already-parsed Map/List) to its JSON text. Delegates to {@link JsonbColumns}
+     * so a PGobject is read via toString() rather than serializing its wrapper.
      */
     String stringifyValue(Object value) {
-        if (value == null) return null;
-        if (value instanceof String s) return s;
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            return null;
-        }
+        return JsonbColumns.toJsonText(value, objectMapper);
     }
 
     @SuppressWarnings("unchecked")
