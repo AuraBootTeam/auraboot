@@ -138,6 +138,16 @@ stays 0.69 (this adds margin). The next BUNDLE-floor bump should land together w
 next large class (`DynamicDataServiceImpl` 34% / `NamedQueryServiceImpl` 47%) after a
 fresh full-suite run.
 
+Follow-up (same day): `DynamicDataServiceImplCoverageIT` (8 tests) targeted the dynamic
+CRUD core (`DynamicDataServiceImpl`, the biggest single gap by line count). **Honest
+finding: biggest-by-line ≠ easiest-to-lift.** Adding the full 14-operator `list` sweep,
+sort/keyword/pagination edges, and the previously-untested `getStats` / `getFieldOptions`
+/ `validate` / `exportData` / not-found branches lifted it **34.1%→~39%** line (20%→26%
+branch, +~80-100 lines) — modest, because the uncovered bulk lives in very-hard-to-test
+paths (`executeCustomAction` ~450 LOC, `saveWithRelations`, relation methods needing
+multi-model + action-definition setup). A big lift on this class is a separate, heavier
+slice. Additive isolated IT; gate stays 0.69.
+
 **Frontend** — wired in `web-admin/vitest.config.ts` `coverage.thresholds` (lines 19 /
 stmts 18 / funcs 16 / branches 16 today). Raise in lockstep with new tests.
 
