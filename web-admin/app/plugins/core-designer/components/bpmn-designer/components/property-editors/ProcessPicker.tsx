@@ -73,6 +73,7 @@ export function ProcessPicker({ value, onChange, placeholder }: ProcessPickerPro
         onChange={(e) => setSearch(e.target.value)}
         className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
         placeholder={t('bpmn.callactivity.searchProcess')}
+        data-testid="process-picker-search"
       />
 
       {/* Select dropdown */}
@@ -81,6 +82,7 @@ export function ProcessPicker({ value, onChange, placeholder }: ProcessPickerPro
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
         disabled={loading}
+        data-testid="process-picker-select"
       >
         <option value="">{placeholder || t('bpmn.callactivity.selectProcess')}</option>
         {loading && <option disabled>{t('bpmn.common.loading')}</option>}

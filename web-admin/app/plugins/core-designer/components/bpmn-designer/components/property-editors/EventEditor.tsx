@@ -26,6 +26,7 @@ export function StartEventEditor({
           onChange={(e) => handleChange('description', e.target.value)}
           className="w-full rounded-md border border-gray-300 px-3 py-2"
           rows={2}
+          data-testid="startevent-description"
         />
       </div>
 
@@ -36,6 +37,7 @@ export function StartEventEditor({
           value={config?.initiator || 'initiator'}
           onChange={(e) => handleChange('initiator', e.target.value)}
           className="w-full rounded-md border border-gray-300 px-3 py-2"
+          data-testid="startevent-initiator"
         />
       </div>
 
@@ -47,6 +49,7 @@ export function StartEventEditor({
           onChange={(e) => handleChange('formKey', e.target.value)}
           className="w-full rounded-md border border-gray-300 px-3 py-2"
           placeholder={t('bpmn.prop.startevent.formKeyPlaceholder')}
+          data-testid="startevent-form-key"
         />
       </div>
     </>
@@ -74,6 +77,7 @@ export function EndEventEditor({
           onChange={(e) => handleChange('description', e.target.value)}
           className="w-full rounded-md border border-gray-300 px-3 py-2"
           rows={2}
+          data-testid="endevent-description"
         />
       </div>
 
@@ -84,6 +88,7 @@ export function EndEventEditor({
             checked={config?.terminateAll || false}
             onChange={(e) => handleChange('terminateAll', e.target.checked)}
             className="mr-2"
+            data-testid="endevent-terminate-all"
           />
           <span className="text-sm font-medium text-gray-700">{t('bpmn.prop.endevent.terminateAll')}</span>
         </label>
