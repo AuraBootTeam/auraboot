@@ -6,7 +6,15 @@
 #   ./scripts/oss-test.sh --smoke            # run with PW_PROFILE=smoke (tags @smoke as resolved by base playwright.config.ts profile)
 #   ./scripts/oss-test.sh --bpm-regression   # run the aggregated spec-1 BPM regression suite
 #                                            #   (all specs tagged @bpm-regression — see web-admin/tests/e2e/bpm/README.md)
-#   ./scripts/oss-test.sh <glob>...          # run subset matching extra glob(s) that must already be in scope
+#   NOTE: positional spec globs do NOT reliably filter (the oss config builds its
+#   own testMatch from oss-scope.json — see comment below). For a targeted single
+#   spec run use playwright directly with the oss config + full env contract:
+#     PLAYWRIGHT_BASE_URL=http://127.0.0.1:<vite> BACKEND_URL=http://127.0.0.1:<be> \
+#     BE_PORT=<be> BFF_PORT=<bff> PW_SKIP_WEBSERVER=1 \
+#     PG_HOST=127.0.0.1 PG_PORT=5432 PG_USER=<u> PG_DB=<db> PGPASSWORD=<p> \
+#     npx playwright test -c playwright.oss.config.ts tests/e2e/<dir>/<file>.spec.ts
+#   (use 127.0.0.1, not localhost — backend listens IPv4 only; PG_* must point at
+#   the SAME stack or setup invariants read the wrong database.)
 #
 # Reads:  oss-scope.json (at repo root)
 # Invokes: web-admin/npx playwright test <paths...>
