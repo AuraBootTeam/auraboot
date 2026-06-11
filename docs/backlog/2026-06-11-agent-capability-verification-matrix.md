@@ -14,7 +14,7 @@ created: 2026-06-11
 ## TL;DR(本次真实验证结论)
 
 - **后端 `testAgent`(全量 agent 真栈,DeepSeek 注入):1640 测试 → 1618 PASS / 13 FAIL / 9 SKIP(98.7%)**。
-- 13 失败 = **11 env-invalid**(共享 `aura_boot` 缺 CRM 插件,`mt_crm_account` 不存在 + 0 crm 能力,psql 实证)+ **2 待澄清**(plan 反序列化 / failRun NPE,隔离复现,**其中 failRun NPE 疑似真 bug**)+ **0 已确认产品 bug**。
+- 13 失败逐条定性(crm-seeded clone 复跑,见 §4b):**1 真 bug 已修**(failRun 根任务 NPE,PR #580)+ **1 待跟进 finding**(`loadPlanFromRun` JSONB/PGobject 健壮性)+ **3 env→转绿**(crm 表)+ **8 更深 env**(crm capabilities 未同步给测试租户,非产品 bug)+ **0 其它产品 bug**。
 - **DeepSeek 真模型腿 `CapabilityEvalLiveIT` 3/3 PASS**;**L3 审批闭环浏览器 `acp-approval-closeloop` 3/3 PASS**(本会话)。
 - 机制类能力(loop/五层策略/审批/记忆/协作/调度/恢复/技能/grounding 非 crm)**全绿**;**输出形式与契约预期一致**(见 §5)。
 - 边界:其余 ~31 个 agent/aurabot **浏览器 E2E 本会话未逐一重跑**(仅审批闭环重跑);crm 域测试需 crm-seeded 库复跑;2 个待澄清项需 clean-DB 复跑定性。
@@ -135,6 +135,24 @@ created: 2026-06-11
 | capabilityRouter / objectResolver / CS agent(crm 域) | 路由到 crm capability / 解析到 crm_account | 当前共享库无 crm → 输出为空/null | ⚠️ env-invalid,**形式预期正确**,需 crm-seeded 库复跑 |
 
 **结论**:已实跑的能力**输出结构与预期契约一致**;唯一不符项是 crm 域测试因共享库缺 CRM 插件而输出空(环境问题,非形式/契约问题)。
+
+---
+
+## 4b. 第 2 轮:13 个失败逐条定性(crm-seeded clone + fix,2026-06-11)
+
+把 crm-a4 库 `auraboot_11`(有 crm)只读 `pg_dump` 还原到独立 `auraboot_32`(`mt_crm_account` 在 + 231 crm caps),用 `SPRING_DATASOURCE_URL` env 覆盖让 testAgent 跑 crm-seeded 库 + 我的 failRun fix:
+
+| 原失败 | 数 | 第 2 轮结果 | 定性 |
+|---|---|---|---|
+| `CustomerServiceAgentIntegrationTest` | 1 | ✅ **转绿** | env(缺 `mt_crm_account` 表)→ crm seed 修好 |
+| `ObjectResolverIntegrationTest` / `ObjectResolverEmbeddingTest` | 2 | ✅ **转绿**(17/17 + 7/7) | env(缺 crm_account 模型)→ crm seed 修好 |
+| `CapabilityRouter` / `AcpP1Features` capabilityRouter | 8 | ❌ 仍 `[]` | **更深 env**:crm capabilities scope 在 crm-a4 租户,testAgent 新建测试租户看不到 → 需 test-tenant capability 同步(**非路由逻辑 bug**) |
+| `AcpKernelServices::testFailRun` | 1 | ✅ **转绿** | **真 bug** → 已修 **PR #580**(根任务失败 NPE) |
+| `AcpKernelServices::testPersistAndLoadPlan` | 1 | ❌ 仍失败(**fresh runPid**,非 stale) | **第 2 finding**:`PlanService.loadPlanFromRun:191` 未处理 MyBatis 把 JSONB 返成 `PGobject` 的情形(`raw instanceof String` false → 序列化 PGobject 包装而非 plan 数组 → 反序列化失败)。真健壮性缺口 or env-config 差异 → 待 clean-current-schema 库 + 确认 CI 配置定性 |
+
+**13 个失败最终定性**:**1 真 bug 已修(#580)** + **1 待跟进 finding(loadPlanFromRun PGobject)** + **3 env→转绿** + **8 更深 env(test-tenant capability 同步,非产品 bug)** + **0 其它产品 bug**。
+
+> 8 个 CapabilityRouter 全绿需「测试套件 setup 给测试租户同步 crm capabilities」(CI 全 reset-init 库本就如此);DB clone 不含此步。这是测试基础设施层,不是 agent 路由能力问题。
 
 ---
 
