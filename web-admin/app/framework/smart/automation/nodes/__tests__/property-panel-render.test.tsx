@@ -57,6 +57,7 @@ const EXPECTED_AUTOMATION_FIELD_TYPES = [
   'multiselect',
   'number',
   'process-select',
+  'rule-binding',
   'select',
   'text',
   'textarea',

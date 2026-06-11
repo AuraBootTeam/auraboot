@@ -30,6 +30,10 @@ import { DependentMultiSelect } from './DependentMultiSelect';
 import { LocalizedTextInput, type LocalizedTextValue } from './LocalizedTextInput';
 import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/IconPicker';
 import { ArrayItemEditor } from './ArrayItemEditor';
+import {
+  DecisionRuleBindingBlock,
+  type RuleConsumerBindingDraft,
+} from '~/ui/smart/decision/DecisionRuleBindingBlock';
 import { dictService } from '~/shared/services/dictService';
 import { toast } from 'sonner';
 import type { FieldAdapter } from '~/ui/field-adapter';
@@ -311,6 +315,22 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         />
       );
 
+    case 'rule-binding':
+      return (
+        <RuleBindingField
+          adapter={adapter}
+          label={label}
+          helpText={helpText}
+          mode={schema.ruleBindingMode ?? 'decision'}
+          consumerType={schema.ruleBindingConsumerType}
+          consumerCode={schema.ruleBindingConsumerCode}
+          consumerNodeId={schema.ruleBindingConsumerNodeId}
+          showImpactPreview={Boolean(schema.ruleBindingShowImpactPreview)}
+          showTestRunner={Boolean(schema.ruleBindingShowTestRunner)}
+          initialDecisionCode={schema.ruleBindingInitialDecisionCode}
+        />
+      );
+
     case 'semantic-model-select':
       return (
         <ResourceSelectField
@@ -450,6 +470,53 @@ function ResourceSelectField({
       ) : (
         helpText && <p className="mt-1 text-xs text-gray-500">{helpText}</p>
       )}
+    </div>
+  );
+}
+
+function RuleBindingField({
+  adapter,
+  label,
+  helpText,
+  mode,
+  consumerType,
+  consumerCode,
+  consumerNodeId,
+  showImpactPreview,
+  showTestRunner,
+  initialDecisionCode,
+}: {
+  adapter: FieldAdapter<unknown>;
+  label?: string;
+  helpText?: string;
+  mode: 'condition' | 'decision' | 'combined';
+  consumerType?: string;
+  consumerCode?: string;
+  consumerNodeId?: string;
+  showImpactPreview?: boolean;
+  showTestRunner?: boolean;
+  initialDecisionCode?: string;
+}) {
+  return (
+    <div data-testid="rule-binding-property-field">
+      {label && <div className="mb-1 text-sm font-medium text-gray-700">{label}</div>}
+      {helpText && <p className="mb-2 text-xs text-gray-500">{helpText}</p>}
+      <DecisionRuleBindingBlock
+        value={adapter.value as RuleConsumerBindingDraft | string | undefined}
+        onChange={(next) => adapter.setValue(next)}
+        block={{
+          props: {
+            mode,
+            consumerType,
+            consumerCode,
+            consumerNodeId,
+            initialDecisionCode,
+            showImpactPreview,
+            showTestRunner,
+          },
+        }}
+      />
+      {adapter.error ? <p className="mt-1 text-xs text-red-600">{adapter.error}</p> : null}
     </div>
   );
 }

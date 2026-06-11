@@ -1,6 +1,7 @@
 package com.auraboot.framework.automation.service;
 
 import com.auraboot.framework.automation.service.AutomationFlowTriggerDeriver.DerivedTrigger;
+import com.auraboot.framework.decision.rule.RuleBindingKind;
 import com.auraboot.framework.exception.ValidationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,39 @@ class AutomationFlowTriggerDeriverTest {
         assertThat(result.isEmpty()).isFalse();
         assertThat(result.triggerType()).isEqualTo("on_record_create");
         assertThat(result.modelCode()).isEqualTo("crm_lead");
+    }
+
+    @Test
+    void derive_recordCreateTrigger_preservesRuleCenterBinding() {
+        Map<String, Object> ruleBinding = Map.of(
+                "consumerType", "AUTOMATION",
+                "consumerNodeId", "trigger",
+                "bindingKind", "DECISION_REF",
+                "enabled", true,
+                "decisionBinding", Map.of(
+                        "decisionCode", "lead_routing",
+                        "versionPolicy", "LATEST_PUBLISHED",
+                        "inputMappings", List.of(),
+                        "outputMappings", List.of(),
+                        "fallbackPolicy", Map.of("mode", "FAIL_CLOSED"),
+                        "traceMode", "SAMPLED",
+                        "enabled", true));
+        Map<String, Object> cfg = Map.of(
+                "triggerType", "on_record_create",
+                "modelCode", "crm_lead",
+                "ruleBinding", ruleBinding);
+        Map<String, Object> fc = flowConfig(List.of(
+                triggerNode("trigger-record-create", cfg),
+                actionNode()));
+
+        DerivedTrigger result = deriver.derive(fc);
+
+        assertThat(result.triggerConfig().getRuleBinding()).isNotNull();
+        assertThat(result.triggerConfig().getRuleBinding().consumerType()).isEqualTo("AUTOMATION");
+        assertThat(result.triggerConfig().getRuleBinding().consumerNodeId()).isEqualTo("trigger");
+        assertThat(result.triggerConfig().getRuleBinding().bindingKind()).isEqualTo(RuleBindingKind.DECISION_REF);
+        assertThat(result.triggerConfig().getRuleBinding().decisionBinding().decisionCode())
+                .isEqualTo("lead_routing");
     }
 
     // ==================== BPM event trigger ====================

@@ -150,6 +150,8 @@
 
   { "key": "automation.field.modelCode", "zh-CN": "目标模型", "en-US": "Model", "source": "import", "refType": "ui" },
   { "key": "automation.field.modelCode.desc", "zh-CN": "选择要操作的数据模型", "en-US": "Select the data model to operate on", "source": "import", "refType": "ui" },
+  { "key": "automation.field.ruleBinding", "zh-CN": "引用规则中心", "en-US": "Rule Center Binding", "source": "import", "refType": "ui" },
+  { "key": "automation.field.ruleBinding.desc", "zh-CN": "在触发条件前评估已发布决策,并把结果注入 decision 变量", "en-US": "Evaluate a published decision before trigger conditions and expose the result as the decision variable", "source": "import", "refType": "ui" },
   { "key": "automation.field.fieldCode", "zh-CN": "目标字段", "en-US": "Field", "source": "import", "refType": "ui" },
   { "key": "automation.field.watchFields", "zh-CN": "监听字段", "en-US": "Watch Fields", "source": "import", "refType": "ui" },
   { "key": "automation.field.watchFields.desc", "zh-CN": "留空表示监听所有字段变更", "en-US": "Leave empty to watch all field changes", "source": "import", "refType": "ui" },
