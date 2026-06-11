@@ -7,8 +7,10 @@
  * and editable through the low-code pages with ZERO raw-code / bare-i18n-key leakage.
  *
  * This replaces the M5 spec lost when its original worktree was cleaned up. The J6
- * chain (pe_rfq → pe_dfm_review / pe_customer_board / pe_rfq_price_tier) is set up via
- * the real pe:* commands in beforeAll, then asserted through the UI.
+ * chain (pe_rfq → crm_review_common[dfm] / pe_customer_board / pe_rfq_price_tier) is set
+ * up via the real pe:* / crm:* commands in beforeAll, then asserted through the UI.
+ * (A2-S1: the legacy pe_dfm_review model was decommissioned; DFM reviews now live on the
+ * layered crm_review_common model with review_type 'dfm'.)
  *
  * Run:
  *   PLAYWRIGHT_BASE_URL=http://localhost:5239 BACKEND_URL=http://localhost:6509 \
@@ -22,8 +24,8 @@
  *   M3  pe_rfq            · detail — quantity-break price-tier sub-table shows the tier rows
  *   M4  pe_customer_board · list   — board master (layers / IPC) visible, no raw leak
  *   M5  pe_customer_board · detail — board detail fields render, no raw leak
- *   M6  pe_dfm_review     · list   — DFM review with conclusion visible, no raw leak
- *   M7  pe_dfm_review     · detail — DFM conclusion + engineer render, no raw leak
+ *   M6  crm_review_common · list   — DFM review (review_type dfm) visible, no raw leak
+ *   M7  crm_review_common · detail — DFM conclusion + reviewer render, no raw leak
  *   M8  pe_rfq            · form   — create form opens with labelled fields (no raw leak)
  */
 import { test, expect, type Page } from '@playwright/test';
@@ -126,13 +128,13 @@ async function openDetail(page: Page, code: string): Promise<void> {
 }
 
 /**
- * Assert no raw PCBA field code (pe_rfq_*, pe_dfm_*, pe_board_*, pe_pt_*) and no bare
+ * Assert no raw field code (pe_rfq_*, pe_board_*, pe_pt_*, crm_rv_*) and no bare
  * i18n key (model.<x>.<y>.label) is leaking into the rendered page text. These are the
  * §2.2 blockers — a label that shows the column code instead of its localized name.
  */
 async function assertNoRawCodeLeak(page: Page, label: string): Promise<void> {
   const body = await page.locator('body').innerText();
-  const rawField = body.match(/\bpe_(rfq|dfm|board|pt|opp|ql|qt)_[a-z_]+\b/g) || [];
+  const rawField = body.match(/\b(?:pe_(?:rfq|dfm|board|pt|opp|ql|qt)|crm_(?:rv|rk|cl))_[a-z_]+\b/g) || [];
   const bareKey = body.match(/\bmodel\.[a-z_]+\.[a-z_.]+\.label\b/g) || [];
   expect(rawField, `[${label}] raw field code leaked: ${[...new Set(rawField)].join(', ')}`).toHaveLength(0);
   expect(bareKey, `[${label}] bare i18n key leaked: ${[...new Set(bareKey)].join(', ')}`).toHaveLength(0);
@@ -187,18 +189,20 @@ test.describe('CRM M5 PCBA J6 (L4 UI golden)', () => {
     await cmd('pe:submit_rfq', undefined, rfqId);
     await cmd('pe:request_dfm_review', undefined, rfqId);
 
-    // --- DFM review attached to the RFQ (conclusion pass) ---
-    r = await cmd('pe:create_dfm_review', {
-      pe_dfm_rfq_id: rfqId,
-      pe_dfm_conclusion: 'pass',
-      pe_dfm_engineer: 'Engineer Wang',
-      pe_dfm_review_date: '2026-06-04',
-      pe_dfm_risk_items: 'Min trace 0.1mm within capability; impedance control required on L2/L5.',
-      pe_dfm_recommendations: 'Proceed to quotation; add controlled-impedance test coupon.',
+    // --- DFM review on the layered review model (A2-S1: crm_review_common, type dfm) ---
+    const dfmTitle = `J6 DFM Review ${TAG}`;
+    r = await cmd('crm:create_review', {
+      crm_rv_title: dfmTitle,
+      crm_rv_review_type: 'dfm',
+      crm_rv_status: 'passed',
+      crm_rv_reviewer_id: 'Engineer Wang',
+      crm_rv_decided_at: '2026-06-04T10:00:00Z',
+      crm_rv_conclusion: 'Min trace 0.1mm within capability; impedance control required on L2/L5.',
+      crm_rv_recommendation: 'Proceed to quotation; add controlled-impedance test coupon.',
     });
     expect(r?.code, 'create dfm review returns OK').toBe('0');
-    const dfms = await listRows('pe_dfm_review');
-    dfmCode = dfms.find((d) => d?.pe_dfm_rfq_id === rfqId)?.pe_dfm_code || '';
+    const dfms = await listRows('crm_review_common');
+    dfmCode = dfms.find((d) => d?.crm_rv_title === dfmTitle)?.crm_rv_code || '';
     expect(dfmCode, 'dfm code resolved').not.toBe('');
 
     // --- quantity-break price tiers on the RFQ (the volume-sensitive PCBA pricing) ---
@@ -276,20 +280,20 @@ test.describe('CRM M5 PCBA J6 (L4 UI golden)', () => {
     await page.screenshot({ path: `${SHOT}/m5_board_detail.png`, fullPage: true });
   });
 
-  // ---- M6: DFM review list ----
+  // ---- M6: DFM review list (layered crm_review_common) ----
   test('M6 DFM review list shows the manufacturability review', async ({ page }) => {
-    await gotoPage(page, '/p/pe_dfm_review');
+    await gotoPage(page, '/p/crm_review_common');
     await expect(page.getByText(dfmCode).first()).toBeVisible({ timeout: 12000 });
-    await assertNoRawCodeLeak(page, 'pe_dfm_review_list');
+    await assertNoRawCodeLeak(page, 'crm_review_common_list');
     await page.screenshot({ path: `${SHOT}/m6_dfm_list.png`, fullPage: true });
   });
 
-  // ---- M7: DFM review detail (conclusion + engineer) ----
-  test('M7 DFM review detail renders conclusion and engineer', async ({ page }) => {
-    await gotoPage(page, '/p/pe_dfm_review');
+  // ---- M7: DFM review detail (conclusion + reviewer) ----
+  test('M7 DFM review detail renders conclusion and reviewer', async ({ page }) => {
+    await gotoPage(page, '/p/crm_review_common');
     await openDetail(page, dfmCode);
     await expect(page.getByText('Engineer Wang').first()).toBeVisible({ timeout: 10000 });
-    await assertNoRawCodeLeak(page, 'pe_dfm_review_detail');
+    await assertNoRawCodeLeak(page, 'crm_review_common_detail');
     await page.screenshot({ path: `${SHOT}/m7_dfm_detail.png`, fullPage: true });
   });
 
