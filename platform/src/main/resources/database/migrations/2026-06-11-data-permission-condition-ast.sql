@@ -1,0 +1,13 @@
+-- B2: structured condition AST for CUSTOM row data-scope.
+--
+-- The legacy CUSTOM scope stored a free-form SQL fragment in `scope_expression` and guarded it
+-- with a blocklist (SqlSafetyUtils.validateSqlFragment). `condition_ast` stores a structured
+-- decision ConditionNode (JSON) instead, which DataPermissionEngine compiles to SQL via the
+-- allowlist ConditionToSqlBuilder (validated identifiers + escaped/typed literals + whitelisted
+-- operators). Additive only: existing CUSTOM policies keep using `scope_expression` until they are
+-- re-authored as an AST; when `condition_ast` is present it takes precedence.
+--
+-- Stored as TEXT (not JSONB) intentionally: the column is serialized-and-read-back AST, never
+-- queried with jsonb operators, and TEXT avoids the MyBatis-Plus JacksonTypeHandler varchar→jsonb
+-- write incompatibility.
+ALTER TABLE ab_data_permission_policy ADD COLUMN IF NOT EXISTS condition_ast TEXT;
