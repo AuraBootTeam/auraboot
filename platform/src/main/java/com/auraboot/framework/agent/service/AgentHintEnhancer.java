@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.util.JsonbColumns;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
@@ -102,12 +103,15 @@ public class AgentHintEnhancer {
             if (execConfigRaw != null) {
                 try {
                     Map<String, Object> execConfig;
-                    if (execConfigRaw instanceof String s) {
-                        execConfig = objectMapper.readValue(s, Map.class);
-                    } else if (execConfigRaw instanceof Map) {
+                    if (execConfigRaw instanceof Map) {
                         execConfig = (Map<String, Object>) execConfigRaw;
                     } else {
-                        execConfig = objectMapper.convertValue(execConfigRaw, Map.class);
+                        // String or a driver PGobject (JSONB column via generic
+                        // query) — read the JSON text via JsonbColumns. The old
+                        // else (convertValue on a PGobject) yielded the wrapper
+                        // {type,value}, silently corrupting the parsed hints.
+                        String json = JsonbColumns.toJsonText(execConfigRaw, objectMapper);
+                        execConfig = json == null ? Map.of() : objectMapper.readValue(json, Map.class);
                     }
 
                     // Extract key fields
