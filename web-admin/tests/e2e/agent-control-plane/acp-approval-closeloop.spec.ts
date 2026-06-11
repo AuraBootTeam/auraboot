@@ -154,11 +154,18 @@ test.describe('A5: Agent approval close-loop (golden)', () => {
       const tenantId: string = tenantMatch[1];
 
       // Policy authorizing the admin as approver (fail-secure requirement).
+      // adminId is an ab_user.id snowflake (> 2^53). Number(adminId) would silently
+      // lose precision (…880 -> …900), so the seeded approver_rules.userId would NOT
+      // equal the real Long userId in AgentApprovalGateService.evaluateApproverRules
+      // (userId.equals(toLong(ruleUserId))) -> "not authorized" and the approve
+      // command never returns 200. Embed adminId (a digit string from PG) directly as
+      // a full-precision JSON number — same precision discipline already applied to
+      // tenantId above (extracted as string), which the original missed for userId.
       await client.query(
         `INSERT INTO ab_approval_policy (pid, tenant_id, policy_name, approver_rules, deleted_flag, created_at)
          VALUES ($1, $2, 'A5 Golden Policy', $3::jsonb, FALSE, now())
          ON CONFLICT (pid) DO UPDATE SET approver_rules = EXCLUDED.approver_rules`,
-        [POLICY_PID, tenantId, JSON.stringify([{ type: 'user', userId: Number(adminId) }])],
+        [POLICY_PID, tenantId, `[{"type":"user","userId":${adminId}}]`],
       );
       // Two pending approvals (as the runtime would create), linked to the policy.
       for (const [pid, title] of [[APPROVE_PID, APPROVE_TITLE], [REJECT_PID, REJECT_TITLE]] as const) {
