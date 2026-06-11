@@ -2,7 +2,12 @@ package com.auraboot.framework.decision;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.event.BpmEvent;
+import com.auraboot.framework.bpm.entity.BpmNotifyRecord;
+import com.auraboot.framework.bpm.entity.SlaRecordEntity;
+import com.auraboot.framework.bpm.mapper.BpmNotifyRecordMapper;
+import com.auraboot.framework.bpm.mapper.SlaRecordMapper;
 import com.auraboot.framework.bpm.service.SlaConfigService;
+import com.auraboot.framework.bpm.service.SlaSchedulerService;
 import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionDTO;
@@ -26,6 +31,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -71,11 +77,15 @@ class SlaDecisionE2EIntegrationTest extends BaseIntegrationTest {
     @Autowired private DrtDefinitionService drtDefinitionService;
     @Autowired private DecisionVersionService drtVersionService;
     @Autowired private SlaConfigService slaConfigService;
+    @Autowired private SlaSchedulerService slaSchedulerService;
+    @Autowired private SlaRecordMapper slaRecordMapper;
+    @Autowired private BpmNotifyRecordMapper notifyRecordMapper;
     @Autowired private ApplicationEventPublisher eventPublisher;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     private String instanceId;
     private String slaConfigPid;
+    private Long escalationRecipientId;
 
     @AfterEach
     public void cleanup() {
@@ -85,6 +95,9 @@ class SlaDecisionE2EIntegrationTest extends BaseIntegrationTest {
             }
             if (slaConfigPid != null) {
                 jdbcTemplate.update("DELETE FROM ab_sla_config WHERE pid=?", slaConfigPid);
+            }
+            if (escalationRecipientId != null) {
+                jdbcTemplate.update("DELETE FROM ab_bpm_notify_record WHERE recipient_user_id=?", escalationRecipientId);
             }
         } catch (Exception ignore) { }
     }
@@ -216,5 +229,103 @@ class SlaDecisionE2EIntegrationTest extends BaseIntegrationTest {
         assertThat(minutes)
                 .as("SLA ruleBinding decision deadline minutes (120), not the fixed PT24H fallback")
                 .isBetween(118L, 122L);
+    }
+
+    @Test
+    void slaActivation_withRuleBinding_thenSchedulerMarksOverdueAndEscalates() throws Exception {
+        Long tid = getTestTenant().getId();
+        String activityId = "node_rule_binding_escalation_" + System.nanoTime();
+        instanceId = "PI-SLA-RULE-BINDING-ESC-" + System.nanoTime();
+        String decisionCode = "drt_sla_rule_binding_esc_" + System.nanoTime();
+        escalationRecipientId = 980000000L + Math.floorMod(System.nanoTime(), 1000000L);
+
+        publishRuleBindingDeadlineDecision(decisionCode);
+
+        RuleConsumerBinding ruleBinding = new RuleConsumerBinding(
+                "SLA",
+                "sla-rule-binding-escalation-it",
+                activityId,
+                RuleBindingKind.DECISION_REF,
+                null,
+                new DecisionBinding(
+                        decisionCode,
+                        DecisionVersionPolicy.LATEST_PUBLISHED,
+                        null,
+                        null,
+                        null,
+                        List.of(
+                                new DecisionBinding.InputMapping(
+                                        "targetType",
+                                        RuleValueSource.field(Scope.RECORD, "data.targetType")),
+                                new DecisionBinding.InputMapping(
+                                        "targetKey",
+                                        RuleValueSource.field(Scope.RECORD, "data.targetKey"))),
+                        List.of(),
+                        DecisionBinding.FallbackPolicy.failClosed(),
+                        200,
+                        DecisionBinding.TraceMode.ALWAYS,
+                        true,
+                        null,
+                        null),
+                true);
+
+        var cfg = slaConfigService.create(new SlaConfigService.CreateSlaConfigRequest(
+                "Rule Binding SLA Escalation " + System.nanoTime(),
+                "NODE",
+                activityId,
+                null,
+                "FIXED",
+                "PT24H",
+                null,
+                List.of(Map.of(
+                        "threshold", "50%",
+                        "action", "escalate",
+                        "recipients", "userId:" + escalationRecipientId)),
+                ruleBinding,
+                null,
+                null,
+                null,
+                null));
+        slaConfigPid = cfg.getPid();
+
+        String taskId = "TASK-SLA-RULE-BINDING-ESC-1";
+        eventPublisher.publishEvent(BpmEvent.of(tid, "task_assigned", "task",
+                "pk-sla-rule-binding-escalation", instanceId, activityId,
+                Map.of(
+                        "taskInstanceId", taskId,
+                        "activityId", activityId,
+                        "processInstanceId", instanceId)));
+
+        SlaRecordEntity created = slaRecordMapper.findByProcessInstance(instanceId, tid).stream()
+                .filter(record -> activityId.equals(record.getNodeId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(created.getTaskId()).isEqualTo(taskId);
+
+        Instant now = Instant.now();
+        jdbcTemplate.update("""
+                        UPDATE ab_sla_record
+                        SET start_time=?, deadline_time=?, updated_at=?
+                        WHERE pid=?
+                        """,
+                Timestamp.from(now.minusSeconds(120)),
+                Timestamp.from(now.minusSeconds(30)),
+                Timestamp.from(now),
+                created.getPid());
+
+        slaSchedulerService.scanSlaRecords();
+        MetaContext.setContext(tid, getTestUser().getId(), getTestUser().getPid(), getTestUser().getUserName());
+
+        SlaRecordEntity overdue = slaRecordMapper.findByPid(created.getPid(), tid);
+        assertThat(overdue.getStatus()).isEqualTo("overdue");
+        assertThat(overdue.getCurrentWarningLevel()).isEqualTo(1);
+        assertThat(overdue.getWarningHistory()).hasSize(1);
+        assertThat(overdue.getWarningHistory().get(0)).containsEntry("action", "escalate");
+
+        List<BpmNotifyRecord> notifications = notifyRecordMapper.findByRecipient(tid, escalationRecipientId, "urge");
+        assertThat(notifications).isNotEmpty();
+        assertThat(notifications.get(0).getTaskId()).isEqualTo(taskId);
+        assertThat(notifications.get(0).getProcessInstanceId()).isEqualTo(instanceId);
+        assertThat(notifications.get(0).getContent()).contains("SLA ESCALATION");
     }
 }

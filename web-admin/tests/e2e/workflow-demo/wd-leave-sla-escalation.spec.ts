@@ -127,11 +127,6 @@ test.describe('workflow-demo — R3 SLA escalation', () => {
 
       const slaCheckBody = await slaCheckResp.json();
       const slaRecords = (slaCheckBody?.data as Array<Record<string, unknown>>) ?? [];
-      expect(
-        slaRecords.length,
-        'SlaActivationListener must have created SLA records when task activated',
-      ).toBeGreaterThanOrEqual(1);
-
       const managerSlaRecord = slaRecords.find(
         (r) => r.nodeId === 'task_manager_approve',
       );
