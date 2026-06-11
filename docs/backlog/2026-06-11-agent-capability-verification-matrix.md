@@ -13,11 +13,15 @@ created: 2026-06-11
 
 ## TL;DR(本次真实验证结论)
 
-- **后端 `testAgent`(全量 agent 真栈,DeepSeek 注入):1640 测试 → 1618 PASS / 13 FAIL / 9 SKIP(98.7%)**。
-- 13 失败逐条定性(crm-seeded clone 复跑,见 §4b):**1 真 bug 已修**(failRun 根任务 NPE,PR #580)+ **1 待跟进 finding**(`loadPlanFromRun` JSONB/PGobject 健壮性)+ **3 env→转绿**(crm 表)+ **8 更深 env**(crm capabilities 未同步给测试租户,非产品 bug)+ **0 其它产品 bug**。
+- **后端 `testAgent` 全量真栈(DeepSeek 注入)+ 根因修复后:1640 测试 → 1626 PASS / 5 FAIL / 9 SKIP**(基线 1618 → 1626,3 个根因 fix 修掉 8 个真-bug 失败)。
+- **根因解决:13 失败 = 3 个真生产 bug(8 个失败)已修 + 5 个环境失败 + 0 残留产品 bug**:
+  - **#580** `RunLifecycleService.publishTaskCompleted` 根任务 NPE(任何根 agent run 失败必崩)。
+  - **#586** `PlanService.loadPlanFromRun` PGobject JSONB(任何持久化 plan 的 resume 加载必崩)。
+  - **#589** `CapabilityRouter.parseJsonList` PGobject JSONB(**capability 路由层在 JSONB 返 PGobject 时整体返空** —— agent BIF→capability→skill 路由瘫痪)。三者同根:**通用 `selectByQuery` 读 JSONB 不应用 type-handler → 返 PGobject,旧代码未处理**(canonical 正解 `StepLoopService.parseExecutionConfig`)。
+  - 5 个剩余全 env:3 个测试需 crm 插件表(`mt_crm_account`/crm 模型,shared 库现无)+ 2 个 `CapabilityRouter` 隔离跑 7/7 全绿、全量套件里被 shared-aura_boot 并发 churn/测试顺序污染(env-flaky,非逻辑)。
 - **DeepSeek 真模型腿 `CapabilityEvalLiveIT` 3/3 PASS**;**L3 审批闭环浏览器 `acp-approval-closeloop` 3/3 PASS**(本会话)。
-- 机制类能力(loop/五层策略/审批/记忆/协作/调度/恢复/技能/grounding 非 crm)**全绿**;**输出形式与契约预期一致**(见 §5)。
-- 边界:其余 ~31 个 agent/aurabot **浏览器 E2E 本会话未逐一重跑**(仅审批闭环重跑);crm 域测试需 crm-seeded 库复跑;2 个待澄清项需 clean-DB 复跑定性。
+- ⚠️ **前一轮把 8 个 CapabilityRouter 误判为 "test-infra/test-tenant capability 同步" —— 实为真 bug(#589 PGobject)**;owner 坚持「根因解决」纠正了此误判。系统性建议:抽共享 JSONB-列读取 helper,杜绝 PGobject-on-generic-read 复发(已 ≥3 处)。
+- 边界:真正 1640/1640 需 CI 的 reset-init 干净库(带 crm 插件 + 隔离并发 churn);~31 个浏览器 E2E 除审批闭环外本会话未逐一重跑。
 
 ---
 
