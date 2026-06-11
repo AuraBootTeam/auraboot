@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.AuthenticationResponse;
 import com.auraboot.framework.auth.dto.RegisterRequest;
 import com.auraboot.framework.auth.service.AuthService;
+import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
 import com.auraboot.framework.saas.config.service.SystemModeService;
@@ -54,6 +55,9 @@ class MultiTenantSelfRegistrationIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private AuthService authService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     @Autowired
     private TenantApplicationService tenantApplicationService;
@@ -131,5 +135,17 @@ class MultiTenantSelfRegistrationIntegrationTest extends BaseIntegrationTest {
         Tenant created = tenantService.findByName(sel.getTenantName());
         assertNotNull(created, "the created tenant must be persisted");
         assertEquals(tResp.getTenantId(), created.getId(), "response tenantId must match the persisted tenant");
+
+        // Regression: the tenant-scoped JWT MUST carry memberId. PermissionInterceptor/
+        // UserPermissionServiceImpl resolves permissions through the member, so a JWT with
+        // only tenantId (no memberId) yields "MemberId not available in MetaContext" and 403s
+        // every permission-gated endpoint — i.e. a freshly self-registered founder lands in a
+        // workspace they cannot actually use until they re-login. See createTenantForUser.
+        assertNull(jwtUtil.extractMemberId(authResp.getJwt()),
+                "the register-step JWT is tenant-less, so it must not carry a memberId yet");
+        assertNotNull(jwtUtil.extractMemberId(tResp.getJwt()),
+                "the tenant-scoped JWT must carry memberId so permission resolution works end-to-end");
+        assertEquals(tResp.getTenantId(), jwtUtil.extractTenantId(tResp.getJwt()),
+                "the tenant-scoped JWT tenantId claim must match the created tenant");
     }
 }
