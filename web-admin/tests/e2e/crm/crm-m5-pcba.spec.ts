@@ -8,7 +8,7 @@
  *
  * This replaces the M5 spec lost when its original worktree was cleaned up. The J6
  * chain (crm_customer_request_common + crm_customer_request_pcba_rfq sidecar →
- * crm_review_common[dfm] / pe_customer_board / crm_customer_request_pcba_price_tier)
+ * crm_review_common[dfm] / req_product_pcba_board / crm_customer_request_pcba_price_tier)
  * is set up via the real crm:* / pe:* commands in beforeAll, then asserted through the UI.
  * (A2-S1: the legacy DFM model was decommissioned; DFM reviews now live on the layered
  * crm_review_common model with review_type 'dfm'. A2-S2: the legacy RFQ model was
@@ -26,8 +26,8 @@
  *   M1  crm_customer_request_pcba_rfq · list   — RFQ code + product model + DFM status visible, no raw leak
  *   M2  crm_customer_request_pcba_rfq · detail — basic + PCBA tech fields render, no raw leak
  *   M3  pe_rfq_workspace (crm_customer_request_common) · detail — RFQ tab price-tier sub-table shows the tier rows
- *   M4  pe_customer_board · list   — board master (layers / IPC) visible, no raw leak
- *   M5  pe_customer_board · detail — board detail fields render, no raw leak
+ *   M4  req_product_pcba_board · list   — board master (layers / IPC) visible, no raw leak
+ *   M5  req_product_pcba_board · detail — board detail fields render, no raw leak
  *   M6  crm_review_common · list   — DFM review (review_type dfm) visible, no raw leak
  *   M7  crm_review_common · detail — DFM conclusion + reviewer render, no raw leak
  *   M8  crm_customer_request_pcba_rfq · form — create form opens with labelled fields (no raw leak)
@@ -168,7 +168,7 @@ test.describe('CRM M5 PCBA J6 (L4 UI golden)', () => {
     });
     const board = rid(r);
     expect(board, 'create board').toBeTruthy();
-    const boards = await listRows('pe_customer_board');
+    const boards = await listRows('req_product_pcba_board');
     boardCode = boards.find((b) => b?.pid === board || b?.pe_board_account_id === acc)?.pe_board_code || '';
     expect(boardCode, 'board code resolved').not.toBe('');
 
@@ -278,19 +278,19 @@ test.describe('CRM M5 PCBA J6 (L4 UI golden)', () => {
 
   // ---- M4: customer board list ----
   test('M4 customer board list shows the board master record', async ({ page }) => {
-    await gotoPage(page, '/p/pe_customer_board');
+    await gotoPage(page, '/p/req_product_pcba_board');
     await expect(page.getByText(boardCode).first()).toBeVisible({ timeout: 12000 });
     await expect(page.getByText(`J6 Controller Board ${TAG}`).first()).toBeVisible({ timeout: 8000 });
-    await assertNoRawCodeLeak(page, 'pe_customer_board_list');
+    await assertNoRawCodeLeak(page, 'req_product_pcba_board_list');
     await page.screenshot({ path: `${SHOT}/m4_board_list.png`, fullPage: true });
   });
 
   // ---- M5: customer board detail ----
   test('M5 customer board detail renders the board spec fields', async ({ page }) => {
-    await gotoPage(page, '/p/pe_customer_board');
+    await gotoPage(page, '/p/req_product_pcba_board');
     await openDetail(page, boardCode);
     await expect(page.getByText(`J6 Controller Board ${TAG}`).first()).toBeVisible({ timeout: 10000 });
-    await assertNoRawCodeLeak(page, 'pe_customer_board_detail');
+    await assertNoRawCodeLeak(page, 'req_product_pcba_board_detail');
     await page.screenshot({ path: `${SHOT}/m5_board_detail.png`, fullPage: true });
   });
 
