@@ -45,6 +45,56 @@
       "resourceType": "menu"
     },
     {
+      "code": "acp.runtime.manage",
+      "name": "Agent 运行时操作",
+      "description": "派发任务给 Agent、脚手架、调度重载/触发、工具契约派生、dry-run/沙箱、协作与 BPM 桥接、技能同步",
+      "type": "function",
+      "module": "acp",
+      "resource": "/api/agent",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "acp.agent_run.admin",
+      "name": "Agent 运行管理视图",
+      "description": "查看与管理 Agent 运行历史与 shadow runs",
+      "type": "function",
+      "module": "acp",
+      "resource": "/api/admin/agent-runs",
+      "action": "admin",
+      "resourceType": "function"
+    },
+    {
+      "code": "acp.memory.admin",
+      "name": "Agent 记忆治理",
+      "description": "记忆推升审核/撤回/批量批准与层级管理",
+      "type": "function",
+      "module": "acp",
+      "resource": "/api/memory/promotions",
+      "action": "admin",
+      "resourceType": "function"
+    },
+    {
+      "code": "acp.profile.admin",
+      "name": "用户画像管理",
+      "description": "跨用户 soul profile 管理与遗忘操作（用户自助编辑不受此码限制）",
+      "type": "function",
+      "module": "acp",
+      "resource": "/api/admin/user-soul-profiles",
+      "action": "admin",
+      "resourceType": "function"
+    },
+    {
+      "code": "acp.learning.review",
+      "name": "学习回路评审",
+      "description": "学习草稿评审/重命名/晋升评估",
+      "type": "function",
+      "module": "acp",
+      "resource": "/api/learning/drafts",
+      "action": "review",
+      "resourceType": "function"
+    },
+    {
       "code": "notification.view",
       "name": "通知中心",
       "description": "查看和管理通知消息",
@@ -1456,31 +1506,31 @@
     },
     {
       "code": "billing.catalog.read",
-      "name": "计费资源目录读取",
-      "description": "查看计费资源目录条目",
+      "name": "计费目录查看",
+      "description": "查看计费资源目录",
       "type": "function",
       "module": "billing",
-      "resource": "billing:catalog",
+      "resource": "/api/billing/catalog",
       "action": "read",
       "resourceType": "function"
     },
     {
       "code": "billing.quota.read",
-      "name": "配额余额读取",
-      "description": "查看配额桶余额",
+      "name": "配额查看",
+      "description": "查看配额余额与消费记录",
       "type": "function",
       "module": "billing",
-      "resource": "billing:quota",
+      "resource": "/api/billing/quota",
       "action": "read",
       "resourceType": "function"
     },
     {
       "code": "billing.usage.read",
-      "name": "用量事件读取",
-      "description": "查看计量用量事件",
+      "name": "用量查看",
+      "description": "查看计量用量",
       "type": "function",
       "module": "billing",
-      "resource": "billing:usage",
+      "resource": "/api/billing/usage",
       "action": "read",
       "resourceType": "function"
     }

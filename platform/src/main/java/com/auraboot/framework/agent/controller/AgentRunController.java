@@ -37,6 +37,8 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 
 /**
  * Replay UI MVP — admin-facing read-only listing of agent runs.
@@ -67,6 +69,7 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/agent-runs")
+@RequirePermission(MetaPermission.ACP_AGENT_RUN_ADMIN)
 public class AgentRunController {
 
     /** Hard cap on page size to keep payload + admin SQL bounded. */
