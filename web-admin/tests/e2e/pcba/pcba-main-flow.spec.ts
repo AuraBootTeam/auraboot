@@ -28,6 +28,8 @@ type DemoEntry = {
   label: RegExp;
   route: RegExp;
   modelCode: string;
+  /** Sidebar section to expand; defaults to the Demo Flow directory. */
+  parentLabel?: RegExp;
 };
 
 type CommandResult = { code: string; recordId: string };
@@ -60,7 +62,8 @@ const PAGE_KEYS = {
   customer: 'crm-account',
   product: 'prod-product',
   supplier: 'pe-supplier',
-  rfq: 'pe-rfq',
+  customerRequest: 'crm_customer_request',
+  rfq: 'crm_customer_request_pcba_rfq',
   quotation: 'sl-sales-quotation',
   quotationLine: 'sl-sales-quotation-line',
   salesOrder: 'sl-sales-order',
@@ -87,11 +90,14 @@ const DEMO_ENTRIES = {
     modelCode: 'crm_account',
   },
   rfq: {
+    // A2-S2: legacy RFQ page is dead; the PCBA RFQ sidecar list lives under the
+    // Sales-To-Order IA section (menu pe_crm_crm_customer_request_pcba_rfq).
     id: 'rfq',
-    href: '/p/pe_rfq',
-    label: /2\.\s*RFQ/i,
-    route: /\/p\/pe_rfq(?:$|[?#])/,
-    modelCode: 'pe_rfq',
+    href: '/p/crm_customer_request_pcba_rfq',
+    label: /客户需求-PCBA RFQ|Customer Requests \(PCBA RFQ\)|RFQ/i,
+    route: /\/p\/crm_customer_request_pcba_rfq(?:$|[?#])/,
+    modelCode: 'crm_customer_request_pcba_rfq',
+    parentLabel: /销售到订单|Sales To Order/i,
   },
   quotation: {
     id: 'quotation',
@@ -228,12 +234,13 @@ async function revealDemoEntry(page: Page, entry: DemoEntry): Promise<Locator> {
       .first(),
   );
 
+  const sectionLabel = entry.parentLabel ?? /演示主线|Demo Flow/i;
   await clickIfVisible(
     nav
-      .getByRole('button', { name: /演示主线|Demo Flow/i })
-      .or(nav.getByRole('menuitem', { name: /演示主线|Demo Flow/i }))
-      .or(nav.getByRole('link', { name: /演示主线|Demo Flow/i }))
-      .or(nav.locator('button, [role="menuitem"], a').filter({ hasText: /演示主线|Demo Flow/i }))
+      .getByRole('button', { name: sectionLabel })
+      .or(nav.getByRole('menuitem', { name: sectionLabel }))
+      .or(nav.getByRole('link', { name: sectionLabel }))
+      .or(nav.locator('button, [role="menuitem"], a').filter({ hasText: sectionLabel }))
       .first(),
   );
 
@@ -568,43 +575,76 @@ test.describe('PCBA ERP — Demo Flow Mainline @critical', () => {
       uid,
     );
 
+    // A2-S2: RFQ truth = crm_customer_request + crm_customer_request_pcba_rfq sidecar.
+    // The route handler copies the request title into crm_crq_product_model, so the
+    // title doubles as the searchable product model in the sidecar list.
     const rfqProductModel = `E2E PCBA RFQ ${uid}`;
-    const rfqId = mustSucceed(
+    const customerRequestId = mustSucceed(
       await executeCommandViaApi(
         page,
-        'pe:create_rfq',
+        'crm:create_customer_request',
         {
-          pe_rfq_customer_id: customerId,
-          pe_rfq_product_model: rfqProductModel,
-          pe_rfq_revision: 'A',
-          pe_rfq_quantity: 24,
-          pe_rfq_delivery_window: '14 days',
-          pe_rfq_quality_class: 'class_2',
-          pe_rfq_trace_level: 'l1_batch',
-          pe_rfq_supply_mode: 'turnkey',
-          pe_rfq_notes: `Mainline E2E ${uid}`,
+          crm_cr_title: rfqProductModel,
+          crm_cr_account_id: customerId,
+          crm_cr_type: 'rfq',
+          crm_cr_summary: `Mainline E2E ${uid}`,
         },
         undefined,
         'create',
         { allowHttpError: true, timeoutMs: 30_000 },
       ),
-      'pe:create_rfq',
+      'crm:create_customer_request',
     );
 
     await openEntryAndFindRow(page, DEMO_ENTRIES.customer, `E2E Main Customer ${uid}`);
 
+    let customerRequest = await fetchRecord(page, PAGE_KEYS.customerRequest, customerRequestId);
+    expect(String(customerRequest.crm_cr_code ?? '')).toBeTruthy();
+    expect(customerRequest.crm_cr_status).toBe('draft');
+
+    mustSucceed(
+      await executeCommandViaApi(
+        page,
+        'crm:submit_customer_request',
+        {},
+        customerRequestId,
+        'update',
+        { allowHttpError: true, timeoutMs: 30_000 },
+      ),
+      'crm:submit_customer_request',
+    );
+
+    mustSucceed(
+      await executeCommandViaApi(
+        page,
+        'pe:route_customer_request_to_rfq',
+        {},
+        customerRequestId,
+        'update',
+        { allowHttpError: true, timeoutMs: 30_000 },
+      ),
+      'pe:route_customer_request_to_rfq',
+    );
+
+    customerRequest = await fetchRecord(page, PAGE_KEYS.customerRequest, customerRequestId);
+    expect(customerRequest.crm_cr_status).toBe('routed');
+    expect(customerRequest.crm_cr_routed_object_type).toBe('crm_customer_request_pcba_rfq');
+    const rfqId = String(customerRequest.crm_cr_routed_object_id ?? '');
+    expect(rfqId, 'route should write the sidecar pid back to the request').toBeTruthy();
+
     let rfq = await fetchRecord(page, PAGE_KEYS.rfq, rfqId);
-    const rfqCode = String(rfq.pe_rfq_code ?? '');
+    const rfqCode = String(rfq.crm_crq_code ?? '');
     expect(rfqCode).toBeTruthy();
-    expect(rfq.pe_rfq_status).toBe('draft');
+    expect(rfq.crm_crq_dfm_status).toBe('pending');
 
-    await runActionAndRefind(page, DEMO_ENTRIES.rfq, rfqProductModel, 'submit');
+    // DFM gate through the real sidecar list row actions (pending → in_review → passed)
+    await runActionAndRefind(page, DEMO_ENTRIES.rfq, rfqProductModel, 'request_dfm');
     rfq = await fetchRecord(page, PAGE_KEYS.rfq, rfqId);
-    expect(rfq.pe_rfq_status).toBe('submitted');
+    expect(rfq.crm_crq_dfm_status).toBe('in_review');
 
-    await runActionAndRefind(page, DEMO_ENTRIES.rfq, rfqProductModel, 'finalize');
+    await runActionAndRefind(page, DEMO_ENTRIES.rfq, rfqProductModel, 'pass_dfm');
     rfq = await fetchRecord(page, PAGE_KEYS.rfq, rfqId);
-    expect(rfq.pe_rfq_status).toBe('finalized');
+    expect(rfq.crm_crq_dfm_status).toBe('passed');
 
     const quotationId = mustSucceed(
       await executeCommandViaApi(page, 'sl:create_sales_quotation', {
