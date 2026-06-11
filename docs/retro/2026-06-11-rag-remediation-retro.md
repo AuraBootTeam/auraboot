@@ -6,6 +6,8 @@ owner: platform
 topic: RAG G1-G9 remediation retro (aura-endgame P6)
 ---
 
+<!-- no-precipitation: precipitation decision recorded in §沉淀决策 — F1 lesson (grep API consumers) escalated to memory; remaining items already have canonical homes, so no new git canonical target. -->
+
 # RAG Gap Remediation — Retro (2026-06-11)
 
 Scope: review of the RAG subsystem → tracker (`docs/backlog/2026-06-10-rag-system-review-and-gap-tracker.md`)

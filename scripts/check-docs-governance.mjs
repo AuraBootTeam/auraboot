@@ -148,8 +148,9 @@ function matchesGlob(relPath, glob) {
   const re = new RegExp(
     '^' + glob
       .replaceAll('.', '\\.')
-      .replaceAll('/**', '(/.*)?')
-      .replaceAll('*', '[^/]*') + '$',
+      .replaceAll('/**', '@@GLOBSTAR@@')
+      .replaceAll('*', '[^/]*')
+      .replaceAll('@@GLOBSTAR@@', '(/.*)?') + '$',
   );
   return re.test(relPath);
 }
