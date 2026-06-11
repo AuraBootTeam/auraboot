@@ -639,6 +639,36 @@ public final class MetaPermission {
      */
     public static final String ACP_AGENT_APPROVAL = "acp.agent.approval";
 
+    /**
+     * ACP runtime operations: dispatch tasks to agents, scaffolding, schedule
+     * reload/trigger, tool contract derivation, dry-run/sandbox execution,
+     * collaboration (delegate/broadcast/pipeline), BPM bridging, skill sync.
+     */
+    public static final String ACP_RUNTIME_MANAGE = "acp.runtime.manage";
+
+    /**
+     * Admin views over agent runs and shadow runs ({@code /api/admin/agent-runs},
+     * {@code /api/admin/shadow-runs}).
+     */
+    public static final String ACP_AGENT_RUN_ADMIN = "acp.agent_run.admin";
+
+    /**
+     * Agent memory governance: promotion review/retract/batch-approve and
+     * tier admin (promote-now).
+     */
+    public static final String ACP_MEMORY_ADMIN = "acp.memory.admin";
+
+    /**
+     * User-soul-profile administration (cross-user views, forget).
+     * User self-service profile edits are NOT gated by this code.
+     */
+    public static final String ACP_PROFILE_ADMIN = "acp.profile.admin";
+
+    /**
+     * Learning-loop draft governance (review / auto-rename / evaluate-promotion).
+     */
+    public static final String ACP_LEARNING_REVIEW = "acp.learning.review";
+
     // ==================== IoT permissions ====================
 
     /**

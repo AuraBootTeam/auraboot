@@ -101,12 +101,17 @@ Real gaps cluster in three areas: **LLM-backed features stuck at keyword/TODO st
   尚未独立抽取" claims are stale (→ C1). The remaining concern is only that
   `CapabilityViewService` mixes write/read/graph paths — tracked under B2.
 
-### B2 — Six god classes ≥1000 lines (7099 total) 🟡 P2 (tracked, not this round)
+### B2 — Six god classes ≥1000 lines 🟡 (2 of 6 split 2026-06-11; rest deferred with rationale)
 
-- `CapabilityViewService` 1387 / `AgentRunController` 1277 / `ToolLoopService` 1206 (41
-  injected deps) / `AgentRunService` 1092 / `StepLoopService` 1081 / `ChatTurnRuntime` 1056.
-- Splitting these wholesale in one PR is regression-prone; do it opportunistically when
-  each area is next touched. B1 is the first slice.
+- **Done (r2 branch)**: `CapabilityViewService` 1387→670 (extracted `CapabilitySyncService`
+  553 + `CapabilityGraphService` 146 + shared `CapabilityMappingSupport` 134; public API
+  kept as thin delegation, callers untouched); `AgentRunController` 1280→541 (extracted
+  `AgentRunAuditController` 304 + `AgentRunOpsController` 245 + `AgentRunQuerySupport` 340;
+  URLs and class-level `ACP_AGENT_RUN_ADMIN` preserved endpoint-for-endpoint).
+- **Deferred**: `ToolLoopService` 1206 (41 injected deps) / `AgentRunService` 1092 /
+  `StepLoopService` 1081 / `ChatTurnRuntime` 1056 — these four form the deeply coupled
+  agent-loop core (service↔runtime, B4); splitting them safely needs a behavioral test
+  harness around the tool loop first. Split opportunistically when next touched.
 
 ### B3 — `@RequirePermission` nearly absent in agent controllers 🟠 P1 (partial this round)
 
@@ -138,13 +143,14 @@ Real gaps cluster in three areas: **LLM-backed features stuck at keyword/TODO st
 - Fix: after A3/B1 merge, update the enterprise meta docs in one alignment PR (enterprise
   repo) and add `acp-implementation-map.md` (contract → implementing class → table).
 
-### C2 — Frontend SSE event enum drifted from `ResponseSink` 🟡 P2 (verify-then-fix)
+### C2 — Frontend SSE event enum drifted from `ResponseSink` — DONE 2026-06-11
 
-- Backend `ResponseSink` exposes onTextChunk/onToolStart/onToolResult/onConfirmRequired/
-  onThinking/onWarnings/onResultContract/onTurnBegin/onStreamEnd/onTurnCancelled; frontend
-  `auraBotApi.ts` enumerates `'thinking'|'intent'|'preview'|'result'|...`. Map the actual
-  wire event names before changing anything (the enum may be the wire protocol, not the
-  sink methods).
+- Verified: real wire events (SseResponseSink) = chunk/thinking/tool_start/tool_result/
+  result_contract/warning/confirm_required/done/error; the live parser `processSSEStream`
+  was already aligned. The drifted enum belonged to a dead path: `auraBotApi.chat()`
+  posted to the `/chat` stub (backend replies "Use /chat/stream") and parsed a
+  {type,data} envelope with events the backend never emits — zero callers.
+- Fix: dead path + legacy types removed; `AuraBotSseEventName` exported as the wire enum.
 
 ---
 
@@ -156,9 +162,11 @@ Real gaps cluster in three areas: **LLM-backed features stuck at keyword/TODO st
 | 1 | A2 Eval LLM mode + tests | **done** — `LlmToolSelectionService`, truthful mode degradation, hallucination scoring, 10 unit tests green |
 | 1 | A3 task-completion events + event-driven waits | **done** — `AgentTaskCompletedEvent` at all 4 terminal transitions, `TaskJoinService` latch, both delegation wait loops upgraded, 8 tests green |
 | 2 | B1 extract `CapabilitySyncService` | **withdrawn** — already extracted (see B1); split of `CapabilityViewService` stays in B2 |
-| 2 | B3 permission annotations | **partial** — legacy ChatBI now `META_CHATBI_USE`; agent-run codes deferred to permission-governance project (see B3) |
+| 2 | B2 god-class splits | **2 of 6 done** (r2) — CapabilityViewService + AgentRunController; loop core deferred (see B2) |
+| 2 | B3 permission annotations | **done** — ChatBI `META_CHATBI_USE` (r1) + five `acp.*` codes registered & annotated across agent controllers (r2); user-facing flows intentionally ungated |
 | 3 | C1 doc alignment (enterprise PR) | **done** — affordance/collaboration docs updated + `acp-implementation-map.md` added |
-| — | A4/A5/A6/B2/B4/C2 | deferred, tracked above with owners/preconditions |
+| 3 | C2 SSE enum reconciliation | **done** (r2) — dead `/chat` path + legacy enum removed, `AuraBotSseEventName` = wire protocol |
+| — | A4/A5/A6/B4 + B2 loop-core | deferred, tracked above with owners/preconditions |
 
 ## 5. Claims from earlier reviews verified as ALREADY FIXED (do not re-open)
 

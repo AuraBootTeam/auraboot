@@ -1,6 +1,8 @@
 package com.auraboot.framework.integration.agent;
 
+import com.auraboot.framework.agent.controller.AgentRunAuditController;
 import com.auraboot.framework.agent.controller.AgentRunController;
+import com.auraboot.framework.agent.controller.AgentRunOpsController;
 import com.auraboot.framework.agent.dto.replay.AgentActionItem;
 import com.auraboot.framework.agent.dto.replay.AgentConversationMessageItem;
 import com.auraboot.framework.agent.dto.replay.AgentConversationTurnReplay;
@@ -60,6 +62,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private AgentRunController controller;
+    @Autowired private AgentRunAuditController auditController;
+    @Autowired private AgentRunOpsController opsController;
     @Autowired private JdbcTemplate jdbc;
 
     private Long tenantId;
@@ -363,7 +367,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
                         + "\"compensationReason\":\"not retryable\","
                         + "\"request\":{\"tenantId\":" + tenantId + ",\"runPid\":\"" + runPid + "\","
                         + "\"toolName\":\"custom:sync_crm\",\"toolRef\":\"custom:sync_crm\"}}");
-        ApiResponse<Map<String, Object>> resp = controller.runtimeOps(runPid, 20);
+        ApiResponse<Map<String, Object>> resp = opsController.runtimeOps(runPid, 20);
 
         assertThat(resp.isSuccess()).isTrue();
         Map<String, Object> data = resp.getData();
@@ -633,9 +637,9 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
                 "{}", "统计客户信息");
 
         ApiResponse<AgentRuntimeAuditTrail> byRun =
-                controller.audit(runPid, null, "crm.account.search");
+                auditController.audit(runPid, null, "crm.account.search");
         ApiResponse<AgentRuntimeAuditTrail> byConversation =
-                controller.audit(null, conversationId, "crm.account.search");
+                auditController.audit(null, conversationId, "crm.account.search");
 
         assertThat(byRun.isSuccess()).isTrue();
         AgentRuntimeAuditTrail trail = byRun.getData();
@@ -672,7 +676,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
         seedAuthorizationDecision(runPid, "crm.account.search", approvalPid);
 
         ApiResponse<AgentRuntimeAuditTrail> response =
-                controller.audit(runPid, null, "crm.account.search");
+                auditController.audit(runPid, null, "crm.account.search");
 
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.getData().getAuthorizationDecisions()).hasSize(1);

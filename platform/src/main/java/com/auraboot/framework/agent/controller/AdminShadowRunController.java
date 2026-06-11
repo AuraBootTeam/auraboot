@@ -20,6 +20,8 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Collections;
 import java.util.List;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 
 /**
  * D.5 Phase 1 — Shadow Runs comparison admin surface.
@@ -55,6 +57,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/shadow-runs")
+@RequirePermission(MetaPermission.ACP_AGENT_RUN_ADMIN)
 public class AdminShadowRunController {
 
     /** Hard cap on aggregation list — tenants rarely produce more drafts. */
