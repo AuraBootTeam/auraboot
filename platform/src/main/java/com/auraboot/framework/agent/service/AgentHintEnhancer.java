@@ -137,12 +137,16 @@ public class AgentHintEnhancer {
             if (inputSchemaRaw != null) {
                 try {
                     Map<String, Object> inputSchema;
-                    if (inputSchemaRaw instanceof String s) {
-                        inputSchema = objectMapper.readValue(s, Map.class);
-                    } else if (inputSchemaRaw instanceof Map) {
+                    if (inputSchemaRaw instanceof Map) {
                         inputSchema = (Map<String, Object>) inputSchemaRaw;
                     } else {
-                        inputSchema = objectMapper.convertValue(inputSchemaRaw, Map.class);
+                        // input_schema is JSONB; via the generic query it can be a
+                        // driver PGobject — the old else (convertValue on a PGobject)
+                        // serialized the wrapper {type,value} so "fields" was never
+                        // found and inputFields silently dropped. Route via JsonbColumns
+                        // (mirrors the execution_config read above).
+                        String json = JsonbColumns.toJsonText(inputSchemaRaw, objectMapper);
+                        inputSchema = json == null ? Map.of() : objectMapper.readValue(json, Map.class);
                     }
                     Object fields = inputSchema.get("fields");
                     if (fields instanceof List<?> fieldList) {
