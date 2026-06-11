@@ -158,6 +158,87 @@ describe('DecisionRuleBindingBlock', () => {
     expect(screen.getByLabelText('output-mapping-path-0')).toHaveValue('deadlineMinutes');
   });
 
+  it('syncs when a DSL form valueField arrives after the custom block mounts', async () => {
+    let currentValue: unknown;
+    const runtime = {
+      getFieldValue: () => currentValue,
+      updateField: vi.fn(),
+    };
+    const block = {
+      props: {
+        mode: 'decision' as const,
+        valueField: 'rule_binding',
+        fields: [
+          { scope: 'record' as const, path: 'data.priority', label: '优先级', dataType: 'enum' as const },
+        ],
+      },
+    };
+
+    const { rerender } = render(
+      <DecisionRuleBindingBlock runtime={runtime} block={block} />,
+    );
+
+    expect(screen.queryByLabelText('mapping-input-0')).not.toBeInTheDocument();
+
+    currentValue = {
+      bindingKind: 'DECISION_REF',
+      decisionBinding: {
+        decisionCode: 'sla_deadline',
+        versionPolicy: 'LATEST_PUBLISHED',
+        inputMappings: [
+          {
+            input: 'catalogPriority',
+            source: { kind: 'FIELD', scope: 'record', path: 'data.priority' },
+          },
+        ],
+      },
+      enabled: true,
+    };
+    rerender(<DecisionRuleBindingBlock runtime={runtime} block={block} />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('mapping-input-0')).toHaveValue('catalogPriority'),
+    );
+    expect(screen.getByLabelText('decision-code')).toHaveValue('sla_deadline');
+    expect(screen.getByLabelText('mapping-field-0')).toHaveValue('record:data.priority');
+  });
+
+  it('hydrates from the dynamic API JSONB envelope shape', () => {
+    render(
+      <DecisionRuleBindingBlock
+        value={{
+          type: 'jsonb',
+          value: JSON.stringify({
+            bindingKind: 'DECISION_REF',
+            decisionBinding: {
+              decisionCode: 'sla_deadline',
+              versionPolicy: 'LATEST_PUBLISHED',
+              inputMappings: [
+                {
+                  input: 'catalogPriority',
+                  source: { kind: 'FIELD', scope: 'record', path: 'data.priority' },
+                },
+              ],
+            },
+            enabled: true,
+          }),
+        }}
+        block={{
+          props: {
+            mode: 'decision',
+            fields: [
+              { scope: 'record', path: 'data.priority', label: '优先级', dataType: 'enum' },
+            ],
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText('decision-code')).toHaveValue('sla_deadline');
+    expect(screen.getByLabelText('mapping-input-0')).toHaveValue('catalogPriority');
+    expect(screen.getByLabelText('mapping-field-0')).toHaveValue('record:data.priority');
+  });
+
   it('writes RuleConsumerBinding JSON back through the DSL form runtime valueField', () => {
     const updateField = vi.fn();
     const onChange = vi.fn();
@@ -210,6 +291,44 @@ describe('DecisionRuleBindingBlock', () => {
       },
     });
     expect(onChange).toHaveBeenCalledWith(value);
+  });
+
+  it('merges backend decision model fields into configured mapping fields when enabled', async () => {
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+      getModelFields: vi.fn(async () => [
+        {
+          entityCode: 'record',
+          path: 'data.slaCatalogPriority',
+          label: 'SLA Catalog Priority',
+          dataType: 'enum' as const,
+        },
+      ]),
+    };
+
+    render(
+      <DecisionRuleBindingBlock
+        api={api}
+        block={{
+          props: {
+            mode: 'decision',
+            fieldCatalogMode: 'merge',
+            initialDecisionCode: 'complaint_sla_deadline',
+            fields: [
+              { scope: 'record', path: 'data.targetKey', label: '目标键', dataType: 'string' },
+            ],
+          },
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(api.getModelFields).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: '添加映射' }));
+
+    const fieldPicker = screen.getByLabelText('mapping-field-0');
+    expect(fieldPicker).toHaveTextContent('SLA Catalog Priority');
+    expect(fieldPicker).toHaveTextContent('目标键');
   });
 
   it('writes nested AND/OR/NOT condition specs through the DSL form runtime valueField', () => {

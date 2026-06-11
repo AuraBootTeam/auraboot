@@ -188,6 +188,25 @@ function dmnResultError(result: DecisionTableDmnXmlResult): string {
   return issue ? `${issue.code}: ${issue.message ?? 'DMN XML 处理失败'}` : 'DMN XML 处理失败';
 }
 
+function sanitizeFilenamePart(value: string): string {
+  const normalized = value.trim().replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
+  return normalized || 'decision_table';
+}
+
+function downloadTextFile(filename: string, content: string, type: string): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const blob = new Blob([content], { type });
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 function displayJson(value: unknown): string {
   return JSON.stringify(value ?? {}, null, 2);
 }
@@ -355,10 +374,19 @@ export function DecisionTableWorkbenchBlock({
     setDmnBusy(true);
     setDmnError(null);
     try {
-      applyDmnResult(
-        await api.exportTableDmn(table, decisionName.trim() || decisionCode.trim(), decisionCode.trim()),
-        'DMN XML 已导出',
+      const result = await api.exportTableDmn(
+        table,
+        decisionName.trim() || decisionCode.trim(),
+        decisionCode.trim(),
       );
+      applyDmnResult(result, 'DMN XML 已导出');
+      if (result.valid && result.dmnXml) {
+        downloadTextFile(
+          `${sanitizeFilenamePart(decisionCode)}.dmn.xml`,
+          result.dmnXml,
+          'application/xml;charset=utf-8',
+        );
+      }
     } catch (error) {
       setDmnError(errorMessage(error, 'DMN XML 导出失败'));
     } finally {

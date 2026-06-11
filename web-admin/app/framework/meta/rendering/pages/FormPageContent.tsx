@@ -154,6 +154,28 @@ export function mergeLoadedRecordWithDirtyFields(
   return merged;
 }
 
+function snakeToCamel(value: string): string {
+  return value.replace(/_([a-zA-Z0-9])/g, (_, char: string) => char.toUpperCase());
+}
+
+function camelToSnake(value: string): string {
+  return value.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
+}
+
+export function getFormFieldValueWithAlias(
+  formData: Record<string, any>,
+  fieldCode: string,
+): unknown {
+  if (Object.prototype.hasOwnProperty.call(formData, fieldCode)) {
+    return formData[fieldCode];
+  }
+  const alias = fieldCode.includes('_') ? snakeToCamel(fieldCode) : camelToSnake(fieldCode);
+  if (alias !== fieldCode && Object.prototype.hasOwnProperty.call(formData, alias)) {
+    return formData[alias];
+  }
+  return undefined;
+}
+
 function isJsonLikeDataType(dataType?: string): boolean {
   return ['json', 'jsonb'].includes(String(dataType || '').toLowerCase());
 }
@@ -1484,7 +1506,7 @@ export function FormPageContent(props: PageContentProps) {
       token,
       locale,
       t,
-      getFieldValue: (fieldCode: string) => formData[fieldCode],
+      getFieldValue: (fieldCode: string) => getFormFieldValueWithAlias(formData, fieldCode),
       updateField: (fieldCode: string, value: unknown) => {
         dirtyFieldsRef.current.add(fieldCode);
         clearFieldError(fieldCode);

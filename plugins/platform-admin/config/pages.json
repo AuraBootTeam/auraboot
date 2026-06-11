@@ -177,10 +177,6 @@
           {
             "field": "priority_field",
             "colSpan": 4
-          },
-          {
-            "field": "warning_rules",
-            "colSpan": 12
           }
         ]
       },
@@ -191,6 +187,7 @@
         "props": {
           "mode": "decision",
           "valueField": "rule_binding",
+          "fieldCatalogMode": "merge",
           "consumerType": "SLA",
           "showImpactPreview": true,
           "showTestRunner": true,

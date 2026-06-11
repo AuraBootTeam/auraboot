@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ConditionBuilder, type FieldOption } from '~/shared/decision/ui/ConditionBuilder';
 import { group, type GroupNode } from '~/shared/decision/ast/conditionAst';
 import { getApiService } from '~/shared/services/ApiService';
 import {
   createDecisionApi,
   type DecisionImpact,
+  type DecisionModelField,
   type DecisionResult,
   type HttpClient,
   type ScopedContext,
@@ -105,15 +106,24 @@ interface RuleBindingDecisionApi {
     routingKey?: string;
     context: ScopedContext;
   }) => Promise<DecisionResult>;
+  getModelFields?: () => Promise<DecisionModelField[]>;
 }
+
+type JsonBindingEnvelope = {
+  type?: string;
+  value?: string;
+  null?: boolean;
+};
+
+type BindingValueInput = RuleConsumerBindingDraft | string | JsonBindingEnvelope;
 
 interface DecisionRuleBindingBlockProps {
   block?: {
     props?: {
       mode?: 'condition' | 'decision' | 'combined';
       valueField?: string;
-      value?: RuleConsumerBindingDraft | string;
-      initialValue?: RuleConsumerBindingDraft | string;
+      value?: BindingValueInput;
+      initialValue?: BindingValueInput;
       consumerType?: string;
       consumerCode?: string;
       consumerNodeId?: string;
@@ -121,13 +131,14 @@ interface DecisionRuleBindingBlockProps {
       showTestRunner?: boolean;
       initialContextJson?: string;
       fields?: FieldOption[];
+      fieldCatalogMode?: 'disabled' | 'fallback' | 'merge';
       decisions?: DecisionOption[];
       initialDecisionCode?: string;
       initialVersionPolicy?: DecisionVersionPolicy;
     };
   };
   runtime?: RuleBindingRuntime;
-  value?: RuleConsumerBindingDraft | string;
+  value?: BindingValueInput;
   onChange?: (next: RuleConsumerBindingDraft) => void;
   api?: RuleBindingDecisionApi;
 }
@@ -164,8 +175,66 @@ const OUTPUT_TARGET_KINDS: OutputTargetKind[] = [
   'PERMISSION_CONTEXT',
 ];
 
+const SUPPORTED_SCOPES = new Set<FieldOption['scope']>([
+  'meta',
+  'event',
+  'record',
+  'before',
+  'after',
+  'process',
+  'task',
+  'sla',
+  'actor',
+  'tenant',
+  'time',
+  'env',
+]);
+
+const SUPPORTED_DATA_TYPES = new Set<FieldOption['dataType']>([
+  'string',
+  'text',
+  'integer',
+  'decimal',
+  'boolean',
+  'date',
+  'time',
+  'datetime',
+  'duration',
+  'enum',
+  'dict',
+  'user',
+  'role',
+  'group',
+  'department',
+  'collection',
+  'object',
+]);
+
 function fieldKey(field: Pick<FieldOption, 'scope' | 'path'>): string {
   return `${field.scope}:${field.path}`;
+}
+
+function toFieldOption(field: DecisionModelField): FieldOption | null {
+  const scope = String(field.entityCode ?? 'record') as FieldOption['scope'];
+  const path = String(field.path ?? '');
+  if (!SUPPORTED_SCOPES.has(scope) || !path) return null;
+  const dataType = String(field.dataType ?? 'object').toLowerCase() as FieldOption['dataType'];
+  return {
+    scope,
+    path,
+    label: field.label || `${scope}.${path}`,
+    dataType: SUPPORTED_DATA_TYPES.has(dataType) ? dataType : 'object',
+  };
+}
+
+function mergeFieldOptions(primary: FieldOption[], fallback: FieldOption[]): FieldOption[] {
+  const seen = new Set<string>();
+  return [...primary, ...fallback].filter((field) => {
+    const key = fieldKey(field);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function defaultCondition(): GroupNode {
@@ -192,7 +261,26 @@ function parseBindingValue(raw: unknown): RuleConsumerBindingDraft | undefined {
       return undefined;
     }
   }
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    !Array.isArray(raw) &&
+    typeof (raw as { value?: unknown }).value === 'string' &&
+    ['json', 'jsonb'].includes(String((raw as { type?: unknown }).type ?? '').toLowerCase())
+  ) {
+    return parseBindingValue((raw as { value: string }).value);
+  }
   return typeof raw === 'object' ? (raw as RuleConsumerBindingDraft) : undefined;
+}
+
+function bindingValueFingerprint(raw: unknown): string {
+  if (raw === undefined || raw === null || raw === '') return '';
+  if (typeof raw === 'string') return raw;
+  try {
+    return JSON.stringify(raw);
+  } catch {
+    return String(raw);
+  }
 }
 
 function mappingFromSource(input: string, source?: RuleValueSourceDraft): InputMapping | null {
@@ -331,16 +419,22 @@ export function DecisionRuleBindingBlock({
 }: DecisionRuleBindingBlockProps) {
   const props = block?.props ?? {};
   const mode = props.mode ?? 'combined';
-  const fields = props.fields && props.fields.length > 0 ? props.fields : DEFAULT_FIELDS;
+  const configuredFields = props.fields && props.fields.length > 0 ? props.fields : undefined;
+  const fieldCatalogMode = props.fieldCatalogMode ?? 'disabled';
+  const [catalogFields, setCatalogFields] = useState<FieldOption[]>([]);
+  const fields =
+    fieldCatalogMode === 'merge'
+      ? mergeFieldOptions(catalogFields, configuredFields ?? DEFAULT_FIELDS)
+      : configuredFields ?? mergeFieldOptions(catalogFields, DEFAULT_FIELDS);
   const decisions =
     props.decisions && props.decisions.length > 0 ? props.decisions : DEFAULT_DECISIONS;
   const defaultApiRef = useRef<RuleBindingDecisionApi | null>(null);
-  const initialRuleBinding = parseBindingValue(
+  const incomingRawBindingValue =
     value ??
-      props.value ??
-      (props.valueField ? runtime?.getFieldValue?.(props.valueField) : undefined) ??
-      props.initialValue,
-  );
+    props.value ??
+    (props.valueField ? runtime?.getFieldValue?.(props.valueField) : undefined) ??
+    props.initialValue;
+  const initialRuleBinding = parseBindingValue(incomingRawBindingValue);
   const [condition, setCondition] = useState<GroupNode>(() =>
     initialRuleBinding?.conditionSpec?.root ?? defaultCondition(),
   );
@@ -362,6 +456,7 @@ export function DecisionRuleBindingBlock({
   const [testRunning, setTestRunning] = useState(false);
   const [testError, setTestError] = useState('');
   const initialValueWrittenRef = useRef(false);
+  const syncedBindingFingerprintRef = useRef(bindingValueFingerprint(incomingRawBindingValue));
 
   const fieldByKey = useMemo(() => {
     const map = new Map<string, FieldOption>();
@@ -373,6 +468,60 @@ export function DecisionRuleBindingBlock({
   const showDecision = mode === 'decision' || mode === 'combined';
   const showImpactPreview = showDecision && props.showImpactPreview !== false;
   const showTestRunner = showDecision && props.showTestRunner !== false;
+
+  const getDecisionApi = useCallback(() => {
+    if (api) return api;
+    if (!defaultApiRef.current) {
+      defaultApiRef.current = defaultDecisionApi();
+    }
+    return defaultApiRef.current;
+  }, [api]);
+
+  useEffect(() => {
+    const shouldLoadCatalog =
+      fieldCatalogMode === 'merge' || (fieldCatalogMode === 'fallback' && !configuredFields);
+    if (!shouldLoadCatalog) {
+      setCatalogFields([]);
+      return;
+    }
+    let cancelled = false;
+    getDecisionApi()
+      .getModelFields?.()
+      .then((rows) => {
+        if (cancelled) return;
+        setCatalogFields(
+          rows.map(toFieldOption).filter((field): field is FieldOption => Boolean(field)),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogFields([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [configuredFields, fieldCatalogMode, getDecisionApi]);
+
+  useEffect(() => {
+    const nextFingerprint = bindingValueFingerprint(incomingRawBindingValue);
+    if (!nextFingerprint || nextFingerprint === syncedBindingFingerprintRef.current) return;
+    const nextRuleBinding = parseBindingValue(incomingRawBindingValue);
+    if (!nextRuleBinding) return;
+    syncedBindingFingerprintRef.current = nextFingerprint;
+    setCondition(nextRuleBinding.conditionSpec?.root ?? defaultCondition());
+    setBinding(
+      buildInitialBinding(
+        decisions,
+        props.initialDecisionCode,
+        props.initialVersionPolicy,
+        nextRuleBinding,
+      ),
+    );
+  }, [
+    decisions,
+    incomingRawBindingValue,
+    props.initialDecisionCode,
+    props.initialVersionPolicy,
+  ]);
 
   const emitChange = (nextCondition: GroupNode, nextBinding: DecisionBindingDraft) => {
     const nextValue = buildRuleConsumerBinding(nextCondition, nextBinding, {
@@ -485,14 +634,6 @@ export function DecisionRuleBindingBlock({
   const updateCondition = (nextCondition: GroupNode) => {
     setCondition(nextCondition);
     emitChange(nextCondition, binding);
-  };
-
-  const getDecisionApi = () => {
-    if (api) return api;
-    if (!defaultApiRef.current) {
-      defaultApiRef.current = defaultDecisionApi();
-    }
-    return defaultApiRef.current;
   };
 
   const refreshImpact = async () => {

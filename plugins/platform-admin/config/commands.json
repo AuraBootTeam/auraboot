@@ -5,7 +5,7 @@
     "displayName:en": "Create SLA Configuration",
     "type": "create",
     "modelCode": "sla_config",
-    "inputFields": ["name", "target_type", "target_key", "domain_code", "deadline_mode", "deadline_value", "business_calendar", "suspend_policy", "warning_rules", "rule_binding", "model_code", "deadline_field", "priority_field", "enabled"]
+    "inputFields": ["name", "target_type", "target_key", "domain_code", "deadline_mode", "deadline_value", "business_calendar", "suspend_policy", "rule_binding", "model_code", "deadline_field", "priority_field", "enabled"]
   },
   {
     "code": "admin:update_sla_config",
@@ -13,7 +13,7 @@
     "displayName:en": "Update SLA Configuration",
     "type": "update",
     "modelCode": "sla_config",
-    "inputFields": ["name", "target_type", "target_key", "domain_code", "deadline_mode", "deadline_value", "business_calendar", "suspend_policy", "warning_rules", "rule_binding", "model_code", "deadline_field", "priority_field", "enabled"]
+    "inputFields": ["name", "target_type", "target_key", "domain_code", "deadline_mode", "deadline_value", "business_calendar", "suspend_policy", "rule_binding", "model_code", "deadline_field", "priority_field", "enabled"]
   },
   {
     "code": "admin:delete_sla_config",
