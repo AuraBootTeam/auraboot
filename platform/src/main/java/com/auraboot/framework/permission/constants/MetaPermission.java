@@ -773,6 +773,31 @@ public final class MetaPermission {
      * Used by {@code UsageEventController} GET /api/billing/usage/events.
      */
     public static final String BILLING_USAGE_READ = "billing.usage.read";
+
+    /**
+     * Billing plan catalog read permission (list plans, plan versions, price components, quota templates).
+     * Used by {@code BillingPlanConsoleController} GET /api/billing/plans.
+     */
+    public static final String BILLING_PLAN_READ = "billing.plan.read";
+
+    /**
+     * Subscription read permission (list and view subscriptions and subscription items).
+     * Used by {@code BillingSubscriptionConsoleController} GET /api/billing/subscriptions.
+     */
+    public static final String BILLING_SUBSCRIPTION_READ = "billing.subscription.read";
+
+    /**
+     * Invoice read permission (list and view invoices and invoice line items).
+     * Used by {@code BillingInvoiceConsoleController} GET /api/billing/invoices.
+     */
+    public static final String BILLING_INVOICE_READ = "billing.invoice.read";
+
+    /**
+     * License key read permission (list and view license keys and heartbeats).
+     * Used by {@code BillingLicenseConsoleController} GET /api/billing/licenses.
+     */
+    public static final String BILLING_LICENSE_READ = "billing.license.read";
+
     // ==================== AI / RAG Knowledge Base permissions ====================
 
     /**
