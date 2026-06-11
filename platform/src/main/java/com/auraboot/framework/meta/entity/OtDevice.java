@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.entity;
 
+import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -45,11 +46,11 @@ public class OtDevice {
     private String protocol;
 
     /** Connection configuration: { host, port, topic, path, etc. }, stored as JSONB */
-    @TableField("connection_config")
+    @TableField(value = "connection_config", typeHandler = JsonbStringTypeHandler.class)
     private String connectionConfig;
 
     /** Field mapping from device data to model fields, stored as JSONB */
-    @TableField("data_mapping")
+    @TableField(value = "data_mapping", typeHandler = JsonbStringTypeHandler.class)
     private String dataMapping;
 
     /** Target model code to write data to */
