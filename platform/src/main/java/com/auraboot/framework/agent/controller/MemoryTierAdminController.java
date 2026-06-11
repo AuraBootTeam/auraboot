@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 
 /**
  * PR-85 / Phase 4 — admin-facing memory tier controls.
@@ -35,6 +37,7 @@ import java.util.Objects;
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/memory")
+@RequirePermission(MetaPermission.ACP_MEMORY_ADMIN)
 public class MemoryTierAdminController {
 
     private final MemoryL1L2Promoter promoter;

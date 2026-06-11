@@ -65,6 +65,7 @@ public class AgentRuntimeController {
     private final ObjectMapper objectMapper;
 
     @PostMapping("/dispatch")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<String> dispatch(@RequestBody Map<String, String> body) {
         if (!agentProperties.isEnabled()) {
             return ApiResponse.error("Agent runtime is disabled");
@@ -93,6 +94,7 @@ public class AgentRuntimeController {
      * </ul>
      */
     @PostMapping("/heartbeat")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, Object>> runHeartbeat() {
         Long tenantId = MetaContext.getCurrentTenantId();
         return ApiResponse.success(heartbeatService.runHeartbeat(tenantId));
@@ -119,6 +121,7 @@ public class AgentRuntimeController {
      * <p>Response keys: model, fields, fieldBindings, commands
      */
     @PostMapping("/scaffold")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> scaffoldPlugin(@RequestBody Map<String, Object> body) {
         String modelCode = (String) body.get("modelCode");
@@ -138,6 +141,7 @@ public class AgentRuntimeController {
     }
 
     @PostMapping("/schedules/reload")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<String> reloadSchedules() {
         scheduleService.loadAndScheduleAll();
         return ApiResponse.success("Schedules reloaded");
@@ -148,6 +152,7 @@ public class AgentRuntimeController {
      * The template is created with status=INACTIVE; activate it manually when ready.
      */
     @PostMapping("/schedules/seed-heartbeat")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, String>> seedHeartbeatTemplate() {
         Long tenantId = MetaContext.getCurrentTenantId();
         String pid = scheduleService.seedHeartbeatTemplate(tenantId);
@@ -160,6 +165,7 @@ public class AgentRuntimeController {
 
     /** Derive agent contracts from CapabilityView for all active tools */
     @PostMapping("/tools/derive-contracts")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, Object>> deriveContracts() {
         Long tenantId = MetaContext.getCurrentTenantId();
         int derived = contractDeriver.deriveContracts(tenantId);
@@ -168,6 +174,7 @@ public class AgentRuntimeController {
 
     /** Dry-run a single tool call to validate inputs and check preconditions */
     @PostMapping("/tools/dry-run")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, Object>> dryRunTool(@RequestBody Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
         String toolCode = (String) body.get("toolCode");
@@ -181,6 +188,7 @@ public class AgentRuntimeController {
 
     /** Dry-run an entire execution plan (list of tool calls) */
     @PostMapping("/tools/dry-run-plan")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> dryRunPlan(@RequestBody Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -193,6 +201,7 @@ public class AgentRuntimeController {
 
     /** Manually trigger a schedule to run immediately ("Run Now") */
     @PostMapping("/schedule/{schedulePid}/trigger")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, String>> triggerSchedule(@PathVariable String schedulePid) {
         if (!agentProperties.isEnabled()) {
@@ -260,6 +269,7 @@ public class AgentRuntimeController {
 
     /** Retry a failed or timed-out run */
     @PostMapping("/run/{runPid}/retry")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, String>> retryRun(@PathVariable String runPid) {
         if (!agentProperties.isEnabled()) {
             return ApiResponse.error("Agent runtime is disabled");
@@ -323,6 +333,7 @@ public class AgentRuntimeController {
 
     /** Resume a FAILED/TIMEOUT/PENDING run from where it left off (using saved execution plan) */
     @PostMapping("/run/{runPid}/resume")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, String>> resumeRun(@PathVariable String runPid) {
         if (!agentProperties.isEnabled()) {
             return ApiResponse.error("Agent runtime is disabled");
@@ -418,6 +429,7 @@ public class AgentRuntimeController {
 
     /** Batch-enhance agent_hint for commands with missing or generic hints using LLM */
     @PostMapping("/admin/enhance-hints")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, Object>> enhanceHints(
             @RequestParam(defaultValue = "50") int batchSize) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -465,6 +477,7 @@ public class AgentRuntimeController {
 
     /** Run evaluation: generate cases and test tool selection accuracy */
     @PostMapping("/eval/run")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, Object>> runEval(
             @RequestParam(required = false) String modelCode,
             @RequestParam(defaultValue = "20") int maxCases) {
@@ -477,6 +490,7 @@ public class AgentRuntimeController {
 
     /** Delegate a sub-task to another agent */
     @PostMapping("/collaborate/delegate")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, String>> delegateTask(@RequestBody Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -512,6 +526,7 @@ public class AgentRuntimeController {
 
     /** Broadcast the same task to multiple agents in parallel and collect all results */
     @PostMapping("/collaborate/broadcast")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> broadcastTask(@RequestBody Map<String, Object> request) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -538,6 +553,7 @@ public class AgentRuntimeController {
 
     /** Execute a serial pipeline where each agent's output feeds the next agent's input */
     @PostMapping("/collaborate/pipeline")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> pipelineTask(@RequestBody Map<String, Object> request) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -572,6 +588,7 @@ public class AgentRuntimeController {
 
     /** Execute a skill — returns an execution plan */
     @PostMapping("/skills/{skillCode}/execute")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> executeSkill(
             @PathVariable String skillCode,
@@ -584,6 +601,7 @@ public class AgentRuntimeController {
 
     /** Sync auto-generated skills from DSL model definitions */
     @PostMapping("/skills/sync")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, Object>> syncSkills() {
         Long tenantId = MetaContext.getCurrentTenantId();
         var result = skillAutoGenerator.syncSkills(tenantId);
@@ -606,6 +624,7 @@ public class AgentRuntimeController {
 
     /** Delegate a BPM task to an Agent */
     @PostMapping("/bpm/delegate-to-agent")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> bpmDelegateToAgent(@RequestBody Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -634,6 +653,7 @@ public class AgentRuntimeController {
 
     /** Start a BPM process from an Agent */
     @PostMapping("/bpm/start-process")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> agentStartBpm(@RequestBody Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -659,6 +679,7 @@ public class AgentRuntimeController {
 
     /** Execute a tool in a sandbox transaction that is always rolled back — real validation, no DB changes */
     @PostMapping("/tools/sandbox-run")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> sandboxRun(@RequestBody Map<String, Object> request) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -673,6 +694,7 @@ public class AgentRuntimeController {
 
     /** Manually trigger capability sync to ab_capability table for the current tenant */
     @PostMapping("/capabilities/sync")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, Object>> syncCapabilities() {
         Long tenantId = MetaContext.getCurrentTenantId();
         capabilityViewService.syncCapabilities(tenantId);
@@ -681,6 +703,7 @@ public class AgentRuntimeController {
 
     /** Derive agent contracts scoped to a specific model code */
     @PostMapping("/tools/derive-contracts/{modelCode}")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, Object>> deriveContractsForModel(@PathVariable String modelCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
         int count = contractDeriver.deriveForModel(tenantId, modelCode);
@@ -696,6 +719,7 @@ public class AgentRuntimeController {
      * Returns {"lessonsExtracted": 0|1}.
      */
     @PostMapping("/self-improve/{runPid}")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ApiResponse<Map<String, Object>> extractLessons(
             @PathVariable String runPid,
             @RequestParam String agentCode) {
