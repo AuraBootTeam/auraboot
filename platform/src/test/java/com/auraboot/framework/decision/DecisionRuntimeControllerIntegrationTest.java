@@ -25,6 +25,14 @@ import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyDefinitionMapper;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.meta.entity.Field;
+import com.auraboot.framework.meta.entity.Model;
+import com.auraboot.framework.meta.entity.ModelFieldBinding;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
+import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
+import com.auraboot.framework.meta.mapper.MetaFieldMapper;
+import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
+import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -78,6 +86,9 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private AutomationMapper automationMapper;
     @Autowired private SlaConfigMapper slaConfigMapper;
     @Autowired private BpmProcessDefinitionMapper bpmProcessDefinitionMapper;
+    @Autowired private MetaModelMapper metaModelMapper;
+    @Autowired private MetaFieldMapper metaFieldMapper;
+    @Autowired private MetaModelFieldBindingMapper metaModelFieldBindingMapper;
 
     private final ObjectMapper json = new ObjectMapper();
     private MockMvc mockMvc;
@@ -423,6 +434,82 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void httpModelFields_includesPublishedMetaModelFieldsWithoutDecisionRefs() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String modelCode = "it_rule_catalog_model_" + suffix;
+        String fieldCode = "it_rule_catalog_priority_" + suffix;
+        String modelName = "Rule Catalog Model " + suffix;
+        String fieldName = "Rule Catalog Priority " + suffix;
+
+        Model model = new Model();
+        model.setPid(UniqueIdGenerator.generate());
+        model.setTenantId(getTestTenant().getId());
+        model.setCode(modelCode);
+        model.setExtension(extension("displayName", modelName));
+        model.setTableName("mt_" + modelCode);
+        model.setSourceType("physical");
+        model.setVersion(1);
+        model.setSemver("1.0.0");
+        model.setRowVersion(1);
+        model.setIsCurrent(true);
+        model.setStatus("published");
+        model.setDeletedFlag(false);
+        model.setCreatedAt(Instant.now());
+        model.setUpdatedAt(Instant.now());
+        metaModelMapper.insert(model);
+
+        Field field = new Field();
+        field.setPid(UniqueIdGenerator.generate());
+        field.setTenantId(getTestTenant().getId());
+        field.setCode(fieldCode);
+        field.setDataType("string");
+        field.setExtension(extension("displayName", fieldName));
+        FieldFeatureBean feature = new FieldFeatureBean();
+        feature.setRequired(false);
+        feature.setUnique(false);
+        field.setFeature(feature);
+        field.setVersion(1);
+        field.setSemver("1.0.0");
+        field.setRowVersion(1);
+        field.setIsCurrent(true);
+        field.setStatus("published");
+        field.setDeletedFlag(false);
+        field.setCreatedAt(Instant.now());
+        field.setUpdatedAt(Instant.now());
+        metaFieldMapper.insert(field);
+
+        ModelFieldBinding binding = new ModelFieldBinding(getTestTenant().getId(), model.getId(), field.getId(), 0);
+        binding.setCreatedAt(Instant.now());
+        binding.setUpdatedAt(Instant.now());
+        metaModelFieldBindingMapper.insert(binding);
+
+        String body = mockMvc.perform(get("/api/decision/model/fields"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        boolean foundMetaField = false;
+        for (JsonNode catalogField : json.readTree(body).path("data")) {
+            if ("record".equals(catalogField.path("entityCode").asText())
+                    && ("data." + fieldCode).equals(catalogField.path("path").asText())) {
+                foundMetaField = true;
+                assertTrue(catalogField.path("label").asText().contains(modelName));
+                assertTrue(catalogField.path("label").asText().contains(fieldName));
+                assertTrue("string".equals(catalogField.path("dataType").asText()));
+                assertTrue(catalogField.path("refs").asInt() == 0);
+                assertTrue(catalogField.path("decisionCodes").isArray());
+                assertTrue(catalogField.path("decisionCodes").isEmpty());
+            }
+        }
+        assertTrue(foundMetaField);
+    }
+
+    private ExtensionBean extension(String key, String value) {
+        ExtensionBean extension = new ExtensionBean();
+        extension.setExtension(Map.of(key, value));
+        return extension;
+    }
+
+    @Test
     void httpRecentLogs_returnsTenantScopedNewestEvaluationLogsForDslList() throws Exception {
         String suffix = String.valueOf(System.nanoTime());
         DrtLogEntity older = new DrtLogEntity();
@@ -681,7 +768,7 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalRefs").isNumber())
                 .andExpect(jsonPath("$.data.consumerRefs").value(3))
-                .andExpect(jsonPath("$.data.fieldRefs").value(1));
+                .andExpect(jsonPath("$.data.fieldRefs").value(3));
 
         String body = mockMvc.perform(get("/api/decision/fields/impact")
                         .param("fieldRef", "record.data.amount"))

@@ -34,6 +34,7 @@ type DecisionModelField = {
   entityCode?: string;
   path?: string;
   label?: string;
+  refs?: number;
 };
 
 type DecisionImpact = {
@@ -234,6 +235,16 @@ test('SLA config form hosts rule-center binding with backend field catalog and i
     expect(
       fields.some((field) => field.entityCode === 'record' && field.path === catalogFieldPath),
       `model field catalog should include ${catalogFieldRef}: ${JSON.stringify(fields)}`,
+    ).toBe(true);
+    expect(
+      fields.some(
+        (field) =>
+          field.entityCode === 'record' &&
+          field.path === 'data.deadline_value' &&
+          field.refs === 0 &&
+          /SLA|截止|Deadline/i.test(field.label ?? ''),
+      ),
+      `model field catalog should include sla_config.deadline_value from meta model metadata: ${JSON.stringify(fields)}`,
     ).toBe(true);
 
     await block.getByLabel('decision-code').selectOption(decisionCode);

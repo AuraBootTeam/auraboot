@@ -7,6 +7,10 @@ import com.auraboot.framework.decision.entity.DrtVersionEntity;
 import com.auraboot.framework.decision.mapper.DrtVersionMapper;
 import com.auraboot.framework.decision.service.DecisionModelFieldService;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.dto.MetaFieldDTO;
+import com.auraboot.framework.meta.entity.Model;
+import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.service.ModelFieldBindingService;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Derives the F6 field catalogue from validated decision versions.
+ * Derives the rule-center field catalogue from published model metadata plus validated decision refs.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,11 +36,15 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
             "department", "collection", "object");
 
     private final DrtVersionMapper versionMapper;
+    private final MetaModelMapper metaModelMapper;
+    private final ModelFieldBindingService modelFieldBindingService;
 
     @Override
     public List<DecisionModelFieldDTO> listFields() {
         Long tenantId = requireTenant();
         Map<String, FieldAccumulator> fields = new LinkedHashMap<>();
+
+        collectMetaModelFields(fields);
 
         for (DrtVersionEntity version : versionMapper.findWithFieldRefs(tenantId)) {
             Map<String, String> dataTypes = new LinkedHashMap<>();
@@ -64,6 +72,34 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
             throw new ValidationException(ResponseCode.NOT_FOUND, "Decision model fields not found");
         }
         return tenantId;
+    }
+
+    private void collectMetaModelFields(Map<String, FieldAccumulator> fields) {
+        for (Model model : metaModelMapper.findCurrentByTenant()) {
+            if (model == null || !"published".equalsIgnoreCase(String.valueOf(model.getStatus()))) {
+                continue;
+            }
+            List<MetaFieldDTO> modelFields = modelFieldBindingService.getModelFields(model.getPid());
+            String modelLabel = hasText(model.getDisplayName()) ? model.getDisplayName() : model.getCode();
+            for (MetaFieldDTO field : modelFields) {
+                if (field == null || !Boolean.TRUE.equals(field.getVisible()) || !hasText(field.getCode())) {
+                    continue;
+                }
+                FieldRefParts parts = new FieldRefParts("record", recordDataPath(field.getCode()));
+                FieldAccumulator acc = fields.computeIfAbsent(parts.key(), ignored -> new FieldAccumulator(parts));
+                acc.dataType = chooseDataType(acc.dataType, field.getDataType());
+                String fieldLabel = hasText(field.getDisplayName()) ? field.getDisplayName() : field.getCode();
+                acc.label = modelLabel + " / " + fieldLabel;
+            }
+        }
+    }
+
+    private String recordDataPath(String fieldCode) {
+        return fieldCode.startsWith("data.") ? fieldCode : "data." + fieldCode;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private List<String> parseRefs(JsonNode node) {
@@ -136,6 +172,7 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
         private final Set<String> decisionCodes = new LinkedHashSet<>();
         private int refs;
         private String dataType = "object";
+        private String label;
 
         private FieldAccumulator(FieldRefParts parts) {
             this.parts = parts;
@@ -145,7 +182,7 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
             DecisionModelFieldDTO dto = new DecisionModelFieldDTO();
             dto.setEntityCode(parts.entityCode());
             dto.setPath(parts.path());
-            dto.setLabel(parts.label());
+            dto.setLabel(label != null ? label : parts.label());
             dto.setDataType(dataType);
             dto.setRefs(refs);
             dto.setMasked(false);
