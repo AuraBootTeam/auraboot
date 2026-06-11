@@ -86,7 +86,27 @@ class CommandBusIotActionSinkTest {
         Map<String, Object> pl = payload("pe:capture_iot_reading", "dataPointId", "dp-1");
         sink.emit("command", envelope("command", 5L, "dev-5", 999L, pl));
         verify(commandExecutor).execute(eq("pe:capture_iot_reading"), any());
-        // MetaContext is cleared; calling MetaContext.exists() would return false
+        // No caller context existed, so emit() clears afterwards.
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
+    }
+
+    @Test
+    @DisplayName("kind=command: a pre-existing caller context is RESTORED (not cleared) after execute")
+    void command_restoresCallerContext() {
+        // A webhook-triggered automation runs the sink inside an already-tenant-scoped caller
+        // that still needs MetaContext afterwards (AutomationLogMapper.updateStatus). The sink
+        // must not strip that context — regression for the 500 "MetaContext not initialized".
+        com.auraboot.framework.application.tenant.MetaContext.setContext(7L, 42L, "user-pid", "alice");
+        try {
+            Map<String, Object> pl = payload("pe:capture_iot_reading", "dataPointId", "dp-1");
+            sink.emit("command", envelope("command", 7L, "dev-7", 1000L, pl));
+            verify(commandExecutor).execute(eq("pe:capture_iot_reading"), any());
+            // Caller context survives, with its tenant intact.
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isTrue();
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId()).isEqualTo(7L);
+        } finally {
+            com.auraboot.framework.application.tenant.MetaContext.clear();
+        }
     }
 
     @Test
