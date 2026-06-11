@@ -301,7 +301,18 @@ public class TestSeedController {
                         "../plugins/showcase",
                         "../../auraboot/plugins/showcase"
                 );
-                importTestPlugin("../plugins/test-fixtures", "test-fixtures", tenant.getId());
+                // OSS test-fixtures first: under Enterprise host bootRun, "../plugins"
+                // resolves to the Enterprise test-fixtures whose pages currently fail
+                // page validation; the OSS copy is the validation-clean canonical one
+                // (also what the docker mobile-e2e stack imports). Docker is unaffected:
+                // the "../../auraboot/..." path does not exist there, so it falls back to
+                // "../plugins/test-fixtures" (= the OSS mount).
+                importFirstAvailableTestPlugin(
+                        tenant.getId(),
+                        "test-fixtures",
+                        "../../auraboot/plugins/test-fixtures",
+                        "../plugins/test-fixtures"
+                );
                 // Mobile E2E (Android/iOS) targets crm_account as the canonical "real" model
                 // (see EndpointRegistryTest in apps/android and EndpointRegistryTests.swift in
                 // apps/ios). The CRM plugin lives in the enterprise overlay; importTestPlugin
