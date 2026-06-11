@@ -252,6 +252,29 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void shouldNotFilter_automationWebhookSkipsJwtAuth_butOtherAutomationRoutesDoNot() throws Exception {
+        // "/api/automations/webhooks/**" is whitelisted so EXTERNAL services can deliver
+        // webhooks without a JWT (the controller enforces signature/token validation,
+        // fail-closed). The rest of /api/automations stays authenticated.
+        MockHttpServletRequest webhook = new MockHttpServletRequest("POST", "/api/automations/webhooks/AUTO-123");
+        webhook.setServletPath("/api/automations/webhooks/AUTO-123");
+        assertTrue((Boolean) ReflectionTestUtils.invokeMethod(filter, "shouldNotFilter", webhook),
+                "automation webhook receiver must be reachable without a JWT");
+
+        // Path-segment boundary: a sibling path must NOT be whitelisted.
+        MockHttpServletRequest sibling = new MockHttpServletRequest("POST", "/api/automations/webhooks-admin");
+        sibling.setServletPath("/api/automations/webhooks-admin");
+        assertFalse((Boolean) ReflectionTestUtils.invokeMethod(filter, "shouldNotFilter", sibling),
+                "sibling automation route must still require JWT auth");
+
+        // The automations CRUD API itself stays authenticated.
+        MockHttpServletRequest crud = new MockHttpServletRequest("GET", "/api/automations");
+        crud.setServletPath("/api/automations");
+        assertFalse((Boolean) ReflectionTestUtils.invokeMethod(filter, "shouldNotFilter", crud),
+                "automations CRUD API must still require JWT auth");
+    }
+
+    @Test
     void rbacLookupFailure_doesNotPropagate() throws Exception {
         MockHttpServletRequest req = req();
         req.addHeader("Authorization", "Bearer t.token");

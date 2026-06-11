@@ -21,6 +21,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -188,6 +190,8 @@ class AutomationWebhookControllerTest {
                 controller.receiveWebhook(AUTOMATION_PID, rawBody, null, SECRET);
 
         assertThat(response.isSuccess()).isTrue();
+        assertThat(response.getData()).containsKey("logPid");
+        verify(automationTriggerService).executeAutomation(any(), isNull(), any());
     }
 
     @Test
@@ -202,6 +206,93 @@ class AutomationWebhookControllerTest {
 
         assertThat(response.isSuccess()).isFalse();
         assertThat(response.getMessage()).containsIgnoringCase("token");
+    }
+
+    // -----------------------------------------------------------------------
+    // Fail-closed contract — the endpoint is JWT-exempt (whitelisted), so an
+    // automation WITHOUT properly configured webhook validation must NEVER
+    // execute from an unauthenticated request. (Old behavior: missing/unknown
+    // validation config silently accepted the request — that is now a bug.)
+    // -----------------------------------------------------------------------
+
+    @Test
+    void nullTriggerConfigIsRejected_andAutomationNotExecuted() {
+        Automation automation = webhookAutomation("token");
+        automation.setTriggerConfig(null);
+        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+
+        ApiResponse<Map<String, Object>> response =
+                controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", null, null);
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getMessage()).containsIgnoringCase("validation not configured");
+        verify(automationTriggerService, never()).executeAutomation(any(), any(), any());
+    }
+
+    @Test
+    void nullValidationModeIsRejected_andAutomationNotExecuted() {
+        Automation automation = webhookAutomation(null);
+        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+
+        ApiResponse<Map<String, Object>> response =
+                controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", null, null);
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getMessage()).containsIgnoringCase("validation not configured");
+        verify(automationTriggerService, never()).executeAutomation(any(), any(), any());
+    }
+
+    @Test
+    void unknownValidationModeIsRejected_andAutomationNotExecuted() {
+        Automation automation = webhookAutomation("none");
+        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+
+        ApiResponse<Map<String, Object>> response =
+                controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", null, null);
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getMessage()).containsIgnoringCase("validation not configured");
+        verify(automationTriggerService, never()).executeAutomation(any(), any(), any());
+    }
+
+    @Test
+    void tokenModeWithNullSecretIsRejected_andAutomationNotExecuted() {
+        Automation automation = webhookAutomation("token");
+        automation.getTriggerConfig().setSecret(null);
+        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+
+        ApiResponse<Map<String, Object>> response =
+                controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", null, "anything");
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getMessage()).containsIgnoringCase("validation not configured");
+        verify(automationTriggerService, never()).executeAutomation(any(), any(), any());
+    }
+
+    @Test
+    void signatureModeWithBlankSecretIsRejected_andAutomationNotExecuted() {
+        Automation automation = webhookAutomation("signature");
+        automation.getTriggerConfig().setSecret("   ");
+        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+
+        ApiResponse<Map<String, Object>> response =
+                controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", "deadbeef", null);
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getMessage()).containsIgnoringCase("validation not configured");
+        verify(automationTriggerService, never()).executeAutomation(any(), any(), any());
+    }
+
+    @Test
+    void wrongTokenDoesNotExecuteAutomation() {
+        Automation automation = webhookAutomation("token");
+        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+
+        ApiResponse<Map<String, Object>> response =
+                controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", null, "wrong-token");
+
+        assertThat(response.isSuccess()).isFalse();
+        verify(automationTriggerService, never()).executeAutomation(any(), any(), any());
     }
 
     // -----------------------------------------------------------------------
