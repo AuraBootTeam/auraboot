@@ -1,10 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
+import { waitFor } from '@testing-library/react';
 import { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { createExpressionContext, type GlobalState } from '~/framework/meta/runtime/expression/context';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
+import { fetchResult } from '~/shared/services/http-client';
 import formDsl from '~/plugins/core-designer/components/studio/test/final.v1.0/form.json';
+
+vi.mock('~/shared/services/http-client', () => ({
+  fetchResult: vi.fn().mockResolvedValue({ code: '0', data: { records: [], total: 0 } }),
+}));
+
+const mockedFetchResult = vi.mocked(fetchResult);
 
 const createGlobalState = (): GlobalState => ({
   locale: 'zh-CN',
@@ -154,5 +162,59 @@ describe('SchemaRuntime', () => {
     });
 
     expect(runtime.getSchema().id).toBe('form.store');
+  });
+
+  // Regression: workbench detail pages mount with disableAutoFetch=true. Dependency-less
+  // KPI named queries (metric-strip) and filter-bound lists whose filter state is simply
+  // empty must still fetch on mount — otherwise they render "-" / "暂无数据". Only sources
+  // whose dependency parent is genuinely unresolved (e.g. a detail bound to an unselected
+  // row) should defer until their dependency changes.
+  it('fetches dependency-less and dependency-ready data sources on mount under disableAutoFetch, but defers unresolved-parent sources', async () => {
+    mockedFetchResult.mockClear();
+    const manager = createManager();
+    const schema: UnifiedSchema = {
+      ...minimalSchema,
+      dataSources: {
+        // dependency-less aggregate KPI feeding a metric-strip
+        kpi: {
+          type: 'namedQuery',
+          queryCode: 'demo_kpi',
+          format: 'records',
+          adaptor: 'table',
+          params: {},
+        },
+        // filter-bound list — parent `state` exists, filter value just unset → ready
+        filteredList: {
+          type: 'api',
+          endpoint: '/api/dynamic/demo_list/list',
+          method: 'get',
+          adaptor: 'table',
+          params: { keyword: '${state.keyword}' },
+          dependOn: ['state.keyword'],
+        },
+        // detail bound to an unselected row — parent `state.selected` missing → defer
+        rowDetail: {
+          type: 'api',
+          endpoint: '/api/dynamic/demo_detail/list',
+          method: 'get',
+          adaptor: 'table',
+          params: { pid: '${state.selected.pid}' },
+          dependOn: ['state.selected.pid'],
+        },
+      },
+    };
+
+    new SchemaRuntime({
+      schema,
+      globalState: createGlobalState(),
+      dataSourceManager: manager,
+      disableAutoFetch: true,
+    });
+
+    await waitFor(() => expect(mockedFetchResult).toHaveBeenCalled());
+    const endpoints = mockedFetchResult.mock.calls.map((call) => call[0]);
+    expect(endpoints).toContain('/api/datasource/list'); // kpi (namedQuery, no deps)
+    expect(endpoints).toContain('/api/dynamic/demo_list/list'); // filteredList (deps ready)
+    expect(endpoints).not.toContain('/api/dynamic/demo_detail/list'); // rowDetail deferred
   });
 });

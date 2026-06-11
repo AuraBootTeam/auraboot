@@ -711,6 +711,19 @@ export class DataSourceManager {
     return dependencies.some((dependency) => this.readDependencyPath(dependency).missingParent);
   }
 
+  /**
+   * Whether a data source's declared dependencies are resolvable against the
+   * current context (no missing parent in any `dependOn` path). A source with no
+   * dependencies is always ready. Used to decide whether to fetch on mount: a
+   * ready source (incl. dependency-less ones, or filter-bound lists whose filter
+   * state simply isn't set yet) should load immediately; one waiting on an
+   * unresolved parent (e.g. a detail bound to an unselected row) should defer
+   * until its dependency changes.
+   */
+  dependenciesReady(config: DataSourceConfig): boolean {
+    return !this.hasMissingDependencyParent(config);
+  }
+
   private readDependencyPath(expression: string): {
     matched: boolean;
     missingParent: boolean;
