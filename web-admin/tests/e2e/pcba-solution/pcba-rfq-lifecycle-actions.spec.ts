@@ -1,10 +1,20 @@
 /**
- * PCBA ERP — RFQ lifecycle actions
+ * PCBA ERP — RFQ lifecycle actions (A2-S2: customer-request + PCBA sidecar)
  *
  * Coverage:
- * - Sidebar entry: RFQ list is opened from PCBA Sales-to-Order IA
- * - RFQ status tabs: draft, submitted, clarification, finalized, quoted, cancelled
- * - Row actions: lifecycle commands appear only for matching RFQ states
+ * - Sidebar entry: PCBA RFQ sidecar list (crm_customer_request_pcba_rfq) is opened
+ *   from the PCBA Sales-to-Order IA
+ * - Sidecar list tabs: all / dfm_pending / bom_confirmed
+ * - Row actions: the DFM gate commands appear only for matching crm_crq_dfm_status
+ *   (pending → request_dfm; in_review → pass_dfm / conditional_dfm / fail_dfm)
+ * - One real UI transition: request_dfm on a pending row moves it out of the
+ *   dfm_pending tab (pending → in_review)
+ *
+ * The legacy RFQ model was decommissioned (A2). The request lifecycle (draft →
+ * submitted → routed → …) lives on crm_customer_request; this spec seeds it via
+ * crm:create_customer_request → crm:submit_customer_request →
+ * pe:route_customer_request_to_rfq (the handler auto-creates the sidecar) and then
+ * drives the sidecar's DFM gate.
  */
 
 import { expect, test, type APIRequestContext, type Page } from '../../fixtures';
@@ -19,18 +29,20 @@ import {
   waitForTableHydration,
 } from '../helpers/index';
 
-type RfqStatus = 'draft' | 'submitted' | 'clarification' | 'finalized';
+type DfmStatus = 'pending' | 'in_review' | 'passed';
 
 const NAV_TIMEOUT = 15_000;
 const ENTERPRISE_PLUGIN_ROOT =
   process.env.ENTERPRISE_PLUGIN_ROOT ?? path.resolve(process.cwd(), '../../../auraboot-enterprise/plugins');
-const REQUIRED_PLUGINS = ['pcba-solution', 'pcba-crm'];
+const REQUIRED_PLUGINS = ['pcba-solution', 'crm', 'pcba-crm', 'pcba-sales'];
+
+const RFQ_MODEL = 'crm_customer_request_pcba_rfq';
 
 const RFQ_ENTRY = {
-  href: '/p/pe_rfq',
-  label: /询价单|RFQ/i,
+  href: `/p/${RFQ_MODEL}`,
+  label: /客户需求-PCBA RFQ|Customer Requests \(PCBA RFQ\)|RFQ/i,
   parentLabel: /销售到订单|Sales To Order/i,
-  route: /\/p\/pe_rfq(?:$|[?#])/,
+  route: /\/p\/crm_customer_request_pcba_rfq(?:$|[?#])/,
 };
 
 async function importPluginDirectory(request: APIRequestContext, pluginName: string): Promise<void> {
@@ -107,7 +119,7 @@ async function openRfqFromSidebar(page: Page): Promise<void> {
   const listResponse = page
     .waitForResponse(
       (response) =>
-        response.url().includes('/api/dynamic/pe_rfq') &&
+        response.url().includes(`/api/dynamic/${RFQ_MODEL}`) &&
         response.url().includes('list') &&
         response.status() === 200,
       { timeout: NAV_TIMEOUT },
@@ -122,79 +134,110 @@ async function openRfqFromSidebar(page: Page): Promise<void> {
   await waitForTableHydration(page, { timeout: NAV_TIMEOUT });
 }
 
-async function createRfqInStatus(page: Page, status: RfqStatus): Promise<string> {
+/**
+ * Seed one customer request routed into a PCBA RFQ sidecar with the requested DFM
+ * gate state. Returns the product model (= request title, copied onto the sidecar
+ * by the route handler) used to find the row in the sidecar list.
+ */
+async function createSidecarInDfmStatus(page: Page, status: DfmStatus): Promise<string> {
   const productModel = `E2E RFQ ${status} ${uniqueId()}`;
+
+  // The route handler refuses requests without an account, so seed one first.
+  const accountResult = await executeCommandViaApi(
+    page,
+    'crm:create_account',
+    { crm_acc_name: `E2E RFQ Account ${status} ${uniqueId()}` },
+    undefined,
+    'create',
+    { allowHttpError: true, timeoutMs: 30_000 },
+  );
+  expect(accountResult.code, `create account for ${status}`).toBe(ErrorCodes.SUCCESS);
+
   const createResult = await executeCommandViaApi(
     page,
-    'pe:create_rfq',
+    'crm:create_customer_request',
     {
-      pe_rfq_product_model: productModel,
-      pe_rfq_quantity: 500,
-      pe_rfq_delivery_window: '21 days',
-      pe_rfq_quality_class: 'class_2',
-      pe_rfq_trace_level: 'l1_batch',
-      pe_rfq_supply_mode: 'turnkey',
-      pe_rfq_revision: 'A',
-      pe_rfq_notes: `Lifecycle action E2E seed for ${status}`,
+      crm_cr_title: productModel,
+      crm_cr_account_id: accountResult.recordId,
+      crm_cr_type: 'rfq',
+      crm_cr_summary: `Lifecycle action E2E seed for DFM ${status}`,
     },
     undefined,
     'create',
     { allowHttpError: true, timeoutMs: 30_000 },
   );
-  expect(createResult.code, `create RFQ for ${status}`).toBe(ErrorCodes.SUCCESS);
-  expect(createResult.recordId, `create RFQ for ${status} must return recordId`).toBeTruthy();
+  expect(createResult.code, `create customer request for ${status}`).toBe(ErrorCodes.SUCCESS);
+  expect(createResult.recordId, `create customer request for ${status} must return recordId`).toBeTruthy();
 
-  if (status === 'submitted' || status === 'clarification' || status === 'finalized') {
-    const submitResult = await executeCommandViaApi(
+  const submitResult = await executeCommandViaApi(
+    page,
+    'crm:submit_customer_request',
+    {},
+    createResult.recordId,
+    'update',
+    { allowHttpError: true, timeoutMs: 30_000 },
+  );
+  expect(submitResult.code, `submit customer request for ${status}`).toBe(ErrorCodes.SUCCESS);
+
+  const routeResult = await executeCommandViaApi(
+    page,
+    'pe:route_customer_request_to_rfq',
+    {},
+    createResult.recordId,
+    'update',
+    { allowHttpError: true, timeoutMs: 30_000 },
+  );
+  expect(routeResult.code, `route customer request for ${status}`).toBe(ErrorCodes.SUCCESS);
+
+  // Resolve the sidecar pid written back to the request by the route handler.
+  const requestResp = await page.request.get(
+    `/api/dynamic/crm_customer_request/${createResult.recordId}`,
+  );
+  expect(requestResp.ok(), 'routed customer request should be readable').toBe(true);
+  const requestBody = await requestResp.json();
+  const requestRecord = (requestBody.data ?? requestBody) as Record<string, unknown>;
+  const sidecarId = String(requestRecord.crm_cr_routed_object_id ?? '');
+  expect(sidecarId, `route for ${status} must create the PCBA RFQ sidecar`).toBeTruthy();
+
+  if (status === 'in_review' || status === 'passed') {
+    const requestDfm = await executeCommandViaApi(
       page,
-      'pe:submit_rfq',
+      'pe:request_dfm_pcba_rfq',
       {},
-      createResult.recordId,
+      sidecarId,
       'update',
       { allowHttpError: true, timeoutMs: 30_000 },
     );
-    expect(submitResult.code, `submit RFQ for ${status}`).toBe(ErrorCodes.SUCCESS);
+    expect(requestDfm.code, `request DFM for ${status}`).toBe(ErrorCodes.SUCCESS);
   }
 
-  if (status === 'clarification') {
-    const clarifyResult = await executeCommandViaApi(
+  if (status === 'passed') {
+    const passDfm = await executeCommandViaApi(
       page,
-      'pe:clarify_rfq',
+      'pe:pass_dfm_pcba_rfq',
       {},
-      createResult.recordId,
+      sidecarId,
       'update',
       { allowHttpError: true, timeoutMs: 30_000 },
     );
-    expect(clarifyResult.code, 'clarify RFQ').toBe(ErrorCodes.SUCCESS);
-  }
-
-  if (status === 'finalized') {
-    const finalizeResult = await executeCommandViaApi(
-      page,
-      'pe:finalize_rfq',
-      {},
-      createResult.recordId,
-      'update',
-      { allowHttpError: true, timeoutMs: 30_000 },
-    );
-    expect(finalizeResult.code, 'finalize RFQ').toBe(ErrorCodes.SUCCESS);
+    expect(passDfm.code, 'pass DFM').toBe(ErrorCodes.SUCCESS);
   }
 
   return productModel;
 }
 
-async function selectStatusTab(page: Page, status: string): Promise<void> {
+async function selectStatusTab(page: Page, tabKey: string): Promise<void> {
   const listResponse = page
     .waitForResponse(
       (response) =>
-        response.url().includes('/api/dynamic/pe_rfq') &&
+        response.url().includes(`/api/dynamic/${RFQ_MODEL}`) &&
         response.url().includes('list') &&
         response.status() === 200,
       { timeout: NAV_TIMEOUT },
     )
     .catch(() => null);
 
-  await page.getByTestId(`tab-${status}`).click();
+  await page.getByTestId(`tab-${tabKey}`).click();
   await listResponse;
   await waitForTableHydration(page, { timeout: NAV_TIMEOUT });
 }
@@ -224,32 +267,33 @@ async function expectRowActions(
   await expect(dropdown).not.toBeVisible({ timeout: 2_000 });
 }
 
-async function submitDraftRfqFromRow(page: Page, productModel: string): Promise<void> {
+/** Drive request_dfm on a pending row; it must leave the dfm_pending tab. */
+async function requestDfmFromRow(page: Page, productModel: string): Promise<void> {
   const row = page.locator('tbody tr', { hasText: productModel }).first();
-  await expect(row, `draft row for ${productModel} must be visible before submit`).toBeVisible({
+  await expect(row, `pending row for ${productModel} must be visible before request_dfm`).toBeVisible({
     timeout: NAV_TIMEOUT,
   });
 
   await row.getByTestId('row-action-more').click();
   const dropdown = page.getByTestId('row-action-dropdown');
   await expect(dropdown).toBeVisible({ timeout: NAV_TIMEOUT });
-  await dropdown.getByTestId('row-action-submit').click();
+  await dropdown.getByTestId('row-action-request_dfm').click();
 
   const dialog = page.getByTestId('confirm-dialog');
   await expect(dialog).toBeVisible({ timeout: NAV_TIMEOUT });
-  await expect(dialog).toContainText(/确认提交|Confirm/i);
+  await expect(dialog).toContainText(/DFM|确认/i);
 
   const commandResponse = page.waitForResponse(
     (response) =>
       response.url().includes('/api/meta/commands/execute/') &&
-      response.url().includes('submit_rfq') &&
+      response.url().includes('request_dfm_pcba_rfq') &&
       response.status() === 200,
     { timeout: NAV_TIMEOUT },
   );
   const listResponse = page
     .waitForResponse(
       (response) =>
-        response.url().includes('/api/dynamic/pe_rfq') &&
+        response.url().includes(`/api/dynamic/${RFQ_MODEL}`) &&
         response.url().includes('list') &&
         response.status() === 200,
       { timeout: NAV_TIMEOUT },
@@ -277,60 +321,46 @@ test.describe('PCBA ERP — RFQ lifecycle actions @critical', () => {
     }
   });
 
-  test('PCBA-RFQ-01: sidebar RFQ list exposes status tabs and lifecycle row actions', async ({ page }) => {
+  test('PCBA-RFQ-01: sidebar RFQ list exposes DFM tabs and gate row actions', async ({ page }) => {
     const seeded = {
-      draft: await createRfqInStatus(page, 'draft'),
-      submitted: await createRfqInStatus(page, 'submitted'),
-      clarification: await createRfqInStatus(page, 'clarification'),
-      finalized: await createRfqInStatus(page, 'finalized'),
+      pending: await createSidecarInDfmStatus(page, 'pending'),
+      inReview: await createSidecarInDfmStatus(page, 'in_review'),
+      passed: await createSidecarInDfmStatus(page, 'passed'),
     };
 
     await openRfqFromSidebar(page);
 
-    for (const status of ['draft', 'submitted', 'clarification', 'finalized', 'quoted', 'cancelled']) {
-      await expect(page.getByTestId(`tab-${status}`), `${status} tab must be visible`).toBeVisible({
+    for (const tabKey of ['all', 'dfm_pending', 'bom_confirmed']) {
+      await expect(page.getByTestId(`tab-${tabKey}`), `${tabKey} tab must be visible`).toBeVisible({
         timeout: NAV_TIMEOUT,
       });
     }
 
-    await selectStatusTab(page, 'draft');
-    await expectRowActions(page, seeded.draft, ['edit', 'submit', 'cancel', 'delete'], [
-      'clarify',
-      'resubmit',
-      'finalize',
-      'convert',
-    ]);
-    await submitDraftRfqFromRow(page, seeded.draft);
-
-    await selectStatusTab(page, 'submitted');
-    await expect(page.locator('tbody tr', { hasText: seeded.draft }).first()).toBeVisible({
-      timeout: NAV_TIMEOUT,
-    });
-    await expectRowActions(page, seeded.submitted, ['clarify', 'finalize', 'cancel'], [
-      'edit',
-      'submit',
-      'resubmit',
-      'convert',
-      'delete',
+    // pending row: only request_dfm of the gate commands (edit is always available)
+    await selectStatusTab(page, 'dfm_pending');
+    await expectRowActions(page, seeded.pending, ['request_dfm', 'edit'], [
+      'pass_dfm',
+      'conditional_dfm',
+      'fail_dfm',
     ]);
 
-    await selectStatusTab(page, 'clarification');
-    await expectRowActions(page, seeded.clarification, ['edit', 'resubmit', 'finalize', 'cancel'], [
-      'submit',
-      'clarify',
-      'convert',
-      'delete',
+    // in_review row: the three conclusions, request_dfm gone
+    await selectStatusTab(page, 'all');
+    await expectRowActions(page, seeded.inReview, ['pass_dfm', 'conditional_dfm', 'fail_dfm', 'edit'], [
+      'request_dfm',
     ]);
 
-    await selectStatusTab(page, 'finalized');
-    await expectRowActions(page, seeded.finalized, ['convert'], [
-      'edit',
-      'submit',
-      'clarify',
-      'resubmit',
-      'finalize',
-      'cancel',
-      'delete',
+    // passed row: no gate commands at all
+    await expectRowActions(page, seeded.passed, ['edit'], [
+      'request_dfm',
+      'pass_dfm',
+      'conditional_dfm',
+      'fail_dfm',
     ]);
+
+    // drive pending → in_review through the real row action; the row must leave
+    // the dfm_pending tab once its DFM status moves on
+    await selectStatusTab(page, 'dfm_pending');
+    await requestDfmFromRow(page, seeded.pending);
   });
 });
