@@ -659,9 +659,12 @@ def jacocoExcludes = [
     '**/chatbi/**',
     // Inbox/mobile — tested via E2E
     '**/inbox/**',
-    // meta.service.impl — complex orchestration (command pipeline, metadata management,
-    // state machines, etc.) tested indirectly via integration + E2E command flows
-    '**/meta/service/impl/**',
+    // NOTE (2026-06-11): meta/service/impl (command pipeline, metadata orchestration,
+    // state machines) was previously excluded as "tested indirectly". Measurement showed
+    // it is actually ~47% line-covered by 47 existing test files — excluding it
+    // artificially inflated the bundle (80.1% on a narrow denominator) and HID the
+    // orchestration core. It is now MEASURED so the gate reflects real business logic.
+    // Including it moves the bundle to ~70.2% line. Controllers stay excluded (E2E-covered).
 ]
 
 jacocoTestReport {
@@ -703,19 +706,20 @@ jacocoTestCoverageVerification {
         }))
     }
     violationRules {
-        // No-regression ratchet. Measured curated baseline 2026-06-10: LINE 80.1%
-        // (33671/42043), BRANCH 34.5%. The prior 0.50 floor left the whole 80%
-        // achievement unprotected — any PR could silently regress it. This floor
-        // (0.78) locks the line-coverage goal with a small margin for flaky-test
-        // variance; raise toward 0.80 as the sub-80% packages are filled in, and
-        // add a BRANCH floor once branch coverage is lifted from its 34.5% start.
+        // No-regression ratchet over the HONEST denominator. 2026-06-10 the curated
+        // bundle read 80.1% (33671/42043) — but that excluded meta/service/impl (the
+        // command pipeline). 2026-06-11 that exclude was removed (it was already ~47%
+        // covered), so the bundle now measures the real orchestration core and reads
+        // ~70.2% (42826/61002). This floor (0.68) locks that honest number with flaky
+        // margin. Raise it as meta/service/impl IT lifts toward 0.80. The number went
+        // DOWN but the SCOPE went UP — this is more rigorous, not less.
         rule {
             enabled = true
             element = 'BUNDLE'
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.78
+                minimum = 0.68
             }
         }
         // Lock the already-strong security/identity domains so they cannot rot.
