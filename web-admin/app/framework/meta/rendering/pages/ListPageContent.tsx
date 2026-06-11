@@ -106,6 +106,26 @@ function readRefTargetConfig(column: ColumnConfig, meta?: Record<string, any>): 
   };
 }
 
+/**
+ * Resolve a header/filter label from the model field metadata (field-meta API).
+ * The importer denormalises the field's effective displayName (zh-CN first)
+ * into the field extension, so dynamic pages can label columns even when the
+ * page config carries no explicit label and no i18n resource exists. Returns
+ * undefined when metadata is missing so callers keep their own fallbacks.
+ */
+export function resolveFieldMetaDisplayName(
+  fieldCode: string,
+  modelFieldMap: Map<string, any> | undefined,
+): string | undefined {
+  if (!fieldCode || !modelFieldMap) return undefined;
+  const meta = modelFieldMap.get(fieldCode);
+  if (!meta) return undefined;
+  const candidate = meta.displayName ?? meta.extension?.displayName;
+  if (typeof candidate !== 'string') return undefined;
+  const trimmed = candidate.trim();
+  return trimmed && trimmed !== fieldCode ? trimmed : undefined;
+}
+
 export function collectListReferenceDisplayConfigs(
   columns: ColumnConfig[],
   modelFieldMap: Map<string, any>,
@@ -1833,9 +1853,9 @@ function ListPageContentInner(props: PageContentProps) {
       if (fieldLabel && fieldLabel !== fieldKey) {
         return fieldLabel;
       }
-      return fieldCode;
+      return resolveFieldMetaDisplayName(fieldCode, modelFieldMap) ?? fieldCode;
     },
-    [schema?.modelCode, tableName, t],
+    [schema?.modelCode, tableName, t, modelFieldMap],
   );
 
   const filterBlock = useMemo(() => {
@@ -2152,9 +2172,12 @@ function ListPageContentInner(props: PageContentProps) {
       // under the `common:` namespace in i18n yaml resources.
       const commonKey = `common.${column.field}`;
       const commonLabel = t(commonKey);
-      return commonLabel !== commonKey ? commonLabel : column.field;
+      if (commonLabel !== commonKey) return commonLabel;
+      // Last resort before leaking the raw field code: the model field
+      // metadata carries the imported displayName (zh-CN first).
+      return resolveFieldMetaDisplayName(column.field, modelFieldMap) ?? column.field;
     },
-    [locale, t, schema?.modelCode, tableName],
+    [locale, t, schema?.modelCode, tableName, modelFieldMap],
   );
 
   // Column widths map from SavedView
