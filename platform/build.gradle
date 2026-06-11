@@ -710,11 +710,14 @@ jacocoTestCoverageVerification {
         // bundle read 80.1% (33671/42043) — but that excluded meta/service/impl (the
         // command pipeline). 2026-06-11 that exclude was removed (it was already ~47%
         // covered), so the bundle now measures the real orchestration core and read
-        // ~70.2% (42826/61002), floor 0.68. Real-stack IT for the dict domain then
-        // lifted DictServiceImpl 26.7%->79% and DictCascadeServiceImpl 1.8%->77%
-        // (~+480 covered lines), so the bundle now reads ~71.5% and the floor is
-        // raised to 0.69 (preserving the original ~2pt flaky margin). Keep raising it
-        // as meta/service/impl IT lifts toward 0.80. The number went DOWN from the old
+        // ~70.2% (42826/61002), floor 0.68. A wave of real-stack IT for the
+        // meta/service/impl command-pipeline core (2026-06-11) then lifted the package
+        // 47.0%->56.1%: DictService 26.7->79%, DictCascade 1.8->77%, DictVersion
+        // 36.7->74%, DynamicData 34->39%, ReconciliationService 0.2->79%, NamedQuery
+        // 47->85% (~+1437 covered lines). The gate-denominator bundle now reads
+        // ~73.2% (45356/61940), so the floor is raised 0.68->0.69->0.71 (preserving the
+        // original ~2pt flaky margin — full-suite IT has run-to-run flake). Keep raising
+        // it as more of meta/service/impl lands. The number went DOWN from the old
         // narrow 80% but the SCOPE went UP — this is more rigorous, not less.
         rule {
             enabled = true
@@ -722,7 +725,7 @@ jacocoTestCoverageVerification {
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.69
+                minimum = 0.71
             }
         }
         // Lock the already-strong security/identity domains so they cannot rot.
