@@ -76,7 +76,7 @@ test.describe('Dashboard Export Buttons @smoke', () => {
     await expect(excelBtn).toBeVisible({ timeout: 10000 });
     await expect(excelBtn).toBeEnabled();
 
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
     await excelBtn.click();
     const download = await downloadPromise;
 
@@ -93,5 +93,44 @@ test.describe('Dashboard Export Buttons @smoke', () => {
 
     const sheetRows = XLSX.utils.sheet_to_json(workbook.Sheets['数据表格']);
     expect(sheetRows).toEqual(exportRows);
+  });
+
+  test('EXP-04: PDF export downloads a non-empty rendered dashboard artifact', async ({
+    page,
+  }, testInfo) => {
+    const dp = new DashboardDesignerPage(page);
+    const dashboardTitle = `ExportPdf_${Date.now()}`;
+
+    await dp.goto();
+    await dp.openSettings();
+    await dp.settingsTitleInput.fill(dashboardTitle);
+    await dp.saveSettings();
+
+    await dp.addWidget('数据表格');
+    await page.getByTestId('dashboard-datasource-type-select').selectOption('static');
+    await page
+      .getByTestId('dashboard-datasource-static-json')
+      .fill(JSON.stringify([{ region: 'East', cases: 18, owner: 'Ops-PDF' }], null, 2));
+
+    await dp.save();
+
+    const pdfBtn = page.getByTestId('export-pdf-button');
+    await expect(pdfBtn).toBeVisible({ timeout: 10000 });
+    await expect(pdfBtn).toBeEnabled();
+
+    const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+    await pdfBtn.click();
+    const download = await downloadPromise;
+
+    expect(download.suggestedFilename()).toBe(`${dashboardTitle}.pdf`);
+    const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+    await download.saveAs(savedPath);
+
+    const bytes = await readFile(savedPath);
+    const pdfText = bytes.toString('latin1');
+    expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(bytes.length).toBeGreaterThan(1_000);
+    expect(pdfText).toContain('/Type /Page');
+    expect(pdfText.includes('/Subtype /Image') || pdfText.includes(dashboardTitle)).toBe(true);
   });
 });
