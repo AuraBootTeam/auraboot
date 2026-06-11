@@ -1918,7 +1918,8 @@ CREATE TABLE IF NOT EXISTS ab_data_permission_policy (
     model_code       TEXT NOT NULL,
     policy_type      TEXT NOT NULL,         -- ROW / COLUMN
     scope_type       TEXT,                  -- ALL / SELF / DEPARTMENT / DEPARTMENT_TREE / PROJECT / CUSTOM (for ROW)
-    scope_expression TEXT,                  -- SpEL expression for CUSTOM scope
+    scope_expression TEXT,                  -- legacy free-form SQL fragment for CUSTOM scope (deprecated; prefer condition_ast)
+    condition_ast    TEXT,                  -- structured decision ConditionNode (JSON) for CUSTOM scope; compiled by ConditionToSqlBuilder
     field_code       TEXT,                  -- target field (for COLUMN)
     mask_type        TEXT,                  -- HIDE / PARTIAL / HASH / CUSTOM (for COLUMN)
     mask_expression  TEXT,                  -- custom mask expression

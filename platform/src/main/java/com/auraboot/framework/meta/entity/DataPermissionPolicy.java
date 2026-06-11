@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -14,7 +15,7 @@ import java.time.Instant;
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
-@TableName("ab_data_permission_policy")
+@TableName(value = "ab_data_permission_policy", autoResultMap = true)
 public class DataPermissionPolicy {
 
     @TableId(value = "id", type = IdType.AUTO)
@@ -49,11 +50,19 @@ public class DataPermissionPolicy {
     private String scopeType;
 
     /**
-     * SpEL expression for custom row filtering.
+     * Legacy free-form SQL fragment for custom row filtering (deprecated; prefer {@link #conditionAst}).
      * e.g. "#record['created_by'] == #user.id"
      */
     @TableField("scope_expression")
     private String scopeExpression;
+
+    /**
+     * Structured condition AST (decision {@code ConditionNode} JSON) for CUSTOM row scope.
+     * Compiled to SQL by {@code ConditionToSqlBuilder} (allowlist). Takes precedence over
+     * {@link #scopeExpression} when present.
+     */
+    @TableField(value = "condition_ast", typeHandler = JacksonTypeHandler.class)
+    private Object conditionAst;
 
     /**
      * Target field code for COLUMN policies.
