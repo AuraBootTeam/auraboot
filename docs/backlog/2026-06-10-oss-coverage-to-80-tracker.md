@@ -191,6 +191,28 @@ clears the handover's "near-zero backend classes" high-ROI list. Next: `DynamicD
 deeper (executeCustomAction/saveWithRelations), frontend #14 (GA E2E V8 coverage), #3 (Docker
 testcontainers).
 
+**Wave 3 (2026-06-11 — four more near-zero standalone classes, parallel sub-agents):**
+real-stack IT for four niche/standalone near-zero classes (target-selected statically since a
+fresh full-suite baseline was unreliable that hour — a concurrent enterprise `bootRun` on the
+shared DB produced 2554 env-flaky failures; targeted single-class runs stayed robust via
+per-tenant isolation, re-verified together = 109 tests, 0 failures):
+
+| Class | LINE before→after | Tests |
+|---|---|---|
+| OtDeviceService | ~0% → **92.1%** (197/214) | 37 |
+| FieldChangeAuditService | 0% → **100%** (45/45) | 26 |
+| ExportTaskService | 0% → **77.8%** (130/167) | 16 |
+| DefaultCurrencyConversionHandler | 0.7% → **87.6%** (120/137; SPI branch is OSS-unreachable) | 30 |
+
++109 tests. **A third live jsonb-persistence bug found + fixed in-band** (`OtDevice.connectionConfig`/
+`dataMapping` + `OtDataLog.rawData`/`parsedData` missing `JsonbStringTypeHandler` → `registerDevice`/
+`processDeviceData` 500'd in production — same class as wave 2's EDI + QueryAuditLog). **The
+BUNDLE floor stays 0.73 this wave (NOT bumped):** the gate bump needs a clean full-suite, which
+the noisy shared DB could not give that hour. Tests only ever raise coverage, so 0.73 still
+passes; the bump to lock in wave 3 should land in the next clean full-suite consolidation. The
+recurring jsonb-typeHandler omission (3 entities in 2 days) is worth a one-shot audit of all
+`@TableField` String fields mapped to jsonb columns + promoting the rule to canonical.
+
 **Frontend** — wired in `web-admin/vitest.config.ts` `coverage.thresholds` (lines 19 /
 stmts 18 / funcs 16 / branches 16 today). Raise in lockstep with new tests.
 
