@@ -158,12 +158,26 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
         // routes ANY "query" intent to "dsl.query" — including unknown models.
         // This is the documented behaviour: when no domain-specific capability
         // matches, the generic DSL query fallback is wired.
+        // route() only returns dsl.query if the dsl.query SKILL exists for the tenant.
+        // SkillBootstrapRunner seeds it at startup for tenants that exist then; a test
+        // tenant created mid-suite may lack it → route returns [] (non-hermetic).
+        // Self-seed so the test is deterministic regardless of bootstrap ordering.
+        ensureSkill(tenantId, "dsl.query", "DSL Query", "atomic");
+
         List<String> skills = capabilityRouter.route(tenantId, "query", "nonexistent_model");
-        assertThat(skills).containsExactly("dsl.query");
+        // Hermetic: assert the generic fallback IS wired (contains), not that it is
+        // the ONLY skill. This test class commits its seed rows (@Transactional
+        // NOT_SUPPORTED), so capabilities seeded by sibling tests / ambient platform
+        // rows can legitimately add more "*"-matched skills — that does not invalidate
+        // "unknown model falls back to dsl.query". containsExactly was non-hermetic.
+        assertThat(skills).contains("dsl.query");
     }
 
     @Test
     void testCapabilityRouter_intentMismatch() {
+        // Self-seed the generic-query fallback skill (see testCapabilityRouter_noMatch).
+        ensureSkill(tenantId, "dsl.query", "DSL Query", "atomic");
+
         // Seed capability with create intent only
         insertCapability(tenantId, "test_crm.create_only", "CRM Create Only",
                 "[\"create\"]", "[\"crm_*\"]", "[\"crm_lead.create\"]");
@@ -174,7 +188,14 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
         // but DOES match the platform-default CAP_GENERIC_QUERY which routes any
         // "query" intent to "dsl.query".
         List<String> skills = capabilityRouter.route(tenantId, "query", "crm_lead");
-        assertThat(skills).containsExactly("dsl.query");
+        // Hermetic: the actual intent of this test is (a) the generic query fallback
+        // is wired AND (b) the create-only capability does NOT contribute on a "query"
+        // intent. Assert exactly that. containsExactly was non-hermetic: a sibling
+        // test (testCapabilityRouter_crmQueryMatch) commits a crm_* "query" capability
+        // (NOT_SUPPORTED → persists), so crm_lead can legitimately match additional
+        // crm query skills — which must not fail this test.
+        assertThat(skills).contains("dsl.query");
+        assertThat(skills).doesNotContain("crm_lead.create");
     }
 
     @Test
@@ -257,5 +278,21 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
         row.put("updated_at", LocalDateTime.now());
 
         dynamicDataMapper.insert("ab_agent_skill", row);
+    }
+
+    /**
+     * Idempotent skill seed. This class runs @Transactional(NOT_SUPPORTED) so each
+     * insert commits and persists across tests — a plain insert in more than one test
+     * would hit the (tenant_id, skill_code) unique constraint. Query-first so repeated
+     * calls (e.g. dsl.query in both router tests) are safe.
+     */
+    private void ensureSkill(Long tenantId, String skillCode, String skillName, String level) {
+        List<Map<String, Object>> existing = dynamicDataMapper.selectByQuery(
+                "SELECT pid FROM ab_agent_skill " +
+                        "WHERE tenant_id = #{params.tenantId} AND skill_code = #{params.skillCode} LIMIT 1",
+                Map.of("tenantId", tenantId, "skillCode", skillCode));
+        if (existing.isEmpty()) {
+            insertSkill(tenantId, skillCode, skillName, level);
+        }
     }
 }
