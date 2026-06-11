@@ -81,8 +81,14 @@ public class CommandBusIotActionSink implements IotActionSink {
         req.setPayload(payloadMinusCommand);
         req.setClientRequestId(clientRequestId);
 
-        // Set tenant context for this programmatic call; clear in finally
+        // Set tenant context for this programmatic call. Restore (not blindly clear) the
+        // caller's context afterwards: when this sink runs inside an already-tenant-scoped
+        // caller (e.g. a webhook-triggered automation that still has work to do after the
+        // command — AutomationLogMapper.updateStatus), an unconditional clear() would strip
+        // that context and make the downstream update fail with "MetaContext not initialized",
+        // rolling back the whole @Transactional run (including this command's writes).
         Object tenantIdObj = envelope.get("tenantId");
+        Long previousTenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
         boolean tenantSet = false;
         if (tenantIdObj instanceof Number) {
             MetaContext.setCurrentTenantId(((Number) tenantIdObj).longValue());
@@ -95,7 +101,11 @@ public class CommandBusIotActionSink implements IotActionSink {
                     command, deviceId, emittedAt);
         } finally {
             if (tenantSet) {
-                MetaContext.clear();
+                if (previousTenantId != null) {
+                    MetaContext.setCurrentTenantId(previousTenantId);
+                } else {
+                    MetaContext.clear();
+                }
             }
         }
     }
