@@ -76,6 +76,15 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   // 字段更新函数 — also triggers linkage
   const handleChange = (newValue: any) => {
     stateManager.updateField(scopeId, field.field, newValue);
+    // `bindState` mirrors the field value to a page state key that data sources
+    // read (e.g. a filter field feeding `${state.statusFilter}`). updateField
+    // only writes form scope, so without this the search/filter inputs never
+    // reach the list query. Write the state key and refresh dependent sources.
+    const boundStateKey = (field as { bindState?: string }).bindState;
+    if (boundStateKey) {
+      stateManager.updateState(scopeId, boundStateKey, newValue);
+      void runtime?.getDataSourceManager?.()?.notifyStateChanged?.(boundStateKey);
+    }
     runtime?.triggerFieldLinkage(field.field, 'change');
   };
 

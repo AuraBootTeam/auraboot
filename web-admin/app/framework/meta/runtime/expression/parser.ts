@@ -631,7 +631,14 @@ export class ExpressionParser {
       throw new ExpressionSecurityError(`禁止访问危险标识符: ${name}`, name, 'forbidden_global');
     }
 
-    throw new Error(`未定义的标识符: ${name}`);
+    // Unresolved identifier → undefined (lenient), mirroring member access on
+    // null/undefined above. DSL guards are routinely evaluated in contexts that
+    // legitimately lack a root (e.g. a row-action `record.x == 'Y'` evaluated
+    // before any row, or `form.mode` before the form mounts). Throwing here made
+    // every such expression fail and spam the console even though the condition
+    // safely resolves to false. Typos are caught by import-time DSL validation,
+    // not at runtime. Security-forbidden globals still throw above.
+    return undefined;
   }
 
   /**
@@ -812,6 +819,20 @@ export class ExpressionParser {
    * 求值二元表达式节点
    */
   private evaluateBinaryExpression(node: jsep.BinaryExpression): any {
+    // jsep parses `&&` / `||` / `??` as BinaryExpressions, so they reach here
+    // (evaluateLogicalExpression is only hit for explicit LogicalExpression
+    // nodes). They MUST short-circuit: eagerly evaluating the right operand
+    // breaks guard patterns like `x != null && x.includes(y)` — the method runs
+    // on a null/undefined `x` and throws. Evaluate the right side lazily.
+    switch (node.operator) {
+      case '&&':
+        return this.evaluateNode(node.left) && this.evaluateNode(node.right);
+      case '||':
+        return this.evaluateNode(node.left) || this.evaluateNode(node.right);
+      case '??':
+        return this.evaluateNode(node.left) ?? this.evaluateNode(node.right);
+    }
+
     const left = this.evaluateNode(node.left);
     const right = this.evaluateNode(node.right);
 
@@ -842,12 +863,7 @@ export class ExpressionParser {
         return left > right;
       case '>=':
         return left >= right;
-      case '??':
-        return left ?? right;
-      case '&&':
-        return left && right;
-      case '||':
-        return left || right;
+      // `&&` / `||` / `??` are short-circuited above before eager operand eval.
       default:
         throw new Error(`不支持的二元操作符: ${node.operator}`);
     }
