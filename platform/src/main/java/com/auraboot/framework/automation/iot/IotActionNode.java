@@ -1,5 +1,6 @@
 package com.auraboot.framework.automation.iot;
 
+import com.auraboot.framework.automation.bpm.AutomationActionServiceTaskDelegate;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
 import lombok.extern.slf4j.Slf4j;
@@ -84,7 +85,13 @@ public class IotActionNode implements ActionExecutor {
         }
         Object deviceId = context.get(IotRuleContextKeys.DEVICE_ID);
         if (deviceId != null) envelope.put("deviceId", deviceId);
-        Object tenantId = context.get(IotRuleContextKeys.TENANT_ID);
+        // Prefer the authoritative automation tenant (Long, set by AutomationProcessRuntime)
+        // over the context "tenantId": webhook-triggered flows merge the client body into
+        // the context, so the plain key can be an attacker-controlled string.
+        Object tenantId = context.get(AutomationActionServiceTaskDelegate.TENANT_ID_VAR);
+        if (!(tenantId instanceof Number)) {
+            tenantId = context.get(IotRuleContextKeys.TENANT_ID);
+        }
         if (tenantId != null) envelope.put("tenantId", tenantId);
         envelope.put("payload", payload);
         envelope.put("emittedAt", System.currentTimeMillis());
