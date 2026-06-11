@@ -62,6 +62,19 @@ const OUTBOUND_HOST = process.env.E2E_OUTBOUND_HOST || 'host.docker.internal';
 const CALLAPI_OK_URL = process.env.E2E_CALLAPI_OK_URL || 'http://host.docker.internal:6444/actuator/health';
 const CALLAPI_404_URL = process.env.E2E_CALLAPI_404_URL || 'http://host.docker.internal:6444/api/this-endpoint-does-not-exist-404';
 
+async function delay(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function observeFor(ms: number, assertion: () => void, intervalMs = 100): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    assertion();
+    await delay(intervalMs);
+  }
+  assertion();
+}
+
 // ───────────────────────── fire + assert helpers (no UI surface) ─────────────────────────
 
 /**
@@ -110,7 +123,7 @@ async function pollRecordField(
   while (Date.now() < deadline) {
     last = await getOrderRecord(page, recordId);
     if (last[field] === expected) return last;
-    await page.waitForTimeout(1_000);
+    await delay(1_000);
   }
   return last;
 }
@@ -134,7 +147,7 @@ async function pollLogTerminal(
     if (last && ['success', 'failed', 'partial_success'].includes(String(last.status).toLowerCase())) {
       return last;
     }
-    await page.waitForTimeout(1_000);
+    await delay(1_000);
   }
   return last;
 }
@@ -397,8 +410,9 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await expect(page.getByText(/存在错误|Errors/).first()).toBeVisible();
 
     // The validation gate truly blocked the write.
-    await page.waitForTimeout(1_000);
-    expect(wroteApi, 'save must NOT fire an /api/automations write when invalid').toBe(false);
+    await observeFor(1_000, () => {
+      expect(wroteApi, 'save must NOT fire an /api/automations write when invalid').toBe(false);
+    });
     // And the store validation confirms the field-level error for the trigger.
     const validation = await page.evaluate(
       () => (window as unknown as { __flowDesignerStore?: any }).__flowDesignerStore?.getState().validationResult,
@@ -536,9 +550,33 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
         const hit = rows.filter((r) => r?.e2et_item_name === name);
         if (hit.length) return hit;
       }
-      await page.waitForTimeout(1_000);
+      await delay(1_000);
     }
     return rows.filter((r) => r?.e2et_item_name === name);
+  }
+
+  async function fetchItemsByName(page: Page, name: string): Promise<any[]> {
+    const resp = await page.request.get(`/api/dynamic/e2et_order_item/list`, {
+      params: { pageNum: 1, pageSize: 50, keyword: name },
+    });
+    if (!resp.ok()) return [];
+    const data = (await resp.json())?.data;
+    const rows = data?.records ?? data?.list ?? data?.content ?? data?.rows ?? (Array.isArray(data) ? data : []);
+    return rows.filter((r: any) => r?.e2et_item_name === name);
+  }
+
+  async function expectNoItemsByNameFor(
+    page: Page,
+    name: string,
+    observationMs: number,
+    message: string,
+  ): Promise<void> {
+    const deadline = Date.now() + observationMs;
+    while (Date.now() < deadline) {
+      expect(await fetchItemsByName(page, name), message).toHaveLength(0);
+      await delay(1_000);
+    }
+    expect(await fetchItemsByName(page, name), message).toHaveLength(0);
   }
 
   test('N-CREATE-RECORD: drag trigger-record-create→action-create-record, configure via panel, save, enable, fire → a child order_item is created (happy) @golden', async ({
@@ -901,6 +939,25 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     return new Set(rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n)));
   }
 
+  async function expectNoNewLogIdsFor(
+    page: Page,
+    pid: string,
+    before: Set<number>,
+    observationMs: number,
+    message: string,
+  ): Promise<void> {
+    const deadline = Date.now() + observationMs;
+    while (Date.now() < deadline) {
+      const current = await fetchLogIds(page, pid);
+      const newIds = [...current].filter((id) => !before.has(id));
+      expect(newIds, message).toHaveLength(0);
+      await delay(1_000);
+    }
+    const current = await fetchLogIds(page, pid);
+    const newIds = [...current].filter((id) => !before.has(id));
+    expect(newIds, message).toHaveLength(0);
+  }
+
   // ── golden CORNER path (real UI) — lifecycle: enable / disable / re-enable ──────
   test('N-CORNER-LIFECYCLE: enable→fire runs, disable→fire does NOT run, re-enable→fire runs (lifecycle via real UI toggle) @golden', async ({
     page,
@@ -944,9 +1001,13 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       .toBe(false);
     const idsBefore = await fetchLogIds(page, pid);
     await fireCreate(page, 100, `NCL-off ${uniqueId()}`);
-    await page.waitForTimeout(6_000); // give the engine a chance to (not) run
-    const newWhileDisabled = [...(await fetchLogIds(page, pid))].filter((id) => !idsBefore.has(id));
-    expect(newWhileDisabled, `a disabled automation must NOT run (new logs: ${newWhileDisabled})`).toHaveLength(0);
+    await expectNoNewLogIdsFor(
+      page,
+      pid,
+      idsBefore,
+      6_000,
+      'a disabled automation must NOT create a new run log during the observation window',
+    );
 
     // RE-ENABLED → fire → runs again, a distinct newer log. Confirm enabled=true committed
     // (the deploy/re-enable can lag the badge) before firing, so the run is not missed.
@@ -1304,11 +1365,12 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     // CONTROL: a plain create (no state transition) must NOT fire a toStates-filtered
     // on_state_change automation — confirms the filter is actually applied.
     await fireCreate(page, 100, `NSF-noop ${uniqueId()}`);
-    await page.waitForTimeout(5_000);
-    expect(
-      (await pollItemsByName(page, itemName, 3_000)).length,
+    await expectNoItemsByNameFor(
+      page,
+      itemName,
+      5_000,
       'a plain create must NOT fire the toStates-filtered on_state_change automation',
-    ).toBe(0);
+    );
 
     // MATCH: cancel an order (draft→cancelled). toState=cancelled = the filter → fires,
     // creating the child item. Before FINDING-4b the read-back toState was null (the
@@ -1408,11 +1470,12 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     // EDGE: update an UNWATCHED field (remark, not the title) → the fieldCode filter must
     // skip it → NO child item created.
     await fireUpdate(page, orderId, { e2et_order_remark: `unwatched ${uniqueId()}` });
-    await page.waitForTimeout(5_000); // give the @Async bridge a chance to (not) fire
-    expect(
-      (await pollItemsByName(page, itemName, 3_000)).length,
+    await expectNoItemsByNameFor(
+      page,
+      itemName,
+      5_000,
       'changing an unwatched field must NOT fire the field-change automation',
-    ).toBe(0);
+    );
 
     // POSITIVE CONTROL: update the WATCHED field (title) → fires → child item created.
     const firedAt = Date.now();
@@ -1461,11 +1524,12 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const log = await pollLogTerminal(page, pid, firedAt);
     expect(String(log!.status).toLowerCase(), `N-LOOP-EDGE empty-collection run should still succeed: ${JSON.stringify(log)}`).toBe('success');
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), body), 'the loop body node completes with 0 iterations').toBe(true);
-    await page.waitForTimeout(3_000);
-    expect(
-      (await pollItemsByName(page, itemName, 3_000)).length,
+    await expectNoItemsByNameFor(
+      page,
+      itemName,
+      3_000,
       'an empty collection creates no child items',
-    ).toBe(0);
+    );
   });
 
   // ── golden CORNER (real UI) — re-entrancy: the same enabled automation fires twice ──────
@@ -1545,7 +1609,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
         const rows = data?.records ?? data?.list ?? data?.content ?? data?.rows ?? (Array.isArray(data) ? data : []);
         found = rows.find((r: any) => r?.e2et_item_name === itemName);
       }
-      if (!found) await page.waitForTimeout(1_500);
+      if (!found) await delay(1_500);
     }
     expect(found, 'the unicode item name round-tripped and persisted exactly').toBeTruthy();
     expect(found.e2et_item_name, 'the persisted name matches the unicode source byte-exact').toBe(itemName);

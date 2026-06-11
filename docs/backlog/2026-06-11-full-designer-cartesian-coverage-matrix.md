@@ -243,6 +243,132 @@ rg -n 'test\.skip|test\.fixme|waitForTimeout\(|toBeGreaterThanOrEqual\(|toBeLess
 
 输出到本文档新增章节“Inventory Snapshot”，不要只写口头结论。
 
+## Inventory Snapshot
+
+> 2026-06-11 live source extraction. Source of truth is implementation code, not old pass counts.
+
+### Extraction Evidence
+
+| 范围 | 真源 | live 计数 |
+|---|---|---:|
+| Page Designer block palette | `web-admin/app/plugins/core-designer/components/studio/workbench/designers/areas/BlockLibrary.tsx` | 17 |
+| BPMN Designer palette | `web-admin/app/plugins/core-designer/components/bpmn-designer/constants/index.ts` | 9 |
+| Automation Designer palette | `web-admin/app/framework/smart/automation/nodes/{triggers,actions,controls}.ts` | 19 |
+| Dashboard Designer widget registry | `web-admin/app/plugins/core-dashboard/widgets/widgetRegistry.ts` | 37 |
+| Report Designer block palette | `web-admin/app/plugins/core-designer/components/report-designer/components/BlockPalette.tsx` | 10 |
+
+### Page Designer Inventory
+
+| 类型 | 分类 | 可用页面 | P0/P1 风险 | 本轮证据状态 |
+|---|---|---|---|---|
+| filters | form | list | P1: filter-form 输入、保存、运行页过滤 | TODO |
+| form-section | form | form/list | P0: 字段绑定、required、readonly、visibleWhen | TODO |
+| form-buttons | form | form | P0: create/update 命令真实触发 | TODO |
+| table | display | list | P0: columns/dataSource/rowActions/search/bulk | TODO |
+| detail-section | display | form/list | P1: 详情字段回显、raw code 防泄漏 | TODO |
+| text | display | list/form | P2: 静态内容保存回显 | TODO |
+| toolbar | layout | list | P0: action.command 与命令管道 | TODO |
+| selection-info | layout | list | P1: 多选状态与批量工具条 | TODO |
+| stat-card | chart | list/form | P1: NQ/API 非空与数值断言 | TODO |
+| chart-card | chart | list/form | P1: 图表数据源与渲染 | TODO |
+| metric-strip | workbench | list/form | P1: 指标点击筛选联动 | TODO |
+| record-inspector | workbench | list/form | P1: 选中行联动详情 | TODO |
+| candidate-list | workbench | list/form | P1: 候选选择写回状态 | TODO |
+| workbench-action-bar | workbench | list/form | P0: 导出/下载/命令行动点 | TODO |
+| evidence-panel | workbench | list/form | P1: raw payload/证据渲染 | TODO |
+| artifact-timeline | workbench | list/form | P1: 附件/导出产物历史 | TODO |
+| review-drawer | workbench | list/form | P1: 浮层复核、候选确认 | TODO |
+
+### Automation Designer Inventory
+
+| 类型 | 分类 | 属性字段 | P0/P1 风险 | 本轮证据状态 |
+|---|---|---|---|---|
+| trigger-record-create | trigger | modelCode | P0: create event fire | TODO |
+| trigger-record-update | trigger | modelCode, watchFields | P0: update event fire / create 不误触发 | TODO |
+| trigger-field-change | trigger | modelCode, fieldCode, fromValue, toValue | P0: watched field 与 non-watched field | TODO |
+| trigger-state-change | trigger | modelCode, stateField, fromStates, toStates | P0: dict-backed state filter | TODO |
+| trigger-scheduled | trigger | cron, timezone, maxExecutionTime | P1: scheduler fire / no fixed sleep fake pass | TODO |
+| trigger-webhook | trigger | secret, validationMode, expectedHeaders | P0: inbound webhook real POST | TODO |
+| trigger-bpm-event | trigger | modelCode, eventTypes | P1: BPM event consumer seam | TODO |
+| trigger-inactivity | trigger | modelCode, inactivityHours, inactivityField, stateField, inactivityStates | P1: scheduled inactivity sweep | TODO |
+| action-update-record | action | modelCode, recordId, fields | P0: side effect + sad invalid field | TODO |
+| action-create-record | action | modelCode, fields | P0: child record created + invalid field sad | TODO |
+| action-send-notification | action | notificationType, title, content, recipients | P1: notification runtime completion | TODO |
+| action-execute-command | action | commandCode, params | P0: command-select picker + restricted principal sad | TODO |
+| action-call-api | action | url, method, headers, body | P0: outbound success/failure | TODO |
+| action-send-webhook | action | url, payload | P0: outbound receiver payload + 500 sad | TODO |
+| action-start-process | action | processKey, businessKey, variables | P1: BPM runtime side effect | TODO |
+| action-llm-call | action | model, prompt fields, outputVariableName, imageVariableNames | P1: built-in stub provider + persisted output; external key not required | TODO |
+| control-condition | control | expression | P0: true/false/edge boundary | TODO |
+| control-delay | control | duration, unit | P1: delayed runtime semantics | TODO |
+| control-loop | control | collection, itemVariable | P1: non-empty and empty collection | TODO |
+
+### BPMN Designer Inventory
+
+| 类型 | 分类 | P0/P1 风险 | 本轮证据状态 |
+|---|---|---|---|
+| START_EVENT | event | initiator / XML start event | TODO |
+| END_EVENT | event | terminateAll / XML end event | TODO |
+| USER_TASK | task | assignee matrix / form binding / MI / runtime task | TODO |
+| SERVICE_TASK | task | command / http / runtime side effect | TODO |
+| RECEIVE_TASK | task | designerJson + BPMN XML | TODO |
+| EXCLUSIVE_GATEWAY | gateway | condition + default branch + runtime route | TODO |
+| PARALLEL_GATEWAY | gateway | fork/join no conditionExpression | TODO |
+| INCLUSIVE_GATEWAY | gateway | multi-condition branch runtime | TODO |
+| CALL_ACTIVITY | task | parent/child deploy + variable mapping runtime | TODO |
+
+### Dashboard / Report Designer Inventory
+
+| 范围 | 类型 | 属性字段摘要 | P0/P1 风险 | 本轮证据状态 |
+|---|---|---|---|---|
+| dashboard | smart-number-card | title, icon, suffix, showTrend | P0: add/save/reload + data source | TODO |
+| dashboard | smart-bar-chart | title, horizontal, stacked | P0: add/save/reload + data source | TODO |
+| dashboard | smart-line-chart | title, smooth, showArea | P0: add/save/reload + data source | TODO |
+| dashboard | smart-pie-chart | title, donut, showLabels | P0: add/save/reload + data source | TODO |
+| dashboard | smart-area-chart | title, smooth, fillOpacity | P1: property panel + render | TODO |
+| dashboard | smart-funnel-chart | title, sort | P1: property panel + render | TODO |
+| dashboard | smart-scatter-chart | title, bubbleMode | P1: property panel + render | TODO |
+| dashboard | smart-radar-chart | title, shape, showArea | P1: property panel + render | TODO |
+| dashboard | smart-table-chart | title, pageSize, striped | P0: table rows + data source | TODO |
+| dashboard | smart-gauge-chart | title, min, max, splitNumber | P1: property panel + render | TODO |
+| dashboard | smart-progress | title, target, format, shape | P1: property panel + render | TODO |
+| dashboard | smart-heatmap-chart | title, xField, yField | P1: property panel + render | TODO |
+| dashboard | smart-treemap-chart | title, nameField, valueField | P1: property panel + render | TODO |
+| dashboard | smart-map-chart | title, mapRegion | P1: property panel + render | TODO |
+| dashboard | smart-leaderboard | title, maxItems, rankField, valueField | P1: property panel + render | TODO |
+| dashboard | smart-rich-text | title, content, format | P1: property panel + render | TODO |
+| dashboard | smart-image | title, src, alt, objectFit | P1: property panel + render | TODO |
+| dashboard | smart-iframe | title, src | P1: property panel + render | TODO |
+| dashboard | smart-countdown | title, targetDate, format | P1: property panel + render | TODO |
+| dashboard | smart-wordcloud-chart | title, shape, colorTheme, gridSize | P1: property panel + render | TODO |
+| dashboard | smart-combo-chart | title, smooth, stack, dataZoom, axes | P1: property panel + render | TODO |
+| dashboard | smart-nps-chart | title, scoreField, legend, ringWidth | P1: property panel + render | TODO |
+| dashboard | smart-gallery | title, columns, image/title/description fields | P1: property panel + render | TODO |
+| dashboard | smart-kanban | title, group/title/description fields | P1: property panel + render | TODO |
+| dashboard | smart-stats-row | title | P1: workbench widget render | TODO |
+| dashboard | smart-stats-card | title, statKey | P1: workbench widget render | TODO |
+| dashboard | smart-inbox | title, maxItems, itemTypes | P1: workbench widget render | TODO |
+| dashboard | smart-calendar | title | P1: workbench widget render | TODO |
+| dashboard | smart-pipeline | title | P1: workbench widget render | TODO |
+| dashboard | smart-leads | title | P1: workbench widget render | TODO |
+| dashboard | smart-activities | title | P1: workbench widget render | TODO |
+| dashboard | smart-my-process | title, maxItems | P1: BPM workbench seam | TODO |
+| dashboard | smart-process-stats | title | P1: BPM workbench seam | TODO |
+| dashboard | smart-shortcuts | title, columns | P1: shortcut interaction | TODO |
+| dashboard | smart-recent | title, maxItems | P1: recent visits data | TODO |
+| dashboard | smart-announcement | title | P1: announcement render | TODO |
+| dashboard | smart-quick-note | title | P1: note persistence | TODO |
+| report | table | dataSource, columns | P0: save/API/export artifact | TODO |
+| report | grouped-table | dataSource, groupByField, columns | P1: save/API/render | TODO |
+| report | stat-card | dataSource, valueField, aggregation | P1: save/API/render | TODO |
+| report | rich-text | content, align | P1: save/API/render | TODO |
+| report | cross-tab | rowField, columnField, valueField | P1: save/API/render | TODO |
+| report | chart | chartType, categoryField, valueField | P1: save/API/render | TODO |
+| report | barcode | format, staticValue | P1: save/API/render | TODO |
+| report | watermark | text, rotation, opacity | P1: save/API/render | TODO |
+| report | page-header | header band | P1: save/API/render | TODO |
+| report | page-footer | footer band | P1: save/API/render | TODO |
+
 ### Phase 2: 旧测试真实性审计
 
 对每个设计器列：
@@ -253,6 +379,63 @@ rg -n 'test\.skip|test\.fixme|waitForTimeout\(|toBeGreaterThanOrEqual\(|toBeLess
 - 可暂时标 N/A 的项
 
 任何退役都必须写“替代证据是什么”；没有替代证据则不能退役，只能标 TODO 或产品缺口。
+
+### First Audit Result
+
+Live command:
+
+```bash
+rg -n -e 'test\.skip' -e 'test\.fixme' -e 'waitForTimeout\(' -e 'toBeGreaterThanOrEqual\(' -e 'toBeLessThanOrEqual\(' -e 'retries:' -e "waitForEvent\(['\"]download['\"]\)\.catch" -e 'page\.request\.put' -e '__reactProps' \
+  web-admin/tests/e2e/page-designer \
+  web-admin/tests/e2e/designer \
+  web-admin/tests/e2e/bpm-designer \
+  web-admin/tests/e2e/automation \
+  web-admin/tests/e2e/dashboard \
+  -g '*.spec.ts'
+```
+
+| 范围 | 审计结论 | 处理 |
+|---|---|---|
+| Automation Designer | `automation-designer-golden.spec.ts` 已清掉本轮引用路径里的 fixed wait,并用真实 browser/backend runtime fresh run 通过。`automation-golden.spec.ts` 仍有 loop / llm / start-process skip/fixme。 | 只引用 `automation-designer-golden.spec.ts`;旧 `automation-golden.spec.ts` skip/fixme 不计完成证据。 |
+| Page Designer | `designer-deep-operations.spec.ts` 有拖拽、属性编辑、保存发布、撤销重做、预览、删除、导入导出; `unified-designer-kind-and-binding.spec.ts` 与 toolbar permissions 有 seed/环境前置 skip。 | 本轮引用 deep/lifecycle/field/smart/list/load-existing fresh run; seed 前置 skip 不计完成证据。 |
+| Dashboard Designer | `dashboard-widget-types.spec.ts` 多处 `>=1` 是“添加后画布至少出现该类 widget”的存在性断言; `dashboard-management.spec.ts` / `dashboard-tab-reorder.spec.ts` 有 PUT setup 与 fixme; `dashboard-export.spec.ts` 已覆盖 Excel/PDF artifact。 | 本轮引用 widget/chart/deep/interactions/export fresh run; management/tab persistence 仍为 P1 gap,不计 DONE。 |
+| BPMN Designer | `web-admin/tests/e2e/bpm-designer/*` 覆盖 userTask/serviceTask/gateway/callActivity/SLA 等 L1/L2/L3;旧 `designer-lifecycle.spec.ts` BPMN 段仍受 permission skip 影响。 | 新 bpm-designer 目录为主要证据;旧 lifecycle skip 不计完成证据。 |
+| Report Designer | `report-designer-deep.spec.ts` 的 fixed wait 已替换为 UI/API active wait,并与 `report-designer-smoke.spec.ts` fresh run 通过。 | Report 10 类 block + 操作 smoke/deep 作为本轮证据;旧 lifecycle 不是主证据。 |
+
+### Live Verification Log
+
+> 2026-06-11 rerun on local real stack. Backend was restarted with `AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1`, `AGENT_LLM_STUB_MODE=true`, `SPRING_PROFILES_ACTIVE=dev`. Local proxy variables were cleared for localhost tests.
+
+| 验证项 | 命令摘要 | 结果 |
+|---|---|---|
+| Backend health | `curl http://127.0.0.1:6443/actuator/health` with `NO_PROXY=localhost,127.0.0.1` | `{"status":"UP"}` |
+| Setup/auth/fixtures | `pnpm exec playwright test -c playwright.config.ts --project=setup --reporter=line` with `IMPORT_TEST_FIXTURES=true` and host plugin root | `16 passed (1.9s)` |
+| Typecheck | `pnpm typecheck` in `web-admin` | passed; only existing Vite tsconfig-paths warning |
+| Automation Designer | `tests/e2e/automation/automation-designer-golden.spec.ts` via `playwright.quick.config.ts`, `PW_QUICK_WORKERS=1`, local outbound URLs | `30 passed (2.5m)` |
+| BPMN Designer | `tests/e2e/bpm-designer` via quick config | `21 passed (48.8s)` |
+| Page Designer | `designer-deep-operations`, `page-designer-full-lifecycle`, `field-properties`, `smart-components`, `list-config-layout`, `load-existing-page` via quick config | `34 passed (1.1m)` |
+| Dashboard Designer | `dashboard-export`, `dashboard-designer-deep`, `dashboard-widget-types`, `dashboard-charts`, `dashboard-interactions` via quick config | `64 passed (56.2s)` |
+| Report Designer | `report-designer-smoke`, `designer/report-designer-deep` via quick config | `98 passed (19.9m)` |
+| Hard redline on referenced specs | grep for `test.skip`, `test.fixme`, `waitForTimeout(`, `retries:`, `waitForEvent('download').catch`, `page.request.put`, `__reactProps` on only the fresh-run evidence specs above | no output |
+| Full redline inventory | same grep across all designer-related specs | still lists old/unreferenced suites and lower-bound assertions; see classification below |
+| Diff hygiene | `git diff --check` | passed |
+
+### Evidence Status Snapshot
+
+| 范围 | 本轮可计入 DONE 的证据 | 明确不能计入 DONE 的剩余项 |
+|---|---|---|
+| Automation Designer | record-create/update/field-change/state-change/scheduled/webhook triggers; update/create/notification/execute-command/call-api/send-webhook/llm-call actions; condition/loop controls; true/false/edge/lifecycle/concurrency/i18n sad/edge/corner paths. Evidence: `automation-designer-golden.spec.ts` 30 pass with real side effects/logs/outbound receiver. | `trigger-bpm-event`, `trigger-inactivity`, `action-start-process`, `control-delay` remain matrix gaps unless a future spec adds real runtime evidence. Legacy `automation-golden.spec.ts` skip/fixme is not evidence. |
+| BPMN Designer | Base palette 9 types are covered through L1 designerJson, L2 BPMN XML, and selected L3 runtime: start/end, userTask assignee/form/MI/SLA, serviceTask command/http/rule/notification, receiveTask, exclusive/parallel/inclusive gateway, callActivity. Evidence: `tests/e2e/bpm-designer` 21 pass. | Old `designer-lifecycle.spec.ts` BPMN permission skip and old gateway lifecycle skip are not evidence. |
+| Page Designer | Form-page designer operations: drag/sort, property edit, save/publish, undo/redo, preview, field drag, delete, outline, multi-type mix, PageSchema V2 import/export, lifecycle, field/smart component panels, list layout/load-existing/error state. Evidence: targeted Page Designer 34 pass. | Full per-block 17-type cartesian coverage is not complete. Workbench-specific blocks such as `metric-strip`, `record-inspector`, `candidate-list`, `evidence-panel`, `artifact-timeline`, `review-drawer` still need typed runtime assertions before marking their inventory rows DONE. |
+| Dashboard Designer | Dashboard designer load, chart palette/config, 14 named widget types add/property-panel checks, data source binding, resize/settings/validation/publish/unpublish/layout, interactions, Excel XLSX artifact parse, PDF header/content marker. Evidence: Dashboard 64 pass. | `dashboard-management.spec.ts` and `dashboard-tab-reorder.spec.ts` still contain API PUT setup/fixme; tab-order preference persistence and row-management flows remain P1 gaps. Registry workbench widgets outside the 14 named widget suite are not individually DONE. |
+| Report Designer | 10 report block types (`data-table`, `grouped-table`, `stat-card`, `rich-text`, `cross-tab`, `chart`, `barcode`, `watermark`, `page-header`, `page-footer`) plus save/export operation smoke/deep. Evidence: Report 98 pass after fixed-wait removal. | Report export artifact is only smoke/API-prompt level here; byte-level Excel/PDF parsing is covered in Dashboard export, not Report. Add report-specific artifact parsing before claiming Report export artifact DONE. |
+
+### Truth Review Notes
+
+- 本轮声明只能说“上述 fresh-run evidence specs 通过且 hard redline clean”。不能说“全量设计器笛卡尔积 100% DONE”。
+- Full redline 仍列出旧套件的 `test.skip` / `test.fixme` / API PUT setup / lower-bound assertions;这些文件不作为本轮 DONE 证据。
+- `toBeGreaterThanOrEqual` 在本轮引用 spec 中只作为业务下限或添加后存在性断言使用,不能用于计算覆盖率或证明某一完整组件族已全部覆盖。
+- 前一次 Dashboard/Report 合批失败的根因是后端 `bootRun` 被 SIGTERM 停止后前端重定向到登录页;该失败已通过重启后端、重跑 setup、分批 fresh run 排除,不计产品缺陷。
 
 ### Phase 3: P0/P1 补测
 

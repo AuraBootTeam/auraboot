@@ -60,8 +60,10 @@ async function openReportAndAddBand(page: Page, bandType: 'Page Header' | 'Page 
     .getByRole('button', { name: new RegExp(bandType, 'i') })
     .first()
     .click();
-  await page.waitForTimeout(300);
   const canvas = page.getByTestId('report-canvas');
+  await expect(canvas.getByText(bandType === 'Page Header' ? 'Header' : 'Footer', { exact: true })).toBeVisible({
+    timeout: 5000,
+  });
   const cursorDivs = canvas.locator('.cursor-pointer');
   if (bandType === 'Page Header') {
     await cursorDivs.first().click({ timeout: 5000 });
@@ -743,8 +745,7 @@ test.describe('Report Operations', () => {
       .click();
     // Save first to get a valid report PID
     const saveBtn = page.getByRole('button', { name: /save/i });
-    await saveBtn.click();
-    const saveResponse = await page
+    const saveResponsePromise = page
       .waitForResponse(
         (res) =>
           res.url().includes('/api/pages') &&
@@ -753,7 +754,9 @@ test.describe('Report Operations', () => {
         { timeout: 10000 },
       )
       .catch(() => null);
-    await page.waitForTimeout(500);
+    await saveBtn.click();
+    const saveResponse = await saveResponsePromise;
+    await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 5000 });
 
     // Click Excel export — if report was saved, it triggers API; otherwise it shows alert
     const excelBtn = page.getByRole('button', { name: /export excel/i });
