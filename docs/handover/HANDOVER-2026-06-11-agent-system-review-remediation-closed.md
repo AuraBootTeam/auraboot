@@ -63,7 +63,7 @@ created: 2026-06-11
 2. **A6 live-LLM eval 回归**(A2 已铺好 `LlmToolSelectionService`;需 LLM key/预算决策,可用低价 provider 做 opt-in suite)
 3. **A4 上下文 LLM 摘要压缩**(`ContextWindowManager` 现只截断;需产品决策:模型/成本上限/摘要落库位置)
 4. **B2 loop 核心四类拆分**(ToolLoopService 1206/StepLoopService 1081/AgentRunService 1092/ChatTurnRuntime 1056;前置=tool loop 行为测试 harness,顺带解 B4 service↔runtime 边界)
-5. **I-1 implementation-map 脚本门禁**(map 中类名 grep 现行代码必命中;retro 立项)
+5. ~~**I-1 implementation-map 脚本门禁**~~ ✅ 已做(ENT #404,`scripts/check-acp-implementation-map.mjs`;首跑抓真漂移 `ab_agent_step`→`ab_agent_action`)
 6. **I-2 存量 finding 文档生命周期**(新规则已固化,存量不回溯;修 finding 的 PR 回标原报告)
 
 ## Context for Next Session
