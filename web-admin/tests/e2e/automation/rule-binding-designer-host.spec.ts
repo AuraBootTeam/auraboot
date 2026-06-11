@@ -1,5 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
-import { uniqueId } from '../helpers';
+import { test, expect, type APIResponse, type Page } from '@playwright/test';
+import { uniqueId, waitForDynamicPageLoad } from '../helpers';
 import {
   dragNodeToCanvas,
   fillNodeConfig,
@@ -11,8 +11,18 @@ const DESIGNER_NEW = '/automation/new';
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const ADMIN_PASSWORD = 'Test2026x';
 const MODEL_LABEL = '投诉';
+const DECISION_CODE = 'approval_routing';
+
+type ApiEnvelope<T> = {
+  code?: number | string;
+  success?: boolean;
+  message?: string;
+  msg?: string;
+  data?: T;
+};
 
 test.use({ storageState: { cookies: [], origins: [] } });
+test.setTimeout(90_000);
 
 async function loginAsAdmin(page: Page, baseURL: string): Promise<void> {
   const response = await page.request.post(`${baseURL}/login`, {
@@ -46,6 +56,45 @@ async function loginAsAdmin(page: Page, baseURL: string): Promise<void> {
   }
 }
 
+function isApiSuccess<T>(body: ApiEnvelope<T> | null | undefined): body is ApiEnvelope<T> {
+  if (!body) return false;
+  if (body.success === false) return false;
+  const code = body.code;
+  return code === undefined || code === null || String(code) === '0';
+}
+
+async function readApi<T>(response: APIResponse): Promise<T> {
+  const body = (await response.json().catch(async () => ({
+    message: await response.text().catch(() => ''),
+  }))) as ApiEnvelope<T>;
+  expect(response.ok(), `HTTP ${response.status()} ${response.url()}: ${JSON.stringify(body)}`).toBe(
+    true,
+  );
+  expect(isApiSuccess(body), `API failed: ${JSON.stringify(body)}`).toBe(true);
+  return body.data as T;
+}
+
+async function ensureApprovalRoutingDecision(page: Page): Promise<void> {
+  const existing = await page.request.get(`/api/decision/definitions/${DECISION_CODE}`);
+  const existingBody = (await existing.json().catch(() => null)) as ApiEnvelope<unknown> | null;
+  if (!existing.ok() || !isApiSuccess(existingBody)) {
+    await readApi(
+      await page.request.post('/api/decision/definitions', {
+        data: {
+          decisionCode: DECISION_CODE,
+          decisionName: 'Approval Routing',
+          description: 'Automation rule-binding golden fixture',
+          scopeType: 'AUTOMATION',
+          ownerModule: 'decision',
+          enabled: true,
+        },
+      }),
+    );
+  }
+
+  await readApi(await page.request.get(`/api/decision/definitions/${DECISION_CODE}/versions`));
+}
+
 async function openNewDesigner(page: Page): Promise<void> {
   await page.goto(DESIGNER_NEW, { waitUntil: 'domcontentloaded' });
   await page
@@ -75,6 +124,7 @@ test('Automation trigger property panel hosts the rule center binding editor and
 }, testInfo) => {
   const resolvedBaseURL = baseURL ?? 'http://127.0.0.1:5212';
   await loginAsAdmin(page, resolvedBaseURL);
+  await ensureApprovalRoutingDecision(page);
   await openNewDesigner(page);
 
   const name = `Rule binding host ${uniqueId()}`;
@@ -120,7 +170,7 @@ test('Automation trigger property panel hosts the rule center binding editor and
       bindingKind: 'DECISION_REF',
       enabled: true,
       decisionBinding: {
-        decisionCode: 'approval_routing',
+        decisionCode: DECISION_CODE,
         versionPolicy: 'ROLLOUT',
         fallbackPolicy: { mode: 'FAIL_CLOSED' },
         enabled: true,
@@ -131,6 +181,36 @@ test('Automation trigger property panel hosts the rule center binding editor and
           },
         ],
       },
+    });
+
+    await readApi(await page.request.post('/api/decision/usage-index/rebuild'));
+    const impact = await readApi<any>(
+      await page.request.get(`/api/decision/definitions/${DECISION_CODE}/impact`),
+    );
+    const incoming = Array.isArray(impact?.incoming) ? impact.incoming : [];
+    expect(incoming).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceType: 'AUTOMATION',
+          sourcePid: pid,
+          binding: 'RULE_BINDING',
+        }),
+      ]),
+    );
+
+    await page.goto(`/p/decisionops_definitions/view/${encodeURIComponent(DECISION_CODE)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForDynamicPageLoad(page);
+    await expect(page.getByTestId('decision-definition-actions-block')).toBeVisible();
+    await expect(page.getByTestId('dda-impact-panel')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('impact-graph-panel')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('impact-incoming')).toContainText('AUTOMATION');
+    await expect(page.getByTestId('impact-incoming')).toContainText('RULE_BINDING');
+    await expect(page.getByTestId('impact-incoming')).toContainText(name);
+    await page.screenshot({
+      path: testInfo.outputPath('automation-rule-binding-impact-graph.png'),
+      fullPage: true,
     });
   } finally {
     await deleteViaApi(page, pid);

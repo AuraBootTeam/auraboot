@@ -22,8 +22,12 @@ import com.auraboot.framework.eventpolicy.mapper.DrtPolicyDefinitionMapper;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
+import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
+import com.auraboot.framework.rbac.entity.RolePermission;
+import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +53,8 @@ class DecisionUsageIndexServiceImplTest {
     private final DrtPolicyDefinitionMapper policyDefinitionMapper = mock(DrtPolicyDefinitionMapper.class);
     private final NamedQueryMapper namedQueryMapper = mock(NamedQueryMapper.class);
     private final BpmProcessDefinitionMapper bpmProcessDefinitionMapper = mock(BpmProcessDefinitionMapper.class);
+    private final RolePermissionMapper rolePermissionMapper = mock(RolePermissionMapper.class);
+    private final PermissionMapper permissionMapper = mock(PermissionMapper.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final DecisionUsageIndexServiceImpl service = new DecisionUsageIndexServiceImpl(
@@ -60,6 +66,8 @@ class DecisionUsageIndexServiceImplTest {
             policyDefinitionMapper,
             namedQueryMapper,
             bpmProcessDefinitionMapper,
+            rolePermissionMapper,
+            permissionMapper,
             objectMapper);
 
     @AfterEach
@@ -526,6 +534,74 @@ class DecisionUsageIndexServiceImplTest {
                     assertThat(ref.getMetadataJson().get("edgeId").asText()).isEqualTo("edge_high_amount");
                     assertThat(ref.getMetadataJson().get("sourceNodeId").asText()).isEqualTo("gateway_route");
                     assertThat(ref.getMetadataJson().get("targetNodeId").asText()).isEqualTo("task_assign");
+                });
+    }
+
+    @Test
+    void rebuildIndexesPermissionPolicyDecisionAndFieldRefs() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        when(versionMapper.selectList(any())).thenReturn(List.of());
+        when(automationMapper.selectList(any())).thenReturn(List.of());
+        when(slaConfigMapper.selectList(any())).thenReturn(List.of());
+        when(policyVersionMapper.selectList(any())).thenReturn(List.of());
+        when(namedQueryMapper.selectList(any())).thenReturn(List.of());
+        when(bpmProcessDefinitionMapper.selectList(any())).thenReturn(List.of());
+
+        RolePermission rolePermission = new RolePermission();
+        rolePermission.setPid("rp-abac-1");
+        rolePermission.setTenantId(10L);
+        rolePermission.setRoleId(700L);
+        rolePermission.setPermissionId(500L);
+        rolePermission.setGrantType("grant");
+        rolePermission.setStatus("active");
+        rolePermission.setDeletedFlag(false);
+        rolePermission.setConditions(Map.of(
+                "dynamicAbac", Map.of(
+                        "decisionBinding", Map.of(
+                                "decisionCode", "permission_amount_guard",
+                                "versionPolicy", "LATEST_PUBLISHED",
+                                "inputMappings", List.of(Map.of(
+                                        "input", "amount",
+                                        "source", Map.of(
+                                                "kind", "field",
+                                                "scope", "record",
+                                                "path", "amount")))))));
+        when(rolePermissionMapper.selectList(any())).thenReturn(List.of(rolePermission));
+
+        Permission permission = new Permission();
+        permission.setId(500L);
+        permission.setCode("model.invoice.approve");
+        permission.setName("Approve Invoice");
+        permission.setResourceType("model");
+        permission.setResourceCode("invoice");
+        permission.setAction("approve");
+        when(permissionMapper.selectById(500L)).thenReturn(permission);
+
+        DecisionUsageIndexRebuildDTO summary = service.rebuild();
+
+        ArgumentCaptor<DecisionUsageRefEntity> captor = ArgumentCaptor.forClass(DecisionUsageRefEntity.class);
+        verify(usageRefMapper).deleteByTenant(10L);
+        verify(usageRefMapper, times(2)).insert(captor.capture());
+        assertThat(summary.getConsumerRefs()).isEqualTo(1);
+        assertThat(summary.getFieldRefs()).isEqualTo(1);
+        assertThat(captor.getAllValues())
+                .extracting(DecisionUsageRefEntity::getSourceType, DecisionUsageRefEntity::getSourceCode,
+                        DecisionUsageRefEntity::getSourcePid, DecisionUsageRefEntity::getTargetType,
+                        DecisionUsageRefEntity::getTargetCode, DecisionUsageRefEntity::getTargetPath,
+                        DecisionUsageRefEntity::getBinding)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(
+                                "PERMISSION_POLICY", "model.invoice.approve", "rp-abac-1",
+                                "DECISION", "permission_amount_guard", null, "ROLE_PERMISSION_CONDITION"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "PERMISSION_POLICY", "model.invoice.approve", "rp-abac-1",
+                                "FIELD", null, "record.amount", "ROLE_PERMISSION_CONDITION"));
+        assertThat(captor.getAllValues())
+                .allSatisfy(ref -> {
+                    assertThat(ref.getMetadataJson().get("permissionCode").asText())
+                            .isEqualTo("model.invoice.approve");
+                    assertThat(ref.getMetadataJson().get("roleId").asLong()).isEqualTo(700L);
+                    assertThat(ref.getMetadataJson().get("sourceName").asText()).isEqualTo("Approve Invoice");
                 });
     }
 }

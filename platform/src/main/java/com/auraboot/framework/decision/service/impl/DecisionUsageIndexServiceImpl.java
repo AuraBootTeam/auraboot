@@ -25,8 +25,12 @@ import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
+import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
+import com.auraboot.framework.rbac.entity.RolePermission;
+import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -56,7 +60,8 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     private static final Set<String> INDEXABLE_VERSION_STATUSES = Set.of(
             "VALIDATED", "PENDING_APPROVAL", "PUBLISHED", "DEPRECATED");
     private static final Set<String> SUPPORTED_SOURCE_TYPES = Set.of(
-            "DECISION_VERSION", "AUTOMATION", "SLA_RULE", "EVENT_POLICY", "NAMED_QUERY", "BPM_PROCESS");
+            "DECISION_VERSION", "AUTOMATION", "SLA_RULE", "EVENT_POLICY", "NAMED_QUERY",
+            "BPM_PROCESS", "PERMISSION_POLICY");
 
     private final DecisionUsageRefMapper usageRefMapper;
     private final DrtVersionMapper versionMapper;
@@ -66,6 +71,8 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     private final DrtPolicyDefinitionMapper policyDefinitionMapper;
     private final NamedQueryMapper namedQueryMapper;
     private final BpmProcessDefinitionMapper bpmProcessDefinitionMapper;
+    private final RolePermissionMapper rolePermissionMapper;
+    private final PermissionMapper permissionMapper;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -81,6 +88,7 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         refs.addAll(scanEventPolicies(tenantId));
         refs.addAll(scanNamedQueries(tenantId));
         refs.addAll(scanBpmProcesses(tenantId));
+        refs.addAll(scanPermissionPolicies(tenantId));
 
         return insertRefs(tenantId, refs);
     }
@@ -104,6 +112,7 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
             case "EVENT_POLICY" -> refreshEventPolicyVersion(tenantId, sourcePid);
             case "NAMED_QUERY" -> refreshNamedQuery(tenantId, sourcePid);
             case "BPM_PROCESS" -> refreshBpmProcess(tenantId, sourcePid);
+            case "PERMISSION_POLICY" -> refreshPermissionPolicy(tenantId, sourcePid);
             default -> throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Unsupported usage-index source type: " + sourceType);
         };
@@ -198,6 +207,20 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
 
         usageRefMapper.deleteBySource(tenantId, "BPM_PROCESS", processPid);
         return insertRefs(tenantId, refsForBpmProcess(tenantId, process));
+    }
+
+    private DecisionUsageIndexRebuildDTO refreshPermissionPolicy(Long tenantId, String rolePermissionPid) {
+        RolePermission rolePermission = rolePermissionMapper.selectOne(new LambdaQueryWrapper<RolePermission>()
+                .eq(RolePermission::getTenantId, tenantId)
+                .eq(RolePermission::getPid, rolePermissionPid)
+                .eq(RolePermission::getDeletedFlag, false));
+        if (rolePermission == null) {
+            throw new ValidationException(ResponseCode.NOT_FOUND,
+                    "Permission policy source not found: " + rolePermissionPid);
+        }
+
+        usageRefMapper.deleteBySource(tenantId, "PERMISSION_POLICY", rolePermissionPid);
+        return insertRefs(tenantId, refsForPermissionPolicy(tenantId, rolePermission));
     }
 
     @Override
@@ -452,6 +475,56 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
                 .toList();
     }
 
+    private List<DecisionUsageRefEntity> scanPermissionPolicies(Long tenantId) {
+        List<RolePermission> rolePermissions = rolePermissionMapper.selectList(new LambdaQueryWrapper<RolePermission>()
+                .eq(RolePermission::getTenantId, tenantId)
+                .eq(RolePermission::getDeletedFlag, false)
+                .eq(RolePermission::getStatus, "active")
+                .isNotNull(RolePermission::getConditions));
+        if (rolePermissions == null || rolePermissions.isEmpty()) {
+            return List.of();
+        }
+        return rolePermissions.stream()
+                .flatMap(rolePermission -> refsForPermissionPolicy(tenantId, rolePermission).stream())
+                .toList();
+    }
+
+    private List<DecisionUsageRefEntity> refsForPermissionPolicy(Long tenantId, RolePermission rolePermission) {
+        JsonNode conditions = toJsonNode(rolePermission.getConditions());
+        RuleReferenceSet ruleRefs = RuleReferenceCollector.collect(conditions);
+        if (ruleRefs.decisionRefs().isEmpty() && ruleRefs.fieldRefs().isEmpty()) {
+            return List.of();
+        }
+
+        Permission permission = rolePermission.getPermissionId() == null
+                ? null
+                : permissionMapper.selectById(rolePermission.getPermissionId());
+        String permissionCode = permission != null && !nullToBlank(permission.getCode()).isBlank()
+                ? permission.getCode()
+                : "permission:" + rolePermission.getPermissionId();
+        Map<String, Object> baseMetadata = metadata(
+                "sourceName", permission != null ? permission.getName() : permissionCode,
+                "permissionCode", permissionCode,
+                "permissionName", permission != null ? permission.getName() : null,
+                "resourceType", permission != null ? permission.getResourceType() : null,
+                "resourceCode", permission != null ? permission.getResourceCode() : null,
+                "action", permission != null ? permission.getAction() : null,
+                "roleId", rolePermission.getRoleId(),
+                "grantType", rolePermission.getGrantType(),
+                "status", rolePermission.getStatus());
+
+        List<DecisionUsageRefEntity> refs = new ArrayList<>();
+        for (String decisionRef : ruleRefs.decisionRefs()) {
+            refs.add(ref(tenantId, "PERMISSION_POLICY", permissionCode, null, rolePermission.getPid(),
+                    "DECISION", decisionRef, null, "ROLE_PERMISSION_CONDITION", baseMetadata));
+        }
+        for (String fieldRef : ruleRefs.fieldRefs()) {
+            refs.add(ref(tenantId, "PERMISSION_POLICY", permissionCode, null, rolePermission.getPid(),
+                    "FIELD", null, fieldRef, "ROLE_PERMISSION_CONDITION", baseMetadata));
+        }
+        return refs;
+    }
+
     private List<DecisionUsageRefEntity> refsForBpmProcess(Long tenantId, BpmProcessDefinition process) {
         List<DecisionUsageRefEntity> refs = new ArrayList<>();
         JsonNode designerRoot = parseDesignerJson(process);
@@ -568,6 +641,23 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         } catch (Exception e) {
             log.warn("Failed to parse BPM designerJson for usage-index: processKey={}, pid={}, error={}",
                     process.getProcessKey(), process.getPid(), e.getMessage());
+            return null;
+        }
+    }
+
+    private JsonNode toJsonNode(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof JsonNode node) {
+            return node;
+        }
+        try {
+            return value instanceof String text
+                    ? objectMapper.readTree(text)
+                    : objectMapper.valueToTree(value);
+        } catch (Exception e) {
+            log.warn("Failed to parse permission policy conditions for usage-index: error={}", e.getMessage());
             return null;
         }
     }

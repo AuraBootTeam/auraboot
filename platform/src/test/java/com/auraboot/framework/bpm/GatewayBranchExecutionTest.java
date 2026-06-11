@@ -5,6 +5,12 @@ import com.auraboot.framework.bpm.dto.ProcessInstanceStatusDTO;
 import com.auraboot.framework.bpm.service.ProcessDeploymentService;
 import com.auraboot.framework.bpm.service.ProcessEngineService;
 import com.auraboot.framework.bpm.service.TaskService;
+import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
+import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
+import com.auraboot.framework.decision.dto.DrtVersionDTO;
+import com.auraboot.framework.decision.model.DecisionValidateResult;
+import com.auraboot.framework.decision.service.DecisionVersionService;
+import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.smart.framework.engine.SmartEngine;
@@ -12,6 +18,7 @@ import com.auraboot.smart.framework.engine.model.instance.InstanceStatus;
 import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.smart.framework.engine.model.instance.TaskInstance;
 import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,6 +60,14 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
 
     @Autowired
     private SmartEngine smartEngine;
+
+    @Autowired
+    private DrtDefinitionService definitionService;
+
+    @Autowired
+    private DecisionVersionService versionService;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * Bypass {@link TaskService#completeTask} which requires a Spring Security user
@@ -108,12 +123,80 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
             </definitions>
             """;
 
+    private static final String RULE_BOUND_GATEWAY_BPMN = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                         xmlns:smart="http://smartengine.org/schema/process"
+                         targetNamespace="http://auraboot.com/bpm">
+              <process id="%s" name="Rule Bound Gateway" isExecutable="true">
+                <startEvent id="start"/>
+                <sequenceFlow id="f_start_submit" sourceRef="start" targetRef="submit"/>
+                <userTask id="submit" name="Submit"
+                          smart:assigneeType="user" smart:assigneeId="testuser1"/>
+                <sequenceFlow id="f_submit_gw" sourceRef="submit" targetRef="gw"/>
+
+                <exclusiveGateway id="gw">
+                  <extensionElements>
+                    <smart:properties>
+                      <smart:property name="aura.ruleBinding" value="%s"/>
+                    </smart:properties>
+                  </extensionElements>
+                </exclusiveGateway>
+
+                <sequenceFlow id="f_gw_director" sourceRef="gw" targetRef="director">
+                  <conditionExpression xsi:type="tFormalExpression"><![CDATA[approvalRoute == "director"]]></conditionExpression>
+                </sequenceFlow>
+                <sequenceFlow id="f_gw_manager" sourceRef="gw" targetRef="manager">
+                  <conditionExpression xsi:type="tFormalExpression"><![CDATA[approvalRoute == "manager"]]></conditionExpression>
+                </sequenceFlow>
+
+                <userTask id="director" name="Director Approval"
+                          smart:assigneeType="user" smart:assigneeId="testuser1"/>
+                <sequenceFlow id="f_director_end" sourceRef="director" targetRef="end"/>
+
+                <userTask id="manager" name="Manager Approval"
+                          smart:assigneeType="user" smart:assigneeId="testuser1"/>
+                <sequenceFlow id="f_manager_end" sourceRef="manager" targetRef="end"/>
+
+                <endEvent id="end"/>
+              </process>
+            </definitions>
+            """;
+
+    private static final String ROUTE_DECISION_TABLE = """
+            { "hitPolicy":"FIRST",
+              "inputs":[
+                {"id":"amount","label":"Amount","expr":{"type":"path","scope":"record","path":"data.amount","dataType":"decimal"}}],
+              "outputs":[{"id":"route","label":"Route","dataType":"string"}],
+              "rules":[
+                {"ruleId":"director-route","priority":20,
+                 "when":{"amount":{"operator":"GT","value":10000}},
+                 "then":{"route":"director"}}],
+              "defaultOutput":{"route":"manager"} }
+            """;
+
     private ProcessInstance deployAndStart(String suffix) {
         String key = "gwbranch-" + suffix + "-" + System.nanoTime();
         String bpmn = String.format(THREE_BRANCH_BPMN, key);
         ProcessDeploymentService.CreateProcessRequest req =
                 new ProcessDeploymentService.CreateProcessRequest(
                         key, "Three Branch " + suffix, "Branch coverage", "test",
+                        bpmn, null, null, null);
+        BpmProcessDefinition def = deploymentService.create(req);
+        deploymentService.deploy(def.getPid());
+
+        Map<String, Object> startVars = new HashMap<>();
+        startVars.put("_startUserId", MetaContext.getCurrentUserId() + "");
+        return processEngineService.startProcess(key, "BIZ-" + System.nanoTime(), startVars);
+    }
+
+    private ProcessInstance deployRuleBoundGatewayAndStart(String suffix, String decisionCode) throws Exception {
+        String key = "gw-rule-binding-" + suffix + "-" + System.nanoTime();
+        String bpmn = String.format(RULE_BOUND_GATEWAY_BPMN, key, xmlAttr(ruleBindingJson(key, decisionCode)));
+        ProcessDeploymentService.CreateProcessRequest req =
+                new ProcessDeploymentService.CreateProcessRequest(
+                        key, "Rule Bound Gateway " + suffix, "Rule center runtime branch coverage", "test",
                         bpmn, null, null, null);
         BpmProcessDefinition def = deploymentService.create(req);
         deploymentService.deploy(def.getPid());
@@ -161,6 +244,93 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
         return reloaded.getStatus();
     }
 
+    private InstanceStatus driveRuleBoundGateway(
+            String suffix,
+            String decisionCode,
+            Object amount,
+            String expectedBranchTaskId) throws Exception {
+        ProcessInstance instance = deployRuleBoundGatewayAndStart(suffix, decisionCode);
+        assertThat(instance).isNotNull();
+
+        TaskInstance submit = currentTask(instance.getInstanceId());
+        assertThat(submit.getProcessDefinitionActivityId()).isEqualTo("submit");
+
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("amount", amount);
+        completeTaskDirect(submit.getInstanceId(), vars);
+
+        TaskInstance branchTask = currentTask(instance.getInstanceId());
+        assertThat(branchTask.getProcessDefinitionActivityId())
+                .as("Rule-bound routed branch for amount=%s", amount)
+                .isEqualTo(expectedBranchTaskId);
+
+        completeTaskDirect(branchTask.getInstanceId(), new HashMap<>());
+
+        ProcessInstanceStatusDTO status = processEngineService.getProcessInstanceStatus(instance.getInstanceId());
+        assertThat(status.status()).as("Final status for rule-bound branch %s", expectedBranchTaskId)
+                .isEqualTo("completed");
+        assertThat(status.currentNodes()).as("No active nodes after completion").isEmpty();
+
+        ProcessInstance reloaded = processEngineService.getProcessInstance(instance.getInstanceId());
+        return reloaded.getStatus();
+    }
+
+    private String publishRouteDecision() throws Exception {
+        String code = "it_bpm_route_" + System.nanoTime();
+        DrtDefinitionCreateRequest def = new DrtDefinitionCreateRequest();
+        def.setDecisionCode(code);
+        def.setDecisionName("IT BPM Route");
+        def.setScopeType("BPM");
+        def.setOwnerModule("bpm");
+        definitionService.create(def);
+
+        DrtVersionCreateRequest ver = new DrtVersionCreateRequest();
+        ver.setKind("DECISION_TABLE");
+        ver.setRuntimeAdapter("PLATFORM_DECISION_TABLE");
+        ver.setContentJson(objectMapper.readTree(ROUTE_DECISION_TABLE));
+        DrtVersionDTO draft = versionService.createDraft(code, ver);
+
+        DecisionValidateResult validation = versionService.validate(draft.getPid());
+        assertThat(validation.valid()).isTrue();
+        assertThat(validation.fieldRefs()).contains("record.data.amount");
+        versionService.publish(draft.getPid());
+        return code;
+    }
+
+    private String ruleBindingJson(String processKey, String decisionCode) throws Exception {
+        return objectMapper.writeValueAsString(Map.of(
+                "consumerType", "BPM",
+                "consumerCode", processKey,
+                "consumerNodeId", "gw",
+                "bindingKind", "DECISION_REF",
+                "decisionBinding", Map.of(
+                        "decisionCode", decisionCode,
+                        "versionPolicy", "LATEST_PUBLISHED",
+                        "inputMappings", List.of(Map.of(
+                                "input", "amount",
+                                "source", Map.of(
+                                        "kind", "FIELD",
+                                        "scope", "record",
+                                        "path", "amount"))),
+                        "outputMappings", List.of(Map.of(
+                                "output", "route",
+                                "target", Map.of(
+                                        "kind", "PROCESS_VARIABLE",
+                                        "path", "approvalRoute"))),
+                        "fallbackPolicy", Map.of("mode", "FAIL_CLOSED"),
+                        "traceMode", "ALWAYS",
+                        "enabled", true),
+                "enabled", true));
+    }
+
+    private String xmlAttr(String value) {
+        return value
+                .replace("&", "&amp;")
+                .replace("\"", "&quot;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
+    }
+
     @Test
     @DisplayName("amount=60000 routes to high branch and completes")
     void highBranchReachesEnd() {
@@ -180,6 +350,18 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
     void defaultBranchReachesEnd() {
         InstanceStatus status = driveBranch("default", 500, "auto");
         assertThat(status).isEqualTo(InstanceStatus.completed);
+    }
+
+    @Test
+    @DisplayName("gateway aura.ruleBinding evaluates published decision and routes branches")
+    void ruleBindingGatewayEvaluatesDecisionBeforeSequenceFlow() throws Exception {
+        String decisionCode = publishRouteDecision();
+
+        InstanceStatus director = driveRuleBoundGateway("director", decisionCode, 20000, "director");
+        assertThat(director).isEqualTo(InstanceStatus.completed);
+
+        InstanceStatus manager = driveRuleBoundGateway("manager", decisionCode, 500, "manager");
+        assertThat(manager).isEqualTo(InstanceStatus.completed);
     }
 
     @Test
