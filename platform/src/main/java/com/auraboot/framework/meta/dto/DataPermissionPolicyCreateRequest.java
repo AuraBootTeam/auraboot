@@ -42,9 +42,18 @@ public class DataPermissionPolicyCreateRequest {
      * Expression for scope configuration.
      * For DEPARTMENT/DEPARTMENT_TREE: "targetField:deptModelCode:parentField"
      * For PROJECT: field name containing project reference (default: "project_pid")
-     * For CUSTOM: SQL WHERE fragment with #userId/#tenantId variables
+     * For CUSTOM (legacy): SQL WHERE fragment with #userId/#tenantId variables. Prefer {@link #conditionAst}.
      */
     private String scopeExpression;
+
+    /**
+     * Structured condition AST (decision {@code ConditionNode} JSON) for CUSTOM row scope.
+     * Compiled to a safe SQL WHERE fragment by {@code ConditionToSqlBuilder}. Record columns are
+     * referenced via {@code record} scope (e.g. path {@code data.region}); the requesting user is
+     * available via {@code actor} scope ({@code actor.id} / {@code actor.memberId}).
+     * Takes precedence over {@link #scopeExpression} when present.
+     */
+    private Object conditionAst;
 
     /**
      * Target field code. Required when policyType = COLUMN.

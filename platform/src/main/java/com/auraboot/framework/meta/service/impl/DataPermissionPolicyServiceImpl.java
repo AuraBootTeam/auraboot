@@ -51,6 +51,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
         entity.setPolicyType(request.getPolicyType());
         entity.setScopeType(request.getScopeType());
         entity.setScopeExpression(request.getScopeExpression());
+        entity.setConditionAst(request.getConditionAst());
         entity.setFieldCode(request.getFieldCode());
         entity.setMaskType(request.getMaskType());
         entity.setMaskExpression(request.getMaskExpression());
@@ -100,6 +101,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
         existing.setPolicyType(request.getPolicyType());
         existing.setScopeType(request.getScopeType());
         existing.setScopeExpression(request.getScopeExpression());
+        existing.setConditionAst(request.getConditionAst());
         existing.setFieldCode(request.getFieldCode());
         existing.setMaskType(request.getMaskType());
         existing.setMaskExpression(request.getMaskExpression());

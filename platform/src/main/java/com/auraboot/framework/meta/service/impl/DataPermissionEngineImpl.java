@@ -1,5 +1,12 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.decision.ast.ConditionAstEvaluator;
+import com.auraboot.framework.decision.ast.ConditionNode;
+import com.auraboot.framework.decision.ast.ConditionToSqlBuilder;
+import com.auraboot.framework.decision.ast.DecisionContext;
+import com.auraboot.framework.decision.ast.EvalTrace;
+import com.auraboot.framework.decision.ast.Scope;
+import com.auraboot.framework.decision.ast.Truth;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.dto.FieldMaskRule;
 import com.auraboot.framework.meta.entity.DataPermissionPolicy;
@@ -8,6 +15,7 @@ import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -33,7 +41,9 @@ import java.util.stream.Collectors;
  *   <li>DEPARTMENT - created_by IN users of same department</li>
  *   <li>DEPARTMENT_TREE - created_by IN users of department + all sub-departments</li>
  *   <li>PROJECT - records within user's project bindings</li>
- *   <li>CUSTOM - custom SQL expression with variable substitution</li>
+ *   <li>CUSTOM - a structured condition AST ({@code condition_ast}) compiled to SQL by the
+ *       allowlist {@link com.auraboot.framework.decision.ast.ConditionToSqlBuilder}; legacy
+ *       policies may still carry a free-form {@code scope_expression} (deprecated)</li>
  * </ul>
  *
  * <p>When multiple ROW policies apply to the same user/model, they are
@@ -79,6 +89,11 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
 
     private final DataPermissionPolicyMapper policyMapper;
     private final DataScopeEvaluator dataScopeEvaluator;
+    private final ObjectMapper objectMapper;
+
+    // Stateless compilers/evaluators for AST-based custom scopes (B2). Not Spring beans — pure.
+    private final ConditionToSqlBuilder conditionToSqlBuilder = new ConditionToSqlBuilder();
+    private final ConditionAstEvaluator astEvaluator = new ConditionAstEvaluator();
 
     // ==================== Row-Level Filtering ====================
 
@@ -480,10 +495,63 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     }
 
     /**
-     * Build custom SQL expression-based row filter.
-     * Supports variable substitution: #userId, #user.id, #tenantId.
+     * Build custom row filter.
+     *
+     * <p>Preferred path (B2): a structured {@code condition_ast} compiled by the allowlist
+     * {@link ConditionToSqlBuilder} (validated identifiers + escaped/typed literals + whitelisted
+     * operators). Falls back to the legacy free-form {@code scope_expression} (deprecated blocklist
+     * path) only when no AST is configured.
      */
     private String buildCustomFilter(DataPermissionPolicy policy, Long userId) {
+        if (policy.getConditionAst() != null) {
+            return buildAstRowFilter(policy, userId);
+        }
+        return buildLegacyExpressionFilter(policy, userId);
+    }
+
+    /**
+     * Compile a structured {@code condition_ast} to a safe SQL WHERE fragment. Any node that cannot
+     * be safely translated (or an unparseable AST) fails closed to {@code 1=0}.
+     */
+    private String buildAstRowFilter(DataPermissionPolicy policy, Long userId) {
+        ConditionNode ast = parseConditionAst(policy);
+        if (ast == null) {
+            return "1=0";
+        }
+        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
+        ConditionToSqlBuilder.Bindings bindings = new ConditionToSqlBuilder.Bindings() {
+            @Override
+            public String column(String recordPath) {
+                String col = recordPath.startsWith("data.") ? recordPath.substring("data.".length()) : recordPath;
+                return SqlSafetyUtils.isValidIdentifier(col) ? col : null;
+            }
+
+            @Override
+            public Object resolve(Scope scope, String path) {
+                return switch (scope) {
+                    case ACTOR -> switch (path) {
+                        case "id", "userId" -> userId;
+                        case "memberId" -> memberId;
+                        default -> null;
+                    };
+                    case TENANT -> "id".equals(path) ? policy.getTenantId() : null;
+                    default -> null;
+                };
+            }
+        };
+        try {
+            return conditionToSqlBuilder.toSql(ast, bindings);
+        } catch (ConditionToSqlBuilder.RejectedConditionException e) {
+            log.warn("Rejected CUSTOM condition_ast for policy pid={}: {}", policy.getPid(), e.getMessage());
+            return "1=0";
+        }
+    }
+
+    /**
+     * Legacy free-form SQL expression with variable substitution (#userId, #user.id, #tenantId).
+     * Deprecated in favour of {@code condition_ast}; retained for policies authored before B2.
+     */
+    private String buildLegacyExpressionFilter(DataPermissionPolicy policy, Long userId) {
         String expr = policy.getScopeExpression();
         if (expr == null || expr.isBlank()) {
             return "";
@@ -504,6 +572,30 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         }
 
         return resolved;
+    }
+
+    /**
+     * Parse a policy's stored {@code condition_ast} into a {@link ConditionNode}. The value may be a
+     * raw JSON {@code String} (custom mapper {@code @Select} queries that bypass the entity's
+     * JacksonTypeHandler) or an already-parsed map (BaseMapper reads) — both are handled. A malformed
+     * AST yields {@code null} (caller denies) rather than throwing out of the hot path.
+     */
+    private ConditionNode parseConditionAst(DataPermissionPolicy policy) {
+        Object raw = policy.getConditionAst();
+        if (raw == null) {
+            return null;
+        }
+        try {
+            if (raw instanceof String s) {
+                return s.isBlank() ? null : objectMapper.readValue(s, ConditionNode.class);
+            }
+            return objectMapper.convertValue(raw, ConditionNode.class);
+        } catch (Exception e) {
+            // CATCH: read-side conversion of stored AST; a malformed AST must not throw out of the
+            // filter path — it is surfaced as a fail-closed deny by the caller.
+            log.warn("Failed to parse condition_ast for policy pid={}: {}", policy.getPid(), e.getMessage());
+            return null;
+        }
     }
 
     // ==================== Private: Post-Query Record Matching ====================
@@ -535,15 +627,44 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
                 return matchesSelf(userId, record);
 
             case "custom":
-                // Custom expressions cannot be reliably evaluated post-query.
-                // Fall back to created_by check as safety measure.
-                log.debug("CUSTOM scope not supported for post-query filtering, falling back to SELF");
-                return matchesSelf(userId, record);
+                return matchesCustom(policy, userId, record);
 
             default:
                 log.warn("Unknown scope type for record matching: {}", scopeType);
                 return false;
         }
+    }
+
+    /**
+     * Post-query evaluation of a CUSTOM scope. When a structured {@code condition_ast} is configured
+     * (B2) it is evaluated in-memory against the record under the same three-valued logic as the SQL
+     * path (only TRUE matches; UNKNOWN/FALSE deny). A legacy free-form SQL expression cannot be
+     * evaluated in-memory and falls back to a SELF check (safe default).
+     */
+    private boolean matchesCustom(DataPermissionPolicy policy, Long userId, Map<String, Object> record) {
+        if (policy.getConditionAst() == null) {
+            log.debug("Legacy CUSTOM expression not evaluable post-query, falling back to SELF for policy pid={}",
+                    policy.getPid());
+            return matchesSelf(userId, record);
+        }
+        ConditionNode ast = parseConditionAst(policy);
+        if (ast == null) {
+            return false; // unparseable → deny
+        }
+        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
+        Map<String, Object> actor = new HashMap<>();
+        actor.put("id", userId);
+        actor.put("userId", userId);
+        if (memberId != null) {
+            actor.put("memberId", memberId);
+        }
+        DecisionContext ctx = DecisionContext.builder()
+                .record(record)
+                .put(Scope.ACTOR, actor)
+                .put(Scope.TENANT, Map.of("id", policy.getTenantId()))
+                .build();
+        EvalTrace trace = astEvaluator.evaluate(ast, ctx);
+        return trace.result() == Truth.TRUE;
     }
 
     /**
