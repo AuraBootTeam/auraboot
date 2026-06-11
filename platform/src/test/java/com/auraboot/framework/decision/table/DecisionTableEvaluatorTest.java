@@ -176,4 +176,24 @@ class DecisionTableEvaluatorTest {
         assertThat(r.matchedRuleId()).isEqualTo("feel-row");
         assertThat(r.outputs()).containsEntry("route", "director");
     }
+
+    @Test
+    void feelCellTextSupportsDateComparisons() {
+        DecisionTable t = new DecisionTable(HitPolicy.FIRST,
+                List.of(input("submittedOn", "submittedOn", DataType.DATE)),
+                List.of(new DecisionTable.Output("route", "Route", DataType.STRING)),
+                List.of(new DecisionTable.Rule("recent", 10,
+                        Map.of("submittedOn", new DecisionTable.Cell(null, null, ">= 2026-06-01")),
+                        Map.of("route", "recent"))),
+                Map.of());
+
+        DecisionContext context = DecisionContext.builder()
+                .record(Map.of("submittedOn", "2026-06-15"))
+                .build();
+        DecisionTableEvaluator.Result r = evaluator.evaluate(t, context);
+
+        assertThat(r.status()).isEqualTo(DecisionStatus.MATCHED);
+        assertThat(r.matchedRuleId()).isEqualTo("recent");
+        assertThat(r.outputs()).containsEntry("route", "recent");
+    }
 }

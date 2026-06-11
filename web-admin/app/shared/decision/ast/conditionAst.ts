@@ -100,6 +100,56 @@ function toNum(v: unknown): number | null {
   return null;
 }
 
+function parseDateOnly(value: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const [, y, m, d] = match;
+  const time = Date.UTC(Number(y), Number(m) - 1, Number(d));
+  return Number.isNaN(time) ? null : time;
+}
+
+function parseTimeOnly(value: string): number | null {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(value.trim());
+  if (!match) return null;
+  const [, hh, mm, ss = '0', ms = '0'] = match;
+  const h = Number(hh);
+  const m = Number(mm);
+  const s = Number(ss);
+  const milli = Number(ms.padEnd(3, '0'));
+  if (h > 23 || m > 59 || s > 59 || milli > 999) return null;
+  return (((h * 60) + m) * 60 + s) * 1000 + milli;
+}
+
+function parseIsoDuration(value: string): number | null {
+  const match = /^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i.exec(value.trim());
+  if (!match) return null;
+  const [, days = '0', hours = '0', minutes = '0', seconds = '0'] = match;
+  if ([days, hours, minutes, seconds].every((part) => part === '0')) return null;
+  const totalSeconds = Number(days) * 86400 + Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
+  return Number.isNaN(totalSeconds) ? null : totalSeconds * 1000;
+}
+
+function toOrderedValue(v: unknown, dt?: DataType): number | null {
+  if (!dt) return null;
+  if (dt === 'date') {
+    if (v instanceof Date) return Date.UTC(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate());
+    if (typeof v !== 'string') return null;
+    return parseDateOnly(v) ?? (Number.isNaN(Date.parse(v)) ? null : Date.parse(v));
+  }
+  if (dt === 'time') {
+    return typeof v === 'string' ? parseTimeOnly(v) : null;
+  }
+  if (dt === 'datetime') {
+    if (v instanceof Date) return v.getTime();
+    if (typeof v !== 'string') return null;
+    return parseDateOnly(v) ?? (Number.isNaN(Date.parse(v)) ? null : Date.parse(v));
+  }
+  if (dt === 'duration') {
+    return typeof v === 'string' ? parseIsoDuration(v) : null;
+  }
+  return null;
+}
+
 function asArray(v: unknown): unknown[] {
   if (Array.isArray(v)) return v;
   if (v === null || v === undefined) return [];
@@ -118,8 +168,17 @@ function valueEquals(left: unknown, right: unknown, dt?: DataType): boolean {
     const a = toNum(left); const b = toNum(right);
     return a !== null && b !== null && a === b;
   }
+  const orderedLeft = toOrderedValue(left, dt);
+  const orderedRight = toOrderedValue(right, dt);
+  if (orderedLeft !== null && orderedRight !== null) return orderedLeft === orderedRight;
   // enum/dict/etc compare by code (string), default case-sensitive string compare
   return String(left) === String(right);
+}
+
+function orderedCompare(left: unknown, right: unknown, dt: DataType | undefined, pred: (c: number) => boolean): Truth {
+  const a = toOrderedValue(left, dt); const b = toOrderedValue(right, dt);
+  if (a !== null && b !== null) return pred(a - b) ? 'TRUE' : 'FALSE';
+  return numericCompare(left, right, pred);
 }
 
 function numericCompare(left: unknown, right: unknown, pred: (c: number) => boolean): Truth {
@@ -153,16 +212,24 @@ function evalCompare(node: CompareNode, ctx: ScopedContext): Truth {
   switch (op) {
     case 'EQ': return bool(valueEquals(left.value, rv, dt));
     case 'NE': return bool(!valueEquals(left.value, rv, dt));
-    case 'GT': return numericCompare(left.value, rv, (c) => c > 0);
-    case 'GTE': return numericCompare(left.value, rv, (c) => c >= 0);
-    case 'LT': return numericCompare(left.value, rv, (c) => c < 0);
-    case 'LTE': return numericCompare(left.value, rv, (c) => c <= 0);
+    case 'GT': return orderedCompare(left.value, rv, dt, (c) => c > 0);
+    case 'GTE': return orderedCompare(left.value, rv, dt, (c) => c >= 0);
+    case 'LT': return orderedCompare(left.value, rv, dt, (c) => c < 0);
+    case 'LTE': return orderedCompare(left.value, rv, dt, (c) => c <= 0);
     case 'IN': return bool(asArray(rv).some((x) => valueEquals(left.value, x, dt)));
     case 'NOT_IN': return bool(!asArray(rv).some((x) => valueEquals(left.value, x, dt)));
     case 'BETWEEN': {
-      const arr = asArray(rv); const v = toNum(left.value);
+      const arr = asArray(rv);
+      if (arr.length !== 2) return 'UNKNOWN';
+      const ordered = toOrderedValue(left.value, dt);
+      const orderedLo = toOrderedValue(arr[0], dt);
+      const orderedHi = toOrderedValue(arr[1], dt);
+      if (ordered !== null && orderedLo !== null && orderedHi !== null) {
+        return bool(ordered >= orderedLo && ordered <= orderedHi);
+      }
+      const v = toNum(left.value);
       const lo = toNum(arr[0]); const hi = toNum(arr[1]);
-      if (v === null || lo === null || hi === null || arr.length !== 2) return 'UNKNOWN';
+      if (v === null || lo === null || hi === null) return 'UNKNOWN';
       return bool(v >= lo && v <= hi);
     }
     case 'CONTAINS_TEXT': return bool(String(left.value).includes(String(rv)));

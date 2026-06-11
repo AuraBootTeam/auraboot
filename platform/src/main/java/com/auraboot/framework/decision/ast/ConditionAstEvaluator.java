@@ -1,7 +1,17 @@
 package com.auraboot.framework.decision.ast;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 
@@ -107,13 +117,13 @@ public final class ConditionAstEvaluator {
         Truth r = switch (op) {
             case EQ -> Truth.of(valueEquals(left.value, rv, dt));
             case NE -> Truth.of(!valueEquals(left.value, rv, dt));
-            case GT -> numericCompare(left.value, rv, cmp -> cmp > 0);
-            case GTE -> numericCompare(left.value, rv, cmp -> cmp >= 0);
-            case LT -> numericCompare(left.value, rv, cmp -> cmp < 0);
-            case LTE -> numericCompare(left.value, rv, cmp -> cmp <= 0);
+            case GT -> orderedCompare(left.value, rv, dt, cmp -> cmp > 0);
+            case GTE -> orderedCompare(left.value, rv, dt, cmp -> cmp >= 0);
+            case LT -> orderedCompare(left.value, rv, dt, cmp -> cmp < 0);
+            case LTE -> orderedCompare(left.value, rv, dt, cmp -> cmp <= 0);
             case IN -> Truth.of(inSet(left.value, rv, dt));
             case NOT_IN -> Truth.of(!inSet(left.value, rv, dt));
-            case BETWEEN -> between(left.value, rv);
+            case BETWEEN -> between(left.value, rv, dt);
             case CONTAINS_TEXT -> Truth.of(String.valueOf(left.value).contains(String.valueOf(rv)));
             case STARTS_WITH -> Truth.of(String.valueOf(left.value).startsWith(String.valueOf(rv)));
             case ENDS_WITH -> Truth.of(String.valueOf(left.value).endsWith(String.valueOf(rv)));
@@ -184,6 +194,11 @@ public final class ConditionAstEvaluator {
         if (dt != null && dt.isCodeCompared()) {
             return Objects.equals(asCode(left), asCode(right));
         }
+        Comparable<?> a = toOrderedValue(left, dt);
+        Comparable<?> b = toOrderedValue(right, dt);
+        if (a != null && b != null) {
+            return compareOrdered(a, b) == 0;
+        }
         // default: case-sensitive, no trim
         return Objects.equals(String.valueOf(left), String.valueOf(right));
     }
@@ -201,10 +216,16 @@ public final class ConditionAstEvaluator {
         return false;
     }
 
-    private Truth between(Object left, Object right) {
+    private Truth between(Object left, Object right, DataType dt) {
         List<?> bounds = DecisionContext.asList(right);
         if (bounds.size() != 2) {
             return Truth.UNKNOWN;
+        }
+        Comparable<?> ordered = toOrderedValue(left, dt);
+        Comparable<?> loValue = toOrderedValue(bounds.get(0), dt);
+        Comparable<?> hiValue = toOrderedValue(bounds.get(1), dt);
+        if (ordered != null && loValue != null && hiValue != null) {
+            return Truth.of(compareOrdered(ordered, loValue) >= 0 && compareOrdered(ordered, hiValue) <= 0);
         }
         BigDecimal v = toBigDecimal(left);
         BigDecimal lo = toBigDecimal(bounds.get(0));
@@ -216,6 +237,15 @@ public final class ConditionAstEvaluator {
     }
 
     private interface CmpPredicate { boolean test(int cmp); }
+
+    private Truth orderedCompare(Object left, Object right, DataType dt, CmpPredicate predicate) {
+        Comparable<?> a = toOrderedValue(left, dt);
+        Comparable<?> b = toOrderedValue(right, dt);
+        if (a != null && b != null) {
+            return Truth.of(predicate.test(compareOrdered(a, b)));
+        }
+        return numericCompare(left, right, predicate);
+    }
 
     private Truth numericCompare(Object left, Object right, CmpPredicate predicate) {
         BigDecimal a = toBigDecimal(left);
@@ -267,6 +297,120 @@ public final class ConditionAstEvaluator {
             }
         }
         return null;
+    }
+
+    private static Comparable<?> toOrderedValue(Object v, DataType dt) {
+        if (v == null || dt == null) {
+            return null;
+        }
+        return switch (dt) {
+            case DATE -> toLocalDate(v);
+            case TIME -> toLocalTime(v);
+            case DATETIME -> toInstant(v);
+            case DURATION -> toDuration(v);
+            default -> null;
+        };
+    }
+
+    private static LocalDate toLocalDate(Object v) {
+        if (v instanceof LocalDate d) {
+            return d;
+        }
+        if (v instanceof LocalDateTime dt) {
+            return dt.toLocalDate();
+        }
+        if (v instanceof Instant i) {
+            return LocalDateTime.ofInstant(i, ZoneOffset.UTC).toLocalDate();
+        }
+        if (v instanceof Date d) {
+            return LocalDateTime.ofInstant(d.toInstant(), ZoneOffset.UTC).toLocalDate();
+        }
+        if (v instanceof String s && !s.isBlank()) {
+            try {
+                return LocalDate.parse(s.trim());
+            } catch (DateTimeParseException ignored) {
+                Instant instant = toInstant(s);
+                return instant == null ? null : LocalDateTime.ofInstant(instant, ZoneOffset.UTC).toLocalDate();
+            }
+        }
+        return null;
+    }
+
+    private static LocalTime toLocalTime(Object v) {
+        if (v instanceof LocalTime t) {
+            return t;
+        }
+        if (v instanceof String s && !s.isBlank()) {
+            try {
+                return LocalTime.parse(s.trim());
+            } catch (DateTimeParseException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static Instant toInstant(Object v) {
+        if (v instanceof Instant i) {
+            return i;
+        }
+        if (v instanceof Date d) {
+            return d.toInstant();
+        }
+        if (v instanceof LocalDateTime dt) {
+            return dt.toInstant(ZoneOffset.UTC);
+        }
+        if (v instanceof LocalDate d) {
+            return d.atStartOfDay().toInstant(ZoneOffset.UTC);
+        }
+        if (v instanceof String s && !s.isBlank()) {
+            String text = s.trim();
+            try {
+                return Instant.parse(text);
+            } catch (DateTimeParseException ignored) {
+                // Try the common non-Zoned JSON forms below.
+            }
+            try {
+                return OffsetDateTime.parse(text).toInstant();
+            } catch (DateTimeParseException ignored) {
+                // Try ZonedDateTime.
+            }
+            try {
+                return ZonedDateTime.parse(text).toInstant();
+            } catch (DateTimeParseException ignored) {
+                // Try LocalDateTime.
+            }
+            try {
+                return LocalDateTime.parse(text).toInstant(ZoneOffset.UTC);
+            } catch (DateTimeParseException ignored) {
+                // Try date-only as start of day.
+            }
+            try {
+                return LocalDate.parse(text).atStartOfDay().toInstant(ZoneOffset.UTC);
+            } catch (DateTimeParseException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static Duration toDuration(Object v) {
+        if (v instanceof Duration d) {
+            return d;
+        }
+        if (v instanceof String s && !s.isBlank()) {
+            try {
+                return Duration.parse(s.trim());
+            } catch (DateTimeParseException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private static int compareOrdered(Comparable left, Comparable right) {
+        return left.compareTo(right);
     }
 
     private static String asCode(Object v) {

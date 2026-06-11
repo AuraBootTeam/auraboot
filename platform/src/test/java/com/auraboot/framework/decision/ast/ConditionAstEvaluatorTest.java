@@ -87,6 +87,25 @@ class ConditionAstEvaluatorTest {
         assertThat(evaluator.evaluate(between, ctxOf(Map.of("amount", 9000))).result()).isEqualTo(Truth.FALSE);
     }
 
+    @Test
+    void dateAndDatetimeComparisonsUseIsoOrdering() {
+        var dateGte = cmp(recPath("submittedOn", DataType.DATE), Operator.GTE, lit("2026-06-01", DataType.DATE));
+        assertThat(evaluator.evaluate(dateGte, ctxOf(Map.of("submittedOn", "2026-06-15"))).result())
+                .isEqualTo(Truth.TRUE);
+        assertThat(evaluator.evaluate(dateGte, ctxOf(Map.of("submittedOn", "2026-05-31"))).result())
+                .isEqualTo(Truth.FALSE);
+
+        var dateBetween = cmp(recPath("submittedOn", DataType.DATE), Operator.BETWEEN,
+                lit(List.of("2026-06-01", "2026-06-30"), DataType.DATE));
+        assertThat(evaluator.evaluate(dateBetween, ctxOf(Map.of("submittedOn", "2026-06-15"))).result())
+                .isEqualTo(Truth.TRUE);
+
+        var datetimeLt = cmp(recPath("submittedAt", DataType.DATETIME), Operator.LT,
+                lit("2026-06-15T10:30:00Z", DataType.DATETIME));
+        assertThat(evaluator.evaluate(datetimeLt, ctxOf(Map.of("submittedAt", "2026-06-15T09:00:00Z"))).result())
+                .isEqualTo(Truth.TRUE);
+    }
+
     // ── sad ──────────────────────────────────────────────────────────────
 
     @Test

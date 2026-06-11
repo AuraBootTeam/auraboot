@@ -272,7 +272,8 @@ export function DecisionTableWorkbenchBlock({
   const refreshSavedVersion = useCallback(
     async (pid: string) => {
       const versions = await api.listVersions(decisionCode.trim());
-      const saved = versions.find((version) => version.pid === pid) ?? null;
+      const versionList = Array.isArray(versions) ? versions : [];
+      const saved = versionList.find((version) => version.pid === pid) ?? null;
       setLastVersion(saved);
       return saved;
     },

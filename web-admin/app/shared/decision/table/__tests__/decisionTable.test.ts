@@ -112,6 +112,26 @@ describe('evaluateTablePreview (mirrors backend §15)', () => {
       outputs: { route: 'director' },
     });
   });
+
+  it('FEEL cell text supports date comparisons', () => {
+    const t: DecisionTable = {
+      hitPolicy: 'FIRST',
+      inputs: [
+        { id: 'submittedOn', label: 'Submitted On', scope: 'record', path: 'data.submittedOn', dataType: 'date' },
+      ],
+      outputs: [{ id: 'route', label: 'Route', dataType: 'string' }],
+      rules: [{
+        ruleId: 'recent',
+        when: { submittedOn: { operator: 'EQ', value: '', feel: '>= 2026-06-01' } },
+        then: { route: 'recent' },
+      }],
+    };
+    expect(evaluateTablePreview(t, { record: { data: { submittedOn: '2026-06-15' } } })).toMatchObject({
+      status: 'MATCHED',
+      matchedRuleId: 'recent',
+      outputs: { route: 'recent' },
+    });
+  });
 });
 
 describe('validateTable', () => {
