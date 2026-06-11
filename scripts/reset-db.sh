@@ -12,7 +12,9 @@ SCHEMA_FILE="$PROJECT_ROOT/platform/src/main/resources/database/schema.sql"
 PG_HOST="${PG_HOST:-${PGHOST:-localhost}}"
 PG_PORT="${PG_PORT:-${PGPORT:-5432}}"
 PG_USER="${PG_USER:-${PGUSER:-${USER:-ghj}}}"
-PG_DB="${PG_DB:-${PGDATABASE:-aura_boot}}"
+# Honour dev.sh runtime POSTGRES_DB as a fallback — prevents a slot-scoped run
+# from silently dropping the shared aura_boot database (2026-06-11 incident).
+PG_DB="${PG_DB:-${PGDATABASE:-${POSTGRES_DB:-aura_boot}}}"
 PG_PASSWORD="${PG_PASSWORD:-${PGPASSWORD:-}}"
 
 psql_run() {
