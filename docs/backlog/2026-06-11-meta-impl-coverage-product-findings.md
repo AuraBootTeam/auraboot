@@ -88,6 +88,33 @@ the 11 public interface methods — dead code.
 - **Test impact:** `SchemaAccessProjectorImplIntegrationTest` reaches 57.2%
   line — the rest is the structurally-unreachable dead code above.
 
+## Wave 3 (2026-06-11) — fourth jsonb-typeHandler bug + repo-wide audit
+
+Wave 3 IT surfaced a **third** in-band-fixed instance of the same jsonb omission:
+`OtDevice.connectionConfig`/`dataMapping` + `OtDataLog.rawData`/`parsedData` lacked
+`JsonbStringTypeHandler` → `registerDevice`/`processDeviceData` 500'd on any non-null
+payload (fixed in #585). Three live instances in two days (EDI, QueryAuditLog, OtDevice),
+plus an independent fix by another session the same day (#586,
+`PlanService.loadPlanFromRun` PGobject jsonb return), make this a systemic pattern.
+
+**Repo-wide audit done** (resolve each entity `@TableName` → check that *own* table's
+column type; name-only matching has false positives — 33 raw candidates → 6 true → 4 were
+the OtDevice/OtDataLog ones fixed in #585). **Two latent instances remain** (no obvious
+non-null writer today, so not actively breaking — but a 500 time-bomb the moment the field
+is written non-null):
+
+| Entity | jsonb column | status |
+|---|---|---|
+| `rag/entity/KbChunk` | `ab_kb_chunk.metadata` | latent — RAG chunk metadata; fix + KbChunk-persistence IT |
+| `meta/entity/InvariantEvaluationLog` | `ab_invariant_evaluation_log.context_snapshot` | latent — invariant-engine eval log; fix + IT |
+
+**Fix recipe (mechanical, proven 3×):** add
+`@TableField(value = "<col>", typeHandler = com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler.class)`
+to the String field. Each fix should land with a regression IT (which also lifts that
+class's coverage — natural future-wave targets). **Worth promoting to canonical** (a
+`@TableField` String mapped to a jsonb column MUST declare the handler) + ideally a
+`check-*.sh` lint that resolves entity table/column types and flags missing handlers.
+
 ## Notes
 - `FieldForkServiceImpl` / `FieldImpactAnalysisServiceImpl` revealed only a
   docs gap, not a bug: `MetaFieldService.create` rejects `dataType` `"int"` /
