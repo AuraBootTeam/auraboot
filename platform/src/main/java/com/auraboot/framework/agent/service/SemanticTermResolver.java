@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.util.JsonbColumns;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
@@ -68,14 +69,20 @@ public class SemanticTermResolver {
             List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql, Map.of());
             for (Map<String, Object> row : rows) {
                 String term = (String) row.get("term");
-                Map<String, Object> resolution;
                 Object resObj = row.get("resolution");
-                if (resObj instanceof String s) {
-                    resolution = objectMapper.readValue(s, Map.class);
-                } else if (resObj instanceof Map<?, ?> m) {
+                // resolution is JSONB; via the generic query it comes back as a driver
+                // PGobject — the old `else { continue; }` silently dropped the term from
+                // the cache (degraded semantic resolution). JsonbColumns handles
+                // String / PGobject / Map uniformly.
+                Map<String, Object> resolution;
+                if (resObj instanceof Map<?, ?> m) {
                     resolution = (Map<String, Object>) m;
                 } else {
-                    continue;
+                    String json = JsonbColumns.toJsonText(resObj, objectMapper);
+                    if (json == null) {
+                        continue;
+                    }
+                    resolution = objectMapper.readValue(json, Map.class);
                 }
 
                 termCache.put(term, new ResolvedTerm(
