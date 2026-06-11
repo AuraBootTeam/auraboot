@@ -148,6 +148,22 @@ paths (`executeCustomAction` ~450 LOC, `saveWithRelations`, relation methods nee
 multi-model + action-definition setup). A big lift on this class is a separate, heavier
 slice. Additive isolated IT; gate stays 0.69.
 
+Follow-up (same day, 2 parallel sub-agents): `ReconciliationServiceIntegrationTest` (35
+tests) lifted `ReconciliationService` **0.2%→78.9%** (+ surfaced 4 real product bugs —
+`docs/backlog/2026-06-11-reconciliation-service-bugs.md`); `NamedQueryServiceImplIntegrationTest`
+(87 tests) lifted `NamedQueryServiceImpl` **47%→84.7%**. Parallel-dispatch discipline:
+shared-DB backend IT is safe to run 2-at-a-time *targeted* (~40 conns each, cap 2) but never
+full-suite concurrently; main loop verified (git branch --contains + independent serial re-run).
+
+**Ratchet bump (2026-06-11 consolidation full-suite run):** the 6 IT classes above lifted
+`meta/service/impl` **47.0%→56.1%** (~+1437 covered lines) and the gate-denominator bundle
+**70.2%→73.2%** (45356/61940). **BUNDLE LINE floor raised 0.69→0.71** (preserves the ~2pt
+flaky margin; full suite has run-to-run flake — failures varied 37→46 across runs, all
+pre-existing/unrelated to these IT, which were 0-failure in every run). Verified
+`:jacocoTestCoverageVerification` BUILD SUCCESSFUL on the full report. Next high-ROI
+meta/service/impl near-zero classes: `SecureQueryExecutorImpl` (16%), `QueryAuditServiceImpl`
+(8.5%), `EdiService` (0.3%), `SchemaAccessProjectorImpl` (0.4%), `DictCascade`-style wins.
+
 **Frontend** — wired in `web-admin/vitest.config.ts` `coverage.thresholds` (lines 19 /
 stmts 18 / funcs 16 / branches 16 today). Raise in lockstep with new tests.
 
