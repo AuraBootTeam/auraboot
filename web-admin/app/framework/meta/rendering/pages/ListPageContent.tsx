@@ -2210,8 +2210,6 @@ function ListPageContentInner(props: PageContentProps) {
       if (listExtensions?.disableRowClick) {
         return;
       }
-      const pid = record.pid as string | undefined;
-      if (!pid) return;
 
       const rowClickMode = resolveListRowClickMode({
         schemaDetailNavigation: (schema as any)?.options?.detailNavigation,
@@ -2223,16 +2221,22 @@ function ListPageContentInner(props: PageContentProps) {
         return;
       }
 
+      // A configured detailUrl template ({field} placeholders) is resolved BEFORE the pid guard
+      // so it works for records that have no pid (e.g. external-REST / aggregate list rows keyed
+      // by a numeric id). Pages without a detailUrl keep requiring a pid (unchanged behavior).
+      const detailUrl = (schema as any)?.options?.detailUrl || (tableBlock as any)?.detailUrl;
+      if (rowClickMode === 'detail' && detailUrl) {
+        const resolved = detailUrl.replace(/\{(\w+)\}/g, (_: string, key: string) =>
+          String(record[key] ?? ''),
+        );
+        navigate(resolved);
+        return;
+      }
+
+      const pid = record.pid as string | undefined;
+      if (!pid) return;
+
       if (rowClickMode === 'detail') {
-        // Support custom URL template with {field} placeholders
-        const detailUrl = (schema as any)?.options?.detailUrl || (tableBlock as any)?.detailUrl;
-        if (detailUrl) {
-          const resolved = detailUrl.replace(/\{(\w+)\}/g, (_: string, key: string) =>
-            String(record[key] ?? ''),
-          );
-          navigate(resolved);
-          return;
-        }
         // Resolve detail page key: check extension.relatedPages.detail first, then options.detailPageKey,
         // then fall back to the {tableName}/view/{pid} convention (which derives {tableName}_detail).
         const relatedDetailPageKey = (schema as any)?.extension?.relatedPages?.detail;
