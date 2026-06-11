@@ -48,7 +48,8 @@ public class KbChunk {
     @TableField("token_count")
     private Integer tokenCount;
 
-    @TableField("metadata")
+    @TableField(value = "metadata",
+            typeHandler = com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler.class)
     private String metadata;
 
     @TableField("embedding_status")

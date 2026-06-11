@@ -36,9 +36,16 @@ production too.
     The coverage IT seeds those non-null paths sparingly — a coverage gap, not a
     persistence bug.
 
-## Open — behavioral defects (NOT fixed; characterized in tests)
+## Behavioral defects (F1/F2 FIXED 2026-06-11; F3 confirmed dead code — won't implement)
 
-### F1 — `SecureQueryExecutorImpl.getQueryCache` throws on every cache miss
+> **Wiring note:** within OSS, no controller/service calls `SecureQueryExecutor` (only a
+> `PerformanceMonitoringAspect` pointcut + a comment reference) or `SchemaAccessProjector`
+> (zero references). They are framework/interface APIs. F1/F2 were still fixed because a
+> framework service should be correct for any (enterprise/plugin) consumer; F3's service is
+> unwired *and* implementing the stub would be building unused functionality, so it is left
+> dead and flagged for removal.
+
+### F1 — `SecureQueryExecutorImpl.getQueryCache` throws on every cache miss — **FIXED**
 `getQueryCache` is annotated `@Cacheable(value = "secureQuery", ...)` but its
 body is `return null;`. On a cache **miss** Spring invokes the method, gets
 `null`, and tries to store it; the `secureQuery` cache (Caffeine, see
@@ -47,13 +54,14 @@ body is `return null;`. On a cache **miss** Spring invokes the method, gets
 values but null was provided`. The cache read path is therefore unusable for
 the common (miss) case. `setQueryCache` is likewise a no-op (`@CachePut` is not
 wired; the body only logs). The query-result cache feature does not work.
-- **Fix direction:** either implement the cache properly (real get/put against
-  the `secureQuery` cache, or remove the `@Cacheable` and manage the cache
-  manually), or allow null values for this cache, or drop the dead caching API.
-- **Test impact:** `SecureQueryExecutorImplIntegrationTest` exercises
-  set/clearQueryCache but cannot assert a working get path.
+- **Fix applied:** removed `@Cacheable`; `getQueryCache`/`setQueryCache`/`clearQueryCache`
+  now access the `secureQuery` cache directly via the `CacheManager` (get/put/evict), keyed by
+  `generateCacheKey(request)`. This also fixes the self-invocation problem (the cache check at
+  `executeSecureQuery` is an internal call that bypassed the proxy entirely, so caching never
+  worked). A miss returns `null` cleanly. Regression: `cacheRoundTrip` / `getQueryCache_missReturnsNull`
+  / `clearQueryCache_evicts` in `SecureQueryExecutorImplIntegrationTest`.
 
-### F2 — `SecureQueryExecutorImpl.executeWithTimeout` loses thread-local context
+### F2 — `SecureQueryExecutorImpl.executeWithTimeout` loses thread-local context — **FIXED**
 `executeWithTimeout(supplier, timeoutMs, op)` runs the supplier via
 `CompletableFuture.supplyAsync(supplier)` on the common `ForkJoinPool`. That
 worker thread does not inherit `MetaContext` (tenant/user) or the security
@@ -61,14 +69,13 @@ context, so any query executed with a non-null positive `timeoutMs` throws
 `IllegalStateException: MetaContext not initialized` (or a permission failure)
 instead of timing out. Every secure-query path that passes a timeout is
 affected.
-- **Fix direction:** use a context-propagating executor (wrap the supplier to
-  copy `MetaContext` / `RequestContext` into the worker, or use a
-  `TaskDecorator`-style propagation), or enforce the timeout without handing the
-  work to a pool that lacks context.
-- **Test impact:** the IT sets `timeoutMs = null` to take the synchronous path;
-  the timeout branch is intentionally uncovered.
+- **Fix applied:** a `withMetaContext(supplier)` wrapper captures the caller thread's
+  `MetaContext` (tenant/user/userPid/username/roleIds + memberId + environmentId) and
+  re-establishes it on the worker thread, clearing it in a `finally`. Regression:
+  `executeSecureQuery_withTimeout_propagatesMetaContext` asserts a positive-`timeoutMs` query
+  does not throw `IllegalStateException` (MetaContext not initialized).
 
-### F3 — `SchemaAccessProjectorImpl.parseSchemaContent` is an unimplemented stub
+### F3 — `SchemaAccessProjectorImpl.parseSchemaContent` is an unimplemented stub — **WON'T IMPLEMENT (dead/unwired)**
 `parseSchemaContent(String)` ignores its argument and always returns
 `new HashMap<>()` (TODO: *"实际实现需要 JSON 解析"*). Both
 `filterSchemaFields(...)` and `calculateFieldPermissions(...)` then read
@@ -80,11 +87,11 @@ field filtering silently does nothing. In addition, ~10 private helpers
 `getFieldCount`, `isFieldMaskingRequired`, `getFrequentSchemaPids`,
 `clearUserPermissionCache`, `findAffectedSchemas`) are never called from any of
 the 11 public interface methods — dead code.
-- **Fix direction:** implement `parseSchemaContent` (parse the page schema JSON
-  into the expected `{fields: {...}}` shape) so `filterSchemaFields` actually
-  filters, or remove the field-filtering claim from the API if it is not
-  intended to be used. Decide whether the 10 uncalled helpers are future work
-  or should be deleted.
+- **Decision:** `SchemaAccessProjector` has **zero callers in OSS** (verified by grep), so
+  implementing `parseSchemaContent` would be building functionality nobody invokes — the wrong
+  fix per the configuration/architecture discipline. Left as-is and flagged for **removal**
+  (the whole service + its 10 uncalled private helpers) in a dedicated cleanup, OR a real
+  implementation if/when a caller is actually wired. Not implemented here.
 - **Test impact:** `SchemaAccessProjectorImplIntegrationTest` reaches 57.2%
   line — the rest is the structurally-unreachable dead code above.
 
@@ -105,10 +112,16 @@ is written non-null):
 
 | Entity | jsonb column | status |
 |---|---|---|
-| `rag/entity/KbChunk` | `ab_kb_chunk.metadata` | latent — RAG chunk metadata; fix + KbChunk-persistence IT |
-| `meta/entity/InvariantEvaluationLog` | `ab_invariant_evaluation_log.context_snapshot` | latent — invariant-engine eval log; fix + IT |
+| `rag/entity/KbChunk` | `ab_kb_chunk.metadata` | **FIXED** — `BaseMapper` auto-insert (no cast); typeHandler added + `KbChunkMetadataJsonbIntegrationTest` regression IT |
+| `meta/entity/InvariantEvaluationLog` | `ab_invariant_evaluation_log.context_snapshot` | **FALSE POSITIVE** — `InvariantEvaluationLogMapper` inserts with an explicit `#{contextSnapshot}::jsonb` cast (custom mapper, not BaseMapper), so no typeHandler is needed. The static audit over-reported; the per-mapper cast is the safe alternative to the typeHandler. |
 
-**Fix recipe (mechanical, proven 3×):** add
+> **Audit lesson:** name+type matching (and even per-table column-type matching) is necessary
+> but **not sufficient** — an entity can map a jsonb column safely if its *mapper* casts
+> `::jsonb` explicitly (custom XML/annotation insert) instead of relying on the `@TableField`
+> typeHandler. A correct lint must check both: BaseMapper auto-insert/update of a String→jsonb
+> field **without** the typeHandler is the real defect; a custom mapper with `::jsonb` is fine.
+
+**Fix recipe (mechanical, proven 4×):** add
 `@TableField(value = "<col>", typeHandler = com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler.class)`
 to the String field. Each fix should land with a regression IT (which also lifts that
 class's coverage — natural future-wave targets). **Worth promoting to canonical** (a
