@@ -14,6 +14,7 @@ class D7CompiledKnowledgeServiceTest {
     @DisplayName("D7-01: Rank published fresh pages before stale pages and expose source paths")
     void retrieve_ranksFreshBeforeStaleAndExposesSourcePaths() {
         D7KnowledgeProperties properties = new D7KnowledgeProperties();
+        properties.setMinMatchScore(0); // isolate the ranking assertion from the G10 floor
         D7CompiledKnowledgeService service = new D7CompiledKnowledgeService(new ObjectMapper(), properties);
 
         D7CompiledKnowledgePage decision = page("compiled.decision.d7", "fresh",
@@ -90,6 +91,57 @@ class D7CompiledKnowledgeServiceTest {
 
         assertThat(matches).extracting(match -> match.getPage().getId())
                 .containsExactly("compiled.ops");
+    }
+
+    @Test
+    @DisplayName("G10-01: floor rejects off-topic query (low coverage) but keeps on-topic")
+    void rank_rejectsOffTopicBelowFloor() {
+        D7CompiledKnowledgeService service = new D7CompiledKnowledgeService(
+                new ObjectMapper(), new D7KnowledgeProperties()); // default minMatchScore = 0.15
+
+        D7CompiledKnowledgePage cmd = page("compiled.cmd", "fresh",
+                "命令执行 权限 审批 流程 配置", "docs/system-reference/core/08-运行时与Action.md");
+
+        // Off-topic: shares no term with the page → coverage 0 → rejected.
+        assertThat(service.rank("炒菜步骤怎么做", List.of(cmd), 1L, 3)).isEmpty();
+        // On-topic: matches several bigrams → above the floor → returned.
+        assertThat(service.rank("命令执行的权限如何配置", List.of(cmd), 1L, 3))
+                .extracting(m -> m.getPage().getId())
+                .containsExactly("compiled.cmd");
+    }
+
+    @Test
+    @DisplayName("G10-02: floor gates pre-penalty coverage, so a relevant stale page survives")
+    void rank_keepsRelevantStalePageOnRawCoverage() {
+        D7CompiledKnowledgeService service = new D7CompiledKnowledgeService(
+                new ObjectMapper(), new D7KnowledgeProperties()); // minMatchScore = 0.15
+
+        // Stale page, full term coverage → penalized score 0.25 but raw coverage 1.0;
+        // flooring on raw coverage must keep it (penalty is for ranking only).
+        D7CompiledKnowledgePage stale = page("compiled.stale.relevant", "stale",
+                "命令执行", "docs/x.md");
+
+        List<D7CompiledKnowledgeMatch> matches = service.rank("命令执行", List.of(stale), 1L, 3);
+
+        assertThat(matches).extracting(m -> m.getPage().getId()).containsExactly("compiled.stale.relevant");
+        assertThat(matches.get(0).isRequiresRawEvidence()).isTrue();
+        assertThat(matches.get(0).getScore()).isLessThan(0.3); // penalty applied to the ranking score
+    }
+
+    @Test
+    @DisplayName("G10-03: minMatchScore=0 disables the floor (legacy any-match behavior)")
+    void rank_floorDisabledKeepsIncidentalMatch() {
+        D7KnowledgeProperties properties = new D7KnowledgeProperties();
+        properties.setMinMatchScore(0);
+        D7CompiledKnowledgeService service = new D7CompiledKnowledgeService(new ObjectMapper(), properties);
+
+        D7CompiledKnowledgePage page = page("compiled.incidental", "fresh",
+                "命令执行 权限 审批 流程 配置 字段 模型 页面", "docs/x.md");
+
+        // Long query, only one incidental term ("配置") matches → tiny coverage,
+        // but with the floor disabled the page is still returned.
+        assertThat(service.rank("如何配置人脸识别登录认证双因子短信验证码", List.of(page), 1L, 3))
+                .isNotEmpty();
     }
 
     private static D7CompiledKnowledgePage page(String id, String staleStatus, String text, String sourcePath) {

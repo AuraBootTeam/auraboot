@@ -29,4 +29,13 @@ public class D7KnowledgeProperties {
 
     /** Weight multiplier for compiled (reviewed) pages in RRF fusion (G5). */
     private double compiledRrfWeight = 1.5;
+
+    /**
+     * Minimum pre-penalty term coverage (matched query terms / total) a compiled
+     * page must reach to survive the relevance-rejection floor (G10). Below this
+     * an off-topic query returns no compiled pages instead of any page sharing a
+     * single incidental term. Calibrated below the lowest answerable true-hit
+     * score on the golden set (0.167); set to 0 to disable (legacy "any match").
+     */
+    private double minMatchScore = 0.15;
 }

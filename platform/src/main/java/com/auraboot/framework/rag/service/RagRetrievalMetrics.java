@@ -44,6 +44,12 @@ public class RagRetrievalMetrics {
                 .register(registry).increment(count);
     }
 
+    /** Chunks dropped by the relevance-rejection floor (G10) — high counts hint the floor is too aggressive. */
+    public void recordRejectionFloor(int count) {
+        Counter.builder("rag.retrieval.rejection_floor_dropped")
+                .register(registry).increment(count);
+    }
+
     /** @param outcome {@code success}/{@code failed}/{@code exhausted} */
     public void recordEmbeddingRetry(String outcome, int count) {
         Counter.builder("rag.embedding.retry").tag("outcome", outcome)
