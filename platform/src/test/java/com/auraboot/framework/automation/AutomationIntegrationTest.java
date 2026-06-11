@@ -49,8 +49,8 @@ public class AutomationIntegrationTest extends BaseIntegrationTest {
         req.setTriggerType("on_record_create");
         // A non-empty flat action satisfies the create-time "actions required" check.
         // A degenerate flowConfig without nodes does NOT bypass it (validation tightened —
-        // AutomationServiceImpl#validateCreateRequest); enable() skips the SmartEngine
-        // deploy for flat-actions automations, so the full CRUD lifecycle works.
+        // AutomationServiceImpl#validateCreateRequest). enable() deploys both visual
+        // flows and flat-actions automations because trigger execution uses SmartEngine.
         req.setActions(List.of(
                 AutomationAction.builder()
                         .type("update_record")

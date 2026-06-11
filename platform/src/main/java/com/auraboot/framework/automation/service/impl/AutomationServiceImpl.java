@@ -305,12 +305,9 @@ public class AutomationServiceImpl implements AutomationService {
         automation.setEnabled(true);
         usageIndexService.refreshSource("AUTOMATION", automation.getPid());
 
-        // T2: compile + deploy the visual flow to SmartEngine on enable so the
-        // trigger path can start it. Flat actions-only automations have no flow to deploy.
-        java.util.Map<String, Object> fc = automation.getFlowConfig();
-        if (fc != null && fc.get("nodes") instanceof java.util.List<?> ns && !ns.isEmpty()) {
-            automationProcessRuntime.deploy(automation);
-        }
+        // Trigger execution always goes through SmartEngine. The compiler supports both
+        // visual flowConfig and flat actions[], so both shapes must be deployed on enable.
+        automationProcessRuntime.deploy(automation);
 
         log.info("Automation enabled: pid={}", pid);
         return toDTO(automation);

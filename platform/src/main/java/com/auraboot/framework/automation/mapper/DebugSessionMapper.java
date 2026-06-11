@@ -1,6 +1,9 @@
 package com.auraboot.framework.automation.mapper;
 
 import com.auraboot.framework.automation.entity.DebugSession;
+import com.auraboot.framework.automation.typehandler.ActionResultsTypeHandler;
+import com.auraboot.framework.automation.typehandler.BreakpointsTypeHandler;
+import com.auraboot.framework.automation.typehandler.TriggerPayloadTypeHandler;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.*;
 
@@ -15,9 +18,27 @@ import java.util.List;
 @Mapper
 public interface DebugSessionMapper extends BaseMapper<DebugSession> {
 
+    @Results(id = "DebugSessionResultMap", value = {
+            @Result(column = "id", property = "id"),
+            @Result(column = "pid", property = "pid"),
+            @Result(column = "tenant_id", property = "tenantId"),
+            @Result(column = "automation_id", property = "automationId"),
+            @Result(column = "record_id", property = "recordId"),
+            @Result(column = "status", property = "status"),
+            @Result(column = "current_action_index", property = "currentActionIndex"),
+            @Result(column = "breakpoints", property = "breakpoints", typeHandler = BreakpointsTypeHandler.class),
+            @Result(column = "execution_context", property = "executionContext", typeHandler = TriggerPayloadTypeHandler.class),
+            @Result(column = "action_results", property = "actionResults", typeHandler = ActionResultsTypeHandler.class),
+            @Result(column = "trigger_payload", property = "triggerPayload", typeHandler = TriggerPayloadTypeHandler.class),
+            @Result(column = "error_message", property = "errorMessage"),
+            @Result(column = "created_at", property = "createdAt"),
+            @Result(column = "updated_at", property = "updatedAt"),
+            @Result(column = "created_by", property = "createdBy")
+    })
     @Select("SELECT * FROM ab_automation_debug_session WHERE pid = #{pid}")
     DebugSession findByPid(@Param("pid") String pid);
 
+    @ResultMap("DebugSessionResultMap")
     @Select("""
         SELECT * FROM ab_automation_debug_session
         WHERE automation_id = #{automationId}
@@ -27,6 +48,7 @@ public interface DebugSessionMapper extends BaseMapper<DebugSession> {
         """)
     DebugSession findActiveByAutomationId(@Param("automationId") String automationId);
 
+    @ResultMap("DebugSessionResultMap")
     @Select("""
         SELECT * FROM ab_automation_debug_session
         WHERE automation_id = #{automationId}

@@ -29,12 +29,13 @@ export function DebugToolbar() {
           statusCfg.bgColor,
           statusCfg.color,
         )}
+        data-testid="automation-debug-status"
       >
         {st(`$i18n:automation.debug.status.${session.status}`) || statusCfg.label}
       </span>
 
       {/* Progress */}
-      <span className="text-xs text-gray-400">
+      <span className="text-xs text-gray-400" data-testid="automation-debug-progress">
         {session.currentActionIndex}/{session.totalActions}
       </span>
 
@@ -46,6 +47,7 @@ export function DebugToolbar() {
         disabled={!isPaused || loading}
         className="rounded bg-blue-600 px-3 py-1 text-xs font-medium hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-600"
         title={st('$i18n:automation.debug.toolbar.step.title') || 'Execute next action (Step Over)'}
+        data-testid="automation-debug-step"
       >
         {st('$i18n:automation.debug.toolbar.step') || 'Step'}
       </button>
@@ -56,6 +58,7 @@ export function DebugToolbar() {
         disabled={!isPaused || loading}
         className="rounded bg-green-600 px-3 py-1 text-xs font-medium hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-600"
         title={st('$i18n:automation.debug.toolbar.continue.title') || 'Continue until breakpoint'}
+        data-testid="automation-debug-continue"
       >
         {st('$i18n:automation.debug.toolbar.continue') || 'Continue'}
       </button>
@@ -66,6 +69,7 @@ export function DebugToolbar() {
         disabled={loading}
         className="rounded bg-yellow-600 px-3 py-1 text-xs font-medium hover:bg-yellow-700 disabled:cursor-not-allowed disabled:bg-gray-600"
         title={st('$i18n:automation.debug.toolbar.restart.title') || 'Restart from beginning'}
+        data-testid="automation-debug-restart"
       >
         {st('$i18n:automation.debug.toolbar.restart') || 'Restart'}
       </button>
@@ -76,6 +80,7 @@ export function DebugToolbar() {
         disabled={!isActive || loading}
         className="rounded bg-red-600 px-3 py-1 text-xs font-medium hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-600"
         title={st('$i18n:automation.debug.toolbar.stop.title') || 'Stop debugging'}
+        data-testid="automation-debug-stop"
       >
         {st('$i18n:automation.debug.toolbar.stop') || 'Stop'}
       </button>
@@ -83,7 +88,11 @@ export function DebugToolbar() {
       <div className="flex-1" />
 
       {/* Exit debug mode */}
-      <button onClick={exitDebugMode} className="px-3 py-1 text-xs text-gray-400 hover:text-white">
+      <button
+        onClick={exitDebugMode}
+        className="px-3 py-1 text-xs text-gray-400 hover:text-white"
+        data-testid="automation-debug-exit"
+      >
         {st('$i18n:automation.debug.toolbar.exit') || 'Exit Debug'}
       </button>
 

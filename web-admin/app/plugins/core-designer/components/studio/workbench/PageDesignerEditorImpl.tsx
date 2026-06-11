@@ -38,6 +38,53 @@ import { useI18n } from '~/contexts/I18nContext';
 // are no-ops, so it is safe to invoke at module-load time.
 initRegistry();
 
+const PAGE_SCHEMA_EXPORT_VERSION = '2.0.0';
+
+function sanitizeExportFilePart(value: string | undefined | null): string {
+  const cleaned = (value || 'page')
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return cleaned || 'page';
+}
+
+function parseImportedPageSchema(raw: unknown): PageSchema {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('导入文件不是有效 JSON 对象');
+  }
+
+  const root = raw as Record<string, unknown>;
+  const candidate = (root.schema ?? root.pageSchema ?? root) as Record<string, unknown> | null;
+  if (!candidate || typeof candidate !== 'object') {
+    throw new Error('导入文件缺少页面 Schema');
+  }
+
+  if (Number(candidate.schemaVersion) !== 2) {
+    throw new Error('仅支持 Page Schema V2');
+  }
+
+  if (!['list', 'form', 'detail'].includes(String(candidate.kind))) {
+    throw new Error('导入文件的页面类型无效');
+  }
+
+  if (!candidate.layout || typeof candidate.layout !== 'object') {
+    throw new Error('导入文件缺少页面布局');
+  }
+
+  if (!Array.isArray(candidate.blocks)) {
+    throw new Error('导入文件缺少区块列表');
+  }
+
+  return {
+    ...(candidate as Partial<PageSchema>),
+    schemaVersion: 2,
+    kind: candidate.kind as PageSchema['kind'],
+    layout: candidate.layout as PageSchema['layout'],
+    blocks: candidate.blocks as PageSchema['blocks'],
+    id: typeof candidate.id === 'string' ? candidate.id : '',
+  };
+}
+
 /**
  * Pure helpers for the Settings ↔ Schema ↔ Settings bridge.
  *
@@ -84,8 +131,9 @@ export default function PageDesignerEditorImpl() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
-  const { showSuccessToast } = useToastContext();
+  const { showSuccessToast, showErrorToast } = useToastContext();
   const { locale } = useI18n();
+  const schemaImportInputRef = useRef<HTMLInputElement | null>(null);
 
   // PageSchema V2 state
   const [schema, setSchema] = useState<PageSchema | null>(null);
@@ -246,6 +294,80 @@ export default function PageDesignerEditorImpl() {
     navigate('/page-designer');
   }, [navigate]);
 
+  const handleExportSchema = useCallback(() => {
+    const currentSchema = latestSchemaRef.current || schema;
+    if (!currentSchema) {
+      showErrorToast('没有可导出的页面配置');
+      return;
+    }
+
+    const pageKey = meta?.pageKey || currentSchema.pageKey || id || 'page';
+    const payload = {
+      exportVersion: PAGE_SCHEMA_EXPORT_VERSION,
+      exportedAt: new Date().toISOString(),
+      metadata: meta
+        ? {
+            id: meta.id,
+            pageKey: meta.pageKey,
+            title: meta.title,
+            description: meta.description,
+            kind: meta.kind,
+            modelCode: meta.viewModelCode || currentSchema.modelCode,
+            version: meta.version,
+            status: meta.status,
+            createdAt: meta.createdAt,
+            updatedAt: meta.updatedAt,
+            tags: meta.tags,
+          }
+        : undefined,
+      schema: {
+        ...currentSchema,
+        id: currentSchema.id || meta?.id || id || '',
+        pageKey,
+      },
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${sanitizeExportFilePart(pageKey)}.page.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+    showSuccessToast('页面配置已导出');
+  }, [id, meta, schema, showErrorToast, showSuccessToast]);
+
+  const handleImportSchemaClick = useCallback(() => {
+    schemaImportInputRef.current?.click();
+  }, []);
+
+  const handleImportSchemaFile = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const imported = parseImportedPageSchema(JSON.parse(text));
+        const currentIdentitySchema: PageSchema = {
+          ...imported,
+          id: schema?.id || meta?.id || id || imported.id,
+          pageKey: schema?.pageKey || meta?.pageKey || imported.pageKey,
+          modelCode: imported.modelCode || schema?.modelCode || meta?.viewModelCode,
+        };
+        handleSchemaChange(currentIdentitySchema);
+        showSuccessToast('页面配置已导入，请保存后生效');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '导入失败';
+        showErrorToast(message);
+      }
+    },
+    [handleSchemaChange, id, meta, schema, showErrorToast, showSuccessToast],
+  );
+
   // Reload page data after rollback
   const handleRollbackSuccess = useCallback(async () => {
     if (!id) return;
@@ -384,6 +506,8 @@ export default function PageDesignerEditorImpl() {
         onZoomChange={toolbarActions.setZoomLevel}
         onDeviceChange={toolbarActions.setDevice}
         onVersionHistory={toolbarActions.toggleVersionHistory}
+        onImport={handleImportSchemaClick}
+        onExport={handleExportSchema}
         onPreview={toolbarActions.togglePreview}
         onSave={() => toolbarActions.save()}
         onPublish={() => toolbarActions.publish()}
@@ -392,6 +516,15 @@ export default function PageDesignerEditorImpl() {
         aiPanelOpen={aiPanelOpen}
         onToggleAiPanel={() => setAiPanelOpen((prev) => !prev)}
         onAiGenerated={handleAiGenerated}
+      />
+
+      <input
+        ref={schemaImportInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        data-testid="page-schema-import-input"
+        onChange={handleImportSchemaFile}
       />
 
       {/* Designer + AI Panel */}

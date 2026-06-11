@@ -149,7 +149,9 @@ public class DebugSessionServiceImpl implements DebugSessionService {
 
         publishEvent(session, "action_started", action, null);
 
-        ActionResult result = executeAction(action, session.getExecutionContext());
+        Map<String, Object> executionContext = getSafeExecutionContext(session);
+        session.setExecutionContext(executionContext);
+        ActionResult result = executeAction(action, executionContext);
 
         // Record result
         List<ActionResult> results = session.getActionResults() != null
@@ -159,7 +161,7 @@ public class DebugSessionServiceImpl implements DebugSessionService {
         session.setActionResults(results);
 
         // Update context with action result
-        Map<String, Object> ctx = new HashMap<>(session.getExecutionContext());
+        Map<String, Object> ctx = new HashMap<>(executionContext);
         ctx.put("action_" + action.getSequence() + "_result", result.getResult());
         session.setExecutionContext(ctx);
 
@@ -224,7 +226,9 @@ public class DebugSessionServiceImpl implements DebugSessionService {
 
             publishEvent(session, "action_started", action, null);
 
-            ActionResult result = executeAction(action, session.getExecutionContext());
+            Map<String, Object> executionContext = getSafeExecutionContext(session);
+            session.setExecutionContext(executionContext);
+            ActionResult result = executeAction(action, executionContext);
 
             // Record result
             List<ActionResult> results = session.getActionResults() != null
@@ -234,7 +238,7 @@ public class DebugSessionServiceImpl implements DebugSessionService {
             session.setActionResults(results);
 
             // Update context
-            Map<String, Object> ctx = new HashMap<>(session.getExecutionContext());
+            Map<String, Object> ctx = new HashMap<>(executionContext);
             ctx.put("action_" + action.getSequence() + "_result", result.getResult());
             session.setExecutionContext(ctx);
 
@@ -390,6 +394,22 @@ public class DebugSessionServiceImpl implements DebugSessionService {
 
         result.setDurationMs(System.currentTimeMillis() - startTime);
         return result;
+    }
+
+    private Map<String, Object> getSafeExecutionContext(DebugSession session) {
+        Map<String, Object> context = new HashMap<>();
+        if (session.getTriggerPayload() != null) {
+            context.putAll(session.getTriggerPayload());
+        }
+        if (session.getExecutionContext() != null) {
+            context.putAll(session.getExecutionContext());
+        }
+        if (session.getRecordId() != null) {
+            context.putIfAbsent("recordId", session.getRecordId());
+        }
+        context.putIfAbsent("automationPid", session.getAutomationId());
+        context.putIfAbsent("debugMode", true);
+        return context;
     }
 
     private void publishEvent(DebugSession session, String eventType,

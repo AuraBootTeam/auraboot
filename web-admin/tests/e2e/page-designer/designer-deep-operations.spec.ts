@@ -16,6 +16,8 @@
 
 import { test, expect } from '../../fixtures';
 import { PageDesignerPage } from '../../pages';
+import { readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
 // ---------------------------------------------------------------------------
 // Shared state for fallback page discovery
@@ -160,6 +162,51 @@ async function addBlocksToCanvas(
   }
 }
 
+async function createArtifactPage(page: import('@playwright/test').Page) {
+  const suffix = Date.now().toString(36);
+  const pageKey = `e2e_artifact_${suffix}`;
+  const blocks = [
+    {
+      id: 'artifact_section',
+      blockType: 'form-section',
+      title: 'Artifact Section',
+      fields: ['name'],
+      layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 },
+    },
+    {
+      id: 'artifact_buttons',
+      blockType: 'form-buttons',
+      title: 'Artifact Buttons',
+      actions: ['save'],
+      layout: { col: 0, colSpan: 12, rowSpan: 1, order: 1 },
+    },
+  ];
+  const resp = await page.request.post('/api/pages', {
+    data: {
+      name: `page_${pageKey}`,
+      pageKey,
+      title: `E2E Artifact ${suffix}`,
+      kind: 'form',
+      modelCode: 'tenant',
+      blocks,
+      layout: { type: 'grid', cols: 12 },
+      metaInfo: { componentCount: blocks.length },
+      semver: '0.1.0',
+    },
+  });
+  expect(resp.ok()).toBe(true);
+  const body = await resp.json();
+  const pid = body.data?.pid;
+  expect(pid).toBeTruthy();
+  return { pid: String(pid), pageKey, blocks };
+}
+
+async function openDesignerByPid(page: import('@playwright/test').Page, pid: string) {
+  await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+  await page.getByTestId('designer-canvas').waitFor({ state: 'visible', timeout: 15000 });
+  await expect(page.getByTestId('toolbar-export')).toBeVisible({ timeout: 10000 });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -239,8 +286,7 @@ test.describe('Page Designer Deep Operations', () => {
     }
 
     if (blockCount < 2) {
-      await expect(designerPage.canvas).toBeVisible({ timeout: 5000 });
-      return;
+      throw new Error(`Expected at least 2 blocks after palette drag, got ${blockCount}`);
     }
 
     const firstBox = await designerPage.block(0).boundingBox();
@@ -294,8 +340,8 @@ test.describe('Page Designer Deep Operations', () => {
       const inputValue = await propertyInput.inputValue();
       expect(inputValue).toBe('Deep Test Value');
     } else {
-      // Properties panel may not have editable inputs
-      expect(true).toBe(true);
+      await expect(page.getByTestId('designer-properties-panel')).toBeVisible();
+      await expect(page.locator('[data-block-id]').first()).toBeVisible();
     }
   });
 
@@ -325,9 +371,7 @@ test.describe('Page Designer Deep Operations', () => {
     const isDisabled = await designerPage.saveButton.isDisabled();
     if (!isDisabled) {
       await designerPage.save();
-      const successMsg = page.locator('.ant-message-success, text=保存成功, text=Saved');
-      const hasSuccess = await successMsg.isVisible({ timeout: 3000 }).catch(() => false);
-      expect(hasSuccess || true).toBe(true);
+      await expect(page.getByTestId('toolbar-save-status')).toBeVisible();
     }
   });
 
@@ -505,5 +549,95 @@ test.describe('Page Designer Deep Operations', () => {
 
     // Verify canvas contains blocks
     await expect(designerPage.canvas).toBeVisible();
+  });
+
+  /**
+   * PD-010: Page schema import/export artifact round-trip
+   */
+  test('PD-010: Import/export downloads PageSchema V2 JSON and saves imported blocks', async ({
+    page,
+  }, testInfo) => {
+    const { pid, pageKey, blocks } = await createArtifactPage(page);
+    await openDesignerByPid(page, pid);
+
+    const exportDownloadPromise = page.waitForEvent('download');
+    await page.getByTestId('toolbar-export').click();
+    const exportDownload = await exportDownloadPromise;
+    expect(exportDownload.suggestedFilename()).toBe(`${pageKey}.page.json`);
+
+    const exportedPath = path.join(testInfo.outputDir, exportDownload.suggestedFilename());
+    await exportDownload.saveAs(exportedPath);
+    const exported = JSON.parse(await readFile(exportedPath, 'utf-8'));
+    expect(exported.exportVersion).toBe('2.0.0');
+    expect(exported.metadata.pageKey).toBe(pageKey);
+    expect(exported.schema.kind).toBe('form');
+    expect(exported.schema.layout).toEqual({ type: 'grid', cols: 12 });
+    expect(exported.schema.blocks.map((block: { id: string }) => block.id)).toEqual(
+      blocks.map((block) => block.id),
+    );
+
+    const importedSchema = {
+      schemaVersion: 2,
+      id: 'imported-artifact',
+      pageKey: `${pageKey}_from_file`,
+      kind: 'form',
+      modelCode: 'tenant',
+      title: 'Imported Artifact Schema',
+      layout: { type: 'grid', cols: 12 },
+      blocks: [
+        {
+          id: 'imported_text',
+          blockType: 'text',
+          title: 'Imported Text Block',
+          props: { content: 'Imported text body' },
+        },
+        {
+          id: 'imported_section',
+          blockType: 'form-section',
+          title: 'Imported Section',
+          fields: ['name'],
+        },
+      ],
+    };
+    const importPath = path.join(testInfo.outputDir, 'page-schema-import.json');
+    await writeFile(
+      importPath,
+      JSON.stringify(
+        {
+          exportVersion: '2.0.0',
+          exportedAt: new Date().toISOString(),
+          metadata: { pageKey: importedSchema.pageKey, title: 'Imported Artifact Schema' },
+          schema: importedSchema,
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    );
+
+    const chooserPromise = page.waitForEvent('filechooser');
+    await page.getByTestId('toolbar-import').click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles(importPath);
+
+    await expect(page.locator('[data-block-id="imported_text"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-block-id="imported_section"]')).toBeVisible();
+    await expect(page.getByTestId('toolbar-save')).toBeEnabled({ timeout: 10000 });
+
+    const saveResponsePromise = page.waitForResponse((response) => {
+      return response.url().includes(`/api/pages/${pid}`) && response.request().method() === 'PUT';
+    });
+    await page.getByTestId('toolbar-save').click();
+    const saveResponse = await saveResponsePromise;
+    expect(saveResponse.ok()).toBe(true);
+
+    const detailResp = await page.request.get(`/api/pages/${pid}`);
+    expect(detailResp.ok()).toBe(true);
+    const detail = await detailResp.json();
+    expect(detail.data.pageKey).toBe(pageKey);
+    expect(detail.data.blocks.map((block: { id: string }) => block.id)).toEqual([
+      'imported_text',
+      'imported_section',
+    ]);
   });
 });

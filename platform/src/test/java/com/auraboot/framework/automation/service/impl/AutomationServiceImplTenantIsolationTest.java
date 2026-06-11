@@ -3,6 +3,7 @@ package com.auraboot.framework.automation.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.dto.AutomationUpdateRequest;
 import com.auraboot.framework.automation.entity.Automation;
+import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.mapper.AutomationLogMapper;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.automation.service.AutomationFlowTriggerDeriver;
@@ -17,6 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -129,6 +133,23 @@ class AutomationServiceImplTenantIsolationTest {
 
         verify(automationMapper).updateAutomation(any(Automation.class));
         verify(usageIndexService).refreshSource("AUTOMATION", "auto-x");
+    }
+
+    @Test
+    void enable_sameTenantFlatActionsAutomation_deploysProcessRuntime() {
+        Automation automation = automationOwnedBy(CURRENT_TENANT);
+        automation.setEnabled(false);
+        automation.setActions(List.of(AutomationAction.builder()
+                .type("send_notification")
+                .config(Map.of("message", "Runtime regression"))
+                .build()));
+        when(automationMapper.findByPid("auto-x")).thenReturn(automation);
+
+        assertThatCode(() -> service.enable("auto-x")).doesNotThrowAnyException();
+
+        verify(automationMapper).updateEnabled("auto-x", true, "user-1");
+        verify(usageIndexService).refreshSource("AUTOMATION", "auto-x");
+        verify(automationProcessRuntime).deploy(automation);
     }
 
     @Test

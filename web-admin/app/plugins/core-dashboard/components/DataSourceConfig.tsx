@@ -146,6 +146,7 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
           数据源类型 <span className="text-red-500">*</span>
         </label>
         <select
+          data-testid="dashboard-datasource-type-select"
           value={value.type}
           onChange={(e) =>
             handleTypeChange(e.target.value as 'aggregate' | 'namedQuery' | 'static')
@@ -280,6 +281,7 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">静态数据 (JSON)</label>
           <textarea
+            data-testid="dashboard-datasource-static-json"
             value={JSON.stringify(value.staticData || [], null, 2)}
             onChange={(e) => {
               try {

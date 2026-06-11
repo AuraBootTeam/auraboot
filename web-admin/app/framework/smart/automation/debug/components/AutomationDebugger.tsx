@@ -58,6 +58,8 @@ function DebugActionList() {
                 'flex items-center gap-3 rounded-lg border px-4 py-3 transition-all',
                 statusClass,
               )}
+              data-testid="automation-debug-action-row"
+              data-action-index={index}
             >
               {/* Breakpoint indicator */}
               <div className="w-3 shrink-0">
