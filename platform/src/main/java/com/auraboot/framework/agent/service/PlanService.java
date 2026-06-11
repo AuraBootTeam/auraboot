@@ -188,7 +188,22 @@ public class PlanService {
                 throw new IllegalStateException("Plan load failed for runPid=" + runPid + ": run row not found");
             }
             Object raw = rows.get(0).get("execution_plan");
-            String planJson = raw instanceof String s ? s : (raw != null ? objectMapper.writeValueAsString(raw) : null);
+            // A JSONB column read via the generic query comes back as a driver
+            // PGobject (no entity type-handler applies). Mirror the canonical
+            // pattern in StepLoopService.parseExecutionConfig: PGobject.toString()
+            // yields the JSON text — whereas objectMapper.writeValueAsString(raw)
+            // would serialize the PGobject *wrapper* ({"type":"jsonb","value":..})
+            // and break deserialization. A Map/List means a handler already parsed it.
+            String planJson;
+            if (raw instanceof String s) {
+                planJson = s;
+            } else if (raw == null) {
+                planJson = null;
+            } else if (raw instanceof Map || raw instanceof List) {
+                planJson = objectMapper.writeValueAsString(raw);
+            } else {
+                planJson = raw.toString();
+            }
             if (planJson == null || planJson.isBlank()) {
                 throw new IllegalStateException("Plan load failed for runPid=" + runPid + ": execution_plan is empty");
             }
