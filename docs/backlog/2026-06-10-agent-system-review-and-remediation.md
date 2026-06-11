@@ -13,6 +13,9 @@ contracts. Every finding below was **verified live** (file:line evidence); inher
 from earlier subagent reports that turned out to be already fixed are listed in §5 so the
 next session does not re-litigate them.
 
+Session retro (process lessons, root-cause analysis of the falsified findings, fixation
+targets): [2026-06-11-agent-system-remediation-session-retro.md](./2026-06-11-agent-system-remediation-session-retro.md).
+
 Verdict: architecture direction ("governed business execution layer", capability contracts,
 five-layer tool policy, L0-L4 risk ladder) is sound and ahead of typical agent frameworks.
 Real gaps cluster in three areas: **LLM-backed features stuck at keyword/TODO stage**,
