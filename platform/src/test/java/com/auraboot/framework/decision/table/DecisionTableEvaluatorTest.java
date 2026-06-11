@@ -196,4 +196,30 @@ class DecisionTableEvaluatorTest {
         assertThat(r.matchedRuleId()).isEqualTo("recent");
         assertThat(r.outputs()).containsEntry("route", "recent");
     }
+
+    @Test
+    void feelCellTextSupportsWhitelistedDateAndDurationFunctions() {
+        DecisionTable t = new DecisionTable(HitPolicy.FIRST,
+                List.of(input("submittedOn", "submittedOn", DataType.DATE),
+                        input("sla", "sla", DataType.DURATION)),
+                List.of(new DecisionTable.Output("route", "Route", DataType.STRING)),
+                List.of(
+                        new DecisionTable.Rule("within-window", 10,
+                                Map.of("submittedOn", new DecisionTable.Cell(null, null, ">= date(2026, 6, 10)"),
+                                       "sla", new DecisionTable.Cell(null, null, "<= duration(\"P2D\")")),
+                                Map.of("route", "fast")),
+                        new DecisionTable.Rule("fallback", 20,
+                                Map.of(),
+                                Map.of("route", "fallback"))),
+                Map.of());
+
+        DecisionContext context = DecisionContext.builder()
+                .record(Map.of("submittedOn", "2026-06-11", "sla", "P1D"))
+                .build();
+        DecisionTableEvaluator.Result r = evaluator.evaluate(t, context);
+
+        assertThat(r.status()).isEqualTo(DecisionStatus.MATCHED);
+        assertThat(r.matchedRuleId()).isEqualTo("within-window");
+        assertThat(r.outputs()).containsEntry("route", "fast");
+    }
 }

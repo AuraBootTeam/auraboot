@@ -50,6 +50,10 @@ public final class ConditionAstEvaluator {
         return collector.finish(result);
     }
 
+    public boolean isFunctionRegistered(String name) {
+        return functions.isRegistered(name);
+    }
+
     private Truth eval(ConditionNode node, DecisionContext ctx, EvalTrace.Collector trace) {
         return switch (node) {
             case ConditionNode.GroupNode g -> evalGroup(g, ctx, trace);

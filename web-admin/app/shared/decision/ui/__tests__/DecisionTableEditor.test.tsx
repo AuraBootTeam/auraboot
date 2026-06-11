@@ -79,6 +79,14 @@ describe('DecisionTableEditor', () => {
     expect(dump.inputs[1].path).toBe('data.risk');
   });
 
+  it('exposes temporal FEEL data types for input columns', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByTestId('dt-add-input'));
+    fireEvent.change(screen.getByLabelText('input-data-type-2'), { target: { value: 'duration' } });
+    const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as DecisionTable;
+    expect(dump.inputs[2].dataType).toBe('duration');
+  });
+
   it('edits output allowed values for PRIORITY', () => {
     render(<Harness />);
     fireEvent.change(screen.getByLabelText('hit-policy'), { target: { value: 'PRIORITY' } });

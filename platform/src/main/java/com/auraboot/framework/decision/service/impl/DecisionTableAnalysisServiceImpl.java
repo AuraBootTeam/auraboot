@@ -160,7 +160,7 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
                             List.of(rule.ruleId()), Map.of("input", entry.getKey()), e.getMessage()));
                     continue;
                 }
-                if (looksUnsupportedFeel(cell.feel())) {
+                if (!DecisionTableFeel.isSupportedSyntax(cell.feel())) {
                     dto.addWarning(DecisionTableAnalysisDTO.Issue.of("DMN_UNSUPPORTED_FEEL", "WARNING",
                             List.of(rule.ruleId()), Map.of("input", entry.getKey()),
                             "FEEL cell uses expressions outside the platform unary-test subset; convert it to -, null, comparison, range, or comma-list syntax before relying on runtime equality semantics"));
@@ -343,41 +343,6 @@ public class DecisionTableAnalysisServiceImpl implements DecisionTableAnalysisSe
             return path.dataType();
         }
         return null;
-    }
-
-    private boolean looksUnsupportedFeel(String feel) {
-        String text = feel == null ? "" : feel.trim();
-        if (text.isEmpty() || "-".equals(text)) {
-            return false;
-        }
-        String lower = text.toLowerCase();
-        if ("null".equals(lower) || "not(null)".equals(lower) || "not null".equals(lower)) {
-            return false;
-        }
-        if (text.matches("^\\[\\s*(.+?)\\s*\\.\\.\\s*(.+?)\\s*]$")) {
-            return false;
-        }
-        java.util.regex.Matcher comparison = java.util.regex.Pattern.compile("^(>=|<=|>|<|!=|=)\\s*(.+)$").matcher(text);
-        if (comparison.matches()) {
-            return looksLikeFeelExpression(comparison.group(2));
-        }
-        if (text.contains(",")) {
-            for (String part : text.split(",")) {
-                if (looksLikeFeelExpression(part)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        return looksLikeFeelExpression(text);
-    }
-
-    private boolean looksLikeFeelExpression(String text) {
-        String candidate = text == null ? "" : text.trim();
-        String lower = candidate.toLowerCase();
-        return candidate.contains("(")
-                || candidate.contains(")")
-                || lower.matches(".*\\b(if|then|else|and|or|between|date|time|duration|not)\\b.*");
     }
 
     private List<ContinuousInterval> intervalsForCell(DecisionTable.Cell cell, DataType dataType) {

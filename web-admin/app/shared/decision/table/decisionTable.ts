@@ -68,6 +68,8 @@ interface ParsedFeelTest {
   value?: unknown;
 }
 
+const FEEL_LITERAL_FUNCTIONS = new Set(['date', 'time', 'date and time', 'duration']);
+
 function parseLiteral(raw: string, dataType?: DataType): unknown {
   const text = raw.trim();
   if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
@@ -76,6 +78,9 @@ function parseLiteral(raw: string, dataType?: DataType): unknown {
   if (text.toLowerCase() === 'null') return null;
   if (text.toLowerCase() === 'true') return true;
   if (text.toLowerCase() === 'false') return false;
+  const functionValue = parseFeelFunctionLiteral(text);
+  if (functionValue.supported) return functionValue.value;
+  if (looksFunctionLike(text)) throw new Error(`Unsupported FEEL function literal: ${raw}`);
   if ((dataType === 'integer' || dataType === 'decimal') && text !== '' && !Number.isNaN(Number(text))) {
     return Number(text);
   }
@@ -83,34 +88,239 @@ function parseLiteral(raw: string, dataType?: DataType): unknown {
 }
 
 function parseFeelCell(text: string | undefined, dataType?: DataType): ParsedFeelTest[] | null {
+  try {
+    const feel = text?.trim() ?? '';
+    if (!feel || feel === '-') return [];
+    const lower = feel.toLowerCase();
+    if (lower === 'null') return [{ operator: 'IS_NULL' }];
+    if (lower === 'not(null)' || lower === 'not null') return [{ operator: 'IS_NOT_NULL' }];
+
+    const range = /^\[\s*(.+?)\s*\.\.\s*(.+?)\s*]$/.exec(feel);
+    if (range) {
+      return [{ operator: 'BETWEEN', value: [parseLiteral(range[1], dataType), parseLiteral(range[2], dataType)] }];
+    }
+
+    const comparison = /^(>=|<=|>|<|!=|=)\s*(.+)$/.exec(feel);
+    if (comparison) {
+      const operator: Operator = comparison[1] === '>' ? 'GT'
+        : comparison[1] === '>=' ? 'GTE'
+          : comparison[1] === '<' ? 'LT'
+            : comparison[1] === '<=' ? 'LTE'
+              : comparison[1] === '!=' ? 'NE'
+                : 'EQ';
+      return [{ operator, value: parseLiteral(comparison[2], dataType) }];
+    }
+
+    if (isSupportedFeelFunctionLiteral(feel)) {
+      return [{ operator: 'EQ', value: parseLiteral(feel, dataType) }];
+    }
+
+    if (feel.includes(',')) {
+      const values = splitTopLevel(feel).map((item) => item.trim()).filter(Boolean).map((item) => parseLiteral(item, dataType));
+      return values.length ? [{ operator: 'IN', value: values }] : null;
+    }
+
+    return [{ operator: 'EQ', value: parseLiteral(feel, dataType) }];
+  } catch {
+    return null;
+  }
+}
+
+export function isSupportedFeelCellSyntax(text: string | undefined): boolean {
+  if (parseFeelCell(text) === null) return false;
   const feel = text?.trim() ?? '';
-  if (!feel || feel === '-') return [];
+  if (!feel || feel === '-') return true;
   const lower = feel.toLowerCase();
-  if (lower === 'null') return [{ operator: 'IS_NULL' }];
-  if (lower === 'not(null)' || lower === 'not null') return [{ operator: 'IS_NOT_NULL' }];
+  if (lower === 'null' || lower === 'not(null)' || lower === 'not null') return true;
 
   const range = /^\[\s*(.+?)\s*\.\.\s*(.+?)\s*]$/.exec(feel);
-  if (range) {
-    return [{ operator: 'BETWEEN', value: [parseLiteral(range[1], dataType), parseLiteral(range[2], dataType)] }];
-  }
+  if (range) return !looksUnsupportedLiteral(range[1]) && !looksUnsupportedLiteral(range[2]);
 
   const comparison = /^(>=|<=|>|<|!=|=)\s*(.+)$/.exec(feel);
-  if (comparison) {
-    const operator: Operator = comparison[1] === '>' ? 'GT'
-      : comparison[1] === '>=' ? 'GTE'
-        : comparison[1] === '<' ? 'LT'
-          : comparison[1] === '<=' ? 'LTE'
-            : comparison[1] === '!=' ? 'NE'
-              : 'EQ';
-    return [{ operator, value: parseLiteral(comparison[2], dataType) }];
-  }
+  if (comparison) return !looksUnsupportedLiteral(comparison[2]);
 
-  if (feel.includes(',')) {
-    const values = feel.split(',').map((item) => item.trim()).filter(Boolean).map((item) => parseLiteral(item, dataType));
-    return values.length ? [{ operator: 'IN', value: values }] : null;
-  }
+  if (isSupportedFeelFunctionLiteral(feel)) return true;
 
-  return [{ operator: 'EQ', value: parseLiteral(feel, dataType) }];
+  if (feel.includes(',')) return splitTopLevel(feel).every((item) => !looksUnsupportedLiteral(item));
+
+  return !looksUnsupportedLiteral(feel);
+}
+
+function parseFeelFunctionLiteral(raw: string): { supported: true; value: unknown } | { supported: false } {
+  const match = /^([A-Za-z][A-Za-z .]*[A-Za-z])\s*\((.*)\)$/.exec(raw.trim());
+  if (!match) return { supported: false };
+  const name = normalizeFunctionName(match[1]);
+  if (!FEEL_LITERAL_FUNCTIONS.has(name)) return { supported: false };
+  const args = splitTopLevel(match[2]).map((arg) => parseFeelFunctionArg(arg)).filter((arg) => arg !== undefined);
+  return { supported: true, value: invokeFeelLiteralFunction(name, args) };
+}
+
+function parseFeelFunctionArg(raw: string): unknown {
+  const text = raw.trim();
+  if (!text) return undefined;
+  if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
+    return text.slice(1, -1);
+  }
+  if (text.toLowerCase() === 'null') return null;
+  if (text.toLowerCase() === 'true') return true;
+  if (text.toLowerCase() === 'false') return false;
+  const nested = parseFeelFunctionLiteral(text);
+  if (nested.supported) return nested.value;
+  if (looksFunctionLike(text)) throw new Error(`Unsupported FEEL function argument: ${raw}`);
+  return text !== '' && !Number.isNaN(Number(text)) ? Number(text) : text;
+}
+
+function invokeFeelLiteralFunction(name: string, args: unknown[]): unknown {
+  if (name === 'date') {
+    if (args.length === 1) return formatDateArg(args[0]);
+    if (args.length === 3) return formatDateParts(args);
+  }
+  if (name === 'time') {
+    if (args.length === 1) return formatTimeArg(args[0]);
+    if (args.length === 3) return formatTimeParts(args);
+  }
+  if (name === 'date and time') {
+    if (args.length === 1) return formatDateTimeArg(args[0]);
+    if (args.length === 2) return `${formatDateArg(args[0])}T${formatTimeArg(args[1])}`;
+    if (args.length === 6) return `${formatDateParts(args.slice(0, 3))}T${formatTimeParts(args.slice(3, 6))}`;
+  }
+  if (name === 'duration' && args.length === 1) {
+    const text = String(args[0] ?? '').trim();
+    if (parseIsoDuration(text) !== null) return text;
+  }
+  throw new Error(`Invalid FEEL ${name}(...) literal`);
+}
+
+function parseDateOnly(value: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const [, y, m, d] = match;
+  const time = Date.UTC(Number(y), Number(m) - 1, Number(d));
+  return Number.isNaN(time) ? null : time;
+}
+
+function parseTimeOnly(value: string): number | null {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(value.trim());
+  if (!match) return null;
+  const [, hh, mm, ss = '0', ms = '0'] = match;
+  const h = Number(hh);
+  const m = Number(mm);
+  const s = Number(ss);
+  const milli = Number(ms.padEnd(3, '0'));
+  if (h > 23 || m > 59 || s > 59 || milli > 999) return null;
+  return (((h * 60) + m) * 60 + s) * 1000 + milli;
+}
+
+function parseIsoDuration(value: string): number | null {
+  const match = /^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i.exec(value.trim());
+  if (!match) return null;
+  const [, days = '0', hours = '0', minutes = '0', seconds = '0'] = match;
+  if ([days, hours, minutes, seconds].every((part) => part === '0')) return null;
+  const totalSeconds = Number(days) * 86400 + Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
+  return Number.isNaN(totalSeconds) ? null : totalSeconds * 1000;
+}
+
+function formatDateArg(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const text = String(value ?? '').trim();
+  const dateOnly = parseDateOnly(text);
+  if (dateOnly !== null) return new Date(dateOnly).toISOString().slice(0, 10);
+  const parsed = Date.parse(text);
+  if (!Number.isNaN(parsed)) return new Date(parsed).toISOString().slice(0, 10);
+  throw new Error(`Invalid FEEL date literal: ${text}`);
+}
+
+function formatDateParts(args: unknown[]): string {
+  const [year, month, day] = args.map(toIntegerArg);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    throw new Error('Invalid FEEL date parts');
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function formatTimeArg(value: unknown): string {
+  const text = String(value ?? '').trim();
+  if (parseTimeOnly(text) === null) throw new Error(`Invalid FEEL time literal: ${text}`);
+  return text;
+}
+
+function formatTimeParts(args: unknown[]): string {
+  const [hour, minute, second] = args.map(toIntegerArg);
+  const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
+  if (parseTimeOnly(time) === null) throw new Error('Invalid FEEL time parts');
+  return time;
+}
+
+function formatDateTimeArg(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  const text = String(value ?? '').trim();
+  if (!Number.isNaN(Date.parse(text))) return text;
+  throw new Error(`Invalid FEEL datetime literal: ${text}`);
+}
+
+function toIntegerArg(value: unknown): number {
+  const number = typeof value === 'number' ? value : Number(String(value ?? '').trim());
+  if (!Number.isInteger(number)) throw new Error(`FEEL argument is not an integer: ${String(value)}`);
+  return number;
+}
+
+function normalizeFunctionName(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function isSupportedFeelFunctionLiteral(raw: string): boolean {
+  const match = /^([A-Za-z][A-Za-z .]*[A-Za-z])\s*\((.*)\)$/.exec(raw.trim());
+  return Boolean(match && FEEL_LITERAL_FUNCTIONS.has(normalizeFunctionName(match[1])));
+}
+
+function looksFunctionLike(value: string): boolean {
+  return value.includes('(') || value.includes(')');
+}
+
+function looksUnsupportedLiteral(raw: string): boolean {
+  const text = raw.trim();
+  if (isSupportedFeelFunctionLiteral(text)) return false;
+  return looksFunctionLike(text) || /\b(if|then|else|and|or|between|date|time|duration|not)\b/.test(text.toLowerCase());
+}
+
+function splitTopLevel(text: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let depth = 0;
+  let quote: '"' | "'" | '' = '';
+  for (const char of text) {
+    if (quote) {
+      current += char;
+      if (char === quote) quote = '';
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      current += char;
+      continue;
+    }
+    if (char === '(') {
+      depth += 1;
+      current += char;
+      continue;
+    }
+    if (char === ')') {
+      depth -= 1;
+      if (depth < 0) throw new Error(`Unmatched ')' in FEEL literal: ${text}`);
+      current += char;
+      continue;
+    }
+    if (char === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  if (quote || depth !== 0) throw new Error(`Unbalanced FEEL literal: ${text}`);
+  parts.push(current);
+  return parts;
 }
 
 function rowToCondition(rule: TableRule, inputs: Map<string, TableInput>): RowCondition {

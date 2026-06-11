@@ -59,6 +59,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -254,6 +255,45 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         JsonNode warnings = json.readTree(body).path("data").path("warnings");
         assertTrue(hasIssueCode(warnings, "DMN_UNSUPPORTED_FEEL"));
         assertTrue(hasIssueCode(warnings, "DMN_CONTINUOUS_DOMAIN"));
+    }
+
+    @Test
+    void httpDecisionTableFeelBuiltinsAnalyzeAndTestRun() throws Exception {
+        String table = """
+            { "hitPolicy":"FIRST",
+              "inputs":[
+                {"id":"submittedOn","label":"Submitted on","scope":"record","path":"data.submittedOn","dataType":"date"},
+                {"id":"sla","label":"SLA","scope":"record","path":"data.sla","dataType":"duration"}],
+              "outputs":[{"id":"route","label":"Route","dataType":"string"}],
+              "rules":[
+                {"ruleId":"fast","priority":10,
+                 "when":{
+                   "submittedOn":{"operator":"EQ","value":"","feel":">= date(2026, 6, 10)"},
+                   "sla":{"operator":"EQ","value":"","feel":"<= duration(\\"P2D\\")"}},
+                 "then":{"route":"fast"}},
+                {"ruleId":"fallback","priority":20,"when":{},"then":{"route":"fallback"}}] }
+            """;
+
+        String analyzeBody = mockMvc.perform(post("/api/decision/tables/analyze").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("model", json.readTree(table)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.valid").value(true))
+                .andReturn().getResponse().getContentAsString();
+        JsonNode analyzeData = json.readTree(analyzeBody).path("data");
+        assertFalse(hasIssueCode(analyzeData.path("warnings"), "DMN_UNSUPPORTED_FEEL"));
+        assertFalse(hasIssueCode(analyzeData.path("errors"), "DMN_FEEL_PARSE"));
+
+        mockMvc.perform(post("/api/decision/test-run").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "kind", "DECISION_TABLE",
+                                "runtimeAdapter", "PLATFORM_DECISION_TABLE",
+                                "contentJson", json.readTree(table),
+                                "context", Map.of("record", Map.of("data",
+                                        Map.of("submittedOn", "2026-06-11", "sla", "P1D")))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("MATCHED"))
+                .andExpect(jsonPath("$.data.outputs.route").value("fast"))
+                .andExpect(jsonPath("$.data.matchedRules[0].ruleId").value("fast"));
     }
 
     @Test

@@ -11,7 +11,11 @@ import {
   type HttpClient,
   type ValidateResult,
 } from '~/shared/decision/api/decisionApi';
-import { type DecisionTable, validateTable } from '~/shared/decision/table/decisionTable';
+import {
+  type DecisionTable,
+  isSupportedFeelCellSyntax,
+  validateTable,
+} from '~/shared/decision/table/decisionTable';
 import { DecisionTableEditor } from '~/shared/decision/ui/DecisionTableEditor';
 
 interface DecisionTableWorkbenchBlockProps {
@@ -142,28 +146,6 @@ function parseContext(text: string): Record<string, Record<string, unknown>> {
   return parsed as Record<string, Record<string, unknown>>;
 }
 
-function supportedFeelSyntax(feel?: string): boolean {
-  const text = feel?.trim() ?? '';
-  if (!text || text === '-') return true;
-  const lower = text.toLowerCase();
-  if (lower === 'null' || lower === 'not(null)' || lower === 'not null') return true;
-  if (/^\[\s*(.+?)\s*\.\.\s*(.+?)\s*]$/.test(text)) return true;
-  const comparison = /^(>=|<=|>|<|!=|=)\s*(.+)$/.exec(text);
-  if (comparison) return !looksLikeFeelExpression(comparison[2]);
-  if (text.includes(',')) {
-    return text.split(',').every((part) => !looksLikeFeelExpression(part));
-  }
-  return !looksLikeFeelExpression(text);
-}
-
-function looksLikeFeelExpression(text: string): boolean {
-  const value = text.trim();
-  const lower = value.toLowerCase();
-  return value.includes('(')
-    || value.includes(')')
-    || /\b(if|then|else|and|or|between|date|time|duration|not)\b/.test(lower);
-}
-
 function localDiagnostics(table: DecisionTable): Diagnostic[] {
   const diagnostics: Diagnostic[] = validateTable(table).map((message) => ({
     severity: 'ERROR',
@@ -172,7 +154,7 @@ function localDiagnostics(table: DecisionTable): Diagnostic[] {
   const inputs = new Map(table.inputs.map((input) => [input.id, input]));
   table.rules.forEach((rule) => {
     Object.entries(rule.when).forEach(([inputId, cell]) => {
-      if (!cell.feel?.trim() || supportedFeelSyntax(cell.feel)) return;
+      if (!cell.feel?.trim() || isSupportedFeelCellSyntax(cell.feel)) return;
       const input = inputs.get(inputId);
       diagnostics.push({
         severity: 'WARNING',

@@ -90,8 +90,92 @@ function resolveOperand(op: Operand | undefined, ctx: ScopedContext): Resolved {
   if (!op) return { present: false, value: undefined };
   if (op.type === 'literal') return { present: true, value: op.value };
   if (op.type === 'path') return resolvePath(ctx, op.scope, op.path);
-  // functionCall is not evaluated client-side (backend authoritative) -> UNKNOWN-yielding
-  return { present: false, value: undefined };
+  return resolveFunctionCall(op, ctx);
+}
+
+function resolveFunctionCall(op: FunctionCallOperand, ctx: ScopedContext): Resolved {
+  const name = normalizeFunctionName(op.name);
+  const args = (op.args ?? []).map((arg) => resolveOperand(arg, ctx));
+  if (args.some((arg) => !arg.present)) return { present: false, value: undefined };
+  try {
+    return { present: true, value: invokeWhitelistedFunction(name, args.map((arg) => arg.value)) };
+  } catch {
+    return { present: false, value: undefined };
+  }
+}
+
+function invokeWhitelistedFunction(name: string, args: unknown[]): unknown {
+  if (name === 'string.length') return args[0] === null || args[0] === undefined ? 0 : String(args[0]).length;
+  if (name === 'string.lower') return args[0] === null || args[0] === undefined ? null : String(args[0]).toLowerCase();
+  if (name === 'string.upper') return args[0] === null || args[0] === undefined ? null : String(args[0]).toUpperCase();
+  if (name === 'collection.size') return Array.isArray(args[0]) ? args[0].length : 0;
+  if (name === 'date') {
+    if (args.length === 1) return formatDateArg(args[0]);
+    if (args.length === 3) return formatDateParts(args);
+  }
+  if (name === 'time') {
+    if (args.length === 1) return formatTimeArg(args[0]);
+    if (args.length === 3) return formatTimeParts(args);
+  }
+  if (name === 'date and time') {
+    if (args.length === 1) return formatDateTimeArg(args[0]);
+    if (args.length === 2) return `${formatDateArg(args[0])}T${formatTimeArg(args[1])}`;
+    if (args.length === 6) return `${formatDateParts(args.slice(0, 3))}T${formatTimeParts(args.slice(3, 6))}`;
+  }
+  if (name === 'duration' && args.length === 1) {
+    const text = String(args[0] ?? '').trim();
+    if (parseIsoDuration(text) !== null) return text;
+  }
+  throw new Error(`Function not whitelisted: ${name}`);
+}
+
+function normalizeFunctionName(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function toIntegerArg(value: unknown): number {
+  const number = typeof value === 'number' ? value : Number(String(value ?? '').trim());
+  if (!Number.isInteger(number)) throw new Error(`function argument is not an integer: ${String(value)}`);
+  return number;
+}
+
+function formatDateArg(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const text = String(value ?? '').trim();
+  const dateOnly = parseDateOnly(text);
+  if (dateOnly !== null) return new Date(dateOnly).toISOString().slice(0, 10);
+  const parsed = Date.parse(text);
+  if (!Number.isNaN(parsed)) return new Date(parsed).toISOString().slice(0, 10);
+  throw new Error(`invalid date literal: ${text}`);
+}
+
+function formatDateParts(args: unknown[]): string {
+  const [year, month, day] = args.map(toIntegerArg);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    throw new Error('invalid date parts');
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function formatTimeArg(value: unknown): string {
+  const text = String(value ?? '').trim();
+  if (parseTimeOnly(text) === null) throw new Error(`invalid time literal: ${text}`);
+  return text;
+}
+
+function formatTimeParts(args: unknown[]): string {
+  const [hour, minute, second] = args.map(toIntegerArg);
+  const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
+  if (parseTimeOnly(time) === null) throw new Error('invalid time parts');
+  return time;
+}
+
+function formatDateTimeArg(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  const text = String(value ?? '').trim();
+  if (!Number.isNaN(Date.parse(text))) return text;
+  throw new Error(`invalid datetime literal: ${text}`);
 }
 
 function toNum(v: unknown): number | null {

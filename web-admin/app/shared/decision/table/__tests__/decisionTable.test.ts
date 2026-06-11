@@ -132,6 +132,36 @@ describe('evaluateTablePreview (mirrors backend §15)', () => {
       outputs: { route: 'recent' },
     });
   });
+
+  it('FEEL cell text supports whitelisted date and duration functions', () => {
+    const t: DecisionTable = {
+      hitPolicy: 'FIRST',
+      inputs: [
+        { id: 'submittedOn', label: 'Submitted On', scope: 'record', path: 'data.submittedOn', dataType: 'date' },
+        { id: 'sla', label: 'SLA', scope: 'record', path: 'data.sla', dataType: 'duration' },
+      ],
+      outputs: [{ id: 'route', label: 'Route', dataType: 'string' }],
+      rules: [
+        {
+          ruleId: 'fast',
+          when: {
+            submittedOn: { operator: 'EQ', value: '', feel: '>= date(2026, 6, 10)' },
+            sla: { operator: 'EQ', value: '', feel: '<= duration("P2D")' },
+          },
+          then: { route: 'fast' },
+        },
+        { ruleId: 'fallback', when: {}, then: { route: 'fallback' } },
+      ],
+    };
+    expect(evaluateTablePreview(t, {
+      record: { data: { submittedOn: '2026-06-11', sla: 'P1D' } },
+    })).toMatchObject({
+      status: 'MATCHED',
+      matchedRuleId: 'fast',
+      outputs: { route: 'fast' },
+    });
+    expect(validateTable(t)).toEqual([]);
+  });
 });
 
 describe('validateTable', () => {

@@ -25,7 +25,7 @@ export interface DecisionTableEditorProps {
 const CELL_OPERATORS: Operator[] = ['EQ', 'NE', 'GT', 'GTE', 'LT', 'LTE', 'IN', 'BETWEEN'];
 const HIT_POLICIES: HitPolicy[] = ['FIRST', 'UNIQUE', 'COLLECT', 'PRIORITY'];
 const AGGREGATIONS: TableAggregation[] = ['NONE', 'SUM', 'MIN', 'MAX', 'COUNT'];
-const DATA_TYPES: DataType[] = ['string', 'integer', 'decimal', 'boolean', 'date', 'datetime', 'enum'];
+const DATA_TYPES: DataType[] = ['string', 'integer', 'decimal', 'boolean', 'date', 'time', 'datetime', 'duration', 'enum'];
 const SCOPES: Scope[] = ['record', 'event', 'meta', 'process', 'task', 'sla'];
 
 const splitValues = (raw: string): string[] =>

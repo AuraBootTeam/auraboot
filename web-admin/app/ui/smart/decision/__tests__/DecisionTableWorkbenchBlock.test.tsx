@@ -182,11 +182,21 @@ describe('DecisionTableWorkbenchBlock', () => {
     expect(screen.getByTestId('dtw-test-result')).toHaveTextContent('director');
   });
 
-  it('shows local unsupported FEEL diagnostics before backend analysis', () => {
+  it('accepts local FEEL built-in literals before backend analysis', () => {
     renderWorkbench();
 
     fireEvent.change(screen.getByLabelText('feel-0-amount'), {
       target: { value: 'date(2026, 06, 10)' },
+    });
+
+    expect(screen.queryByTestId('dtw-local-diagnostics')).toBeNull();
+  });
+
+  it('shows local unsupported FEEL diagnostics for non-whitelisted expressions', () => {
+    renderWorkbench();
+
+    fireEvent.change(screen.getByLabelText('feel-0-amount'), {
+      target: { value: 'if amount > 10 then 1 else 0' },
     });
 
     expect(screen.getByTestId('dtw-local-diagnostics')).toHaveTextContent('DMN_UNSUPPORTED_FEEL');
