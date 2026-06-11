@@ -134,7 +134,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
 
   test('Phase C0: Load existing CRM data', async ({ page }) => {
     // Accounts
-    const accResp = await page.request.get('/api/dynamic/crm_account/list?pageSize=200');
+    const accResp = await page.request.get('/api/dynamic/crm_account_common/list?pageSize=200');
     const accBody = await accResp.json();
     accounts = accBody?.data?.records || [];
     if (accounts.length < 5) {
@@ -145,12 +145,12 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
     }
 
     // Contacts
-    const ctResp = await page.request.get('/api/dynamic/crm_contact/list?pageSize=300');
+    const ctResp = await page.request.get('/api/dynamic/crm_contact_common/list?pageSize=300');
     const ctBody = await ctResp.json();
     contacts = ctBody?.data?.records || [];
 
     // Opportunities (in proposal/negotiation stage for quotes)
-    const oppResp = await page.request.get('/api/dynamic/crm_opportunity/list?pageSize=200');
+    const oppResp = await page.request.get('/api/dynamic/crm_opportunity_common/list?pageSize=200');
     const oppBody = await oppResp.json();
     opportunities = oppBody?.data?.records || [];
 
@@ -580,7 +580,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
             type: 'OBJECT',
             name: `${accName} — 客户协作群`,
             memberIds: adminUserId ? [adminUserId] : [],
-            boundModelCode: 'crm_account',
+            boundModelCode: 'crm_account_common',
             boundRecordId: Number(acc.id) || acc.id,
           },
         });
@@ -665,7 +665,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
           DEFAULT, '${pid}', (SELECT id FROM ab_tenant WHERE name = 'AuraBoot Dev' LIMIT 1), '${subPid}',
           'evt_opp_stage_${Date.now()}_${i}',
           '${subUrl}',
-          '{"event":"entity.updated","model":"crm_opportunity","recordId":"demo-${i}"}',
+          '{"event":"entity.updated","model":"crm_opportunity_common","recordId":"demo-${i}"}',
           ${log.httpStatus},
           '${log.httpStatus === 200 || log.httpStatus === 201 ? '{"status":"ok"}' : '{"error":"Internal Server Error"}'}',
           '${log.status}',
@@ -734,7 +734,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
         ) VALUES (
           nextval('ab_automation_log_id_seq'), '${pid}', (SELECT id FROM ab_tenant WHERE name = 'AuraBoot Dev' LIMIT 1), '${autoId}',
           '${log.trigger}', 'demo_record_${i}',
-          '{"model":"crm_opportunity","field":"crm_opp_stage","oldValue":"proposal","newValue":"negotiation"}'::jsonb,
+          '{"model":"crm_opportunity_common","field":"crm_opp_stage","oldValue":"proposal","newValue":"negotiation"}'::jsonb,
           '${log.status}', '${startTs}', '${endTs}',
           ${log.error ? `'${log.error}'` : 'NULL'},
           '{"steps":["trigger matched","condition evaluated","action executed"],"status":"${log.status}"}'::jsonb,
@@ -789,7 +789,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
     expect(cmpCount).toBeGreaterThanOrEqual(5);
 
     // OppContacts
-    const ocResp = await page.request.get('/api/dynamic/crm_opp_contact/list?pageSize=100');
+    const ocResp = await page.request.get('/api/dynamic/crm_opportunity_contact_common/list?pageSize=100');
     const ocBody = await ocResp.json();
     const ocCount = ocBody?.data?.total || ocBody?.data?.records?.length || 0;
     console.log(`  OppContacts:     ${ocCount} (target: ≥6, skip if no opps)`);

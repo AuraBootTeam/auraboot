@@ -11,7 +11,7 @@
  *   dfm_pending tab (pending → in_review)
  *
  * The legacy RFQ model was decommissioned (A2). The request lifecycle (draft →
- * submitted → routed → …) lives on crm_customer_request; this spec seeds it via
+ * submitted → routed → …) lives on crm_customer_request_common; this spec seeds it via
  * crm:create_customer_request → crm:submit_customer_request →
  * pe:route_customer_request_to_rfq (the handler auto-creates the sidecar) and then
  * drives the sidecar's DFM gate.
@@ -191,7 +191,7 @@ async function createSidecarInDfmStatus(page: Page, status: DfmStatus): Promise<
 
   // Resolve the sidecar pid written back to the request by the route handler.
   const requestResp = await page.request.get(
-    `/api/dynamic/crm_customer_request/${createResult.recordId}`,
+    `/api/dynamic/crm_customer_request_common/${createResult.recordId}`,
   );
   expect(requestResp.ok(), 'routed customer request should be readable').toBe(true);
   const requestBody = await requestResp.json();

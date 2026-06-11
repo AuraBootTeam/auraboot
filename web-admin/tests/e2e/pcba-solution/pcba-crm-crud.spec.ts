@@ -1,7 +1,7 @@
 /**
  * PCBA CRM — CRUD E2E Tests
  *
- * Covers three CRM models: crm_lead, crm_opportunity, crm_complaint.
+ * Covers three CRM models: crm_lead_common, crm_opportunity_common, crm_complaint.
  * Tests include list loading, create via API + verify in UI, edit, status flow, delete, and i18n.
  *
  * Prerequisites: PCBA CRM plugin must be imported and published.
@@ -159,7 +159,7 @@ test.describe('PCBA CRM CRUD', () => {
   // Lead Tests
   // =========================================================================
 
-  test.describe('Lead (crm_lead)', () => {
+  test.describe('Lead (crm_lead_common)', () => {
     const bucket = emptyBucket();
 
     test.afterAll(async ({ browser }) => {
@@ -397,13 +397,13 @@ test.describe('PCBA CRM CRUD', () => {
   // Opportunity Tests
   // =========================================================================
 
-  test.describe('Opportunity (crm_opportunity)', () => {
+  test.describe('Opportunity (crm_opportunity_common)', () => {
     const bucket = emptyBucket();
     let opportunityCloseDateType: string | undefined;
 
     async function opportunityCloseDateValue(page: any, date: string): Promise<string> {
       if (!opportunityCloseDateType) {
-        const modelResp = await page.request.get('/api/meta/models/code/crm_opportunity');
+        const modelResp = await page.request.get('/api/meta/models/code/crm_opportunity_common');
         const modelJson = await modelResp.json().catch(() => ({}));
         const modelPid = modelJson?.data?.pid ?? modelJson?.pid;
         if (modelPid) {

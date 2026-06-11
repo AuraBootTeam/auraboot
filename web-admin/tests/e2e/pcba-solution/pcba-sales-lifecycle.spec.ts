@@ -371,7 +371,7 @@ test.describe('PCBA Sales Lifecycle — Shipment', () => {
     salesOrderPid = soBody?.data?.records?.[0]?.pid;
     if (!salesOrderPid) {
       // Ensure customer account exists
-      const accResp = await p.request.get('/api/dynamic/crm_account/list?pageSize=1');
+      const accResp = await p.request.get('/api/dynamic/crm_account_common/list?pageSize=1');
       const accBody = await accResp.json();
       let accountPid = accBody?.data?.records?.[0]?.pid;
       if (!accountPid) {
@@ -791,7 +791,7 @@ test.describe('PCBA Sales Lifecycle — Sales Return', () => {
     page: import('@playwright/test').Page,
     namePrefix: string,
   ): Promise<string> {
-    const acctResp = await page.request.get('/api/dynamic/crm_account/list?pageSize=1');
+    const acctResp = await page.request.get('/api/dynamic/crm_account_common/list?pageSize=1');
     const acctBody = await acctResp.json().catch(() => ({}));
     const existingPid = acctBody?.data?.records?.[0]?.pid;
     if (existingPid) {
@@ -1355,7 +1355,7 @@ test.describe('PCBA Sales Lifecycle — RMA', () => {
   let rmaCustomerPid: string;
 
   async function ensureRmaCustomerAccount(page: import('@playwright/test').Page): Promise<string> {
-    const acctResp = await page.request.get('/api/dynamic/crm_account/list?pageSize=1');
+    const acctResp = await page.request.get('/api/dynamic/crm_account_common/list?pageSize=1');
     const acctBody = await acctResp.json().catch(() => ({}));
     const existingPid = acctBody?.data?.records?.[0]?.pid;
     if (existingPid) {
