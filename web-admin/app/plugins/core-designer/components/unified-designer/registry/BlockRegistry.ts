@@ -1,5 +1,9 @@
 import type { BlockDefinitionV3 } from '../types';
 import { defaultInspectorSchemaRegistry } from './InspectorSchemaRegistry';
+import {
+  getCustomDesignerBlockDefinitions,
+  getCustomDesignerBlockEntries,
+} from './customBlockRegistry';
 
 export class BlockRegistryV3 {
   private readonly definitions = new Map<string, BlockDefinitionV3>();
@@ -34,7 +38,7 @@ export function createBlockRegistryV3(definitions: BlockDefinitionV3[] = []): Bl
 }
 
 export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
-  return createBlockRegistryV3([
+  const registry = createBlockRegistryV3([
     {
       blockType: 'form',
       label: { 'en-US': 'Form', 'zh-CN': '表单' },
@@ -264,6 +268,25 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
       layoutCapability: 'span',
     },
   ]);
+
+  // Merge plugin-contributed custom blocks (additive; see customBlockRegistry).
+  // Built-in blocks are registered first so a plugin can intentionally override
+  // one by re-using its blockType, but the common case is net-new block types.
+  registry.registerAll(getCustomDesignerBlockDefinitions());
+
+  // Wire each custom block into its declared parents' allowedChildren so the
+  // canvas drop logic (canContain) lets it nest there.
+  for (const { definition, options } of getCustomDesignerBlockEntries()) {
+    for (const parentType of options.allowedParents ?? []) {
+      const parent = registry.get(parentType);
+      if (!parent) continue;
+      const children = new Set(parent.allowedChildren ?? []);
+      children.add(definition.blockType);
+      parent.allowedChildren = Array.from(children);
+    }
+  }
+
+  return registry;
 }
 
 function toInspectorSchema(blockType: string): BlockDefinitionV3['inspector'] {
