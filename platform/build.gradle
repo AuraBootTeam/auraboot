@@ -709,17 +709,20 @@ jacocoTestCoverageVerification {
         // No-regression ratchet over the HONEST denominator. 2026-06-10 the curated
         // bundle read 80.1% (33671/42043) — but that excluded meta/service/impl (the
         // command pipeline). 2026-06-11 that exclude was removed (it was already ~47%
-        // covered), so the bundle now measures the real orchestration core and reads
-        // ~70.2% (42826/61002). This floor (0.68) locks that honest number with flaky
-        // margin. Raise it as meta/service/impl IT lifts toward 0.80. The number went
-        // DOWN but the SCOPE went UP — this is more rigorous, not less.
+        // covered), so the bundle now measures the real orchestration core and read
+        // ~70.2% (42826/61002), floor 0.68. Real-stack IT for the dict domain then
+        // lifted DictServiceImpl 26.7%->79% and DictCascadeServiceImpl 1.8%->77%
+        // (~+480 covered lines), so the bundle now reads ~71.5% and the floor is
+        // raised to 0.69 (preserving the original ~2pt flaky margin). Keep raising it
+        // as meta/service/impl IT lifts toward 0.80. The number went DOWN from the old
+        // narrow 80% but the SCOPE went UP — this is more rigorous, not less.
         rule {
             enabled = true
             element = 'BUNDLE'
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.68
+                minimum = 0.69
             }
         }
         // Lock the already-strong security/identity domains so they cannot rot.
