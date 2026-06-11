@@ -3,7 +3,7 @@
  *
  * Tests PB-001 ~ PB-018: CRUD lifecycle for 4 core base models:
  * - prod_product (Product — product-catalog plugin)
- * - crm_account (Customer/Account — CRM plugin)
+ * - crm_account_common (Customer/Account — CRM plugin)
  * - pe_supplier (Supplier — procurement plugin)
  * - inv_warehouse (Warehouse — inventory plugin)
  *
@@ -536,7 +536,7 @@ test.describe('PCBA Base — Product CRUD', () => {
 });
 
 // ==========================================================================
-// crm_account Tests (formerly pe_customer — moved to CRM plugin)
+// crm_account_common Tests (formerly pe_customer — moved to CRM plugin)
 // ==========================================================================
 
 test.describe('PCBA Base — Account (Customer) CRUD', () => {

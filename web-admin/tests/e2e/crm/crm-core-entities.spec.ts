@@ -10,8 +10,8 @@
  * CE-007 @critical : Campaign cancel branch → active → cancelled
  *
  * Menu paths (CRM root → direct leaf links):
- *   /p/crm-account    → model: crm_account
- *   /p/crm-contact    → model: crm_contact
+ *   /p/crm-account    → model: crm_account_common
+ *   /p/crm-contact    → model: crm_contact_common
  *   /p/crm-campaign   → model: crm_campaign
  *
  * Prerequisites: crm plugin imported and all models published.
@@ -168,7 +168,7 @@ test.describe('CRM — Core Entities', () => {
   // =========================================================================
 
   test('CE-001 @smoke: Navigate to 客户 list via CRM menu', async ({ page }) => {
-    await navigateToCrmPage(page, '客户', 'crm_account');
+    await navigateToCrmPage(page, '客户', 'crm_account_common');
 
     const rows = page.locator('tbody tr');
     await expect(rows.first()).toBeVisible({ timeout: 8_000 });
@@ -185,7 +185,7 @@ test.describe('CRM — Core Entities', () => {
   // =========================================================================
 
   test('CE-002 @smoke: Navigate to 联系人 list via CRM menu', async ({ page }) => {
-    await navigateToCrmPage(page, '联系人', 'crm_contact');
+    await navigateToCrmPage(page, '联系人', 'crm_contact_common');
 
     const rows = page.locator('tbody tr');
     await expect(rows.first()).toBeVisible({ timeout: 8_000 });
@@ -222,14 +222,14 @@ test.describe('CRM — Core Entities', () => {
     expect(accountId).toBeTruthy();
 
     // Verify via direct GET
-    const resp = await page.request.get(`/api/dynamic/crm_account/${accountId}`);
+    const resp = await page.request.get(`/api/dynamic/crm_account_common/${accountId}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body?.data ?? body;
     expect(record.crm_acc_name).toBe(accountName);
 
     // Verify in list UI — table must have rows
-    await navigateToCrmPage(page, '客户', 'crm_account');
+    await navigateToCrmPage(page, '客户', 'crm_account_common');
     const rows = page.locator('tbody tr');
     await expect(rows.first()).toBeVisible({ timeout: 8_000 });
   });
@@ -244,7 +244,7 @@ test.describe('CRM — Core Entities', () => {
     expect(contactId).toBeTruthy();
 
     // Verify via API
-    const resp = await page.request.get(`/api/dynamic/crm_contact/${contactId}`);
+    const resp = await page.request.get(`/api/dynamic/crm_contact_common/${contactId}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body?.data ?? body;
@@ -252,7 +252,7 @@ test.describe('CRM — Core Entities', () => {
     expect(record.crm_ct_account_id).toBe(accountId);
 
     // Verify in list UI — table must have rows
-    await navigateToCrmPage(page, '联系人', 'crm_contact');
+    await navigateToCrmPage(page, '联系人', 'crm_contact_common');
     const rows = page.locator('tbody tr');
     await expect(rows.first()).toBeVisible({ timeout: 8_000 });
   });

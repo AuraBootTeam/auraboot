@@ -1223,7 +1223,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
               blockType: 'table',
               title: '客户清单',
               config: {
-                dataSource: { type: 'model', modelCode: 'crm_account' },
+                dataSource: { type: 'model', modelCode: 'crm_account_common' },
                 columns: [
                   { field: 'crm_acc_code', title: '编号', width: 120 },
                   { field: 'crm_acc_name', title: '客户名', width: 200 },
@@ -1522,7 +1522,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
       {
         name: '军火展 — 字段变更触发(ON_FIELD_CHANGE)',
         triggerType: 'on_field_change',
-        modelCode: 'crm_opportunity',
+        modelCode: 'crm_opportunity_common',
         triggerConfig: { fieldCode: 'crm_opp_expected_amount', stateField: 'crm_opp_stage' },
         actions: [
           {
@@ -1536,7 +1536,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
       {
         name: '军火展 — 记录更新触发(ON_RECORD_UPDATE)',
         triggerType: 'on_record_update',
-        modelCode: 'crm_account',
+        modelCode: 'crm_account_common',
         triggerConfig: { watchFields: ['crm_acc_rating', 'crm_acc_status'] },
         actions: [
           {
@@ -1566,7 +1566,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           },
           {
             type: 'create_record',
-            config: { targetModel: 'crm_lead', message: '从外部创建线索' },
+            config: { targetModel: 'crm_lead_common', message: '从外部创建线索' },
             sequence: 1,
             label: '创建线索',
           },
@@ -1621,7 +1621,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
       const resp = await page.request.post('/api/views', {
         data: {
           name: v.name,
-          modelCode: 'crm_opportunity',
+          modelCode: 'crm_opportunity_common',
           viewType: v.viewType.toLowerCase(),
           scope: 'global',
           viewConfig: v.config,
@@ -1636,7 +1636,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         );
       }
     }
-    console.log(`  Created ${created}/7 SavedViews for crm_opportunity`);
+    console.log(`  Created ${created}/7 SavedViews for crm_opportunity_common`);
   });
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -1806,7 +1806,7 @@ A: 新客户预付 50%，老客户月结 30-60 天。支持银行转账、承兑
     );
 
     // SavedViews
-    const viewResp = await page.request.get('/api/views/accessible?modelCode=crm_opportunity');
+    const viewResp = await page.request.get('/api/views/accessible?modelCode=crm_opportunity_common');
     const viewBody = await viewResp.json().catch(() => ({}));
     const viewCount = Array.isArray(viewBody?.data)
       ? viewBody.data.length

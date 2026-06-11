@@ -9,7 +9,7 @@
  * - View type switching (table ↔ kanban)
  *
  * Prerequisites:
- *   - CRM plugin imported with crm_opportunity model
+ *   - CRM plugin imported with crm_opportunity_common model
  *   - Seed opportunities in different stages
  *
  * @since 7.4.0
@@ -24,8 +24,8 @@ import {
   waitForDynamicPageLoad,
 } from '../helpers/index';
 
-const MODEL_CODE = 'crm_opportunity';
-const ROUTE_KEY = 'crm_opportunity';
+const MODEL_CODE = 'crm_opportunity_common';
+const ROUTE_KEY = 'crm_opportunity_common';
 const STAGE_FILTERS = ['全部', '进行中', '赢单', '输单'];
 
 test.describe('CRM Opportunity Kanban @smoke', () => {
@@ -93,7 +93,7 @@ test.describe('CRM Opportunity Kanban @smoke', () => {
   /** Navigate to CRM Opportunities via sidebar menu */
   async function gotoOpportunityList(page: import('@playwright/test').Page) {
     await navigateToDynamicPage(page, ROUTE_KEY);
-    await expect(page).toHaveURL(/\/p\/crm_opportunity(?:\?.*)?$/);
+    await expect(page).toHaveURL(/\/p\/crm_opportunity_common(?:\?.*)?$/);
     await waitForDynamicPageLoad(page);
   }
 
