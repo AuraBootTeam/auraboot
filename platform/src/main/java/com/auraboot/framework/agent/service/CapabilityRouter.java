@@ -110,11 +110,17 @@ public class CapabilityRouter {
     private List<String> parseJsonList(Object jsonObj) {
         if (jsonObj == null) return List.of();
         try {
-            if (jsonObj instanceof String s) {
-                return objectMapper.readValue(s, List.class);
-            } else if (jsonObj instanceof List<?> list) {
+            if (jsonObj instanceof List<?> list) {
                 return (List<String>) list;
             }
+            // String, or a driver PGobject for a JSONB column read via the generic
+            // query (no entity type-handler applies). Mirror the canonical pattern in
+            // StepLoopService.parseExecutionConfig: PGobject.toString() yields the JSON
+            // text. Without this, intent_patterns/object_patterns/skills all parse to
+            // empty and capability routing silently returns no skills.
+            String json = jsonObj instanceof String s ? s : jsonObj.toString();
+            if (json.isBlank() || "null".equals(json.trim())) return List.of();
+            return objectMapper.readValue(json, List.class);
         } catch (Exception e) {
             // ignore parse failures — treat as empty
         }
