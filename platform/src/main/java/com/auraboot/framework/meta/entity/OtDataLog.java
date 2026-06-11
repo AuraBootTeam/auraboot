@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.entity;
 
+import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -35,11 +36,11 @@ public class OtDataLog {
     private Instant timestamp;
 
     /** Raw device data, stored as JSONB */
-    @TableField("raw_data")
+    @TableField(value = "raw_data", typeHandler = JsonbStringTypeHandler.class)
     private String rawData;
 
     /** Parsed structured data, stored as JSONB */
-    @TableField("parsed_data")
+    @TableField(value = "parsed_data", typeHandler = JsonbStringTypeHandler.class)
     private String parsedData;
 
     /** RECEIVED, PROCESSED, FAILED, IGNORED */
