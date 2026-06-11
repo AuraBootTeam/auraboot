@@ -1,5 +1,5 @@
 import { test, expect, type APIResponse, type Page } from '@playwright/test';
-import { uniqueId, waitForDynamicPageLoad } from '../helpers';
+import { ensureSidebarExpanded, uniqueId, waitForDynamicPageLoad } from '../helpers';
 import {
   dragNodeToCanvas,
   fillNodeConfig,
@@ -10,7 +10,7 @@ import {
 const DESIGNER_NEW = '/automation/new';
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const ADMIN_PASSWORD = 'Test2026x';
-const MODEL_LABEL = '投诉';
+const PREFERRED_MODEL_CODE = 'e2et_order';
 const DECISION_CODE = 'approval_routing';
 
 type ApiEnvelope<T> = {
@@ -19,6 +19,16 @@ type ApiEnvelope<T> = {
   message?: string;
   msg?: string;
   data?: T;
+};
+
+type ModelRecord = {
+  code?: string;
+  displayName?: string;
+  name?: string;
+  extension?: {
+    displayName?: string;
+    name?: string;
+  };
 };
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -63,6 +73,10 @@ function isApiSuccess<T>(body: ApiEnvelope<T> | null | undefined): body is ApiEn
   return code === undefined || code === null || String(code) === '0';
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function readApi<T>(response: APIResponse): Promise<T> {
   const body = (await response.json().catch(async () => ({
     message: await response.text().catch(() => ''),
@@ -95,6 +109,27 @@ async function ensureApprovalRoutingDecision(page: Page): Promise<void> {
   await readApi(await page.request.get(`/api/decision/definitions/${DECISION_CODE}/versions`));
 }
 
+async function resolvePublishedModelLabel(page: Page): Promise<string> {
+  const payload = await readApi<{ records?: ModelRecord[] } | ModelRecord[]>(
+    await page.request.get('/api/meta/models?size=500&currentOnly=true&status=published'),
+  );
+  const records = Array.isArray(payload) ? payload : payload?.records || [];
+  const selected =
+    records.find((record) => record.code === PREFERRED_MODEL_CODE) ??
+    records.find((record) => Boolean(record.code)) ??
+    null;
+
+  expect(selected, 'Automation rule-binding E2E needs at least one published model').toBeTruthy();
+  return (
+    selected?.displayName ||
+    selected?.name ||
+    selected?.extension?.displayName ||
+    selected?.extension?.name ||
+    selected?.code ||
+    PREFERRED_MODEL_CODE
+  );
+}
+
 async function openNewDesigner(page: Page): Promise<void> {
   await page.goto(DESIGNER_NEW, { waitUntil: 'domcontentloaded' });
   await page
@@ -106,6 +141,55 @@ async function openNewDesigner(page: Page): Promise<void> {
     timeout: 20_000,
   });
   await page.locator('.react-flow__pane').waitFor({ state: 'visible', timeout: 10_000 });
+}
+
+async function openDecisionDefinitionDetailViaSidebar(page: Page, decisionCode: string): Promise<void> {
+  await page.goto('/home', { waitUntil: 'domcontentloaded' });
+  await ensureSidebarExpanded(page);
+  const nav = page.locator('nav, aside, [role="navigation"]').first();
+  const parent = nav
+    .getByRole('button', { name: /决策中心|DecisionOps/i })
+    .or(nav.getByRole('link', { name: /决策中心|DecisionOps/i }))
+    .first();
+  const definitionsLink = nav
+    .locator('a[href="/p/decisionops_definitions"]')
+    .or(nav.getByRole('link', { name: /决策定义|Decision Definitions/i }))
+    .first();
+  if (!(await definitionsLink.isVisible({ timeout: 1000 }).catch(() => false))) {
+    await expect(parent).toBeVisible({ timeout: 10_000 });
+    await parent.click();
+  }
+  await expect(definitionsLink).toBeVisible({ timeout: 10_000 });
+  await definitionsLink.click();
+  await expect(page).toHaveURL(/\/p\/decisionops_definitions(?:$|\?)/, { timeout: 15_000 });
+  await waitForDynamicPageLoad(page);
+
+  const searchResponse = page
+    .waitForResponse(
+      (response) =>
+        response.url().includes('/api/decision/definitions') &&
+        response.url().includes(`keyword=${encodeURIComponent(decisionCode)}`) &&
+        response.status() < 400,
+      { timeout: 15_000 },
+    )
+    .catch(() => null);
+  await page.getByTestId('list-search-input').fill(decisionCode);
+  await page.getByTestId('list-search-input').press('Enter');
+  await searchResponse;
+
+  const exactDecisionCode = new RegExp(`^\\s*${escapeRegExp(decisionCode)}\\s*$`);
+  const row = page
+    .locator('tbody tr')
+    .filter({ has: page.locator('td').filter({ hasText: exactDecisionCode }) })
+    .first();
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await row
+    .getByRole('link', { name: /详情|Detail/i })
+    .or(row.getByRole('button', { name: /详情|Detail/i }))
+    .first()
+    .click();
+  await expect(page).toHaveURL(/\/p\/decisionops_definitions\/view\//, { timeout: 15_000 });
+  await waitForDynamicPageLoad(page);
 }
 
 async function setAutomationName(page: Page, name: string): Promise<void> {
@@ -125,13 +209,14 @@ test('Automation trigger property panel hosts the rule center binding editor and
   const resolvedBaseURL = baseURL ?? 'http://127.0.0.1:5212';
   await loginAsAdmin(page, resolvedBaseURL);
   await ensureApprovalRoutingDecision(page);
+  const modelLabel = await resolvePublishedModelLabel(page);
   await openNewDesigner(page);
 
   const name = `Rule binding host ${uniqueId()}`;
   await setAutomationName(page, name);
 
   const triggerId = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
-  await fillNodeConfig(page, triggerId, { modelCode: MODEL_LABEL });
+  await fillNodeConfig(page, triggerId, { modelCode: modelLabel });
 
   const ruleField = page.locator('[data-testid="prop-field-ruleBinding"]');
   await expect(ruleField).toBeVisible();
@@ -146,6 +231,9 @@ test('Automation trigger property panel hosts the rule center binding editor and
   await ruleField.locator('select[aria-label="version-policy"]').selectOption('ROLLOUT');
   await ruleField.getByRole('button', { name: '添加映射' }).click();
   await ruleField.locator('input[aria-label="mapping-input-0"]').fill('amount');
+  await expect(ruleField.locator('[data-testid="decision-binding-preview"]')).toContainText(
+    `"decisionCode": "${DECISION_CODE}"`,
+  );
   await expect(ruleField.locator('[data-testid="decision-binding-preview"]')).toContainText(
     '"versionPolicy": "ROLLOUT"',
   );
@@ -168,8 +256,8 @@ test('Automation trigger property panel hosts the rule center binding editor and
       consumerType: 'AUTOMATION',
       consumerNodeId: 'trigger',
       bindingKind: 'DECISION_REF',
-      enabled: true,
-      decisionBinding: {
+        enabled: true,
+        decisionBinding: {
         decisionCode: DECISION_CODE,
         versionPolicy: 'ROLLOUT',
         fallbackPolicy: { mode: 'FAIL_CLOSED' },
@@ -198,10 +286,7 @@ test('Automation trigger property panel hosts the rule center binding editor and
       ]),
     );
 
-    await page.goto(`/p/decisionops_definitions/view/${encodeURIComponent(DECISION_CODE)}`, {
-      waitUntil: 'domcontentloaded',
-    });
-    await waitForDynamicPageLoad(page);
+    await openDecisionDefinitionDetailViaSidebar(page, DECISION_CODE);
     await expect(page.getByTestId('decision-definition-actions-block')).toBeVisible();
     await expect(page.getByTestId('dda-impact-panel')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('impact-graph-panel')).toBeVisible({ timeout: 15_000 });

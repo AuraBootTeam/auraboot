@@ -1,5 +1,5 @@
 import { test, expect, type APIResponse, type Page } from '@playwright/test';
-import { waitForDynamicPageLoad } from '../helpers';
+import { ensureSidebarExpanded, waitForDynamicPageLoad } from '../helpers';
 
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const ADMIN_PASSWORD = 'Test2026x';
@@ -61,6 +61,10 @@ function isApiSuccess<T>(body: ApiEnvelope<T> | null | undefined): body is ApiEn
   return code === undefined || code === null || String(code) === '0';
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function readApi<T>(response: APIResponse): Promise<T> {
   const body = (await response.json().catch(async () => ({
     message: await response.text().catch(() => ''),
@@ -89,6 +93,55 @@ async function ensureTaskAssignmentDecision(page: Page): Promise<void> {
       }),
     );
   }
+}
+
+async function openDecisionDefinitionDetailViaSidebar(page: Page, decisionCode: string): Promise<void> {
+  await page.goto('/home', { waitUntil: 'domcontentloaded' });
+  await ensureSidebarExpanded(page);
+  const nav = page.locator('nav, aside, [role="navigation"]').first();
+  const parent = nav
+    .getByRole('button', { name: /决策中心|DecisionOps/i })
+    .or(nav.getByRole('link', { name: /决策中心|DecisionOps/i }))
+    .first();
+  const definitionsLink = nav
+    .locator('a[href="/p/decisionops_definitions"]')
+    .or(nav.getByRole('link', { name: /决策定义|Decision Definitions/i }))
+    .first();
+  if (!(await definitionsLink.isVisible({ timeout: 1000 }).catch(() => false))) {
+    await expect(parent).toBeVisible({ timeout: 10_000 });
+    await parent.click();
+  }
+  await expect(definitionsLink).toBeVisible({ timeout: 10_000 });
+  await definitionsLink.click();
+  await expect(page).toHaveURL(/\/p\/decisionops_definitions(?:$|\?)/, { timeout: 15_000 });
+  await waitForDynamicPageLoad(page);
+
+  const searchResponse = page
+    .waitForResponse(
+      (response) =>
+        response.url().includes('/api/decision/definitions') &&
+        response.url().includes(`keyword=${encodeURIComponent(decisionCode)}`) &&
+        response.status() < 400,
+      { timeout: 15_000 },
+    )
+    .catch(() => null);
+  await page.getByTestId('list-search-input').fill(decisionCode);
+  await page.getByTestId('list-search-input').press('Enter');
+  await searchResponse;
+
+  const exactDecisionCode = new RegExp(`^\\s*${escapeRegExp(decisionCode)}\\s*$`);
+  const row = page
+    .locator('tbody tr')
+    .filter({ has: page.locator('td').filter({ hasText: exactDecisionCode }) })
+    .first();
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await row
+    .getByRole('link', { name: /详情|Detail/i })
+    .or(row.getByRole('button', { name: /详情|Detail/i }))
+    .first()
+    .click();
+  await expect(page).toHaveURL(/\/p\/decisionops_definitions\/view\//, { timeout: 15_000 });
+  await waitForDynamicPageLoad(page);
 }
 
 function buildDesignerJson(processKey = PROCESS_KEY) {
@@ -391,7 +444,7 @@ test('BPM userTask property panel hosts rule center assignment and exposes impac
     await ruleSection.getByRole('button', { name: '添加映射' }).click();
     await ruleSection.locator('input[aria-label="mapping-input-0"]').fill('amount');
     await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
-      '"decisionCode": "task_assignee"',
+      `"decisionCode": "${TASK_ASSIGNMENT_DECISION}"`,
     );
     await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
       '"versionPolicy": "ROLLOUT"',
@@ -474,13 +527,7 @@ test('BPM userTask property panel hosts rule center assignment and exposes impac
     expect(bpmIncoming, `BPM impact incoming missing: ${JSON.stringify(incoming)}`).toBeTruthy();
     expect(JSON.stringify(bpmIncoming)).toContain(TASK_ID);
 
-    await page.goto(
-      `/p/decisionops_definitions/view/${encodeURIComponent(TASK_ASSIGNMENT_DECISION)}`,
-      {
-        waitUntil: 'domcontentloaded',
-      },
-    );
-    await waitForDynamicPageLoad(page);
+    await openDecisionDefinitionDetailViaSidebar(page, TASK_ASSIGNMENT_DECISION);
     await expect(page.getByTestId('decision-definition-actions-block')).toBeVisible();
     await expect(page.getByTestId('dda-impact-panel')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('impact-graph-panel')).toBeVisible({ timeout: 15_000 });

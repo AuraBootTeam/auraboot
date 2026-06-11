@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventPolicyDesignerBlock } from '../EventPolicyDesignerBlock';
@@ -35,6 +35,18 @@ describe('EventPolicyDesignerBlock', () => {
       if (endpoint === '/event-policy/definitions/complaint_policy/versions') {
         return Promise.resolve({ data: [] });
       }
+      if (endpoint === '/decision/model/fields') {
+        return Promise.resolve({
+          data: [
+            {
+              entityCode: 'record',
+              path: 'data.customerLevel',
+              label: '客户等级',
+              dataType: 'enum',
+            },
+          ],
+        });
+      }
       return Promise.resolve({ data: [] });
     });
   });
@@ -57,5 +69,23 @@ describe('EventPolicyDesignerBlock', () => {
     await waitFor(() =>
       expect(get).toHaveBeenCalledWith('/event-policy/definitions/complaint_policy/versions', undefined),
     );
+  });
+
+  it('loads model fields into the rule field picker with default event fields as fallback', async () => {
+    render(
+      <MemoryRouter>
+        <EventPolicyDesignerBlock block={{ props: { policyCode: 'complaint_policy' } }} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/decision/model/fields', undefined));
+    await screen.findByTestId('epd-workflow');
+    fireEvent.click(screen.getByTestId('epd-step-rules'));
+    fireEvent.click(screen.getByTestId('cb-add'));
+
+    const fieldPicker = screen.getByLabelText('field-0');
+    expect(fieldPicker).toHaveTextContent('客户等级');
+    expect(fieldPicker).toHaveTextContent('优先级');
+    expect(fieldPicker).toHaveTextContent('金额');
   });
 });

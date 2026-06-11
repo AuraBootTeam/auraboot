@@ -52,6 +52,66 @@ class RuleEvaluationServiceImplTest {
     }
 
     @Test
+    void evaluateConditionSupportsNestedOrAndNotSemantics() {
+        ConditionNode condition = new ConditionNode.GroupNode(ConditionNode.BoolOp.AND, List.of(
+                ConditionNode.CompareNode.of(
+                        new Operand.PathOperand(Scope.RECORD, "data.priority", DataType.ENUM),
+                        Operator.EQ,
+                        new Operand.LiteralOperand("HIGH", DataType.ENUM)),
+                new ConditionNode.GroupNode(ConditionNode.BoolOp.OR, List.of(
+                        ConditionNode.CompareNode.of(
+                                new Operand.PathOperand(Scope.RECORD, "data.amount", DataType.DECIMAL),
+                                Operator.GT,
+                                new Operand.LiteralOperand(5000, DataType.DECIMAL)),
+                        ConditionNode.CompareNode.of(
+                                new Operand.PathOperand(Scope.RECORD, "data.customerLevel", DataType.ENUM),
+                                Operator.EQ,
+                                new Operand.LiteralOperand("VIP", DataType.ENUM)))),
+                new ConditionNode.NotNode(ConditionNode.CompareNode.of(
+                        new Operand.PathOperand(Scope.RECORD, "data.status", DataType.ENUM),
+                        Operator.EQ,
+                        new Operand.LiteralOperand("BLOCKED", DataType.ENUM)))
+        ));
+        RuleEvaluationContext matchedContext = new RuleEvaluationContext(
+                Map.of(Scope.RECORD, Map.of("data", Map.of(
+                        "priority", "HIGH",
+                        "amount", 9000,
+                        "customerLevel", "STANDARD",
+                        "status", "OPEN"))),
+                "EVENT_POLICY",
+                "policy-1",
+                "rule-1",
+                "trace-condition-1",
+                null,
+                null);
+        RuleEvaluationContext blockedContext = new RuleEvaluationContext(
+                Map.of(Scope.RECORD, Map.of("data", Map.of(
+                        "priority", "HIGH",
+                        "amount", 9000,
+                        "customerLevel", "VIP",
+                        "status", "BLOCKED"))),
+                "EVENT_POLICY",
+                "policy-1",
+                "rule-1",
+                "trace-condition-2",
+                null,
+                null);
+
+        RuleEvaluationTrace matched = service.evaluateCondition(ConditionSpec.of(condition), matchedContext);
+        RuleEvaluationTrace blocked = service.evaluateCondition(ConditionSpec.of(condition), blockedContext);
+
+        assertThat(matched.conditionResult()).isEqualTo(Truth.TRUE);
+        assertThat(matched.matched()).isTrue();
+        assertThat(blocked.conditionResult()).isEqualTo(Truth.FALSE);
+        assertThat(blocked.matched()).isFalse();
+        assertThat(matched.fieldRefs()).containsExactly(
+                "record.data.priority",
+                "record.data.amount",
+                "record.data.customerLevel",
+                "record.data.status");
+    }
+
+    @Test
     void evaluateDecisionBindingMapsInputsAndVersionPolicyToDecisionRuntime() {
         DecisionBinding binding = new DecisionBinding(
                 "approval_routing",

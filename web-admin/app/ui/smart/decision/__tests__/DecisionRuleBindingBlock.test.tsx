@@ -212,6 +212,107 @@ describe('DecisionRuleBindingBlock', () => {
     expect(onChange).toHaveBeenCalledWith(value);
   });
 
+  it('writes nested AND/OR/NOT condition specs through the DSL form runtime valueField', () => {
+    const updateField = vi.fn();
+
+    render(
+      <DecisionRuleBindingBlock
+        runtime={{ updateField }}
+        block={{
+          props: {
+            mode: 'condition',
+            valueField: 'rule_binding',
+            consumerType: 'EVENT_POLICY',
+            consumerCode: 'policy-1',
+            consumerNodeId: 'rule-1',
+            fields: [
+              {
+                scope: 'record',
+                path: 'data.priority',
+                label: '优先级',
+                dataType: 'enum',
+                options: ['HIGH', 'LOW'],
+              },
+              { scope: 'record', path: 'data.amount', label: '金额', dataType: 'decimal' },
+            ],
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('cb-add'));
+    fireEvent.change(screen.getByLabelText('field-0'), {
+      target: { value: 'record:data.priority' },
+    });
+    fireEvent.change(screen.getByLabelText('value-0'), {
+      target: { value: 'HIGH' },
+    });
+
+    fireEvent.click(screen.getByTestId('cb-add-group'));
+    fireEvent.click(screen.getByTestId('op-or-1'));
+    fireEvent.change(screen.getByLabelText('field-1-0'), {
+      target: { value: 'record:data.amount' },
+    });
+    fireEvent.change(screen.getByLabelText('operator-1-0'), {
+      target: { value: 'GT' },
+    });
+    fireEvent.change(screen.getByLabelText('value-1-0'), {
+      target: { value: '5000' },
+    });
+
+    fireEvent.click(screen.getByTestId('cb-add-not'));
+    fireEvent.change(screen.getByLabelText('field-2-0'), {
+      target: { value: 'record:data.priority' },
+    });
+    fireEvent.change(screen.getByLabelText('value-2-0'), {
+      target: { value: 'LOW' },
+    });
+
+    const [, value] = updateField.mock.calls.at(-1) ?? [];
+    expect(value).toMatchObject({
+      consumerType: 'EVENT_POLICY',
+      consumerCode: 'policy-1',
+      consumerNodeId: 'rule-1',
+      bindingKind: 'CONDITION',
+      conditionSpec: {
+        root: {
+          type: 'group',
+          op: 'AND',
+          children: [
+            {
+              type: 'compare',
+              operator: 'EQ',
+              left: { scope: 'record', path: 'data.priority' },
+              right: { value: 'HIGH' },
+            },
+            {
+              type: 'group',
+              op: 'OR',
+              children: [
+                {
+                  type: 'compare',
+                  operator: 'GT',
+                  left: { scope: 'record', path: 'data.amount' },
+                  right: { value: '5000' },
+                },
+              ],
+            },
+            {
+              type: 'not',
+              child: {
+                type: 'compare',
+                operator: 'EQ',
+                left: { scope: 'record', path: 'data.priority' },
+                right: { value: 'LOW' },
+              },
+            },
+          ],
+        },
+      },
+      enabled: true,
+    });
+  });
+
   it('writes the initial RuleConsumerBinding value to a DSL form valueField on mount', async () => {
     const updateField = vi.fn();
 

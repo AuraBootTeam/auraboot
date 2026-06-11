@@ -4,6 +4,7 @@ import { getApiService } from '~/shared/services/ApiService';
 import {
   createDecisionApi,
   type DecisionApi,
+  type DecisionModelField,
   type EventPolicySummary,
   type HttpClient,
 } from '~/shared/decision/api/decisionApi';
@@ -40,6 +41,41 @@ const DEFAULT_FIELDS: FieldOption[] = [
   { scope: 'record', path: 'data.status', label: '状态', dataType: 'string' },
 ];
 
+const SUPPORTED_SCOPES = new Set<FieldOption['scope']>([
+  'meta',
+  'event',
+  'record',
+  'before',
+  'after',
+  'process',
+  'task',
+  'sla',
+  'actor',
+  'tenant',
+  'time',
+  'env',
+]);
+
+const SUPPORTED_DATA_TYPES = new Set<FieldOption['dataType']>([
+  'string',
+  'text',
+  'integer',
+  'decimal',
+  'boolean',
+  'date',
+  'time',
+  'datetime',
+  'duration',
+  'enum',
+  'dict',
+  'user',
+  'role',
+  'group',
+  'department',
+  'collection',
+  'object',
+]);
+
 function createApi(): DecisionApi {
   const service = getApiService();
   const http: HttpClient = {
@@ -70,11 +106,35 @@ function runtimeRecord(runtime: EventPolicyDesignerBlockProps['runtime']): Recor
   return context?.record ?? context?.row ?? context?.data ?? {};
 }
 
+function toFieldOption(field: DecisionModelField): FieldOption | null {
+  const scope = String(field.entityCode ?? 'record') as FieldOption['scope'];
+  const path = String(field.path ?? '');
+  if (!SUPPORTED_SCOPES.has(scope) || !path) return null;
+  const dataType = String(field.dataType ?? 'object').toLowerCase() as FieldOption['dataType'];
+  return {
+    scope,
+    path,
+    label: field.label || `${scope}.${path}`,
+    dataType: SUPPORTED_DATA_TYPES.has(dataType) ? dataType : 'object',
+  };
+}
+
+function mergeFieldOptions(primary: FieldOption[], fallback: FieldOption[]): FieldOption[] {
+  const seen = new Set<string>();
+  return [...primary, ...fallback].filter((field) => {
+    const key = `${field.scope}:${field.path}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesignerBlockProps) {
   const [searchParams] = useSearchParams();
   const params = useParams();
   const api = useMemo(() => createApi(), []);
   const record = runtimeRecord(runtime);
+  const configuredFields = block?.props?.fields ?? block?.fields;
   const policyCode =
     searchParams.get('policyCode') ??
     stringValue(block?.props?.policyCode) ??
@@ -82,10 +142,31 @@ export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesigner
     stringValue(record.policyCode) ??
     stringValue(record.policy_code) ??
     stringValue(params.recordId);
-  const fields = block?.props?.fields ?? block?.fields ?? DEFAULT_FIELDS;
+  const [catalogFields, setCatalogFields] = useState<FieldOption[]>([]);
+  const fields = configuredFields ?? mergeFieldOptions(catalogFields, DEFAULT_FIELDS);
   const [policy, setPolicy] = useState<EventPolicySummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (configuredFields && configuredFields.length > 0) {
+      setCatalogFields([]);
+      return;
+    }
+    let cancelled = false;
+    api
+      .getModelFields()
+      .then((rows) => {
+        if (cancelled) return;
+        setCatalogFields(rows.map(toFieldOption).filter((field): field is FieldOption => Boolean(field)));
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogFields([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, configuredFields]);
 
   useEffect(() => {
     if (!policyCode) {

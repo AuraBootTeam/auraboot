@@ -13,14 +13,17 @@ interface RuntimeEntry {
   componentName: string;
 }
 
-const moduleLoaders: Record<string, () => Promise<Record<string, any>>> = import.meta.glob(
-  '../../../../ui/smart/**/*.tsx',
-);
+const moduleLoaders: Record<string, () => Promise<Record<string, any>>> = {
+  ...import.meta.glob('../../../../ui/smart/**/*.tsx'),
+  ...import.meta.glob('/app/ui/smart/**/*.tsx'),
+};
 
 const runtimeEntryMap = new Map<string, RuntimeEntry>();
 
 function registerFromManifest(type: string, runtime: ComponentRuntimeConfig) {
-  const loader = moduleLoaders[runtime.modulePath];
+  const loader =
+    moduleLoaders[runtime.modulePath] ??
+    moduleLoaders[runtime.modulePath.replace('../../../../', '/app/')];
   if (!loader) {
     console.warn(`[RuntimeLoader] 未找到组件模块: ${runtime.modulePath} (type: ${type})`);
     return;
