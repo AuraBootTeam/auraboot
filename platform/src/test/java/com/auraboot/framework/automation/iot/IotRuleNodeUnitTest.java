@@ -1,5 +1,6 @@
 package com.auraboot.framework.automation.iot;
 
+import com.auraboot.framework.automation.bpm.AutomationActionServiceTaskDelegate;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -197,6 +198,37 @@ class IotRuleNodeUnitTest {
             Map<String, Object> payload = (Map<String, Object>) env.get("payload");
             // ${var} single-token: preserves Double type
             assertThat(payload).containsEntry("value", 95.0);
+        }
+
+        @Test
+        @DisplayName("authoritative _automation_tenant_id (Number) wins over context tenantId string")
+        void authoritativeTenantWinsOverContextTenant() {
+            List<Map<String, Object>> capture = new ArrayList<>();
+            IotActionNode node = new IotActionNode(List.of((k, e) -> capture.add(e)));
+
+            // Webhook-triggered flows merge the client body into the context, so
+            // "tenantId" can be an attacker-controlled string. The automation's own
+            // tenant (Long, set by AutomationProcessRuntime) must win.
+            Map<String, Object> ctx = new HashMap<>(Map.of(
+                    IotRuleContextKeys.TENANT_ID, "999999",
+                    AutomationActionServiceTaskDelegate.TENANT_ID_VAR, 42L));
+            node.execute(action("iot_action", Map.of("kind", "command", "payload", Map.of())), ctx);
+
+            assertThat(capture).hasSize(1);
+            assertThat(capture.get(0)).containsEntry("tenantId", 42L);
+        }
+
+        @Test
+        @DisplayName("falls back to context tenantId when no authoritative tenant present")
+        void fallsBackToContextTenant() {
+            List<Map<String, Object>> capture = new ArrayList<>();
+            IotActionNode node = new IotActionNode(List.of((k, e) -> capture.add(e)));
+
+            Map<String, Object> ctx = new HashMap<>(Map.of(IotRuleContextKeys.TENANT_ID, 7L));
+            node.execute(action("iot_action", Map.of("kind", "command", "payload", Map.of())), ctx);
+
+            assertThat(capture).hasSize(1);
+            assertThat(capture.get(0)).containsEntry("tenantId", 7L);
         }
 
         @Test
