@@ -69,12 +69,14 @@ const APPROVAL_CENTER_ENTRY: PcbaEntry = {
 
 const SALES_AND_PROCUREMENT_ENTRIES: PcbaEntry[] = [
   {
+    // A2-S2: legacy RFQ menu is dead; the PCBA RFQ sidecar menu is
+    // pe_crm_crm_customer_request_pcba_rfq (pcba-crm menus.json).
     id: 'rfq-list',
-    href: '/p/pe_rfq',
-    label: /询价单|RFQ/i,
+    href: '/p/crm_customer_request_pcba_rfq',
+    label: /客户需求-PCBA RFQ|Customer Requests \(PCBA RFQ\)|RFQ/i,
     parentLabel: /销售到订单|Sales To Order/i,
-    route: /\/p\/pe_rfq(?:$|[?#])/,
-    modelCode: 'pe_rfq',
+    route: /\/p\/crm_customer_request_pcba_rfq(?:$|[?#])/,
+    modelCode: 'crm_customer_request_pcba_rfq',
   },
   {
     id: 'order-confirmation-list',
@@ -337,7 +339,7 @@ async function expectDynamicListReady(page: Page): Promise<void> {
   }
   await expect(headers.first()).toBeVisible({ timeout: NAV_TIMEOUT });
   const headerText = (await headers.allTextContents()).join(' ');
-  expect(headerText).not.toMatch(/\bpe_[a-z0-9_]+\b|model\.|field\./i);
+  expect(headerText).not.toMatch(/\bpe_[a-z0-9_]+\b|\bcrm_(?:crq|cpt)_[a-z0-9_]+\b|model\.|field\./i);
 }
 
 async function expectDashboardReady(page: Page, title: RegExp): Promise<void> {

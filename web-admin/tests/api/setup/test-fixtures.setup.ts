@@ -770,7 +770,7 @@ test.describe('E2E Test Fixtures Setup', () => {
         'product-catalog': 'prod_product',
         'sales-templates': 'stpl_b2b_deal',
         'tax-compliance': 'tax_vat_rate',
-        'pcba-crm': 'pe_rfq',
+        'pcba-crm': 'crm_customer_request_pcba_rfq',
         'pcba-industry': 'pe_production_plan',
         'pcba-solution': 'pe_supplier_contact',
         'templates/crm-quick-start': 'tcrm_lead',

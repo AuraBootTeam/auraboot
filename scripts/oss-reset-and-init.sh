@@ -93,7 +93,9 @@ PLATFORM_DIR="$PROJECT_ROOT/platform"
 PG_HOST="${PG_HOST:-${PGHOST:-localhost}}"
 PG_PORT="${PG_PORT:-${PGPORT:-5432}}"
 PG_USER="${PG_USER:-${PGUSER:-ghj}}"
-PG_DB="${PG_DB:-${PGDATABASE:-aura_boot}}"
+# dev.sh runtime envs (POSTGRES_DB / SERVER_PORT) are honoured as fallbacks so a
+# slot-scoped run can never silently target the shared aura_boot database.
+PG_DB="${PG_DB:-${PGDATABASE:-${POSTGRES_DB:-aura_boot}}}"
 PG_PASSWORD_ENV=""
 if [ -n "${PG_PASSWORD:-${PGPASSWORD:-}}" ]; then
     PG_PASSWORD_ENV="PGPASSWORD=${PG_PASSWORD:-${PGPASSWORD}}"
@@ -118,7 +120,7 @@ WEB_ADMIN_DIR="$PROJECT_ROOT/web-admin"
 #   PG_DB        postgres db   (default aura_boot)
 # Example: BE_PORT=6478 VITE_PORT=5208 BFF_PORT=3535 PG_PORT=5467 \
 #          PG_USER=auraboot PGPASSWORD=auraboot_dev ./scripts/oss-reset-and-init.sh
-export BE_PORT="${BE_PORT:-6443}"
+export BE_PORT="${BE_PORT:-${SERVER_PORT:-6443}}"
 export VITE_PORT="${VITE_PORT:-5173}"
 export BFF_PORT="${BFF_PORT:-3500}"
 export AURA_BE_BASE="http://localhost:${BE_PORT}"

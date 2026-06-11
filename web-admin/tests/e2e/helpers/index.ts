@@ -1093,17 +1093,17 @@ export async function findRowInPaginatedList(
  * Usage:
  * ```typescript
  * // Verify by text field
- * const records = await queryFilteredList(page, 'pe-rfq', 'pe_rfq_product_model', 'E2E RFQ Test');
+ * const records = await queryFilteredList(page, 'crm_customer_request_pcba_rfq', 'crm_crq_product_model', 'E2E RFQ Test');
  * expect(records.length).toBeGreaterThan(0);
  *
  * // Verify by status tab + text
- * const records = await queryFilteredList(page, 'pe-rfq', 'pe_rfq_product_model', 'E2E RFQ', {
- *   extraFilters: [{ fieldName: 'pe_rfq_status', operator: 'EQ', value: 'draft' }],
+ * const records = await queryFilteredList(page, 'crm_customer_request_pcba_rfq', 'crm_crq_product_model', 'E2E RFQ', {
+ *   extraFilters: [{ fieldName: 'crm_crq_dfm_status', operator: 'EQ', value: 'pending' }],
  * });
  * ```
  *
  * @param page       Playwright Page (uses page.request for authenticated API calls)
- * @param pageKey    The dynamic page key (hyphenated, e.g. 'pe-rfq')
+ * @param pageKey    The dynamic page key (e.g. 'crm_customer_request_pcba_rfq' or hyphenated 'crm-account')
  * @param fieldName  The field to filter on
  * @param searchText The text to search for (will be wrapped in %...% for LIKE)
  * @param options    Optional extra filters, page size

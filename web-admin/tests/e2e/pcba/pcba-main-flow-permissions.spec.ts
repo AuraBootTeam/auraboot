@@ -31,6 +31,8 @@ type DemoEntry = {
   label: RegExp;
   route: RegExp;
   modelCode: string;
+  /** Sidebar section to expand; defaults to the Demo Flow directory. */
+  parentLabel?: RegExp;
 };
 
 type CommandResult = {
@@ -100,7 +102,8 @@ const REQUIRED_PLUGINS = [
 ];
 
 const PAGE_KEYS = {
-  rfq: 'pe-rfq',
+  customerRequest: 'crm_customer_request',
+  rfq: 'crm_customer_request_pcba_rfq',
   purchaseOrder: 'pr-purchase-order',
   inbound: 'inv-inbound',
   productionPlan: 'pe-production-plan',
@@ -110,11 +113,14 @@ const PAGE_KEYS = {
 
 const DEMO_ENTRIES = {
   rfq: {
+    // A2-S2: legacy RFQ page is dead; the PCBA RFQ sidecar list lives under the
+    // Sales-To-Order IA section (menu pe_crm_crm_customer_request_pcba_rfq).
     id: 'rfq',
-    href: '/p/pe_rfq',
-    label: /2\.\s*RFQ/i,
-    route: /\/p\/pe_rfq(?:$|[?#])/,
-    modelCode: 'pe_rfq',
+    href: '/p/crm_customer_request_pcba_rfq',
+    label: /客户需求-PCBA RFQ|Customer Requests \(PCBA RFQ\)|RFQ/i,
+    route: /\/p\/crm_customer_request_pcba_rfq(?:$|[?#])/,
+    modelCode: 'crm_customer_request_pcba_rfq',
+    parentLabel: /销售到订单|Sales To Order/i,
   },
   purchaseOrder: {
     id: 'purchase-order',
@@ -497,21 +503,49 @@ async function createFixtureData(
 
   const bomId = await createBom(request, headers, finishedProductId, materialProductId, uid);
 
+  // A2-S2: RFQ truth = crm_customer_request + crm_customer_request_pcba_rfq sidecar.
+  // Create + submit + route as admin; the route handler creates the sidecar with the
+  // request title as crm_crq_product_model and a pending DFM gate.
   const rfqSearch = `E2E PCBA Role RFQ ${uid}`;
-  const rfqId = mustSucceed(
-    await executeCommand(request, headers, 'pe:create_rfq', {
-      pe_rfq_customer_id: customerId,
-      pe_rfq_product_model: rfqSearch,
-      pe_rfq_revision: 'A',
-      pe_rfq_quantity: 8,
-      pe_rfq_delivery_window: '14 days',
-      pe_rfq_quality_class: 'class_2',
-      pe_rfq_trace_level: 'l1_batch',
-      pe_rfq_supply_mode: 'turnkey',
-      pe_rfq_notes: `Role permission E2E ${uid}`,
+  const customerRequestId = mustSucceed(
+    await executeCommand(request, headers, 'crm:create_customer_request', {
+      crm_cr_title: rfqSearch,
+      crm_cr_account_id: customerId,
+      crm_cr_type: 'rfq',
+      crm_cr_summary: `Role permission E2E ${uid}`,
     }),
-    'pe:create_rfq',
+    'crm:create_customer_request',
   );
+  const submitRequest = await executeCommand(
+    request,
+    headers,
+    'crm:submit_customer_request',
+    {},
+    customerRequestId,
+    'update',
+  );
+  expect(submitRequest.code, 'crm:submit_customer_request should succeed').toBe(
+    ErrorCodes.SUCCESS,
+  );
+  const routeRequest = await executeCommand(
+    request,
+    headers,
+    'pe:route_customer_request_to_rfq',
+    {},
+    customerRequestId,
+    'update',
+  );
+  expect(routeRequest.code, 'pe:route_customer_request_to_rfq should succeed').toBe(
+    ErrorCodes.SUCCESS,
+  );
+  const routedRequest = await fetchRecord(
+    request,
+    headers,
+    PAGE_KEYS.customerRequest,
+    customerRequestId,
+  );
+  const rfqId = String(routedRequest.crm_cr_routed_object_id ?? '');
+  expect(rfqId, 'route should write the PCBA RFQ sidecar pid back to the request').toBeTruthy();
 
   const purchaseOrder = await createPurchaseOrder(
     request,
@@ -667,12 +701,13 @@ async function revealDemoEntry(page: Page, entry: DemoEntry): Promise<Locator> {
       .first(),
   );
 
+  const sectionLabel = entry.parentLabel ?? /演示主线|Demo Flow/i;
   await clickIfVisible(
     nav
-      .getByRole('button', { name: /演示主线|Demo Flow/i })
-      .or(nav.getByRole('menuitem', { name: /演示主线|Demo Flow/i }))
-      .or(nav.getByRole('link', { name: /演示主线|Demo Flow/i }))
-      .or(nav.locator('button, [role="menuitem"], a').filter({ hasText: /演示主线|Demo Flow/i }))
+      .getByRole('button', { name: sectionLabel })
+      .or(nav.getByRole('menuitem', { name: sectionLabel }))
+      .or(nav.getByRole('link', { name: sectionLabel }))
+      .or(nav.locator('button, [role="menuitem"], a').filter({ hasText: sectionLabel }))
       .first(),
   );
 
@@ -815,7 +850,8 @@ test.describe('PCBA-011 - Demo Flow business role permissions @critical', () => 
   test('pe_sales can work RFQ and is blocked from warehouse confirmation', async ({ browser }) => {
     const page = await newRolePage(browser, users.pe_sales);
     await openEntryAndFindRow(page, DEMO_ENTRIES.rfq, fixtures.rfqSearch);
-    await expectAllowedCommand(page, 'pe:submit_rfq', fixtures.rfqId);
+    // pe_sales owns the PCBA DFM gate (pe.dfm.manage): pending → in_review on the sidecar
+    await expectAllowedCommand(page, 'pe:request_dfm_pcba_rfq', fixtures.rfqId);
     await expectForbiddenCommand(page, 'inv:confirm_warehouse_in', fixtures.inboundId);
     await page.context().close();
   });

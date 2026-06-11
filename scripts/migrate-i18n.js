@@ -1,3 +1,8 @@
+// ⚠️ STALE / HISTORICAL: one-shot i18n migration script; the pcba-* source
+// plugins it reads no longer live in this repo. The pe_rfq_* field codes in the
+// migration tables below refer to the legacy RFQ model decommissioned in A2-S2
+// (successor: crm_customer_request + crm_customer_request_pcba_rfq sidecar,
+// crm_crq_* fields). Kept verbatim as a record of the completed migration.
 const fs = require("fs");
 const path = require("path");
 

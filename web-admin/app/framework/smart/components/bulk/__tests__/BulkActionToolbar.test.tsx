@@ -21,7 +21,7 @@ describe('BulkActionToolbar custom actions', () => {
       <BulkActionToolbar
         selectedCount={2}
         selectedIds={['risk-1', 'risk-2']}
-        modelCode="pe_dfm_risk"
+        modelCode="crm_risk_common"
         bulkActions={bulkActions}
         resolveActionLabel={(button) => String(button.label)}
         onBulkAction={onBulkAction}
