@@ -11,7 +11,7 @@
  *   - Verifies view type switching and column rendering
  *
  * Prerequisites:
- *   - CRM plugin imported with crm_lead and crm_opportunity models
+ *   - CRM plugin imported with crm_lead_common and crm_opportunity_common models
  *   - At least 1 lead and 1 opportunity exist (seeded in beforeAll)
  *
  * @since 7.5.0
@@ -31,8 +31,8 @@ import {
 
 const LEAD_PAGE_KEY = 'crm-lead';
 const OPP_PAGE_KEY = 'crm-opportunity';
-const OPP_MODEL_CODE = 'crm_opportunity';
-const LEAD_MODEL_CODE = 'crm_lead';
+const OPP_MODEL_CODE = 'crm_opportunity_common';
+const LEAD_MODEL_CODE = 'crm_lead_common';
 
 // ============================================================================
 // Feature 1: RecordPreviewDrawer

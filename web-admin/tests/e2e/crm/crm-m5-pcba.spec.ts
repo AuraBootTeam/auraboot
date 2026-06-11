@@ -7,12 +7,12 @@
  * and editable through the low-code pages with ZERO raw-code / bare-i18n-key leakage.
  *
  * This replaces the M5 spec lost when its original worktree was cleaned up. The J6
- * chain (crm_customer_request + crm_customer_request_pcba_rfq sidecar →
+ * chain (crm_customer_request_common + crm_customer_request_pcba_rfq sidecar →
  * crm_review_common[dfm] / pe_customer_board / crm_customer_request_pcba_price_tier)
  * is set up via the real crm:* / pe:* commands in beforeAll, then asserted through the UI.
  * (A2-S1: the legacy DFM model was decommissioned; DFM reviews now live on the layered
  * crm_review_common model with review_type 'dfm'. A2-S2: the legacy RFQ model was
- * decommissioned; the RFQ truth is now crm_customer_request with the 1:1 PCBA sidecar
+ * decommissioned; the RFQ truth is now crm_customer_request_common with the 1:1 PCBA sidecar
  * crm_customer_request_pcba_rfq, and price tiers live on
  * crm_customer_request_pcba_price_tier keyed by the customer-request pid.)
  *
@@ -25,7 +25,7 @@
  * COVERAGE MATRIX (model · kind):
  *   M1  crm_customer_request_pcba_rfq · list   — RFQ code + product model + DFM status visible, no raw leak
  *   M2  crm_customer_request_pcba_rfq · detail — basic + PCBA tech fields render, no raw leak
- *   M3  pe_rfq_workspace (crm_customer_request) · detail — RFQ tab price-tier sub-table shows the tier rows
+ *   M3  pe_rfq_workspace (crm_customer_request_common) · detail — RFQ tab price-tier sub-table shows the tier rows
  *   M4  pe_customer_board · list   — board master (layers / IPC) visible, no raw leak
  *   M5  pe_customer_board · detail — board detail fields render, no raw leak
  *   M6  crm_review_common · list   — DFM review (review_type dfm) visible, no raw leak
@@ -259,7 +259,7 @@ test.describe('CRM M5 PCBA J6 (L4 UI golden)', () => {
   // ---- M3: price-tier sub-table on the RFQ workspace detail (volume-break pricing) ----
   test('M3 RFQ workspace price-tier sub-table shows the quantity breaks', async ({ page }) => {
     // price tiers are children of the customer request; the RFQ workspace detail
-    // (/p/pe_rfq_workspace, modelCode crm_customer_request) renders them on its RFQ tab.
+    // (/p/pe_rfq_workspace, modelCode crm_customer_request_common) renders them on its RFQ tab.
     await gotoPage(page, '/p/pe_rfq_workspace');
     await openDetail(page, `J6-PCBA-${TAG}`);
     // the 阶梯报价 (Price Tiers) sub-table lives on the RFQ tab, not the default

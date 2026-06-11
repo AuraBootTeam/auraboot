@@ -758,7 +758,7 @@ test.describe('E2E Test Fixtures Setup', () => {
         'dual-prevention': 'dp_issue',
         'e2e-test-order': 'e2et_order',
         'asset-management': 'asset',
-        crm: 'crm_lead',
+        crm: 'crm_lead_common',
         'org-management': 'org_department',
         sales: 'sl_sales_order_common',
         procurement: 'pr_purchase_order',

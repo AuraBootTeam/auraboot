@@ -102,7 +102,7 @@ const REQUIRED_PLUGINS = [
 ];
 
 const PAGE_KEYS = {
-  customerRequest: 'crm_customer_request',
+  customerRequest: 'crm_customer_request_common',
   rfq: 'crm_customer_request_pcba_rfq',
   purchaseOrder: 'pr-purchase-order',
   inbound: 'inv-inbound',
@@ -503,7 +503,7 @@ async function createFixtureData(
 
   const bomId = await createBom(request, headers, finishedProductId, materialProductId, uid);
 
-  // A2-S2: RFQ truth = crm_customer_request + crm_customer_request_pcba_rfq sidecar.
+  // A2-S2: RFQ truth = crm_customer_request_common + crm_customer_request_pcba_rfq sidecar.
   // Create + submit + route as admin; the route handler creates the sidecar with the
   // request title as crm_crq_product_model and a pending DFM gate.
   const rfqSearch = `E2E PCBA Role RFQ ${uid}`;
