@@ -60,7 +60,7 @@ created: 2026-06-11
 ## Next Steps(deferred,各有前置,按 ROI 排序)
 
 1. **A5 L3 审批闭环浏览器黄金 E2E**(ai-governance 白皮书核心承诺;需前端栈专门会话,pending 卡→批准→命令执行→状态断言)
-2. **A6 live-LLM eval 回归**(A2 已铺好 `LlmToolSelectionService`;需 LLM key/预算决策,可用低价 provider 做 opt-in suite)
+2. ~~**A6 live-LLM eval 回归**~~ ✅ 已做(2026-06-11):`CapabilityEvalLiveIT`(`@Tag("agent-eval-live")`,`DEEPSEEK_API_KEY` 门控)对真 DeepSeek 证 provider 解析 / 受控 catalog 真选择 + 幻觉分区 / 全 eval evalMode=llm 持久化,3/3 passed。跑法见 tracker A6
 3. **A4 上下文 LLM 摘要压缩**(`ContextWindowManager` 现只截断;需产品决策:模型/成本上限/摘要落库位置)
 4. **B2 loop 核心四类拆分**(ToolLoopService 1206/StepLoopService 1081/AgentRunService 1092/ChatTurnRuntime 1056;前置=tool loop 行为测试 harness,顺带解 B4 service↔runtime 边界)
 5. ~~**I-1 implementation-map 脚本门禁**~~ ✅ 已做(ENT #404,`scripts/check-acp-implementation-map.mjs`;首跑抓真漂移 `ab_agent_step`→`ab_agent_action`)

@@ -85,10 +85,17 @@ Real gaps cluster in three areas: **LLM-backed features stuck at keyword/TODO st
 - Why deferred: requires full web stack + golden run; schedule as its own session per
   §2.2 golden discipline.
 
-### A6 — Zero live-LLM regression tests 🟡 P2 (deferred — needs key/budget decision)
+### A6 — Zero live-LLM regression tests ✅ DONE (2026-06-11, opt-in DeepSeek suite)
 
-- All agent tests mock the provider. Eval framework LLM mode (A2) is the prerequisite;
-  once A2 lands, a small live smoke (cheap provider) can be wired as an opt-in suite.
+- ~~All agent tests mock the provider.~~ Added `CapabilityEvalLiveIT` (`@Tag("agent-eval-live")`,
+  gated by `DEEPSEEK_API_KEY` env): seeds a tenant-level DeepSeek `ab_cloud_config`, then proves
+  against the **real** model that (1) the seeded provider is the one resolved, (2) tool selection
+  picks the right code from a controlled catalog with hallucinations partitioned out, and
+  (3) the full eval runs in `llm` mode (not degraded) and persists `eval_mode=llm`.
+  Blanks `agent.anthropic.api-key` so resolution routes to DeepSeek instead of the stub; the
+  real key is read from env (never committed) and the seeded config is cleaned up after the run.
+- Run: `cd platform && DEEPSEEK_API_KEY=sk-... ./gradlew :platform:testAgent --tests '*CapabilityEvalLiveIT*'`
+  (3/3 passed on 2026-06-11; ~2s/test = real round-trips). Plain `testAgent` skips it.
 
 ---
 
