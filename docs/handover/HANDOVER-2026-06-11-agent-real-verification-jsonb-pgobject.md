@@ -1,10 +1,17 @@
 ---
 type: handover
-status: active
+status: closed
 created: 2026-06-11
+distilled_to: docs/backlog/2026-06-11-agent-capability-verification-matrix.md
 ---
 
 # Session Handover - 2026-06-11 — Agent 系统真实验证 + 5 个系统性 JSONB-PGobject bug
+
+> **沉淀去向(固化,2026-06-11)**:本会话的核心 durable lesson「读 JSONB 列经通用查询/JdbcTemplate 返 `PGobject` → 只判 `instanceof String` 静默坏 → 走 `JsonbColumns.toJsonText`」已固化进 canonical:
+> - 工程坑(症状/根因/处理/反面教材)→ `auraboot-enterprise/docs/agent-rules/engineering-gotchas/backend-spring-db.md` §「读 JSONB 列经通用查询返 PGobject」+ `AGENTS.md` 红线关键字速查表 JSONB 行。
+> - 本仓 OSS-local 权威报告(逐条根因 + 误判纠正)→ `docs/backlog/2026-06-11-agent-capability-verification-matrix.md`(本 doc 的 `distilled_to` 目标)。
+> - 多会话宿主「绝不广撒 pkill / 绝不跑 oss-reset-init stop 步」已在 canonical `engineering-gotchas/main-conversation-discipline.md` §「pkill -f 全局匹配误杀并发会话」;「失败先 root-cause 再分类、别从域/返空推 env」已是红线 §15。
+> 剩余 in-progress 项(literal 1640/1640 修 2 个非 hermetic 测试 / 全量 agent E2E / JsonbColumns suspect 扫)是后续开发任务,不构成可复用结论,见下文 §Tasks In Progress / Next Steps。
 
 ## Session Summary
 
