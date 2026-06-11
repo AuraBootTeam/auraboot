@@ -30,7 +30,7 @@ describe('DataSourceManager', () => {
     );
     manager.register('canonicalLines', {
       type: 'api',
-      endpoint: '/api/dynamic/bom_canonical_line/list',
+      endpoint: '/api/dynamic/req_requirement_line_pcba_bom/list',
       method: 'get',
       adaptor: 'table',
       autoFetch: false,
@@ -45,7 +45,7 @@ describe('DataSourceManager', () => {
     await manager.fetch('canonicalLines');
 
     expect(mockedFetchResult).toHaveBeenCalledWith(
-      '/api/dynamic/bom_canonical_line/list',
+      '/api/dynamic/req_requirement_line_pcba_bom/list',
       expect.objectContaining({
         method: 'get',
         params: expect.objectContaining({
