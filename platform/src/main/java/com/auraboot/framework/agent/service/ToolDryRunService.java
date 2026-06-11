@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.dto.CapabilityView;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.util.JsonbColumns;
 import com.auraboot.framework.meta.context.SandboxContext;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -388,11 +389,8 @@ public class ToolDryRunService {
             if (modelCode == null) return;
 
             // Parse executionConfig to get stateField and fromStates
-            String execConfigJson = (String) cmdRow.get("execution_config");
-            if (execConfigJson == null || execConfigJson.isBlank()) return;
-
-            Map<String, Object> execConfig = objectMapper.readValue(execConfigJson,
-                    new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> execConfig = parseExecConfig(cmdRow.get("execution_config"));
+            if (execConfig == null) return;
 
             String stateField = (String) execConfig.get("stateField");
             List<String> fromStates = (List<String>) execConfig.get("fromStates");
@@ -428,6 +426,23 @@ public class ToolDryRunService {
     }
 
     /**
+     * Parse a command's {@code execution_config} (JSONB) read via the generic
+     * {@code selectByQuery}. The driver returns a PGobject — not a String — so the
+     * old {@code (String) row.get("execution_config")} cast threw a ClassCastException
+     * that was swallowed by the surrounding catch, silently skipping state-transition
+     * validation / side-effect preview. JsonbColumns handles String / PGobject / Map.
+     */
+    private Map<String, Object> parseExecConfig(Object raw) {
+        String json = JsonbColumns.toJsonText(raw, objectMapper);
+        if (json == null) return null;
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * Extract sideEffects from a command's executionConfig and add as side_effect_preview.
      */
     @SuppressWarnings("unchecked")
@@ -442,11 +457,8 @@ public class ToolDryRunService {
                     Map.of("tenantId", tenantId, "code", commandCode));
             if (cmdRows.isEmpty()) return;
 
-            String execConfigJson = (String) cmdRows.get(0).get("execution_config");
-            if (execConfigJson == null || execConfigJson.isBlank()) return;
-
-            Map<String, Object> execConfig = objectMapper.readValue(execConfigJson,
-                    new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> execConfig = parseExecConfig(cmdRows.get(0).get("execution_config"));
+            if (execConfig == null) return;
 
             List<String> sideEffects = (List<String>) execConfig.get("sideEffects");
             if (sideEffects != null && !sideEffects.isEmpty()) {
