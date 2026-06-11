@@ -12,8 +12,8 @@
  * Menu hierarchy:
  *   Sales (root)
  *   └── 价格与折扣 (sl_pricing_dir)
- *       ├── 价格表         → /sales/price-lists      (sl_price_list_list)
- *       └── 折扣规则       → /sales/discount-rules   (sl_discount_rule_list)
+ *       ├── 价格表         → /sales/price-lists      (sl_price_list_common_list)
+ *       └── 折扣规则       → /sales/discount-rules   (sl_discount_rule_common_list)
  *
  * @since 10.0.0
  */
