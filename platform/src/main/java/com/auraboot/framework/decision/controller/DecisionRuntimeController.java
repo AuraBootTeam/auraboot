@@ -306,9 +306,16 @@ public class DecisionRuntimeController {
     @Operation(summary = "Get decision rollout metrics")
     @RequirePermission(MetaPermission.DRT_DEFINITION_READ)
     public ApiResponse<DecisionRolloutMetricsDTO> getRolloutMetrics(
-            @Parameter(description = "Rollout policy PID") @PathVariable @NotBlank String pid) {
-        log.info("Getting decision rollout metrics: pid={}", pid);
-        return ApiResponse.success(rolloutService.metrics(pid));
+            @Parameter(description = "Rollout policy PID") @PathVariable @NotBlank String pid,
+            @Parameter(description = "Metrics window in hours, capped at 2160")
+            @RequestParam(defaultValue = "168") int windowHours,
+            @Parameter(description = "Metrics bucket size in minutes")
+            @RequestParam(defaultValue = "60") int bucketMinutes,
+            @Parameter(description = "Refresh pre-aggregated buckets from evaluation logs before reading")
+            @RequestParam(defaultValue = "true") boolean refresh) {
+        log.info("Getting decision rollout metrics: pid={}, windowHours={}, bucketMinutes={}, refresh={}",
+                pid, windowHours, bucketMinutes, refresh);
+        return ApiResponse.success(rolloutService.metrics(pid, windowHours, bucketMinutes, refresh));
     }
 
     @GetMapping("/fields/impact")

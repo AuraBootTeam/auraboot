@@ -117,6 +117,22 @@ describe('ExecutionLogTraceBlock', () => {
     );
   });
 
+  it('renders a fixed execution log table with stable column definitions and truncated cells', async () => {
+    render(
+      <MemoryRouter initialEntries={['/p/decisionops_execution_logs']}>
+        <ExecutionLogTraceBlock block={{ props: { mode: 'list' } }} />
+      </MemoryRouter>,
+    );
+
+    const row = await screen.findByTestId('elta-row-log-1');
+    const table = row.closest('table');
+
+    expect(table).toHaveClass('elta-table');
+    expect(table?.querySelectorAll('colgroup col')).toHaveLength(9);
+    expect(table?.querySelector('.elta-col-actions')).toBeTruthy();
+    expect(row.querySelectorAll('.elta-cell-text').length).toBeGreaterThanOrEqual(7);
+  });
+
   it('opens a trace chain drawer without returning to the old console', async () => {
     render(
       <MemoryRouter initialEntries={['/p/decisionops_execution_logs']}>

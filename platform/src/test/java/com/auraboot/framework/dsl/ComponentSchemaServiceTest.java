@@ -78,6 +78,34 @@ class ComponentSchemaServiceTest {
         assertThat(chart.getName()).isEqualTo("Smart Bar Chart");
     }
 
+    @Test
+    void shouldExposeDecisionRuleBindingComponentSchema() {
+        ComponentSchemaDTO component = service.getComponent("decisionrulebinding");
+        assertThat(component).isNotNull();
+        assertThat(component.getCategory()).isEqualTo("display");
+        assertThat(component.getCompatibleDataTypes()).contains("json");
+        assertThat(component.getTags()).contains(
+                "rule-center",
+                "decision-binding",
+                "condition",
+                "impact",
+                "test-runner");
+        assertThat(component.getProperties()).extracting(property -> property.get("key"))
+                .contains(
+                        "mode",
+                        "valueField",
+                        "consumerType",
+                        "consumerCode",
+                        "consumerNodeId",
+                        "initialDecisionCode",
+                        "initialVersionPolicy",
+                        "showImpactPreview",
+                        "showTestRunner",
+                        "initialContextJson",
+                        "fields",
+                        "decisions");
+    }
+
     // ---- Data type filtering ----
 
     @Test

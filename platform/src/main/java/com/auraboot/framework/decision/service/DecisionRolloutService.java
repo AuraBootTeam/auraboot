@@ -40,5 +40,7 @@ public interface DecisionRolloutService {
 
     DecisionRolloutMetricsDTO metrics(String pid);
 
+    DecisionRolloutMetricsDTO metrics(String pid, int windowHours, int bucketMinutes, boolean refresh);
+
     DecisionRolloutSelection select(Long tenantId, DrtEvaluateRequest request, List<DrtVersionEntity> candidates);
 }

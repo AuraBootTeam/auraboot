@@ -49,6 +49,54 @@ describe('DecisionRuleBindingBlock', () => {
     );
   });
 
+  it('edits decision output mappings for downstream action and process targets', () => {
+    const onChange = vi.fn();
+
+    render(
+      <DecisionRuleBindingBlock
+        onChange={onChange}
+        block={{
+          props: {
+            mode: 'decision',
+            initialDecisionCode: 'approval_routing',
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('decision-output-mapping-empty')).toHaveTextContent('暂无输出映射');
+    fireEvent.click(screen.getByRole('button', { name: '添加输出' }));
+    fireEvent.change(screen.getByLabelText('output-mapping-output-0'), {
+      target: { value: 'assigneeUserId' },
+    });
+    fireEvent.change(screen.getByLabelText('output-mapping-kind-0'), {
+      target: { value: 'PROCESS_VARIABLE' },
+    });
+    fireEvent.change(screen.getByLabelText('output-mapping-path-0'), {
+      target: { value: 'assigneeUserId' },
+    });
+
+    expect(screen.getByTestId('decision-output-mapping-0')).toBeInTheDocument();
+    expect(screen.getByTestId('decision-binding-preview')).toHaveTextContent(
+      '"output": "assigneeUserId"',
+    );
+    expect(screen.getByTestId('decision-binding-preview')).toHaveTextContent(
+      '"kind": "PROCESS_VARIABLE"',
+    );
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        decisionBinding: expect.objectContaining({
+          outputMappings: [
+            {
+              output: 'assigneeUserId',
+              target: { kind: 'PROCESS_VARIABLE', path: 'assigneeUserId' },
+            },
+          ],
+        }),
+      }),
+    );
+  });
+
   it('can render decision-only mode for compact host surfaces', () => {
     render(
       <DecisionRuleBindingBlock
@@ -84,7 +132,12 @@ describe('DecisionRuleBindingBlock', () => {
                 source: { kind: 'FIELD', scope: 'record', path: 'data.amount' },
               },
             ],
-            outputMappings: [],
+            outputMappings: [
+              {
+                output: 'deadlineMinutes',
+                target: { kind: 'SLA_FIELD', path: 'deadlineMinutes' },
+              },
+            ],
             fallbackPolicy: { mode: 'FAIL_OPEN' },
             traceMode: 'SAMPLED',
             enabled: true,
@@ -99,6 +152,10 @@ describe('DecisionRuleBindingBlock', () => {
     expect(screen.getByLabelText('fallback-mode')).toHaveValue('FAIL_OPEN');
     expect(screen.getByTestId('decision-binding-mapping-0')).toBeInTheDocument();
     expect(screen.getByLabelText('mapping-input-0')).toHaveValue('amount');
+    expect(screen.getByTestId('decision-output-mapping-0')).toBeInTheDocument();
+    expect(screen.getByLabelText('output-mapping-output-0')).toHaveValue('deadlineMinutes');
+    expect(screen.getByLabelText('output-mapping-kind-0')).toHaveValue('SLA_FIELD');
+    expect(screen.getByLabelText('output-mapping-path-0')).toHaveValue('deadlineMinutes');
   });
 
   it('writes RuleConsumerBinding JSON back through the DSL form runtime valueField', () => {

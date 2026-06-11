@@ -54,8 +54,14 @@ import java.util.concurrent.ConcurrentMap;
 @RequiredArgsConstructor
 public class DecisionRolloutServiceImpl implements DecisionRolloutService {
 
-    private static final int ROLLOUT_METRICS_WINDOW_HOURS = 6;
-    private static final int ROLLOUT_METRICS_WINDOW_BUCKET_SECONDS = 30 * 60;
+    private static final int DEFAULT_ROLLOUT_METRICS_WINDOW_HOURS = 24 * 7;
+    private static final int MAX_ROLLOUT_METRICS_WINDOW_HOURS = 24 * 90;
+    private static final int DEFAULT_ROLLOUT_METRICS_BUCKET_MINUTES = 60;
+    private static final int MIN_ROLLOUT_METRICS_BUCKET_MINUTES = 5;
+    private static final int MAX_ROLLOUT_METRICS_BUCKET_MINUTES = 24 * 60;
+    private static final int ROLLOUT_METRICS_RETENTION_DAYS = 90;
+    private static final String ROLLOUT_METRICS_SOURCE = "PRE_AGGREGATED_BUCKETS";
+    private static final String ROLLOUT_METRICS_LATENCY_AGGREGATION = "MAX_BUCKET_P95";
 
     private final DecisionRolloutPolicyMapper rolloutMapper;
     private final DrtVersionMapper versionMapper;
@@ -237,17 +243,39 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
 
     @Override
     public DecisionRolloutMetricsDTO metrics(String pid) {
+        return metrics(pid, DEFAULT_ROLLOUT_METRICS_WINDOW_HOURS,
+                DEFAULT_ROLLOUT_METRICS_BUCKET_MINUTES, true);
+    }
+
+    @Override
+    public DecisionRolloutMetricsDTO metrics(String pid, int windowHours, int bucketMinutes, boolean refresh) {
         DecisionRolloutPolicyEntity policy = load(pid);
+        int safeWindowHours = normalizeWindowHours(windowHours);
+        int safeBucketSeconds = normalizeBucketMinutes(bucketMinutes) * 60;
+        Instant now = Instant.now();
+        Instant since = now.minusSeconds(safeWindowHours * 60L * 60L);
+        if (refresh) {
+            logMapper.refreshRolloutMetricBuckets(policy.getTenantId(), policy.getPid(), since, safeBucketSeconds);
+            logMapper.deleteRolloutMetricBucketsOlderThan(
+                    policy.getTenantId(), now.minusSeconds(ROLLOUT_METRICS_RETENTION_DAYS * 24L * 60L * 60L));
+        }
+
         DecisionRolloutMetricsDTO dto = new DecisionRolloutMetricsDTO();
         dto.setPolicyPid(policy.getPid());
+        dto.setWindowHours(safeWindowHours);
+        dto.setBucketSeconds(safeBucketSeconds);
+        dto.setRetentionDays(ROLLOUT_METRICS_RETENTION_DAYS);
+        dto.setSource(ROLLOUT_METRICS_SOURCE);
+        dto.setLatencyAggregation(ROLLOUT_METRICS_LATENCY_AGGREGATION);
+        dto.setRefreshedAt(now);
         dto.getBaseline().setVersion(policy.getBaselineVersion());
         dto.getCandidate().setVersion(policy.getCandidateVersion());
 
-        logMapper.aggregateByRolloutPolicy(policy.getTenantId(), policy.getPid())
+        logMapper.aggregateMetricBucketsByRolloutPolicy(policy.getTenantId(), policy.getPid(), since, safeBucketSeconds)
                 .forEach(row -> applyAggregate(dto, row));
-        logMapper.aggregateDistributionByRolloutPolicy(policy.getTenantId(), policy.getPid())
+        logMapper.aggregateBucketDistributionByRolloutPolicy(policy.getTenantId(), policy.getPid(), since, safeBucketSeconds)
                 .forEach(row -> applyDistribution(dto, row));
-        dto.setWindows(metricWindows(policy));
+        dto.setWindows(metricWindows(policy, since, safeBucketSeconds));
         return dto;
     }
 
@@ -335,10 +363,12 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
         metrics.getResultDistribution().put(row.getResultKey(), safeLong(row.getItemCount()));
     }
 
-    private List<DecisionRolloutMetricsDTO.WindowMetrics> metricWindows(DecisionRolloutPolicyEntity policy) {
-        Instant since = Instant.now().minusSeconds(ROLLOUT_METRICS_WINDOW_HOURS * 60L * 60L);
-        List<DecisionRolloutMetricWindowRow> rows = logMapper.aggregateWindowsByRolloutPolicy(
-                policy.getTenantId(), policy.getPid(), since, ROLLOUT_METRICS_WINDOW_BUCKET_SECONDS);
+    private List<DecisionRolloutMetricsDTO.WindowMetrics> metricWindows(
+            DecisionRolloutPolicyEntity policy,
+            Instant since,
+            int bucketSeconds) {
+        List<DecisionRolloutMetricWindowRow> rows = logMapper.findRolloutMetricBucketWindows(
+                policy.getTenantId(), policy.getPid(), since, bucketSeconds);
         Map<Instant, DecisionRolloutMetricsDTO.WindowMetrics> byWindow = new LinkedHashMap<>();
         for (DecisionRolloutMetricWindowRow row : rows) {
             if (row.getWindowStart() == null) {
@@ -396,6 +426,21 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
 
     private long safeLong(Long value) {
         return value == null ? 0L : value;
+    }
+
+    private int normalizeWindowHours(int windowHours) {
+        if (windowHours <= 0) {
+            return DEFAULT_ROLLOUT_METRICS_WINDOW_HOURS;
+        }
+        return Math.min(windowHours, MAX_ROLLOUT_METRICS_WINDOW_HOURS);
+    }
+
+    private int normalizeBucketMinutes(int bucketMinutes) {
+        if (bucketMinutes <= 0) {
+            return DEFAULT_ROLLOUT_METRICS_BUCKET_MINUTES;
+        }
+        return Math.max(MIN_ROLLOUT_METRICS_BUCKET_MINUTES,
+                Math.min(bucketMinutes, MAX_ROLLOUT_METRICS_BUCKET_MINUTES));
     }
 
     private DecisionRolloutPolicyEntity load(String pid) {

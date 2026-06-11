@@ -11,6 +11,12 @@ import java.util.Map;
 @Data
 public class DecisionRolloutMetricsDTO {
     private String policyPid;
+    private int windowHours;
+    private int bucketSeconds;
+    private int retentionDays;
+    private String source;
+    private String latencyAggregation;
+    private Instant refreshedAt;
     private ArmMetrics baseline = new ArmMetrics();
     private ArmMetrics candidate = new ArmMetrics();
     private List<WindowMetrics> windows = new ArrayList<>();

@@ -143,16 +143,24 @@ class DecisionRolloutServiceImplTest {
 
         DecisionRolloutMetricAggregateRow baseline = aggregate(DecisionRolloutArm.BASELINE, 90, 60, 1, 22L);
         DecisionRolloutMetricAggregateRow candidate = aggregate(DecisionRolloutArm.CANDIDATE, 10, 8, 0, 18L);
-        when(logMapper.aggregateByRolloutPolicy(10L, "rollout-1")).thenReturn(List.of(baseline, candidate));
-        when(logMapper.aggregateDistributionByRolloutPolicy(10L, "rollout-1")).thenReturn(List.of(
-                distribution(DecisionRolloutArm.BASELINE, "APPROVE", 60),
-                distribution(DecisionRolloutArm.CANDIDATE, "REVIEW", 2)
-        ));
-        when(logMapper.aggregateWindowsByRolloutPolicy(
+        when(logMapper.aggregateMetricBucketsByRolloutPolicy(
                 org.mockito.ArgumentMatchers.eq(10L),
                 org.mockito.ArgumentMatchers.eq("rollout-1"),
                 org.mockito.ArgumentMatchers.any(Instant.class),
-                org.mockito.ArgumentMatchers.eq(1800)))
+                org.mockito.ArgumentMatchers.eq(3600))).thenReturn(List.of(baseline, candidate));
+        when(logMapper.aggregateBucketDistributionByRolloutPolicy(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq("rollout-1"),
+                org.mockito.ArgumentMatchers.any(Instant.class),
+                org.mockito.ArgumentMatchers.eq(3600))).thenReturn(List.of(
+                distribution(DecisionRolloutArm.BASELINE, "APPROVE", 60),
+                distribution(DecisionRolloutArm.CANDIDATE, "REVIEW", 2)
+        ));
+        when(logMapper.findRolloutMetricBucketWindows(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq("rollout-1"),
+                org.mockito.ArgumentMatchers.any(Instant.class),
+                org.mockito.ArgumentMatchers.eq(3600)))
                 .thenReturn(List.of(
                         window("2026-06-10T01:00:00Z", DecisionRolloutArm.BASELINE, 9, 6, 0, 20L),
                         window("2026-06-10T01:00:00Z", DecisionRolloutArm.CANDIDATE, 1, 1, 0, 12L)
@@ -160,6 +168,20 @@ class DecisionRolloutServiceImplTest {
 
         var metrics = service.metrics("rollout-1");
 
+        verify(logMapper).refreshRolloutMetricBuckets(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq("rollout-1"),
+                org.mockito.ArgumentMatchers.any(Instant.class),
+                org.mockito.ArgumentMatchers.eq(3600));
+        verify(logMapper).deleteRolloutMetricBucketsOlderThan(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any(Instant.class));
+        assertThat(metrics.getWindowHours()).isEqualTo(168);
+        assertThat(metrics.getBucketSeconds()).isEqualTo(3600);
+        assertThat(metrics.getRetentionDays()).isEqualTo(90);
+        assertThat(metrics.getSource()).isEqualTo("PRE_AGGREGATED_BUCKETS");
+        assertThat(metrics.getLatencyAggregation()).isEqualTo("MAX_BUCKET_P95");
+        assertThat(metrics.getRefreshedAt()).isNotNull();
         assertThat(metrics.getBaseline().getEvaluations()).isEqualTo(90);
         assertThat(metrics.getBaseline().getMatchedRate()).isEqualTo(60.0 / 90.0);
         assertThat(metrics.getBaseline().getResultDistribution()).containsEntry("APPROVE", 60L);
@@ -168,6 +190,46 @@ class DecisionRolloutServiceImplTest {
         assertThat(metrics.getWindows()).hasSize(1);
         assertThat(metrics.getWindows().get(0).getBaseline().getEvaluations()).isEqualTo(9);
         assertThat(metrics.getWindows().get(0).getCandidate().getEvaluations()).isEqualTo(1);
+    }
+
+    @Test
+    void metricsNormalizesWindowAndBucketParametersAndCanSkipRefresh() throws Exception {
+        DecisionRolloutPolicyEntity active = policy(10);
+        when(rolloutMapper.findByPid(10L, "rollout-1")).thenReturn(active);
+        MetaContext.setContext(10L, 42L, "user-pid", "tester");
+        when(logMapper.aggregateMetricBucketsByRolloutPolicy(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq("rollout-1"),
+                org.mockito.ArgumentMatchers.any(Instant.class),
+                org.mockito.ArgumentMatchers.eq(300))).thenReturn(List.of());
+        when(logMapper.aggregateBucketDistributionByRolloutPolicy(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq("rollout-1"),
+                org.mockito.ArgumentMatchers.any(Instant.class),
+                org.mockito.ArgumentMatchers.eq(300))).thenReturn(List.of());
+        when(logMapper.findRolloutMetricBucketWindows(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq("rollout-1"),
+                org.mockito.ArgumentMatchers.any(Instant.class),
+                org.mockito.ArgumentMatchers.eq(300))).thenReturn(List.of());
+
+        var metrics = service.metrics("rollout-1", 24 * 120, 1, false);
+
+        assertThat(metrics.getWindowHours()).isEqualTo(24 * 90);
+        assertThat(metrics.getBucketSeconds()).isEqualTo(5 * 60);
+        verify(logMapper, times(0)).refreshRolloutMetricBuckets(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt());
+        verify(logMapper, times(0)).deleteRolloutMetricBucketsOlderThan(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+        verify(logMapper).aggregateMetricBucketsByRolloutPolicy(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq("rollout-1"),
+                org.mockito.ArgumentMatchers.any(Instant.class),
+                org.mockito.ArgumentMatchers.eq(300));
     }
 
     @Test

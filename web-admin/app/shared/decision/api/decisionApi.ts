@@ -349,8 +349,20 @@ export interface DecisionRolloutWindowMetrics {
   candidate: DecisionRolloutArmMetrics;
 }
 
+export interface DecisionRolloutMetricsParams {
+  windowHours?: number;
+  bucketMinutes?: number;
+  refresh?: boolean;
+}
+
 export interface DecisionRolloutMetrics {
   policyPid: string;
+  windowHours?: number;
+  bucketSeconds?: number;
+  retentionDays?: number;
+  source?: string;
+  latencyAggregation?: string;
+  refreshedAt?: string;
   baseline: DecisionRolloutArmMetrics;
   candidate: DecisionRolloutArmMetrics;
   windows?: DecisionRolloutWindowMetrics[];
@@ -600,8 +612,15 @@ export function createDecisionApi(http: HttpClient) {
       http.post<DecisionRollout>(`${D}/rollouts/${pid}/promote`, req).then((r) => r.data),
     rollbackRollout: (pid: string, req?: DecisionRolloutActionRequest) =>
       http.post<DecisionRollout>(`${D}/rollouts/${pid}/rollback`, req).then((r) => r.data),
-    getRolloutMetrics: (pid: string) =>
-      http.get<DecisionRolloutMetrics>(`${D}/rollouts/${pid}/metrics`).then((r) => r.data),
+    getRolloutMetrics: (pid: string, params?: DecisionRolloutMetricsParams) => {
+      const query = compactParams(params ?? {});
+      return http
+        .get<DecisionRolloutMetrics>(
+          `${D}/rollouts/${pid}/metrics`,
+          Object.keys(query).length > 0 ? query : undefined,
+        )
+        .then((r) => r.data);
+    },
     getFieldImpact: (fieldRef: string) =>
       http.get<DecisionFieldImpact>(`${D}/fields/impact`, { fieldRef }).then((r) => r.data),
     getIntegrationImpact: (targetType: string, targetCode: string) =>

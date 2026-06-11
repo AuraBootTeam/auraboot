@@ -316,6 +316,42 @@
       ],
       "tags": ["table", "data", "grid", "display"]
     },
+    "decisionrulebinding": {
+      "name": "Decision Rule Binding",
+      "category": "display",
+      "description": "Rule-center condition and decision binding editor for DSL-hosted consumers",
+      "compatibleDataTypes": ["json"],
+      "properties": [
+        { "key": "mode", "label": "Mode", "type": "select", "options": [
+          { "label": "Condition + decision", "value": "combined" },
+          { "label": "Condition only", "value": "condition" },
+          { "label": "Decision only", "value": "decision" }
+        ], "group": "basic" },
+        { "key": "valueField", "label": "Value Field", "type": "string", "group": "binding" },
+        { "key": "consumerType", "label": "Consumer Type", "type": "select", "options": [
+          { "label": "Automation", "value": "AUTOMATION" },
+          { "label": "BPM", "value": "BPM" },
+          { "label": "SLA", "value": "SLA" },
+          { "label": "Permission", "value": "PERMISSION" },
+          { "label": "Event Policy", "value": "EVENT_POLICY" }
+        ], "group": "binding" },
+        { "key": "consumerCode", "label": "Consumer Code", "type": "string", "group": "binding" },
+        { "key": "consumerNodeId", "label": "Consumer Node ID", "type": "string", "group": "binding" },
+        { "key": "initialDecisionCode", "label": "Initial Decision Code", "type": "string", "group": "basic" },
+        { "key": "initialVersionPolicy", "label": "Initial Version Policy", "type": "select", "options": [
+          { "label": "Latest published", "value": "LATEST_PUBLISHED" },
+          { "label": "Fixed version", "value": "FIXED_VERSION" },
+          { "label": "Version tag", "value": "VERSION_TAG" },
+          { "label": "Rollout", "value": "ROLLOUT" }
+        ], "group": "basic" },
+        { "key": "showImpactPreview", "label": "Show Impact Preview", "type": "boolean", "group": "behavior" },
+        { "key": "showTestRunner", "label": "Show Test Runner", "type": "boolean", "group": "behavior" },
+        { "key": "initialContextJson", "label": "Initial Context JSON", "type": "json", "group": "advanced" },
+        { "key": "fields", "label": "Context Fields", "type": "array", "group": "advanced" },
+        { "key": "decisions", "label": "Decision Options", "type": "array", "group": "advanced" }
+      ],
+      "tags": ["decisionops", "rule-center", "condition", "decision-binding", "impact", "test-runner", "custom-block"]
+    },
     "button": {
       "name": "Button",
       "category": "interaction",

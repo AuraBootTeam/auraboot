@@ -17,6 +17,7 @@ import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.framework.bpm.extension.BpmExtensionAccessor;
 import com.auraboot.framework.bpm.service.AssigneeResolverService;
 import com.auraboot.framework.bpm.service.BpmRuleBindingRuntimeService;
+import com.auraboot.framework.bpm.service.BpmRuleBindingRuntimeService.TaskAssignmentResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -43,10 +44,19 @@ public class IdAndGroupTaskAssigneeDispatcher implements TaskAssigneeDispatcher 
             Activity activity, ExecutionContext context) {
         List<TaskAssigneeCandidateInstance> candidates = new ArrayList<>();
         Map<String, Object> request = context != null ? context.getRequest() : Map.of();
-        List<String> ruleAssignees = resolveRuleBindingAssignees(activity, context, request);
-        if (!ruleAssignees.isEmpty()) {
-            for (int i = 0; i < ruleAssignees.size(); i++) {
-                addCandidate(candidates, ruleAssignees.get(i), AssigneeTypeConstant.USER, i + 1);
+        TaskAssignmentResult ruleAssignment = resolveRuleBindingAssignment(activity, context, request);
+        if (ruleAssignment.failClosed()) {
+            log.warn("Rule-center assignment failed closed for activity {}; returning empty candidate list.",
+                    activity.getId());
+            return candidates;
+        }
+        if (ruleAssignment.hasCandidates()) {
+            int priority = 1;
+            for (String userId : ruleAssignment.userIds()) {
+                addCandidate(candidates, userId, AssigneeTypeConstant.USER, priority++);
+            }
+            for (String groupId : ruleAssignment.groupIds()) {
+                addCandidate(candidates, groupId, AssigneeTypeConstant.GROUP, priority++);
             }
             log.debug("Rule-center assignment resolved for activity {}: count={}",
                     activity.getId(), candidates.size());
@@ -128,26 +138,26 @@ public class IdAndGroupTaskAssigneeDispatcher implements TaskAssigneeDispatcher 
         return candidates;
     }
 
-    private List<String> resolveRuleBindingAssignees(
+    private TaskAssignmentResult resolveRuleBindingAssignment(
             Activity activity,
             ExecutionContext context,
             Map<String, Object> request) {
         if (!(activity instanceof ExtensionElementContainer extensionContainer)) {
-            return List.of();
+            return TaskAssignmentResult.empty();
         }
         BpmExtensionAccessor extensionAccessor = extensionAccessorProvider.getIfAvailable();
         BpmRuleBindingRuntimeService ruleBindingRuntimeService =
                 ruleBindingRuntimeServiceProvider.getIfAvailable();
         if (extensionAccessor == null || ruleBindingRuntimeService == null) {
-            return List.of();
+            return TaskAssignmentResult.empty();
         }
         String processKey = processKey(context);
         String processInstanceId = processInstanceId(context);
         return extensionAccessor
                 .getRuleConsumerBinding(extensionContainer, processKey, activity.getId())
-                .map(binding -> ruleBindingRuntimeService.resolveTaskAssignees(
+                .map(binding -> ruleBindingRuntimeService.resolveTaskAssignment(
                         binding, processKey, activity.getId(), processInstanceId, request))
-                .orElse(List.of());
+                .orElse(TaskAssignmentResult.empty());
     }
 
     private String processKey(ExecutionContext context) {

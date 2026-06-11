@@ -15,19 +15,29 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/ui/ui/dialog
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { permissionService } from '~/shared/services/permissionService';
+import {
+  DecisionRuleBindingBlock,
+  type RuleConsumerBindingDraft,
+} from '~/ui/smart/decision/DecisionRuleBindingBlock';
+import type { FieldOption } from '~/shared/decision/ui/ConditionBuilder';
 
 // ---------------------------------------------------------------------------
 // Policy schema field types
 // ---------------------------------------------------------------------------
 
 interface PolicyFieldSchema {
-  type: 'number' | 'string' | 'boolean' | 'enum' | 'enum[]';
+  type: 'number' | 'string' | 'boolean' | 'enum' | 'enum[]' | 'rule-center';
   label: string;
   default?: any;
   required?: boolean;
   min?: number;
   max?: number;
   options?: string[];
+  mode?: 'condition' | 'decision' | 'combined';
+  expectedMatched?: boolean;
+  timeoutMs?: number;
+  decisions?: Array<{ code: string; name?: string }>;
+  fields?: FieldOption[];
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +226,115 @@ function FieldRenderer({ fieldKey, fieldSchema, value, onChange }: FieldRenderer
       );
     }
 
+    case 'rule-center': {
+      const current = value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, any>)
+        : {};
+      const expectedMatched =
+        current.expectedMatched !== undefined
+          ? Boolean(current.expectedMatched)
+          : fieldSchema.expectedMatched !== false;
+      const timeoutMs = Number(current.timeoutMs ?? fieldSchema.timeoutMs ?? 50);
+      const initialRuleBinding: RuleConsumerBindingDraft | undefined =
+        current.ruleBinding ??
+        (current.decisionBinding || current.conditionSpec
+          ? {
+              consumerType: 'PERMISSION',
+              bindingKind: current.decisionBinding ? 'DECISION_REF' : 'CONDITION',
+              decisionBinding: current.decisionBinding,
+              conditionSpec: current.conditionSpec,
+              enabled: current.enabled !== false,
+            }
+          : undefined);
+
+      const emitRuleCenterValue = (
+        patch: Partial<Record<string, any>>,
+        nextRuleBinding: RuleConsumerBindingDraft | undefined = initialRuleBinding,
+      ) => {
+        const nextTimeout = Number(patch.timeoutMs ?? timeoutMs);
+        const ruleBinding = nextRuleBinding
+          ? {
+              ...nextRuleBinding,
+              consumerType: nextRuleBinding.consumerType ?? 'PERMISSION',
+              decisionBinding: nextRuleBinding.decisionBinding
+                ? {
+                    ...nextRuleBinding.decisionBinding,
+                    timeoutMs: nextTimeout,
+                    fallbackPolicy:
+                      nextRuleBinding.decisionBinding.fallbackPolicy ?? { mode: 'FAIL_CLOSED' },
+                  }
+                : nextRuleBinding.decisionBinding,
+            }
+          : undefined;
+        onChange(fieldKey, {
+          ...current,
+          expectedMatched,
+          timeoutMs: nextTimeout,
+          enabled: current.enabled !== false,
+          ...patch,
+          ruleBinding,
+        });
+      };
+
+      return (
+        <div
+          className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40"
+          data-testid={`policy-field-${fieldKey}`}
+        >
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div>
+              {labelEl}
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Permission ABAC is read-only and fails closed on timeout, error, or fallback.
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={expectedMatched}
+                onChange={(event) => emitRuleCenterValue({ expectedMatched: event.target.checked })}
+                data-testid={`policy-rule-expected-${fieldKey}`}
+              />
+              expected matched
+            </label>
+          </div>
+
+          <label className="mb-3 block text-xs font-medium text-gray-600 dark:text-gray-300">
+            Timeout ms
+            <input
+              id={`${fieldId}-timeout`}
+              type="number"
+              min={1}
+              max={1000}
+              className={`${inputClass} mt-1`}
+              value={Number.isFinite(timeoutMs) ? timeoutMs : 50}
+              onChange={(event) =>
+                emitRuleCenterValue({ timeoutMs: Number(event.target.value || 50) })
+              }
+              data-testid={`policy-rule-timeout-${fieldKey}`}
+            />
+          </label>
+
+          <DecisionRuleBindingBlock
+            value={initialRuleBinding}
+            onChange={(next) => emitRuleCenterValue({}, next)}
+            block={{
+              props: {
+                mode: fieldSchema.mode ?? 'combined',
+                consumerType: 'PERMISSION',
+                consumerNodeId: fieldKey,
+                showImpactPreview: true,
+                showTestRunner: true,
+                fields: fieldSchema.fields,
+                decisions: fieldSchema.decisions,
+                initialVersionPolicy: 'LATEST_PUBLISHED',
+              },
+            }}
+          />
+        </div>
+      );
+    }
+
     default:
       return null;
   }
@@ -240,6 +359,13 @@ export default function PolicyConfigDialog({
 
   const [values, setValues] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
+  const text = useCallback(
+    (key: string, fallback: string) => {
+      const translated = t(key, undefined, fallback);
+      return translated && translated !== key ? translated : fallback;
+    },
+    [t],
+  );
 
   // Build initial values from schema defaults merged with passed-in initialValues
   useEffect(() => {
@@ -269,7 +395,7 @@ export default function PolicyConfigDialog({
           (Array.isArray(v) && v.length === 0);
         if (isEmpty) {
           showErrorToast(
-            (t('admin.permission.policy.requiredError') || 'Required field missing') +
+            text('admin.permission.policy.requiredError', 'Required field missing') +
               ': ' +
               field.label,
           );
@@ -282,13 +408,13 @@ export default function PolicyConfigDialog({
     try {
       await permissionService.setPolicy(rolePid, permissionPid, values);
       showSuccessToast(
-        t('admin.permission.policy.saveSuccess') || 'Policy configuration saved',
+        text('admin.permission.policy.saveSuccess', 'Policy configuration saved'),
       );
       onSuccess();
       onClose();
     } catch (err) {
       showErrorToast(
-        t('admin.permission.policy.saveError') || 'Failed to save policy configuration',
+        text('admin.permission.policy.saveError', 'Failed to save policy configuration'),
       );
     } finally {
       setSaving(false);
@@ -299,12 +425,12 @@ export default function PolicyConfigDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] max-w-3xl overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pr-12">
           <DialogTitle className="flex items-center gap-2">
             <span>⚙️</span>
             <span>
-              {t('admin.permission.policy.dialogTitle') || 'Policy Configuration'}
+              {text('admin.permission.policy.dialogTitle', 'Policy Configuration')}
               {' — '}
               <span className="font-normal text-gray-600 dark:text-gray-400">
                 {permissionLabel}
@@ -313,32 +439,38 @@ export default function PolicyConfigDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4" data-testid="policy-config-form">
-          {fieldEntries.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">
-              {t('admin.permission.policy.noFields') || 'No configurable fields in this policy.'}
-            </p>
-          ) : (
-            fieldEntries.map(([key, fieldSchema]) => (
-              <FieldRenderer
-                key={key}
-                fieldKey={key}
-                fieldSchema={fieldSchema}
-                value={values[key]}
-                onChange={handleFieldChange}
-              />
-            ))
-          )}
+        <form
+          onSubmit={handleSubmit}
+          className="min-h-0"
+          data-testid="policy-config-form"
+        >
+          <div className="max-h-[calc(100vh-13rem)] space-y-4 overflow-y-auto px-6 py-4 pb-24">
+            {fieldEntries.length === 0 ? (
+              <p className="text-sm text-gray-400 italic">
+                {text('admin.permission.policy.noFields', 'No configurable fields in this policy.')}
+              </p>
+            ) : (
+              fieldEntries.map(([key, fieldSchema]) => (
+                <FieldRenderer
+                  key={key}
+                  fieldKey={key}
+                  fieldSchema={fieldSchema}
+                  value={values[key]}
+                  onChange={handleFieldChange}
+                />
+              ))
+            )}
+          </div>
 
           {/* Footer buttons */}
-          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+          <div className="absolute right-0 bottom-0 left-0 z-10 flex justify-end gap-3 border-t border-gray-100 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900">
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
               className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
             >
-              {t('common.cancel') || 'Cancel'}
+              {text('common.cancel', 'Cancel')}
             </button>
             <button
               type="submit"
@@ -368,10 +500,10 @@ export default function PolicyConfigDialog({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                     />
                   </svg>
-                  {t('common.saving') || 'Saving...'}
+                  {text('common.saving', 'Saving...')}
                 </>
               ) : (
-                t('common.save') || 'Save'
+                text('common.save', 'Save')
               )}
             </button>
           </div>

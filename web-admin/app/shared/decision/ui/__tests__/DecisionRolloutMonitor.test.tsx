@@ -46,6 +46,12 @@ function rolloutApi(overrides: Partial<DecisionApi> = {}): Partial<DecisionApi> 
     ]),
     getRolloutMetrics: vi.fn(async () => ({
       policyPid: 'rollout-1',
+      windowHours: 168,
+      bucketSeconds: 3600,
+      retentionDays: 90,
+      source: 'PRE_AGGREGATED_BUCKETS',
+      latencyAggregation: 'MAX_BUCKET_P95',
+      refreshedAt: '2026-06-11T06:30:25Z',
       baseline: {
         version: 1,
         evaluations: 90,
@@ -120,7 +126,16 @@ describe('DecisionRolloutMonitor', () => {
     expect(screen.getByTestId('rollout-row-rollout-1')).toHaveTextContent('Cohort keys 1');
     expect(screen.getByTestId('rollout-row-rollout-1')).toHaveTextContent('Segments 1');
     await waitFor(() => expect(screen.getByTestId('rollout-metrics-baseline')).toBeInTheDocument());
-    expect(api.getRolloutMetrics).toHaveBeenCalledWith('rollout-1');
+    expect(api.getRolloutMetrics).toHaveBeenCalledWith('rollout-1', {
+      windowHours: 168,
+      bucketMinutes: 60,
+    });
+    expect(screen.getByTestId('rollout-metrics-meta')).toHaveTextContent(
+      'Source PRE_AGGREGATED_BUCKETS',
+    );
+    expect(screen.getByTestId('rollout-metrics-meta')).toHaveTextContent('Window 168h');
+    expect(screen.getByTestId('rollout-metrics-meta')).toHaveTextContent('Bucket 60m');
+    expect(screen.getByTestId('rollout-metrics-meta')).toHaveTextContent('Retention 90d');
     expect(screen.getByTestId('rollout-metrics-baseline')).toHaveTextContent('90');
     expect(screen.getByTestId('rollout-metrics-candidate')).toHaveTextContent('10');
     expect(screen.getByTestId('rollout-metrics-candidate')).toHaveTextContent('80.0%');

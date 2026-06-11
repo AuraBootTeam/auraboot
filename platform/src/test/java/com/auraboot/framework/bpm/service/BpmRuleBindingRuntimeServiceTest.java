@@ -85,6 +85,49 @@ class BpmRuleBindingRuntimeServiceTest {
         assertThat(assignees).containsExactly("u7", "u8");
     }
 
+    @Test
+    void resolveTaskAssignmentUsesConventionalGroupOutputKeys() {
+        RuleConsumerBinding binding = binding("approve", List.of());
+        when(ruleEvaluationService.evaluateDecisionBinding(any(), any()))
+                .thenReturn(trace(Map.of("candidateGroups", List.of("finance-managers", "risk-owners"))));
+
+        BpmRuleBindingRuntimeService.TaskAssignmentResult assignment = service.resolveTaskAssignment(
+                binding, "expense", "approve", "pi-4", new HashMap<>());
+
+        assertThat(assignment.userIds()).isEmpty();
+        assertThat(assignment.groupIds()).containsExactly("finance-managers", "risk-owners");
+        assertThat(assignment.failClosed()).isFalse();
+    }
+
+    @Test
+    void resolveTaskAssignmentUsesOutputMappingsPointingAtCandidateGroupTargets() {
+        RuleConsumerBinding binding = binding("approve", List.of(new DecisionBinding.OutputMapping(
+                "groups",
+                new RuleMappingTarget(RuleMappingTarget.Kind.ACTION_PARAM, "candidateGroups"))));
+        when(ruleEvaluationService.evaluateDecisionBinding(any(), any()))
+                .thenReturn(trace(Map.of("groups", "g1,g2")));
+
+        BpmRuleBindingRuntimeService.TaskAssignmentResult assignment = service.resolveTaskAssignment(
+                binding, "expense", "approve", "pi-5", new HashMap<>());
+
+        assertThat(assignment.userIds()).isEmpty();
+        assertThat(assignment.groupIds()).containsExactly("g1", "g2");
+    }
+
+    @Test
+    void resolveTaskAssignmentFailsClosedOnDecisionErrorWithoutAssigneeFallback() {
+        RuleConsumerBinding binding = binding("approve", List.of());
+        when(ruleEvaluationService.evaluateDecisionBinding(any(), any()))
+                .thenReturn(errorTrace());
+
+        BpmRuleBindingRuntimeService.TaskAssignmentResult assignment = service.resolveTaskAssignment(
+                binding, "expense", "approve", "pi-6", new HashMap<>());
+
+        assertThat(assignment.failClosed()).isTrue();
+        assertThat(assignment.userIds()).isEmpty();
+        assertThat(assignment.groupIds()).isEmpty();
+    }
+
     private RuleConsumerBinding binding(String nodeId, List<DecisionBinding.OutputMapping> outputs) {
         return new RuleConsumerBinding(
                 "BPM",
@@ -130,6 +173,30 @@ class BpmRuleBindingRuntimeServiceTest {
                 12L,
                 null,
                 List.of(),
+                List.of(),
+                List.of(),
+                List.of());
+    }
+
+    private RuleEvaluationTrace errorTrace() {
+        return new RuleEvaluationTrace(
+                "trace-error",
+                "BPM",
+                "expense",
+                "approve",
+                RuleBindingKind.DECISION_REF,
+                "task_assignee",
+                1,
+                DecisionVersionPolicy.LATEST_PUBLISHED,
+                null,
+                DecisionStatus.ERROR,
+                false,
+                Map.of("amount", 60000),
+                Map.of(),
+                true,
+                12L,
+                "DECISION_EVALUATION_FAILED",
+                List.of("adapter failed"),
                 List.of(),
                 List.of(),
                 List.of());

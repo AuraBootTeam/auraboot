@@ -210,6 +210,16 @@ class SlaDecisionDeadlineTest {
     }
 
     @Test
+    void ruleEvaluationServiceFailureDoesNotFallbackToLegacyDecisionService() {
+        when(ruleEvaluationService.evaluateDecisionBinding(any(DecisionBinding.class), any(RuleEvaluationContext.class)))
+                .thenThrow(new RuntimeException("timeout"));
+        when(decisionService.evaluate(any(DrtEvaluateRequest.class))).thenReturn(withMinutes(15));
+
+        assertThat(listenerWithRuleEvaluation().resolveRuleDeadlineMinutes(config(), "sla_deadline")).isNull();
+        verify(decisionService, never()).evaluate(any(DrtEvaluateRequest.class));
+    }
+
+    @Test
     void returnsNullWhenNoMinutesOutput() {
         when(decisionService.evaluate(any(DrtEvaluateRequest.class))).thenReturn(withMinutes(null));
         assertThat(listener().resolveRuleDeadlineMinutes(config(), "x")).isNull();

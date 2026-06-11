@@ -1,6 +1,12 @@
 package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.decision.rule.ConditionSpec;
+import com.auraboot.framework.decision.rule.DecisionBinding;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
+import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.PermissionPolicyService;
@@ -8,9 +14,14 @@ import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.postgresql.util.PGobject;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +44,7 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     private final PermissionMapper permissionMapper;
     private final UserRoleService userRoleService;
     private final ObjectMapper objectMapper;
+    private final ObjectProvider<DecisionUsageIndexService> usageIndexServiceProvider;
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
@@ -95,6 +107,7 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
             log.warn("No role-permission binding found: roleId={}, permissionId={}", roleId, permissionId);
             return;
         }
+        validatePolicyValues(policyValues);
 
         // Use direct SQL update for JSONB column — MyBatis-Plus updateById
         // with JacksonTypeHandler on Object type doesn't reliably serialize JSONB.
@@ -106,6 +119,7 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
             return;
         }
         rolePermissionMapper.updateConditionsById(rp.getId(), jsonStr);
+        refreshPermissionPolicyUsageIndex(rp);
 
         log.info("Updated policy for role-permission: roleId={}, permissionId={}, keys={}",
                 roleId, permissionId, policyValues.keySet());
@@ -247,10 +261,87 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
         );
     }
 
+    private void validatePolicyValues(Map<String, Object> policyValues) {
+        if (policyValues == null || policyValues.isEmpty()) {
+            return;
+        }
+        JsonNode root = objectMapper.valueToTree(policyValues);
+        validateRuleCenterAbacNode("$", root);
+    }
+
+    private void validateRuleCenterAbacNode(String path, JsonNode node) {
+        if (node == null || node.isNull()) {
+            return;
+        }
+        if (node.isObject()) {
+            validateNestedRuleCenterObject(path + ".ruleBinding", node.get("ruleBinding"), RuleConsumerBinding.class);
+            validateNestedRuleCenterObject(path + ".decisionBinding", node.get("decisionBinding"), DecisionBinding.class);
+            validateNestedRuleCenterObject(path + ".conditionSpec", node.get("conditionSpec"), ConditionSpec.class);
+            if (node.hasNonNull("decisionCode")) {
+                validateNestedRuleCenterObject(path, node, DecisionBinding.class);
+            }
+            node.fields().forEachRemaining(entry ->
+                    validateRuleCenterAbacNode(path + "." + entry.getKey(), entry.getValue()));
+            return;
+        }
+        if (node.isArray()) {
+            for (int i = 0; i < node.size(); i++) {
+                validateRuleCenterAbacNode(path + "[" + i + "]", node.get(i));
+            }
+        }
+    }
+
+    private <T> void validateNestedRuleCenterObject(String path, JsonNode node, Class<T> type) {
+        if (node == null || node.isNull()) {
+            return;
+        }
+        try {
+            T parsed = objectMapper.copy()
+                    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                    .configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS, true)
+                    .convertValue(node, type);
+            if (parsed instanceof DecisionBinding binding
+                    && (binding.decisionCode() == null || binding.decisionCode().isBlank())) {
+                throw new IllegalArgumentException("decisionCode is required");
+            }
+            if (parsed instanceof RuleConsumerBinding binding
+                    && binding.decisionBinding() != null
+                    && (binding.decisionBinding().decisionCode() == null
+                    || binding.decisionBinding().decisionCode().isBlank())) {
+                throw new IllegalArgumentException("ruleBinding.decisionBinding.decisionCode is required");
+            }
+        } catch (IllegalArgumentException e) {
+            throw new RootUnCheckedException(ResponseCode.BadParam,
+                    "Invalid permission ABAC policy at " + path + ": " + e.getMessage(), e);
+        }
+    }
+
+    private void refreshPermissionPolicyUsageIndex(RolePermission rp) {
+        if (rp.getPid() == null || rp.getPid().isBlank()) {
+            return;
+        }
+        DecisionUsageIndexService usageIndexService = usageIndexServiceProvider.getIfAvailable();
+        if (usageIndexService == null) {
+            return;
+        }
+        usageIndexService.refreshSource("PERMISSION_POLICY", rp.getPid());
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> convertToMap(Object value) {
         if (value == null) {
             return null;
+        }
+        if (value instanceof Map<?, ?> map) {
+            String wrappedJson = unwrapPgJsonWrapper(map);
+            if (wrappedJson != null) {
+                value = wrappedJson;
+            } else {
+                return (Map<String, Object>) value;
+            }
+        }
+        if (value instanceof PGobject pgObject) {
+            value = pgObject.getValue();
         }
         if (value instanceof Map) {
             return (Map<String, Object>) value;
@@ -274,5 +365,18 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
             log.warn("Failed to convert policy value: {}", value.getClass().getName(), e);
             return null;
         }
+    }
+
+    private String unwrapPgJsonWrapper(Map<?, ?> map) {
+        Object type = map.get("type");
+        Object rawValue = map.get("value");
+        if (!(rawValue instanceof String str) || str.isBlank()) {
+            return null;
+        }
+        if (type instanceof String typeStr
+                && ("jsonb".equalsIgnoreCase(typeStr) || "json".equalsIgnoreCase(typeStr))) {
+            return str;
+        }
+        return null;
     }
 }

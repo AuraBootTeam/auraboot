@@ -14,8 +14,10 @@ import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.smart.framework.engine.SmartEngine;
+import com.auraboot.smart.framework.engine.constant.AssigneeTypeConstant;
 import com.auraboot.smart.framework.engine.model.instance.InstanceStatus;
 import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
+import com.auraboot.smart.framework.engine.model.instance.TaskAssigneeInstance;
 import com.auraboot.smart.framework.engine.model.instance.TaskInstance;
 import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -164,6 +166,29 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
             </definitions>
             """;
 
+    private static final String RULE_BOUND_TASK_ASSIGNMENT_BPMN = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                         xmlns:smart="http://smartengine.org/schema/process"
+                         targetNamespace="http://auraboot.com/bpm">
+              <process id="%s" name="Rule Bound Task Assignment" isExecutable="true">
+                <startEvent id="start"/>
+                <sequenceFlow id="f_start_approve" sourceRef="start" targetRef="approve"/>
+                <userTask id="approve" name="Rule Assigned Approval"
+                          smart:assigneeType="user" smart:assigneeId="static-fallback-user">
+                  <extensionElements>
+                    <smart:properties>
+                      <smart:property name="aura.ruleBinding" value="%s"/>
+                    </smart:properties>
+                  </extensionElements>
+                </userTask>
+                <sequenceFlow id="f_approve_end" sourceRef="approve" targetRef="end"/>
+                <endEvent id="end"/>
+              </process>
+            </definitions>
+            """;
+
     private static final String ROUTE_DECISION_TABLE = """
             { "hitPolicy":"FIRST",
               "inputs":[
@@ -174,6 +199,27 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
                  "when":{"amount":{"operator":"GT","value":10000}},
                  "then":{"route":"director"}}],
               "defaultOutput":{"route":"manager"} }
+            """;
+
+    private static final String TASK_ASSIGNMENT_DECISION_TABLE = """
+            { "hitPolicy":"FIRST",
+              "inputs":[
+                {"id":"amount","label":"Amount","expr":{"type":"path","scope":"record","path":"data.amount","dataType":"decimal"}}],
+              "outputs":[
+                {"id":"reviewUsers","label":"Review Users","dataType":"string"},
+                {"id":"reviewGroups","label":"Review Groups","dataType":"string"},
+                {"id":"primaryAssignee","label":"Primary Assignee","dataType":"string"}],
+              "rules":[
+                {"ruleId":"director-assignment","priority":20,
+                 "when":{"amount":{"operator":"GT","value":10000}},
+                 "then":{
+                   "reviewUsers":"rule-user-1,rule-user-2",
+                   "reviewGroups":"finance-managers,risk-owners",
+                   "primaryAssignee":"rule-primary-user"}}],
+              "defaultOutput":{
+                "reviewUsers":"rule-default-user",
+                "reviewGroups":"default-reviewers",
+                "primaryAssignee":"rule-default-primary"} }
             """;
 
     private ProcessInstance deployAndStart(String suffix) {
@@ -203,6 +249,29 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
 
         Map<String, Object> startVars = new HashMap<>();
         startVars.put("_startUserId", MetaContext.getCurrentUserId() + "");
+        return processEngineService.startProcess(key, "BIZ-" + System.nanoTime(), startVars);
+    }
+
+    private ProcessInstance deployRuleBoundAssignmentAndStart(
+            String suffix,
+            String decisionCode,
+            Object amount) throws Exception {
+        String key = "task-rule-assignment-" + suffix + "-" + System.nanoTime();
+        String bpmn = String.format(
+                RULE_BOUND_TASK_ASSIGNMENT_BPMN,
+                key,
+                xmlAttr(taskAssignmentRuleBindingJson(key, decisionCode)));
+        ProcessDeploymentService.CreateProcessRequest req =
+                new ProcessDeploymentService.CreateProcessRequest(
+                        key, "Rule Bound Task Assignment " + suffix,
+                        "Rule center runtime task assignment coverage", "test",
+                        bpmn, null, null, null);
+        BpmProcessDefinition def = deploymentService.create(req);
+        deploymentService.deploy(def.getPid());
+
+        Map<String, Object> startVars = new HashMap<>();
+        startVars.put("_startUserId", MetaContext.getCurrentUserId() + "");
+        startVars.put("amount", amount);
         return processEngineService.startProcess(key, "BIZ-" + System.nanoTime(), startVars);
     }
 
@@ -297,6 +366,28 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
         return code;
     }
 
+    private String publishTaskAssignmentDecision() throws Exception {
+        String code = "it_bpm_task_assignment_" + System.nanoTime();
+        DrtDefinitionCreateRequest def = new DrtDefinitionCreateRequest();
+        def.setDecisionCode(code);
+        def.setDecisionName("IT BPM Task Assignment");
+        def.setScopeType("BPM");
+        def.setOwnerModule("bpm");
+        definitionService.create(def);
+
+        DrtVersionCreateRequest ver = new DrtVersionCreateRequest();
+        ver.setKind("DECISION_TABLE");
+        ver.setRuntimeAdapter("PLATFORM_DECISION_TABLE");
+        ver.setContentJson(objectMapper.readTree(TASK_ASSIGNMENT_DECISION_TABLE));
+        DrtVersionDTO draft = versionService.createDraft(code, ver);
+
+        DecisionValidateResult validation = versionService.validate(draft.getPid());
+        assertThat(validation.valid()).isTrue();
+        assertThat(validation.fieldRefs()).contains("record.data.amount");
+        versionService.publish(draft.getPid());
+        return code;
+    }
+
     private String ruleBindingJson(String processKey, String decisionCode) throws Exception {
         return objectMapper.writeValueAsString(Map.of(
                 "consumerType", "BPM",
@@ -321,6 +412,52 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
                         "traceMode", "ALWAYS",
                         "enabled", true),
                 "enabled", true));
+    }
+
+    private String taskAssignmentRuleBindingJson(String processKey, String decisionCode) throws Exception {
+        return objectMapper.writeValueAsString(Map.of(
+                "consumerType", "BPM",
+                "consumerCode", processKey,
+                "consumerNodeId", "approve",
+                "bindingKind", "DECISION_REF",
+                "decisionBinding", Map.of(
+                        "decisionCode", decisionCode,
+                        "versionPolicy", "LATEST_PUBLISHED",
+                        "inputMappings", List.of(Map.of(
+                                "input", "amount",
+                                "source", Map.of(
+                                        "kind", "FIELD",
+                                        "scope", "record",
+                                        "path", "amount"))),
+                        "outputMappings", List.of(
+                                Map.of(
+                                        "output", "reviewUsers",
+                                        "target", Map.of(
+                                                "kind", "ACTION_PARAM",
+                                                "path", "candidateUsers")),
+                                Map.of(
+                                        "output", "reviewGroups",
+                                        "target", Map.of(
+                                                "kind", "ACTION_PARAM",
+                                                "path", "candidateGroups")),
+                                Map.of(
+                                        "output", "primaryAssignee",
+                                        "target", Map.of(
+                                                "kind", "PROCESS_VARIABLE",
+                                                "path", "assigneeUserId"))),
+                        "fallbackPolicy", Map.of("mode", "FAIL_CLOSED"),
+                        "traceMode", "ALWAYS",
+                        "enabled", true),
+                "enabled", true));
+    }
+
+    private List<TaskAssigneeInstance> taskAssignees(TaskInstance task) {
+        if (task.getTaskAssigneeInstanceList() != null
+                && !task.getTaskAssigneeInstanceList().isEmpty()) {
+            return task.getTaskAssigneeInstanceList();
+        }
+        return smartEngine.getTaskAssigneeQueryService()
+                .findList(task.getInstanceId(), MetaContext.getCurrentTenantIdAsString());
     }
 
     private String xmlAttr(String value) {
@@ -362,6 +499,33 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
 
         InstanceStatus manager = driveRuleBoundGateway("manager", decisionCode, 500, "manager");
         assertThat(manager).isEqualTo(InstanceStatus.completed);
+    }
+
+    @Test
+    @DisplayName("userTask aura.ruleBinding evaluates published decision and drives candidates")
+    void ruleBindingUserTaskEvaluatesDecisionBeforeAssignment() throws Exception {
+        String decisionCode = publishTaskAssignmentDecision();
+
+        ProcessInstance instance = deployRuleBoundAssignmentAndStart("director", decisionCode, 20000);
+        TaskInstance approve = currentTask(instance.getInstanceId());
+        assertThat(approve.getProcessDefinitionActivityId()).isEqualTo("approve");
+
+        List<TaskAssigneeInstance> assignees = taskAssignees(approve);
+        assertThat(assignees).extracting(TaskAssigneeInstance::getAssigneeId)
+                .containsExactlyInAnyOrder(
+                        "rule-user-1",
+                        "rule-user-2",
+                        "rule-primary-user",
+                        "finance-managers",
+                        "risk-owners");
+        assertThat(assignees).filteredOn(a -> AssigneeTypeConstant.USER.equals(a.getAssigneeType()))
+                .extracting(TaskAssigneeInstance::getAssigneeId)
+                .containsExactlyInAnyOrder("rule-user-1", "rule-user-2", "rule-primary-user");
+        assertThat(assignees).filteredOn(a -> AssigneeTypeConstant.GROUP.equals(a.getAssigneeType()))
+                .extracting(TaskAssigneeInstance::getAssigneeId)
+                .containsExactlyInAnyOrder("finance-managers", "risk-owners");
+        assertThat(assignees).extracting(TaskAssigneeInstance::getAssigneeId)
+                .doesNotContain("static-fallback-user");
     }
 
     @Test

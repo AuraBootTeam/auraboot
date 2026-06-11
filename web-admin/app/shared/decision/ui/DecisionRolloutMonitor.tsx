@@ -219,6 +219,36 @@ function windowTrend(windows: DecisionRolloutWindowMetrics[] = []) {
   );
 }
 
+function metricsMeta(metrics: {
+  windowHours?: number;
+  bucketSeconds?: number;
+  retentionDays?: number;
+  source?: string;
+  latencyAggregation?: string;
+  refreshedAt?: string;
+}) {
+  const bucketMinutes =
+    metrics.bucketSeconds && Number.isFinite(metrics.bucketSeconds)
+      ? Math.round(metrics.bucketSeconds / 60)
+      : undefined;
+  const items = [
+    metrics.source ? `Source ${metrics.source}` : null,
+    metrics.windowHours ? `Window ${metrics.windowHours}h` : null,
+    bucketMinutes ? `Bucket ${bucketMinutes}m` : null,
+    metrics.retentionDays ? `Retention ${metrics.retentionDays}d` : null,
+    metrics.latencyAggregation ? `Latency ${metrics.latencyAggregation}` : null,
+    metrics.refreshedAt ? `Refreshed ${metrics.refreshedAt}` : null,
+  ].filter((item): item is string => Boolean(item));
+
+  return (
+    <div className="rollout-metrics-meta" data-testid="rollout-metrics-meta">
+      {items.map((item) => (
+        <span key={item}>{item}</span>
+      ))}
+    </div>
+  );
+}
+
 function statusTone(status?: string): string {
   if (status === 'ACTIVE' || status === 'PROMOTED') return 'is-success';
   if (status === 'PAUSED' || status === 'DRAFT') return 'is-warning';
@@ -243,6 +273,8 @@ export function DecisionRolloutMonitor({
   const [cohortTracePrefixes, setCohortTracePrefixes] = useState('');
   const [tenantSegments, setTenantSegments] = useState('');
   const [salt, setSalt] = useState('decision-rollout');
+  const [metricsWindowHours, setMetricsWindowHours] = useState('168');
+  const [metricsBucketMinutes, setMetricsBucketMinutes] = useState('60');
   const [note, setNote] = useState('');
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [selectedPid, setSelectedPid] = useState<string | null>(null);
@@ -278,8 +310,12 @@ export function DecisionRolloutMonitor({
   );
   const activePid = selectedRollout?.pid;
   const metricsQuery = useQuery({
-    queryKey: ['decision-rollout-metrics', activePid],
-    queryFn: () => api.getRolloutMetrics(activePid ?? ''),
+    queryKey: ['decision-rollout-metrics', activePid, metricsWindowHours, metricsBucketMinutes],
+    queryFn: () =>
+      api.getRolloutMetrics(activePid ?? '', {
+        windowHours: Math.max(1, asNumber(metricsWindowHours)),
+        bucketMinutes: Math.max(1, asNumber(metricsBucketMinutes)),
+      }),
     enabled: Boolean(activePid),
   });
 
@@ -428,6 +464,26 @@ export function DecisionRolloutMonitor({
             onChange={(event) => setSalt(event.target.value)}
           />
         </label>
+        <label>
+          Metrics window
+          <input
+            aria-label="rollout-metrics-window-hours"
+            type="number"
+            min="1"
+            value={metricsWindowHours}
+            onChange={(event) => setMetricsWindowHours(event.target.value)}
+          />
+        </label>
+        <label>
+          Bucket minutes
+          <input
+            aria-label="rollout-metrics-bucket-minutes"
+            type="number"
+            min="5"
+            value={metricsBucketMinutes}
+            onChange={(event) => setMetricsBucketMinutes(event.target.value)}
+          />
+        </label>
         <button
           className="decisionops-primary-button"
           data-testid="rollout-create"
@@ -573,6 +629,7 @@ export function DecisionRolloutMonitor({
             {metricsQuery.data ? (
               <div className="rollout-metrics" data-testid="rollout-metrics-panel">
                 <h3>版本指标对比</h3>
+                {metricsMeta(metricsQuery.data)}
                 <div className="rollout-metrics-grid">
                   {metricSummary(
                     'Baseline',

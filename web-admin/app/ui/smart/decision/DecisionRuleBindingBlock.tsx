@@ -23,6 +23,19 @@ export interface InputMapping {
   path: string;
 }
 
+export type OutputTargetKind =
+  | 'ACTION_PARAM'
+  | 'FIELD'
+  | 'PROCESS_VARIABLE'
+  | 'SLA_FIELD'
+  | 'PERMISSION_CONTEXT';
+
+export interface OutputMapping {
+  output: string;
+  targetKind: OutputTargetKind;
+  targetPath: string;
+}
+
 export interface RuleValueSourceDraft {
   kind: 'FIELD' | 'LITERAL';
   scope?: FieldOption['scope'];
@@ -30,10 +43,16 @@ export interface RuleValueSourceDraft {
   value?: unknown;
 }
 
+export interface RuleMappingTargetDraft {
+  kind: OutputTargetKind;
+  path: string;
+}
+
 export interface DecisionBindingDraft {
   decisionCode: string;
   versionPolicy: DecisionVersionPolicy;
   inputMappings: InputMapping[];
+  outputMappings: OutputMapping[];
   fallbackMode: 'FAIL_CLOSED' | 'FAIL_OPEN' | 'DEFAULT_VALUE';
 }
 
@@ -53,7 +72,10 @@ export interface RuleConsumerBindingDraft {
       input: string;
       source: RuleValueSourceDraft;
     }>;
-    outputMappings: unknown[];
+    outputMappings: Array<{
+      output: string;
+      target: RuleMappingTargetDraft;
+    }>;
     fallbackPolicy: {
       mode: DecisionBindingDraft['fallbackMode'];
     };
@@ -134,6 +156,14 @@ const VERSION_POLICIES: DecisionVersionPolicy[] = [
   'ROLLOUT',
 ];
 
+const OUTPUT_TARGET_KINDS: OutputTargetKind[] = [
+  'ACTION_PARAM',
+  'FIELD',
+  'PROCESS_VARIABLE',
+  'SLA_FIELD',
+  'PERMISSION_CONTEXT',
+];
+
 function fieldKey(field: Pick<FieldOption, 'scope' | 'path'>): string {
   return `${field.scope}:${field.path}`;
 }
@@ -176,6 +206,17 @@ function mappingFromSource(input: string, source?: RuleValueSourceDraft): InputM
   };
 }
 
+function mappingFromTarget(output: string, target?: RuleMappingTargetDraft): OutputMapping | null {
+  if (!output || !target?.kind || !target.path) {
+    return null;
+  }
+  return {
+    output,
+    targetKind: target.kind,
+    targetPath: target.path,
+  };
+}
+
 function buildInitialBinding(
   decisions: DecisionOption[],
   initialDecisionCode?: string,
@@ -190,6 +231,10 @@ function buildInitialBinding(
       decisionBinding?.inputMappings
         ?.map((mapping) => mappingFromSource(mapping.input, mapping.source))
         .filter((mapping): mapping is InputMapping => Boolean(mapping)) ?? [],
+    outputMappings:
+      decisionBinding?.outputMappings
+        ?.map((mapping) => mappingFromTarget(mapping.output, mapping.target))
+        .filter((mapping): mapping is OutputMapping => Boolean(mapping)) ?? [],
     fallbackMode: decisionBinding?.fallbackPolicy?.mode || 'FAIL_CLOSED',
   };
 }
@@ -224,7 +269,10 @@ function buildRuleConsumerBinding(
             input: mapping.input,
             source: { kind: 'FIELD', scope: mapping.scope, path: mapping.path },
           })),
-          outputMappings: [],
+          outputMappings: binding.outputMappings.map((mapping) => ({
+            output: mapping.output,
+            target: { kind: mapping.targetKind, path: mapping.targetPath },
+          })),
           fallbackPolicy: { mode: binding.fallbackMode },
           traceMode: 'SAMPLED',
           enabled: true,
@@ -389,6 +437,45 @@ export function DecisionRuleBindingBlock({
       const next = {
         ...current,
         inputMappings: current.inputMappings.filter((_, i) => i !== index),
+      };
+      emitChange(condition, next);
+      return next;
+    });
+  };
+
+  const addOutputMapping = () => {
+    setBinding((current) => {
+      const next = {
+        ...current,
+        outputMappings: [
+          ...current.outputMappings,
+          {
+            output: `output${current.outputMappings.length + 1}`,
+            targetKind: 'ACTION_PARAM' as const,
+            targetPath: `result.output${current.outputMappings.length + 1}`,
+          },
+        ],
+      };
+      emitChange(condition, next);
+      return next;
+    });
+  };
+
+  const updateOutputMapping = (index: number, patch: Partial<OutputMapping>) => {
+    setBinding((current) => {
+      const next = current.outputMappings.slice();
+      next[index] = { ...next[index], ...patch };
+      const nextBinding = { ...current, outputMappings: next };
+      emitChange(condition, nextBinding);
+      return nextBinding;
+    });
+  };
+
+  const removeOutputMapping = (index: number) => {
+    setBinding((current) => {
+      const next = {
+        ...current,
+        outputMappings: current.outputMappings.filter((_, i) => i !== index),
       };
       emitChange(condition, next);
       return next;
@@ -584,19 +671,79 @@ export function DecisionRuleBindingBlock({
             </div>
           ))}
 
+          <div className="decision-rule-mapping-header">
+            <strong>输出映射</strong>
+            <button type="button" onClick={addOutputMapping}>
+              添加输出
+            </button>
+          </div>
+
+          {binding.outputMappings.length === 0 && (
+            <div className="decision-rule-empty" data-testid="decision-output-mapping-empty">
+              暂无输出映射
+            </div>
+          )}
+
+          {binding.outputMappings.map((mapping, index) => (
+            <div
+              className="decision-rule-mapping-row"
+              data-testid={`decision-output-mapping-${index}`}
+              key={index}
+            >
+              <input
+                aria-label={`output-mapping-output-${index}`}
+                value={mapping.output}
+                onChange={(event) => updateOutputMapping(index, { output: event.target.value })}
+              />
+              <select
+                aria-label={`output-mapping-kind-${index}`}
+                value={mapping.targetKind}
+                onChange={(event) =>
+                  updateOutputMapping(index, {
+                    targetKind: event.target.value as OutputTargetKind,
+                  })
+                }
+              >
+                {OUTPUT_TARGET_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {kind}
+                  </option>
+                ))}
+              </select>
+              <input
+                aria-label={`output-mapping-path-${index}`}
+                value={mapping.targetPath}
+                onChange={(event) =>
+                  updateOutputMapping(index, { targetPath: event.target.value })
+                }
+              />
+              <button
+                type="button"
+                aria-label={`output-mapping-remove-${index}`}
+                onClick={() => removeOutputMapping(index)}
+              >
+                删除
+              </button>
+            </div>
+          ))}
+
           <pre className="decision-rule-binding-preview" data-testid="decision-binding-preview">
             {JSON.stringify(
               {
                 bindingKind: 'DECISION_REF',
-                  decisionBinding: {
-                    decisionCode: binding.decisionCode,
-                    versionPolicy: binding.versionPolicy,
-                    inputMappings: binding.inputMappings.map((mapping) => ({
-                      input: mapping.input,
-                      source: { kind: 'FIELD', scope: mapping.scope, path: mapping.path },
-                    })),
-                    fallbackPolicy: { mode: binding.fallbackMode },
-                  },
+                decisionBinding: {
+                  decisionCode: binding.decisionCode,
+                  versionPolicy: binding.versionPolicy,
+                  inputMappings: binding.inputMappings.map((mapping) => ({
+                    input: mapping.input,
+                    source: { kind: 'FIELD', scope: mapping.scope, path: mapping.path },
+                  })),
+                  outputMappings: binding.outputMappings.map((mapping) => ({
+                    output: mapping.output,
+                    target: { kind: mapping.targetKind, path: mapping.targetPath },
+                  })),
+                  fallbackPolicy: { mode: binding.fallbackMode },
+                },
               },
               null,
               2,

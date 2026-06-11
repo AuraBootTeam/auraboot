@@ -341,6 +341,11 @@ describe('decisionApi client', () => {
     await api.promoteRollout('rollout-pid', { note: 'promote candidate' });
     await api.rollbackRollout('rollout-pid', { note: 'rollback candidate' });
     await api.getRolloutMetrics('rollout-pid');
+    await api.getRolloutMetrics('rollout-pid', {
+      windowHours: 168,
+      bucketMinutes: 60,
+      refresh: false,
+    });
 
     expect(calls).toEqual([
       {
@@ -381,6 +386,11 @@ describe('decisionApi client', () => {
         body: { note: 'rollback candidate' },
       },
       { method: 'get', endpoint: '/decision/rollouts/rollout-pid/metrics', params: undefined },
+      {
+        method: 'get',
+        endpoint: '/decision/rollouts/rollout-pid/metrics',
+        params: { windowHours: 168, bucketMinutes: 60, refresh: false },
+      },
     ]);
   });
 

@@ -139,6 +139,10 @@ function display(value: unknown): string {
   return String(value);
 }
 
+function cellText(value: unknown, className?: string) {
+  return <div className={`elta-cell-text${className ? ` ${className}` : ''}`}>{display(value)}</div>;
+}
+
 function matchedRuleLabels(raw: unknown): string[] {
   if (!raw) return [];
   if (Array.isArray(raw)) {
@@ -383,6 +387,17 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
       {mode === 'list' && (
         <div className="elta-table-wrap">
           <table className="elta-table">
+            <colgroup>
+              <col className="elta-col-trace" />
+              <col className="elta-col-decision" />
+              <col className="elta-col-version" />
+              <col className="elta-col-status" />
+              <col className="elta-col-caller" />
+              <col className="elta-col-rollout" />
+              <col className="elta-col-duration" />
+              <col className="elta-col-time" />
+              <col className="elta-col-actions" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Trace ID</th>
@@ -399,14 +414,14 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             <tbody>
               {records.map((log) => (
                 <tr key={log.pid ?? log.traceId} data-testid={`elta-row-${log.pid ?? log.traceId}`}>
-                  <td className="mono">{display(log.traceId)}</td>
-                  <td>{display(log.decisionCode)}</td>
-                  <td>{display(log.selectedVersion ?? log.decisionVersion)}</td>
+                  <td className="mono">{cellText(log.traceId, 'mono')}</td>
+                  <td>{cellText(log.decisionCode)}</td>
+                  <td>{cellText(log.selectedVersion ?? log.decisionVersion)}</td>
                   <td><span className={`elta-status elta-status-${log.status ?? 'UNKNOWN'}`}>{display(log.status)}</span></td>
-                  <td>{display(log.callerType)} / {display(log.callerRef)}</td>
-                  <td>{display(log.rolloutArm)} {log.rolloutBucket != null ? `#${log.rolloutBucket}` : ''}</td>
-                  <td>{log.durationMs != null ? `${log.durationMs}ms` : '-'}</td>
-                  <td>{formatDate(log.createdAt)}</td>
+                  <td>{cellText(`${display(log.callerType)} / ${display(log.callerRef)}`)}</td>
+                  <td>{cellText(`${display(log.rolloutArm)}${log.rolloutBucket != null ? ` #${log.rolloutBucket}` : ''}`)}</td>
+                  <td>{cellText(log.durationMs != null ? `${log.durationMs}ms` : '-')}</td>
+                  <td>{cellText(formatDate(log.createdAt))}</td>
                   <td className="elta-row-actions">
                     <button type="button" data-testid={`elta-open-trace-${log.pid ?? log.traceId}`} onClick={() => void loadTrace(log)}>
                       Trace

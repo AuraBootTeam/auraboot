@@ -1,6 +1,7 @@
 package com.auraboot.framework.bpm.service;
 
 import com.auraboot.framework.decision.ast.Scope;
+import com.auraboot.framework.decision.model.DecisionStatus;
 import com.auraboot.framework.decision.rule.DecisionBinding;
 import com.auraboot.framework.decision.rule.RuleBindingKind;
 import com.auraboot.framework.decision.rule.RuleConsumerBinding;
@@ -80,11 +81,28 @@ public class BpmRuleBindingRuntimeService {
             String nodeId,
             String processInstanceId,
             Map<String, Object> request) {
+        return resolveTaskAssignment(binding, processKey, nodeId, processInstanceId, request).userIds();
+    }
+
+    public TaskAssignmentResult resolveTaskAssignment(
+            RuleConsumerBinding binding,
+            String processKey,
+            String nodeId,
+            String processInstanceId,
+            Map<String, Object> request) {
         Optional<RuleEvaluationTrace> trace = evaluateAndApply(binding, processKey, nodeId, processInstanceId, request);
-        if (trace.isEmpty() || !trace.get().matched()) {
-            return List.of();
+        if (trace.isEmpty()) {
+            return TaskAssignmentResult.empty();
         }
-        return extractAssigneeIds(binding, trace.get().outputSnapshot());
+        RuleEvaluationTrace evaluationTrace = trace.get();
+        boolean failClosed = isFailClosedFallback(binding, evaluationTrace);
+        if (failClosed) {
+            return new TaskAssignmentResult(List.of(), List.of(), true, evaluationTrace);
+        }
+        if (!outputsUsable(binding, evaluationTrace)) {
+            return new TaskAssignmentResult(List.of(), List.of(), false, evaluationTrace);
+        }
+        return extractTaskAssignment(binding, evaluationTrace.outputSnapshot(), evaluationTrace);
     }
 
     private RuleEvaluationContext buildContext(
@@ -187,32 +205,79 @@ public class BpmRuleBindingRuntimeService {
         }
     }
 
-    private List<String> extractAssigneeIds(RuleConsumerBinding binding, Map<String, Object> outputs) {
+    private TaskAssignmentResult extractTaskAssignment(
+            RuleConsumerBinding binding,
+            Map<String, Object> outputs,
+            RuleEvaluationTrace trace) {
         if (outputs == null || outputs.isEmpty()) {
-            return List.of();
+            return new TaskAssignmentResult(List.of(), List.of(), false, trace);
         }
-        List<String> result = new ArrayList<>();
+        List<String> userIds = new ArrayList<>();
+        List<String> groupIds = new ArrayList<>();
         if (binding != null && binding.decisionBinding() != null) {
             for (DecisionBinding.OutputMapping mapping : binding.decisionBinding().outputMappings()) {
                 if (mapping == null || mapping.output() == null || mapping.target() == null) continue;
                 String path = mapping.target().path();
-                if (path != null && isAssigneeTarget(path)) {
-                    addValues(result, outputs.get(mapping.output()));
+                if (path != null && isUserAssignmentTarget(path)) {
+                    addValues(userIds, outputs.get(mapping.output()));
+                } else if (path != null && isGroupAssignmentTarget(path)) {
+                    addValues(groupIds, outputs.get(mapping.output()));
                 }
             }
         }
         for (String key : List.of(
                 "assigneeUserId", "assigneeUserIds", "assigneeId", "assigneeIds",
                 "assignee", "candidateUserIds", "candidateUsers", "userIds", "users")) {
-            addValues(result, outputs.get(key));
+            addValues(userIds, outputs.get(key));
         }
-        return result.stream().filter(s -> !s.isBlank()).distinct().toList();
+        for (String key : List.of(
+                "candidateGroupIds", "candidateGroups", "candidateGroup",
+                "groups", "groupIds", "assigneeGroup", "assigneeGroupId")) {
+            addValues(groupIds, outputs.get(key));
+        }
+        return new TaskAssignmentResult(
+                distinctNonBlank(userIds),
+                distinctNonBlank(groupIds),
+                false,
+                trace);
     }
 
-    private boolean isAssigneeTarget(String path) {
+    private boolean outputsUsable(RuleConsumerBinding binding, RuleEvaluationTrace trace) {
+        if (trace.matched()) {
+            return true;
+        }
+        DecisionBinding decisionBinding = binding == null ? null : binding.decisionBinding();
+        return trace.fallbackApplied()
+                && decisionBinding != null
+                && decisionBinding.fallbackPolicy().mode() == DecisionBinding.FallbackMode.DEFAULT_VALUE
+                && !trace.outputSnapshot().isEmpty();
+    }
+
+    private boolean isFailClosedFallback(RuleConsumerBinding binding, RuleEvaluationTrace trace) {
+        if (trace == null) {
+            return false;
+        }
+        DecisionBinding decisionBinding = binding == null ? null : binding.decisionBinding();
+        DecisionBinding.FallbackMode fallbackMode = decisionBinding == null
+                ? DecisionBinding.FallbackMode.FAIL_CLOSED
+                : decisionBinding.fallbackPolicy().mode();
+        boolean failed = trace.fallbackApplied()
+                || trace.decisionStatus() == DecisionStatus.ERROR
+                || (trace.errorCode() != null && !trace.errorCode().isBlank());
+        return failed && fallbackMode == DecisionBinding.FallbackMode.FAIL_CLOSED;
+    }
+
+    private boolean isUserAssignmentTarget(String path) {
         String normalized = path.toLowerCase(Locale.ROOT);
-        return normalized.contains("assignee") || normalized.contains("candidateuser")
+        return normalized.equals("assignee")
+                || normalized.contains("assigneeuser") || normalized.contains("candidateuser")
                 || normalized.endsWith("userids") || normalized.endsWith("users");
+    }
+
+    private boolean isGroupAssignmentTarget(String path) {
+        String normalized = path.toLowerCase(Locale.ROOT);
+        return normalized.contains("assigneegroup") || normalized.contains("candidategroup")
+                || normalized.endsWith("groupids") || normalized.endsWith("groups");
     }
 
     private void addValues(List<String> target, Object value) {
@@ -230,6 +295,10 @@ public class BpmRuleBindingRuntimeService {
                 target.add(trimmed);
             }
         }
+    }
+
+    private List<String> distinctNonBlank(List<String> values) {
+        return values.stream().filter(s -> !s.isBlank()).distinct().toList();
     }
 
     private void putIfPossible(Map<String, Object> request, String key, Object value) {
@@ -291,5 +360,25 @@ public class BpmRuleBindingRuntimeService {
 
     private String safeKey(String nodeId) {
         return nodeId == null ? "node" : nodeId.replaceAll("[^A-Za-z0-9_]", "_");
+    }
+
+    public record TaskAssignmentResult(
+            List<String> userIds,
+            List<String> groupIds,
+            boolean failClosed,
+            RuleEvaluationTrace trace
+    ) {
+        public TaskAssignmentResult {
+            userIds = userIds == null ? List.of() : List.copyOf(userIds);
+            groupIds = groupIds == null ? List.of() : List.copyOf(groupIds);
+        }
+
+        public boolean hasCandidates() {
+            return !userIds.isEmpty() || !groupIds.isEmpty();
+        }
+
+        public static TaskAssignmentResult empty() {
+            return new TaskAssignmentResult(List.of(), List.of(), false, null);
+        }
     }
 }

@@ -1062,6 +1062,28 @@
   font-weight: 800;
 }
 
+.rollout-metrics-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rollout-metrics-meta span {
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .rollout-confirm-panel p {
   margin: 0;
   color: #64748b;
@@ -1204,7 +1226,10 @@
 }
 
 .rollout-distribution dt {
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rollout-distribution dd {
@@ -1722,6 +1747,7 @@
 .decisionops-shell .dt-grid {
   width: 100%;
   min-width: 920px;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   border: 1px solid #e5e7eb;
@@ -2201,7 +2227,44 @@
 .elta-table {
   width: 100%;
   min-width: 1080px;
+  table-layout: fixed;
   border-collapse: collapse;
+}
+
+.elta-col-trace {
+  width: 180px;
+}
+
+.elta-col-decision {
+  width: 150px;
+}
+
+.elta-col-version {
+  width: 82px;
+}
+
+.elta-col-status {
+  width: 100px;
+}
+
+.elta-col-caller {
+  width: 160px;
+}
+
+.elta-col-rollout {
+  width: 120px;
+}
+
+.elta-col-duration {
+  width: 86px;
+}
+
+.elta-col-time {
+  width: 160px;
+}
+
+.elta-col-actions {
+  width: 142px;
 }
 
 .elta-table th,
@@ -2222,6 +2285,14 @@
 .elta-table td {
   color: #111827;
   font-size: 13px;
+}
+
+.elta-cell-text {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .elta-status {
