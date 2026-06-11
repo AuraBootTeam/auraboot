@@ -150,6 +150,69 @@ describe('DecisionRolloutMonitor', () => {
     expect(screen.getByTestId('rollout-window-trend')).toHaveTextContent('9/1');
   });
 
+  it('refetches rollout metrics when the long-window controls change', async () => {
+    const getRolloutMetrics = vi.fn(async (_pid: string, params?: { windowHours?: number; bucketMinutes?: number }) => {
+      const windowHours = params?.windowHours ?? 168;
+      const bucketMinutes = params?.bucketMinutes ?? 60;
+      return {
+        policyPid: 'rollout-1',
+        windowHours,
+        bucketSeconds: bucketMinutes * 60,
+        retentionDays: 90,
+        source: 'PRE_AGGREGATED_BUCKETS',
+        latencyAggregation: 'MAX_BUCKET_P95',
+        refreshedAt: '2026-06-11T06:45:00Z',
+        baseline: {
+          version: 1,
+          evaluations: 1,
+          matched: 0,
+          errors: 0,
+          matchedRate: 0,
+          errorRate: 0,
+          resultDistribution: { 'matched=false,truth=FALSE': 1 },
+        },
+        candidate: {
+          version: 2,
+          evaluations: 2,
+          matched: 2,
+          errors: 0,
+          matchedRate: 1,
+          errorRate: 0,
+          resultDistribution: { 'matched=true,truth=TRUE': 2 },
+        },
+        windows: [],
+      };
+    });
+    const api = rolloutApi({ getRolloutMetrics });
+    renderMonitor(api);
+
+    await waitFor(() =>
+      expect(getRolloutMetrics).toHaveBeenCalledWith('rollout-1', {
+        windowHours: 168,
+        bucketMinutes: 60,
+      }),
+    );
+
+    fireEvent.change(screen.getByLabelText('rollout-metrics-window-hours'), {
+      target: { value: '2160' },
+    });
+    fireEvent.change(screen.getByLabelText('rollout-metrics-bucket-minutes'), {
+      target: { value: '5' },
+    });
+
+    await waitFor(() =>
+      expect(getRolloutMetrics).toHaveBeenLastCalledWith('rollout-1', {
+        windowHours: 2160,
+        bucketMinutes: 5,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('rollout-metrics-meta')).toHaveTextContent('Window 2160h'),
+    );
+    expect(screen.getByTestId('rollout-metrics-meta')).toHaveTextContent('Bucket 5m');
+    expect(screen.getByTestId('rollout-metrics-meta')).toHaveTextContent('Retention 90d');
+  });
+
   it('creates a rollout policy from the inline configuration form', async () => {
     const api = rolloutApi({ listRollouts: vi.fn(async () => []) });
     renderMonitor(api);
