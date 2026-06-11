@@ -62,4 +62,22 @@ describe('Smart Select', () => {
 
     expect(screen.getByTestId('select-trigger-wd_req_type')).toHaveTextContent('年假');
   });
+
+  it('keeps the Radix select controlled when an empty value later becomes populated', () => {
+    mockOptions = [
+      { label: 'Queued', value: 'QUEUED' },
+      { label: 'Running', value: 'RUNNING' },
+    ];
+    vi.mocked(console.error).mockClear();
+
+    const { rerender } = render(<Select name="crawler_status" />);
+
+    rerender(<Select name="crawler_status" value="RUNNING" />);
+
+    const consoleErrors = vi
+      .mocked(console.error)
+      .mock.calls.map((call) => call.map(String).join(' '))
+      .join('\n');
+    expect(consoleErrors).not.toContain('changing from uncontrolled to controlled');
+  });
 });

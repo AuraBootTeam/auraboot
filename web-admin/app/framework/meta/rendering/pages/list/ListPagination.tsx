@@ -7,6 +7,7 @@
 
 import { Pagination } from '~/ui/Pagination';
 import { BulkActionToolbar } from '~/framework/smart/components/bulk/BulkActionToolbar';
+import type { ButtonConfig } from '~/framework/meta/schemas/types';
 
 export interface ListPaginationProps {
   current: number;
@@ -20,6 +21,9 @@ export interface ListPaginationProps {
   modelCode: string;
   onBulkEdit: () => void;
   onBulkDelete: (ids: string[]) => Promise<void>;
+  bulkActions?: ButtonConfig[];
+  onBulkAction?: (button: ButtonConfig, ids: string[]) => void | Promise<void>;
+  resolveBulkActionLabel?: (button: ButtonConfig) => string;
   onClearSelection: () => void;
 }
 
@@ -35,6 +39,9 @@ export function ListPagination({
   modelCode,
   onBulkEdit,
   onBulkDelete,
+  bulkActions,
+  onBulkAction,
+  resolveBulkActionLabel,
   onClearSelection,
 }: ListPaginationProps) {
   return (
@@ -58,6 +65,9 @@ export function ListPagination({
         modelCode={modelCode}
         onBulkEdit={onBulkEdit}
         onBulkDelete={onBulkDelete}
+        bulkActions={bulkActions}
+        onBulkAction={onBulkAction}
+        resolveActionLabel={resolveBulkActionLabel}
         onClearSelection={onClearSelection}
       />
     </>

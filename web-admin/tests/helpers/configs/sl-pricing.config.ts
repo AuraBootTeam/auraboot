@@ -2,8 +2,8 @@
  * Sales Pricing — Model test configurations for Price List and Discount Rule.
  *
  * Provides ModelTestConfig instances for:
- *   - sl_price_list: price list lifecycle (draft → active → inactive → archived)
- *   - sl_discount_rule: discount rule lifecycle (draft → active → inactive → archived)
+ *   - sl_price_list_common: price list lifecycle (draft → active → inactive → archived)
+ *   - sl_discount_rule_common: discount rule lifecycle (draft → active → inactive → archived)
  *
  * @since 10.0.0
  */
@@ -16,7 +16,7 @@ import type { ModelTestConfig } from '../model-test-helper';
 // ---------------------------------------------------------------------------
 
 export const SL_PRICE_LIST_CONFIG: ModelTestConfig = {
-  modelCode: 'sl_price_list',
+  modelCode: 'sl_price_list_common',
   pageKey: 'sl-price-list',
   namespace: 'sl',
   commands: {
@@ -45,7 +45,7 @@ export const SL_PRICE_LIST_CONFIG: ModelTestConfig = {
 // ---------------------------------------------------------------------------
 
 export const SL_DISCOUNT_RULE_CONFIG: ModelTestConfig = {
-  modelCode: 'sl_discount_rule',
+  modelCode: 'sl_discount_rule_common',
   pageKey: 'sl-discount-rule',
   namespace: 'sl',
   commands: {

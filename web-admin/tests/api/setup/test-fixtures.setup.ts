@@ -760,7 +760,7 @@ test.describe('E2E Test Fixtures Setup', () => {
         'asset-management': 'asset',
         crm: 'crm_lead',
         'org-management': 'org_department',
-        sales: 'sl_sales_order',
+        sales: 'sl_sales_order_common',
         procurement: 'pr_purchase_order',
         inventory: 'inv_inbound',
         finance: 'fin_account',

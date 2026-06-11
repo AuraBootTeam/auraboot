@@ -6,6 +6,7 @@ import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.permission.service.FieldPermissionService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,13 +35,16 @@ class CommandFieldMapExecutorReferencePidCompanionTest {
     @Mock
     private MetaModelService metaModelService;
 
+    @Mock
+    private FieldPermissionService fieldPermissionService;
+
     @Test
     @DisplayName("implicit create copies *_pid companion into missing reference *_id field")
     void implicitCreateCopiesPidCompanionIntoReferenceField() {
         when(metaModelService.getModelDefinition("mkt_purchase")).thenReturn(Optional.of(purchaseModel()));
         when(dynamicDataMapper.insert(eq("mt_mkt_purchase"), anyMap())).thenReturn(1);
 
-        CommandFieldMapExecutor executor = new CommandFieldMapExecutor(dynamicDataMapper, metaModelService);
+        CommandFieldMapExecutor executor = new CommandFieldMapExecutor(dynamicDataMapper, metaModelService, fieldPermissionService);
         executor.executeImplicitFieldMapPhase(
                 Map.of("type", "create", "inputFields", List.of("mkt_pur_plugin_pid", "mkt_pur_plan_pid")),
                 Map.of("mkt_pur_plugin_pid", "PLG-PID", "mkt_pur_plan_pid", "PLAN-PID"),
@@ -64,7 +68,7 @@ class CommandFieldMapExecutorReferencePidCompanionTest {
         when(metaModelService.getModelDefinition("mkt_purchase")).thenReturn(Optional.of(purchaseModel()));
         when(dynamicDataMapper.insert(eq("mt_mkt_purchase"), anyMap())).thenReturn(1);
 
-        CommandFieldMapExecutor executor = new CommandFieldMapExecutor(dynamicDataMapper, metaModelService);
+        CommandFieldMapExecutor executor = new CommandFieldMapExecutor(dynamicDataMapper, metaModelService, fieldPermissionService);
         executor.executeImplicitFieldMapPhase(
                 Map.of("type", "create", "inputFields", List.of("mkt_pur_plugin_id", "mkt_pur_plugin_pid")),
                 Map.of("mkt_pur_plugin_id", "EXPLICIT-REF", "mkt_pur_plugin_pid", "PLG-PID"),
@@ -97,7 +101,7 @@ class CommandFieldMapExecutorReferencePidCompanionTest {
         request.setOperationType("update");
         request.setTargetRecordId("BPM-DOMAIN-001");
 
-        CommandFieldMapExecutor executor = new CommandFieldMapExecutor(dynamicDataMapper, metaModelService);
+        CommandFieldMapExecutor executor = new CommandFieldMapExecutor(dynamicDataMapper, metaModelService, fieldPermissionService);
         executor.executeImplicitFieldMapPhase(
                 Map.of("type", "update", "inputFields", List.of("domain_name", "sort_fields")),
                 Map.of("domain_name", "BPM Domain", "sort_fields", "[]"),

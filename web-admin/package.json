@@ -173,6 +173,7 @@
     "re-resizable": "^6.11.2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-draggable": "^4.5.0",
     "react-grid-layout": "^2.2.2",
     "react-leaflet": "^5.0.0",
     "react-markdown": "^10.1.0",

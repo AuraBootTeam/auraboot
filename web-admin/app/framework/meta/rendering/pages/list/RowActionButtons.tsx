@@ -104,12 +104,14 @@ export function RowActionButtons({
   buttons,
   record,
   evaluateVisibleWhen,
+  canUseButton = () => true,
   resolveButtonLabel,
   handleAction,
 }: {
   buttons: ButtonConfig[];
   record: any;
   evaluateVisibleWhen: (expr: string | undefined, record: any) => boolean;
+  canUseButton?: (button: ButtonConfig) => boolean;
   resolveButtonLabel: (button: ButtonConfig) => string;
   handleAction: (button: ButtonConfig, record?: any) => void;
 }) {
@@ -132,7 +134,7 @@ export function RowActionButtons({
   }, [open]);
 
   const visibleButtons = buttons.filter((button) =>
-    evaluateVisibleWhen(button.visibleWhen, record),
+    canUseButton(button) && evaluateVisibleWhen(button.visibleWhen, record),
   );
 
   if (visibleButtons.length === 0) return null;
