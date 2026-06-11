@@ -131,6 +131,13 @@ mappers/bridges). Lift: `DictServiceImpl` 26.7%→**79.0%** line (52.7% branch),
 suite report. Next dict-domain targets if continued: `DictVersionServiceImpl` (36.7%),
 then the larger gaps `DynamicDataServiceImpl` (34%), `NamedQueryServiceImpl` (47%).
 
+Follow-up (same day): `DictVersionServiceImplIntegrationTest` (11 tests) lifted
+`DictVersionServiceImpl` 36.7%→**74.3%** line (60.6% branch), completing the dict domain
+(all 3 dict services now ~74–79%). Additive isolated IT (targeted-verified, green); gate
+stays 0.69 (this adds margin). The next BUNDLE-floor bump should land together with the
+next large class (`DynamicDataServiceImpl` 34% / `NamedQueryServiceImpl` 47%) after a
+fresh full-suite run.
+
 **Frontend** — wired in `web-admin/vitest.config.ts` `coverage.thresholds` (lines 19 /
 stmts 18 / funcs 16 / branches 16 today). Raise in lockstep with new tests.
 
