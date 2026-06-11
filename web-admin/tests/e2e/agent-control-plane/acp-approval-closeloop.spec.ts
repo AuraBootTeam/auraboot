@@ -1,4 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { Client } from 'pg';
+import { PG_CONN } from '../../helpers/environments';
 import { gotoAcpUiPage } from './route-helpers';
 import { findRowByContent } from '../helpers';
 
@@ -7,30 +9,44 @@ import { findRowByContent } from '../helpers';
  *
  * The AI-governance whitepaper §5 promise: a risky (L3/L4) agent action is
  * gated, surfaces as a pending approval, and only executes once a human
- * approves. The backend close-loop already exists end-to-end:
+ * approves. The backend close-loop already exists end to end:
  *
  *   DSL page `agent_approval_list` (/p/agent_approval, backed by the real
  *   `ab_agent_approval` table)
- *     -> rowAction "同意/拒绝"  (action.command = acp:approve_request / acp:reject_request)
+ *     -> rowAction 同意/拒绝  (action.command = acp:approve_request / acp:reject_request)
  *       -> AgentApprovalCommandHandler  (platform command handler)
- *         -> AgentApprovalGateService.approve/reject  (+ executeApprovedPendingTool)
+ *         -> AgentApprovalGateService.approve/reject  (fail-secure, policy-driven)
  *
  * Existing ACP specs cover CRUD/lifecycle/dashboard but NONE drives the
- * approval card -> approve -> status-change loop. This golden closes that gap:
- * it seeds real pending approvals, drives the rowAction through the real
- * command pipeline, and asserts the persisted status flips — i.e. the button
- * is not a no-op (the §2.2 gate-gap check), and the governance gate works.
+ * approval card -> approve/reject -> persisted-status-change loop. This golden
+ * closes that gap and is the §2.2 gate-gap proof that the rowAction buttons are
+ * not no-ops.
  *
- * Scope note: a directly-seeded approval has no linked suspended run, so the
- * `executeApprovedPendingTool` leg returns handled=false — that resume-and-run
- * leg is covered by backend integration tests, not this browser golden. What
- * this proves is the UI close-loop: pending row -> approve action -> command ->
- * handler -> gate service -> persisted approval_status transition.
+ * SEED — discovered constraints (verified 2026-06-11 against a live stack):
+ *   1. `ab_agent_approval` is created by the agent runtime, NOT by users — the
+ *      user-facing `POST /api/dynamic/agent-approval/create` is 403 (admin lacks
+ *      `model.agent_approval.create`, by design). So we seed via SQL, mirroring
+ *      what the runtime writes.
+ *   2. `AgentApprovalGateService.isAuthorizedApprover` is fail-secure: the
+ *      approval must reference an `ab_approval_policy` whose `approver_rules`
+ *      authorize the caller. We seed a policy with a `{type:user}` rule for the
+ *      admin so the approve/reject actually pass authorization.
  *
- * Host-first run (zero docker), against a running OSS stack:
+ * Note: a directly-seeded approval has no linked suspended run, so the
+ * `executeApprovedPendingTool` resume leg returns handled=false (covered by
+ * backend integration tests, not this browser golden). What this proves is the
+ * UI close-loop: pending row -> rowAction -> command pipeline -> handler ->
+ * gate service -> persisted approval_status transition.
+ *
+ * The same close-loop was verified at the command-pipeline level on 2026-06-11
+ * (POST /api/meta/commands/execute/acp:approve_request|reject_request flips
+ * ab_agent_approval.approval_status pending -> approved/rejected). This spec
+ * adds the browser-DOM-click leg; run it host-first against a running OSS stack:
+ *
  *   cd web-admin && NO_PROXY=localhost \
  *     PLAYWRIGHT_BASE_URL=http://127.0.0.1:<vite> BACKEND_URL=http://127.0.0.1:<be> \
  *     BE_PORT=<be> BFF_PORT=<bff> PW_SKIP_WEBSERVER=1 \
+ *     PG_HOST=127.0.0.1 PG_PORT=5432 PG_USER=<u> PG_DB=<db> PGPASSWORD=<p> \
  *     npx playwright test -c playwright.oss.config.ts \
  *       tests/e2e/agent-control-plane/acp-approval-closeloop.spec.ts
  */
@@ -39,11 +55,13 @@ const APPROVAL_LIST = '/dynamic/agent-approval';
 const uid = `a5${Date.now().toString(36)}`;
 const APPROVE_TITLE = `ApproveCase_${uid}`;
 const REJECT_TITLE = `RejectCase_${uid}`;
+const POLICY_PID = `A5POL${uid}`.slice(0, 26).padEnd(26, '0');
+const APPROVE_PID = `A5APV${uid}`.slice(0, 26).padEnd(26, '0');
+const REJECT_PID = `A5REJ${uid}`.slice(0, 26).padEnd(26, '0');
 
-let acpPluginInstalled = true;
-const seededPids: Record<string, string> = {};
+let acpReady = true;
 
-// --- row-action helpers (mirrors acp-lifecycle-deep.spec.ts conventions) -----
+// --- row-action helpers (mirror acp-lifecycle-deep.spec.ts conventions) -------
 
 async function ensureRowDropdownOpen(page: Page, row: Locator): Promise<boolean> {
   const existing = page.locator('[data-testid="row-action-dropdown"]');
@@ -76,7 +94,6 @@ async function clickRowActionBtn(page: Page, row: Locator, btnCode: string): Pro
   await btn.click();
 }
 
-/** Confirm a Popconfirm/modal ("确定"/"确认"/OK or data-testid=confirm-ok). */
 async function confirmDialog(page: Page): Promise<void> {
   const ok = page
     .locator('[data-testid="confirm-ok"], button:has-text("确定"), button:has-text("确认"), button:has-text("OK")')
@@ -85,78 +102,82 @@ async function confirmDialog(page: Page): Promise<void> {
   await ok.click();
 }
 
-/** Fetch the persisted approval_status straight from the dynamic entity API. */
-async function fetchApprovalStatus(page: Page, pid: string): Promise<string | null> {
-  const resp = await page.request.get(`/api/dynamic/agent-approval/${pid}`);
-  if (!resp.ok()) return null;
-  const body = await resp.json().catch(() => null);
-  const data = body?.data ?? body;
-  return (data?.approval_status as string) ?? null;
-}
-
-// --- seed ---------------------------------------------------------------------
-
-async function seedPendingApproval(page: Page, title: string): Promise<string | null> {
-  const resp = await page.request.post('/api/dynamic/agent-approval/create', {
-    data: {
-      approval_type: 'action',
-      approval_title: title,
-      description: `A5 close-loop golden ${title}`,
-      approval_status: 'pending',
-      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
-    },
-  });
-  if (!resp.ok()) return null;
-  const body = await resp.json().catch(() => null);
-  const data = body?.data ?? body;
-  return (data?.pid as string) ?? (data?.recordId as string) ?? null;
+async function statusOf(pid: string): Promise<string | null> {
+  const client = new Client(PG_CONN);
+  await client.connect();
+  try {
+    const r = await client.query('SELECT approval_status FROM ab_agent_approval WHERE pid = $1', [pid]);
+    return r.rows[0]?.approval_status ?? null;
+  } finally {
+    await client.end();
+  }
 }
 
 test.describe('A5: Agent approval close-loop (golden)', () => {
   test.describe.configure({ mode: 'serial', timeout: 120_000 });
   test.setTimeout(90_000);
 
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
-    const ctx = await browser.newContext({
-      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
-    });
-    const page = await ctx.newPage();
+  test.beforeAll(async () => {
+    const client = new Client(PG_CONN);
+    await client.connect();
     try {
-      // Plugin-availability probe: if the agent-approval model is not imported,
-      // the dynamic create endpoint 404s — that is an environment gap, skip.
-      const approvePid = await seedPendingApproval(page, APPROVE_TITLE);
-      if (!approvePid) {
-        acpPluginInstalled = false;
+      const admin = await client.query(`SELECT id FROM ab_user WHERE email = 'admin@auraboot.com' LIMIT 1`);
+      if (admin.rows.length === 0) {
+        acpReady = false;
         return;
       }
-      seededPids.approve = approvePid;
-      const rejectPid = await seedPendingApproval(page, REJECT_TITLE);
-      expect(rejectPid, 'second pending approval must seed once the model is reachable').toBeTruthy();
-      seededPids.reject = rejectPid as string;
+      const adminId: string = admin.rows[0].id;
+      // The approval list and the approve command both run in the admin's active
+      // tenant; seed there so the row is visible and the tenant guard passes.
+      const tenant = await client.query(
+        `SELECT tm.tenant_id FROM ab_tenant_member tm
+           WHERE tm.user_id = $1 AND tm.status = 'active' AND tm.deleted_flag = FALSE
+           ORDER BY tm.tenant_id LIMIT 1`,
+        [adminId],
+      );
+      const model = await client.query(`SELECT 1 FROM ab_meta_model WHERE code = 'agent_approval' LIMIT 1`);
+      if (tenant.rows.length === 0 || model.rows.length === 0) {
+        acpReady = false; // agent-control-plane not imported — environment gap
+        return;
+      }
+      const tenantId: string = tenant.rows[0].tenant_id;
+
+      // Policy authorizing the admin as approver (fail-secure requirement).
+      await client.query(
+        `INSERT INTO ab_approval_policy (pid, tenant_id, policy_name, approver_rules, deleted_flag, created_at)
+         VALUES ($1, $2, 'A5 Golden Policy', $3::jsonb, FALSE, now())
+         ON CONFLICT (pid) DO UPDATE SET approver_rules = EXCLUDED.approver_rules`,
+        [POLICY_PID, tenantId, JSON.stringify([{ type: 'user', userId: Number(adminId) }])],
+      );
+      // Two pending approvals (as the runtime would create), linked to the policy.
+      for (const [pid, title] of [[APPROVE_PID, APPROVE_TITLE], [REJECT_PID, REJECT_TITLE]] as const) {
+        await client.query(
+          `INSERT INTO ab_agent_approval (pid, tenant_id, approval_type, approval_title, approval_status, policy_id, created_at)
+           VALUES ($1, $2, 'action', $3, 'pending', $4, now())
+           ON CONFLICT (pid) DO UPDATE SET approval_status = 'pending', approver_id = NULL, policy_id = EXCLUDED.policy_id`,
+          [pid, tenantId, title, POLICY_PID],
+        );
+      }
     } finally {
-      await ctx.close();
+      await client.end();
     }
   });
 
-  test('ACP-APPROVAL-01: pending approval is visible with an Approve action', async ({ page }) => {
-    test.skip(!acpPluginInstalled, 'agent-control-plane plugin not installed — environment gap');
+  test('ACP-APPROVAL-01: pending approval visible with an Approve action', async ({ page }) => {
+    test.skip(!acpReady, 'agent-control-plane not imported / no admin tenant — environment gap');
     await gotoAcpUiPage(page, APPROVAL_LIST);
-
     const row = await findRowByContent(page, APPROVE_TITLE);
     await expect(row).toBeVisible({ timeout: 15_000 });
-    // status tag still pending, and the gated action is offered (visibleWhen pending)
     await expect(row).toContainText(/pending|待审批|待处理/i);
     await expect(row.locator('[data-testid="row-action-approve"]')).toBeVisible({ timeout: 10_000 });
   });
 
   test('ACP-APPROVAL-02: Approve drives the real command pipeline and flips status', async ({ page }) => {
-    test.skip(!acpPluginInstalled, 'agent-control-plane plugin not installed — environment gap');
+    test.skip(!acpReady, 'environment gap');
     await gotoAcpUiPage(page, APPROVAL_LIST);
     const row = await findRowByContent(page, APPROVE_TITLE);
     await expect(row).toBeVisible({ timeout: 15_000 });
 
-    // Click 同意 -> acp:approve_request must hit the command pipeline (200).
     const execResp = page.waitForResponse(
       (r) => r.url().includes('/commands/execute/') && r.status() === 200,
       { timeout: 20_000 },
@@ -166,12 +187,9 @@ test.describe('A5: Agent approval close-loop (golden)', () => {
     const resolved = await execResp;
     expect(resolved.url()).toContain('acp:approve_request');
 
-    // Persisted truth: status flipped pending -> approved through the gate service.
-    await expect
-      .poll(() => fetchApprovalStatus(page, seededPids.approve), { timeout: 15_000 })
-      .toBe('approved');
+    await expect.poll(() => statusOf(APPROVE_PID), { timeout: 15_000 }).toBe('approved');
 
-    // UI gate-gap proof: the Approve action is no longer offered (visibleWhen pending).
+    // gate-gap proof: the Approve action is no longer offered once approved.
     await gotoAcpUiPage(page, APPROVAL_LIST);
     const after = await findRowByContent(page, APPROVE_TITLE);
     await expect(after).toBeVisible({ timeout: 15_000 });
@@ -179,7 +197,7 @@ test.describe('A5: Agent approval close-loop (golden)', () => {
   });
 
   test('ACP-APPROVAL-03: Reject with a reason flips status to rejected', async ({ page }) => {
-    test.skip(!acpPluginInstalled, 'agent-control-plane plugin not installed — environment gap');
+    test.skip(!acpReady, 'environment gap');
     await gotoAcpUiPage(page, APPROVAL_LIST);
     const row = await findRowByContent(page, REJECT_TITLE);
     await expect(row).toBeVisible({ timeout: 15_000 });
@@ -202,8 +220,6 @@ test.describe('A5: Agent approval close-loop (golden)', () => {
     const resolved = await execResp;
     expect(resolved.url()).toContain('acp:reject_request');
 
-    await expect
-      .poll(() => fetchApprovalStatus(page, seededPids.reject), { timeout: 15_000 })
-      .toBe('rejected');
+    await expect.poll(() => statusOf(REJECT_PID), { timeout: 15_000 }).toBe('rejected');
   });
 });
