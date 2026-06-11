@@ -1038,42 +1038,55 @@ class SecureQueryExecutorImplIntegrationTest {
     // ==================== Tier 1: getQueryCache / setQueryCache / clearQueryCache ====================
 
     @Test
-    @DisplayName("getQueryCache: cache configured to not allow null → throws IllegalArgumentException on cache miss")
-    void getQueryCache_noCacheSet() {
-        SecureQueryRequest r = req("cacheModel", QueryType.SELECT_ALL);
-        r.setQueryId("test-qid-" + RUN + "-nocache");
-
-        // The Caffeine 'secureQuery' cache is configured allowNullValues=false.
-        // getQueryCache() returns null on cache miss, which Spring Cache then tries to put back → throws.
-        // This is a product bug: @Cacheable(value="secureQuery") on a method that returns null
-        // conflicts with the cache's allowNullValues=false setting.
-        // Test verifies the behaviour (throws IllegalArgumentException with cache error).
-        assertThrows(IllegalArgumentException.class,
-            () -> secureQueryExecutor.getQueryCache(r),
-            "Caffeine cache 'secureQuery' does not allow null values — product bug: " +
-            "getQueryCache returning null conflicts with allowNullValues=false");
+    @DisplayName("getQueryCache: returns null cleanly on a cache miss (no throw)")
+    void getQueryCache_missReturnsNull() {
+        // Regression for the fixed bug: the @Cacheable(value="secureQuery") method returned null
+        // while the cache disallows nulls, so an external call threw IllegalArgumentException, and
+        // the internal self-invocation bypassed the proxy entirely (cache never worked). After the
+        // fix (direct CacheManager access) a miss simply returns null.
+        SecureQueryRequest r = req(CODE_PREFIX + RUN + "_cache_miss", QueryType.SELECT_ALL);
+        assertNull(secureQueryExecutor.getQueryCache(r), "cache miss must return null, not throw");
     }
 
     @Test
-    @DisplayName("setQueryCache: no-op (logs only) → does not throw")
-    void setQueryCache_noThrow() {
-        SecureQueryRequest r = req("cacheModel", QueryType.SELECT_ALL);
-        r.setQueryId("test-qid-" + RUN + "-set");
+    @DisplayName("setQueryCache then getQueryCache round-trips the cached result")
+    void cacheRoundTrip() {
+        SecureQueryRequest r = req(CODE_PREFIX + RUN + "_cache_rt", QueryType.SELECT_ALL);
 
         PaginationResult<Map<String, Object>> result = new PaginationResult<>();
         result.setRecords(List.of(Map.of("id", 1)));
         result.setTotal(1L);
 
-        assertDoesNotThrow(() -> secureQueryExecutor.setQueryCache(r, result));
+        secureQueryExecutor.setQueryCache(r, result);
+
+        PaginationResult<Map<String, Object>> cached = secureQueryExecutor.getQueryCache(r);
+        assertNotNull(cached, "result set into the cache must be retrievable");
+        assertEquals(1L, cached.getTotal());
+        assertEquals(1, cached.getRecords().size());
     }
 
     @Test
-    @DisplayName("clearQueryCache: no-op (logs only) → does not throw")
-    void clearQueryCache_noThrow() {
-        SecureQueryRequest r = req("cacheModel", QueryType.SELECT_ALL);
-        r.setQueryId("test-qid-" + RUN + "-clear");
+    @DisplayName("clearQueryCache evicts the entry (subsequent get returns null)")
+    void clearQueryCache_evicts() {
+        SecureQueryRequest r = req(CODE_PREFIX + RUN + "_cache_clear", QueryType.SELECT_ALL);
 
-        assertDoesNotThrow(() -> secureQueryExecutor.clearQueryCache(r));
+        PaginationResult<Map<String, Object>> result = new PaginationResult<>();
+        result.setRecords(List.of(Map.of("id", 1)));
+        result.setTotal(1L);
+
+        secureQueryExecutor.setQueryCache(r, result);
+        assertNotNull(secureQueryExecutor.getQueryCache(r));
+
+        secureQueryExecutor.clearQueryCache(r);
+        assertNull(secureQueryExecutor.getQueryCache(r), "entry must be gone after clear");
+    }
+
+    @Test
+    @DisplayName("setQueryCache with null result is a safe no-op")
+    void setQueryCache_nullResultNoOp() {
+        SecureQueryRequest r = req(CODE_PREFIX + RUN + "_cache_null", QueryType.SELECT_ALL);
+        assertDoesNotThrow(() -> secureQueryExecutor.setQueryCache(r, null));
+        assertNull(secureQueryExecutor.getQueryCache(r));
     }
 
     // ==================== Tier 1: applyDataMasking ====================
@@ -1401,9 +1414,8 @@ class SecureQueryExecutorImplIntegrationTest {
             r.setPagination(pg);
             r.setEnableDataMasking(false);
             r.setEnableAudit(false);
-            // IMPORTANT: Must set null so executeWithTimeout takes the synchronous path.
-            // With a non-null timeoutMs, the query runs in a CompletableFuture worker thread
-            // where MetaContext ThreadLocal is not propagated → IllegalStateException.
+            // Synchronous path (timeoutMs null). The non-null/async path is covered by
+            // executeSecureQuery_withTimeout_propagatesMetaContext below.
             r.setTimeoutMs(null);
 
             try {
@@ -1421,6 +1433,53 @@ class SecureQueryExecutorImplIntegrationTest {
                 log.info("executeSecureQuery raised SecurityException (expected without permission setup): {}", se.getMessage());
                 assertTrue(se.getMessage().contains("验证失败") || se.getMessage().contains("权限"),
                     "SecurityException message should mention permission");
+            }
+        } finally {
+            jdbcTemplate.update("DELETE FROM " + testTableName + " WHERE pid = ?", pid);
+        }
+    }
+
+    @Test
+    @DisplayName("executeSecureQuery: positive timeoutMs runs on a worker thread but keeps MetaContext (no IllegalStateException)")
+    void executeSecureQuery_withTimeout_propagatesMetaContext() {
+        // Regression for the fixed executeWithTimeout bug: a non-null timeoutMs offloads the query
+        // to a CompletableFuture worker on the common ForkJoinPool. Before the fix, that thread had
+        // no MetaContext ThreadLocal → "MetaContext not initialized". After the fix the caller's
+        // context (tenant/user/roles) is re-established on the worker, so the query runs scoped.
+        String nameCol   = fieldCodeName.toLowerCase();
+        String statusCol = fieldCodeStatus.toLowerCase();
+
+        String pid = UniqueIdGenerator.generate();
+        jdbcTemplate.update(
+            "INSERT INTO " + testTableName +
+            " (pid, " + nameCol + ", " + statusCol + ", tenant_id, created_at, created_by, updated_at, updated_by)" +
+            " VALUES (?, ?, ?, ?, NOW(), ?, NOW(), ?)",
+            pid, "TimeoutRow-" + RUN, "active", testTenant.getId(),
+            testUser.getId(), testUser.getId()
+        );
+
+        try {
+            SecureQueryRequest r = req(testModelCode, QueryType.SELECT_ALL);
+            PaginationRequest pg = new PaginationRequest();
+            pg.setPageNum(1);
+            pg.setPageSize(20);
+            r.setPagination(pg);
+            r.setTimeoutMs(10000); // positive → async worker path
+
+            try {
+                @SuppressWarnings("unchecked")
+                PaginationResult<Map<String, Object>> result = secureQueryExecutor.executeSecureQuery(r);
+                // The key assertion is simply that it did NOT throw IllegalStateException
+                // (MetaContext not initialized) from the worker thread.
+                assertNotNull(result);
+                assertNotNull(result.getRecords());
+                assertTrue(result.getTotal() >= 0);
+            } catch (SecurityException se) {
+                // Permission edge — acceptable; the point is no MetaContext loss.
+                log.info("executeSecureQuery (timeout path) raised SecurityException (expected without full permission setup): {}",
+                    se.getMessage());
+            } catch (IllegalStateException ise) {
+                fail("MetaContext was lost on the timeout worker thread — propagation fix regressed: " + ise.getMessage());
             }
         } finally {
             jdbcTemplate.update("DELETE FROM " + testTableName + " WHERE pid = ?", pid);
