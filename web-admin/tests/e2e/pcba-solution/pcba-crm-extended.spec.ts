@@ -3,10 +3,10 @@
  *
  * Tests PCE-001 ~ PCE-018: CRUD lifecycle, status transitions, and field
  * variations for 2 CRM-extended models:
- * - crm_customer_request + crm_customer_request_pcba_rfq sidecar (A2-S2 RFQ truth) —
+ * - crm_customer_request_common + crm_customer_request_pcba_rfq sidecar (A2-S2 RFQ truth) —
  *   request lifecycle (draft/submitted/routed) plus the sidecar DFM gate
  *   (pending/in_review/passed/conditional/failed) with supply modes & quality classes
- * - crm_contact (Contact) — simple CRUD with primary contact flag
+ * - crm_contact_common (Contact) — simple CRUD with primary contact flag
  *
  * Each model tests: list rendering, create via API + verify in list,
  * create via UI form, edit via UI, delete via UI, state transitions,
@@ -36,7 +36,7 @@ import {
 
 const PAGE_KEYS = {
   rfq: 'crm_customer_request_pcba_rfq',
-  customerRequest: 'crm_customer_request',
+  customerRequest: 'crm_customer_request_common',
   customerContact: 'crm-contact',
 };
 
@@ -303,7 +303,7 @@ test.describe('PCBA CRM Extended', () => {
   test.describe.configure({ timeout: 60000 });
 
   // =========================================================================
-  // crm_customer_request + crm_customer_request_pcba_rfq sidecar (PCE-001 ~ PCE-011)
+  // crm_customer_request_common + crm_customer_request_pcba_rfq sidecar (PCE-001 ~ PCE-011)
   // =========================================================================
 
   test.describe('RFQ (crm_customer_request_pcba_rfq)', () => {
@@ -875,10 +875,10 @@ test.describe('PCBA CRM Extended', () => {
   });
 
   // =========================================================================
-  // crm_contact — Contact (PCE-012 ~ PCE-018)
+  // crm_contact_common — Contact (PCE-012 ~ PCE-018)
   // =========================================================================
 
-  test.describe('Contact (crm_contact)', () => {
+  test.describe('Contact (crm_contact_common)', () => {
     const bucket = emptyBucket();
     /** A shared customer id created in beforeAll, reused across contact tests. */
     let sharedCustomerId: string | null = null;
@@ -910,7 +910,7 @@ test.describe('PCBA CRM Extended', () => {
 
       // Fallback: query existing account if creation failed
       if (!sharedCustomerId) {
-        const resp = await p.request.get('/api/dynamic/crm_account/list?pageSize=1');
+        const resp = await p.request.get('/api/dynamic/crm_account_common/list?pageSize=1');
         if (resp.ok()) {
           const body = await resp.json();
           const rec = body?.data?.records?.[0];
@@ -986,7 +986,7 @@ test.describe('PCBA CRM Extended', () => {
     });
 
     test('PCE-014: Create Contact via UI form', async ({ page }) => {
-      await ensureAuthenticated(page, '/p/crm_contact');
+      await ensureAuthenticated(page, '/p/crm_contact_common');
       await navigateToDynamicPage(page, PAGE_KEYS.customerContact);
       await clickCreateButton(page);
       await waitForFormReady(page);

@@ -62,7 +62,7 @@ const PAGE_KEYS = {
   customer: 'crm-account',
   product: 'prod-product',
   supplier: 'pe-supplier',
-  customerRequest: 'crm_customer_request',
+  customerRequest: 'crm_customer_request_common',
   rfq: 'crm_customer_request_pcba_rfq',
   quotation: 'sl-sales-quotation',
   quotationLine: 'sl-sales-quotation-line',
@@ -84,10 +84,10 @@ const PAGE_KEYS = {
 const DEMO_ENTRIES = {
   customer: {
     id: 'customer',
-    href: '/p/crm_account',
+    href: '/p/crm_account_common',
     label: /1\.\s*(客户|Customer)/i,
-    route: /\/p\/crm_account(?:$|[?#])/,
-    modelCode: 'crm_account',
+    route: /\/p\/crm_account_common(?:$|[?#])/,
+    modelCode: 'crm_account_common',
   },
   rfq: {
     // A2-S2: legacy RFQ page is dead; the PCBA RFQ sidecar list lives under the
@@ -575,7 +575,7 @@ test.describe('PCBA ERP — Demo Flow Mainline @critical', () => {
       uid,
     );
 
-    // A2-S2: RFQ truth = crm_customer_request + crm_customer_request_pcba_rfq sidecar.
+    // A2-S2: RFQ truth = crm_customer_request_common + crm_customer_request_pcba_rfq sidecar.
     // The route handler copies the request title into crm_crq_product_model, so the
     // title doubles as the searchable product model in the sidecar list.
     const rfqProductModel = `E2E PCBA RFQ ${uid}`;
