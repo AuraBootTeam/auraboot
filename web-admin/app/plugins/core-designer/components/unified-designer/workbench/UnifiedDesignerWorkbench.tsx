@@ -29,6 +29,12 @@ import {
 import { setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
+import {
+  DEVICE_PREVIEW_PRESETS,
+  DEFAULT_DEVICE_PREVIEW_ID,
+  getDeviceFrameStyle,
+  getDevicePreviewPreset,
+} from '../preview/devicePreviewPresets';
 import { getKindPolicy, isBlockTypeAllowedForKind } from '../registry/kindPolicy';
 import {
   createBlockTemplate,
@@ -76,6 +82,7 @@ export function UnifiedDesignerWorkbench({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [validationErrorCount, setValidationErrorCount] = useState(0);
   const [mode, setMode] = useState<WorkbenchMode>('edit');
+  const [previewDeviceId, setPreviewDeviceId] = useState<string>(DEFAULT_DEVICE_PREVIEW_ID);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
   const [activeDropIntent, setActiveDropIntent] = useState<ActiveDropIntent>(null);
@@ -550,7 +557,31 @@ export function UnifiedDesignerWorkbench({
           className="min-h-0 flex-1 overflow-auto bg-slate-100 p-4 lg:p-6"
           data-testid="unified-runtime-preview"
         >
-          <div className="mx-auto max-w-7xl">
+          <div className="mx-auto mb-3 flex max-w-7xl items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">预览设备</span>
+            <select
+              data-testid="preview-device-select"
+              value={previewDeviceId}
+              onChange={(event) => setPreviewDeviceId(event.target.value)}
+              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
+            >
+              {DEVICE_PREVIEW_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div
+            className={
+              getDevicePreviewPreset(previewDeviceId).width == null
+                ? 'mx-auto max-w-7xl'
+                : 'mx-auto overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200'
+            }
+            data-testid="preview-device-frame"
+            data-device={previewDeviceId}
+            style={getDeviceFrameStyle(getDevicePreviewPreset(previewDeviceId))}
+          >
             <RecursiveBlockRenderer
               schema={document}
               runtimeServices={defaultRuntimeExecutionServices}
