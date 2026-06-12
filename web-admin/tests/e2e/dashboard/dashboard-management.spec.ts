@@ -57,6 +57,19 @@ async function checkActionInDropdown(page: Page, row: Locator, actionCode: strin
 import { BASE_URL } from '../../helpers/environments';
 const MGMT_PATH = '/p/dashboard_management';
 
+function minimalDashboardWidget() {
+  return {
+    id: `w-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    type: 'stat-card',
+    title: 'Test Widget',
+    x: 0,
+    y: 0,
+    w: 4,
+    h: 2,
+    config: { label: 'Total', value: '0', color: 'blue', namedQuery: 'nq_test' },
+  };
+}
+
 /**
  * Helper: get JWT token from page cookies for direct API calls
  */
@@ -83,6 +96,7 @@ async function createDashboardViaApi(
     data: {
       title: overrides.title || `E2E Dashboard ${Date.now()}`,
       scope: overrides.scope || 'global',
+      widgets: overrides.widgets ?? [minimalDashboardWidget()],
       ...overrides,
     },
   });
@@ -105,48 +119,14 @@ async function deleteDashboardViaApi(
 }
 
 /**
- * Helper: add a minimal widget to a dashboard via API (required before publishing)
- */
-async function addWidgetToDashboardViaApi(
-  page: import('@playwright/test').Page,
-  pid: string,
-): Promise<void> {
-  const token = await getToken(page);
-  // Fetch current dashboard to get existing widgets
-  const getResp = await page.request.get(`${BASE_URL}/api/dashboards/${pid}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!getResp.ok()) return;
-  const body = await getResp.json();
-  const existing = body.data?.widgets || [];
-  if (existing.length > 0) return; // already has widgets
-
-  // Add a minimal stat-card widget with required config fields
-  const minimalWidget = {
-    id: `w-${Date.now()}`,
-    type: 'stat-card',
-    title: 'Test Widget',
-    x: 0,
-    y: 0,
-    w: 4,
-    h: 2,
-    config: { label: 'Total', value: '0', color: 'blue', namedQuery: 'nq_test' },
-  };
-  await page.request.put(`${BASE_URL}/api/dashboards/${pid}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    data: { widgets: [...existing, minimalWidget] },
-  });
-}
-
-/**
  * Helper: publish a dashboard via API
- * Automatically adds a widget if dashboard has none (backend requires ≥1 widget to publish)
+ * Test dashboards are created with a minimal widget because the backend
+ * requires at least one widget before publishing.
  */
 async function publishDashboardViaApi(
   page: import('@playwright/test').Page,
   pid: string,
 ): Promise<void> {
-  await addWidgetToDashboardViaApi(page, pid);
   const token = await getToken(page);
   const resp = await page.request.post(`${BASE_URL}/api/dashboards/${pid}/publish`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -675,9 +655,6 @@ test.describe('Dashboard Management', () => {
       scope: 'personal',
     });
 
-    // Add a widget via API so backend publish validation passes
-    await addWidgetToDashboardViaApi(page, pid);
-
     try {
       // Step 1: Verify draft state — use full uniqueTitle to avoid matching old test data
       await gotoManagementWithFilter(page, uniqueTitle);
@@ -776,9 +753,6 @@ test.describe('Dashboard Management', () => {
     });
 
     try {
-      // Add widget via API so backend publish validation passes
-      await addWidgetToDashboardViaApi(page, pid);
-
       await gotoManagementWithFilter(page, uniqueTitle);
 
       const row = page.locator('tr', { hasText: uniqueTitle }).first();
