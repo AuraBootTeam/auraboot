@@ -144,4 +144,45 @@ describe('TabFilterEditor', () => {
       props: { valueField: 'name' },
     });
   });
+
+  it('edits stat child block data settings on the selected tab', () => {
+    const onCommit = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'metrics',
+            label: { 'en-US': 'Metrics', 'zh-CN': '指标' },
+            filter: null,
+            blocks: [
+              {
+                id: 'metrics_stat',
+                blockType: 'stat-card',
+                title: { 'en-US': 'Metric', 'zh-CN': '指标' },
+                dataSource: 'old_stats',
+                props: { valueField: 'oldCount' },
+              },
+            ],
+          },
+        ]}
+        onCommit={onCommit}
+      />,
+    );
+
+    expect(screen.getByTestId('tab-child-stat-data-source-input-0')).toHaveValue('old_stats');
+    expect(screen.getByTestId('tab-child-stat-value-field-input-0')).toHaveValue('oldCount');
+
+    fireEvent.change(screen.getByTestId('tab-child-stat-data-source-input-0'), {
+      target: { value: 'nested_stats' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-stat-value-field-input-0'), {
+      target: { value: 'totalCount' },
+    });
+
+    expect(serializedTabs()[0].blocks?.[0]).toMatchObject({
+      blockType: 'stat-card',
+      dataSource: 'nested_stats',
+      props: { valueField: 'totalCount' },
+    });
+  });
 });

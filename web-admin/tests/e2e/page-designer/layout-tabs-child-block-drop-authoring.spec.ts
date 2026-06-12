@@ -152,7 +152,7 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     );
   });
 
-  test('drags a stat card child block and edits its title', async ({ page }) => {
+  test('drags a stat card child block and edits its data settings', async ({ page }) => {
     const { pid, tabsBlockId } = await createTabsChildDropAuthoringPage(page);
     await openDesignerByPid(page, pid);
 
@@ -170,6 +170,8 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     await expect(page.getByTestId('tab-child-block-0')).toContainText('stat-card');
     await page.getByTestId('tab-child-title-en-input-0').fill('Nested metric card');
     await page.getByTestId('tab-child-title-zh-input-0').fill('嵌套指标卡片');
+    await page.getByTestId('tab-child-stat-data-source-input-0').fill('nested_stats');
+    await page.getByTestId('tab-child-stat-value-field-input-0').fill('totalCount');
     await expect.poll(() => canvasBlockIds(page)).toEqual(beforeTopLevelIds);
 
     await saveDesignerAndWait(page, pid);
@@ -186,6 +188,8 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
             {
               blockType: 'stat-card',
               title: { 'en-US': 'Nested metric card', 'zh-CN': '嵌套指标卡片' },
+              dataSource: 'nested_stats',
+              props: { valueField: 'totalCount' },
             },
           ],
         },
@@ -198,5 +202,11 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
       'Nested metric card',
     );
     await expect(page.getByTestId('tab-child-title-zh-input-0')).toHaveValue('嵌套指标卡片');
+    await expect(page.getByTestId('tab-child-stat-data-source-input-0')).toHaveValue(
+      'nested_stats',
+    );
+    await expect(page.getByTestId('tab-child-stat-value-field-input-0')).toHaveValue(
+      'totalCount',
+    );
   });
 });

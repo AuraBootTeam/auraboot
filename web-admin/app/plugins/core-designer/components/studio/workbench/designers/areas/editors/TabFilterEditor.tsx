@@ -164,6 +164,24 @@ export function TabFilterEditor({
     [tabs, updateChildBlock],
   );
 
+  const updateStatChildBlockDataSource = useCallback(
+    (tabIndex: number, blockIndex: number, dataSource: string) => {
+      updateChildBlock(tabIndex, blockIndex, { dataSource: dataSource || undefined });
+    },
+    [updateChildBlock],
+  );
+
+  const updateStatChildBlockValueField = useCallback(
+    (tabIndex: number, blockIndex: number, valueField: string) => {
+      const childBlock = getTabBlocks(tabs[tabIndex])[blockIndex];
+      if (!childBlock) return;
+      updateChildBlock(tabIndex, blockIndex, {
+        props: { ...(childBlock.props || {}), valueField },
+      });
+    },
+    [tabs, updateChildBlock],
+  );
+
   const removeChildBlock = useCallback(
     (tabIndex: number, blockIndex: number) => {
       const nextBlocks = getTabBlocks(tabs[tabIndex]).filter((_, index) => index !== blockIndex);
@@ -373,6 +391,42 @@ export function TabFilterEditor({
                         />
                       </label>
                     </div>
+                    {block.blockType === 'stat-card' && (
+                      <div className="mb-1.5 grid grid-cols-2 gap-1.5">
+                        <label className="text-[10px] text-gray-500">
+                          Data source
+                          <input
+                            className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
+                            value={typeof block.dataSource === 'string' ? block.dataSource : ''}
+                            onChange={(event) =>
+                              updateStatChildBlockDataSource(
+                                selectedIndex,
+                                index,
+                                event.target.value,
+                              )
+                            }
+                            disabled={readonly}
+                            data-testid={`tab-child-stat-data-source-input-${index}`}
+                          />
+                        </label>
+                        <label className="text-[10px] text-gray-500">
+                          Value field
+                          <input
+                            className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
+                            value={String(block.props?.valueField || '')}
+                            onChange={(event) =>
+                              updateStatChildBlockValueField(
+                                selectedIndex,
+                                index,
+                                event.target.value,
+                              )
+                            }
+                            disabled={readonly}
+                            data-testid={`tab-child-stat-value-field-input-${index}`}
+                          />
+                        </label>
+                      </div>
+                    )}
                     {block.blockType === 'text' ? (
                       <textarea
                         className="min-h-16 w-full resize-y rounded border px-1.5 py-1 text-xs"
@@ -383,7 +437,7 @@ export function TabFilterEditor({
                         disabled={readonly}
                         data-testid={`tab-child-text-content-${index}`}
                       />
-                    ) : (
+                    ) : block.blockType === 'stat-card' ? null : (
                       <div className="rounded border border-dashed px-2 py-2 text-[10px] text-gray-400">
                         This block type is preserved but not editable here.
                       </div>
