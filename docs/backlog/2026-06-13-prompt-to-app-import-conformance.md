@@ -27,6 +27,6 @@ created: 2026-06-13
 
 ## 残留(非本切片)
 - **生成质量**:本轮弱模型(deepseek-chat→v4-flash)只生成 model+fields,`pages=0 commands=0`(D5 用 v4-pro 得全量)。pages/commands 生成质量 = prompt/model 调优,独立项。
-- **permissions 合成 + grant**:生成 model 无 permissions → dynamic CRUD 403。合成 `dynamic.<model>.read/manage` + 授权是完成 generate→apply→CRUD 全链的下一步(同后处理模式)。
+- ✅ **CRUD 可用(本切片续做,#后续 PR)**:取证发现 dynamic CRUD 403 真因 = 生成 model 无 commands → `CommandActionDeriver` 派生不出 `model.<code>.create` → `AutoPermissionAssignmentService` 没建该权限。修:`synthesizeCrudCommands`(commands 空且单 model 时合成 create/update/delete)→ 派生权限 → 自动授予。真栈 golden:generate→apply(`COMMAND:{CREATE:3}`)→ 重登 → `POST /api/dynamic/equipment/create` **200** + list rows=1 = **CRUD_OK**。
 - **MD-3 in-designer AI 副驾**:复用本 generate/refine(现 import-ready)→ 限定到设计器当前面片段。
 - ⚠️ DeepSeek key:本验证用 key(已轮换提醒);`aura_boot_auraqr` CloudConfig 仍存旧 D5 leaked key,须清。
