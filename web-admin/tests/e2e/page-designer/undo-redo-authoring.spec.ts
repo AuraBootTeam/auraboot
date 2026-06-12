@@ -3,6 +3,7 @@ import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 
 const FORM_BLOCK_ID = 'pd_undo_redo_section';
+const BLOCK_TITLE_SECTION_ID = 'pd_undo_redo_block_title_section';
 const SHOWCASE_MODEL = 'showcase_all_fields';
 const RATING_FIELD = 'sc_rating';
 
@@ -41,6 +42,44 @@ async function createUndoRedoAuthoringPage(page: Page) {
   return { pid, pageKey, title };
 }
 
+async function createBlockTitleUndoRedoPage(page: Page) {
+  const id = uniqueId('pd_block_undo_redo_authoring');
+  const pageKey = id.replace(/-/g, '_');
+  const title = `Block undo redo authoring ${id}`;
+  const payload = {
+    name: title,
+    pageKey,
+    title,
+    kind: 'form',
+    modelCode: SHOWCASE_MODEL,
+    profile: 'admin',
+    layout: { type: 'stack', gap: 12 },
+    blocks: [
+      {
+        id: BLOCK_TITLE_SECTION_ID,
+        blockType: 'form-section',
+        title: 'Original block title',
+        fields: [],
+      },
+    ],
+    dataSources: {},
+    schemaVersion: 4,
+    metaInfo: { runtimeE2E: true, undoRedoBlockAuthoring: true },
+    semver: '0.1.0',
+  };
+
+  const createResp = await page.request.post('/api/pages', { data: payload });
+  expect(
+    createResp.ok(),
+    `Create block undo/redo authoring page failed: ${createResp.status()}`,
+  ).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created block undo/redo authoring pid').toBeTruthy();
+  return { pid, pageKey, title };
+}
+
 async function fetchModelFieldType(page: Page, modelCode: string, fieldCode: string) {
   const modelResp = await page.request.get(`/api/meta/models/code/${modelCode}`);
   expect(modelResp.ok(), `Fetch model ${modelCode} failed: ${modelResp.status()}`).toBeTruthy();
@@ -69,6 +108,12 @@ async function selectDesignerField(page: Page, fieldCode: string) {
   await page.getByTestId(`designer-field-${fieldCode}`).click();
   await expect(page.getByRole('heading', { name: '字段属性' })).toBeVisible({ timeout: 5_000 });
   await expect(page.getByTestId('field-property-field-input')).toHaveValue(fieldCode);
+}
+
+async function selectCanvasBlock(page: Page, blockId: string) {
+  const block = page.locator(`[data-testid="sortable-block"][data-block-id="${blockId}"]`);
+  await expect(block).toBeVisible({ timeout: 5_000 });
+  await block.click();
 }
 
 async function selectComponentForField(page: Page, component: string) {
@@ -130,6 +175,12 @@ function savedFieldByCode(savedPage: Record<string, any>, fieldCode: string): Re
   return typeof field === 'string' ? { field } : field;
 }
 
+function savedBlockById(savedPage: Record<string, any>, blockId: string): Record<string, any> {
+  const block = (savedPage.blocks ?? []).find((item: any) => item.id === blockId);
+  expect(block, `saved block ${blockId}`).toBeTruthy();
+  return block;
+}
+
 test.describe('Page Designer undo/redo authoring persistence', () => {
   test('saves the undone schema and then saves the redone schema for a field property edit', async ({
     page,
@@ -160,5 +211,30 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
       component: 'rating',
       props: { maxRating: 7 },
     });
+  });
+
+  test('saves the undone schema and then saves the redone schema for a block title edit', async ({
+    page,
+  }) => {
+    const { pid } = await createBlockTitleUndoRedoPage(page);
+    await openDesignerByPid(page, pid);
+    await selectCanvasBlock(page, BLOCK_TITLE_SECTION_ID);
+
+    const titleInput = page.getByTestId('block-title-input-zh');
+    await expect(titleInput).toHaveValue('Original block title');
+    await titleInput.fill('Edited block title');
+    await expect(titleInput).toHaveValue('Edited block title');
+
+    await page.getByTestId('toolbar-undo').click();
+    await expect(titleInput).toHaveValue('Original block title');
+    await saveDesignerAndWait(page, pid);
+    const undonePage = await fetchPageByPid(page, pid);
+    expect(savedBlockById(undonePage, BLOCK_TITLE_SECTION_ID).title).toBe('Original block title');
+
+    await page.getByTestId('toolbar-redo').click();
+    await expect(titleInput).toHaveValue('Edited block title');
+    await saveDesignerAndWait(page, pid);
+    const redonePage = await fetchPageByPid(page, pid);
+    expect(savedBlockById(redonePage, BLOCK_TITLE_SECTION_ID).title).toBe('Edited block title');
   });
 });
