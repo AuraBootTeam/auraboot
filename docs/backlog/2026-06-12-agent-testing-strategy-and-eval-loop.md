@@ -122,7 +122,10 @@ harness/打分/持久化全在,缺的只是 **回归门 + 定时/触发 + key + 
 `OpenAiCompatibleLlmProvider` 前回放录制响应:验**真请求序列化**(OpenAI tools/messages 形)+
 **真 tool-call 解析**(`function.arguments` JSON 串 → input map、finish_reason→stopReason)+
 错误/空 choices/非法 JSON 优雅暴露。cassette 是内联文本块,provider 改线格式时重录刷新。
-后续刀:Anthropic provider + 真流式(SSE 分块)同样回放;cassette 改为「捕获真响应」做权威基线。
+✅ Anthropic provider sync L2 也已落地(`AnthropicLlmProviderRecordReplayTest`:`/v1/messages` + `x-api-key` + `content[].tool_use` 解析)。
+后续刀:真流式(SSE 分块,`streamChat`)回放;cassette 改为「捕获真响应」做权威基线。
+另:fast-follow「统一内联 `checkRegression` 到 gate」✅ 已完成——`CapabilityEvalService.checkRegression` 现委托
+`CapabilityEvalRegressionGate`(只取 `regressed` 维度,保留「相对回归」语义,但覆盖全 5 维 + 滚动基线)。
 
 **③ agent 原型级 eval —— ~2 天/每个 agent**
 给 cs/pcba/competitive 各手工标 10-20 条 `(真实 NL → 期望工具/参数/结果)` 进 L3 集;每个生产

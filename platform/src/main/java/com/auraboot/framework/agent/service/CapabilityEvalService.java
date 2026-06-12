@@ -7,6 +7,7 @@ import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.entity.AbCapabilityEvalRun;
+import com.auraboot.framework.agent.eval.CapabilityEvalRegressionGate;
 import com.auraboot.framework.agent.mapper.AbCapabilityEvalRunMapper;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -384,26 +385,31 @@ public class CapabilityEvalService {
      */
     private void checkRegression(Long tenantId, AbCapabilityEvalRun current, Map<String, Object> report) {
         try {
-            List<AbCapabilityEvalRun> previous = evalRunMapper.selectList(
+            // Unified onto the shared CapabilityEvalRegressionGate (also used by
+            // ScheduledCapabilityEvalJob). This inline check keeps its "relative
+            // regression only" character — it filters to dimensions that *regressed*
+            // against the rolling baseline and ignores absolute-floor findings (the
+            // scheduled job's gate concern) — but now covers all 5 dimensions over a
+            // rolling-median baseline instead of only tool-accuracy vs the single
+            // previous run.
+            List<AbCapabilityEvalRun> window = evalRunMapper.selectList(
                     new LambdaQueryWrapper<AbCapabilityEvalRun>()
                             .eq(AbCapabilityEvalRun::getTenantId, tenantId)
                             .ne(AbCapabilityEvalRun::getPid, current.getPid())
                             .orderByDesc(AbCapabilityEvalRun::getRunAt)
-                            .last("LIMIT 1")
+                            .last("LIMIT 5")
             );
-
-            if (!previous.isEmpty()) {
-                AbCapabilityEvalRun prev = previous.get(0);
-                if (prev.getToolSelectionAccuracy() != null && current.getToolSelectionAccuracy() != null) {
-                    double delta = current.getToolSelectionAccuracy() - prev.getToolSelectionAccuracy();
-                    if (delta < -0.05) {
-                        log.warn("REGRESSION: Tool selection accuracy dropped by {:.1f}% (from {:.1f}% to {:.1f}%)",
-                                Math.abs(delta) * 100, prev.getToolSelectionAccuracy() * 100,
-                                current.getToolSelectionAccuracy() * 100);
-                        report.put("regression_warning", String.format(
-                                "Tool selection accuracy degraded by %.1f%%", Math.abs(delta) * 100));
-                    }
-                }
+            CapabilityEvalRegressionGate.Verdict verdict = CapabilityEvalRegressionGate.evaluate(
+                    current, window, CapabilityEvalRegressionGate.Thresholds.defaults());
+            List<CapabilityEvalRegressionGate.Finding> regressions = verdict.findings().stream()
+                    .filter(CapabilityEvalRegressionGate.Finding::regressed)
+                    .toList();
+            if (!regressions.isEmpty()) {
+                String summary = regressions.stream()
+                        .map(CapabilityEvalRegressionGate.Finding::detail)
+                        .collect(java.util.stream.Collectors.joining("; "));
+                log.warn("Capability-eval regression tenant={}: {}", tenantId, summary);
+                report.put("regression_warning", summary);
             }
         } catch (Exception e) {
             log.warn("Regression check failed: {}", e.getMessage());
