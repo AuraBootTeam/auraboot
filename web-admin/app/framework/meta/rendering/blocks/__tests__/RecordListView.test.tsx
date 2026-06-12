@@ -84,7 +84,7 @@ describe('RecordListView', () => {
       data: { records: [{ id: '1', bom_std_material_code: 'R100', bom_std_material_name: 'Resistor' }], total: 1, page: 1 },
     });
 
-    render(<RecordListView modelCode="bom_standard_item" columns={columns} fixedFilters={{ bom_std_task_id: 'T-1' }} />);
+    render(<RecordListView modelCode="bom_standard_line_pcba" columns={columns} fixedFilters={{ bom_std_task_id: 'T-1' }} />);
 
     await waitFor(() => expect(screen.getByTestId('list-table')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText('R100')).toBeInTheDocument());
@@ -99,7 +99,7 @@ describe('RecordListView', () => {
       data: { records: [{ id: '1', bom_std_material_code: 'R100', bom_std_material_name: null }], total: 1, page: 1 },
     });
 
-    render(<RecordListView modelCode="bom_standard_item" columns={columns} fixedFilters={{ bom_std_task_id: 'T-1' }} />);
+    render(<RecordListView modelCode="bom_standard_line_pcba" columns={columns} fixedFilters={{ bom_std_task_id: 'T-1' }} />);
 
     await waitFor(() => expect(screen.getByText('R100')).toBeInTheDocument());
     const nameCell = screen.getByTestId('cell-bom_std_material_name');
@@ -109,7 +109,7 @@ describe('RecordListView', () => {
   it('typing in the search box triggers a reload carrying the keyword', async () => {
     fetchResultMock.mockResolvedValue({ code: 0, data: { records: [], total: 0, page: 1 } });
 
-    render(<RecordListView modelCode="bom_standard_item" columns={columns} />);
+    render(<RecordListView modelCode="bom_standard_line_pcba" columns={columns} />);
 
     await waitFor(() => expect(fetchResultMock).toHaveBeenCalled());
     fireEvent.change(screen.getByTestId('embedded-list-search'), { target: { value: 'cap' } });
@@ -125,7 +125,7 @@ describe('RecordListView', () => {
     mockSearchParams = new URLSearchParams('filter_bom_std_reason_code=missing_critical_field');
     fetchResultMock.mockResolvedValue({ code: 0, data: { records: [], total: 0, page: 1 } });
 
-    render(<RecordListView modelCode="bom_standard_item" columns={columns} fixedFilters={{ bom_std_task_id: 'T-1' }} />);
+    render(<RecordListView modelCode="bom_standard_line_pcba" columns={columns} fixedFilters={{ bom_std_task_id: 'T-1' }} />);
 
     await waitFor(() => {
       const conditions = lastFilters();
@@ -142,7 +142,7 @@ describe('RecordListView', () => {
   it('shows an error alert when the request fails', async () => {
     fetchResultMock.mockResolvedValue({ code: 1, desc: 'boom' });
 
-    render(<RecordListView modelCode="bom_standard_item" columns={columns} />);
+    render(<RecordListView modelCode="bom_standard_line_pcba" columns={columns} />);
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('boom'));
   });

@@ -39,12 +39,12 @@ describe('usePageDataSources', () => {
 
     const schema = {
       id: 'bom_workbench',
-      modelCode: 'bom_convert_task',
+      modelCode: 'bom_conversion_task_pcba',
       dataSources: {
         lines: {
           type: 'api',
           method: 'get',
-          endpoint: '/api/dynamic/bom_standard_item/list',
+          endpoint: '/api/dynamic/bom_standard_line_pcba/list',
           adaptor: 'table',
           params: {
             bom_std_task_id: '${form.pid}',
@@ -66,7 +66,7 @@ describe('usePageDataSources', () => {
       expect(result.current.getData('lines')?.records?.[0]?.pid).toBe('line-1');
     });
 
-    expect(fetchResultMock).toHaveBeenCalledWith('/api/dynamic/bom_standard_item/list', {
+    expect(fetchResultMock).toHaveBeenCalledWith('/api/dynamic/bom_standard_line_pcba/list', {
       method: 'get',
       params: {
         filters: expect.any(String),
@@ -98,12 +98,12 @@ describe('usePageDataSources', () => {
 
     const schema = {
       id: 'bom_workbench',
-      modelCode: 'bom_convert_task',
+      modelCode: 'bom_conversion_task_pcba',
       dataSources: {
         lines: {
           type: 'api',
           method: 'get',
-          endpoint: '/api/dynamic/bom_standard_item/list',
+          endpoint: '/api/dynamic/bom_standard_line_pcba/list',
           adaptor: 'table',
           params: {
             bom_std_task_id: '${form.pid}',
@@ -135,7 +135,7 @@ describe('usePageDataSources', () => {
       expect(result.current.getData('lines')?.records?.[0]?.pid).toBe('line-2');
     });
 
-    expect(fetchResultMock).toHaveBeenLastCalledWith('/api/dynamic/bom_standard_item/list', {
+    expect(fetchResultMock).toHaveBeenLastCalledWith('/api/dynamic/bom_standard_line_pcba/list', {
       method: 'get',
       params: {
         filters: expect.any(String),

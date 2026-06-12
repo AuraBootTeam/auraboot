@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TwoPluginCoexistenceIT extends AbstractCoreLiteIT {
 
     private static final String PLUGIN_A_PAGEKEY =
-            System.getenv().getOrDefault("CORE_LITE_BOM_PAGEKEY", "bom_convert_task_workbench_list");
+            System.getenv().getOrDefault("CORE_LITE_BOM_PAGEKEY", "bom_conversion_task_pcba_workbench_list");
     private static final String PLUGIN_B_PAGEKEY =
             System.getenv().getOrDefault("CORE_LITE_OTHER_PAGEKEY", "crm_account_list");
 

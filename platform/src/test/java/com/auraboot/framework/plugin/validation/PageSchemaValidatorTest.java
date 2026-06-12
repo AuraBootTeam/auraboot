@@ -164,7 +164,7 @@ class PageSchemaValidatorTest {
         p.setDataSources(Map.of(
                 "standardLines", Map.of(
                         "type", "api",
-                        "endpoint", "/api/dynamic/bom_standard_item/list"
+                        "endpoint", "/api/dynamic/bom_standard_line_pcba/list"
                 )
         ));
         manifest.setPages(List.of(p));
@@ -188,7 +188,7 @@ class PageSchemaValidatorTest {
                   "dataSources": {
                     "standardLines": {
                       "type": "api",
-                      "endpoint": "/api/dynamic/bom_standard_item/list"
+                      "endpoint": "/api/dynamic/bom_standard_line_pcba/list"
                     }
                   },
                   "blocks": [
