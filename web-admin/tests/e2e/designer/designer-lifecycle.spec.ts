@@ -11,8 +11,11 @@
  * BPMN lifecycle coverage moved to tests/e2e/bpm-designer, where the specs
  * assert designerJson, BPMN XML, and selected SmartEngine runtime behavior
  * without permission-gated skip wrappers.
+ * Automation coverage moved to tests/e2e/automation/automation-designer-golden.spec.ts,
+ * where trigger/action/control nodes are verified through browser authoring,
+ * backend persistence, and runtime side effects instead of API save fallbacks.
  *
- * Each remaining designer has a serial describe block (DL-PD, DL-RPT, DL-DASH, DL-AUTO).
+ * Each remaining designer has a serial describe block (DL-PD, DL-RPT, DL-DASH).
  *
  * @since 6.0.0
  */
@@ -422,128 +425,5 @@ test.describe.serial('Dashboard Designer Lifecycle (DL-DASH)', () => {
     // Dashboard stores widgets as separate jsonb field, not a schema blob
     const widgets = data.widgets || [];
     expect(widgets.length).toBeGreaterThan(0);
-  });
-});
-
-// ============================================================
-//  4. Automation Designer (DL-AUTO)
-// ============================================================
-
-test.describe.serial('Automation Designer Lifecycle (DL-AUTO)', () => {
-  test.setTimeout(60000);
-  const autoName = uniqueId('dl_auto');
-  let pid: string;
-
-  test('DL-AUTO-01: Node palette — create automation and verify palette', async ({ page }) => {
-    // Create via API (matching automation-designer.spec.ts pattern)
-    const resp = await page.request.post('/api/automations', {
-      data: {
-        name: autoName,
-        description: 'DL-AUTO lifecycle test',
-        triggerType: 'on_record_create',
-        modelCode: 'ab_user',
-        actions: [
-          {
-            type: 'send_notification',
-            config: { message: 'lifecycle test' },
-            sequence: 0,
-            label: 'Notify',
-          },
-        ],
-        enabled: false,
-      },
-    });
-    const body = await resp.json();
-    pid = body.data?.pid || body.data?.id;
-    expect(pid, `Create automation failed: ${JSON.stringify(body)}`).toBeTruthy();
-
-    await page.goto(`/automation/${pid}`, { waitUntil: 'domcontentloaded' });
-    await waitForDesignerLoad(page);
-
-    // Palette or canvas should be visible
-    await expect(
-      page.locator('[data-testid="flow-palette"], [draggable="true"], .react-flow').first(),
-    ).toBeVisible({ timeout: 10000 });
-
-    // Draggable nodes exist
-    expect(await page.locator('[draggable="true"]').count()).toBeGreaterThan(0);
-  });
-
-  test('DL-AUTO-02: Property edit — modify name/description', async ({ page }) => {
-    await page.goto(`/automation/${pid}`, { waitUntil: 'domcontentloaded' });
-    await waitForDesignerLoad(page);
-
-    const nameInput = page
-      .locator(
-        'input[placeholder*="名称"], input[placeholder*="name"], input[placeholder*="Automation"]',
-      )
-      .first();
-    if (await nameInput.isVisible({ timeout: 8000 }).catch(() => false)) {
-      await nameInput.click();
-      await nameInput.clear();
-      await nameInput.type(`${autoName}_edited`, { delay: 10 });
-    } else {
-      // Verify the editor is at least loaded
-      await expect(page.locator('.react-flow, [data-testid="flow-canvas"]').first()).toBeVisible({
-        timeout: 8000,
-      });
-    }
-  });
-
-  test('DL-AUTO-03: Save + API verify', async ({ page }) => {
-    await page.goto(`/automation/${pid}`, { waitUntil: 'domcontentloaded' });
-    await waitForDesignerLoad(page);
-
-    // Modify name with type() to trigger React onChange
-    const nameInput = page
-      .locator(
-        'input[placeholder*="名称"], input[placeholder*="name"], input[placeholder*="Automation"]',
-      )
-      .first();
-    if (await nameInput.isVisible({ timeout: 8000 }).catch(() => false)) {
-      await nameInput.click();
-      await nameInput.clear();
-      await nameInput.type(`${autoName}_saved`, { delay: 10 });
-    }
-
-    const btn = page.locator('button:has-text("Save"), button:has-text("保存")').first();
-    await expect(btn).toBeVisible({ timeout: 8000 });
-
-    // Wait for dirty state propagation → button enabled
-    const isEnabled = await btn.isEnabled({ timeout: 5000 }).catch(() => false);
-    if (!isEnabled) {
-      // Save via API as fallback (name change may not trigger dirty in all implementations)
-      const resp = await page.request.put(`/api/automations/${pid}`, {
-        data: { name: `${autoName}_saved` },
-      });
-      expect(resp.status()).toBeLessThan(400);
-      return;
-    }
-
-    const [response] = await Promise.all([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes(`/api/automations/${pid}`) &&
-          r.request().method().toLowerCase() === 'put',
-        { timeout: 15000 },
-      ),
-      btn.click(),
-    ]);
-    expect(response.status()).toBeLessThan(400);
-  });
-
-  test('DL-AUTO-04: Enable + API verify', async ({ page }) => {
-    expect(pid).toBeTruthy();
-    const resp = await page.request.post(`/api/automations/${pid}/enable`);
-    expect(resp.status()).toBeLessThan(400);
-  });
-
-  test('DL-AUTO-05: Backend data verify — enabled true', async ({ page }) => {
-    expect(pid).toBeTruthy();
-    const resp = await page.request.get(`/api/automations/${pid}`);
-    expect(resp.ok()).toBeTruthy();
-    const { data } = await resp.json();
-    expect(data.enabled).toBe(true);
-    expect(data.name).toBeTruthy();
   });
 });
