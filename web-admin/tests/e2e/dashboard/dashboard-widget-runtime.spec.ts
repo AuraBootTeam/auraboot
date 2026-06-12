@@ -177,6 +177,22 @@ function runtimeWidgets(): DashboardWidgetFixture[] {
         dataSource: { type: 'static' },
       },
     },
+    {
+      id: 'runtime-stats-card',
+      type: 'smart-stats-card',
+      title: 'Runtime Stats Card',
+      x: 0,
+      y: 8,
+      w: 3,
+      h: 2,
+      config: {
+        title: 'Runtime Stats Card',
+        dataSource: { type: 'static' },
+        visualization: {
+          statKey: 'inbox_pending',
+        },
+      },
+    },
   ];
 }
 
@@ -351,6 +367,11 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       const statsRow = await expectRuntimeBlock(page, 'runtime-stats-row', 'smart-stats-row');
       await expect(statsRow.getByTestId('stats-row')).toBeVisible();
       await expect(statsRow.locator('[data-testid^="stat-card-"]')).toHaveCount(4);
+
+      const statsCard = await expectRuntimeBlock(page, 'runtime-stats-card', 'smart-stats-card');
+      const singleCard = statsCard.getByTestId('stat-card-inbox_pending');
+      await expect(singleCard).toBeVisible();
+      await expect(singleCard).not.toContainText('—', { timeout: 10_000 });
     } finally {
       await cleanupDashboard(page, dashboard?.pid);
     }
