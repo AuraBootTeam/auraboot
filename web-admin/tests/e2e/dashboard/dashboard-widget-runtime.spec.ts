@@ -79,6 +79,8 @@ type CreatedCrmWorkbenchFixture = {
   activitySubject: string;
   opportunityStage: string;
   opportunityAmount: number;
+  expectedPipelineStageCount: number;
+  expectedPipelineStageAmount: number;
 };
 
 type CreatedBpmWorkbenchFixture = {
@@ -87,6 +89,7 @@ type CreatedBpmWorkbenchFixture = {
   processName: string;
   processInstanceId: string;
   businessKey: string;
+  expectedRunningCount: number;
 };
 
 type DynamicListResponse<T> = {
@@ -117,6 +120,11 @@ type PipelineStageRecord = {
   label?: string;
   count?: number;
   amount?: string | number;
+};
+
+type PipelineStageSnapshot = {
+  count: number;
+  amount: number;
 };
 
 type BpmStartedProcessRecord = {
@@ -1168,6 +1176,12 @@ async function expectInboxListContains(
 async function createCrmWorkbenchFixture(page: Page): Promise<CreatedCrmWorkbenchFixture> {
   await ensureCrmStarterPluginImported(page);
 
+  const baselinePipelineStage = await readPipelineStageSnapshot(
+    page,
+    'qualification',
+    'CRM pipeline baseline before fixture create',
+  );
+
   const suffix = uniqueId('DWRCRM');
   const leadCompany = `DWR CRM Lead ${suffix}`;
   const leadContact = `DWR Contact ${suffix}`;
@@ -1251,6 +1265,8 @@ async function createCrmWorkbenchFixture(page: Page): Promise<CreatedCrmWorkbenc
     activitySubject,
     opportunityStage: 'qualification',
     opportunityAmount,
+    expectedPipelineStageCount: baselinePipelineStage.count + 1,
+    expectedPipelineStageAmount: baselinePipelineStage.amount + opportunityAmount,
   };
 
   await expectCrmLeadListContains(page, fixture, 'CRM lead list immediately after fixture create');
@@ -1259,7 +1275,7 @@ async function createCrmWorkbenchFixture(page: Page): Promise<CreatedCrmWorkbenc
     fixture,
     'CRM activity list immediately after fixture create',
   );
-  await expectPipelineIncludesStageAmount(
+  await expectPipelineMatchesFixtureDelta(
     page,
     fixture,
     'CRM pipeline immediately after fixture create',
@@ -1411,26 +1427,51 @@ async function expectCrmActivityListContains(
   expect(match, `${context} should include ${fixture.activitySubject}`).toBeTruthy();
 }
 
-async function expectPipelineIncludesStageAmount(
+function coerceFiniteNumber(value: unknown, context: string): number {
+  const numeric = Number(value ?? 0);
+  expect(Number.isFinite(numeric), `${context} should be numeric`).toBe(true);
+  return numeric;
+}
+
+async function readPipelineStageSnapshot(
   page: Page,
-  fixture: CreatedCrmWorkbenchFixture,
+  stageCode: string,
   context: string,
   response?: APIResponse | PlaywrightResponse,
-): Promise<void> {
+): Promise<PipelineStageSnapshot> {
   const pipelineResponse = response ?? await page.request.get('/api/workbench/pipeline');
   const body = await parseJsonResponse<{ data?: { stages?: PipelineStageRecord[] } }>(
     pipelineResponse,
     context,
   );
-  const stage = body.data?.stages?.find((item) => item.code === fixture.opportunityStage);
-  expect(stage, `${context} should include stage ${fixture.opportunityStage}`).toBeTruthy();
-  expect(Number(stage?.count ?? 0), `${context} stage count`).toBeGreaterThanOrEqual(1);
-  expect(Number(stage?.amount ?? 0), `${context} stage amount`).toBeGreaterThanOrEqual(
-    fixture.opportunityAmount,
+  const stage = body.data?.stages?.find((item) => item.code === stageCode);
+  return {
+    count: coerceFiniteNumber(stage?.count, `${context} stage count`),
+    amount: coerceFiniteNumber(stage?.amount, `${context} stage amount`),
+  };
+}
+
+async function expectPipelineMatchesFixtureDelta(
+  page: Page,
+  fixture: CreatedCrmWorkbenchFixture,
+  context: string,
+  response?: APIResponse | PlaywrightResponse,
+): Promise<void> {
+  const stage = await readPipelineStageSnapshot(
+    page,
+    fixture.opportunityStage,
+    context,
+    response,
   );
+  expect(stage.count, `${context} stage count delta`).toBe(fixture.expectedPipelineStageCount);
+  expect(stage.amount, `${context} stage amount delta`).toBe(fixture.expectedPipelineStageAmount);
 }
 
 async function createBpmWorkbenchFixture(page: Page): Promise<CreatedBpmWorkbenchFixture> {
+  const baselineRunningCount = await readBpmRunningCount(
+    page,
+    'BPM stats baseline before fixture create',
+  );
   const suffix = uniqueId('DWRBPM');
   const processKey = `dwr_bpm_${suffix.toLowerCase()}`;
   const processName = `DWR BPM Process ${suffix}`;
@@ -1483,13 +1524,18 @@ async function createBpmWorkbenchFixture(page: Page): Promise<CreatedBpmWorkbenc
     processName,
     processInstanceId: processInstanceId!,
     businessKey,
+    expectedRunningCount: baselineRunningCount + 1,
   };
   await expectBpmWorkbenchContainsProcess(
     page,
     fixture,
     'BPM workbench immediately after fixture create',
   );
-  await expectBpmStatsIncludesRunning(page, 'BPM stats immediately after fixture create');
+  await expectBpmStatsMatchesFixtureDelta(
+    page,
+    fixture,
+    'BPM stats immediately after fixture create',
+  );
   return fixture;
 }
 
@@ -1529,15 +1575,24 @@ async function expectBpmWorkbenchContainsProcess(
   expect(match, `${context} should include ${fixture.businessKey}`).toBeTruthy();
 }
 
-async function expectBpmStatsIncludesRunning(
+async function readBpmRunningCount(
   page: Page,
   context: string,
   response?: APIResponse | PlaywrightResponse,
-): Promise<void> {
+): Promise<number> {
   const statsResponse = response ?? await page.request.get('/api/workbench/bpm-stats');
   const body = await parseJsonResponse<{ data?: BpmStatsRecord }>(statsResponse, context);
-  // The seeded BPM instance creates a lower-bound contract; pre-existing live data may be higher.
-  expect(body.data?.runningCount ?? 0, `${context} runningCount`).toBeGreaterThanOrEqual(1);
+  return coerceFiniteNumber(body.data?.runningCount, `${context} runningCount`);
+}
+
+async function expectBpmStatsMatchesFixtureDelta(
+  page: Page,
+  fixture: CreatedBpmWorkbenchFixture,
+  context: string,
+  response?: APIResponse | PlaywrightResponse,
+): Promise<void> {
+  const runningCount = await readBpmRunningCount(page, context, response);
+  expect(runningCount, `${context} runningCount delta`).toBe(fixture.expectedRunningCount);
 }
 
 async function expectRuntimeBlock(page: Page, id: string, type: string): Promise<Locator> {
@@ -1998,7 +2053,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
         timeout: 15_000,
       });
-      await expectPipelineIncludesStageAmount(
+      await expectPipelineMatchesFixtureDelta(
         page,
         crmFixture,
         'CRM pipeline consumed by viewer',
@@ -2402,7 +2457,12 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
         'BPM workbench consumed by viewer',
         await workbenchResponse,
       );
-      await expectBpmStatsIncludesRunning(page, 'BPM stats consumed by viewer', await statsResponse);
+      await expectBpmStatsMatchesFixtureDelta(
+        page,
+        bpmFixture,
+        'BPM stats consumed by viewer',
+        await statsResponse,
+      );
 
       const myProcessBlock = await expectRuntimeBlock(
         page,
@@ -2430,9 +2490,12 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
         'smart-process-stats',
       );
       await expect(statsBlock.getByTestId('process-stats-widget')).toBeVisible();
-      await expect(statsBlock.getByTestId('process-stats-running-count')).not.toHaveText('0', {
-        timeout: 10_000,
-      });
+      await expect(statsBlock.getByTestId('process-stats-running-count')).toHaveText(
+        String(bpmFixture.expectedRunningCount),
+        {
+          timeout: 10_000,
+        },
+      );
       await expect(statsBlock).toContainText(/Completion Rate|完成率/);
     } finally {
       await cleanupBpmWorkbenchFixture(page, bpmFixture);
