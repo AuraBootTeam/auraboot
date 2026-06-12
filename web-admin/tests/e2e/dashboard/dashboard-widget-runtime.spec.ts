@@ -32,6 +32,15 @@ type CreatedDashboard = {
   title: string;
 };
 
+type CreatedEngagement = {
+  id: string;
+  targetId: string;
+  targetLabel: string;
+  targetContext?: {
+    path?: string;
+  };
+};
+
 const SVG_DATA_URL =
   'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22480%22%20height%3D%22200%22%20viewBox%3D%220%200%20480%20200%22%3E%3Crect%20width%3D%22480%22%20height%3D%22200%22%20fill%3D%22%23eef6ff%22%2F%3E%3Ctext%20x%3D%22240%22%20y%3D%22108%22%20font-size%3D%2232%22%20text-anchor%3D%22middle%22%20fill%3D%22%231d4ed8%22%3ERuntime%20Image%3C%2Ftext%3E%3C%2Fsvg%3E';
 
@@ -240,6 +249,27 @@ function shortcutWidgets(): DashboardWidgetFixture[] {
   ];
 }
 
+function recentWidgets(): DashboardWidgetFixture[] {
+  return [
+    {
+      id: 'runtime-recent',
+      type: 'smart-recent',
+      title: 'Runtime Recent',
+      x: 0,
+      y: 0,
+      w: 6,
+      h: 3,
+      config: {
+        title: 'Runtime Recent',
+        dataSource: { type: 'static' },
+        visualization: {
+          maxItems: 6,
+        },
+      },
+    },
+  ];
+}
+
 function advancedRuntimeWidgets(): DashboardWidgetFixture[] {
   return [
     {
@@ -431,6 +461,60 @@ async function cleanupDashboard(page: Page, pid?: string): Promise<void> {
   if (!pid) return;
   await page.request.post(`/api/dashboards/${pid}/unpublish`).catch(() => undefined);
   await page.request.delete(`/api/dashboards/${pid}`).catch(() => undefined);
+}
+
+async function createRecentEngagementFixture(page: Page): Promise<CreatedEngagement> {
+  const targetId = `runtime-recent-${Date.now()}`;
+  const targetPath = `/runtime/recent/${targetId}`;
+  const response = await page.request.post('/api/user-engagement', {
+    data: {
+      targetType: 'page',
+      targetId,
+      targetLabel: `Runtime Recent ${targetId}`,
+      targetContext: {
+        path: targetPath,
+        icon: 'layout-dashboard',
+        modelCode: 'dashboard',
+      },
+      engagementType: 'recent_view',
+      sortOrder: -100,
+    },
+  });
+  const body = await parseJsonResponse<{ data?: CreatedEngagement }>(
+    response,
+    'create recent engagement',
+  );
+  expect(body.data?.id, 'created recent engagement id').toMatch(/^\d+$/);
+  expect(body.data?.targetId, 'created recent target id').toBe(targetId);
+  expect(typeof body.data?.id, 'created recent id should be a JS-safe string').toBe('string');
+  await expectRecentListContains(page, targetId, 'recent list immediately after create');
+  return body.data!;
+}
+
+async function cleanupEngagement(page: Page, id?: string): Promise<void> {
+  if (!id) return;
+  await page.request.delete(`/api/user-engagement/${id}`).catch(() => undefined);
+}
+
+async function expectRecentListContains(
+  page: Page,
+  targetId: string,
+  context: string,
+  response?: APIResponse,
+): Promise<CreatedEngagement> {
+  const listResponse = response ?? await page.request.get('/api/user-engagement', {
+    params: {
+      engagementType: 'recent_view',
+      targetType: 'page',
+    },
+  });
+  const listBody = await parseJsonResponse<{ data?: CreatedEngagement[] }>(
+    listResponse,
+    context,
+  );
+  const match = listBody.data?.find((item) => item.targetId === targetId);
+  expect(match, `${context} should include ${targetId}`).toBeTruthy();
+  return match!;
 }
 
 async function expectRuntimeBlock(page: Page, id: string, type: string): Promise<Locator> {
@@ -658,6 +742,54 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       await expect(kanban).toContainText('Runtime Card A');
       await expect(kanban).toContainText('Runtime Card B');
     } finally {
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
+  test('DWR-005: recent widget renders engagement API recent page visits', async ({ page }) => {
+    let dashboard: CreatedDashboard | undefined;
+    let recent: CreatedEngagement | undefined;
+
+    try {
+      recent = await createRecentEngagementFixture(page);
+      dashboard = await createPublishedDashboard(
+        page,
+        recentWidgets(),
+        'Runtime Recent Widget Matrix',
+      );
+
+      await page.addInitScript(() => {
+        window.localStorage.removeItem('auraboot:recent-visits');
+      });
+      const recentListResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/user-engagement') &&
+          response.url().includes('engagementType=recent_view') &&
+          response.request().method() === 'GET' &&
+          response.status() === 200,
+        { timeout: 10_000 },
+      );
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expectRecentListContains(
+        page,
+        recent.targetId,
+        'recent list consumed by viewer',
+        await recentListResponse,
+      );
+
+      const recentBlock = await expectRuntimeBlock(page, 'runtime-recent', 'smart-recent');
+      await expect(recentBlock).toContainText('Runtime Recent');
+      await expect(recentBlock.getByRole('link', { name: new RegExp(recent.targetLabel) })).toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(recentBlock.getByRole('link', { name: new RegExp(recent.targetLabel) }))
+        .toHaveAttribute('href', recent.targetContext?.path ?? '');
+      await expect(recentBlock).not.toContainText(/暂无访问记录|No recent visits/);
+    } finally {
+      await cleanupEngagement(page, recent?.id);
       await cleanupDashboard(page, dashboard?.pid);
     }
   });

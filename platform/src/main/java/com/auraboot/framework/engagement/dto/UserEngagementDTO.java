@@ -1,5 +1,7 @@
 package com.auraboot.framework.engagement.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.time.OffsetDateTime;
@@ -8,6 +10,7 @@ import java.util.Map;
 
 @Data
 public class UserEngagementDTO {
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
     private String targetType;
     private String targetId;

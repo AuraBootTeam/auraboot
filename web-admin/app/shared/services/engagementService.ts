@@ -9,7 +9,7 @@ import { get, post, put, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 export interface UserEngagement {
-  id: number;
+  id: string;
   targetType: string;
   targetId: string;
   targetLabel: string;
@@ -97,7 +97,7 @@ export async function addFavorite(
 /**
  * Remove a favorite engagement record by ID.
  */
-export async function removeFavorite(id: number): Promise<void> {
+export async function removeFavorite(id: string): Promise<void> {
   const result = await del<void>(`/api/user-engagement/${id}`);
   if (!ResultHelper.isSuccess(result)) {
     throw new Error(result.desc || 'Failed to remove favorite');
@@ -107,7 +107,7 @@ export async function removeFavorite(id: number): Promise<void> {
 /**
  * Reorder favorites by providing an ordered list of IDs.
  */
-export async function reorderFavorites(orderedIds: number[]): Promise<void> {
+export async function reorderFavorites(orderedIds: string[]): Promise<void> {
   const result = await put<void>('/api/user-engagement/reorder', { orderedIds });
   if (!ResultHelper.isSuccess(result)) {
     throw new Error(result.desc || 'Failed to reorder favorites');
