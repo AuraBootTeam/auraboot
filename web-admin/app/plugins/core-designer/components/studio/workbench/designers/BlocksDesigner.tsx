@@ -146,6 +146,14 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
     [selectedBlockId, blocks],
   );
 
+  const resolvedSelectedFieldInfo = useMemo(() => {
+    if (!selectedFieldInfo) return null;
+    const block = blocks.find((b) => b.id === selectedFieldInfo.blockId);
+    const fieldRef = block?.fields?.[selectedFieldInfo.fieldIndex];
+    if (!fieldRef) return null;
+    return { ...selectedFieldInfo, fieldRef };
+  }, [blocks, selectedFieldInfo]);
+
   // Block IDs for SortableContext
   const blockIds = useMemo(() => blocks.map((b) => b.id), [blocks]);
 
@@ -587,7 +595,9 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                         block={block}
                         isSelected={selectedBlockId === block.id}
                         selectedFieldInfo={
-                          selectedFieldInfo?.blockId === block.id ? selectedFieldInfo : null
+                          resolvedSelectedFieldInfo?.blockId === block.id
+                            ? resolvedSelectedFieldInfo
+                            : null
                         }
                         onSelect={() => handleBlockSelect(block.id)}
                         onDelete={() => removeBlock(block.id)}
@@ -622,7 +632,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
             <BlockPropertyPanel
               block={selectedBlock}
               modelCode={modelCode || schema.modelCode}
-              selectedFieldInfo={selectedFieldInfo}
+              selectedFieldInfo={resolvedSelectedFieldInfo}
               onChange={(updates) => {
                 if (selectedBlockId) updateBlock(selectedBlockId, updates);
               }}

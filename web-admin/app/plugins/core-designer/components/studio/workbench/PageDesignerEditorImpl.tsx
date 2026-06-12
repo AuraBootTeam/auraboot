@@ -255,6 +255,7 @@ export default function PageDesignerEditorImpl() {
     const prev = dslHistory.undo();
     if (prev) {
       setSchema(prev);
+      latestSchemaRef.current = prev;
       toolbarActions.markUnsaved();
     }
   }, [dslHistory, toolbarActions]);
@@ -264,6 +265,7 @@ export default function PageDesignerEditorImpl() {
     const next = dslHistory.redo();
     if (next) {
       setSchema(next);
+      latestSchemaRef.current = next;
       toolbarActions.markUnsaved();
     }
   }, [dslHistory, toolbarActions]);
@@ -375,6 +377,7 @@ export default function PageDesignerEditorImpl() {
     if (result) {
       setMeta(result.meta);
       setSchema(result.schema);
+      latestSchemaRef.current = result.schema;
       dslHistory.resetHistory(result.schema);  // reset history so undo cannot reach pre-rollback state
     } else {
       setError('回滚后未找到页面');
