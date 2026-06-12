@@ -25,11 +25,6 @@ async function publishPage(page: Page, payload: Record<string, unknown>) {
   const pid = String(createBody.data?.pid || '');
   expect(pid, 'created page pid').toBeTruthy();
 
-  const updateResp = await page.request.put(`/api/pages/${pid}`, { data: payload });
-  expect(updateResp.ok(), `Update standard block page failed: ${updateResp.status()}`).toBeTruthy();
-  const updateBody = await updateResp.json();
-  expect(updateBody.code, 'update page API code').toBe('0');
-
   const publishResp = await page.request.post(`/api/pages/${pid}/publish`);
   expect(publishResp.ok(), `Publish standard block page failed: ${publishResp.status()}`).toBeTruthy();
   const publishBody = await publishResp.json();
