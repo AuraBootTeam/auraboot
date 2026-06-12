@@ -99,6 +99,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
                 return (
                   <SortableFieldItem
                     key={fieldId}
+                    fieldCode={field.field || String(index)}
                     id={fieldId}
                     fieldName={
                       resolveLocalizedText(field.label, locale) ||
@@ -134,6 +135,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
  */
 interface SortableFieldItemProps {
   id: string;
+  fieldCode: string;
   fieldName: string;
   placeholder?: string;
   required?: boolean;
@@ -147,6 +149,7 @@ interface SortableFieldItemProps {
 
 const SortableFieldItem: React.FC<SortableFieldItemProps> = ({
   id,
+  fieldCode,
   fieldName,
   placeholder,
   required,
@@ -184,6 +187,8 @@ const SortableFieldItem: React.FC<SortableFieldItemProps> = ({
       ref={setNodeRef}
       style={style}
       onClick={handleClick}
+      data-testid={`designer-field-${fieldCode}`}
+      data-field-code={fieldCode}
       className={`group/field relative transition-all duration-200 ${
         !disabled ? 'cursor-pointer' : ''
       } ${isSelected ? 'rounded-lg bg-blue-50/50 ring-2 ring-blue-500' : ''} ${

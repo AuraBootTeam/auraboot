@@ -130,6 +130,7 @@ export const FieldsEditor: React.FC<FieldsEditorProps> = ({
       {!readonly && (
         <div className="flex items-center gap-2">
           <input
+            data-testid="fields-add-input"
             type="text"
             value={newFieldCode}
             onChange={(e) => setNewFieldCode(e.target.value)}
@@ -138,6 +139,7 @@ export const FieldsEditor: React.FC<FieldsEditorProps> = ({
             placeholder="输入字段代码"
           />
           <button
+            data-testid="fields-add-button"
             onClick={handleAddField}
             disabled={!newFieldCode.trim()}
             className="rounded-md bg-blue-500 px-3 py-2 text-sm text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300"
