@@ -198,6 +198,32 @@ function quickNoteWidgets(): DashboardWidgetFixture[] {
   ];
 }
 
+function shortcutWidgets(): DashboardWidgetFixture[] {
+  return [
+    {
+      id: 'runtime-shortcuts',
+      type: 'smart-shortcuts',
+      title: 'Runtime Shortcuts',
+      x: 0,
+      y: 0,
+      w: 6,
+      h: 2,
+      config: {
+        title: 'Runtime Shortcuts',
+        dataSource: { type: 'static' },
+        shortcuts: [
+          {
+            label: 'Runtime Dashboards',
+            icon: '>',
+            path: '/dashboards',
+            color: 'bg-blue-50',
+          },
+        ],
+      },
+    },
+  ];
+}
+
 async function parseJsonResponse<T>(response: APIResponse, context: string): Promise<T> {
   const text = await response.text();
   expect(response.ok(), `${context} failed: status=${response.status()} body=${text}`).toBe(true);
@@ -364,6 +390,34 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
         );
         await saveQuickNoteThroughUi(page, originalNote).catch(() => undefined);
       }
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
+  test('DWR-003: shortcuts widget navigates from published viewer interaction', async ({ page }) => {
+    let dashboard: CreatedDashboard | undefined;
+
+    try {
+      dashboard = await createPublishedDashboard(
+        page,
+        shortcutWidgets(),
+        'Runtime Shortcuts Matrix',
+      );
+
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      const shortcuts = await expectRuntimeBlock(page, 'runtime-shortcuts', 'smart-shortcuts');
+      await expect(shortcuts.getByTestId('shortcuts-list')).toBeVisible();
+
+      const shortcut = shortcuts.getByRole('link', { name: /Runtime Dashboards/ });
+      await expect(shortcut).toHaveAttribute('href', /\/dashboards$/);
+
+      await shortcut.click();
+      await expect(page).toHaveURL(/\/dashboards$/);
+    } finally {
       await cleanupDashboard(page, dashboard?.pid);
     }
   });
