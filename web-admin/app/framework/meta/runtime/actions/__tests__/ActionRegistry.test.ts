@@ -87,3 +87,19 @@ describe('ActionRegistry record navigation', () => {
     );
   });
 });
+
+describe('ActionRegistry refresh', () => {
+  it('prefers explicit data source targets over page-level loadData', async () => {
+    const loadData = vi.fn();
+    const reload = vi.fn().mockResolvedValue(undefined);
+
+    await actionRegistry.execute('refresh', {
+      loadData,
+      dataSourceManager: { reload } as any,
+      args: { target: 'ds_orders' },
+    });
+
+    expect(reload).toHaveBeenCalledWith('ds_orders');
+    expect(loadData).not.toHaveBeenCalled();
+  });
+});
