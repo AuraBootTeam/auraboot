@@ -17,6 +17,7 @@ import { test, expect } from '../../fixtures';
 import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { inflateSync } from 'node:zlib';
 import { uniqueId } from '../helpers';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +135,154 @@ async function createReportExportPage(page: Page) {
   expect(pid, 'created report page pid').toBeTruthy();
 
   return { pid, title, exportRows };
+}
+
+async function createReportNonTableExportPage(page: Page) {
+  const title = uniqueId('ReportNonTableExport');
+  const pageKey = title.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+  const exportRows = [
+    { region: 'North', status: 'Open', owner: 'Ops-A', cases: 12 },
+    { region: 'North', status: 'Closed', owner: 'Ops-A', cases: 3 },
+    { region: 'South', status: 'Open', owner: 'Ops-B', cases: 9 },
+  ];
+  const reportDsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title,
+    page: {
+      size: 'A4',
+      orientation: 'portrait',
+      margin: { top: 20, right: 20, bottom: 20, left: 20 },
+    },
+    dataSources: {
+      ops: {
+        type: 'static',
+        data: exportRows,
+      },
+    },
+    body: [
+      {
+        id: 'header',
+        blockType: 'page-header',
+        content: 'Operations Header',
+      },
+      {
+        id: 'grouped_cases',
+        blockType: 'grouped-table',
+        title: 'Grouped Cases',
+        dataSource: 'ops',
+        groupByField: 'owner',
+        showHeader: true,
+        columns: [
+          { field: 'region', label: 'Region' },
+          { field: 'status', label: 'Status' },
+          { field: 'cases', label: 'Cases' },
+        ],
+      },
+      {
+        id: 'status_matrix',
+        blockType: 'cross-tab',
+        title: 'Region Status Matrix',
+        dataSource: 'ops',
+        rowField: 'region',
+        columnField: 'status',
+        valueField: 'cases',
+        aggregation: 'sum',
+        showRowTotal: true,
+        showColumnTotal: true,
+      },
+      {
+        id: 'open_total',
+        blockType: 'stat-card',
+        title: 'Open Case Total',
+        dataSource: 'ops',
+        valueField: 'cases',
+        aggregation: 'sum',
+        label: 'Total Cases',
+      },
+      {
+        id: 'summary',
+        blockType: 'rich-text',
+        title: 'Executive Summary',
+        content: 'Operations summary line one\nOperations summary line two',
+      },
+      {
+        id: 'status_chart',
+        blockType: 'chart',
+        title: 'Status Chart',
+        dataSource: 'ops',
+        chartType: 'bar',
+        categoryField: 'status',
+        valueField: 'cases',
+        aggregation: 'sum',
+      },
+      {
+        id: 'barcode',
+        blockType: 'barcode',
+        title: 'Export Barcode',
+        format: 'code128',
+        staticValue: 'OPS-2026-EXPORT',
+      },
+      {
+        id: 'watermark',
+        blockType: 'watermark',
+        text: 'CONFIDENTIAL',
+      },
+      {
+        id: 'footer',
+        blockType: 'page-footer',
+        content: 'Operations Footer',
+      },
+    ],
+  };
+
+  const createResp = await page.request.post('/api/pages', {
+    data: {
+      pageKey,
+      name: title,
+      title,
+      kind: 'list',
+      profile: 'report',
+      blocks: [],
+      schemaVersion: 4,
+      semver: '0.1.0',
+      metaInfo: { e2eArtifact: 'report-non-table-export' },
+      extension: { reportDsl },
+    },
+  });
+  expect(createResp.ok(), `Create non-table report page failed: ${createResp.status()}`).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create non-table report page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created non-table report page pid').toBeTruthy();
+
+  return { pid, title, exportRows };
+}
+
+function extractPdfContentText(bytes: Buffer): string {
+  const source = bytes.toString('latin1');
+  const chunks: string[] = [];
+  let offset = 0;
+  while (offset < source.length) {
+    const streamIndex = source.indexOf('stream', offset);
+    if (streamIndex < 0) break;
+    const dataStart = source.indexOf('\n', streamIndex);
+    const streamEnd = source.indexOf('endstream', dataStart);
+    if (dataStart < 0 || streamEnd < 0) break;
+
+    let raw = bytes.subarray(dataStart + 1, streamEnd);
+    while (raw.length > 0 && (raw[raw.length - 1] === 10 || raw[raw.length - 1] === 13)) {
+      raw = raw.subarray(0, raw.length - 1);
+    }
+
+    try {
+      chunks.push(inflateSync(raw).toString('latin1'));
+    } catch {
+      chunks.push(raw.toString('latin1'));
+    }
+    offset = streamEnd + 'endstream'.length;
+  }
+  return chunks.join('\n');
 }
 
 // ===================================================================
@@ -874,6 +1023,113 @@ test.describe('Report Operations', () => {
       expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
       expect(bytes.length).toBeGreaterThan(1_000);
       expect(pdfText).toContain('/Type /Page');
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
+
+  test('RPT-OP-09: Export Excel includes non-table semantic sheets', async ({ page }, testInfo) => {
+    const { pid, title } = await createReportNonTableExportPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const excelBtn = page.getByRole('button', { name: /export excel/i });
+      await expect(excelBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/excel') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
+      await excelBtn.click();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `Excel export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(download.suggestedFilename()).toBe(`${title}.xlsx`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const bytes = await readFile(savedPath);
+      expect(bytes.subarray(0, 2).toString()).toBe('PK');
+
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.read(bytes, { type: 'buffer' });
+      expect(workbook.SheetNames).toEqual([
+        'Grouped Cases',
+        'Region Status Matrix',
+        'Open Case Total',
+        'Executive Summary',
+        'Status Chart',
+        'Report Text',
+      ]);
+      const grouped = workbook.Sheets['Grouped Cases'];
+      expect(grouped.A2.v).toBe('Region');
+      expect(grouped.A3.v).toBe('owner: Ops-A (2)');
+      expect(grouped.A4.v).toBe('North');
+      expect(grouped.A6.v).toBe('owner: Ops-B (1)');
+
+      const matrix = workbook.Sheets['Region Status Matrix'];
+      expect(matrix.A2.v).toBe('region \\ status');
+      expect(matrix.B2.v).toBe('Closed');
+      expect(matrix.C2.v).toBe('Open');
+      expect(matrix.B3.v).toBe(3);
+      expect(matrix.C3.v).toBe(12);
+      expect(matrix.A5.v).toBe('Total');
+      expect(matrix.D5.v).toBe(24);
+
+      expect(workbook.Sheets['Open Case Total'].B3.v).toBe(24);
+      expect(workbook.Sheets['Executive Summary'].A2.v).toBe('Operations summary line one');
+      expect(workbook.Sheets['Status Chart'].A3.v).toBe('Closed');
+      expect(workbook.Sheets['Status Chart'].B4.v).toBe(21);
+      expect(workbook.Sheets['Report Text'].A2.v).toBe('Page Header');
+      expect(workbook.Sheets['Report Text'].B3.v).toBe('OPS-2026-EXPORT');
+      expect(workbook.Sheets['Report Text'].B4.v).toBe('CONFIDENTIAL');
+      expect(workbook.Sheets['Report Text'].B5.v).toBe('Operations Footer');
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
+
+  test('RPT-OP-10: Export PDF includes non-table semantic content', async ({ page }, testInfo) => {
+    const { pid, title } = await createReportNonTableExportPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const pdfBtn = page.getByRole('button', { name: /export pdf/i });
+      await expect(pdfBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/pdf') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
+      await pdfBtn.click();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `PDF export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(exportResponse.headers()['content-type']).toContain('application/pdf');
+      expect(download.suggestedFilename()).toBe(`${title}.pdf`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const bytes = await readFile(savedPath);
+      const pdfText = bytes.toString('latin1');
+      const pdfContentText = extractPdfContentText(bytes);
+      expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      expect(bytes.length).toBeGreaterThan(1_000);
+      expect(pdfText).toContain('/Type /Page');
+      expect(pdfContentText).toContain('OPS-2026-EXPORT');
+      expect(pdfContentText).toContain('CONFIDENTIAL');
     } finally {
       await page.request.delete(`/api/pages/${pid}`).catch(() => {});
     }

@@ -150,14 +150,22 @@ public class ReportExportServiceImpl implements ReportExportService {
             String blockType = stringValue(block.get("blockType"), "");
             String blockTitle = stringValue(block.get("title"), blockType.isBlank() ? "Block" : blockType);
             switch (blockType) {
-                case "table", "grouped-table", "cross-tab" -> {
+                case "table" -> {
                     appendTablePdfLines(lines, block, dataSets, blockTitle);
+                    renderedBlocks++;
+                }
+                case "grouped-table" -> {
+                    appendGroupedTablePdfLines(lines, block, dataSets, blockTitle);
+                    renderedBlocks++;
+                }
+                case "cross-tab" -> {
+                    appendCrossTabPdfLines(lines, block, dataSets, blockTitle);
                     renderedBlocks++;
                 }
                 case "stat-card" -> {
                     lines.add(PdfLine.subheading(blockTitle));
                     lines.add(PdfLine.text(stringValue(block.get("label"), blockTitle) + ": "
-                            + aggregateStat(block, rowsForBlock(block, dataSets))));
+                            + formatExportValue(aggregateStat(block, rowsForBlock(block, dataSets)))));
                     renderedBlocks++;
                 }
                 case "rich-text" -> {
@@ -170,8 +178,19 @@ public class ReportExportServiceImpl implements ReportExportService {
                     }
                     renderedBlocks++;
                 }
+                case "chart" -> {
+                    appendChartPdfLines(lines, block, dataSets, blockTitle);
+                    renderedBlocks++;
+                }
+                case "barcode", "watermark", "page-header", "page-footer" -> {
+                    ReportTextArtifact artifact = textArtifactForBlock(block, dataSets);
+                    if (artifact != null) {
+                        lines.add(PdfLine.text(artifact.label() + ": " + artifact.value()));
+                        renderedBlocks++;
+                    }
+                }
                 default -> {
-                    // Visual-only blocks need richer PDF semantics; keep them out of this DONE scope.
+                    // Unknown visual blocks need richer export semantics before they can be claimed as DONE.
                 }
             }
         }
@@ -198,9 +217,101 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
         for (Map<String, Object> row : rows) {
             List<String> values = columns.stream()
-                    .map(column -> stringValue(row.get(column.field()), ""))
+                    .map(column -> formatExportValue(row.get(column.field())))
                     .toList();
             lines.add(PdfLine.text(values));
+        }
+    }
+
+    private void appendGroupedTablePdfLines(List<PdfLine> lines,
+                                            Map<String, Object> block,
+                                            Map<String, List<Map<String, Object>>> dataSets,
+                                            String blockTitle) {
+        lines.add(PdfLine.subheading(blockTitle));
+        List<Map<String, Object>> rows = rowsForBlock(block, dataSets);
+        List<ReportColumn> columns = resolveColumns(block, rows);
+        if (!columns.isEmpty() && !Boolean.FALSE.equals(block.get("showHeader"))) {
+            lines.add(PdfLine.text(columns.stream().map(ReportColumn::label).toList()));
+        }
+        if (rows.isEmpty()) {
+            lines.add(PdfLine.text("No data rows"));
+            return;
+        }
+
+        String groupByField = stringValue(block.get("groupByField"), "");
+        if (!StringUtils.hasText(groupByField)) {
+            appendTablePdfLines(lines, block, dataSets, blockTitle);
+            return;
+        }
+
+        for (Map.Entry<String, List<Map<String, Object>>> group : groupRows(rows, groupByField).entrySet()) {
+            lines.add(PdfLine.text(groupByField + ": " + group.getKey() + " (" + group.getValue().size() + ")"));
+            for (Map<String, Object> row : group.getValue()) {
+                List<String> values = columns.stream()
+                        .map(column -> formatExportValue(row.get(column.field())))
+                        .toList();
+                lines.add(PdfLine.text(values));
+            }
+        }
+    }
+
+    private void appendCrossTabPdfLines(List<PdfLine> lines,
+                                        Map<String, Object> block,
+                                        Map<String, List<Map<String, Object>>> dataSets,
+                                        String blockTitle) {
+        lines.add(PdfLine.subheading(blockTitle));
+        CrossTabProjection projection = crossTabProjection(block, rowsForBlock(block, dataSets));
+        if (projection.rows().isEmpty() || projection.columns().isEmpty()) {
+            lines.add(PdfLine.text("No data rows"));
+            return;
+        }
+
+        List<String> header = new ArrayList<>();
+        header.add(projection.rowField() + " \\ " + projection.columnField());
+        header.addAll(projection.columns());
+        if (projection.showRowTotal()) {
+            header.add("Total");
+        }
+        lines.add(PdfLine.text(header));
+
+        for (String rowKey : projection.rows()) {
+            List<String> values = new ArrayList<>();
+            values.add(rowKey);
+            for (String columnKey : projection.columns()) {
+                values.add(formatExportValue(projection.value(rowKey, columnKey)));
+            }
+            if (projection.showRowTotal()) {
+                values.add(formatExportValue(projection.rowTotal(rowKey)));
+            }
+            lines.add(PdfLine.text(values));
+        }
+
+        if (projection.showColumnTotal()) {
+            List<String> values = new ArrayList<>();
+            values.add("Total");
+            for (String columnKey : projection.columns()) {
+                values.add(formatExportValue(projection.columnTotal(columnKey)));
+            }
+            if (projection.showRowTotal()) {
+                values.add(formatExportValue(projection.grandTotal()));
+            }
+            lines.add(PdfLine.text(values));
+        }
+    }
+
+    private void appendChartPdfLines(List<PdfLine> lines,
+                                     Map<String, Object> block,
+                                     Map<String, List<Map<String, Object>>> dataSets,
+                                     String blockTitle) {
+        lines.add(PdfLine.subheading(blockTitle));
+        List<ReportMetric> metrics = aggregateChartMetrics(block, rowsForBlock(block, dataSets));
+        if (metrics.isEmpty()) {
+            lines.add(PdfLine.text("No chart data"));
+            return;
+        }
+        lines.add(PdfLine.text(List.of("Category", "Value")));
+        for (ReportMetric metric : metrics) {
+            lines.add(PdfLine.text(List.of(metric.label(), formatExportValue(metric.value()))));
         }
     }
 
@@ -281,6 +392,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
 
         int renderedBlocks = 0;
+        List<ReportTextArtifact> textArtifacts = new ArrayList<>();
         for (Object blockObject : body) {
             if (!(blockObject instanceof Map<?, ?> rawBlock)) {
                 continue;
@@ -288,18 +400,44 @@ public class ReportExportServiceImpl implements ReportExportService {
             Map<String, Object> block = (Map<String, Object>) rawBlock;
             String blockType = stringValue(block.get("blockType"), "");
             switch (blockType) {
-                case "table", "grouped-table", "cross-tab" -> {
+                case "table" -> {
                     writeTableSheet(workbook, block, dataSets, titleStyle, headerStyle);
+                    renderedBlocks++;
+                }
+                case "grouped-table" -> {
+                    writeGroupedTableSheet(workbook, block, dataSets, titleStyle, headerStyle);
+                    renderedBlocks++;
+                }
+                case "cross-tab" -> {
+                    writeCrossTabSheet(workbook, block, dataSets, titleStyle, headerStyle);
                     renderedBlocks++;
                 }
                 case "stat-card" -> {
                     writeStatCardSheet(workbook, block, dataSets, titleStyle, headerStyle);
                     renderedBlocks++;
                 }
+                case "rich-text" -> {
+                    writeRichTextSheet(workbook, block, titleStyle);
+                    renderedBlocks++;
+                }
+                case "chart" -> {
+                    writeChartSheet(workbook, block, dataSets, titleStyle, headerStyle);
+                    renderedBlocks++;
+                }
+                case "barcode", "watermark", "page-header", "page-footer" -> {
+                    ReportTextArtifact artifact = textArtifactForBlock(block, dataSets);
+                    if (artifact != null) {
+                        textArtifacts.add(artifact);
+                    }
+                }
                 default -> {
-                    // Non-tabular visual blocks do not have a meaningful Excel projection yet.
+                    // Unknown visual blocks need richer export semantics before they can be claimed as DONE.
                 }
             }
+        }
+        if (!textArtifacts.isEmpty()) {
+            writeTextArtifactsSheet(workbook, textArtifacts, titleStyle);
+            renderedBlocks++;
         }
         return renderedBlocks;
     }
@@ -373,6 +511,125 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
     }
 
+    private void writeGroupedTableSheet(Workbook workbook,
+                                        Map<String, Object> block,
+                                        Map<String, List<Map<String, Object>>> dataSets,
+                                        CellStyle titleStyle,
+                                        CellStyle headerStyle) {
+        String title = stringValue(block.get("title"), "Grouped Table");
+        List<Map<String, Object>> rows = rowsForBlock(block, dataSets);
+        List<ReportColumn> columns = resolveColumns(block, rows);
+        String groupByField = stringValue(block.get("groupByField"), "");
+        if (!StringUtils.hasText(groupByField)) {
+            writeTableSheet(workbook, block, dataSets, titleStyle, headerStyle);
+            return;
+        }
+
+        Sheet sheet = workbook.createSheet(uniqueSheetName(workbook, title));
+        int rowIndex = 0;
+        Row titleRow = sheet.createRow(rowIndex++);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue(title);
+        titleCell.setCellStyle(titleStyle);
+
+        if (!Boolean.FALSE.equals(block.get("showHeader")) && !columns.isEmpty()) {
+            Row headerRow = sheet.createRow(rowIndex++);
+            for (int i = 0; i < columns.size(); i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(columns.get(i).label());
+                cell.setCellStyle(headerStyle);
+            }
+        }
+
+        if (rows.isEmpty()) {
+            sheet.createRow(rowIndex).createCell(0).setCellValue("No data rows");
+        } else {
+            for (Map.Entry<String, List<Map<String, Object>>> group : groupRows(rows, groupByField).entrySet()) {
+                Row groupRow = sheet.createRow(rowIndex++);
+                Cell groupCell = groupRow.createCell(0);
+                groupCell.setCellValue(groupByField + ": " + group.getKey() + " (" + group.getValue().size() + ")");
+                groupCell.setCellStyle(headerStyle);
+
+                for (Map<String, Object> rowData : group.getValue()) {
+                    Row row = sheet.createRow(rowIndex++);
+                    for (int i = 0; i < columns.size(); i++) {
+                        writeCell(row.createCell(i), rowData.get(columns.get(i).field()));
+                    }
+                }
+            }
+        }
+
+        for (int i = 0; i < Math.max(columns.size(), 1); i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+
+    private void writeCrossTabSheet(Workbook workbook,
+                                    Map<String, Object> block,
+                                    Map<String, List<Map<String, Object>>> dataSets,
+                                    CellStyle titleStyle,
+                                    CellStyle headerStyle) {
+        String title = stringValue(block.get("title"), "Cross Tab");
+        CrossTabProjection projection = crossTabProjection(block, rowsForBlock(block, dataSets));
+        Sheet sheet = workbook.createSheet(uniqueSheetName(workbook, title));
+        int rowIndex = 0;
+
+        Row titleRow = sheet.createRow(rowIndex++);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue(title);
+        titleCell.setCellStyle(titleStyle);
+
+        if (projection.rows().isEmpty() || projection.columns().isEmpty()) {
+            sheet.createRow(rowIndex).createCell(0).setCellValue("No data rows");
+            sheet.autoSizeColumn(0);
+            return;
+        }
+
+        Row headerRow = sheet.createRow(rowIndex++);
+        Cell firstHeaderCell = headerRow.createCell(0);
+        firstHeaderCell.setCellValue(projection.rowField() + " \\ " + projection.columnField());
+        firstHeaderCell.setCellStyle(headerStyle);
+        for (int i = 0; i < projection.columns().size(); i++) {
+            Cell cell = headerRow.createCell(i + 1);
+            cell.setCellValue(projection.columns().get(i));
+            cell.setCellStyle(headerStyle);
+        }
+        if (projection.showRowTotal()) {
+            Cell totalCell = headerRow.createCell(projection.columns().size() + 1);
+            totalCell.setCellValue("Total");
+            totalCell.setCellStyle(headerStyle);
+        }
+
+        for (String rowKey : projection.rows()) {
+            Row row = sheet.createRow(rowIndex++);
+            row.createCell(0).setCellValue(rowKey);
+            for (int i = 0; i < projection.columns().size(); i++) {
+                writeCell(row.createCell(i + 1), projection.value(rowKey, projection.columns().get(i)));
+            }
+            if (projection.showRowTotal()) {
+                writeCell(row.createCell(projection.columns().size() + 1), projection.rowTotal(rowKey));
+            }
+        }
+
+        if (projection.showColumnTotal()) {
+            Row totalRow = sheet.createRow(rowIndex);
+            Cell labelCell = totalRow.createCell(0);
+            labelCell.setCellValue("Total");
+            labelCell.setCellStyle(headerStyle);
+            for (int i = 0; i < projection.columns().size(); i++) {
+                writeCell(totalRow.createCell(i + 1), projection.columnTotal(projection.columns().get(i)));
+            }
+            if (projection.showRowTotal()) {
+                writeCell(totalRow.createCell(projection.columns().size() + 1), projection.grandTotal());
+            }
+        }
+
+        int columnCount = projection.columns().size() + (projection.showRowTotal() ? 2 : 1);
+        for (int i = 0; i < columnCount; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+
     private void writeStatCardSheet(Workbook workbook,
                                     Map<String, Object> block,
                                     Map<String, List<Map<String, Object>>> dataSets,
@@ -397,6 +654,81 @@ public class ReportExportServiceImpl implements ReportExportService {
         Row valueRow = sheet.createRow(2);
         valueRow.createCell(0).setCellValue(stringValue(block.get("label"), title));
         writeCell(valueRow.createCell(1), aggregateStat(block, rowsForBlock(block, dataSets)));
+        sheet.autoSizeColumn(0);
+        sheet.autoSizeColumn(1);
+    }
+
+    private void writeRichTextSheet(Workbook workbook, Map<String, Object> block, CellStyle titleStyle) {
+        String title = stringValue(block.get("title"), "Rich Text");
+        Sheet sheet = workbook.createSheet(uniqueSheetName(workbook, title));
+        Row titleRow = sheet.createRow(0);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue(title);
+        titleCell.setCellStyle(titleStyle);
+
+        String content = stringValue(block.get("content"), "");
+        int rowIndex = 1;
+        for (String paragraph : content.split("\\R")) {
+            if (StringUtils.hasText(paragraph)) {
+                sheet.createRow(rowIndex++).createCell(0).setCellValue(paragraph);
+            }
+        }
+        if (rowIndex == 1) {
+            sheet.createRow(rowIndex).createCell(0).setCellValue("No rich text content");
+        }
+        sheet.autoSizeColumn(0);
+    }
+
+    private void writeChartSheet(Workbook workbook,
+                                 Map<String, Object> block,
+                                 Map<String, List<Map<String, Object>>> dataSets,
+                                 CellStyle titleStyle,
+                                 CellStyle headerStyle) {
+        String title = stringValue(block.get("title"), "Chart Data");
+        Sheet sheet = workbook.createSheet(uniqueSheetName(workbook, title));
+        Row titleRow = sheet.createRow(0);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue(title);
+        titleCell.setCellStyle(titleStyle);
+
+        Row headerRow = sheet.createRow(1);
+        Cell categoryHeader = headerRow.createCell(0);
+        categoryHeader.setCellValue("Category");
+        categoryHeader.setCellStyle(headerStyle);
+        Cell valueHeader = headerRow.createCell(1);
+        valueHeader.setCellValue("Value");
+        valueHeader.setCellStyle(headerStyle);
+
+        List<ReportMetric> metrics = aggregateChartMetrics(block, rowsForBlock(block, dataSets));
+        if (metrics.isEmpty()) {
+            sheet.createRow(2).createCell(0).setCellValue("No chart data");
+        } else {
+            int rowIndex = 2;
+            for (ReportMetric metric : metrics) {
+                Row row = sheet.createRow(rowIndex++);
+                row.createCell(0).setCellValue(metric.label());
+                writeCell(row.createCell(1), metric.value());
+            }
+        }
+        sheet.autoSizeColumn(0);
+        sheet.autoSizeColumn(1);
+    }
+
+    private void writeTextArtifactsSheet(Workbook workbook,
+                                         List<ReportTextArtifact> artifacts,
+                                         CellStyle titleStyle) {
+        Sheet sheet = workbook.createSheet(uniqueSheetName(workbook, "Report Text"));
+        Row titleRow = sheet.createRow(0);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue("Report Text");
+        titleCell.setCellStyle(titleStyle);
+
+        for (int i = 0; i < artifacts.size(); i++) {
+            ReportTextArtifact artifact = artifacts.get(i);
+            Row row = sheet.createRow(i + 1);
+            row.createCell(0).setCellValue(artifact.label());
+            row.createCell(1).setCellValue(artifact.value());
+        }
         sheet.autoSizeColumn(0);
         sheet.autoSizeColumn(1);
     }
@@ -426,6 +758,81 @@ public class ReportExportServiceImpl implements ReportExportService {
             columns.add(new ReportColumn(field, field));
         }
         return columns;
+    }
+
+    private Map<String, List<Map<String, Object>>> groupRows(List<Map<String, Object>> rows, String groupByField) {
+        Map<String, List<Map<String, Object>>> groups = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            String groupKey = stringValue(row.get(groupByField), "Other");
+            groups.computeIfAbsent(groupKey, ignored -> new ArrayList<>()).add(row);
+        }
+        return groups;
+    }
+
+    private CrossTabProjection crossTabProjection(Map<String, Object> block, List<Map<String, Object>> rows) {
+        String rowField = stringValue(block.get("rowField"), "Row");
+        String columnField = stringValue(block.get("columnField"), "Column");
+        String valueField = stringValue(block.get("valueField"), "");
+        String aggregation = stringValue(block.get("aggregation"), "sum").toLowerCase(Locale.ROOT);
+        boolean showRowTotal = !Boolean.FALSE.equals(block.get("showRowTotal"));
+        boolean showColumnTotal = !Boolean.FALSE.equals(block.get("showColumnTotal"));
+
+        Set<String> rowKeys = new LinkedHashSet<>();
+        Set<String> columnKeys = new LinkedHashSet<>();
+        Map<String, List<Double>> values = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            String rowKey = stringValue(row.get(rowField), "Other");
+            String columnKey = stringValue(row.get(columnField), "Other");
+            Object rawValue = row.get(valueField);
+            double value = rawValue instanceof Number number ? number.doubleValue() : 0d;
+            rowKeys.add(rowKey);
+            columnKeys.add(columnKey);
+            values.computeIfAbsent(rowKey + "\u0000" + columnKey, ignored -> new ArrayList<>()).add(value);
+        }
+
+        List<String> sortedRows = rowKeys.stream().sorted().toList();
+        List<String> sortedColumns = columnKeys.stream().sorted().toList();
+        Map<String, Double> aggregated = new HashMap<>();
+        for (Map.Entry<String, List<Double>> entry : values.entrySet()) {
+            aggregated.put(entry.getKey(), aggregateNumbers(entry.getValue(), aggregation));
+        }
+        return new CrossTabProjection(rowField, columnField, sortedRows, sortedColumns,
+                aggregated, showRowTotal, showColumnTotal);
+    }
+
+    private List<ReportMetric> aggregateChartMetrics(Map<String, Object> block, List<Map<String, Object>> rows) {
+        String categoryField = stringValue(block.get("categoryField"), "");
+        String valueField = stringValue(block.get("valueField"), "");
+        String aggregation = stringValue(block.get("aggregation"), "sum").toLowerCase(Locale.ROOT);
+        if (!StringUtils.hasText(categoryField)) {
+            return List.of();
+        }
+
+        Map<String, List<Double>> grouped = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            String category = stringValue(row.get(categoryField), "Other");
+            Object rawValue = row.get(valueField);
+            double value = rawValue instanceof Number number ? number.doubleValue() : 0d;
+            grouped.computeIfAbsent(category, ignored -> new ArrayList<>()).add(value);
+        }
+
+        return grouped.entrySet().stream()
+                .map(entry -> new ReportMetric(entry.getKey(), aggregateNumbers(entry.getValue(), aggregation)))
+                .sorted((left, right) -> left.label().compareTo(right.label()))
+                .toList();
+    }
+
+    private double aggregateNumbers(List<Double> values, String aggregation) {
+        if (values.isEmpty()) {
+            return 0d;
+        }
+        return switch (aggregation) {
+            case "avg" -> values.stream().mapToDouble(Double::doubleValue).average().orElse(0d);
+            case "count" -> values.size();
+            case "min" -> values.stream().mapToDouble(Double::doubleValue).min().orElse(0d);
+            case "max" -> values.stream().mapToDouble(Double::doubleValue).max().orElse(0d);
+            default -> values.stream().mapToDouble(Double::doubleValue).sum();
+        };
     }
 
     private List<Map<String, Object>> rowsForBlock(Map<String, Object> block,
@@ -460,6 +867,43 @@ public class ReportExportServiceImpl implements ReportExportService {
             case "max" -> values.stream().mapToDouble(Double::doubleValue).max().orElse(0);
             default -> values.stream().mapToDouble(Double::doubleValue).sum();
         };
+    }
+
+    private ReportTextArtifact textArtifactForBlock(Map<String, Object> block,
+                                                    Map<String, List<Map<String, Object>>> dataSets) {
+        String blockType = stringValue(block.get("blockType"), "");
+        String label = switch (blockType) {
+            case "page-header" -> "Page Header";
+            case "page-footer" -> "Page Footer";
+            case "watermark" -> "Watermark";
+            case "barcode" -> "Barcode";
+            default -> "";
+        };
+        if (!StringUtils.hasText(label)) {
+            return null;
+        }
+
+        String value = switch (blockType) {
+            case "barcode" -> resolveBarcodeValue(block, rowsForBlock(block, dataSets));
+            case "watermark" -> stringValue(block.get("text"), "");
+            default -> stringValue(firstPresent(block, "content", "text", "title"), "");
+        };
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return new ReportTextArtifact(label, value);
+    }
+
+    private String resolveBarcodeValue(Map<String, Object> block, List<Map<String, Object>> rows) {
+        String staticValue = stringValue(block.get("staticValue"), "");
+        if (StringUtils.hasText(staticValue)) {
+            return staticValue;
+        }
+        String field = stringValue(block.get("field"), "");
+        if (!StringUtils.hasText(field) || rows.isEmpty()) {
+            return "";
+        }
+        return stringValue(rows.get(0).get(field), "");
     }
 
     private List<Map<String, Object>> normalizeRows(Object rowsObject) {
@@ -539,6 +983,17 @@ public class ReportExportServiceImpl implements ReportExportService {
         return text.isEmpty() ? fallback : text;
     }
 
+    private String formatExportValue(Object value) {
+        if (value instanceof Number number) {
+            double doubleValue = number.doubleValue();
+            if (Math.rint(doubleValue) == doubleValue) {
+                return Long.toString(Math.round(doubleValue));
+            }
+            return Double.toString(doubleValue);
+        }
+        return stringValue(value, "");
+    }
+
     private String uniqueSheetName(Workbook workbook, String preferredName) {
         String baseName = WorkbookUtil.createSafeSheetName(stringValue(preferredName, "Report"));
         if (baseName.length() > 31) {
@@ -560,6 +1015,36 @@ public class ReportExportServiceImpl implements ReportExportService {
     }
 
     private record ReportColumn(String field, String label) {
+    }
+
+    private record ReportMetric(String label, double value) {
+    }
+
+    private record ReportTextArtifact(String label, String value) {
+    }
+
+    private record CrossTabProjection(String rowField,
+                                      String columnField,
+                                      List<String> rows,
+                                      List<String> columns,
+                                      Map<String, Double> values,
+                                      boolean showRowTotal,
+                                      boolean showColumnTotal) {
+        double value(String rowKey, String columnKey) {
+            return values.getOrDefault(rowKey + "\u0000" + columnKey, 0d);
+        }
+
+        double rowTotal(String rowKey) {
+            return columns.stream().mapToDouble(columnKey -> value(rowKey, columnKey)).sum();
+        }
+
+        double columnTotal(String columnKey) {
+            return rows.stream().mapToDouble(rowKey -> value(rowKey, columnKey)).sum();
+        }
+
+        double grandTotal() {
+            return rows.stream().mapToDouble(this::rowTotal).sum();
+        }
     }
 
     private record PdfLine(String text, boolean bold, float fontSize, float lineHeight) {
