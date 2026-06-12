@@ -1,7 +1,7 @@
 /**
  * Dashboard Widget Types E2E Tests
  *
- * Tests DW-001 to DW-036: Verify each widget type renders in the dashboard designer.
+ * Tests DW-001 to DW-050: Verify each widget type renders in the dashboard designer.
  * - Number card, bar, line, pie, area, funnel, scatter, radar, table chart
  * - Word cloud, combo chart, NPS, gallery, kanban (new)
  * - Widget palette categories and counts
@@ -14,12 +14,37 @@
  * @since 6.3.0
  */
 
+import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { DashboardDesignerPage } from '../../pages';
 
 interface WidgetMatrixRow {
   label: string;
   type: string;
+}
+
+type PropertyEditKind = 'text' | 'number' | 'checkbox' | 'select';
+
+interface WidgetPropertyEdit {
+  key: string;
+  kind: PropertyEditKind;
+  value: string | number | boolean;
+}
+
+interface WidgetPayloadCase extends WidgetMatrixRow {
+  testCode: string;
+  expectedTitle?: string;
+  size: {
+    w: number;
+    h: number;
+    minW: number;
+    minH: number;
+    maxW?: number;
+    maxH?: number;
+  };
+  dataSource: Record<string, unknown>;
+  edit: WidgetPropertyEdit;
+  expectedConfig: Record<string, unknown>;
 }
 
 const BASE_WIDGETS: WidgetMatrixRow[] = [
@@ -43,11 +68,129 @@ const EXTENDED_WIDGETS: WidgetMatrixRow[] = [
   { label: '看板', type: 'smart-kanban' },
 ];
 
+const PAYLOAD_MATRIX_STATIC_ROWS = [
+  { category: 'alpha', value: 3 },
+  { category: 'beta', value: 5 },
+];
+
+const STATIC_PAYLOAD_DATA_SOURCE = {
+  type: 'static',
+  staticData: PAYLOAD_MATRIX_STATIC_ROWS,
+};
+
+const SAVED_PAYLOAD_WIDGETS: WidgetPayloadCase[] = [
+  {
+    testCode: 'DW-038',
+    ...BASE_WIDGETS[0],
+    size: { w: 3, h: 2, minW: 2, minH: 2, maxW: 6, maxH: 4 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.suffix', kind: 'text', value: '件' },
+    expectedConfig: { visualization: { suffix: '件' } },
+  },
+  {
+    testCode: 'DW-039',
+    ...BASE_WIDGETS[1],
+    size: { w: 6, h: 4, minW: 4, minH: 3 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.horizontal', kind: 'checkbox', value: true },
+    expectedConfig: { visualization: { horizontal: true } },
+  },
+  {
+    testCode: 'DW-040',
+    ...BASE_WIDGETS[2],
+    size: { w: 6, h: 4, minW: 4, minH: 3 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.showArea', kind: 'checkbox', value: true },
+    expectedConfig: { visualization: { showArea: true } },
+  },
+  {
+    testCode: 'DW-041',
+    ...BASE_WIDGETS[3],
+    size: { w: 4, h: 4, minW: 3, minH: 3 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.donut', kind: 'checkbox', value: true },
+    expectedConfig: { visualization: { donut: true } },
+  },
+  {
+    testCode: 'DW-042',
+    ...EXTENDED_WIDGETS[5],
+    size: { w: 4, h: 4, minW: 3, minH: 3 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.sort', kind: 'select', value: 'ascending' },
+    expectedConfig: { visualization: { sort: 'ascending' } },
+  },
+  {
+    testCode: 'DW-043',
+    ...EXTENDED_WIDGETS[6],
+    size: { w: 6, h: 4, minW: 4, minH: 3 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.bubbleMode', kind: 'checkbox', value: true },
+    expectedConfig: { visualization: { bubbleMode: true } },
+  },
+  {
+    testCode: 'DW-044',
+    ...EXTENDED_WIDGETS[7],
+    size: { w: 4, h: 4, minW: 4, minH: 4 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.shape', kind: 'select', value: 'circle' },
+    expectedConfig: { visualization: { shape: 'circle' } },
+  },
+  {
+    testCode: 'DW-045',
+    ...EXTENDED_WIDGETS[8],
+    size: { w: 6, h: 4, minW: 4, minH: 3 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.pageSize', kind: 'number', value: 25 },
+    expectedConfig: { visualization: { pageSize: 25 } },
+  },
+  {
+    testCode: 'DW-046',
+    ...EXTENDED_WIDGETS[9],
+    size: { w: 6, h: 4, minW: 4, minH: 3, maxW: 12, maxH: 8 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.colorTheme', kind: 'select', value: 'brand' },
+    expectedConfig: { visualization: { colorTheme: 'brand' } },
+  },
+  {
+    testCode: 'DW-047',
+    ...EXTENDED_WIDGETS[10],
+    size: { w: 8, h: 5, minW: 6, minH: 4, maxW: 12, maxH: 8 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.yAxisLeft.name', kind: 'text', value: 'Revenue' },
+    expectedConfig: { visualization: { yAxisLeft: { name: 'Revenue' } } },
+  },
+  {
+    testCode: 'DW-048',
+    ...EXTENDED_WIDGETS[11],
+    expectedTitle: 'NPS',
+    size: { w: 4, h: 4, minW: 3, minH: 3, maxW: 8, maxH: 8 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.ringWidth', kind: 'number', value: 42 },
+    expectedConfig: { visualization: { ringWidth: 42 } },
+  },
+  {
+    testCode: 'DW-049',
+    ...EXTENDED_WIDGETS[12],
+    size: { w: 8, h: 5, minW: 4, minH: 3, maxW: 12, maxH: 10 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.columns', kind: 'select', value: '4' },
+    expectedConfig: { visualization: { columns: '4' } },
+  },
+  {
+    testCode: 'DW-050',
+    ...EXTENDED_WIDGETS[13],
+    size: { w: 12, h: 6, minW: 6, minH: 4, maxW: 12, maxH: 10 },
+    dataSource: STATIC_PAYLOAD_DATA_SOURCE,
+    edit: { key: 'visualization.groupField', kind: 'text', value: 'stage' },
+    expectedConfig: { visualization: { groupField: 'stage' } },
+  },
+];
+
 /**
  * Navigate to dashboard designer and verify it loaded.
  */
 async function ensureDesignerLoaded(
-  page: import('@playwright/test').Page,
+  page: Page,
   designerPage: DashboardDesignerPage,
 ): Promise<boolean> {
   try {
@@ -91,7 +234,7 @@ async function expectWidgetAdded(
 }
 
 async function saveDashboardAndReadBack(
-  page: import('@playwright/test').Page,
+  page: Page,
   designer: DashboardDesignerPage,
 ): Promise<Record<string, any>> {
   const saveResponsePromise = page.waitForResponse((response) => {
@@ -113,6 +256,54 @@ async function saveDashboardAndReadBack(
   expect(getResponse.ok(), `dashboard readback failed: ${getResponse.status()}`).toBeTruthy();
   const readBody = await getResponse.json();
   return readBody.data;
+}
+
+function widgetPropertyTestId(key: string): string {
+  return `widget-prop-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+}
+
+async function setWidgetProperty(page: Page, edit: WidgetPropertyEdit): Promise<void> {
+  const field = page.getByTestId(widgetPropertyTestId(edit.key));
+  await expect(field).toBeVisible({ timeout: 5000 });
+
+  switch (edit.kind) {
+    case 'checkbox':
+      await field.setChecked(Boolean(edit.value));
+      if (edit.value) {
+        await expect(field).toBeChecked();
+      } else {
+        await expect(field).not.toBeChecked();
+      }
+      break;
+    case 'number':
+      await field.fill(String(edit.value));
+      await expect(field).toHaveValue(String(edit.value));
+      break;
+    case 'select':
+      await field.selectOption(String(edit.value));
+      await expect(field).toHaveValue(String(edit.value));
+      break;
+    case 'text':
+      await field.fill(String(edit.value));
+      await expect(field).toHaveValue(String(edit.value));
+      break;
+  }
+}
+
+async function setStaticDataSource(
+  page: Page,
+  rows: Record<string, unknown>[] = PAYLOAD_MATRIX_STATIC_ROWS,
+): Promise<void> {
+  await page.getByTestId('dashboard-datasource-type-select').selectOption('static');
+  await page
+    .getByTestId('dashboard-datasource-static-json')
+    .fill(JSON.stringify(rows, null, 2));
+}
+
+function expectWidgetLayout(widget: Record<string, any>, size: WidgetPayloadCase['size']): void {
+  for (const [key, value] of Object.entries(size)) {
+    expect(widget[key], `widget ${key}`).toBe(value);
+  }
 }
 
 test.describe('Dashboard Widget Types — Palette Verification', () => {
@@ -712,9 +903,9 @@ test.describe('Dashboard Widget Types — Property Panel', () => {
 
 test.describe('Dashboard Widget Types — Saved Payload', () => {
   /**
-   * DW-037: UI-added widget persists exact type/componentType and registry defaults
+   * DW-037: UI-added widget persists exact type/componentType, data source, and edited properties
    */
-  test('DW-037: Area Chart saves exact widget payload and default visualization', async ({
+  test('DW-037: Area Chart saves static data source and visualization property', async ({
     page,
   }) => {
     const designer = new DashboardDesignerPage(page);
@@ -729,10 +920,12 @@ test.describe('Dashboard Widget Types — Saved Payload', () => {
     ];
 
     await expectWidgetAdded(designer, BASE_WIDGETS[4]);
-    await page.getByTestId('dashboard-datasource-type-select').selectOption('static');
-    await page
-      .getByTestId('dashboard-datasource-static-json')
-      .fill(JSON.stringify(staticRows, null, 2));
+    await setStaticDataSource(page, staticRows);
+    await setWidgetProperty(page, {
+      key: 'visualization.fillOpacity',
+      kind: 'number',
+      value: 0.75,
+    });
 
     const dashboard = await saveDashboardAndReadBack(page, designer);
     expect(dashboard.widgets).toHaveLength(1);
@@ -752,10 +945,39 @@ test.describe('Dashboard Widget Types — Saved Payload', () => {
       },
       visualization: {
         smooth: true,
-        fillOpacity: 0.6,
+        fillOpacity: 0.75,
       },
     });
   });
+
+  for (const widgetCase of SAVED_PAYLOAD_WIDGETS) {
+    test(`${widgetCase.testCode}: ${widgetCase.type} saves edited property payload`, async ({
+      page,
+    }) => {
+      const designer = new DashboardDesignerPage(page);
+      const loaded = await ensureDesignerLoaded(page, designer);
+      if (!loaded) {
+        throw new Error('Designer not available');
+      }
+
+      await expectWidgetAdded(designer, widgetCase);
+      await setStaticDataSource(page);
+      await setWidgetProperty(page, widgetCase.edit);
+
+      const dashboard = await saveDashboardAndReadBack(page, designer);
+      expect(dashboard.widgets).toHaveLength(1);
+
+      const widget = dashboard.widgets[0];
+      expect(widget.type).toBe(widgetCase.type);
+      expect(widget.componentType).toBe(widgetCase.type);
+      expectWidgetLayout(widget, widgetCase.size);
+      expect(widget.config).toMatchObject({
+        title: widgetCase.expectedTitle || widgetCase.label,
+        dataSource: widgetCase.dataSource,
+        ...widgetCase.expectedConfig,
+      });
+    });
+  }
 });
 
 test.describe('Dashboard Widget Types — Categories & Counts', () => {

@@ -32,11 +32,14 @@ const PropertyField: React.FC<{
   value: unknown;
   onChange: (value: unknown) => void;
 }> = ({ schema, value, onChange }) => {
+  const fieldTestId = `widget-prop-${schema.key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+
   const renderField = () => {
     switch (schema.type) {
       case 'text':
         return (
           <input
+            data-testid={fieldTestId}
             type="text"
             value={(value as string) || ''}
             onChange={(e) => onChange(e.target.value)}
@@ -48,6 +51,7 @@ const PropertyField: React.FC<{
       case 'number':
         return (
           <input
+            data-testid={fieldTestId}
             type="number"
             value={(value as number) || 0}
             onChange={(e) => onChange(Number(e.target.value))}
@@ -60,6 +64,7 @@ const PropertyField: React.FC<{
         return (
           <label className="flex cursor-pointer items-center gap-2">
             <input
+              data-testid={fieldTestId}
               type="checkbox"
               checked={Boolean(value)}
               onChange={(e) => onChange(e.target.checked)}
@@ -72,6 +77,7 @@ const PropertyField: React.FC<{
       case 'select':
         return (
           <select
+            data-testid={fieldTestId}
             value={(value as string) || (schema.defaultValue as string) || ''}
             onChange={(e) => onChange(e.target.value)}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -98,6 +104,7 @@ const PropertyField: React.FC<{
         // TODO: Implement model selector
         return (
           <input
+            data-testid={fieldTestId}
             type="text"
             value={(value as string) || ''}
             onChange={(e) => onChange(e.target.value)}
@@ -110,6 +117,7 @@ const PropertyField: React.FC<{
         // TODO: Implement named query selector
         return (
           <input
+            data-testid={fieldTestId}
             type="text"
             value={(value as string) || ''}
             onChange={(e) => onChange(e.target.value)}
@@ -121,6 +129,7 @@ const PropertyField: React.FC<{
       case 'json':
         return (
           <textarea
+            data-testid={fieldTestId}
             value={typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
             onChange={(e) => {
               try {
@@ -138,6 +147,7 @@ const PropertyField: React.FC<{
       default:
         return (
           <input
+            data-testid={fieldTestId}
             type="text"
             value={String(value || '')}
             onChange={(e) => onChange(e.target.value)}
