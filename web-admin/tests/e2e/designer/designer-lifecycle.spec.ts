@@ -1,14 +1,18 @@
 /**
  * Designer Lifecycle E2E Tests
  *
- * Tests the complete lifecycle for all 5 designers:
+ * Legacy lifecycle smoke coverage for the remaining designer suites:
  *   1. Component/Block/Widget/Node Add
  *   2. Property Edit
  *   3. Save + API Verify
  *   4. Publish/Deploy/Enable + API Verify
  *   5. Backend Data Verify
  *
- * Each designer has a serial describe block (DL-PD, DL-RPT, DL-DASH, DL-BPMN, DL-AUTO).
+ * BPMN lifecycle coverage moved to tests/e2e/bpm-designer, where the specs
+ * assert designerJson, BPMN XML, and selected SmartEngine runtime behavior
+ * without permission-gated skip wrappers.
+ *
+ * Each remaining designer has a serial describe block (DL-PD, DL-RPT, DL-DASH, DL-AUTO).
  *
  * @since 6.0.0
  */
@@ -422,195 +426,7 @@ test.describe.serial('Dashboard Designer Lifecycle (DL-DASH)', () => {
 });
 
 // ============================================================
-//  4. BPMN Designer (DL-BPMN)
-// ============================================================
-
-test.describe.serial('BPMN Designer Lifecycle (DL-BPMN)', () => {
-  test.setTimeout(60000);
-  const testId = uniqueId('dl_bpmn');
-  const processKey = `dlbpmn_${Date.now()}`;
-  let pid: string;
-  let missingProcessUpdatePermission = false;
-
-  function generateMinimalBpmn(pKey: string, pName: string): string {
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
-             targetNamespace="http://auraboot.com/bpm"
-             id="definitions_${pKey}">
-  <process id="${pKey}" name="${pName}" isExecutable="true">
-    <startEvent id="start"/>
-    <userTask id="userTask1" name="E2E Approval"/>
-    <endEvent id="end"/>
-    <sequenceFlow id="flow1" sourceRef="start" targetRef="userTask1"/>
-    <sequenceFlow id="flow2" sourceRef="userTask1" targetRef="end"/>
-  </process>
-</definitions>`;
-  }
-
-  test('DL-BPMN-01: Node add — create process and verify palette', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
-
-    // Create via API (matching bpm-lifecycle.spec.ts pattern)
-    const resp = await page.request.post('/api/bpm/process-definitions', {
-      data: {
-        processKey,
-        processName: testId,
-        description: 'DL-BPMN lifecycle test',
-        category: 'e2e-test',
-        bpmnContent: generateMinimalBpmn(processKey, testId),
-        designerJson: JSON.stringify({
-          nodes: [
-            {
-              id: 'start',
-              type: 'startEvent',
-              position: { x: 100, y: 200 },
-              data: { type: 'startEvent', label: 'Start' },
-            },
-            {
-              id: 'userTask1',
-              type: 'userTask',
-              position: { x: 300, y: 200 },
-              data: { type: 'userTask', label: 'E2E Approval' },
-            },
-            {
-              id: 'end',
-              type: 'endEvent',
-              position: { x: 500, y: 200 },
-              data: { type: 'endEvent', label: 'End' },
-            },
-          ],
-          edges: [
-            { id: 'flow1', source: 'start', target: 'userTask1', type: 'smoothstep' },
-            { id: 'flow2', source: 'userTask1', target: 'end', type: 'smoothstep' },
-          ],
-        }),
-      },
-    });
-    const body = await resp.json();
-    if (resp.status() === 403 && JSON.stringify(body).includes('bpm.process.update')) {
-      missingProcessUpdatePermission = true;
-      test.skip(true, 'Missing permission: bpm.process.update');
-    }
-    pid = body.data?.pid || body.data?.id;
-    expect(pid, `Create BPMN failed: ${JSON.stringify(body)}`).toBeTruthy();
-
-    await page.goto(`/bpmn-designer?id=${pid}`, { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-testid="bpmn-page-title"]')).toBeVisible({ timeout: 10000 });
-
-    // Palette has 9 draggable nodes
-    const palette = page.locator('[data-testid="bpmn-palette"]');
-    await expect(palette).toBeVisible({ timeout: 5000 });
-    const draggableNodes = palette.locator('[draggable="true"]');
-    expect(await draggableNodes.count()).toBeGreaterThanOrEqual(9);
-
-    // Canvas visible
-    await expect(page.locator('.react-flow')).toBeVisible({ timeout: 5000 });
-  });
-
-  test('DL-BPMN-02: Property edit — click userTask, verify property panel', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
-    await page.goto(`/bpmn-designer?id=${pid}`, { waitUntil: 'domcontentloaded' });
-    await page
-      .locator('[data-testid="bpmn-page-title"]')
-      .waitFor({ state: 'visible', timeout: 10000 });
-
-    const flowNodes = page.locator('.react-flow__node');
-    await flowNodes
-      .first()
-      .waitFor({ state: 'visible', timeout: 8000 })
-      .catch(() => {});
-
-    const userTask = flowNodes.filter({ hasText: /Approval|审批|User Task|用户任务/i }).first();
-    if (await userTask.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await userTask.click();
-      await expect(
-        page.locator('text=/指派人|assignee|审批人|属性|Properties/i').first(),
-      ).toBeVisible({ timeout: 5000 });
-    } else {
-      // Fallback: verify name input editable
-      const nameInput = page.locator('[data-testid="bpmn-field-name"]');
-      await expect(nameInput).toBeVisible({ timeout: 5000 });
-      await nameInput.fill(uniqueId('BPMN_Edit'));
-    }
-  });
-
-  test('DL-BPMN-03: Save + API verify', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
-    await page.goto(`/bpmn-designer?id=${pid}`, { waitUntil: 'domcontentloaded' });
-    await page
-      .locator('[data-testid="bpmn-page-title"]')
-      .waitFor({ state: 'visible', timeout: 10000 });
-
-    // Modify name to trigger dirty state
-    const nameInput = page.locator('[data-testid="bpmn-field-name"]');
-    await expect(nameInput).toBeVisible({ timeout: 5000 });
-    await nameInput.fill(`${testId}_saved`);
-
-    const btn = page.locator('[data-testid="bpmn-toolbar-btn-save"]');
-    if (!(await btn.isEnabled({ timeout: 5000 }).catch(() => false))) {
-      await expect(btn).toBeVisible();
-      return;
-    }
-
-    // Save may open a dialog
-    await btn.click();
-
-    const saveDialog = page
-      .locator('h2:has-text("保存流程定义"), h2:has-text("Save Process")')
-      .first();
-    if (await saveDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const confirmBtn = page
-        .locator('[role="dialog"]')
-        .locator('button:has-text("保存"), button:has-text("Save"), button.bg-blue-600')
-        .first();
-      const [response] = await Promise.all([
-        page.waitForResponse(
-          (r) =>
-            r.url().includes('/api/bpm/process-definitions') &&
-            r.request().method().toLowerCase() === 'put',
-          { timeout: 15000 },
-        ),
-        confirmBtn.click(),
-      ]);
-      expect(response.status()).toBeLessThan(400);
-    } else {
-      await page
-        .waitForResponse(
-          (r) =>
-            r.url().includes('/api/bpm/process-definitions') &&
-            r.request().method().toLowerCase() === 'put',
-          { timeout: 8000 },
-        )
-        .then((r) => expect(r.status()).toBeLessThan(400))
-        .catch(() => {});
-    }
-  });
-
-  test('DL-BPMN-04: Deploy + API verify', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
-    expect(pid).toBeTruthy();
-    const resp = await page.request.post(`/api/bpm/process-definitions/${pid}/deploy`);
-    // Deploy may fail with validation errors (missing assignee); accept < 500
-    expect(resp.status()).toBeLessThan(400);
-  });
-
-  test('DL-BPMN-05: Backend data verify — designerJson non-empty', async ({ page }) => {
-    test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
-    expect(pid).toBeTruthy();
-    const resp = await page.request.get(`/api/bpm/process-definitions/${pid}`);
-    expect(resp.ok()).toBeTruthy();
-    const { data } = await resp.json();
-    expect(data.processName || data.name).toBeTruthy();
-    const designerJson = data.designerJson || data.extension?.designerJson;
-    expect(designerJson).toBeTruthy();
-    const parsed = typeof designerJson === 'string' ? JSON.parse(designerJson) : designerJson;
-    expect(parsed.nodes).toBeTruthy();
-    expect(parsed.nodes.length).toBeGreaterThanOrEqual(2);
-  });
-});
-
-// ============================================================
-//  5. Automation Designer (DL-AUTO)
+//  4. Automation Designer (DL-AUTO)
 // ============================================================
 
 test.describe.serial('Automation Designer Lifecycle (DL-AUTO)', () => {
