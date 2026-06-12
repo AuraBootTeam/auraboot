@@ -95,7 +95,7 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
     const filters = JSON.stringify([
       { fieldName: 'crm_opp_stage', operator: 'eq', value: stageCode },
     ]);
-    window.location.href = `/crm_opportunity?filters=${encodeURIComponent(filters)}`;
+    window.location.href = `/p/crm_opportunity?filters=${encodeURIComponent(filters)}`;
   };
 
   // --- Loading ---
@@ -154,7 +154,7 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
             {t('workbench.pipeline.empty', {}, 'No opportunity data')}
           </span>
           <a
-            href="/crm_opportunity"
+            href="/p/crm_opportunity"
             className="mt-2 text-xs text-blue-500 hover:text-blue-600"
           >
             {t('workbench.pipeline.goToCrm', {}, 'Go to CRM')} &rarr;

@@ -10,7 +10,9 @@ import { get } from '~/shared/services/http-client';
 import { useI18n } from '~/contexts/I18nContext';
 
 interface ActivityRecord {
-  id: string;
+  id?: string;
+  pid?: string;
+  recordId?: string;
   crm_act_type?: string;
   crm_act_subject?: string;
   crm_activity_type?: string;
@@ -60,6 +62,10 @@ function formatRelativeTime(dateStr: string, t: (key: string, params?: Record<st
   return date.toLocaleDateString();
 }
 
+function getActivityRecordId(activity: ActivityRecord): string {
+  return activity.pid || activity.id || activity.recordId || '';
+}
+
 export function ActivitiesWidget({ title, maxItems = 6, className = '' }: ActivitiesWidgetProps) {
   const { t } = useI18n();
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
@@ -92,7 +98,12 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
 
   const handleActivityClick = (activity: ActivityRecord) => {
     if (activity.crm_activity_related_model && activity.crm_activity_related_id) {
-      window.location.href = `/${activity.crm_activity_related_model}/${activity.crm_activity_related_id}`;
+      window.location.href = `/p/${encodeURIComponent(activity.crm_activity_related_model)}/view/${encodeURIComponent(activity.crm_activity_related_id)}`;
+      return;
+    }
+    const recordId = getActivityRecordId(activity);
+    if (recordId) {
+      window.location.href = `/p/crm_activity/view/${encodeURIComponent(recordId)}`;
     }
   };
 
@@ -149,7 +160,8 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
         <div className="absolute bottom-0 left-[17px] top-0 w-px bg-gray-200" />
 
         <div className="space-y-3">
-          {activities.map((activity) => {
+          {activities.map((activity, index) => {
+            const recordId = getActivityRecordId(activity);
             const actType = activity.crm_act_type || activity.crm_activity_type || 'note';
             const subject = activity.crm_act_subject || activity.crm_activity_subject;
             const icon = TYPE_ICONS[actType] || '\uD83D\uDCCC';
@@ -157,11 +169,15 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
             const timeStr = activity.created_at
               ? formatRelativeTime(activity.created_at, t)
               : '';
-            const isClickable = !!(activity.crm_activity_related_model && activity.crm_activity_related_id);
+            const isClickable = !!(
+              recordId ||
+              (activity.crm_activity_related_model && activity.crm_activity_related_id)
+            );
 
             return (
               <button
-                key={activity.id}
+                key={recordId || `${subject ?? 'activity'}-${index}`}
+                data-testid={recordId ? `activity-row-${recordId}` : undefined}
                 type="button"
                 onClick={() => handleActivityClick(activity)}
                 disabled={!isClickable}

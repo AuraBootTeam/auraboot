@@ -10,7 +10,9 @@ import { get } from '~/shared/services/http-client';
 import { useI18n } from '~/contexts/I18nContext';
 
 interface LeadRecord {
-  id: string;
+  id?: string;
+  pid?: string;
+  recordId?: string;
   crm_lead_company?: string;
   crm_lead_contact_name?: string;
   crm_lead_contact_email?: string;
@@ -46,6 +48,10 @@ function formatRelativeTime(dateStr: string, t: (key: string, params?: Record<st
   const days = Math.floor(hours / 24);
   if (days < 7) return t('workbench.leads.daysAgo', { days }, `${days}d ago`);
   return date.toLocaleDateString();
+}
+
+function getLeadRecordId(lead: LeadRecord): string {
+  return lead.pid || lead.id || lead.recordId || '';
 }
 
 export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidgetProps) {
@@ -87,7 +93,10 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
   }, [maxItems]);
 
   const handleRowClick = (lead: LeadRecord) => {
-    window.location.href = `/crm_lead/${lead.id}`;
+    const recordId = getLeadRecordId(lead);
+    if (recordId) {
+      window.location.href = `/p/crm_lead/view/${encodeURIComponent(recordId)}`;
+    }
   };
 
   // --- Loading ---
@@ -159,7 +168,7 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
         <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
         {total > maxItems && (
           <a
-            href="/crm_lead"
+            href="/p/crm_lead"
             className="text-[11px] text-blue-500 hover:text-blue-600"
           >
             {t('workbench.leads.viewAll', {}, 'View All')} &rarr;
@@ -169,7 +178,8 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
 
       {/* Lead rows */}
       <div className="flex-1 space-y-2 overflow-y-auto">
-        {leads.map((lead) => {
+        {leads.map((lead, index) => {
+          const recordId = getLeadRecordId(lead);
           const status = lead.crm_lead_status || 'new';
           const statusStyle = STATUS_STYLES[status] || STATUS_STYLES.new;
           const timeStr = lead.created_at
@@ -178,9 +188,11 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
 
           return (
             <button
-              key={lead.id}
+              key={recordId || `${lead.crm_lead_company ?? 'lead'}-${index}`}
+              data-testid={recordId ? `lead-row-${recordId}` : undefined}
               type="button"
               onClick={() => handleRowClick(lead)}
+              disabled={!recordId}
               className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-gray-100 bg-white p-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/30"
             >
               {/* Icon */}

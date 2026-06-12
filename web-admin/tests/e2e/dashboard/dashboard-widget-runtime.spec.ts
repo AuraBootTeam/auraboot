@@ -1715,6 +1715,120 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
     }
   });
 
+  test('DWR-010: CRM workbench widget clicks use canonical dynamic page navigation', async ({ page }) => {
+    let dashboard: CreatedDashboard | undefined;
+    let crmFixture: CreatedCrmWorkbenchFixture | undefined;
+
+    try {
+      crmFixture = await createCrmWorkbenchFixture(page);
+      dashboard = await createPublishedDashboard(
+        page,
+        crmWorkbenchWidgets(),
+        'Runtime CRM Workbench Navigation Matrix',
+      );
+
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      const pipelineBlock = await expectRuntimeBlock(page, 'runtime-pipeline', 'smart-pipeline');
+      const qualificationStage = pipelineBlock.getByTestId('pipeline-stage-qualification');
+      await expect(qualificationStage).toBeVisible({ timeout: 10_000 });
+      await qualificationStage.click();
+      await expect(page).toHaveURL(/\/p\/crm_opportunity\?/);
+      const filters = new URL(page.url()).searchParams.get('filters') ?? '';
+      expect(filters, 'pipeline stage URL filters').toContain('crm_opp_stage');
+      expect(filters, 'pipeline stage URL filters').toContain('qualification');
+
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      const leadsBlock = await expectRuntimeBlock(page, 'runtime-leads', 'smart-leads');
+      const leadRow = leadsBlock.getByTestId(`lead-row-${crmFixture.leadId}`);
+      await expect(leadRow).toContainText(crmFixture.leadCompany, { timeout: 10_000 });
+      await leadRow.click();
+      await expect(page).toHaveURL(new RegExp(`/p/crm_lead/view/${crmFixture.leadId}`));
+
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      const activitiesBlock = await expectRuntimeBlock(
+        page,
+        'runtime-activities',
+        'smart-activities',
+      );
+      const activityRow = activitiesBlock.getByTestId(`activity-row-${crmFixture.activityId}`);
+      await expect(activityRow).toContainText(crmFixture.activitySubject, { timeout: 10_000 });
+      await activityRow.click();
+      await expect(page).toHaveURL(new RegExp(`/p/crm_activity/view/${crmFixture.activityId}`));
+    } finally {
+      await cleanupCrmWorkbenchFixture(page, crmFixture);
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
+  test('DWR-011: CRM workbench widgets render empty and unavailable states', async ({ page }) => {
+    let dashboard: CreatedDashboard | undefined;
+
+    try {
+      dashboard = await createPublishedDashboard(
+        page,
+        crmWorkbenchWidgets(),
+        'Runtime CRM Workbench Empty State Matrix',
+      );
+      await page.route('**/api/workbench/pipeline**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: '0',
+            data: { stages: [], totalAmount: 0, totalCount: 0 },
+          }),
+        });
+      });
+      await page.route('**/api/dynamic/crm_lead/list**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: '0',
+            data: { records: [], total: 0 },
+          }),
+        });
+      });
+      await page.route('**/api/dynamic/crm_activity/list**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: '0',
+            data: { records: [], total: 0 },
+          }),
+        });
+      });
+
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      const pipelineBlock = await expectRuntimeBlock(page, 'runtime-pipeline', 'smart-pipeline');
+      await expect(pipelineBlock.getByTestId('pipeline-crm-unavailable')).toBeVisible();
+      await expect(pipelineBlock).not.toContainText('workbench.pipeline.');
+
+      const leadsBlock = await expectRuntimeBlock(page, 'runtime-leads', 'smart-leads');
+      await expect(leadsBlock.getByTestId('leads-empty')).toBeVisible();
+      await expect(leadsBlock).not.toContainText('workbench.leads.');
+
+      const activitiesBlock = await expectRuntimeBlock(
+        page,
+        'runtime-activities',
+        'smart-activities',
+      );
+      await expect(activitiesBlock.getByTestId('activities-empty')).toBeVisible();
+      await expect(activitiesBlock).not.toContainText('workbench.activities.');
+    } finally {
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
   test('DWR-009: BPM workbench widgets render live BPM runtime data', async ({ page }) => {
     let dashboard: CreatedDashboard | undefined;
     let bpmFixture: CreatedBpmWorkbenchFixture | undefined;
