@@ -117,9 +117,12 @@ harness/打分/持久化全在,缺的只是 **回归门 + 定时/触发 + key + 
 - **不进每次 CI**;CI 只跑 `evalMode="keyword"`(确定性)当烟雾门。
 - 产出:5 维分随时间的回归曲线 + 越线告警(`AgentObservationService` 事件 + WARN)。
 
-**② 补 L2 provider 录制回放 —— ~3-4 天,新但小**
-给 `LlmProviderFactory`/tool-loop 加 `MockWebServer`/cassette 录放,覆盖 DeepSeek/OpenAI/
-Anthropic 的 tool-call & 流式响应,CI 里确定性回放;抓「只在真 send 时炸」类。定期重录防 drift。
+**② 补 L2 provider 录制回放 —— ✅ 首刀已落地(`OpenAiCompatibleLlmProviderRecordReplayTest`)**
+用 JDK `HttpServer` 回环(本仓约定,零依赖,非 MockWebServer/WireMock)在真
+`OpenAiCompatibleLlmProvider` 前回放录制响应:验**真请求序列化**(OpenAI tools/messages 形)+
+**真 tool-call 解析**(`function.arguments` JSON 串 → input map、finish_reason→stopReason)+
+错误/空 choices/非法 JSON 优雅暴露。cassette 是内联文本块,provider 改线格式时重录刷新。
+后续刀:Anthropic provider + 真流式(SSE 分块)同样回放;cassette 改为「捕获真响应」做权威基线。
 
 **③ agent 原型级 eval —— ~2 天/每个 agent**
 给 cs/pcba/competitive 各手工标 10-20 条 `(真实 NL → 期望工具/参数/结果)` 进 L3 集;每个生产
