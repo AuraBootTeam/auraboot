@@ -4,6 +4,7 @@
  * Covers representative Dashboard Viewer runtime semantics that are not proven
  * by designer saved-payload readback tests:
  * - static data widgets render computed values
+ * - foundational chart widgets render through the published viewer registry
  * - content/embed widgets pass authored props into real DOM nodes
  * - workbench widgets resolve through the shared runtime registry
  *
@@ -300,6 +301,283 @@ function runtimeWidgets(): DashboardWidgetFixture[] {
         visualization: {
           statKey: 'inbox_pending',
         },
+      },
+    },
+  ];
+}
+
+function foundationalChartWidgets(): DashboardWidgetFixture[] {
+  const categoryRows = [
+    { category: 'Alpha', value: 42, secondary: 11 },
+    { category: 'Beta', value: 27, secondary: 18 },
+  ];
+  const scatterRows = [
+    { x: 12, y: 30 },
+    { x: 28, y: 54 },
+  ];
+  const heatmapRows = [
+    { weekday: 'Mon', segment: 'AM', intensity: 7 },
+    { weekday: 'Tue', segment: 'PM', intensity: 12 },
+  ];
+
+  return [
+    {
+      id: 'runtime-number-card',
+      type: 'smart-number-card',
+      title: 'Runtime Number Card',
+      x: 0,
+      y: 0,
+      w: 3,
+      h: 2,
+      config: {
+        title: 'Runtime Number Card',
+        suffix: ' units',
+        dataSource: {
+          type: 'static',
+          staticData: [{ count: 1234 }],
+          metrics: [{ field: 'count', aggregation: 'sum', alias: 'count' }],
+        },
+      },
+    },
+    {
+      id: 'runtime-bar-chart',
+      type: 'smart-bar-chart',
+      title: 'Runtime Bar Chart',
+      x: 3,
+      y: 0,
+      w: 3,
+      h: 3,
+      config: {
+        title: 'Runtime Bar Chart',
+        dataSource: {
+          type: 'static',
+          staticData: categoryRows,
+          dimensions: ['category'],
+          metrics: [{ field: 'value', aggregation: 'sum', alias: 'value' }],
+        },
+      },
+    },
+    {
+      id: 'runtime-line-chart',
+      type: 'smart-line-chart',
+      title: 'Runtime Line Chart',
+      x: 6,
+      y: 0,
+      w: 3,
+      h: 3,
+      config: {
+        title: 'Runtime Line Chart',
+        dataSource: {
+          type: 'static',
+          staticData: categoryRows,
+          dimensions: ['category'],
+          metrics: [{ field: 'value', aggregation: 'sum', alias: 'value' }],
+        },
+        visualization: { smooth: true, showArea: false },
+      },
+    },
+    {
+      id: 'runtime-pie-chart',
+      type: 'smart-pie-chart',
+      title: 'Runtime Pie Chart',
+      x: 9,
+      y: 0,
+      w: 3,
+      h: 3,
+      config: {
+        title: 'Runtime Pie Chart',
+        dataSource: {
+          type: 'static',
+          staticData: categoryRows,
+          dimensions: ['category'],
+          metrics: [{ field: 'value', aggregation: 'sum', alias: 'value' }],
+        },
+        visualization: { donut: true, showLabels: true },
+      },
+    },
+    {
+      id: 'runtime-area-chart',
+      type: 'smart-area-chart',
+      title: 'Runtime Area Chart',
+      x: 0,
+      y: 3,
+      w: 3,
+      h: 3,
+      config: {
+        title: 'Runtime Area Chart',
+        dataSource: {
+          type: 'static',
+          staticData: categoryRows,
+          dimensions: ['category'],
+          metrics: [{ field: 'value', aggregation: 'sum', alias: 'value' }],
+        },
+        visualization: { smooth: true, fillOpacity: 0.65 },
+      },
+    },
+    {
+      id: 'runtime-funnel-chart',
+      type: 'smart-funnel-chart',
+      title: 'Runtime Funnel Chart',
+      x: 3,
+      y: 3,
+      w: 3,
+      h: 3,
+      config: {
+        title: 'Runtime Funnel Chart',
+        dataSource: {
+          type: 'static',
+          staticData: categoryRows,
+          dimensions: ['category'],
+          metrics: [{ field: 'value', aggregation: 'sum', alias: 'value' }],
+        },
+        visualization: { sort: 'descending' },
+      },
+    },
+    {
+      id: 'runtime-scatter-chart',
+      type: 'smart-scatter-chart',
+      title: 'Runtime Scatter Chart',
+      x: 6,
+      y: 3,
+      w: 3,
+      h: 3,
+      config: {
+        title: 'Runtime Scatter Chart',
+        dataSource: {
+          type: 'static',
+          staticData: scatterRows,
+          metrics: [
+            { field: 'x', aggregation: 'sum', alias: 'x' },
+            { field: 'y', aggregation: 'sum', alias: 'y' },
+          ],
+        },
+      },
+    },
+    {
+      id: 'runtime-radar-chart',
+      type: 'smart-radar-chart',
+      title: 'Runtime Radar Chart',
+      x: 9,
+      y: 3,
+      w: 3,
+      h: 3,
+      config: {
+        title: 'Runtime Radar Chart',
+        dataSource: {
+          type: 'static',
+          staticData: [
+            { name: 'Alpha', quality: 82, speed: 76 },
+            { name: 'Beta', quality: 68, speed: 91 },
+          ],
+          dimensions: ['name'],
+          metrics: [
+            { field: 'quality', aggregation: 'sum', alias: 'quality' },
+            { field: 'speed', aggregation: 'sum', alias: 'speed' },
+          ],
+        },
+      },
+    },
+    {
+      id: 'runtime-table-chart',
+      type: 'smart-table-chart',
+      title: 'Runtime Table Chart',
+      x: 0,
+      y: 6,
+      w: 4,
+      h: 3,
+      config: {
+        title: 'Runtime Table Chart',
+        dataSource: {
+          type: 'static',
+          staticData: [
+            { region: 'North', cases: 42 },
+            { region: 'South', cases: 27 },
+          ],
+          dimensions: ['region'],
+          metrics: [{ field: 'cases', aggregation: 'sum', alias: 'cases' }],
+        },
+        table: {
+          columns: [
+            { field: 'region', label: 'Region' },
+            { field: 'cases', label: 'Cases', align: 'right' },
+          ],
+        },
+        pageSize: 5,
+      },
+    },
+    {
+      id: 'runtime-gauge-chart',
+      type: 'smart-gauge-chart',
+      title: 'Runtime Gauge Chart',
+      x: 4,
+      y: 6,
+      w: 4,
+      h: 3,
+      config: {
+        title: 'Runtime Gauge Chart',
+        dataSource: {
+          type: 'static',
+          staticData: [{ value: 68 }],
+          metrics: [{ field: 'value', aggregation: 'sum', alias: 'value' }],
+        },
+        visualization: { min: 0, max: 100, splitNumber: 5 },
+      },
+    },
+    {
+      id: 'runtime-heatmap-chart',
+      type: 'smart-heatmap-chart',
+      title: 'Runtime Heatmap Chart',
+      x: 8,
+      y: 6,
+      w: 4,
+      h: 3,
+      config: {
+        title: 'Runtime Heatmap Chart',
+        dataSource: {
+          type: 'static',
+          staticData: heatmapRows,
+          dimensions: ['weekday', 'segment'],
+          metrics: [{ field: 'intensity', aggregation: 'sum', alias: 'intensity' }],
+        },
+        visualization: { xField: 'weekday', yField: 'segment', valueField: 'intensity' },
+      },
+    },
+    {
+      id: 'runtime-treemap-chart',
+      type: 'smart-treemap-chart',
+      title: 'Runtime Treemap Chart',
+      x: 0,
+      y: 9,
+      w: 6,
+      h: 3,
+      config: {
+        title: 'Runtime Treemap Chart',
+        dataSource: {
+          type: 'static',
+          staticData: categoryRows,
+          dimensions: ['category'],
+          metrics: [{ field: 'value', aggregation: 'sum', alias: 'value' }],
+        },
+        visualization: { nameField: 'category', valueField: 'value' },
+      },
+    },
+    {
+      id: 'runtime-map-chart',
+      type: 'smart-map-chart',
+      title: 'Runtime Map Chart',
+      x: 6,
+      y: 9,
+      w: 6,
+      h: 3,
+      config: {
+        title: 'Runtime Map Chart',
+        dataSource: {
+          type: 'static',
+          staticData: [{ region: 'East', value: 9 }],
+          dimensions: ['region'],
+          metrics: [{ field: 'value', aggregation: 'sum', alias: 'value' }],
+        },
+        visualization: { mapRegion: 'china', regionField: 'region', valueField: 'value' },
       },
     },
   ];
@@ -1336,6 +1614,56 @@ async function saveQuickNoteThroughUi(page: Page, content: string): Promise<void
 }
 
 test.describe('Dashboard Widget Runtime Semantics', () => {
+  test('DWR-014: published viewer renders foundational chart widget runtime semantics', async ({ page }) => {
+    let dashboard: CreatedDashboard | undefined;
+    try {
+      dashboard = await createPublishedDashboard(
+        page,
+        foundationalChartWidgets(),
+        'Foundational Chart Runtime Matrix',
+      );
+
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      const numberCard = await expectRuntimeBlock(page, 'runtime-number-card', 'smart-number-card');
+      await expect(numberCard).toContainText('Runtime Number Card');
+      await expect(numberCard).toContainText('1,234 units');
+
+      for (const [id, type] of [
+        ['runtime-bar-chart', 'smart-bar-chart'],
+        ['runtime-line-chart', 'smart-line-chart'],
+        ['runtime-pie-chart', 'smart-pie-chart'],
+        ['runtime-area-chart', 'smart-area-chart'],
+        ['runtime-funnel-chart', 'smart-funnel-chart'],
+        ['runtime-scatter-chart', 'smart-scatter-chart'],
+        ['runtime-radar-chart', 'smart-radar-chart'],
+        ['runtime-gauge-chart', 'smart-gauge-chart'],
+        ['runtime-heatmap-chart', 'smart-heatmap-chart'],
+        ['runtime-treemap-chart', 'smart-treemap-chart'],
+      ] as const) {
+        const block = await expectRuntimeBlock(page, id, type);
+        await expectRenderedChartSurface(block, type);
+      }
+
+      const table = await expectRuntimeBlock(page, 'runtime-table-chart', 'smart-table-chart');
+      await expect(table).toContainText('Runtime Table Chart');
+      await expect(table).toContainText('Region');
+      await expect(table).toContainText('Cases');
+      await expect(table).toContainText('North');
+      await expect(table).toContainText('42');
+
+      const map = await expectRuntimeBlock(page, 'runtime-map-chart', 'smart-map-chart');
+      await expect(map).toContainText('Runtime Map Chart');
+      await expect(map.locator('[data-widget-type="smart-map-chart"] svg').last()).toBeVisible();
+      await expect(map).not.toContainText('Unknown widget');
+    } finally {
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
   test('DWR-001: published viewer renders representative widget runtime semantics', async ({ page }) => {
     let dashboard: CreatedDashboard | undefined;
     try {
