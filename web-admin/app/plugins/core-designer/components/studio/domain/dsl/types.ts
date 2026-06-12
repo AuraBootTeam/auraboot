@@ -117,6 +117,7 @@ export type BlockType =
   | 'artifact-timeline'
   | 'review-drawer'
   | 'chart-card'
+  | 'custom'
   | 'text';
 
 /**
@@ -136,6 +137,7 @@ export interface DslBlock {
   // `title` may be a plain string, an `$i18n:key` string, or a LocalizedText
   // object `{ "zh-CN": "...", "en-US": "..." }`. See LocalizedTextInput.
   title?: string | { [locale: string]: string };
+  component?: string;
   fields?: DslFieldRef[]; // filters, form-section
   columns?: DslColumnRef[]; // table
   buttons?: DslButton[]; // toolbar, form-buttons

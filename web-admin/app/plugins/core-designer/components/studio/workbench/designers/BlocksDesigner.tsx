@@ -191,6 +191,11 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
         case 'form-buttons':
           newBlock.buttons = [];
           break;
+        case 'custom':
+          newBlock.title = { 'zh-CN': '自定义区块', 'en-US': 'Custom Block' };
+          newBlock.component = 'decision-field-impact';
+          newBlock.props = {};
+          break;
       }
 
       const currentSchema = latestSchemaRef.current;

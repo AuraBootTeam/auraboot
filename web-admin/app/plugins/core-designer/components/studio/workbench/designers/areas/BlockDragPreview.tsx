@@ -31,6 +31,7 @@ const BLOCK_INFO: Record<BlockType, { name: string; icon: string }> = {
   'artifact-timeline': { name: 'Artifact Timeline', icon: 'TL' },
   'review-drawer': { name: 'Review Drawer', icon: 'REV' },
   'chart-card': { name: 'Chart Card', icon: '📉' },
+  custom: { name: 'Custom Block', icon: 'EXT' },
   text: { name: 'Text Content', icon: '📃' },
 };
 
