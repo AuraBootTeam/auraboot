@@ -14,8 +14,11 @@
  * Automation coverage moved to tests/e2e/automation/automation-designer-golden.spec.ts,
  * where trigger/action/control nodes are verified through browser authoring,
  * backend persistence, and runtime side effects instead of API save fallbacks.
+ * Dashboard coverage moved to tests/e2e/dashboard, where widget authoring,
+ * property panels, management lifecycle, artifacts, and published viewer runtime
+ * paths are covered with dedicated browser/backend evidence.
  *
- * Each remaining designer has a serial describe block (DL-PD, DL-RPT, DL-DASH).
+ * Each remaining designer has a serial describe block (DL-PD, DL-RPT).
  *
  * @since 6.0.0
  */
@@ -313,117 +316,5 @@ test.describe.serial('Report Designer Lifecycle (DL-RPT)', () => {
     expect(data.profile).toBe('report');
     expect(['draft', 'published']).toContain(data.status);
     expect(Array.isArray(data.blocks)).toBe(true);
-  });
-});
-
-// ============================================================
-//  3. Dashboard Designer (DL-DASH)
-// ============================================================
-
-test.describe.serial('Dashboard Designer Lifecycle (DL-DASH)', () => {
-  test.setTimeout(60000);
-  let pid: string;
-
-  test('DL-DASH-01: Widget add — add number card widget', async ({ page }) => {
-    await page.goto('/dashboard-designer', { waitUntil: 'domcontentloaded' });
-    await waitForDesignerLoad(page);
-    await expect(page.locator('h1').first()).toBeVisible({ timeout: 10000 });
-
-    // Palette — try testid, then structural fallback
-    const palette = page.locator('[data-testid="widget-palette"], aside').first();
-    await expect(palette).toBeVisible({ timeout: 10000 });
-
-    // Click number card
-    const numberCard = page.getByText(/数字卡片|Number Card|NumberCard/i).first();
-    await expect(numberCard).toBeVisible({ timeout: 5000 });
-    await numberCard.click();
-
-    // Verify widget appears
-    const widgets = page.locator('.react-grid-item');
-    await expect(widgets.first()).toBeVisible({ timeout: 8000 });
-    expect(await widgets.count()).toBeGreaterThanOrEqual(1);
-  });
-
-  test('DL-DASH-02: Property edit — open settings, modify title', async ({ page }) => {
-    await page.goto('/dashboard-designer', { waitUntil: 'domcontentloaded' });
-    await waitForDesignerLoad(page);
-
-    const settingsBtn = page.locator('[data-testid="toolbar-btn-settings"]');
-    await expect(settingsBtn).toBeVisible({ timeout: 8000 });
-    await settingsBtn.click();
-
-    const dialog = page.locator('[role="dialog"][aria-modal="true"]').first();
-    await expect(dialog).toBeVisible({ timeout: 5000 });
-
-    const titleInput = dialog.locator('input[type="text"]').first();
-    await expect(titleInput).toBeVisible({ timeout: 5000 });
-    await titleInput.fill(uniqueId('dl_dash'));
-
-    // Save settings
-    await dialog
-      .locator(
-        'button:has-text("保存"), button:has-text("Save"), button:has-text("确定"), button.bg-blue-600',
-      )
-      .first()
-      .click();
-    await expect(dialog).not.toBeVisible({ timeout: 5000 });
-  });
-
-  test('DL-DASH-03: Save + API verify', async ({ page }) => {
-    // Create dashboard via API first
-    const dashTitle = uniqueId('dl_dash');
-    const createResp = await page.request.post('/api/dashboards', {
-      data: {
-        title: dashTitle,
-        scope: 'personal',
-        widgets: [
-          {
-            id: 'w1',
-            type: 'NumberCard',
-            x: 0,
-            y: 0,
-            w: 4,
-            h: 2,
-            title: 'Test Card',
-            config: { title: 'Test Card', label: 'Count', value: 0 },
-          },
-        ],
-        layoutConfig: { columns: 12, rowHeight: 60 },
-      },
-    });
-    const createBody = await createResp.json();
-    pid = createBody.data?.pid || createBody.data?.id;
-    expect(pid, `Create dashboard via API failed: ${JSON.stringify(createBody)}`).toBeTruthy();
-
-    // Open in designer and verify save button is visible
-    await page.goto(`/dashboard-designer/${pid}`, { waitUntil: 'domcontentloaded' });
-    await waitForDesignerLoad(page);
-    await expect(page.locator('[data-testid="designer-toolbar-btn-save"]')).toBeVisible({
-      timeout: 8000,
-    });
-
-    // Verify dashboard was saved by reading it back
-    const readResp = await page.request.get(`/api/dashboards/${pid}`);
-    expect(readResp.ok()).toBeTruthy();
-    const readBody = await readResp.json();
-    expect(readBody.data.title).toBe(dashTitle);
-  });
-
-  test('DL-DASH-04: Publish + API verify', async ({ page }) => {
-    expect(pid).toBeTruthy();
-    // Publish via API (UI publish button requires isDirty=false which is hard to achieve in headless)
-    const resp = await page.request.post(`/api/dashboards/${pid}/publish`);
-    expect(resp.status()).toBeLessThan(400);
-  });
-
-  test('DL-DASH-05: Backend data verify — published, widgets non-empty', async ({ page }) => {
-    expect(pid).toBeTruthy();
-    const resp = await page.request.get(`/api/dashboards/${pid}`);
-    expect(resp.ok()).toBeTruthy();
-    const { data } = await resp.json();
-    expect(data.status).toBe('published');
-    // Dashboard stores widgets as separate jsonb field, not a schema blob
-    const widgets = data.widgets || [];
-    expect(widgets.length).toBeGreaterThan(0);
   });
 });
