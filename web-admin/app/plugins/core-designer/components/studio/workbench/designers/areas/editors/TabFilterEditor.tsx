@@ -182,6 +182,17 @@ export function TabFilterEditor({
     [tabs, updateChildBlock],
   );
 
+  const updateStatChildBlockProp = useCallback(
+    (tabIndex: number, blockIndex: number, propKey: string, value: any) => {
+      const childBlock = getTabBlocks(tabs[tabIndex])[blockIndex];
+      if (!childBlock) return;
+      updateChildBlock(tabIndex, blockIndex, {
+        props: { ...(childBlock.props || {}), [propKey]: value },
+      });
+    },
+    [tabs, updateChildBlock],
+  );
+
   const updateChartChildBlockDataSource = useCallback(
     (tabIndex: number, blockIndex: number, dataSource: string) => {
       updateChildBlock(tabIndex, blockIndex, { dataSource: dataSource || undefined });
@@ -190,7 +201,7 @@ export function TabFilterEditor({
   );
 
   const updateChartChildBlockProp = useCallback(
-    (tabIndex: number, blockIndex: number, propKey: string, value: string) => {
+    (tabIndex: number, blockIndex: number, propKey: string, value: any) => {
       const childBlock = getTabBlocks(tabs[tabIndex])[blockIndex];
       if (!childBlock) return;
       updateChildBlock(tabIndex, blockIndex, {
@@ -198,6 +209,16 @@ export function TabFilterEditor({
       });
     },
     [tabs, updateChildBlock],
+  );
+
+  const updateChildBlockRefreshInterval = useCallback(
+    (tabIndex: number, blockIndex: number, value: string) => {
+      const next = Number(value);
+      updateChildBlock(tabIndex, blockIndex, {
+        refreshInterval: Number.isFinite(next) && next > 0 ? next : undefined,
+      });
+    },
+    [updateChildBlock],
   );
 
   const removeChildBlock = useCallback(
@@ -410,37 +431,104 @@ export function TabFilterEditor({
                       </label>
                     </div>
                     {block.blockType === 'stat-card' && (
-                      <div className="mb-1.5 grid grid-cols-2 gap-1.5">
-                        <label className="text-[10px] text-gray-500">
-                          Data source
+                      <div className="mb-1.5 space-y-1.5">
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <label className="text-[10px] text-gray-500">
+                            Data source
+                            <input
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
+                              value={typeof block.dataSource === 'string' ? block.dataSource : ''}
+                              onChange={(event) =>
+                                updateStatChildBlockDataSource(
+                                  selectedIndex,
+                                  index,
+                                  event.target.value,
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-stat-data-source-input-${index}`}
+                            />
+                          </label>
+                          <label className="text-[10px] text-gray-500">
+                            Value field
+                            <input
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
+                              value={String(block.props?.valueField || '')}
+                              onChange={(event) =>
+                                updateStatChildBlockValueField(
+                                  selectedIndex,
+                                  index,
+                                  event.target.value,
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-stat-value-field-input-${index}`}
+                            />
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <label className="text-[10px] text-gray-500">
+                            Suffix
+                            <input
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                              value={String(block.props?.suffix || '')}
+                              onChange={(event) =>
+                                updateStatChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'suffix',
+                                  event.target.value,
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-stat-suffix-input-${index}`}
+                            />
+                          </label>
+                          <label className="text-[10px] text-gray-500">
+                            Color
+                            <select
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                              value={String(block.props?.color || 'blue')}
+                              onChange={(event) =>
+                                updateStatChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'color',
+                                  event.target.value,
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-stat-color-select-${index}`}
+                            >
+                              <option value="blue">Blue</option>
+                              <option value="green">Green</option>
+                              <option value="orange">Orange</option>
+                              <option value="red">Red</option>
+                              <option value="purple">Purple</option>
+                            </select>
+                          </label>
+                        </div>
+                        <label className="block text-[10px] text-gray-500">
+                          Refresh interval (ms)
                           <input
-                            className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
-                            value={typeof block.dataSource === 'string' ? block.dataSource : ''}
+                            type="number"
+                            className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                            value={
+                              typeof block.refreshInterval === 'number'
+                                ? block.refreshInterval
+                                : ''
+                            }
                             onChange={(event) =>
-                              updateStatChildBlockDataSource(
+                              updateChildBlockRefreshInterval(
                                 selectedIndex,
                                 index,
                                 event.target.value,
                               )
                             }
                             disabled={readonly}
-                            data-testid={`tab-child-stat-data-source-input-${index}`}
-                          />
-                        </label>
-                        <label className="text-[10px] text-gray-500">
-                          Value field
-                          <input
-                            className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
-                            value={String(block.props?.valueField || '')}
-                            onChange={(event) =>
-                              updateStatChildBlockValueField(
-                                selectedIndex,
-                                index,
-                                event.target.value,
-                              )
-                            }
-                            disabled={readonly}
-                            data-testid={`tab-child-stat-value-field-input-${index}`}
+                            min={0}
+                            step={500}
+                            data-testid={`tab-child-stat-refresh-interval-input-${index}`}
                           />
                         </label>
                       </div>
@@ -522,6 +610,104 @@ export function TabFilterEditor({
                               data-testid={`tab-child-chart-y-field-input-${index}`}
                             />
                           </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <label className="text-[10px] text-gray-500">
+                            Refresh interval (ms)
+                            <input
+                              type="number"
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                              value={
+                                typeof block.refreshInterval === 'number'
+                                  ? block.refreshInterval
+                                  : ''
+                              }
+                              onChange={(event) =>
+                                updateChildBlockRefreshInterval(
+                                  selectedIndex,
+                                  index,
+                                  event.target.value,
+                                )
+                              }
+                              disabled={readonly}
+                              min={0}
+                              step={500}
+                              data-testid={`tab-child-chart-refresh-interval-input-${index}`}
+                            />
+                          </label>
+                          <label className="text-[10px] text-gray-500">
+                            Height
+                            <input
+                              type="number"
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                              value={Number(block.props?.height ?? 200)}
+                              onChange={(event) =>
+                                updateChartChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'height',
+                                  Number(event.target.value),
+                                )
+                              }
+                              disabled={readonly}
+                              min={100}
+                              max={600}
+                              step={20}
+                              data-testid={`tab-child-chart-height-input-${index}`}
+                            />
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <div className="flex items-center justify-between gap-2 rounded border px-1.5 py-1">
+                            <span className="text-[10px] text-gray-500">Smooth</span>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={Boolean(block.props?.smooth ?? true)}
+                              onClick={() =>
+                                updateChartChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'smooth',
+                                  !Boolean(block.props?.smooth ?? true),
+                                )
+                              }
+                              disabled={readonly}
+                              className={`h-4 w-8 rounded-full text-[8px] ${
+                                block.props?.smooth ?? true
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-gray-200 text-gray-500'
+                              } disabled:opacity-40`}
+                              data-testid={`tab-child-chart-smooth-switch-${index}`}
+                            >
+                              {block.props?.smooth ?? true ? 'On' : 'Off'}
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 rounded border px-1.5 py-1">
+                            <span className="text-[10px] text-gray-500">Legend</span>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={Boolean(block.props?.showLegend ?? true)}
+                              onClick={() =>
+                                updateChartChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'showLegend',
+                                  !Boolean(block.props?.showLegend ?? true),
+                                )
+                              }
+                              disabled={readonly}
+                              className={`h-4 w-8 rounded-full text-[8px] ${
+                                block.props?.showLegend ?? true
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-gray-200 text-gray-500'
+                              } disabled:opacity-40`}
+                              data-testid={`tab-child-chart-legend-switch-${index}`}
+                            >
+                              {block.props?.showLegend ?? true ? 'On' : 'Off'}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}

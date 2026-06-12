@@ -186,6 +186,52 @@ describe('TabFilterEditor', () => {
     });
   });
 
+  it('edits stat child block appearance and refresh settings on the selected tab', () => {
+    const onCommit = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'metrics',
+            label: { 'en-US': 'Metrics', 'zh-CN': '指标' },
+            filter: null,
+            blocks: [
+              {
+                id: 'metrics_stat',
+                blockType: 'stat-card',
+                title: { 'en-US': 'Metric', 'zh-CN': '指标' },
+                dataSource: 'old_stats',
+                refreshInterval: 1000,
+                props: { valueField: 'oldCount', suffix: 'items', color: 'blue' },
+              },
+            ],
+          },
+        ]}
+        onCommit={onCommit}
+      />,
+    );
+
+    expect(screen.getByTestId('tab-child-stat-suffix-input-0')).toHaveValue('items');
+    expect(screen.getByTestId('tab-child-stat-color-select-0')).toHaveValue('blue');
+    expect(screen.getByTestId('tab-child-stat-refresh-interval-input-0')).toHaveValue(1000);
+
+    fireEvent.change(screen.getByTestId('tab-child-stat-suffix-input-0'), {
+      target: { value: 'records' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-stat-color-select-0'), {
+      target: { value: 'green' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-stat-refresh-interval-input-0'), {
+      target: { value: '1500' },
+    });
+
+    expect(serializedTabs()[0].blocks?.[0]).toMatchObject({
+      blockType: 'stat-card',
+      refreshInterval: 1500,
+      props: { valueField: 'oldCount', suffix: 'records', color: 'green' },
+    });
+  });
+
   it('edits chart child block data settings on the selected tab', () => {
     const onCommit = vi.fn();
     render(
@@ -234,6 +280,72 @@ describe('TabFilterEditor', () => {
       blockType: 'chart-card',
       dataSource: 'nested_chart_ds',
       props: { chartType: 'line', xField: 'category', yField: 'amount' },
+    });
+  });
+
+  it('edits chart child block appearance and refresh settings on the selected tab', () => {
+    const onCommit = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'charts',
+            label: { 'en-US': 'Charts', 'zh-CN': '图表' },
+            filter: null,
+            blocks: [
+              {
+                id: 'charts_chart',
+                blockType: 'chart-card',
+                title: { 'en-US': 'Chart', 'zh-CN': '图表' },
+                dataSource: 'old_chart_ds',
+                refreshInterval: 1000,
+                props: {
+                  chartType: 'bar',
+                  xField: 'oldCategory',
+                  yField: 'oldValue',
+                  smooth: false,
+                  showLegend: false,
+                  height: 180,
+                },
+              },
+            ],
+          },
+        ]}
+        onCommit={onCommit}
+      />,
+    );
+
+    expect(screen.getByTestId('tab-child-chart-refresh-interval-input-0')).toHaveValue(1000);
+    expect(screen.getByTestId('tab-child-chart-smooth-switch-0')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    expect(screen.getByTestId('tab-child-chart-legend-switch-0')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    expect(screen.getByTestId('tab-child-chart-height-input-0')).toHaveValue(180);
+
+    fireEvent.change(screen.getByTestId('tab-child-chart-refresh-interval-input-0'), {
+      target: { value: '1500' },
+    });
+    fireEvent.click(screen.getByTestId('tab-child-chart-smooth-switch-0'));
+    fireEvent.click(screen.getByTestId('tab-child-chart-legend-switch-0'));
+    fireEvent.change(screen.getByTestId('tab-child-chart-height-input-0'), {
+      target: { value: '240' },
+    });
+
+    expect(serializedTabs()[0].blocks?.[0]).toMatchObject({
+      blockType: 'chart-card',
+      refreshInterval: 1500,
+      props: {
+        chartType: 'bar',
+        xField: 'oldCategory',
+        yField: 'oldValue',
+        smooth: true,
+        showLegend: true,
+        height: 240,
+      },
     });
   });
 });

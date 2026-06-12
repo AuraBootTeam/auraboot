@@ -172,6 +172,9 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     await page.getByTestId('tab-child-title-zh-input-0').fill('嵌套指标卡片');
     await page.getByTestId('tab-child-stat-data-source-input-0').fill('nested_stats');
     await page.getByTestId('tab-child-stat-value-field-input-0').fill('totalCount');
+    await page.getByTestId('tab-child-stat-suffix-input-0').fill('records');
+    await page.getByTestId('tab-child-stat-color-select-0').selectOption('green');
+    await page.getByTestId('tab-child-stat-refresh-interval-input-0').fill('1500');
     await expect.poll(() => canvasBlockIds(page)).toEqual(beforeTopLevelIds);
 
     await saveDesignerAndWait(page, pid);
@@ -189,7 +192,8 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
               blockType: 'stat-card',
               title: { 'en-US': 'Nested metric card', 'zh-CN': '嵌套指标卡片' },
               dataSource: 'nested_stats',
-              props: { valueField: 'totalCount' },
+              refreshInterval: 1500,
+              props: { valueField: 'totalCount', suffix: 'records', color: 'green' },
             },
           ],
         },
@@ -208,6 +212,9 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     await expect(page.getByTestId('tab-child-stat-value-field-input-0')).toHaveValue(
       'totalCount',
     );
+    await expect(page.getByTestId('tab-child-stat-suffix-input-0')).toHaveValue('records');
+    await expect(page.getByTestId('tab-child-stat-color-select-0')).toHaveValue('green');
+    await expect(page.getByTestId('tab-child-stat-refresh-interval-input-0')).toHaveValue('1500');
   });
 
   test('drags a chart child block and edits its data settings', async ({ page }) => {
@@ -232,6 +239,10 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     await page.getByTestId('tab-child-chart-type-select-0').selectOption('line');
     await page.getByTestId('tab-child-chart-x-field-input-0').fill('category');
     await page.getByTestId('tab-child-chart-y-field-input-0').fill('amount');
+    await page.getByTestId('tab-child-chart-refresh-interval-input-0').fill('1500');
+    await page.getByTestId('tab-child-chart-smooth-switch-0').click();
+    await page.getByTestId('tab-child-chart-legend-switch-0').click();
+    await page.getByTestId('tab-child-chart-height-input-0').fill('240');
     await expect.poll(() => canvasBlockIds(page)).toEqual(beforeTopLevelIds);
 
     await saveDesignerAndWait(page, pid);
@@ -249,7 +260,15 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
               blockType: 'chart-card',
               title: { 'en-US': 'Nested trend chart', 'zh-CN': '嵌套趋势图' },
               dataSource: 'nested_chart_ds',
-              props: { chartType: 'line', xField: 'category', yField: 'amount' },
+              refreshInterval: 1500,
+              props: {
+                chartType: 'line',
+                xField: 'category',
+                yField: 'amount',
+                smooth: false,
+                showLegend: false,
+                height: 240,
+              },
             },
           ],
         },
@@ -268,5 +287,17 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     await expect(page.getByTestId('tab-child-chart-type-select-0')).toHaveValue('line');
     await expect(page.getByTestId('tab-child-chart-x-field-input-0')).toHaveValue('category');
     await expect(page.getByTestId('tab-child-chart-y-field-input-0')).toHaveValue('amount');
+    await expect(page.getByTestId('tab-child-chart-refresh-interval-input-0')).toHaveValue(
+      '1500',
+    );
+    await expect(page.getByTestId('tab-child-chart-smooth-switch-0')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    await expect(page.getByTestId('tab-child-chart-legend-switch-0')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    await expect(page.getByTestId('tab-child-chart-height-input-0')).toHaveValue('240');
   });
 });

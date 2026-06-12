@@ -22,6 +22,8 @@ import {
 
 test.describe('Page Designer loads existing pages', () => {
   test('clicking edit on a list page shows designer canvas via sidebar nav', async ({ page }) => {
+    const designerUrlPattern = /\/page-designer\/|\/unified-designer(?:\?|$)/;
+
     // D1: Navigate via sidebar menu (禁止 page.goto 直达 — must use sidebar navigation)
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
     await ensureSidebarExpanded(page);
@@ -92,7 +94,7 @@ test.describe('Page Designer loads existing pages', () => {
       const firstRow = page.locator('tbody tr').first();
       await expect(firstRow).toBeVisible({ timeout: 10000 });
       await firstRow.getByRole('button', { name: /edit|design|编辑|设计/i }).first().click();
-      await page.waitForURL(/\/page-designer\//);
+      await page.waitForURL(designerUrlPattern);
     }
     await page.waitForLoadState('domcontentloaded').catch(() => {});
 
@@ -101,13 +103,13 @@ test.describe('Page Designer loads existing pages', () => {
     // detail → detail-config-panel, form → designer-canvas. Accept any.
     const canvas = page
       .locator(
-        '[data-testid="designer-canvas"], [data-designer-canvas], .designer-canvas, [data-testid="areas-designer"], [data-testid="list-config-panel"], [data-testid="detail-config-panel"]',
+        '[data-testid="designer-canvas"], [data-designer-canvas], .designer-canvas, [data-testid="areas-designer"], [data-testid="list-config-panel"], [data-testid="detail-config-panel"], [data-testid="unified-designer-workbench"]',
       )
       .first();
     await expect(canvas).toBeVisible({ timeout: 10000 });
 
     // D9: Regression assertion: URL navigated to the designer (not an error page)
-    expect(page.url()).toMatch(/\/page-designer\//);
+    expect(page.url()).toMatch(designerUrlPattern);
   });
 
   test('page designer shows error state for non-existent page id', async ({ page }) => {
