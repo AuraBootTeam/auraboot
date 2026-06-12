@@ -182,6 +182,24 @@ export function TabFilterEditor({
     [tabs, updateChildBlock],
   );
 
+  const updateChartChildBlockDataSource = useCallback(
+    (tabIndex: number, blockIndex: number, dataSource: string) => {
+      updateChildBlock(tabIndex, blockIndex, { dataSource: dataSource || undefined });
+    },
+    [updateChildBlock],
+  );
+
+  const updateChartChildBlockProp = useCallback(
+    (tabIndex: number, blockIndex: number, propKey: string, value: string) => {
+      const childBlock = getTabBlocks(tabs[tabIndex])[blockIndex];
+      if (!childBlock) return;
+      updateChildBlock(tabIndex, blockIndex, {
+        props: { ...(childBlock.props || {}), [propKey]: value },
+      });
+    },
+    [tabs, updateChildBlock],
+  );
+
   const removeChildBlock = useCallback(
     (tabIndex: number, blockIndex: number) => {
       const nextBlocks = getTabBlocks(tabs[tabIndex]).filter((_, index) => index !== blockIndex);
@@ -427,6 +445,86 @@ export function TabFilterEditor({
                         </label>
                       </div>
                     )}
+                    {block.blockType === 'chart-card' && (
+                      <div className="mb-1.5 space-y-1.5">
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <label className="text-[10px] text-gray-500">
+                            Data source
+                            <input
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
+                              value={typeof block.dataSource === 'string' ? block.dataSource : ''}
+                              onChange={(event) =>
+                                updateChartChildBlockDataSource(
+                                  selectedIndex,
+                                  index,
+                                  event.target.value,
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-chart-data-source-input-${index}`}
+                            />
+                          </label>
+                          <label className="text-[10px] text-gray-500">
+                            Chart type
+                            <select
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                              value={String(block.props?.chartType || 'bar')}
+                              onChange={(event) =>
+                                updateChartChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'chartType',
+                                  event.target.value,
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-chart-type-select-${index}`}
+                            >
+                              <option value="bar">Bar</option>
+                              <option value="line">Line</option>
+                              <option value="pie">Pie</option>
+                              <option value="area">Area</option>
+                            </select>
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <label className="text-[10px] text-gray-500">
+                            X field
+                            <input
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
+                              value={String(block.props?.xField || '')}
+                              onChange={(event) =>
+                                updateChartChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'xField',
+                                  event.target.value,
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-chart-x-field-input-${index}`}
+                            />
+                          </label>
+                          <label className="text-[10px] text-gray-500">
+                            Y field
+                            <input
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
+                              value={String(block.props?.yField || '')}
+                              onChange={(event) =>
+                                updateChartChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'yField',
+                                  event.target.value,
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-chart-y-field-input-${index}`}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    )}
                     {block.blockType === 'text' ? (
                       <textarea
                         className="min-h-16 w-full resize-y rounded border px-1.5 py-1 text-xs"
@@ -437,7 +535,7 @@ export function TabFilterEditor({
                         disabled={readonly}
                         data-testid={`tab-child-text-content-${index}`}
                       />
-                    ) : block.blockType === 'stat-card' ? null : (
+                    ) : block.blockType === 'stat-card' || block.blockType === 'chart-card' ? null : (
                       <div className="rounded border border-dashed px-2 py-2 text-[10px] text-gray-400">
                         This block type is preserved but not editable here.
                       </div>

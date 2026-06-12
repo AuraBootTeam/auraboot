@@ -209,4 +209,64 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
       'totalCount',
     );
   });
+
+  test('drags a chart child block and edits its data settings', async ({ page }) => {
+    const { pid, tabsBlockId } = await createTabsChildDropAuthoringPage(page);
+    await openDesignerByPid(page, pid);
+
+    await selectCanvasBlock(page, tabsBlockId);
+    await expect(page.getByTestId('tab-child-blocks-editor')).toBeVisible();
+
+    await page.getByTestId('tab-filter-key-input').fill('charts');
+    await page.getByTestId('tab-filter-label-en-input').fill('Charts');
+    await page.getByTestId('tab-filter-label-zh-input').fill('图表');
+
+    const beforeTopLevelIds = await canvasBlockIds(page);
+    await dragPaletteBlockToTabChildDropZone(page, 'chart-card');
+
+    await expect(page.getByTestId('tab-child-block-0')).toBeVisible();
+    await expect(page.getByTestId('tab-child-block-0')).toContainText('chart-card');
+    await page.getByTestId('tab-child-title-en-input-0').fill('Nested trend chart');
+    await page.getByTestId('tab-child-title-zh-input-0').fill('嵌套趋势图');
+    await page.getByTestId('tab-child-chart-data-source-input-0').fill('nested_chart_ds');
+    await page.getByTestId('tab-child-chart-type-select-0').selectOption('line');
+    await page.getByTestId('tab-child-chart-x-field-input-0').fill('category');
+    await page.getByTestId('tab-child-chart-y-field-input-0').fill('amount');
+    await expect.poll(() => canvasBlockIds(page)).toEqual(beforeTopLevelIds);
+
+    await saveDesignerAndWait(page, pid);
+    const savedPage = await fetchPageByPid(page, pid);
+    const savedBlock = savedBlockById(savedPage, tabsBlockId);
+    expect(savedBlock).toMatchObject({
+      blockType: 'tabs',
+      tabs: [
+        {
+          key: 'charts',
+          label: { 'en-US': 'Charts', 'zh-CN': '图表' },
+          filter: null,
+          blocks: [
+            {
+              blockType: 'chart-card',
+              title: { 'en-US': 'Nested trend chart', 'zh-CN': '嵌套趋势图' },
+              dataSource: 'nested_chart_ds',
+              props: { chartType: 'line', xField: 'category', yField: 'amount' },
+            },
+          ],
+        },
+      ],
+    });
+
+    await openDesignerByPid(page, pid);
+    await selectCanvasBlock(page, tabsBlockId);
+    await expect(page.getByTestId('tab-child-title-en-input-0')).toHaveValue(
+      'Nested trend chart',
+    );
+    await expect(page.getByTestId('tab-child-title-zh-input-0')).toHaveValue('嵌套趋势图');
+    await expect(page.getByTestId('tab-child-chart-data-source-input-0')).toHaveValue(
+      'nested_chart_ds',
+    );
+    await expect(page.getByTestId('tab-child-chart-type-select-0')).toHaveValue('line');
+    await expect(page.getByTestId('tab-child-chart-x-field-input-0')).toHaveValue('category');
+    await expect(page.getByTestId('tab-child-chart-y-field-input-0')).toHaveValue('amount');
+  });
 });

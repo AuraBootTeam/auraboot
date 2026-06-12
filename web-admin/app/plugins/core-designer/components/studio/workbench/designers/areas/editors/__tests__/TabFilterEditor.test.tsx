@@ -185,4 +185,55 @@ describe('TabFilterEditor', () => {
       props: { valueField: 'totalCount' },
     });
   });
+
+  it('edits chart child block data settings on the selected tab', () => {
+    const onCommit = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'charts',
+            label: { 'en-US': 'Charts', 'zh-CN': '图表' },
+            filter: null,
+            blocks: [
+              {
+                id: 'charts_chart',
+                blockType: 'chart-card',
+                title: { 'en-US': 'Chart', 'zh-CN': '图表' },
+                dataSource: 'old_chart_ds',
+                props: { chartType: 'bar', xField: 'oldCategory', yField: 'oldValue' },
+              },
+            ],
+          },
+        ]}
+        onCommit={onCommit}
+      />,
+    );
+
+    expect(screen.getByTestId('tab-child-chart-data-source-input-0')).toHaveValue(
+      'old_chart_ds',
+    );
+    expect(screen.getByTestId('tab-child-chart-type-select-0')).toHaveValue('bar');
+    expect(screen.getByTestId('tab-child-chart-x-field-input-0')).toHaveValue('oldCategory');
+    expect(screen.getByTestId('tab-child-chart-y-field-input-0')).toHaveValue('oldValue');
+
+    fireEvent.change(screen.getByTestId('tab-child-chart-data-source-input-0'), {
+      target: { value: 'nested_chart_ds' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-chart-type-select-0'), {
+      target: { value: 'line' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-chart-x-field-input-0'), {
+      target: { value: 'category' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-chart-y-field-input-0'), {
+      target: { value: 'amount' },
+    });
+
+    expect(serializedTabs()[0].blocks?.[0]).toMatchObject({
+      blockType: 'chart-card',
+      dataSource: 'nested_chart_ds',
+      props: { chartType: 'line', xField: 'category', yField: 'amount' },
+    });
+  });
 });
