@@ -56,6 +56,7 @@ import {
 } from '~/framework/smart/utils/conditionalFormatEvaluator';
 import { SmartViewRenderer } from '~/framework/smart/components/view/SmartViewRenderer';
 import { modelService } from '~/shared/services/modelService';
+import { dynamicService } from '~/shared/services/dynamicService';
 import { useTimezone } from '~/contexts/TimezoneContext';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { ListTabs } from './list/ListTabs';
@@ -1498,17 +1499,11 @@ function ListPageContentInner(props: PageContentProps) {
   const handleBulkDelete = useCallback(
     async (ids: string[]) => {
       const mc = schema?.modelCode || tableName;
-      const resp = await fetchResult(`/api/dynamic/${mc}/batch`, {
-        method: 'delete',
-        params: ids,
-        token: token || undefined,
-      });
-      if (ResultHelper.isSuccess(resp)) {
-        setSelectedIds(new Set());
-        loadData({ page: 0, size: pagination.pageSize, filters });
-      }
+      await dynamicService.batchDelete(mc, ids);
+      setSelectedIds(new Set());
+      loadData({ page: 0, size: pagination.pageSize, filters });
     },
-    [schema?.modelCode, tableName, token, loadData, pagination.pageSize, filters],
+    [schema?.modelCode, tableName, loadData, pagination.pageSize, filters],
   );
 
   const handleBulkEditComplete = useCallback(() => {

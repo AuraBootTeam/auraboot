@@ -174,6 +174,18 @@ describe('buildRequest', () => {
     expect(init.body).toBe('{"name":"John","email":"john@test.com"}');
   });
 
+  it('should preserve array bodies for batch PUT requests', () => {
+    const options: FetchOptions = {
+      method: 'put',
+      params: [{ pid: 'pid-1', name: 'Updated' }],
+    };
+    const { url, init } = buildRequest('/api/dynamic/page_schema/batch', options, serverContext);
+    expect(url).toContain('/api/dynamic/page_schema/batch');
+    expect(url).not.toContain('?0=');
+    expect(init.method).toBe('put');
+    expect(init.body).toBe('[{"pid":"pid-1","name":"Updated"}]');
+  });
+
   it('should build DELETE request with query params (not body)', () => {
     const options: FetchOptions = {
       method: 'delete',
@@ -183,6 +195,18 @@ describe('buildRequest', () => {
     expect(url).toContain('?reason=inactive');
     expect(init.method).toBe('delete');
     expect(init.body).toBeUndefined();
+  });
+
+  it('should build DELETE request with array JSON body for batch APIs', () => {
+    const options: FetchOptions = {
+      method: 'delete',
+      params: ['pid-1', 'pid-2'],
+    };
+    const { url, init } = buildRequest('/api/dynamic/page_schema/batch', options, serverContext);
+    expect(url).toContain('/api/dynamic/page_schema/batch');
+    expect(url).not.toContain('?0=');
+    expect(init.method).toBe('delete');
+    expect(init.body).toBe('["pid-1","pid-2"]');
   });
 
   it('should replace path variables and use remaining as query/body', () => {

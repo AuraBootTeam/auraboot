@@ -71,7 +71,7 @@ export interface FetchOptions {
    * // Result: /api/user/123?role=admin (GET)
    * // Result: /api/user/123 with body {role: 'admin'} (POST)
    */
-  params?: Record<string, any>;
+  params?: Record<string, any> | any[];
 
   /**
    * Explicit authentication token

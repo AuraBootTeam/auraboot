@@ -311,6 +311,31 @@ async function fetchOrder(page: Page, orderPid: string): Promise<Record<string, 
   return body.data ?? {};
 }
 
+async function fetchPageByKey(page: Page, pageKey: string): Promise<Record<string, any>> {
+  const resp = await page.request.get(`/api/pages/key/${pageKey}`);
+  expect(resp.ok(), `Fetch page by key failed: ${resp.status()}`).toBeTruthy();
+  const body = await resp.json();
+  expect(body.code, 'fetch page by key code').toBe('0');
+  return body.data ?? {};
+}
+
+async function listPageSchemasByKeyword(
+  page: Page,
+  keyword: string,
+): Promise<Record<string, any>[]> {
+  const resp = await page.request.get('/api/dynamic/page_schema/list', {
+    params: {
+      pageNum: '1',
+      pageSize: '20',
+      keyword,
+    },
+  });
+  expect(resp.ok(), `List page_schema failed: ${resp.status()}`).toBeTruthy();
+  const body = await resp.json();
+  expect(body.code, 'list page_schema code').toBe('0');
+  return body.data?.records ?? [];
+}
+
 async function clickSubTableAdd(page: Page) {
   const emptyAction = page.getByTestId('subtable-empty-action');
   if (await emptyAction.isVisible({ timeout: 2_000 }).catch(() => false)) {
@@ -392,8 +417,12 @@ test.describe('Page Designer standard block runtime', () => {
     await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 15_000 });
 
     const searchResponse = page.waitForResponse(
-      (response) =>
-        response.url().includes('/api/dynamic/page_schema/list') && response.status() === 200,
+      (response) => {
+        if (!response.url().includes('/api/dynamic/page_schema/list') || response.status() !== 200) {
+          return false;
+        }
+        return new URL(response.url()).searchParams.get('keyword') === pageKey;
+      },
       { timeout: 15_000 },
     );
     await page.getByTestId('list-search-input').fill(pageKey);
@@ -427,6 +456,75 @@ test.describe('Page Designer standard block runtime', () => {
 
     await page.getByRole('button', { name: 'Clear selection' }).click();
     await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
+  });
+
+  test('table bulk edit and delete persist through dynamic batch APIs', async ({ page }) => {
+    const { pageKey, pid } = await createPublishedStandardListPage(page);
+    const target = await createPublishedStandardListPage(page);
+    const editedName = `Bulk edited ${uniqueId('page_schema')}`;
+
+    await page.goto(`/p/c/${pageKey}?keyword=${encodeURIComponent(pageKey)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('table-row-0')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('row-checkbox-0').check();
+
+    const bulkEditResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/dynamic/page_schema/batch') &&
+        response.request().method() === 'PUT',
+      { timeout: 15_000 },
+    );
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('combobox').selectOption('name');
+    await page.getByPlaceholder('Enter new value...').fill(editedName);
+    await page.getByRole('button', { name: 'Update 1 Records' }).click();
+    expect((await bulkEditResponse).ok(), 'bulk edit response').toBeTruthy();
+
+    await expect
+      .poll(async () => String((await fetchPageByKey(page, pageKey)).name ?? ''), {
+        timeout: 10_000,
+      })
+      .toBe(editedName);
+    await expect(page.getByRole('heading', { name: 'Bulk Edit' })).toHaveCount(0);
+    await expect(page.getByTestId('table-cell-0-name')).toContainText(editedName, {
+      timeout: 15_000,
+    });
+
+    await page.goto(`/p/c/${pageKey}?keyword=${encodeURIComponent(target.pageKey)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page.getByTestId('table-row-0')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('table-cell-0-page_key')).toContainText(target.pageKey);
+    await page.getByTestId('row-checkbox-0').check();
+
+    const bulkDeleteResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/dynamic/page_schema/batch') &&
+        response.request().method() === 'DELETE',
+      { timeout: 15_000 },
+    );
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: /Confirm|确认/ }).click();
+    expect((await bulkDeleteResponse).ok(), 'bulk delete response').toBeTruthy();
+
+    await expect
+      .poll(
+        async () => {
+          const records = await listPageSchemasByKeyword(page, target.pageKey);
+          return records.some((record) => String(record.pid) === target.pid);
+        },
+        { timeout: 10_000 },
+      )
+      .toBe(false);
+    await expect(page.locator('body')).not.toContainText(target.pageKey);
+
+    const hostRecords = await listPageSchemasByKeyword(page, pageKey);
+    expect(
+      hostRecords.some((record) => String(record.pid) === pid),
+      'host page remains after deleting only the target row',
+    ).toBe(true);
   });
 
   test('persists and renders form-section and form-buttons in a real custom form page', async ({

@@ -134,7 +134,7 @@ export class DynamicService {
   ): Promise<DynamicEntity[]> {
     const result = await post<DynamicEntity[]>(
       `${this.baseUrl}/${entityCode}/batch`,
-      { dataList },
+      dataList,
       undefined,
       request,
     );
@@ -149,9 +149,13 @@ export class DynamicService {
     updates: { id: string; data: Record<string, any> }[],
     request?: Request,
   ): Promise<DynamicEntity[]> {
+    const rows = updates.map((update) => ({
+      ...update.data,
+      pid: update.id,
+    }));
     const result = await put<DynamicEntity[]>(
       `${this.baseUrl}/${entityCode}/batch`,
-      { updates },
+      rows,
       undefined,
       request,
     );
@@ -164,7 +168,7 @@ export class DynamicService {
   async batchDelete(entityCode: string, ids: string[], request?: Request): Promise<void> {
     const result = await del<void>(
       `${this.baseUrl}/${entityCode}/batch`,
-      { ids },
+      ids,
       undefined,
       request,
     );

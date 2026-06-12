@@ -128,6 +128,18 @@ describe('HttpClient integration', () => {
       expect(init.method).toBe('put');
       expect(JSON.parse(init.body)).toEqual({ name: 'Updated' });
     });
+
+    it('should make PUT request with array body for batch endpoints', async () => {
+      mockFetchSuccess([{ pid: 'pid-1' }]);
+
+      await put('/api/dynamic/page_schema/batch', [{ pid: 'pid-1', name: 'Updated' }]);
+
+      const [url, init] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain('/api/dynamic/page_schema/batch');
+      expect(url).not.toContain('?0=');
+      expect(init.method).toBe('put');
+      expect(JSON.parse(init.body)).toEqual([{ pid: 'pid-1', name: 'Updated' }]);
+    });
   });
 
   describe('del', () => {
@@ -151,6 +163,18 @@ describe('HttpClient integration', () => {
       const [, init] = (globalThis.fetch as any).mock.calls[0];
       expect(init.method).toBe('delete');
       expect(init.body).toBeUndefined();
+    });
+
+    it('should make DELETE request with array body for batch endpoints', async () => {
+      mockFetchSuccess();
+
+      await del('/api/dynamic/page_schema/batch', ['pid-1', 'pid-2']);
+
+      const [url, init] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain('/api/dynamic/page_schema/batch');
+      expect(url).not.toContain('?0=');
+      expect(init.method).toBe('delete');
+      expect(JSON.parse(init.body)).toEqual(['pid-1', 'pid-2']);
     });
   });
 
