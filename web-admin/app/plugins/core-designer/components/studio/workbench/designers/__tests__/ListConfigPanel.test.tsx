@@ -102,9 +102,11 @@ describe('ListConfigPanel', () => {
     });
 
     // create / bulkDelete are false in capabilities → disabled; export = true → enabled.
+    // refresh is a page-level read action and does not depend on model mutation capabilities.
     expect(screen.getByTestId('toolbar-preset-create')).toBeDisabled();
     expect(screen.getByTestId('toolbar-preset-bulkDelete')).toBeDisabled();
     expect(screen.getByTestId('toolbar-preset-export')).not.toBeDisabled();
+    expect(screen.getByTestId('toolbar-preset-refresh')).not.toBeDisabled();
   });
 
   it('renders the shared icon picker for toolbar custom buttons', async () => {

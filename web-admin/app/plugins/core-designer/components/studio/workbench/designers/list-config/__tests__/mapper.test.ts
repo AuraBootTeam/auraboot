@@ -116,8 +116,8 @@ describe('list mapper', () => {
 
   it('preserves unknown custom button fields across roundtrip', () => {
     const originalButton = {
-      code: 'refresh',
-      label: 'Refresh',
+      code: 'reloadTable',
+      label: 'Reload table',
       command: 'refresh:table',
       variant: 'default',
       action: { type: 'command', command: 'refresh:table' },
@@ -135,9 +135,50 @@ describe('list mapper', () => {
     const vm = blocksToViewModel(originalBlocks);
     expect(vm.toolbar.presets).toEqual([]);
     expect(vm.toolbar.customButtons).toHaveLength(1);
-    expect(vm.toolbar.customButtons[0].label).toBe('Refresh');
+    expect(vm.toolbar.customButtons[0].label).toBe('Reload table');
     expect(vm.toolbar.customButtons[0].command).toBe('refresh:table');
     expect(vm.toolbar.customButtons[0].raw).toEqual(originalButton);
+
+    const roundTripped = viewModelToBlocks(vm);
+    const toolbar = roundTripped.find((b) => b.blockType === 'toolbar')!;
+    expect((toolbar.buttons as unknown as unknown[])[0]).toEqual(originalButton);
+  });
+
+  it('round-trips refresh as a toolbar preset', () => {
+    const vm = emptyListViewModel();
+    vm.toolbar.presets = ['refresh'];
+
+    const blocks = viewModelToBlocks(vm);
+    const toolbar = blocks.find((b) => b.blockType === 'toolbar')!;
+    expect(toolbar.buttons).toEqual([{ preset: 'refresh' }]);
+
+    const back = blocksToViewModel(blocks);
+    expect(back.toolbar.presets).toEqual(['refresh']);
+    expect(back.toolbar.customButtons).toEqual([]);
+  });
+
+  it('preserves rich refresh preset fields across roundtrip', () => {
+    const originalButton = {
+      code: 'refresh',
+      label: 'Refresh',
+      command: 'refresh:table',
+      variant: 'default',
+      action: { type: 'command', command: 'refresh:table' },
+      confirm: 'Are you sure?',
+    };
+    const originalBlocks: DslBlock[] = [
+      {
+        id: 'toolbar',
+        blockType: 'toolbar',
+        buttons: [originalButton],
+      } as unknown as DslBlock,
+      { id: 'table', blockType: 'table' },
+    ];
+
+    const vm = blocksToViewModel(originalBlocks);
+    expect(vm.toolbar.presets).toEqual(['refresh']);
+    expect(vm.toolbar.presetRaw?.refresh).toEqual(originalButton);
+    expect(vm.toolbar.customButtons).toEqual([]);
 
     const roundTripped = viewModelToBlocks(vm);
     const toolbar = roundTripped.find((b) => b.blockType === 'toolbar')!;
@@ -151,8 +192,8 @@ describe('list mapper', () => {
         blockType: 'toolbar',
         buttons: [
           {
-            code: 'refresh',
-            label: 'Refresh',
+            code: 'reloadTable',
+            label: 'Reload table',
             command: 'refresh:table',
             variant: 'default',
             action: { type: 'command', command: 'refresh:table' },
@@ -170,7 +211,7 @@ describe('list mapper', () => {
     const btn = (roundTripped.find((b) => b.blockType === 'toolbar')!
       .buttons as unknown as Array<Record<string, unknown>>)[0];
     expect(btn.label).toBe('Reload');
-    expect(btn.code).toBe('refresh');
+    expect(btn.code).toBe('reloadTable');
     expect(btn.variant).toBe('default');
     expect(btn.action).toEqual({ type: 'command', command: 'refresh:table' });
   });

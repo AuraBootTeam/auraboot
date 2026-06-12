@@ -169,6 +169,31 @@ describe('canonicalizePageSchemaDto', () => {
     expect(validateStructure(schema)).toEqual([]);
   });
 
+  it('normalizes refresh toolbar preset shorthand into an executable builtin button', () => {
+    const schema = canonicalizePageSchemaDto({
+      pageKey: 'refresh_preset_list',
+      modelCode: 'page_schema',
+      modelCategory: null,
+      kind: 'list',
+      layout: { type: 'stack' },
+      blocks: [
+        {
+          id: 'toolbar',
+          blockType: 'toolbar',
+          buttons: [{ preset: 'refresh' }],
+        },
+      ],
+    });
+
+    const button = (schema.blocks[0] as any).buttons[0];
+    expect(button).toMatchObject({
+      preset: 'refresh',
+      code: 'refresh',
+      label: { 'zh-CN': '刷新', 'en-US': 'Refresh' },
+    });
+    expect(validateStructure(schema)).toEqual([]);
+  });
+
   it('preserves top-level page dataSources from DSL v4 page DTOs', () => {
     const schema = canonicalizePageSchemaDto({
       pageKey: 'workbench_detail',

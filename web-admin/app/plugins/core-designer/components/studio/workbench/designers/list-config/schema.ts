@@ -98,6 +98,7 @@ export const filterDetailSchemas: ExtendedPropertySchema<string>[] = [
 /** Toolbar preset toggles (gated by capabilities at render time). */
 export const toolbarPresetSchemas: ExtendedPropertySchema<string>[] = [
   { key: 'presetCreate', label: '新增', type: 'boolean', group: '预设按钮' },
+  { key: 'presetRefresh', label: '刷新', type: 'boolean', group: '预设按钮' },
   { key: 'presetExport', label: '导出', type: 'boolean', group: '预设按钮' },
   { key: 'presetBulkDelete', label: '批量删除', type: 'boolean', group: '预设按钮' },
 ];

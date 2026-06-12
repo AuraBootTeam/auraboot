@@ -27,13 +27,15 @@ interface PresetDescriptor {
   key: ToolbarPresetKey;
   label: string;
   /** Capability gate: preset is disabled when this capability is false. */
-  capability: keyof ModelCapabilities;
+  capability?: keyof ModelCapabilities;
+  description: string;
 }
 
 const PRESETS: PresetDescriptor[] = [
-  { key: 'create', label: '新增', capability: 'create' },
-  { key: 'export', label: '导出', capability: 'export' },
-  { key: 'bulkDelete', label: '批量删除', capability: 'bulkDelete' },
+  { key: 'create', label: '新增', capability: 'create', description: '当前模型支持该预设动作' },
+  { key: 'refresh', label: '刷新', description: '刷新当前列表数据，不依赖模型写入能力' },
+  { key: 'export', label: '导出', capability: 'export', description: '当前模型支持该预设动作' },
+  { key: 'bulkDelete', label: '批量删除', capability: 'bulkDelete', description: '当前模型支持该预设动作' },
 ];
 
 export const ToolbarTab: React.FC<ToolbarTabProps> = ({
@@ -131,7 +133,7 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
             </div>
           )}
           {PRESETS.map((preset) => {
-            const allowed = capabilities ? !!capabilities[preset.capability] : false;
+            const allowed = preset.capability ? !!capabilities?.[preset.capability] : true;
             const active = activePresets.has(preset.key);
             return (
               <label
@@ -150,10 +152,10 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium text-slate-800">{preset.label}</span>
                   <span className="mt-1 block text-xs text-slate-500">
-                    {capabilityError
+                    {capabilityError && preset.capability
                       ? '当前无法读取模型能力，请修复模型绑定后再切换预设动作'
                       : allowed
-                      ? '当前模型支持该预设动作'
+                      ? preset.description
                       : `当前模型未开启 ${String(preset.capability)} 能力`}
                   </span>
                 </span>

@@ -289,6 +289,8 @@ export type ActionDef =
 // Button 配置
 export interface ButtonConfig {
   code: string;
+  /** Designer-authored shorthand for common toolbar buttons. */
+  preset?: string;
   /** @deprecated Use `label` for i18n display text. Kept for backward compatibility. */
   action?: string | ActionDef; // Legacy: i18n key string. New: ActionDef object.
   content?: string | LocalizedText;

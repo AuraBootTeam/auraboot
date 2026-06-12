@@ -133,6 +133,11 @@ function normalizeDataSourceMap(
 
 function normalizeButton(button: ButtonConfig): ButtonConfig {
   const result: ButtonConfig = { ...button };
+  if (result.preset === 'refresh' && !result.code) {
+    result.code = 'refresh';
+    result.label = result.label ?? { 'zh-CN': '刷新', 'en-US': 'Refresh' };
+  }
+
   const visibleWhen = normalizeConditionExpression((result as any).visibleWhen);
   if (visibleWhen) {
     result.visibleWhen = visibleWhen;

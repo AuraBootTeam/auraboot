@@ -38,7 +38,7 @@ export interface FilterConfig {
   displayMode?: 'inline' | 'drawer' | 'top-bar';
 }
 
-export type ToolbarPresetKey = 'create' | 'export' | 'bulkDelete';
+export type ToolbarPresetKey = 'create' | 'refresh' | 'export' | 'bulkDelete';
 
 export interface CustomButton {
   label: string;
@@ -97,7 +97,7 @@ export function emptyListViewModel(): ListViewModel {
 }
 
 // Known preset keys — must match ToolbarPresetKey.
-const PRESET_KEYS: readonly ToolbarPresetKey[] = ['create', 'export', 'bulkDelete'];
+const PRESET_KEYS: readonly ToolbarPresetKey[] = ['create', 'refresh', 'export', 'bulkDelete'];
 const PRESET_KEY_SET = new Set<string>(PRESET_KEYS);
 
 // ---------------------------------------------------------------------------
