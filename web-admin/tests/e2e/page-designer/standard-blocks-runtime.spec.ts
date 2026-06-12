@@ -57,6 +57,7 @@ function buildPageBase(kind: PageKind, pageKey: string, title: string) {
 async function createPublishedStandardListPage(page: Page) {
   const id = uniqueId('standard_runtime_list');
   const pageKey = id.replace(/-/g, '_');
+  const title = `Standard list runtime ${id}`;
   const blocks = [
     {
       id: 'std_filters',
@@ -165,21 +166,28 @@ async function createPublishedStandardListPage(page: Page) {
       table: {
         columns: [
           { field: 'name', label: 'Name', width: 260 },
-          { field: 'pageKey', label: 'Page Key', width: 220 },
+          { field: 'page_key', label: 'Page Key', width: 220 },
           { field: 'status', label: 'Status', width: 160 },
         ],
         selection: true,
         pagination: { pageSize: 10 },
+        rowActions: [
+          {
+            code: 'runtime_inspect',
+            label: 'Inspect row',
+            action: { type: 'navigate', to: `/p/c/${pageKey}?runtimeRow={pid}` },
+          },
+        ],
       },
       columns: [
         { field: 'name', label: 'Name', width: 260 },
-        { field: 'pageKey', label: 'Page Key', width: 220 },
+        { field: 'page_key', label: 'Page Key', width: 220 },
         { field: 'status', label: 'Status', width: 160 },
       ],
     },
   ];
   const payload = {
-    ...buildPageBase('list', pageKey, `Standard list runtime ${id}`),
+    ...buildPageBase('list', pageKey, title),
     blocks,
     dataSources: {
       ds_stats: {
@@ -200,8 +208,8 @@ async function createPublishedStandardListPage(page: Page) {
     },
   };
 
-  await publishPage(page, payload);
-  return { pageKey, blocks };
+  const pid = await publishPage(page, payload);
+  return { pageKey, title, blocks, pid };
 }
 
 async function createPublishedStandardFormPage(page: Page) {
@@ -317,7 +325,54 @@ test.describe('Page Designer standard block runtime', () => {
     await expect(page.getByTestId('ab:list:page_schema:table')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('table-cell-0-name')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('table-cell-0-status')).toBeVisible();
+    await expect(page.getByTestId('table-cell-0-actions')).toBeVisible();
     await expect(page.locator('body')).not.toContainText('Unknown block type');
+  });
+
+  test('table runtime supports search, row action navigation, and bulk toolbar actions', async ({
+    page,
+  }) => {
+    const { pageKey, title, pid } = await createPublishedStandardListPage(page);
+
+    await page.goto(`/p/c/${pageKey}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 15_000 });
+
+    const searchResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/dynamic/page_schema/list') && response.status() === 200,
+      { timeout: 15_000 },
+    );
+    await page.getByTestId('list-search-input').fill(pageKey);
+    await page.getByTestId('list-search-input').press('Enter');
+    await searchResponse;
+
+    await expect(page.getByTestId('table-row-0')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('table-cell-0-name')).toContainText(title);
+    await expect(page.getByTestId('table-cell-0-page_key')).toContainText(pageKey);
+
+    await page.getByTestId('table-row-0').hover();
+    await expect(page.getByTestId('row-action-runtime_inspect')).toBeVisible();
+    await page.getByTestId('row-action-runtime_inspect').click();
+    await expect(page).toHaveURL(new RegExp(`/p/c/${pageKey}\\?runtimeRow=${pid}`));
+
+    await page.goto(`/p/c/${pageKey}?keyword=${encodeURIComponent(pageKey)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page.getByTestId('table-row-0')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('row-checkbox-0').check();
+    await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Clear selection' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await expect(page.getByRole('heading', { name: 'Bulk Edit' })).toBeVisible();
+    await expect(page.getByText('Update 1 selected records')).toBeVisible();
+    await expect(page.getByRole('combobox')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('heading', { name: 'Bulk Edit' })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Clear selection' }).click();
+    await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
   });
 
   test('persists and renders form-section and form-buttons in a real custom form page', async ({
