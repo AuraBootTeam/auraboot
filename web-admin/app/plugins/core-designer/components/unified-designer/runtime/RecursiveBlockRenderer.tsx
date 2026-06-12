@@ -3,6 +3,7 @@ import { usePermissions } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import type { DslBlockV3, PageSchemaV3 } from '../types';
+import { getCustomBlockRenderer } from './customBlockRendererRegistry';
 import {
   normalizeRuntimeExecutionError,
   type RuntimeExecutionContext,
@@ -253,7 +254,15 @@ function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: Runtim
           blockPath={blockPath}
         />
       );
-    default:
+    default: {
+      // Plugin-contributed custom blocks may register a runtime renderer
+      // (e.g. AuraQR's scannability-qc live score). When present it fully
+      // replaces the generic container; otherwise fall through so unknown /
+      // layout blocks still render their title + children (zero regression).
+      const CustomRenderer = getCustomBlockRenderer(block.blockType);
+      if (CustomRenderer) {
+        return <CustomRenderer block={block} />;
+      }
       return (
         <RuntimeContainer
           block={block}
@@ -262,6 +271,7 @@ function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: Runtim
           blockPath={blockPath}
         />
       );
+    }
   }
 }
 
