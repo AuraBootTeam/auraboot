@@ -240,6 +240,153 @@ function shortcutWidgets(): DashboardWidgetFixture[] {
   ];
 }
 
+function advancedRuntimeWidgets(): DashboardWidgetFixture[] {
+  return [
+    {
+      id: 'runtime-wordcloud',
+      type: 'smart-wordcloud-chart',
+      title: 'Runtime Word Cloud',
+      x: 0,
+      y: 0,
+      w: 4,
+      h: 4,
+      config: {
+        title: 'Runtime Word Cloud',
+        dataSource: {
+          type: 'static',
+          staticData: [
+            { keyword: 'Runtime', weight: 42 },
+            { keyword: 'Coverage', weight: 21 },
+          ],
+          dimensions: ['keyword'],
+          metrics: [{ field: 'weight', aggregation: 'sum', alias: 'weight' }],
+        },
+        visualization: {
+          colorTheme: 'brand',
+          gridSize: 6,
+        },
+      },
+    },
+    {
+      id: 'runtime-combo',
+      type: 'smart-combo-chart',
+      title: 'Runtime Combo',
+      x: 4,
+      y: 0,
+      w: 4,
+      h: 4,
+      config: {
+        title: 'Runtime Combo',
+        dataSource: {
+          type: 'static',
+          staticData: [
+            { quarter: 'Q1', revenue: 120, conversion: 30 },
+            { quarter: 'Q2', revenue: 180, conversion: 42 },
+          ],
+          dimensions: ['quarter'],
+          metrics: [
+            { field: 'revenue', aggregation: 'sum', alias: 'revenue' },
+            { field: 'conversion', aggregation: 'sum', alias: 'conversion' },
+          ],
+        },
+        visualization: {
+          seriesConfig: [
+            { metricIndex: 0, chartType: 'bar', yAxisIndex: 0, showLabel: true },
+            { metricIndex: 1, chartType: 'line', yAxisIndex: 1, showLabel: true },
+          ],
+          yAxisLeft: { name: 'Revenue' },
+          yAxisRight: { name: 'Conversion' },
+        },
+      },
+    },
+    {
+      id: 'runtime-nps',
+      type: 'smart-nps-chart',
+      title: 'Runtime NPS',
+      x: 8,
+      y: 0,
+      w: 4,
+      h: 4,
+      config: {
+        title: 'Runtime NPS',
+        dataSource: {
+          type: 'static',
+          staticData: [{ score: 10 }, { score: 9 }, { score: 8 }, { score: 4 }],
+          dimensions: ['score'],
+          metrics: [{ field: 'score', aggregation: 'sum', alias: 'score' }],
+        },
+        visualization: {
+          scoreField: 'score',
+          showLegend: true,
+          ringWidth: 28,
+        },
+      },
+    },
+    {
+      id: 'runtime-gallery',
+      type: 'smart-gallery',
+      title: 'Runtime Gallery',
+      x: 0,
+      y: 4,
+      w: 6,
+      h: 4,
+      config: {
+        title: 'Runtime Gallery',
+        dataSource: { type: 'static' },
+        visualization: {
+          staticItems: [
+            {
+              image: SVG_DATA_URL,
+              title: 'Runtime Gallery Alpha',
+              description: 'Gallery item from authored visualization props',
+            },
+          ],
+          columns: 2,
+          imageFit: 'contain',
+        },
+      },
+    },
+    {
+      id: 'runtime-kanban',
+      type: 'smart-kanban',
+      title: 'Runtime Kanban',
+      x: 6,
+      y: 4,
+      w: 6,
+      h: 4,
+      config: {
+        title: 'Runtime Kanban',
+        dataSource: {
+          type: 'static',
+          staticData: [
+            {
+              id: 'card-a',
+              stage: 'Backlog',
+              title: 'Runtime Card A',
+              description: 'Backlog card rendered from static rows',
+            },
+            {
+              id: 'card-b',
+              stage: 'Done',
+              title: 'Runtime Card B',
+              description: 'Done card rendered from static rows',
+            },
+          ],
+          dimensions: ['stage'],
+          metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
+        },
+        visualization: {
+          groupField: 'stage',
+          titleField: 'title',
+          descriptionField: 'description',
+          columnOrder: ['Backlog', 'Done'],
+          showCount: true,
+        },
+      },
+    },
+  ];
+}
+
 async function parseJsonResponse<T>(response: APIResponse, context: string): Promise<T> {
   const text = await response.text();
   expect(response.ok(), `${context} failed: status=${response.status()} body=${text}`).toBe(true);
@@ -293,6 +440,35 @@ async function expectRuntimeBlock(page: Page, id: string, type: string): Promise
   await expect(block.locator(`[data-widget-type="${type}"]`)).toBeVisible({ timeout: 10_000 });
   await expect(block).not.toContainText('Unknown widget');
   return block;
+}
+
+async function expectRenderedChartSurface(block: Locator, label: string): Promise<void> {
+  const surface = block.locator(
+    '[data-widget-type] .echarts-for-react, [data-widget-type] canvas, [data-widget-type] svg',
+  );
+  await expect(surface.first(), `${label} should render an ECharts surface`).toBeVisible({
+    timeout: 10_000,
+  });
+  const largestSurface = await surface.evaluateAll((nodes) =>
+    nodes.reduce(
+      (largest, node) => {
+        const rect = node.getBoundingClientRect();
+        const area = rect.width * rect.height;
+        return area > largest.area
+          ? { area, width: rect.width, height: rect.height }
+          : largest;
+      },
+      { area: 0, width: 0, height: 0 },
+    ),
+  );
+  expect(largestSurface.width, `${label} chart width`).toBeGreaterThan(40);
+  expect(largestSurface.height, `${label} chart height`).toBeGreaterThan(40);
+  await expect(block, `${label} should exit loading state`).not.toContainText('Loading...', {
+    timeout: 10_000,
+  });
+  await expect(block, `${label} should not show chart error`).not.toContainText(
+    /Failed to load|Please configure|No data/,
+  );
 }
 
 async function currentUserNoteContent(page: Page): Promise<string> {
@@ -438,6 +614,49 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
 
       await shortcut.click();
       await expect(page).toHaveURL(/\/dashboards$/);
+    } finally {
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
+  test('DWR-004: published viewer renders advanced chart and view widgets', async ({ page }) => {
+    let dashboard: CreatedDashboard | undefined;
+
+    try {
+      dashboard = await createPublishedDashboard(
+        page,
+        advancedRuntimeWidgets(),
+        'Runtime Advanced Widget Matrix',
+      );
+
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      const wordCloud = await expectRuntimeBlock(
+        page,
+        'runtime-wordcloud',
+        'smart-wordcloud-chart',
+      );
+      await expectRenderedChartSurface(wordCloud, 'word cloud');
+
+      const combo = await expectRuntimeBlock(page, 'runtime-combo', 'smart-combo-chart');
+      await expectRenderedChartSurface(combo, 'combo chart');
+
+      const nps = await expectRuntimeBlock(page, 'runtime-nps', 'smart-nps-chart');
+      await expectRenderedChartSurface(nps, 'NPS chart');
+
+      const gallery = await expectRuntimeBlock(page, 'runtime-gallery', 'smart-gallery');
+      await expect(gallery).toContainText('Runtime Gallery Alpha');
+      await expect(gallery).toContainText('Gallery item from authored visualization props');
+      await expect(gallery.locator('img[alt="Runtime Gallery Alpha"]')).toBeVisible();
+
+      const kanban = await expectRuntimeBlock(page, 'runtime-kanban', 'smart-kanban');
+      await expect(kanban).toContainText('Backlog');
+      await expect(kanban).toContainText('Done');
+      await expect(kanban).toContainText('Runtime Card A');
+      await expect(kanban).toContainText('Runtime Card B');
     } finally {
       await cleanupDashboard(page, dashboard?.pid);
     }
