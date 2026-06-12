@@ -5,7 +5,8 @@
  *   - form-section / detail-section: covered by detail-configpanel-e2e,
  *     runtime-rendering-e2e, subtable-modes-e2e.
  *   - sub-table (3 modes): covered by subtable-modes-e2e.
- *   - tabs: covered by runtime-rendering-e2e.
+ *   - tabs: covered by runtime-rendering-e2e; this file adds focused
+ *     nested layout coverage for tabs with grid/stack child block layouts.
  *
  * This file closes the gap for detail-kind blocks that are actually dispatched
  * by `web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx` but
@@ -272,7 +273,56 @@ function buildTabsBlock(innerBlocks: any[], tabKey = 'd_tab') {
   };
 }
 
-test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments)', () => {
+function buildLayoutNestingTabsBlock() {
+  return {
+    id: 'd_layout_tabs',
+    blockType: 'tabs' as const,
+    tabs: [
+      {
+        key: 'layout_overview',
+        label: 'Layout Overview',
+        layout: { type: 'grid', cols: 12, colGap: 8, rowGap: 12 },
+        blocks: [
+          {
+            id: 'd_layout_identity',
+            blockType: 'detail-section',
+            title: 'Layout Identity',
+            layout: { col: 0, colSpan: 6, order: 2 },
+            fields: [{ field: 'sc_name' }, { field: 'sc_code' }],
+          },
+          {
+            id: 'd_layout_rich_text',
+            blockType: 'rich-text',
+            layout: { col: 6, colSpan: 6, order: 1 },
+            content:
+              '<p data-testid="layout-overview-content">Nested overview content from rich-text</p>',
+          },
+        ],
+      },
+      {
+        key: 'layout_secondary',
+        label: 'Layout Secondary',
+        layout: { type: 'stack', gap: 4 },
+        blocks: [
+          {
+            id: 'd_layout_divider',
+            blockType: 'divider',
+            title: 'Layout divider',
+          },
+          {
+            id: 'd_layout_secondary_text',
+            blockType: 'rich-text',
+            content:
+              '<p data-testid="layout-secondary-content">Secondary layout tab mounted</p>',
+          },
+        ],
+      },
+    ],
+  };
+}
+
+test.describe('D — Detail-kind block/layout coverage', () => {
+  test.describe.configure({ mode: 'serial' });
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(90_000);
 
@@ -303,6 +353,104 @@ test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments
         })
         .catch(() => null);
     }
+  });
+
+  test('D.layout-tabs: renders nested grid and stack blocks across detail tabs', async ({
+    page,
+    request,
+  }) => {
+    const seed = await seedRecord(request);
+    createdPids.push(seed.pid);
+
+    detailSnapshot = await snapshotDetailPage(request, DETAIL_PAGE_KEY);
+    const keep = detailSnapshot.blocks.filter(
+      (b: any) => b?.blockType !== 'tabs' && b?.blockType !== 'toolbar',
+    );
+    const nextBlocks = [
+      ...keep,
+      {
+        id: 'd_identity',
+        blockType: 'detail-section',
+        title: 'D Detail Identity',
+        columns: 2,
+        fields: [{ field: 'sc_name' }, { field: 'sc_code' }],
+      },
+      buildLayoutNestingTabsBlock(),
+    ];
+    await replacePageBlocks(request, detailSnapshot, nextBlocks);
+
+    const readback = await snapshotDetailPage(request, DETAIL_PAGE_KEY);
+    const tabsBlock = readback.blocks.find((block: any) => block?.id === 'd_layout_tabs');
+    expect(tabsBlock?.blockType, 'layout tabs block should persist').toBe('tabs');
+    const persistedLayoutTabs = (tabsBlock?.tabs || []).filter((tab: any) =>
+      String(tab.key || '').startsWith('layout_'),
+    );
+    expect(
+      persistedLayoutTabs.map((tab: any) => ({
+        key: tab.key,
+        layout: tab.layout,
+        blocks: (tab.blocks || []).map((block: any) => ({
+          id: block.id,
+          blockType: block.blockType,
+          layout: block.layout,
+        })),
+      })),
+      'nested layout and block order should persist in detail page schema',
+    ).toEqual([
+      {
+        key: 'layout_overview',
+        layout: { type: 'grid', cols: 12, colGap: 8, rowGap: 12 },
+        blocks: [
+          {
+            id: 'd_layout_identity',
+            blockType: 'detail-section',
+            layout: { col: 0, colSpan: 6, order: 2 },
+          },
+          {
+            id: 'd_layout_rich_text',
+            blockType: 'rich-text',
+            layout: { col: 6, colSpan: 6, order: 1 },
+          },
+        ],
+      },
+      {
+        key: 'layout_secondary',
+        layout: { type: 'stack', gap: 4 },
+        blocks: [
+          { id: 'd_layout_divider', blockType: 'divider', layout: undefined },
+          { id: 'd_layout_secondary_text', blockType: 'rich-text', layout: undefined },
+        ],
+      },
+    ]);
+
+    await gotoShowcaseListViaMenu(page);
+    await openDetailViaListRow(page, seed);
+
+    const overviewTab = page.getByTestId('ab:detail:showcase_all_fields:tab:layout_overview');
+    const secondaryTab = page.getByTestId('ab:detail:showcase_all_fields:tab:layout_secondary');
+    await expect(overviewTab, 'overview tab should render').toBeVisible({ timeout: 10_000 });
+    await expect(secondaryTab, 'secondary tab should render').toBeVisible({ timeout: 10_000 });
+
+    await expect(page.getByTestId('grid-layout')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('grid-item-d_layout_identity')).toBeVisible();
+    await expect(page.getByTestId('grid-item-d_layout_rich_text')).toBeVisible();
+    await expect(page.getByTestId('layout-overview-content')).toBeVisible();
+    await expect(page.locator('.form-section', { hasText: 'Layout Identity' })).toContainText(
+      seed.sc_name,
+    );
+    await expect(page.getByTestId('layout-secondary-content')).toHaveCount(0);
+
+    await secondaryTab.click();
+    await expect(secondaryTab).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('stack-layout')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('divider-block')).toContainText('Layout divider');
+    await expect(page.getByTestId('layout-secondary-content')).toBeVisible();
+    await expect(page.getByTestId('layout-overview-content')).toHaveCount(0);
+
+    await overviewTab.click();
+    await expect(overviewTab).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('grid-layout')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('layout-overview-content')).toBeVisible();
   });
 
   // ---------------------------------------------------------------------------
