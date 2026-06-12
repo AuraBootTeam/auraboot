@@ -374,7 +374,7 @@ const CustomPropsJsonEditor: React.FC<CustomPropsJsonEditorProps> = ({
  */
 const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readonly }) => {
   const props = (block.props || {}) as Record<string, any>;
-  const chartRefreshInterval =
+  const blockRefreshInterval =
     block.refreshInterval ??
     (typeof props.refreshInterval === 'number' ? props.refreshInterval : undefined);
 
@@ -457,6 +457,25 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
               data-testid="stat-change-field-input"
             />
           </PropertyField>
+
+          <PropertyField label="刷新间隔(ms)" testId="stat-refresh-interval">
+            <input
+              type="number"
+              value={blockRefreshInterval ?? ''}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                onChange({
+                  refreshInterval: Number.isFinite(next) && next > 0 ? next : undefined,
+                });
+              }}
+              disabled={readonly}
+              className="property-input"
+              min={0}
+              step={500}
+              placeholder="0"
+              data-testid="stat-refresh-interval-input"
+            />
+          </PropertyField>
         </>
       )}
 
@@ -514,7 +533,7 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
           <PropertyField label="刷新间隔(ms)" testId="chart-refresh-interval">
             <input
               type="number"
-              value={chartRefreshInterval ?? ''}
+              value={blockRefreshInterval ?? ''}
               onChange={(e) => {
                 const next = Number(e.target.value);
                 onChange({
