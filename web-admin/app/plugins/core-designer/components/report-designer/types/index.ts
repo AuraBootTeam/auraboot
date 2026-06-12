@@ -39,10 +39,11 @@ export interface PageMargin {
 // ==================== Data Sources ====================
 
 export interface ReportDataSource {
-  type: 'model' | 'namedQuery' | 'api';
+  type: 'model' | 'namedQuery' | 'api' | 'static';
   modelCode?: string;
   queryCode?: string;
   url?: string;
+  data?: Record<string, unknown>[];
   filters?: Array<{ field: string; operator: string; value: string }>;
   sortBy?: Array<{ field: string; order: 'asc' | 'desc' }>;
 }

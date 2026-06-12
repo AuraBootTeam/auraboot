@@ -28,14 +28,17 @@ const noProxyHttpsAgent = new https.Agent({
  * Whether a request path should be proxied as a raw binary download rather than
  * parsed/re-serialized through the JSON proxy.
  *
- * Matches `/download` when it is a complete path segment — at end of path,
- * before a query string, OR followed by another segment (e.g. the file endpoint
- * `/api/file/download/{fileId}`). The trailing-segment case was previously
- * missed, so xlsx bytes fell through to the JSON proxy and were re-serialized as
- * a JSON string (`"PK…`), corrupting every downloaded file.
+ * Matches download/export artifact endpoints that must not be parsed and
+ * re-serialized through the JSON proxy. If xlsx bytes fall through the JSON
+ * path, they become a JSON string (`"PK…`) and the downloaded file is
+ * corrupted.
  */
 export function isBinaryDownloadPath(path: string): boolean {
-  return /\/download(?:\/|\?|$)/.test(path);
+  const pathname = path.split('?')[0];
+  return (
+    /\/download(?:\/|$)/.test(pathname) ||
+    /\/export\/(?:excel|xlsx|csv|pdf)(?:\/|$)/.test(pathname)
+  );
 }
 
 export function shouldForwardRequestBody(method: string): boolean {
@@ -269,8 +272,8 @@ export class BffProxyService {
 
       logger.info(`[${requestId}] Starting binary download from ${backendUrl}`);
 
-      const response = await axios({
-        method: 'get',
+      const axiosConfig: AxiosRequestConfig = {
+        method: req.method.toLowerCase() as any,
         url: backendUrl,
         headers,
         responseType: 'arraybuffer',
@@ -278,7 +281,12 @@ export class BffProxyService {
         httpAgent: noProxyHttpAgent,
         httpsAgent: noProxyHttpsAgent,
         proxy: false as const,
-      });
+      };
+      if (shouldForwardRequestBody(req.method)) {
+        axiosConfig.data = req.body;
+      }
+
+      const response = await axios(axiosConfig);
 
       // 转发响应头
       const contentType = toResponseHeaderValue(response.headers['content-type']);

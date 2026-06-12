@@ -19,6 +19,12 @@ describe('isBinaryDownloadPath', () => {
     expect(isBinaryDownloadPath('/api/templates/t1/download')).toBe(true);
   });
 
+  it('detects report artifact export endpoints that stream binary bytes', () => {
+    expect(isBinaryDownloadPath('/api/reports/export/excel')).toBe(true);
+    expect(isBinaryDownloadPath('/api/reports/export/excel?format=xlsx')).toBe(true);
+    expect(isBinaryDownloadPath('/api/reports/export/pdf')).toBe(true);
+  });
+
   it('does not over-match paths that merely contain "download"', () => {
     expect(isBinaryDownloadPath('/api/downloads/list')).toBe(false);
     expect(isBinaryDownloadPath('/api/file/downloaded')).toBe(false);
