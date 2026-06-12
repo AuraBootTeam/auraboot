@@ -5,6 +5,8 @@ import { uniqueId } from '../helpers';
 const FORM_BLOCK_ID = 'pd_undo_redo_section';
 const BLOCK_TITLE_SECTION_ID = 'pd_undo_redo_block_title_section';
 const BLOCK_DELETE_TEXT_ID = 'pd_undo_redo_delete_text';
+const BLOCK_REORDER_FIRST_ID = 'pd_undo_redo_reorder_first';
+const BLOCK_REORDER_SECOND_ID = 'pd_undo_redo_reorder_second';
 const SHOWCASE_MODEL = 'showcase_all_fields';
 const RATING_FIELD = 'sc_rating';
 
@@ -149,6 +151,48 @@ async function createBlockDeleteUndoRedoPage(page: Page) {
   return { pid, pageKey, title };
 }
 
+async function createBlockReorderUndoRedoPage(page: Page) {
+  const id = uniqueId('pd_block_reorder_undo_redo_authoring');
+  const pageKey = id.replace(/-/g, '_');
+  const title = `Block reorder undo redo authoring ${id}`;
+  const payload = {
+    name: title,
+    pageKey,
+    title,
+    kind: 'form',
+    modelCode: SHOWCASE_MODEL,
+    profile: 'admin',
+    layout: { type: 'stack', gap: 12 },
+    blocks: [
+      {
+        id: BLOCK_REORDER_FIRST_ID,
+        blockType: 'text',
+        props: { content: 'First reorder seed text' },
+      },
+      {
+        id: BLOCK_REORDER_SECOND_ID,
+        blockType: 'text',
+        props: { content: 'Second reorder seed text' },
+      },
+    ],
+    dataSources: {},
+    schemaVersion: 4,
+    metaInfo: { runtimeE2E: true, undoRedoBlockReorder: true },
+    semver: '0.1.0',
+  };
+
+  const createResp = await page.request.post('/api/pages', { data: payload });
+  expect(
+    createResp.ok(),
+    `Create block reorder undo/redo authoring page failed: ${createResp.status()}`,
+  ).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created block reorder undo/redo authoring pid').toBeTruthy();
+  return { pid, pageKey, title };
+}
+
 async function fetchModelFieldType(page: Page, modelCode: string, fieldCode: string) {
   const modelResp = await page.request.get(`/api/meta/models/code/${modelCode}`);
   expect(modelResp.ok(), `Fetch model ${modelCode} failed: ${modelResp.status()}`).toBeTruthy();
@@ -221,6 +265,29 @@ async function deleteCanvasBlock(page: Page, blockId: string) {
   await expect(block).toBeHidden({ timeout: 5_000 });
 }
 
+async function dragBlockBelow(page: Page, sourceBlockId: string, targetBlockId: string) {
+  const source = page.locator(`[data-testid="sortable-block"][data-block-id="${sourceBlockId}"]`);
+  const target = page.locator(`[data-testid="sortable-block"][data-block-id="${targetBlockId}"]`);
+  await expect(source).toBeVisible({ timeout: 5_000 });
+  await expect(target).toBeVisible({ timeout: 5_000 });
+
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+  expect(sourceBox, `source block ${sourceBlockId} box`).toBeTruthy();
+  expect(targetBox, `target block ${targetBlockId} box`).toBeTruthy();
+
+  await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 18);
+  await page.mouse.down();
+  await page.mouse.move(sourceBox!.x + sourceBox!.width / 2 + 12, sourceBox!.y + 42, {
+    steps: 4,
+  });
+  await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height - 6, {
+    steps: 12,
+  });
+  await page.mouse.up();
+  await page.mouse.move(20, 20);
+}
+
 async function selectComponentForField(page: Page, component: string) {
   const componentSelect = page.getByTestId('field-property-component-select');
   await expect(componentSelect).toBeVisible({ timeout: 5_000 });
@@ -262,6 +329,15 @@ async function saveDesignerAndWait(page: Page, pid: string) {
   await saveResp;
 }
 
+async function clickEnabledToolbarButton(page: Page, testId: string) {
+  const button = page.getByTestId(testId);
+  await expect(button).toBeVisible({ timeout: 5_000 });
+  await expect(button).toBeEnabled({ timeout: 5_000 });
+  await button.scrollIntoViewIfNeeded();
+  await button.click({ trial: true });
+  await button.click();
+}
+
 async function fetchPageByPid(page: Page, pid: string): Promise<Record<string, any>> {
   const resp = await page.request.get(`/api/pages/${pid}`);
   expect(resp.ok(), `Fetch page ${pid} failed: ${resp.status()}`).toBeTruthy();
@@ -299,7 +375,7 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
     await fillWidgetInput(page, 'maxRating', '7');
     await expect(page.getByTestId('widget-prop-maxRating').locator('input')).toHaveValue('7');
 
-    await page.getByTestId('toolbar-undo').click();
+    await clickEnabledToolbarButton(page, 'toolbar-undo');
     await expect(page.getByTestId('widget-prop-maxRating').locator('input')).toHaveValue('5');
     await saveDesignerAndWait(page, pid);
     const undonePage = await fetchPageByPid(page, pid);
@@ -307,7 +383,7 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
     expect(undoneField.component).toBe('rating');
     expect(undoneField.props ?? {}).not.toMatchObject({ maxRating: 7 });
 
-    await page.getByTestId('toolbar-redo').click();
+    await clickEnabledToolbarButton(page, 'toolbar-redo');
     await expect(page.getByTestId('widget-prop-maxRating').locator('input')).toHaveValue('7');
     await saveDesignerAndWait(page, pid);
     const redonePage = await fetchPageByPid(page, pid);
@@ -330,13 +406,13 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
     await titleInput.fill('Edited block title');
     await expect(titleInput).toHaveValue('Edited block title');
 
-    await page.getByTestId('toolbar-undo').click();
+    await clickEnabledToolbarButton(page, 'toolbar-undo');
     await expect(titleInput).toHaveValue('Original block title');
     await saveDesignerAndWait(page, pid);
     const undonePage = await fetchPageByPid(page, pid);
     expect(savedBlockById(undonePage, BLOCK_TITLE_SECTION_ID).title).toBe('Original block title');
 
-    await page.getByTestId('toolbar-redo').click();
+    await clickEnabledToolbarButton(page, 'toolbar-redo');
     await expect(titleInput).toHaveValue('Edited block title');
     await saveDesignerAndWait(page, pid);
     const redonePage = await fetchPageByPid(page, pid);
@@ -355,7 +431,7 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
       .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
       .toEqual([...baselineBlockIds, textBlockId]);
 
-    await page.getByTestId('toolbar-undo').click();
+    await clickEnabledToolbarButton(page, 'toolbar-undo');
     await expect
       .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
       .toEqual(baselineBlockIds);
@@ -363,7 +439,7 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
     const undonePage = await fetchPageByPid(page, pid);
     expect((undonePage.blocks ?? []).map((block: any) => block.id)).not.toContain(textBlockId);
 
-    await page.getByTestId('toolbar-redo').click();
+    await clickEnabledToolbarButton(page, 'toolbar-redo');
     await expect
       .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
       .toEqual([...baselineBlockIds, textBlockId]);
@@ -411,5 +487,39 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
     expect((redonePage.blocks ?? []).map((block: any) => block.id)).not.toContain(
       BLOCK_DELETE_TEXT_ID,
     );
+  });
+
+  test('saves the undone schema and then saves the redone schema for a block reorder action', async ({
+    page,
+  }) => {
+    const { pid } = await createBlockReorderUndoRedoPage(page);
+    await openDesignerByPid(page, pid);
+
+    const initialOrder = [BLOCK_REORDER_FIRST_ID, BLOCK_REORDER_SECOND_ID];
+    const reordered = [BLOCK_REORDER_SECOND_ID, BLOCK_REORDER_FIRST_ID];
+    await expect
+      .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
+      .toEqual(initialOrder);
+
+    await dragBlockBelow(page, BLOCK_REORDER_FIRST_ID, BLOCK_REORDER_SECOND_ID);
+    await expect
+      .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
+      .toEqual(reordered);
+
+    await clickEnabledToolbarButton(page, 'toolbar-undo');
+    await expect
+      .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
+      .toEqual(initialOrder);
+    await saveDesignerAndWait(page, pid);
+    const undonePage = await fetchPageByPid(page, pid);
+    expect((undonePage.blocks ?? []).map((block: any) => block.id)).toEqual(initialOrder);
+
+    await clickEnabledToolbarButton(page, 'toolbar-redo');
+    await expect
+      .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
+      .toEqual(reordered);
+    await saveDesignerAndWait(page, pid);
+    const redonePage = await fetchPageByPid(page, pid);
+    expect((redonePage.blocks ?? []).map((block: any) => block.id)).toEqual(reordered);
   });
 });
