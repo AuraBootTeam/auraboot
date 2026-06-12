@@ -40,6 +40,9 @@ export function toPageSchema(dto: PageSchemaDTO): PageSchema {
     modelCode: (dto.modelCode ?? dto.extension?.viewModelCode) as string | undefined,
     title: dto.title,
     layout: (dto.layout as PageSchema['layout']) ?? { type: 'stack' },
+    dataSource: ((dto as any).dataSource ?? dto.extension?.dataSource) as
+      | PageSchema['dataSource']
+      | undefined,
     blocks: dto.blocks as PageSchema['blocks'],
     profile: dto.profile as PageSchema['profile'],
     extension: dto.extension,
@@ -210,8 +213,15 @@ export function createDslSchemaPayload(
   if (schema.pageKey != null) {
     payload.pageKey = schema.pageKey;
   }
-  if (schema.extension && Object.keys(schema.extension).length > 0) {
-    payload.extension = { ...schema.extension };
+  const extension: Record<string, unknown> =
+    schema.extension && Object.keys(schema.extension).length > 0
+      ? { ...schema.extension }
+      : {};
+  if (schema.dataSource !== undefined) {
+    extension.dataSource = schema.dataSource;
+  }
+  if (Object.keys(extension).length > 0) {
+    payload.extension = extension;
   }
   if (schema.title != null) {
     payload.title = schema.title;

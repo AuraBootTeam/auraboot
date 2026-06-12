@@ -89,12 +89,14 @@ export function DataSourceEditor({
           }}
           disabled={readonly}
           spellCheck={false}
+          data-testid="ds-code-textarea"
         />
         {codeError && <div className="text-xs text-red-500">{codeError}</div>}
         <button
           onClick={handleCodeApply}
           className="rounded bg-blue-500 px-3 py-1 text-xs text-white"
           disabled={readonly}
+          data-testid="ds-code-apply"
         >
           Apply
         </button>
@@ -130,6 +132,7 @@ export function DataSourceEditor({
             value={dataSource.method || 'get'}
             onChange={(e) => updateField('method', e.target.value)}
             disabled={readonly}
+            data-testid="ds-method-select"
           >
             <option value="get">GET</option>
             <option value="post">POST</option>
@@ -155,6 +158,7 @@ export function DataSourceEditor({
           value={(dataSource as any).adaptor || 'table'}
           onChange={(e) => updateField('adaptor', e.target.value)}
           disabled={readonly}
+          data-testid="ds-adaptor-select"
         >
           <option value="table">table — {'{ records: [], total }'}</option>
           <option value="form">form — single object</option>
@@ -171,6 +175,7 @@ export function DataSourceEditor({
             checked={dataSource.pagination !== false}
             onChange={(e) => updateField('pagination', e.target.checked)}
             disabled={readonly}
+            data-testid="ds-pagination-checkbox"
           />
           Enabled
         </label>
@@ -187,14 +192,15 @@ export function DataSourceEditor({
             }}
             className="text-[10px] text-blue-500"
             disabled={readonly}
+            data-testid="ds-param-add"
           >
             + Add
           </button>
         </div>
         {Object.keys((dataSource as any).params || {}).length > 0 ? (
           <div className="space-y-1">
-            {Object.entries((dataSource as any).params || {}).map(([key, value]) => (
-              <div key={key} className="flex items-center gap-1">
+            {Object.entries((dataSource as any).params || {}).map(([key, value], index) => (
+              <div key={key} className="flex items-center gap-1" data-testid={`ds-param-row-${index}`}>
                 <input
                   className="flex-1 rounded border px-1.5 py-0.5 text-xs"
                   value={key}
@@ -207,6 +213,7 @@ export function DataSourceEditor({
                   }}
                   placeholder="key"
                   disabled={readonly}
+                  data-testid={`ds-param-key-${index}`}
                 />
                 <input
                   className="flex-1 rounded border px-1.5 py-0.5 text-xs"
@@ -218,6 +225,7 @@ export function DataSourceEditor({
                   }}
                   placeholder="value"
                   disabled={readonly}
+                  data-testid={`ds-param-value-${index}`}
                 />
                 <button
                   onClick={() => {
@@ -227,6 +235,7 @@ export function DataSourceEditor({
                   }}
                   className="text-xs text-red-400"
                   disabled={readonly}
+                  data-testid={`ds-param-delete-${index}`}
                 >
                   ×
                 </button>
@@ -245,17 +254,20 @@ export function DataSourceEditor({
         <button
           onClick={onTestDetect}
           className="rounded bg-blue-500 px-3 py-1 text-xs text-white"
-          disabled={readonly}
+          disabled={readonly || !onTestDetect}
+          data-testid="ds-test-detect-button"
         >
           Test & Detect Fields
         </button>
         {testStatus?.connected && (
-          <span className="ml-2 text-xs text-green-600">
+          <span className="ml-2 text-xs text-green-600" data-testid="ds-test-status">
             ✓ {testStatus.recordCount ?? '?'} records
           </span>
         )}
         {testStatus?.error && !testStatus.connected && (
-          <span className="ml-2 text-xs text-red-500">{testStatus.error}</span>
+          <span className="ml-2 text-xs text-red-500" data-testid="ds-test-status">
+            {testStatus.error}
+          </span>
         )}
       </div>
     </div>

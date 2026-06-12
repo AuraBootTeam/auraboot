@@ -54,6 +54,17 @@ export interface PageSchemaExtension {
   plugin?: Record<string, unknown>;
 }
 
+export interface PageDataSourceConfig {
+  type?: 'table' | 'namedQuery' | 'api' | string;
+  endpoint?: string;
+  method?: 'get' | 'post' | string;
+  pagination?: boolean;
+  queryCode?: string;
+  params?: Record<string, unknown>;
+  adaptor?: string;
+  [key: string]: unknown;
+}
+
 /**
  * Page Schema V2 — flat shape stored in ab_page_schema.blocks (JSONB).
  */
@@ -66,6 +77,7 @@ export interface PageSchema {
   title?: LocalizedText;
   profile?: 'admin' | 'report';
   layout: PageLayout;
+  dataSource?: PageDataSourceConfig;
   blocks: DslBlock[];
   extension?: PageSchemaExtension;
 }
