@@ -10,6 +10,7 @@ import com.auraboot.framework.automation.mapper.AutomationMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -317,6 +318,35 @@ class AutomationTriggerServiceImplTest {
         service.onStateChange("model-J", "rec-010", "draft", "suspended"); // SUSPENDED not in toStates
 
         verify(automationLogMapper, never()).insertLog(any());
+    }
+
+    // =========================================================
+    // onBpmEvent — SmartEngine process key matching
+    // =========================================================
+
+    @Test
+    void onBpmEvent_versionedSmartEngineProcessKeyMatchesBareAutomationModelCode() {
+        TriggerConfig config = new TriggerConfig();
+        config.setEventTypes(List.of("task_assigned"));
+        Automation automation = buildAutomation("auto-bpm-001", "e2et_payment_approval", null, config, List.of());
+        automation.setTriggerType("on_bpm_event");
+
+        when(automationMapper.findEnabledByModelCodeAndTriggerType("e2et_payment_approval", "on_bpm_event"))
+                .thenReturn(List.of(automation));
+
+        service.onBpmEvent("task_assigned", "e2et_payment_approval:1", "pi-001",
+                Map.of("taskInstanceId", "task-001"));
+
+        verify(automationMapper).findEnabledByModelCodeAndTriggerType("e2et_payment_approval", "on_bpm_event");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(automationProcessRuntime).run(eq(automation), eq("pi-001"), payloadCaptor.capture(), any());
+        assertThat(payloadCaptor.getValue())
+                .containsEntry("event", "bpm_event")
+                .containsEntry("eventType", "task_assigned")
+                .containsEntry("processKey", "e2et_payment_approval:1")
+                .containsEntry("instanceId", "pi-001")
+                .containsEntry("taskInstanceId", "task-001");
     }
 
     // =========================================================

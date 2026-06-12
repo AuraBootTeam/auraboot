@@ -236,9 +236,10 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     public void onBpmEvent(String eventType, String processKey, String instanceId, Map<String, Object> payload) {
         log.debug("BPM event: eventType={}, processKey={}, instanceId={}", eventType, processKey, instanceId);
 
-        // Use processKey as modelCode to find matching automations
+        // SmartEngine task events can carry "processKey:version"; automation rules store the bare process key.
+        String automationModelCode = normalizeBpmProcessKey(processKey);
         List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
-                processKey, "on_bpm_event");
+                automationModelCode, "on_bpm_event");
 
         for (Automation automation : automations) {
             try {
@@ -268,6 +269,17 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                         automation.getPid(), e.getMessage(), e);
             }
         }
+    }
+
+    private String normalizeBpmProcessKey(String processKey) {
+        if (processKey == null) {
+            return null;
+        }
+        int versionSeparator = processKey.indexOf(':');
+        if (versionSeparator <= 0) {
+            return processKey;
+        }
+        return processKey.substring(0, versionSeparator);
     }
 
     @Override

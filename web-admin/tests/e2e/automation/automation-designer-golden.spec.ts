@@ -600,6 +600,27 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     return last;
   }
 
+  async function startBpmProcess(
+    page: Page,
+    processKey: string,
+    businessKey: string,
+    variables: Record<string, unknown>,
+  ): Promise<string> {
+    const resp = await page.request.post('/api/bpm/process-instances', {
+      data: {
+        processDefinitionId: processKey,
+        businessKey,
+        variables,
+      },
+    });
+    expect(resp.ok(), `BPM start failed with ${resp.status()}: ${await resp.text()}`).toBe(true);
+    const body = await resp.json();
+    expect(String(body.code), `BPM start response: ${JSON.stringify(body)}`).toBe('0');
+    const instanceId = body.data?.instanceId as string | undefined;
+    expect(instanceId, `BPM start missing instanceId: ${JSON.stringify(body)}`).toBeTruthy();
+    return instanceId!;
+  }
+
   test('N-CREATE-RECORD: drag trigger-record-create→action-create-record, configure via panel, save, enable, fire → a child order_item is created (happy) @golden', async ({
     page,
   }) => {
@@ -973,6 +994,67 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       origin: 'designer-start-process',
       tag,
     });
+  });
+
+  test('N-TRIGGER-BPM-EVENT: drag trigger-bpm-event→action-create-record, pick a BPM process and event type, start BPM → automation runs from task_assigned @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const processKey = 'e2et_payment_approval';
+    const businessKey = `NBE-${tag}`;
+    const itemName = `NBE-item-${tag}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-BPM-EVENT ${tag}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-bpm-event', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, {
+      modelCode: '付款审批流程',
+      eventTypes: ['任务分配'],
+    });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields:
+        '{"e2et_order_id":"${instanceId}","e2et_item_name":"' +
+        itemName +
+        '","e2et_item_spec":"bpm-event","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const triggerNode = saved.flowConfig.nodes.find((n: any) => n.id === trigger);
+    expect(triggerNode.data.config.modelCode, 'BPM process-select persisted process key').toBe(processKey);
+    expect(triggerNode.data.config.eventTypes, 'eventTypes persisted as raw BPM event values').toContain(
+      'task_assigned',
+    );
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    const instanceId = await startBpmProcess(page, processKey, businessKey, {
+      origin: 'designer-bpm-event',
+      tag,
+    });
+    const log = await pollLogTerminal(page, pid, firedAt, 60_000);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-BPM-EVENT run: ${JSON.stringify(log)}`).toBe(
+      'success',
+    );
+    expect(log?.errorMessage ?? '', 'BPM event trigger run should not carry an error').toBe('');
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(
+      statuses.find((s) => s.nodeId === action)?.status,
+      `create-record node completed after BPM event: ${JSON.stringify(statuses)}`,
+    ).toBe('completed');
+    expect((await pollItemsByName(page, itemName)).length, 'child item created by BPM event trigger').toBeGreaterThanOrEqual(1);
+
+    const bpmStatus = await pollProcessStatusByBusinessKey(page, businessKey, processKey);
+    expect(bpmStatus?.instanceId, `BPM status by businessKey: ${JSON.stringify(bpmStatus)}`).toBe(instanceId);
+    expect(
+      bpmStatus?.currentNodes?.some((n: any) => n.nodeId === 'manager_review' && n.status === 'active'),
+      'task_assigned came from the active manager_review userTask',
+    ).toBe(true);
   });
 
   // ── golden SAD path (real UI) — a runtime failure surfaces on the node ──────────
