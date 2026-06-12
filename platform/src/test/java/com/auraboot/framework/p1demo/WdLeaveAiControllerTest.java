@@ -12,6 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,7 +57,7 @@ class WdLeaveAiControllerTest {
     @Test
     void aiFill_blankNlInput_returnsBadRequest() {
         ResponseEntity<WdLeaveAiController.AiFillResponse> resp = controller.aiFill(
-                new WdLeaveAiController.AiFillRequest("  ", null, null));
+                new WdLeaveAiController.AiFillRequest("  ", null, null, null));
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
@@ -63,7 +65,7 @@ class WdLeaveAiControllerTest {
     void aiFill_noTenant_returns401() {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(null);
         ResponseEntity<WdLeaveAiController.AiFillResponse> resp = controller.aiFill(
-                new WdLeaveAiController.AiFillRequest("一周年假", null, null));
+                new WdLeaveAiController.AiFillRequest("一周年假", null, null, null));
         assertThat(resp.getStatusCodeValue()).isEqualTo(401);
         assertThat(resp.getBody().errorKey()).isEqualTo("ai.fill.tenant_required");
     }
@@ -78,11 +80,35 @@ class WdLeaveAiControllerTest {
                 eq("turn-1"), eq("我请假"), eq(Map.of("k", "v")))).thenReturn(123L);
 
         ResponseEntity<WdLeaveAiController.AiFillResponse> resp = controller.aiFill(
-                new WdLeaveAiController.AiFillRequest("我请假", "2026-05-01", 99L));
+                new WdLeaveAiController.AiFillRequest("我请假", "2026-05-01", 99L, null));
 
         assertThat(resp.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(resp.getBody().turnId()).isEqualTo("turn-1");
         assertThat(resp.getBody().annotationId()).isEqualTo(123L);
+    }
+
+    @Test
+    void aiFill_stripsLockedFieldsFromResponseAndPersistence() {
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(7L);
+        Map<String, Object> generated = new LinkedHashMap<>();
+        generated.put("wd_req_reason", "family matter");
+        generated.put("wd_req_type", "annual");
+        WdLeaveAiFillService.AiFillResult fillResult =
+                new WdLeaveAiFillService.AiFillResult("turn-9", generated, 10L, 0.0, "raw");
+        when(aiFillService.extractFields(anyString(), anyString(), eq(7L))).thenReturn(fillResult);
+        when(annotationRepository.insertGrounding(anyLong(), anyString(), anyLong(),
+                anyString(), anyString(), any())).thenReturn(1L);
+
+        ResponseEntity<WdLeaveAiController.AiFillResponse> resp = controller.aiFill(
+                new WdLeaveAiController.AiFillRequest(
+                        "我请假", "2026-05-01", 99L, List.of("wd_req_reason")));
+
+        // Locked field never reaches the response...
+        assertThat(resp.getBody().fields()).containsOnlyKeys("wd_req_type");
+        assertThat(resp.getBody().fields()).doesNotContainKey("wd_req_reason");
+        // ...nor the grounding annotation that gets persisted.
+        verify(annotationRepository).insertGrounding(eq(7L), eq("wd_leave_request"), eq(99L),
+                eq("turn-9"), eq("我请假"), eq(Map.of("wd_req_type", "annual")));
     }
 
     @Test
@@ -92,7 +118,7 @@ class WdLeaveAiControllerTest {
                 new WdLeaveAiFillService.AiFillResult("turn-2", Map.of(), 50L, 0.0001, "raw");
         when(aiFillService.extractFields(anyString(), anyString(), anyLong())).thenReturn(fillResult);
 
-        controller.aiFill(new WdLeaveAiController.AiFillRequest("hi", null, null));
+        controller.aiFill(new WdLeaveAiController.AiFillRequest("hi", null, null, null));
         verify(annotationRepository).insertGrounding(eq(7L), anyString(), eq(-1L),
                 anyString(), anyString(), any());
     }

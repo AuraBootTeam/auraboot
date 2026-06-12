@@ -110,6 +110,7 @@ const fieldFields: PropertySchema<string>[] = [
   { key: 'props.dictCode', label: 'Dict code', type: 'text' },
   { key: 'props.required', label: 'Required', type: 'boolean' },
   { key: 'props.readOnly', label: 'Read only', type: 'boolean' },
+  { key: 'props.aiLocked', label: 'AI locked', type: 'boolean' },
   permissionCodeField,
   { key: 'props.placeholder', label: 'Placeholder', type: 'text' },
   { key: 'props.helpText', label: 'Help text', type: 'text' },

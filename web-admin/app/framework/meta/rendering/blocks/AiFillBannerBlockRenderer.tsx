@@ -40,7 +40,7 @@ interface AiFillResponse {
 const DEFAULT_ENDPOINT = '/api/wd-leave-request/ai-fill';
 
 export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ block, runtime }) => {
-  const { applyFields } = useDslFormFill();
+  const { applyFields, lockedFields } = useDslFormFill();
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
@@ -70,6 +70,8 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
       const result = await post<AiFillResponse>(endpoint, {
         nlInput,
         currentDate: today,
+        // D5: tell the backend which fields are AI-locked so it skips them too.
+        lockedFields,
       });
       if (!ResultHelper.isSuccess(result)) {
         setError(result.message || result.desc || `Request failed (${result.code})`);
