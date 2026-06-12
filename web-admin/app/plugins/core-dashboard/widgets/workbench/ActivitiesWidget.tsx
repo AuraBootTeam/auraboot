@@ -189,6 +189,7 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
               >
                 {/* Circle icon */}
                 <div
+                  data-testid={`activity-type-${actType}`}
                   className={`relative z-10 flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full text-sm ${colorClass}`}
                 >
                   {icon}

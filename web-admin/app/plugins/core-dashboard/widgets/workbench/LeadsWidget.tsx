@@ -215,6 +215,7 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
 
               {/* Status badge */}
               <span
+                data-testid={`lead-status-${status}`}
                 className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusStyle.bg} ${statusStyle.text}`}
               >
                 {t(`workbench.leads.status.${status}`, {}, status)}

@@ -95,14 +95,20 @@ type DynamicListResponse<T> = {
 
 type CrmLeadRecord = {
   id?: string | number;
+  pid?: string | number;
   crm_lead_company?: string;
   crm_lead_contact_name?: string;
+  crm_lead_status?: string;
+  created_at?: string;
 };
 
 type CrmActivityRecord = {
   id?: string | number;
+  pid?: string | number;
+  crm_act_type?: string;
   crm_act_subject?: string;
   crm_activity_subject?: string;
+  created_at?: string;
 };
 
 type PipelineStageRecord = {
@@ -1823,6 +1829,154 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
         'smart-activities',
       );
       await expect(activitiesBlock.getByTestId('activities-empty')).toBeVisible();
+      await expect(activitiesBlock).not.toContainText('workbench.activities.');
+    } finally {
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
+  test('DWR-012: CRM workbench widgets render stage, lead status, and activity type variants', async ({
+    page,
+  }) => {
+    let dashboard: CreatedDashboard | undefined;
+    const now = new Date().toISOString();
+    const pipelineStages = [
+      { code: 'discovery', label: 'Discovery', count: 5, amount: 500000, color: '#3B82F6' },
+      { code: 'qualification', label: 'Qualification', count: 4, amount: 400000, color: '#8B5CF6' },
+      { code: 'proposal', label: 'Proposal', count: 3, amount: 300000, color: '#F59E0B' },
+      { code: 'negotiation', label: 'Negotiation', count: 2, amount: 200000, color: '#EF4444' },
+      { code: 'closed_won', label: 'Closed Won', count: 1, amount: 100000, color: '#10B981' },
+      { code: 'closed_lost', label: 'Closed Lost', count: 1, amount: 50000, color: '#6B7280' },
+    ];
+    const leadVariants: CrmLeadRecord[] = [
+      {
+        pid: 'lead-new',
+        crm_lead_company: 'Variant New Lead',
+        crm_lead_contact_name: 'New Contact',
+        crm_lead_status: 'new',
+        created_at: now,
+      },
+      {
+        pid: 'lead-following',
+        crm_lead_company: 'Variant Follow Lead',
+        crm_lead_contact_name: 'Follow Contact',
+        crm_lead_status: 'following_up',
+        created_at: now,
+      },
+      {
+        pid: 'lead-converted',
+        crm_lead_company: 'Variant Converted Lead',
+        crm_lead_contact_name: 'Converted Contact',
+        crm_lead_status: 'converted',
+        created_at: now,
+      },
+      {
+        pid: 'lead-disqualified',
+        crm_lead_company: 'Variant Disqualified Lead',
+        crm_lead_contact_name: 'Disqualified Contact',
+        crm_lead_status: 'disqualified',
+        created_at: now,
+      },
+    ];
+    const activityVariants: CrmActivityRecord[] = [
+      {
+        pid: 'activity-call',
+        crm_act_type: 'call',
+        crm_act_subject: 'Variant Call Activity',
+        created_at: now,
+      },
+      {
+        pid: 'activity-meeting',
+        crm_act_type: 'meeting',
+        crm_act_subject: 'Variant Meeting Activity',
+        created_at: now,
+      },
+      {
+        pid: 'activity-email',
+        crm_act_type: 'email',
+        crm_act_subject: 'Variant Email Activity',
+        created_at: now,
+      },
+      {
+        pid: 'activity-note',
+        crm_act_type: 'note',
+        crm_act_subject: 'Variant Note Activity',
+        created_at: now,
+      },
+    ];
+
+    try {
+      dashboard = await createPublishedDashboard(
+        page,
+        crmWorkbenchWidgets(),
+        'Runtime CRM Workbench Variant Matrix',
+      );
+      await page.route('**/api/workbench/pipeline**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: '0',
+            data: {
+              stages: pipelineStages,
+              totalAmount: pipelineStages.reduce((sum, stage) => sum + stage.amount, 0),
+              totalCount: pipelineStages.reduce((sum, stage) => sum + stage.count, 0),
+            },
+          }),
+        });
+      });
+      await page.route('**/api/dynamic/crm_lead/list**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: '0',
+            data: { records: leadVariants, total: leadVariants.length },
+          }),
+        });
+      });
+      await page.route('**/api/dynamic/crm_activity/list**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: '0',
+            data: { records: activityVariants, total: activityVariants.length },
+          }),
+        });
+      });
+
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      const pipelineBlock = await expectRuntimeBlock(page, 'runtime-pipeline', 'smart-pipeline');
+      for (const stage of pipelineStages) {
+        const stageRow = pipelineBlock.getByTestId(`pipeline-stage-${stage.code}`);
+        await expect(stageRow).toBeVisible({ timeout: 10_000 });
+        await expect(stageRow).toContainText(stage.label);
+      }
+      await expect(pipelineBlock).not.toContainText('workbench.pipeline.');
+
+      const leadsBlock = await expectRuntimeBlock(page, 'runtime-leads', 'smart-leads');
+      for (const lead of leadVariants) {
+        const row = leadsBlock.getByTestId(`lead-row-${lead.pid}`);
+        await expect(row).toContainText(lead.crm_lead_company ?? '');
+        await expect(row.getByTestId(`lead-status-${lead.crm_lead_status}`)).toBeVisible();
+      }
+      await expect(leadsBlock).not.toContainText('workbench.leads.');
+
+      const activitiesBlock = await expectRuntimeBlock(
+        page,
+        'runtime-activities',
+        'smart-activities',
+      );
+      for (const activity of activityVariants) {
+        const row = activitiesBlock.getByTestId(`activity-row-${activity.pid}`);
+        await expect(row).toContainText(activity.crm_act_subject ?? '');
+        await expect(row.getByTestId(`activity-type-${activity.crm_act_type}`)).toBeVisible();
+      }
       await expect(activitiesBlock).not.toContainText('workbench.activities.');
     } finally {
       await cleanupDashboard(page, dashboard?.pid);
