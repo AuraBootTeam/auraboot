@@ -13,9 +13,13 @@ interface TestTab {
 function StatefulTabFilterEditor({
   initialTabs,
   onCommit,
+  activeLibraryBlockType,
+  onDropLibraryBlockToTab,
 }: {
   initialTabs: TestTab[];
   onCommit: (tabs: TestTab[]) => void;
+  activeLibraryBlockType?: string | null;
+  onDropLibraryBlockToTab?: (parentBlockId: string, tabKey: string, blockType: string) => void;
 }) {
   const [tabs, setTabs] = React.useState<TestTab[]>(initialTabs);
 
@@ -24,6 +28,8 @@ function StatefulTabFilterEditor({
       <TabFilterEditor
         tabs={tabs as any}
         blockId="tabs_block"
+        activeLibraryBlockType={activeLibraryBlockType}
+        onDropLibraryBlockToTab={onDropLibraryBlockToTab as any}
         onChange={(nextTabs) => {
           const typedTabs = nextTabs as TestTab[];
           setTabs(typedTabs);
@@ -596,5 +602,174 @@ describe('TabFilterEditor', () => {
       buttons: [],
       props: { align: 'right' },
     });
+  });
+
+  it('edits form buttons child block button actions on the selected tab', () => {
+    const onCommit = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'actions',
+            label: { 'en-US': 'Actions', 'zh-CN': '操作' },
+            filter: null,
+            blocks: [
+              {
+                id: 'actions_buttons',
+                blockType: 'form-buttons',
+                title: { 'en-US': 'Footer actions', 'zh-CN': '底部操作' },
+                buttons: [],
+                props: { align: 'left' },
+              },
+            ],
+          },
+        ]}
+        onCommit={onCommit}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('tab-child-button-add-0'));
+
+    const addedButton = serializedTabs()[0].blocks?.[0].buttons?.[0];
+    expect(addedButton).toMatchObject({
+      code: expect.stringMatching(/^action_/),
+      label: { 'en-US': 'Action', 'zh-CN': '操作' },
+      action: { type: 'command' },
+    });
+
+    fireEvent.change(screen.getByTestId('tab-child-button-code-input-0-0'), {
+      target: { value: 'submit_review' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-button-label-en-input-0-0'), {
+      target: { value: 'Submit review' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-button-label-zh-input-0-0'), {
+      target: { value: '提交审核' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-button-action-command-input-0-0'), {
+      target: { value: 'pgm:update_page_schema' },
+    });
+    fireEvent.click(screen.getByTestId('tab-child-button-primary-checkbox-0-0'));
+    fireEvent.click(screen.getByTestId('tab-child-button-danger-checkbox-0-0'));
+
+    expect(serializedTabs()[0].blocks?.[0].buttons?.[0]).toMatchObject({
+      code: 'submit_review',
+      label: { 'en-US': 'Submit review', 'zh-CN': '提交审核' },
+      action: { type: 'command', command: 'pgm:update_page_schema' },
+      primary: true,
+      danger: true,
+    });
+  });
+
+  it('merges rapid button block edits before the parent rerenders', () => {
+    const onChange = vi.fn();
+    render(
+      <TabFilterEditor
+        tabs={
+          [
+            {
+              key: 'actions',
+              label: { 'en-US': 'Actions', 'zh-CN': '操作' },
+              filter: null,
+              blocks: [
+                {
+                  id: 'actions_buttons',
+                  blockType: 'form-buttons',
+                  title: { 'en-US': 'Footer actions', 'zh-CN': '底部操作' },
+                  buttons: [],
+                  props: { align: 'left' },
+                },
+              ],
+            },
+          ] as any
+        }
+        blockId="tabs_block"
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId('tab-child-button-align-select-0'), {
+      target: { value: 'right' },
+    });
+    fireEvent.click(screen.getByTestId('tab-child-button-add-0'));
+
+    const latestTabs = onChange.mock.calls.at(-1)?.[0] as TestTab[];
+    expect(latestTabs[0].blocks?.[0]).toMatchObject({
+      blockType: 'form-buttons',
+      props: { align: 'right' },
+      buttons: [
+        {
+          code: expect.stringMatching(/^action_/),
+          label: { 'en-US': 'Action', 'zh-CN': '操作' },
+          action: { type: 'command' },
+        },
+      ],
+    });
+  });
+
+  it('does not treat child button editor pointer-up as a tab child drop', () => {
+    const onCommit = vi.fn();
+    const onDropLibraryBlockToTab = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'actions',
+            label: { 'en-US': 'Actions', 'zh-CN': '操作' },
+            filter: null,
+            blocks: [
+              {
+                id: 'actions_buttons',
+                blockType: 'form-buttons',
+                title: { 'en-US': 'Footer actions', 'zh-CN': '底部操作' },
+                buttons: [],
+                props: { align: 'left' },
+              },
+            ],
+          },
+        ]}
+        activeLibraryBlockType="detail-section"
+        onDropLibraryBlockToTab={onDropLibraryBlockToTab}
+        onCommit={onCommit}
+      />,
+    );
+
+    fireEvent.pointerUp(screen.getByTestId('tab-child-button-add-0'));
+    fireEvent.click(screen.getByTestId('tab-child-button-add-0'));
+
+    expect(onDropLibraryBlockToTab).not.toHaveBeenCalled();
+    expect(serializedTabs()[0].blocks?.[0].buttons).toHaveLength(1);
+  });
+
+  it('does not treat pointer-up from the child block editor card as a tab child drop', () => {
+    const onCommit = vi.fn();
+    const onDropLibraryBlockToTab = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'actions',
+            label: { 'en-US': 'Actions', 'zh-CN': '操作' },
+            filter: null,
+            blocks: [
+              {
+                id: 'actions_buttons',
+                blockType: 'form-buttons',
+                title: { 'en-US': 'Footer actions', 'zh-CN': '底部操作' },
+                buttons: [],
+                props: { align: 'left' },
+              },
+            ],
+          },
+        ]}
+        activeLibraryBlockType="detail-section"
+        onDropLibraryBlockToTab={onDropLibraryBlockToTab}
+        onCommit={onCommit}
+      />,
+    );
+
+    fireEvent.pointerUp(screen.getByTestId('tab-child-block-0'));
+
+    expect(onDropLibraryBlockToTab).not.toHaveBeenCalled();
   });
 });

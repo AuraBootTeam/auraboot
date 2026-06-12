@@ -406,7 +406,16 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     await page.getByTestId('tab-child-span-select-0').selectOption('6');
     await page.getByTestId('tab-child-section-columns-select-0').selectOption('3');
     await page.getByTestId('tab-child-section-gutter-select-0').selectOption('24');
+    await expect(page.getByTestId('tab-child-section-collapsible-switch-0')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
     await page.getByTestId('tab-child-section-collapsible-switch-0').click();
+    await expect(page.getByTestId('tab-child-section-collapsible-switch-0')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(page.getByTestId('tab-child-section-default-collapsed-switch-0')).toBeVisible();
     await page.getByTestId('tab-child-section-default-collapsed-switch-0').click();
     await expect.poll(() => canvasBlockIds(page)).toEqual(beforeTopLevelIds);
 
@@ -480,6 +489,21 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     await page.getByTestId('tab-child-visible-input-0').fill('{{ record.status != "CLOSED" }}');
     await page.getByTestId('tab-child-span-select-0').selectOption('8');
     await page.getByTestId('tab-child-button-align-select-0').selectOption('right');
+    await expect(page.getByTestId('tab-child-button-align-select-0')).toHaveValue('right');
+    await expect(page.getByTestId('tab-child-button-actions-0')).toContainText(
+      'No configured buttons',
+    );
+    await expect(page.getByTestId('tab-child-button-add-0')).toBeEnabled();
+    await page.getByTestId('tab-child-button-add-0').click();
+    await expect(page.getByTestId('tab-child-button-0-0')).toBeVisible();
+    await page.getByTestId('tab-child-button-code-input-0-0').fill('submit_review');
+    await page.getByTestId('tab-child-button-label-en-input-0-0').fill('Submit review');
+    await page.getByTestId('tab-child-button-label-zh-input-0-0').fill('提交审核');
+    await page
+      .getByTestId('tab-child-button-action-command-input-0-0')
+      .fill('pgm:update_page_schema');
+    await page.getByTestId('tab-child-button-primary-checkbox-0-0').click();
+    await page.getByTestId('tab-child-button-danger-checkbox-0-0').click();
     await expect.poll(() => canvasBlockIds(page)).toEqual(beforeTopLevelIds);
 
     await saveDesignerAndWait(page, pid);
@@ -498,7 +522,15 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
               title: { 'en-US': 'Nested footer actions', 'zh-CN': '嵌套底部操作' },
               visible: '{{ record.status != "CLOSED" }}',
               span: 8,
-              buttons: [],
+              buttons: [
+                {
+                  code: 'submit_review',
+                  label: { 'en-US': 'Submit review', 'zh-CN': '提交审核' },
+                  action: { type: 'command', command: 'pgm:update_page_schema' },
+                  primary: true,
+                  danger: true,
+                },
+              ],
               props: { align: 'right' },
             },
           ],
@@ -517,5 +549,17 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     );
     await expect(page.getByTestId('tab-child-span-select-0')).toHaveValue('8');
     await expect(page.getByTestId('tab-child-button-align-select-0')).toHaveValue('right');
+    await expect(page.getByTestId('tab-child-button-code-input-0-0')).toHaveValue(
+      'submit_review',
+    );
+    await expect(page.getByTestId('tab-child-button-label-en-input-0-0')).toHaveValue(
+      'Submit review',
+    );
+    await expect(page.getByTestId('tab-child-button-label-zh-input-0-0')).toHaveValue('提交审核');
+    await expect(page.getByTestId('tab-child-button-action-command-input-0-0')).toHaveValue(
+      'pgm:update_page_schema',
+    );
+    await expect(page.getByTestId('tab-child-button-primary-checkbox-0-0')).toBeChecked();
+    await expect(page.getByTestId('tab-child-button-danger-checkbox-0-0')).toBeChecked();
   });
 });
