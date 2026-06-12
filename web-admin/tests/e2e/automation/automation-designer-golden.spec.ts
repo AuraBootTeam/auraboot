@@ -1532,6 +1532,52 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     );
   });
 
+  // ── control-delay: real designer + SmartEngine runtime seam ────────────────────
+  // The visual node persists duration/unit from the property panel; the backend compiler
+  // must map control-delay to a SmartEngine serviceTask and ControlNodeExecutor must consume
+  // duration/unit, not only legacy delayMs/delaySeconds. The downstream create-record side
+  // effect proves the graph continued after the delay node.
+  test('N-DELAY: build trigger-webhook→control-delay(1 second)→create-record in the designer; fire webhook → delay node and downstream action complete (runtime seam) @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const itemName = `NDELAY-item-${tag}`;
+    const parentOrderId = await fireCreate(page, 100, `NDELAY-parent ${tag}`);
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-DELAY ${tag}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-webhook', { x: 150, y: 70 });
+    const delayNode = await dragNodeToCanvas(page, 'control-delay', { x: 150, y: 200 });
+    const body = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 330 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, delayNode);
+    await connectEdge(page, delayNode, body);
+    await fillNodeConfig(page, delayNode, { duration: '1', unit: '秒' });
+    await fillNodeConfig(page, body, {
+      modelCode: '订单明细',
+      fields: `{"e2et_order_id":"${parentOrderId}","e2et_item_name":"${itemName}","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}`,
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const dnode = saved.flowConfig.nodes.find((n: any) => n.id === delayNode);
+    expect(String(dnode.data.config.duration), 'delay duration persisted from the panel').toBe('1');
+    expect(dnode.data.config.unit, 'delay unit persisted as the backend value').toBe('seconds');
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
+      data: { parentOrderId },
+    });
+    expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
+    const log = await pollLogTerminal(page, pid, firedAt, 60_000);
+    expect(String(log!.status).toLowerCase(), `N-DELAY run: ${JSON.stringify(log)}`).toBe('success');
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(statuses.find((s) => s.nodeId === delayNode)?.status, `delay node completed: ${JSON.stringify(statuses)}`).toBe('completed');
+    expect(statuses.find((s) => s.nodeId === body)?.status, `downstream body completed after delay: ${JSON.stringify(statuses)}`).toBe('completed');
+    expect((await pollItemsByName(page, itemName)).length, 'downstream create-record ran after the delay').toBeGreaterThanOrEqual(1);
+  });
+
   // ── golden CORNER (real UI) — re-entrancy: the same enabled automation fires twice ──────
   // Two back-to-back creates must each produce an independent run + its own side effect
   // (no dropped run, no cross-contamination). The child item name binds to ${recordId}

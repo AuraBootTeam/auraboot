@@ -300,7 +300,7 @@ rg -n 'test\.skip|test\.fixme|waitForTimeout\(|toBeGreaterThanOrEqual\(|toBeLess
 | action-start-process | action | processKey, businessKey, variables | P1: BPM runtime side effect | TODO |
 | action-llm-call | action | model, prompt fields, outputVariableName, imageVariableNames | P1: built-in stub provider + persisted output; external key not required | TODO |
 | control-condition | control | expression | P0: true/false/edge boundary | TODO |
-| control-delay | control | duration, unit | P1: delayed runtime semantics | TODO |
+| control-delay | control | duration, unit | P1: delayed runtime semantics | DONE: 2026-06-12 `N-DELAY` browser/backend runtime seam, compiler maps to `delay`, executor consumes `duration/unit` |
 | control-loop | control | collection, itemVariable | P1: non-empty and empty collection | TODO |
 
 ### BPMN Designer Inventory
@@ -396,7 +396,7 @@ rg -n -e 'test\.skip' -e 'test\.fixme' -e 'waitForTimeout\(' -e 'toBeGreaterThan
 
 | 范围 | 审计结论 | 处理 |
 |---|---|---|
-| Automation Designer | `automation-designer-golden.spec.ts` 已清掉本轮引用路径里的 fixed wait,并用真实 browser/backend runtime fresh run 通过。`automation-golden.spec.ts` 仍有 loop / llm / start-process skip/fixme。 | 只引用 `automation-designer-golden.spec.ts`;旧 `automation-golden.spec.ts` skip/fixme 不计完成证据。 |
+| Automation Designer | `automation-designer-golden.spec.ts` 已清掉本轮引用路径里的 fixed wait,并用真实 browser/backend runtime fresh run 通过。2026-06-12 新增 `control-delay` 闭环:先用 `AutomationFlowCompilerTest` / `ControlNodeExecutorTest` 红绿验证编译与执行契约,再用 `N-DELAY` 真浏览器拖拽、属性面板、保存回显、webhook 触发、节点状态、下游副作用证明 runtime seam。`automation-golden.spec.ts` 仍有 loop / llm / start-process skip/fixme。 | 只引用 `automation-designer-golden.spec.ts`;旧 `automation-golden.spec.ts` skip/fixme 不计完成证据。 |
 | Page Designer | `designer-deep-operations.spec.ts` 有拖拽、属性编辑、保存发布、撤销重做、预览、删除、导入导出; `unified-designer-kind-and-binding.spec.ts` 与 toolbar permissions 有 seed/环境前置 skip。 | 本轮引用 deep/lifecycle/field/smart/list/load-existing fresh run; seed 前置 skip 不计完成证据。 |
 | Dashboard Designer | `dashboard-widget-types.spec.ts` 多处 `>=1` 是“添加后画布至少出现该类 widget”的存在性断言; `dashboard-management.spec.ts` / `dashboard-tab-reorder.spec.ts` 有 PUT setup 与 fixme; `dashboard-export.spec.ts` 已覆盖 Excel/PDF artifact。 | 本轮引用 widget/chart/deep/interactions/export fresh run; management/tab persistence 仍为 P1 gap,不计 DONE。 |
 | BPMN Designer | `web-admin/tests/e2e/bpm-designer/*` 覆盖 userTask/serviceTask/gateway/callActivity/SLA 等 L1/L2/L3;旧 `designer-lifecycle.spec.ts` BPMN 段仍受 permission skip 影响。 | 新 bpm-designer 目录为主要证据;旧 lifecycle skip 不计完成证据。 |
@@ -412,6 +412,14 @@ rg -n -e 'test\.skip' -e 'test\.fixme' -e 'waitForTimeout\(' -e 'toBeGreaterThan
 | Setup/auth/fixtures | `pnpm exec playwright test -c playwright.config.ts --project=setup --reporter=line` with `IMPORT_TEST_FIXTURES=true` and host plugin root | `16 passed (1.9s)` |
 | Typecheck | `pnpm typecheck` in `web-admin` | passed; only existing Vite tsconfig-paths warning |
 | Automation Designer | `tests/e2e/automation/automation-designer-golden.spec.ts` via `playwright.quick.config.ts`, `PW_QUICK_WORKERS=1`, local outbound URLs | `30 passed (2.5m)` |
+| 2026-06-12 Backend delay seam | `./gradlew :test --tests com.auraboot.framework.automation.bpm.AutomationFlowCompilerTest --tests com.auraboot.framework.automation.executor.impl.ControlNodeExecutorTest` in `platform` | first run red: `control-delay` unsupported + `duration/unit` ignored; after fix `33 tests completed, 0 failed` |
+| 2026-06-12 Setup/auth/fixtures | `pnpm exec playwright test -c playwright.config.ts --project=setup --reporter=line` on host stack `:6443/:5174/:3501` | `16 passed (2.0s)` |
+| 2026-06-12 Automation Designer delay targeted | `automation-designer-golden.spec.ts -g "N-DELAY"` via quick config, `PW_QUICK_WORKERS=1`, host stack `:6443/:5174/:3501` | `1 passed (6.4s)` |
+| 2026-06-12 Automation Designer full | `tests/e2e/automation/automation-designer-golden.spec.ts` via quick config, `PW_QUICK_WORKERS=1`, host stack `:6443/:5174/:3501` | `31 passed (2.9m)` |
+| 2026-06-12 Typecheck | `pnpm typecheck` in `web-admin` | passed; only existing Vite tsconfig-paths warning |
+| 2026-06-12 Hard redline on Automation referenced spec | grep for `test.skip`, `test.fixme`, `waitForTimeout(`, `retries:`, `waitForEvent('download').catch`, `page.request.put`, `__reactProps` on `automation-designer-golden.spec.ts` | no output |
+| 2026-06-12 Lower-bound classification | grep for `toBeGreaterThanOrEqual` / `toBeLessThanOrEqual` on `automation-designer-golden.spec.ts` | existing `>=1` / `>=2` are business existence lower bounds for side effects/log rows/receiver hits; not used as coverage-completion percentages |
+| 2026-06-12 Diff hygiene | `git diff --check` | passed |
 | BPMN Designer | `tests/e2e/bpm-designer` via quick config | `21 passed (48.8s)` |
 | Page Designer | `designer-deep-operations`, `page-designer-full-lifecycle`, `field-properties`, `smart-components`, `list-config-layout`, `load-existing-page` via quick config | `34 passed (1.1m)` |
 | Dashboard Designer | `dashboard-export`, `dashboard-designer-deep`, `dashboard-widget-types`, `dashboard-charts`, `dashboard-interactions` via quick config | `64 passed (56.2s)` |
@@ -424,7 +432,7 @@ rg -n -e 'test\.skip' -e 'test\.fixme' -e 'waitForTimeout\(' -e 'toBeGreaterThan
 
 | 范围 | 本轮可计入 DONE 的证据 | 明确不能计入 DONE 的剩余项 |
 |---|---|---|
-| Automation Designer | record-create/update/field-change/state-change/scheduled/webhook triggers; update/create/notification/execute-command/call-api/send-webhook/llm-call actions; condition/loop controls; true/false/edge/lifecycle/concurrency/i18n sad/edge/corner paths. Evidence: `automation-designer-golden.spec.ts` 30 pass with real side effects/logs/outbound receiver. | `trigger-bpm-event`, `trigger-inactivity`, `action-start-process`, `control-delay` remain matrix gaps unless a future spec adds real runtime evidence. Legacy `automation-golden.spec.ts` skip/fixme is not evidence. |
+| Automation Designer | record-create/update/field-change/state-change/scheduled/webhook triggers; update/create/notification/execute-command/call-api/send-webhook/llm-call actions; condition/loop/delay controls; true/false/edge/lifecycle/concurrency/i18n sad/edge/corner paths. Evidence: `automation-designer-golden.spec.ts` 31 pass with real side effects/logs/outbound receiver, including `N-DELAY` for `control-delay` UI save + SmartEngine runtime + downstream side effect. Backend seam evidence: `AutomationFlowCompilerTest` + `ControlNodeExecutorTest` targeted pass. | `trigger-bpm-event`, `trigger-inactivity`, `action-start-process` remain matrix gaps unless a future spec adds real runtime evidence. Legacy `automation-golden.spec.ts` skip/fixme is not evidence. |
 | BPMN Designer | Base palette 9 types are covered through L1 designerJson, L2 BPMN XML, and selected L3 runtime: start/end, userTask assignee/form/MI/SLA, serviceTask command/http/rule/notification, receiveTask, exclusive/parallel/inclusive gateway, callActivity. Evidence: `tests/e2e/bpm-designer` 21 pass. | Old `designer-lifecycle.spec.ts` BPMN permission skip and old gateway lifecycle skip are not evidence. |
 | Page Designer | Form-page designer operations: drag/sort, property edit, save/publish, undo/redo, preview, field drag, delete, outline, multi-type mix, PageSchema V2 import/export, lifecycle, field/smart component panels, list layout/load-existing/error state. Evidence: targeted Page Designer 34 pass. | Full per-block 17-type cartesian coverage is not complete. Workbench-specific blocks such as `metric-strip`, `record-inspector`, `candidate-list`, `evidence-panel`, `artifact-timeline`, `review-drawer` still need typed runtime assertions before marking their inventory rows DONE. |
 | Dashboard Designer | Dashboard designer load, chart palette/config, 14 named widget types add/property-panel checks, data source binding, resize/settings/validation/publish/unpublish/layout, interactions, Excel XLSX artifact parse, PDF header/content marker. Evidence: Dashboard 64 pass. | `dashboard-management.spec.ts` and `dashboard-tab-reorder.spec.ts` still contain API PUT setup/fixme; tab-order preference persistence and row-management flows remain P1 gaps. Registry workbench widgets outside the 14 named widget suite are not individually DONE. |
@@ -435,6 +443,7 @@ rg -n -e 'test\.skip' -e 'test\.fixme' -e 'waitForTimeout\(' -e 'toBeGreaterThan
 - 本轮声明只能说“上述 fresh-run evidence specs 通过且 hard redline clean”。不能说“全量设计器笛卡尔积 100% DONE”。
 - Full redline 仍列出旧套件的 `test.skip` / `test.fixme` / API PUT setup / lower-bound assertions;这些文件不作为本轮 DONE 证据。
 - `toBeGreaterThanOrEqual` 在本轮引用 spec 中只作为业务下限或添加后存在性断言使用,不能用于计算覆盖率或证明某一完整组件族已全部覆盖。
+- 2026-06-12 `control-delay` 的 DONE 只覆盖设计器配置 `duration/unit` → 后端编译/执行 → SmartEngine 节点状态 → 下游副作用闭环;它不代表 `trigger-bpm-event`、`trigger-inactivity`、`action-start-process` 已完成。
 - 前一次 Dashboard/Report 合批失败的根因是后端 `bootRun` 被 SIGTERM 停止后前端重定向到登录页;该失败已通过重启后端、重跑 setup、分批 fresh run 排除,不计产品缺陷。
 
 ### Phase 3: P0/P1 补测
