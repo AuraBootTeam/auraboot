@@ -58,6 +58,11 @@ const ChartBlockRenderer = React.lazy(() =>
     default: m.ChartBlockRenderer,
   })),
 );
+const SelectionInfoBlockRenderer = React.lazy(() =>
+  import('~/framework/meta/rendering/blocks/SelectionInfoBlockRenderer').then((m) => ({
+    default: m.SelectionInfoBlockRenderer,
+  })),
+);
 const TabsBlockRenderer = React.lazy(() =>
   import('~/framework/meta/rendering/blocks/TabsBlockRenderer').then((m) => ({
     default: m.TabsBlockRenderer,
@@ -86,6 +91,7 @@ const adminProfile: RenderProfile = {
   blockTypes: [
     'form',
     'form-section',
+    'detail-section',
     'form-buttons',
     'form-wizard',
     'table',
@@ -93,16 +99,21 @@ const adminProfile: RenderProfile = {
     'toolbar',
     'action',
     'description',
+    'text',
     'chart',
+    'chart-card',
     'tabs',
     'sub-table',
     'monthly-grid',
+    'stat-card',
+    'selection-info',
     'custom',
   ],
 
   blockRenderers: new Map<string, any>([
     ['form', FormBlockRenderer],
     ['form-section', FormSectionBlockRenderer],
+    ['detail-section', FormSectionBlockRenderer],
     ['form-buttons', FormButtonsBlockRenderer],
     ['form-wizard', FormWizardBlockRenderer],
     ['table', TableBlockRenderer],
@@ -110,7 +121,10 @@ const adminProfile: RenderProfile = {
     ['toolbar', ToolbarBlockRenderer],
     ['action', ToolbarBlockRenderer],
     ['description', DescriptionBlockRenderer],
+    ['text', DescriptionBlockRenderer],
     ['chart', ChartBlockRenderer],
+    ['chart-card', ChartBlockRenderer],
+    ['selection-info', SelectionInfoBlockRenderer],
     ['tabs', TabsBlockRenderer],
     // tabs, sub-table, monthly-grid are handled inline by page renderers
   ]),

@@ -72,6 +72,9 @@ export function initBlockRegistry(): void {
   BlockRegistry.register('form-section', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/FormSectionBlockRenderer'), 'FormSectionBlockRenderer'),
   });
+  BlockRegistry.register('detail-section', {
+    component: lazy(() => import('~/framework/meta/rendering/blocks/FormSectionBlockRenderer'), 'FormSectionBlockRenderer'),
+  });
   BlockRegistry.register('form-buttons', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/FormButtonsBlockRenderer'), 'FormButtonsBlockRenderer'),
   });
@@ -89,7 +92,13 @@ export function initBlockRegistry(): void {
   BlockRegistry.register('description', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/DescriptionBlockRenderer'), 'DescriptionBlockRenderer'),
   });
+  BlockRegistry.register('text', {
+    component: lazy(() => import('~/framework/meta/rendering/blocks/DescriptionBlockRenderer'), 'DescriptionBlockRenderer'),
+  });
   BlockRegistry.register('chart', {
+    component: lazy(() => import('~/framework/meta/rendering/blocks/ChartBlockRenderer'), 'ChartBlockRenderer'),
+  });
+  BlockRegistry.register('chart-card', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/ChartBlockRenderer'), 'ChartBlockRenderer'),
   });
   BlockRegistry.register('tabs', {
@@ -106,6 +115,12 @@ export function initBlockRegistry(): void {
   });
   BlockRegistry.register('stat-card', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/StatCardBlockRenderer'), 'StatCardBlockRenderer'),
+  });
+  BlockRegistry.register('selection-info', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/SelectionInfoBlockRenderer'),
+      'SelectionInfoBlockRenderer',
+    ),
   });
   BlockRegistry.register('metric-strip', {
     component: lazy(

@@ -11,6 +11,10 @@ describe('block schema workbench block types', () => {
     expect(BLOCK_TYPES).toContain('artifact-timeline');
     expect(BLOCK_TYPES).toContain('review-drawer');
     expect(BLOCK_TYPES).toContain('status-banner');
+    expect(BLOCK_TYPES).toContain('detail-section');
+    expect(BLOCK_TYPES).toContain('text');
+    expect(BLOCK_TYPES).toContain('chart-card');
+    expect(BLOCK_TYPES).toContain('selection-info');
 
     expect(blockTypeEnum.safeParse('metric-strip').success).toBe(true);
     expect(blockTypeEnum.safeParse('record-inspector').success).toBe(true);
@@ -20,5 +24,9 @@ describe('block schema workbench block types', () => {
     expect(blockTypeEnum.safeParse('artifact-timeline').success).toBe(true);
     expect(blockTypeEnum.safeParse('review-drawer').success).toBe(true);
     expect(blockTypeEnum.safeParse('status-banner').success).toBe(true);
+    expect(blockTypeEnum.safeParse('detail-section').success).toBe(true);
+    expect(blockTypeEnum.safeParse('text').success).toBe(true);
+    expect(blockTypeEnum.safeParse('chart-card').success).toBe(true);
+    expect(blockTypeEnum.safeParse('selection-info').success).toBe(true);
   });
 });

@@ -34,7 +34,7 @@ export const StatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ bl
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
 
-  const cfg = (block as any).statCard || {};
+  const cfg = { ...((block as any).props || {}), ...((block as any).statCard || {}) };
   const title = block.title ? getLocalizedText(block.title, locale, t) : '';
 
   // Try to pull value from data source (first row, valueField column). Fallback
@@ -58,7 +58,7 @@ export const StatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ bl
   }, [block.dataSource, cfg.valueField, cfg.value, cfg.number, runtime]);
 
   const unit = cfg.unit || cfg.suffix || '';
-  const trend: string | undefined = cfg.trend;
+  const trend: string | undefined = cfg.trend ?? cfg.change ?? cfg.changeField;
   const trendDirection: 'up' | 'down' | 'flat' = cfg.trendDirection || 'flat';
   const trendClass =
     trendDirection === 'up'

@@ -74,12 +74,17 @@ export function resolveRecordParams(
 }
 
 export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, runtime }) => {
-  const chartType = (block.chartType as string) || 'bar';
+  const props = (block as any).props || {};
+  const chartType = (block.chartType as string) || props.chartType || 'bar';
   const ChartComponent = getChartComponent(chartType);
 
   // Build chart props from DSL block config
   const chartProps = useMemo(() => {
-    const config = (block as any).chartConfig || {};
+    const config = (block as any).chartConfig || {
+      ...(props.xField ? { xField: props.xField } : {}),
+      ...(props.yField ? { yField: props.yField } : {}),
+      ...(props.height ? { height: props.height } : {}),
+    };
     const visualization = (block as any).visualization || {};
     const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
 
@@ -111,7 +116,7 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
       refreshInterval: (block as any).refreshInterval,
       className: block.className,
     };
-  }, [block, runtime]);
+  }, [block, props.chartType, props.xField, props.yField, props.height, runtime]);
 
   if (!ChartComponent) {
     return (

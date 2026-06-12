@@ -47,6 +47,7 @@ vi.mock('~/framework/meta/hooks/useTreeData', () => ({
 import { FormButtonsBlockRenderer } from '../FormButtonsBlockRenderer';
 import { ToolbarBlockRenderer } from '../ToolbarBlockRenderer';
 import { TableBlockRenderer } from '../TableBlockRenderer';
+import { SelectionInfoBlockRenderer } from '../SelectionInfoBlockRenderer';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 
 // ---------------------------------------------------------------------------
@@ -387,5 +388,32 @@ describe('TableBlockRenderer', () => {
 
     expect(getByTestId('table-th-name')).toHaveClass('px-3', 'py-2');
     expect(getByTestId('table-row-row-1').querySelector('td')).toHaveClass('px-3', 'py-2');
+  });
+});
+
+describe('SelectionInfoBlockRenderer', () => {
+  it('renders selection count and row label from configured runtime state binding', () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'en-US',
+        t: (k: string) => k,
+        state: {
+          selectedLine: { pid: 'row-1', title: 'Copper audit line' },
+        },
+      }),
+    });
+    const block = {
+      blockType: 'selection-info',
+      title: 'Selected record',
+      selection: { bind: 'selectedLine' },
+    };
+
+    const { getByTestId } = render(
+      <SelectionInfoBlockRenderer block={block as any} runtime={runtime} />,
+    );
+
+    expect(getByTestId('selection-info-title')).toHaveTextContent('Selected record');
+    expect(getByTestId('selection-info-count')).toHaveTextContent('1');
+    expect(getByTestId('selection-info-label')).toHaveTextContent('Copper audit line');
   });
 });

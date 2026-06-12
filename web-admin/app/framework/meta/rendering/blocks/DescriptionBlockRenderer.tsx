@@ -21,7 +21,9 @@ export const DescriptionBlockRenderer: React.FC<DescriptionBlockRendererProps> =
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
 
-  const content = block.content ? getLocalizedText(block.content, locale, t) : '';
+  const props = (block as any).props || {};
+  const contentSource = block.content ?? props.content ?? props.text ?? '';
+  const content = contentSource ? getLocalizedText(contentSource, locale, t) : '';
 
   return (
     <div className="description-block rounded-md border border-blue-200 bg-blue-50 p-4">

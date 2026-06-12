@@ -503,9 +503,14 @@ export function DetailPageContent(props: PageContentProps) {
     [allBlocks],
   );
 
-  // For simple detail pages without tabs, find form-section blocks directly
+  // For simple detail pages without tabs, find field-display blocks directly.
+  // Page Designer exposes both form-section and detail-section; both render
+  // as read-only field groups on detail pages.
   const directFormBlocks = useMemo(
-    () => allBlocks.filter((b: BlockConfig) => b.blockType === 'form-section'),
+    () =>
+      allBlocks.filter(
+        (b: BlockConfig) => b.blockType === 'form-section' || b.blockType === 'detail-section',
+      ),
     [allBlocks],
   );
   const effectiveDirectFormBlocks = directFormBlocks;
@@ -1056,7 +1061,7 @@ function DetailBlockRenderer({
     return null;
   }
 
-  if (block.blockType === 'form-section') {
+  if (block.blockType === 'form-section' || block.blockType === 'detail-section') {
     return (
       <div className="form-section">
         {block.title && (
