@@ -11,10 +11,19 @@ interface TabFilterExpression {
   value: any;
 }
 
+interface TabChildBlock {
+  id: string;
+  blockType: string;
+  title?: string | LocalizedText;
+  props?: Record<string, any>;
+  [key: string]: any;
+}
+
 interface ListTabConfig {
   key: string;
   label: string | LocalizedText;
   filter: TabFilterExpression | null;
+  blocks?: TabChildBlock[];
 }
 
 export interface TabFilterEditorProps {
@@ -30,6 +39,19 @@ function getLabel(label: string | LocalizedText, lang: 'en-US' | 'zh-CN'): strin
 
 function getDisplayLabel(label: string | LocalizedText): string {
   return getLabel(label, 'en-US') || getLabel(label, 'zh-CN') || '(untitled)';
+}
+
+function getTabBlocks(tab: ListTabConfig | undefined): TabChildBlock[] {
+  return Array.isArray(tab?.blocks) ? tab.blocks : [];
+}
+
+function createTextChildBlock(index: number): TabChildBlock {
+  return {
+    id: `tab_text_${Date.now()}_${index}`,
+    blockType: 'text',
+    title: { 'en-US': 'Text', 'zh-CN': '文本内容' },
+    props: { content: '' },
+  };
 }
 
 export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorProps) {
@@ -81,7 +103,37 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
     [updateTab],
   );
 
+  const addTextChildBlock = useCallback(
+    (index: number) => {
+      const childBlocks = getTabBlocks(tabs[index]);
+      updateTab(index, { blocks: [...childBlocks, createTextChildBlock(childBlocks.length)] });
+    },
+    [tabs, updateTab],
+  );
+
+  const updateTextChildBlock = useCallback(
+    (tabIndex: number, blockIndex: number, content: string) => {
+      const childBlocks = getTabBlocks(tabs[tabIndex]);
+      const nextBlocks = childBlocks.map((block, index) =>
+        index === blockIndex
+          ? { ...block, props: { ...(block.props || {}), content } }
+          : block,
+      );
+      updateTab(tabIndex, { blocks: nextBlocks });
+    },
+    [tabs, updateTab],
+  );
+
+  const removeChildBlock = useCallback(
+    (tabIndex: number, blockIndex: number) => {
+      const nextBlocks = getTabBlocks(tabs[tabIndex]).filter((_, index) => index !== blockIndex);
+      updateTab(tabIndex, { blocks: nextBlocks });
+    },
+    [tabs, updateTab],
+  );
+
   const currentTab = tabs[selectedIndex];
+  const currentTabBlocks = getTabBlocks(currentTab);
 
   return (
     <div className="space-y-3" data-testid="tab-filter-editor">
@@ -160,6 +212,74 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
               onChange={(f) => updateFilter(selectedIndex, f)}
               readonly={readonly}
             />
+          </div>
+
+          {/* Child blocks */}
+          <div>
+            <label className="text-[10px] font-semibold text-gray-500">Child Blocks</label>
+            <div
+              className="mt-1 space-y-1.5 rounded border bg-gray-50 p-1.5"
+              data-testid="tab-child-blocks-editor"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] text-gray-400">
+                  {currentTabBlocks.length} child block{currentTabBlocks.length === 1 ? '' : 's'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => addTextChildBlock(selectedIndex)}
+                  className="rounded border border-blue-200 px-2 py-0.5 text-[10px] text-blue-600 hover:bg-blue-50 disabled:opacity-40"
+                  disabled={readonly}
+                  data-testid="tab-child-add-text-block"
+                >
+                  + Text
+                </button>
+              </div>
+
+              {currentTabBlocks.length === 0 ? (
+                <div className="rounded border border-dashed bg-white px-2 py-2 text-center text-[10px] text-gray-400">
+                  No child blocks
+                </div>
+              ) : (
+                currentTabBlocks.map((block, index) => (
+                  <div
+                    key={block.id || index}
+                    className="rounded border bg-white p-1.5"
+                    data-testid={`tab-child-block-${index}`}
+                  >
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <span className="font-mono text-[10px] text-gray-500">
+                        {block.blockType}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeChildBlock(selectedIndex, index)}
+                        className="text-[10px] text-red-500 hover:text-red-700 disabled:opacity-40"
+                        disabled={readonly}
+                        data-testid={`tab-child-remove-${index}`}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    {block.blockType === 'text' ? (
+                      <textarea
+                        className="min-h-16 w-full resize-y rounded border px-1.5 py-1 text-xs"
+                        value={String(block.props?.content || '')}
+                        onChange={(event) =>
+                          updateTextChildBlock(selectedIndex, index, event.target.value)
+                        }
+                        disabled={readonly}
+                        data-testid={`tab-child-text-content-${index}`}
+                      />
+                    ) : (
+                      <div className="rounded border border-dashed px-2 py-2 text-[10px] text-gray-400">
+                        This block type is preserved but not editable here.
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
           {/* Footer: reorder + delete */}
