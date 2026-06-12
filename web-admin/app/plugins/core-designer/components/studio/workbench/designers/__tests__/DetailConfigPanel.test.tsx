@@ -1,9 +1,27 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DetailConfigPanel } from '../DetailConfigPanel';
 
 vi.mock('~/shared/hooks/useModelCapabilities', () => ({
   useModelCapabilities: () => ({ data: undefined }),
+}));
+
+vi.mock('~/shared/services/http-client', () => ({
+  fetchResult: vi.fn(async (url: string) => {
+    if (url.includes('/api/meta/models/code/')) {
+      return { code: '0', data: { pid: 'model_showcase' } };
+    }
+    if (url.includes('/api/meta/models/model_showcase/fields')) {
+      return {
+        code: '0',
+        data: [
+          { code: 'sc_name', displayName: 'Name', dataType: 'string' },
+          { code: 'sc_quantity', displayName: 'Quantity', dataType: 'integer' },
+        ],
+      };
+    }
+    return { code: '0', data: undefined };
+  }),
 }));
 
 describe('DetailConfigPanel', () => {
@@ -42,5 +60,41 @@ describe('DetailConfigPanel', () => {
     await waitFor(() => {
       expect(onSchemaChange).not.toHaveBeenCalled();
     });
+  });
+
+  it('exposes detail section authoring and pushes section blocks through schema changes', async () => {
+    const onSchemaChange = vi.fn();
+    const schema = {
+      schemaVersion: 2,
+      kind: 'detail',
+      id: 'p2',
+      pageKey: 'showcase_detail',
+      modelCode: 'showcase_all_fields',
+      title: 'Showcase Detail',
+      layout: { type: 'stack' },
+      blocks: [],
+    } as any;
+
+    render(<DetailConfigPanel schema={schema} onSchemaChange={onSchemaChange} />);
+
+    fireEvent.click(screen.getByTestId('detail-tab-sections'));
+    expect(screen.getByTestId('add-section-btn')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('add-section-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('section-item-0')).toHaveTextContent('分组 1');
+      expect(onSchemaChange).toHaveBeenCalled();
+    });
+
+    const latestSchema = onSchemaChange.mock.calls.at(-1)?.[0];
+    expect(latestSchema.blocks).toMatchObject([
+      {
+        blockType: 'detail-section',
+        title: '分组 1',
+        columns: 2,
+        fields: [],
+      },
+    ]);
   });
 });

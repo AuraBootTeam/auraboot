@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BoltIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { BoltIcon, DocumentTextIcon, RectangleGroupIcon } from '@heroicons/react/24/outline';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { useModelCapabilities } from '~/shared/hooks/useModelCapabilities';
+import { fetchResult } from '~/shared/services/http-client';
 import { cn } from '~/utils/cn';
 import { blocksToDetailVm, detailVmToBlocks, type DetailViewModel } from './detail-config/mapper';
 import { ActionsTab } from './detail-config/ActionsTab';
 import { PageMetaTab } from './detail-config/PageMetaTab';
+import { SectionsTab, type ResolvedFieldLite } from './detail-config/SectionsTab';
 import {
   validateDetailVm,
   hasBlockingErrors,
@@ -21,12 +23,34 @@ export interface DetailConfigPanelProps {
   previewMode?: boolean;
 }
 
+type DetailTabId = 'actions' | 'sections' | 'page-meta';
+
+interface MetaModelLookup {
+  pid?: string;
+  id?: string;
+}
+
+interface DetailFieldRecord {
+  code?: string;
+  name?: unknown;
+  displayName?: unknown;
+  dataType?: string;
+  fieldType?: string;
+  extension?: {
+    displayName?: unknown;
+  };
+  'displayName:zh-CN'?: string;
+  'displayName:en'?: string;
+  'displayName:en-US'?: string;
+}
+
 const NAV_ITEMS: Array<{
-  id: 'actions' | 'page-meta';
+  id: DetailTabId;
   label: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }> = [
   { id: 'actions', label: '操作按钮', icon: BoltIcon },
+  { id: 'sections', label: '字段分组', icon: RectangleGroupIcon },
   { id: 'page-meta', label: '页面信息', icon: DocumentTextIcon },
 ];
 
@@ -35,7 +59,8 @@ export const DetailConfigPanel: React.FC<DetailConfigPanelProps> = ({
 }) => {
   const effectiveModelCode = modelCode ?? schema.modelCode;
   const { data: capabilities } = useModelCapabilities(effectiveModelCode);
-  const [activeTab, setActiveTab] = useState<'actions' | 'page-meta'>('actions');
+  const fields = useDetailSectionFields(effectiveModelCode);
+  const [activeTab, setActiveTab] = useState<DetailTabId>('actions');
   const [vm, setVm] = useState<DetailViewModel>(() => blocksToDetailVm(schema.blocks ?? []));
   const lastPushedRef = useRef<string>(JSON.stringify(schema.blocks ?? []));
   const latestSchemaRef = useRef(schema);
@@ -179,6 +204,8 @@ export const DetailConfigPanel: React.FC<DetailConfigPanelProps> = ({
               <p className="mt-3 text-sm leading-6 text-slate-500">
                 {activeTab === 'actions'
                   ? '管理详情页顶部动作，确保主操作清晰且和模型能力一致。'
+                  : activeTab === 'sections'
+                    ? '维护详情页字段分组、列数、折叠行为和字段分配。'
                   : '维护页面标题、路由标识和基础元信息，保证详情页识别稳定。'}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -265,6 +292,13 @@ export const DetailConfigPanel: React.FC<DetailConfigPanelProps> = ({
               modelCode={effectiveModelCode}
               readonly={readonly}
             />
+          ) : activeTab === 'sections' ? (
+            <SectionsTab
+              vm={vm}
+              setVm={setVmAndPushSchema}
+              fields={fields}
+              readonly={readonly}
+            />
           ) : (
             <PageMetaTab
               schema={schemaWithLatestBlocks}
@@ -282,3 +316,81 @@ export const DetailConfigPanel: React.FC<DetailConfigPanelProps> = ({
 };
 
 export default DetailConfigPanel;
+
+function useDetailSectionFields(modelCode: string | undefined): ResolvedFieldLite[] | undefined {
+  const [fields, setFields] = useState<ResolvedFieldLite[] | undefined>(
+    modelCode ? undefined : [],
+  );
+
+  useEffect(() => {
+    if (!modelCode) {
+      setFields([]);
+      return;
+    }
+
+    let cancelled = false;
+    setFields(undefined);
+
+    const load = async () => {
+      const modelResult = await fetchResult<MetaModelLookup>(
+        `/api/meta/models/code/${encodeURIComponent(modelCode)}`,
+      );
+      const modelPid = modelResult?.data?.pid ?? modelResult?.data?.id;
+      if (!modelPid) {
+        if (!cancelled) setFields([]);
+        return;
+      }
+
+      const fieldsResult = await fetchResult<DetailFieldRecord[] | { records?: DetailFieldRecord[] }>(
+        `/api/meta/models/${encodeURIComponent(modelPid)}/fields`,
+      );
+      const records = normalizeFieldRecords(fieldsResult?.data);
+      if (cancelled) return;
+      setFields(records.map((field) => ({
+        code: String(field.code),
+        displayName: resolveFieldDisplayName(field),
+        dataType: field.dataType ?? field.fieldType,
+      })));
+    };
+
+    load().catch(() => {
+      if (!cancelled) setFields([]);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modelCode]);
+
+  return fields;
+}
+
+function normalizeFieldRecords(
+  data: DetailFieldRecord[] | { records?: DetailFieldRecord[] } | null | undefined,
+): DetailFieldRecord[] {
+  if (Array.isArray(data)) return data.filter((field) => typeof field.code === 'string');
+  if (Array.isArray(data?.records)) {
+    return data.records.filter((field) => typeof field.code === 'string');
+  }
+  return [];
+}
+
+function resolveFieldDisplayName(field: DetailFieldRecord): string | undefined {
+  return (
+    readText(field.displayName) ||
+    readText(field.name) ||
+    readText(field.extension?.displayName) ||
+    field['displayName:zh-CN'] ||
+    field['displayName:en-US'] ||
+    field['displayName:en'] ||
+    field.code
+  );
+}
+
+function readText(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim()) return value;
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  const candidate = record['zh-CN'] ?? record['en-US'] ?? record.en;
+  return typeof candidate === 'string' && candidate.trim() ? candidate : undefined;
+}
