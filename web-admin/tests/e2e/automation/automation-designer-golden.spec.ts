@@ -533,8 +533,8 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   // Each case below drives the REAL designer (drag the node-under-test, configure via
   // the real property panel, connect, save, enable via the list toggle, fire a real
   // trigger) then verifies the backend ran correctly. Reuses only proven H1 patterns
-  // (model-select by label, json field). SmartEngine-dependent nodes (start-process,
-  // bpm-event, control-delay) are excluded per the directive.
+  // (model-select by label, json field). SmartEngine-dependent nodes are covered only
+  // when the live runtime seam is proven in this spec.
 
   /** Poll the dynamic list for an e2et_order_item carrying `name` (create-record side effect). */
   async function pollItemsByName(page: Page, name: string, timeoutMs = 20_000): Promise<any[]> {
@@ -577,6 +577,27 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       await delay(1_000);
     }
     expect(await fetchItemsByName(page, name), message).toHaveLength(0);
+  }
+
+  async function pollProcessStatusByBusinessKey(
+    page: Page,
+    businessKey: string,
+    processKey: string,
+    timeoutMs = 30_000,
+  ): Promise<any | null> {
+    const deadline = Date.now() + timeoutMs;
+    let last: any = null;
+    while (Date.now() < deadline) {
+      const resp = await page.request.get('/api/bpm/process-instances/by-business-key/status', {
+        params: { businessKey, processKey },
+      });
+      if (resp.ok()) {
+        last = (await resp.json())?.data ?? null;
+        if (last?.instanceId) return last;
+      }
+      await delay(1_000);
+    }
+    return last;
   }
 
   test('N-CREATE-RECORD: drag trigger-record-create→action-create-record, configure via panel, save, enable, fire → a child order_item is created (happy) @golden', async ({
@@ -879,6 +900,79 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const log = await pollLogTerminal(page, pid, firedAt);
     expect(String(log!.status).toLowerCase(), `N-TRIGGER-WEBHOOK run: ${JSON.stringify(log)}`).toBe('success');
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'downstream action completed on webhook fire').toBe(true);
+  });
+
+  test('N-START-PROCESS: drag trigger-webhook→action-start-process, pick a BPM process, fire webhook → BPM instance is started and correlated by businessKey @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const processKey = 'e2et_payment_approval';
+    const businessKey = `NSP-${tag}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-START-PROCESS ${tag}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-webhook', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-start-process', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, action, {
+      processKey: '付款审批流程',
+      businessKey: '${bizKey}',
+      variables: `{"origin":"designer-start-process","tag":"${tag}"}`,
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const startNode = saved.flowConfig.nodes.find((n: any) => n.id === action);
+    expect(startNode.data.config.processKey, 'process-select persisted the picked process key').toBe(
+      processKey,
+    );
+    expect(startNode.data.config.businessKey, 'businessKey expression persisted from the panel').toBe(
+      '${bizKey}',
+    );
+    expect(startNode.data.config.variables, 'variables JSON persisted as an object').toMatchObject({
+      origin: 'designer-start-process',
+      tag,
+    });
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
+      data: { bizKey: businessKey },
+    });
+    expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
+    expect(String((await resp.json())?.code), 'webhook POST accepted').toBe('0');
+
+    const log = await pollLogTerminal(page, pid, firedAt, 60_000);
+    expect(String(log!.status).toLowerCase(), `N-START-PROCESS run: ${JSON.stringify(log)}`).toBe(
+      'success',
+    );
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(
+      statuses.find((s) => s.nodeId === action)?.status,
+      `start-process node completed: ${JSON.stringify(statuses)}`,
+    ).toBe('completed');
+
+    const bpmStatus = await pollProcessStatusByBusinessKey(page, businessKey, processKey);
+    expect(bpmStatus?.processDefinitionId, `BPM status by businessKey: ${JSON.stringify(bpmStatus)}`).toBe(
+      processKey,
+    );
+    expect(bpmStatus?.status, 'started BPM process remains at the manager review wait state').toBe(
+      'running',
+    );
+    expect(
+      bpmStatus?.currentNodes?.some((n: any) => n.nodeId === 'manager_review' && n.status === 'active'),
+      'manager_review userTask is active',
+    ).toBe(true);
+    expect(
+      bpmStatus?.completedNodes?.some((n: any) => n.nodeId === 'start_1' && n.status === 'completed'),
+      'start event completed',
+    ).toBe(true);
+    expect(bpmStatus?.variables, 'process variables from the automation node reached BPM runtime').toMatchObject({
+      origin: 'designer-start-process',
+      tag,
+    });
   });
 
   // ── golden SAD path (real UI) — a runtime failure surfaces on the node ──────────

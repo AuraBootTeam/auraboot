@@ -131,10 +131,10 @@ relates_to:
 
 | 组件族 | 具体类型 | 必测属性 | 必测动作 | 后端 / runtime 证据 | 状态 |
 |---|---|---|---|---|---|
-| trigger | record-create / record-update / field-change / state-change / scheduled / webhook / bpm-event | modelCode、event、condition、ruleBinding | 拖入、配置、保存、enable、fire | automation DTO + execution log | TODO |
-| action | update-record / create-record / send-notification / execute-command / call-api / send-webhook / start-process / llm-call | target model、field mapping、payload、receiver、fallback | 保存、test run、debug step | side effect + node statuses | TODO |
-| control | condition / loop / delay | expression、branch condition、collection mapping、timer | true/false branch、非法表达式、循环边界 | SmartEngine process + logs | TODO |
-| edge | true/false/default branch | conditionExpression、sourceHandle | 连线、改条件、删除 | flowConfig edges + runtime branch | TODO |
+| trigger | record-create / record-update / field-change / state-change / scheduled / webhook / bpm-event | modelCode、event、condition、ruleBinding | 拖入、配置、保存、enable、fire | automation DTO + execution log | PARTIAL: record/update/field/state/scheduled/webhook DONE; `trigger-bpm-event` and `trigger-inactivity` remain TODO |
+| action | update-record / create-record / send-notification / execute-command / call-api / send-webhook / start-process / llm-call | target model、field mapping、payload、receiver、fallback | 保存、test run、debug step | side effect + node statuses | DONE: action family covered in `automation-designer-golden.spec.ts` including 2026-06-12 `action-start-process` |
+| control | condition / loop / delay | expression、branch condition、collection mapping、timer | true/false branch、非法表达式、循环边界 | SmartEngine process + logs | DONE: condition/loop/delay runtime semantics covered; delay seam added 2026-06-12 |
+| edge | true/false/default branch | conditionExpression、sourceHandle | 连线、改条件、删除 | flowConfig edges + runtime branch | DONE: true/false/default branch routing covered by condition/loop/action golden flows |
 | rule binding | decision ref block | decisionCode、versionPolicy、input mapping、fallback | 配置、保存、impact graph | usage-index + impact | DONE in rule-center slice |
 
 ### 现有证据起点
@@ -283,25 +283,25 @@ rg -n 'test\.skip|test\.fixme|waitForTimeout\(|toBeGreaterThanOrEqual\(|toBeLess
 
 | 类型 | 分类 | 属性字段 | P0/P1 风险 | 本轮证据状态 |
 |---|---|---|---|---|
-| trigger-record-create | trigger | modelCode | P0: create event fire | TODO |
-| trigger-record-update | trigger | modelCode, watchFields | P0: update event fire / create 不误触发 | TODO |
-| trigger-field-change | trigger | modelCode, fieldCode, fromValue, toValue | P0: watched field 与 non-watched field | TODO |
-| trigger-state-change | trigger | modelCode, stateField, fromStates, toStates | P0: dict-backed state filter | TODO |
-| trigger-scheduled | trigger | cron, timezone, maxExecutionTime | P1: scheduler fire / no fixed sleep fake pass | TODO |
-| trigger-webhook | trigger | secret, validationMode, expectedHeaders | P0: inbound webhook real POST | TODO |
+| trigger-record-create | trigger | modelCode | P0: create event fire | DONE: golden flow fires real create event and verifies log + downstream side effect |
+| trigger-record-update | trigger | modelCode, watchFields | P0: update event fire / create 不误触发 | DONE: golden flow fires real update event and verifies update-specific log + side effect |
+| trigger-field-change | trigger | modelCode, fieldCode, fromValue, toValue | P0: watched field 与 non-watched field | DONE: golden flow covers watched field-change and non-watched no-fire behavior |
+| trigger-state-change | trigger | modelCode, stateField, fromStates, toStates | P0: dict-backed state filter | DONE: golden flow covers dict-backed state transition fire |
+| trigger-scheduled | trigger | cron, timezone, maxExecutionTime | P1: scheduler fire / no fixed sleep fake pass | DONE: golden flow covers scheduler fire without fixed sleep evidence |
+| trigger-webhook | trigger | secret, validationMode, expectedHeaders | P0: inbound webhook real POST | DONE: golden flows fire real inbound webhook POSTs and verify execution logs |
 | trigger-bpm-event | trigger | modelCode, eventTypes | P1: BPM event consumer seam | TODO |
 | trigger-inactivity | trigger | modelCode, inactivityHours, inactivityField, stateField, inactivityStates | P1: scheduled inactivity sweep | TODO |
-| action-update-record | action | modelCode, recordId, fields | P0: side effect + sad invalid field | TODO |
-| action-create-record | action | modelCode, fields | P0: child record created + invalid field sad | TODO |
-| action-send-notification | action | notificationType, title, content, recipients | P1: notification runtime completion | TODO |
-| action-execute-command | action | commandCode, params | P0: command-select picker + restricted principal sad | TODO |
-| action-call-api | action | url, method, headers, body | P0: outbound success/failure | TODO |
-| action-send-webhook | action | url, payload | P0: outbound receiver payload + 500 sad | TODO |
-| action-start-process | action | processKey, businessKey, variables | P1: BPM runtime side effect | TODO |
-| action-llm-call | action | model, prompt fields, outputVariableName, imageVariableNames | P1: built-in stub provider + persisted output; external key not required | TODO |
-| control-condition | control | expression | P0: true/false/edge boundary | TODO |
+| action-update-record | action | modelCode, recordId, fields | P0: side effect + sad invalid field | DONE: golden flow verifies persisted field update and sad invalid field failure |
+| action-create-record | action | modelCode, fields | P0: child record created + invalid field sad | DONE: golden flow verifies child record creation and invalid field failure |
+| action-send-notification | action | notificationType, title, content, recipients | P1: notification runtime completion | DONE: golden flow verifies notification node completion |
+| action-execute-command | action | commandCode, params | P0: command-select picker + restricted principal sad | DONE: golden flow verifies command-select save and restricted-principal sad path |
+| action-call-api | action | url, method, headers, body | P0: outbound success/failure | DONE: golden flow verifies outbound success and 404 sad node failure |
+| action-send-webhook | action | url, payload | P0: outbound receiver payload + 500 sad | DONE: golden flow verifies receiver payload and upstream 500 sad behavior |
+| action-start-process | action | processKey, businessKey, variables | P1: BPM runtime side effect | DONE: 2026-06-12 `N-START-PROCESS` browser/backend runtime seam, process picker uses deployed BPM definitions, Automation `CUSTOM` storage switches to BPM `DATABASE`, businessKey status proves BPM instance |
+| action-llm-call | action | model, prompt fields, outputVariableName, imageVariableNames | P1: built-in stub provider + persisted output; external key not required | DONE: golden flow verifies built-in stub provider output without external key |
+| control-condition | control | expression | P0: true/false/edge boundary | DONE: golden flows cover true/false branch routing and invalid-expression sad path |
 | control-delay | control | duration, unit | P1: delayed runtime semantics | DONE: 2026-06-12 `N-DELAY` browser/backend runtime seam, compiler maps to `delay`, executor consumes `duration/unit` |
-| control-loop | control | collection, itemVariable | P1: non-empty and empty collection | TODO |
+| control-loop | control | collection, itemVariable | P1: non-empty and empty collection | DONE: golden flows cover non-empty loop fan-out and empty collection behavior |
 
 ### BPMN Designer Inventory
 
@@ -396,7 +396,7 @@ rg -n -e 'test\.skip' -e 'test\.fixme' -e 'waitForTimeout\(' -e 'toBeGreaterThan
 
 | 范围 | 审计结论 | 处理 |
 |---|---|---|
-| Automation Designer | `automation-designer-golden.spec.ts` 已清掉本轮引用路径里的 fixed wait,并用真实 browser/backend runtime fresh run 通过。2026-06-12 新增 `control-delay` 闭环:先用 `AutomationFlowCompilerTest` / `ControlNodeExecutorTest` 红绿验证编译与执行契约,再用 `N-DELAY` 真浏览器拖拽、属性面板、保存回显、webhook 触发、节点状态、下游副作用证明 runtime seam。`automation-golden.spec.ts` 仍有 loop / llm / start-process skip/fixme。 | 只引用 `automation-designer-golden.spec.ts`;旧 `automation-golden.spec.ts` skip/fixme 不计完成证据。 |
+| Automation Designer | `automation-designer-golden.spec.ts` 已清掉本轮引用路径里的 fixed wait,并用真实 browser/backend runtime fresh run 通过。2026-06-12 新增 `control-delay` 闭环:先用 `AutomationFlowCompilerTest` / `ControlNodeExecutorTest` 红绿验证编译与执行契约,再用 `N-DELAY` 真浏览器拖拽、属性面板、保存回显、webhook 触发、节点状态、下游副作用证明 runtime seam。2026-06-12 新增 `action-start-process` 闭环:先用 direct BPM API 证明 `e2et_payment_approval` 可启动并停在 `manager_review`,再用 `StartProcessActionExecutorTest` 红绿锁定 Automation `CUSTOM` storage 到 BPM `DATABASE` 的 seam,最后用 `N-START-PROCESS` 真浏览器拖拽、process-select、保存回显、enable、webhook fire、execution log、BPM businessKey status 证明 runtime side effect。`automation-golden.spec.ts` 仍有 loop / llm / start-process skip/fixme。 | 只引用 `automation-designer-golden.spec.ts`;旧 `automation-golden.spec.ts` skip/fixme 不计完成证据。 |
 | Page Designer | `designer-deep-operations.spec.ts` 有拖拽、属性编辑、保存发布、撤销重做、预览、删除、导入导出; `unified-designer-kind-and-binding.spec.ts` 与 toolbar permissions 有 seed/环境前置 skip。 | 本轮引用 deep/lifecycle/field/smart/list/load-existing fresh run; seed 前置 skip 不计完成证据。 |
 | Dashboard Designer | `dashboard-widget-types.spec.ts` 多处 `>=1` 是“添加后画布至少出现该类 widget”的存在性断言; `dashboard-management.spec.ts` / `dashboard-tab-reorder.spec.ts` 有 PUT setup 与 fixme; `dashboard-export.spec.ts` 已覆盖 Excel/PDF artifact。 | 本轮引用 widget/chart/deep/interactions/export fresh run; management/tab persistence 仍为 P1 gap,不计 DONE。 |
 | BPMN Designer | `web-admin/tests/e2e/bpm-designer/*` 覆盖 userTask/serviceTask/gateway/callActivity/SLA 等 L1/L2/L3;旧 `designer-lifecycle.spec.ts` BPMN 段仍受 permission skip 影响。 | 新 bpm-designer 目录为主要证据;旧 lifecycle skip 不计完成证据。 |
@@ -416,6 +416,12 @@ rg -n -e 'test\.skip' -e 'test\.fixme' -e 'waitForTimeout\(' -e 'toBeGreaterThan
 | 2026-06-12 Setup/auth/fixtures | `pnpm exec playwright test -c playwright.config.ts --project=setup --reporter=line` on host stack `:6443/:5174/:3501` | `16 passed (2.0s)` |
 | 2026-06-12 Automation Designer delay targeted | `automation-designer-golden.spec.ts -g "N-DELAY"` via quick config, `PW_QUICK_WORKERS=1`, host stack `:6443/:5174/:3501` | `1 passed (6.4s)` |
 | 2026-06-12 Automation Designer full | `tests/e2e/automation/automation-designer-golden.spec.ts` via quick config, `PW_QUICK_WORKERS=1`, host stack `:6443/:5174/:3501` | `31 passed (2.9m)` |
+| 2026-06-12 Direct BPM start-process proof | admin login + `POST /api/bpm/process-instances` + `GET /api/bpm/process-instances/by-business-key/status` for `e2et_payment_approval` | process instance created, `manager_review` active, `start_1` completed, variables echoed |
+| 2026-06-12 Frontend process picker unit | `pnpm exec vitest run app/shared/services/__tests__/resourceSelectService.test.ts` | `15 tests` passed; new test maps `/api/bpm/process-definitions/deployed` DTO to process-select options |
+| 2026-06-12 Backend start-process storage seam | `./gradlew :test --tests com.auraboot.framework.automation.executor.impl.StartProcessActionExecutorTest` in `platform` | first run red: assertion saw outer `CUSTOM` during BPM start; after fix `BUILD SUCCESSFUL`, `7 tests` passed |
+| 2026-06-12 Automation Designer start-process targeted | `automation-designer-golden.spec.ts -g "N-START-PROCESS"` via quick config, `PW_QUICK_WORKERS=1`, host stack `:6443/:5174/:3501` | first red: process-select no result due paginated endpoint; second red: webhook 500 from `CustomTaskInstanceStorage.insert()`; third red: list badge stale after toggle; after fixes `1 passed (3.5s)` |
+| 2026-06-12 Automation Designer full host-mode | `tests/e2e/automation/automation-designer-golden.spec.ts` via quick config, `PW_QUICK_WORKERS=1`, host stack `:6443/:5174/:3501`, `E2E_OUTBOUND_HOST=127.0.0.1`, `E2E_CALLAPI_OK_URL=http://127.0.0.1:3501/health` | `32 passed (2.0m)` |
+| 2026-06-12 Automation full first run classification | same spec without host-mode outbound override | environment-invalid for local host stack: default outbound URL targeted `host.docker.internal:6444`; rerun above is the product evidence |
 | 2026-06-12 Typecheck | `pnpm typecheck` in `web-admin` | passed; only existing Vite tsconfig-paths warning |
 | 2026-06-12 Hard redline on Automation referenced spec | grep for `test.skip`, `test.fixme`, `waitForTimeout(`, `retries:`, `waitForEvent('download').catch`, `page.request.put`, `__reactProps` on `automation-designer-golden.spec.ts` | no output |
 | 2026-06-12 Lower-bound classification | grep for `toBeGreaterThanOrEqual` / `toBeLessThanOrEqual` on `automation-designer-golden.spec.ts` | existing `>=1` / `>=2` are business existence lower bounds for side effects/log rows/receiver hits; not used as coverage-completion percentages |
@@ -432,7 +438,7 @@ rg -n -e 'test\.skip' -e 'test\.fixme' -e 'waitForTimeout\(' -e 'toBeGreaterThan
 
 | 范围 | 本轮可计入 DONE 的证据 | 明确不能计入 DONE 的剩余项 |
 |---|---|---|
-| Automation Designer | record-create/update/field-change/state-change/scheduled/webhook triggers; update/create/notification/execute-command/call-api/send-webhook/llm-call actions; condition/loop/delay controls; true/false/edge/lifecycle/concurrency/i18n sad/edge/corner paths. Evidence: `automation-designer-golden.spec.ts` 31 pass with real side effects/logs/outbound receiver, including `N-DELAY` for `control-delay` UI save + SmartEngine runtime + downstream side effect. Backend seam evidence: `AutomationFlowCompilerTest` + `ControlNodeExecutorTest` targeted pass. | `trigger-bpm-event`, `trigger-inactivity`, `action-start-process` remain matrix gaps unless a future spec adds real runtime evidence. Legacy `automation-golden.spec.ts` skip/fixme is not evidence. |
+| Automation Designer | record-create/update/field-change/state-change/scheduled/webhook triggers; update/create/notification/execute-command/call-api/send-webhook/start-process/llm-call actions; condition/loop/delay controls; true/false/edge/lifecycle/concurrency/i18n sad/edge/corner paths. Evidence: `automation-designer-golden.spec.ts` 32 pass with real side effects/logs/outbound receiver, including `N-DELAY` for `control-delay` UI save + SmartEngine runtime + downstream side effect, and `N-START-PROCESS` for process-select + BPM business process start + `manager_review` wait-state correlation. Backend seam evidence: `AutomationFlowCompilerTest` + `ControlNodeExecutorTest` targeted pass for delay, `StartProcessActionExecutorTest` targeted pass for storage-mode boundary. | `trigger-bpm-event` and `trigger-inactivity` remain matrix gaps unless a future spec adds real runtime evidence. Legacy `automation-golden.spec.ts` skip/fixme is not evidence. |
 | BPMN Designer | Base palette 9 types are covered through L1 designerJson, L2 BPMN XML, and selected L3 runtime: start/end, userTask assignee/form/MI/SLA, serviceTask command/http/rule/notification, receiveTask, exclusive/parallel/inclusive gateway, callActivity. Evidence: `tests/e2e/bpm-designer` 21 pass. | Old `designer-lifecycle.spec.ts` BPMN permission skip and old gateway lifecycle skip are not evidence. |
 | Page Designer | Form-page designer operations: drag/sort, property edit, save/publish, undo/redo, preview, field drag, delete, outline, multi-type mix, PageSchema V2 import/export, lifecycle, field/smart component panels, list layout/load-existing/error state. Evidence: targeted Page Designer 34 pass. | Full per-block 17-type cartesian coverage is not complete. Workbench-specific blocks such as `metric-strip`, `record-inspector`, `candidate-list`, `evidence-panel`, `artifact-timeline`, `review-drawer` still need typed runtime assertions before marking their inventory rows DONE. |
 | Dashboard Designer | Dashboard designer load, chart palette/config, 14 named widget types add/property-panel checks, data source binding, resize/settings/validation/publish/unpublish/layout, interactions, Excel XLSX artifact parse, PDF header/content marker. Evidence: Dashboard 64 pass. | `dashboard-management.spec.ts` and `dashboard-tab-reorder.spec.ts` still contain API PUT setup/fixme; tab-order preference persistence and row-management flows remain P1 gaps. Registry workbench widgets outside the 14 named widget suite are not individually DONE. |
@@ -443,7 +449,8 @@ rg -n -e 'test\.skip' -e 'test\.fixme' -e 'waitForTimeout\(' -e 'toBeGreaterThan
 - 本轮声明只能说“上述 fresh-run evidence specs 通过且 hard redline clean”。不能说“全量设计器笛卡尔积 100% DONE”。
 - Full redline 仍列出旧套件的 `test.skip` / `test.fixme` / API PUT setup / lower-bound assertions;这些文件不作为本轮 DONE 证据。
 - `toBeGreaterThanOrEqual` 在本轮引用 spec 中只作为业务下限或添加后存在性断言使用,不能用于计算覆盖率或证明某一完整组件族已全部覆盖。
-- 2026-06-12 `control-delay` 的 DONE 只覆盖设计器配置 `duration/unit` → 后端编译/执行 → SmartEngine 节点状态 → 下游副作用闭环;它不代表 `trigger-bpm-event`、`trigger-inactivity`、`action-start-process` 已完成。
+- 2026-06-12 `control-delay` 的 DONE 只覆盖设计器配置 `duration/unit` → 后端编译/执行 → SmartEngine 节点状态 → 下游副作用闭环;它不代表 `trigger-bpm-event`、`trigger-inactivity` 已完成。
+- 2026-06-12 `action-start-process` 的 DONE 只覆盖设计器配置 `processKey/businessKey/variables` → 保存回显 → Automation webhook runtime → BPM durable process start → by-businessKey status 闭环;它不代表 `trigger-bpm-event` 或 `trigger-inactivity` 已完成。
 - 前一次 Dashboard/Report 合批失败的根因是后端 `bootRun` 被 SIGTERM 停止后前端重定向到登录页;该失败已通过重启后端、重跑 setup、分批 fresh run 排除,不计产品缺陷。
 
 ### Phase 3: P0/P1 补测

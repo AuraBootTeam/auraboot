@@ -33,12 +33,12 @@ interface DashboardRecord {
   }>;
 }
 
-interface ProcessRecord {
-  records: Array<{
-    name: string;
-    key: string;
-    version: number;
-  }>;
+interface ProcessDefinitionRecord {
+  name?: string;
+  key?: string;
+  processName?: string;
+  processKey?: string;
+  version: number;
 }
 
 interface AutomationRecord {
@@ -101,12 +101,22 @@ export async function fetchDashboardOptions(): Promise<ResourceOption[]> {
 }
 
 export async function fetchProcessOptions(): Promise<ResourceOption[]> {
-  const result = await fetchResult<ProcessRecord>('/api/bpm/process-definitions?size=100');
-  return (result?.data?.records || []).map((p) => ({
-    label: `${p.name} (${p.key})`,
-    value: p.key,
-    description: `v${p.version}`,
-  }));
+  const result = await fetchResult<{ records?: ProcessDefinitionRecord[] } | ProcessDefinitionRecord[]>(
+    '/api/bpm/process-definitions/deployed',
+  );
+  const records = Array.isArray(result?.data) ? result.data : result?.data?.records || [];
+  const options: ResourceOption[] = [];
+  for (const p of records) {
+    const key = p.key || p.processKey;
+    const name = p.name || p.processName || key;
+    if (!key) continue;
+    options.push({
+      label: `${name} (${key})`,
+      value: key,
+      description: `v${p.version}`,
+    });
+  }
+  return options;
 }
 
 export async function fetchAutomationOptions(): Promise<ResourceOption[]> {
