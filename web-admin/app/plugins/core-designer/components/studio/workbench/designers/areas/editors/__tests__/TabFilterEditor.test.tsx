@@ -23,6 +23,7 @@ function StatefulTabFilterEditor({
     <>
       <TabFilterEditor
         tabs={tabs as any}
+        blockId="tabs_block"
         onChange={(nextTabs) => {
           const typedTabs = nextTabs as TestTab[];
           setTabs(typedTabs);
@@ -69,6 +70,11 @@ describe('TabFilterEditor', () => {
     );
 
     expect(screen.getByTestId('tab-child-blocks-editor')).toBeVisible();
+    expect(screen.getByTestId('tab-child-blocks-editor')).toHaveAttribute(
+      'data-drop-id',
+      'tab-child-drop:tabs_block:overview',
+    );
+    expect(screen.getByTestId('tab-child-drop-zone')).toBeVisible();
 
     fireEvent.click(screen.getByTestId('tab-child-add-text-block'));
 

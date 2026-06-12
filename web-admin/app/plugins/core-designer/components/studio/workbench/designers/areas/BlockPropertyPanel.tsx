@@ -7,7 +7,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { DslBlock, DslFieldRef, DslFieldOverride } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type {
+  BlockType,
+  DslBlock,
+  DslFieldRef,
+  DslFieldOverride,
+} from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { FieldsEditor } from './editors/FieldsEditor';
 import { ColumnsEditor } from './editors/ColumnsEditor';
 import { ActionsEditor } from './editors/ActionsEditor';
@@ -42,6 +47,8 @@ export interface BlockPropertyPanelProps {
   onDataSourceChange?: (ds: Record<string, unknown>) => void;
   onTestDetect?: () => void;
   testStatus?: { connected: boolean; recordCount: number | null; error: string | null };
+  activeLibraryBlockType?: BlockType | null;
+  onDropLibraryBlockToTab?: (parentBlockId: string, tabKey: string, blockType: BlockType) => void;
 }
 
 /**
@@ -102,6 +109,8 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
   onDataSourceChange,
   onTestDetect,
   testStatus,
+  activeLibraryBlockType,
+  onDropLibraryBlockToTab,
 }) => {
   const { locale } = useI18n();
   // Resolve field dataType from model metadata
@@ -227,7 +236,14 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
           </EditorSection>
         )}
 
-        <BlockEditors block={block} modelCode={modelCode} onChange={onChange} readonly={readonly} />
+        <BlockEditors
+          block={block}
+          modelCode={modelCode}
+          onChange={onChange}
+          readonly={readonly}
+          activeLibraryBlockType={activeLibraryBlockType}
+          onDropLibraryBlockToTab={onDropLibraryBlockToTab}
+        />
       </div>
     </div>
   );
@@ -270,9 +286,18 @@ interface BlockEditorsProps {
   modelCode?: string;
   onChange: (updates: Partial<DslBlock>) => void;
   readonly?: boolean;
+  activeLibraryBlockType?: BlockType | null;
+  onDropLibraryBlockToTab?: (parentBlockId: string, tabKey: string, blockType: BlockType) => void;
 }
 
-const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange, readonly }) => {
+const BlockEditors: React.FC<BlockEditorsProps> = ({
+  block,
+  modelCode,
+  onChange,
+  readonly,
+  activeLibraryBlockType,
+  onDropLibraryBlockToTab,
+}) => {
   const sections: React.ReactNode[] = [];
   const { locale } = useI18n();
   const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
@@ -336,6 +361,9 @@ const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange,
         <TabFilterEditor
           tabs={(block as any).tabs || []}
           onChange={(tabs) => onChange({ tabs } as any)}
+          blockId={block.id}
+          activeLibraryBlockType={activeLibraryBlockType}
+          onDropLibraryBlockToTab={onDropLibraryBlockToTab}
           readonly={readonly}
         />
       </EditorSection>,

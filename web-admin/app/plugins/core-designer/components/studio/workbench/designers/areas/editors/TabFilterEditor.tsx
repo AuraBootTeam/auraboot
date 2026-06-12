@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useDroppable } from '@dnd-kit/core';
 
 interface LocalizedText {
   'en-US'?: string;
@@ -29,6 +30,9 @@ interface ListTabConfig {
 export interface TabFilterEditorProps {
   tabs: ListTabConfig[];
   onChange: (tabs: ListTabConfig[]) => void;
+  blockId?: string;
+  activeLibraryBlockType?: string | null;
+  onDropLibraryBlockToTab?: (parentBlockId: string, tabKey: string, blockType: any) => void;
   readonly?: boolean;
 }
 
@@ -54,7 +58,14 @@ function createTextChildBlock(index: number): TabChildBlock {
   };
 }
 
-export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorProps) {
+export function TabFilterEditor({
+  tabs,
+  onChange,
+  blockId,
+  activeLibraryBlockType,
+  onDropLibraryBlockToTab,
+  readonly,
+}: TabFilterEditorProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const updateTab = useCallback(
@@ -134,6 +145,24 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
 
   const currentTab = tabs[selectedIndex];
   const currentTabBlocks = getTabBlocks(currentTab);
+  const currentTabDropId =
+    blockId && currentTab?.key
+      ? `tab-child-drop:${blockId}:${encodeURIComponent(currentTab.key)}`
+      : 'tab-child-drop:unknown';
+  const { setNodeRef: setChildDropRef, isOver: isChildDropOver } = useDroppable({
+    id: currentTabDropId,
+    disabled: readonly || !blockId || !currentTab,
+  });
+  const handleChildDropPointerUp = useCallback(() => {
+    if (readonly || !blockId || !currentTab || !activeLibraryBlockType) return;
+    onDropLibraryBlockToTab?.(blockId, currentTab.key, activeLibraryBlockType);
+  }, [
+    activeLibraryBlockType,
+    blockId,
+    currentTab,
+    onDropLibraryBlockToTab,
+    readonly,
+  ]);
 
   return (
     <div className="space-y-3" data-testid="tab-filter-editor">
@@ -218,8 +247,13 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
           <div>
             <label className="text-[10px] font-semibold text-gray-500">Child Blocks</label>
             <div
-              className="mt-1 space-y-1.5 rounded border bg-gray-50 p-1.5"
+              ref={setChildDropRef}
+              onPointerUp={handleChildDropPointerUp}
+              className={`mt-1 space-y-1.5 rounded border p-1.5 transition-colors ${
+                isChildDropOver ? 'border-blue-400 bg-blue-50' : 'bg-gray-50'
+              }`}
               data-testid="tab-child-blocks-editor"
+              data-drop-id={currentTabDropId}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] text-gray-400">
@@ -234,6 +268,19 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
                 >
                   + Text
                 </button>
+              </div>
+
+              <div
+                className={`rounded border border-dashed px-2 py-2 text-center text-[10px] transition-colors ${
+                  isChildDropOver
+                    ? 'border-blue-400 bg-blue-50 text-blue-600'
+                    : 'border-gray-200 bg-white text-gray-400'
+                }`}
+                data-testid="tab-child-drop-zone"
+              >
+                {isChildDropOver
+                  ? 'Release to add block'
+                  : 'Drag a block from the library into this tab'}
               </div>
 
               {currentTabBlocks.length === 0 ? (

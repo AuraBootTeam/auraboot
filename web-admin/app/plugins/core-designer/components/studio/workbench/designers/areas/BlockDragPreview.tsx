@@ -40,7 +40,10 @@ export const BlockDragPreview: React.FC<BlockDragPreviewProps> = ({ blockType })
   const info = BLOCK_INFO[blockType] || { name: blockType, icon: '📦' };
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border-2 border-blue-400 bg-white px-4 py-3 shadow-lg">
+    <div
+      className="flex items-center gap-3 rounded-lg border-2 border-blue-400 bg-white px-4 py-3 shadow-lg"
+      data-testid="block-drag-preview"
+    >
       <span className="text-xl">{info.icon}</span>
       <div>
         <div className="text-sm font-medium text-gray-900">{info.name}</div>
