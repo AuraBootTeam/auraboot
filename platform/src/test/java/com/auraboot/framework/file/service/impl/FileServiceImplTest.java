@@ -167,6 +167,16 @@ class FileServiceImplTest {
     }
 
     @Test
+    void getFileById_nonNumericPidMiss_doesNotQueryNumericIdColumn() {
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
+
+        FileEntity result = fileService.getFileById("01KSWFILEPID");
+
+        assertThat(result).isNull();
+        verify(fileMapper, never()).selectById((java.io.Serializable) "01KSWFILEPID");
+    }
+
+    @Test
     void getFilesByUserId_delegatesToMapper() {
         FileEntity e = new FileEntity();
         when(fileMapper.selectByCreatedBy(7L)).thenReturn(List.of(e));
@@ -179,9 +189,10 @@ class FileServiceImplTest {
 
     @Test
     void deleteFile_notFound_throwsBusinessException() {
-        when(fileMapper.selectById((java.io.Serializable) "missing")).thenReturn(null);
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
+        when(fileMapper.selectById((java.io.Serializable) "404")).thenReturn(null);
 
-        assertThatThrownBy(() -> fileService.deleteFile("missing", 1L))
+        assertThatThrownBy(() -> fileService.deleteFile("404", 1L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("File not found");
     }
@@ -213,6 +224,24 @@ class FileServiceImplTest {
         assertThat(ok).isTrue();
         verify(storageProvider).delete("k1");
         verify(fileMapper).updateById(entity);
+        verify(fileMapper).deleteById(1L);
+    }
+
+    @Test
+    void deleteFile_acceptsUploadResponsePid() {
+        FileEntity entity = new FileEntity();
+        entity.setId(1L);
+        entity.setPid("01KSWFILEPID");
+        entity.setCreatedBy(42L);
+        entity.setFileName("k1");
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(entity);
+        when(fileMapper.deleteById(1L)).thenReturn(1);
+
+        boolean ok = fileService.deleteFile("01KSWFILEPID", 42L);
+
+        assertThat(ok).isTrue();
+        verify(fileMapper, never()).selectById((java.io.Serializable) "01KSWFILEPID");
+        verify(storageProvider).delete("k1");
         verify(fileMapper).deleteById(1L);
     }
 
