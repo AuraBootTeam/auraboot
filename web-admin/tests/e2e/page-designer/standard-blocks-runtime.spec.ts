@@ -212,6 +212,51 @@ async function createPublishedStandardListPage(page: Page) {
   return { pageKey, title, blocks, pid };
 }
 
+async function createPublishedCustomBlockListPage(page: Page) {
+  const id = uniqueId('standard_runtime_custom');
+  const pageKey = id.replace(/-/g, '_');
+  const title = `Standard custom runtime ${id}`;
+  const blocks = [
+    {
+      id: 'custom_field_impact',
+      blockType: 'custom',
+      component: 'decision-field-impact',
+      props: {
+        initialCurrentDataType: 'string',
+      },
+    },
+    {
+      id: 'custom_hidden',
+      blockType: 'custom',
+      component: 'DecisionFieldImpactBlock',
+      visibleWhen: '${false}',
+    },
+    {
+      id: 'custom_unknown_component',
+      blockType: 'custom',
+      component: 'E2EMissingCustomRuntimeBlock',
+    },
+  ];
+  const payload = {
+    ...buildPageBase('list', pageKey, title),
+    blocks,
+    dataSources: {},
+    extension: {
+      customOnly: true,
+      skipFieldMeta: true,
+      hideSavedViews: true,
+      hideQuickFilters: true,
+      hideSort: true,
+      hideColumnSettings: true,
+      hideRowHeight: true,
+      hideFilterChips: true,
+    },
+  };
+
+  await publishPage(page, payload);
+  return { pageKey, title, blocks };
+}
+
 async function createPublishedStandardFormPage(page: Page) {
   const id = uniqueId('standard_runtime_form');
   const pageKey = id.replace(/-/g, '_');
@@ -492,6 +537,56 @@ test.describe('Page Designer standard block runtime', () => {
     await expect(page.getByTestId('table-cell-0-name')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('table-cell-0-status')).toBeVisible();
     await expect(page.getByTestId('table-cell-0-actions')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('Unknown block type');
+  });
+
+  test('custom blocks load registered runtime components and surface unresolved components', async ({
+    page,
+  }) => {
+    const { pageKey, title } = await createPublishedCustomBlockListPage(page);
+
+    const readback = await fetchPageByKey(page, pageKey);
+    expect(readback.name, 'custom host page name').toBe(title);
+    expect(readback.extension?.customOnly, 'custom-only runtime flag').toBe(true);
+    expect(readback.extension?.skipFieldMeta, 'custom host skips model metadata').toBe(true);
+    expect(
+      (readback.blocks || []).map((block: any) => ({
+        id: block.id,
+        blockType: block.blockType,
+        component: block.component,
+        visibleWhen: block.visibleWhen,
+      })),
+      'custom blocks persisted for runtime host',
+    ).toEqual([
+      {
+        id: 'custom_field_impact',
+        blockType: 'custom',
+        component: 'decision-field-impact',
+        visibleWhen: undefined,
+      },
+      {
+        id: 'custom_hidden',
+        blockType: 'custom',
+        component: 'DecisionFieldImpactBlock',
+        visibleWhen: '${false}',
+      },
+      {
+        id: 'custom_unknown_component',
+        blockType: 'custom',
+        component: 'E2EMissingCustomRuntimeBlock',
+        visibleWhen: undefined,
+      },
+    ]);
+
+    await page.goto(`/p/c/${pageKey}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('list-misc-blocks')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('decision-field-impact')).toHaveCount(1, { timeout: 15_000 });
+    await expect(page.getByLabel('field-impact-ref')).toBeVisible();
+    await expect(page.getByLabel('field-impact-current-type')).toHaveValue('string');
+    await expect(page.getByTestId('field-impact-load')).toBeDisabled();
+    await expect(page.locator('body')).toContainText('Failed to load E2EMissingCustomRuntimeBlock', {
+      timeout: 15_000,
+    });
     await expect(page.locator('body')).not.toContainText('Unknown block type');
   });
 
