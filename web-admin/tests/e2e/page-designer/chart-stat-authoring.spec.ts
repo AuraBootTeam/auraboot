@@ -127,14 +127,17 @@ async function fetchPageByPid(page: Page, pid: string): Promise<Record<string, a
   return body.data ?? {};
 }
 
-async function publishListRuntimePage(
+async function createAndPublishListRuntimePage(
   page: Page,
-  pid: string,
   savedPage: Record<string, any>,
-) {
+): Promise<string> {
   const savedBlocks = Array.isArray(savedPage.blocks) ? savedPage.blocks : [];
+  const runtimePageKey = uniqueId('pd_chart_stat_runtime').replace(/-/g, '_');
+  const runtimeTitle = `Chart stat runtime ${runtimePageKey}`;
   const runtimePayload = {
-    ...savedPage,
+    name: runtimeTitle,
+    pageKey: runtimePageKey,
+    title: runtimeTitle,
     kind: 'list',
     modelCode: 'page_schema',
     profile: 'admin',
@@ -166,18 +169,26 @@ async function publishListRuntimePage(
       hideFilterChips: true,
       miscBlocksPosition: 'beforeTable',
     },
+    dataSources: savedPage.dataSources || {},
+    layout: savedPage.layout || { type: 'stack', gap: 12 },
+    schemaVersion: savedPage.schemaVersion ?? 4,
+    metaInfo: { ...(savedPage.metaInfo || {}), chartStatRuntime: true },
+    semver: savedPage.semver ?? '0.1.0',
   };
 
-  const updateResp = await page.request.put(`/api/pages/${pid}`, { data: runtimePayload });
-  expect(updateResp.ok(), `Update list runtime page failed: ${updateResp.status()}`).toBeTruthy();
-  const updateBody = await updateResp.json();
-  expect(updateBody.code, 'update list runtime page API code').toBe('0');
+  const createResp = await page.request.post('/api/pages', { data: runtimePayload });
+  expect(createResp.ok(), `Create list runtime page failed: ${createResp.status()}`).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create list runtime page API code').toBe('0');
+  const runtimePid = String(createBody.data?.pid || '');
+  expect(runtimePid, 'created chart/stat runtime pid').toBeTruthy();
 
-  const publishResp = await page.request.post(`/api/pages/${pid}/publish`);
+  const publishResp = await page.request.post(`/api/pages/${runtimePid}/publish`);
   expect(publishResp.ok(), `Publish list runtime page failed: ${publishResp.status()}`).toBeTruthy();
   const publishBody = await publishResp.json();
   expect(publishBody.code, 'publish list runtime page API code').toBe('0');
   expect(publishBody.data?.status, 'published list runtime page status').toBe('published');
+  return runtimePageKey;
 }
 
 test.describe('Page Designer chart/stat authoring', () => {
@@ -256,7 +267,7 @@ test.describe('Page Designer chart/stat authoring', () => {
       },
     });
 
-    await publishListRuntimePage(page, pid, savedPage);
+    const runtimePageKey = await createAndPublishListRuntimePage(page, savedPage);
 
     const statRuntimeResp = page.waitForResponse(
       (response) =>
@@ -270,7 +281,7 @@ test.describe('Page Designer chart/stat authoring', () => {
       { timeout: 15_000 },
     );
 
-    await page.goto(`/p/c/${pageKey}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/p/c/${runtimePageKey}`, { waitUntil: 'domcontentloaded' });
     const [statResp, chartResp] = await Promise.all([statRuntimeResp, chartRuntimeResp]);
     const statRuntimeBody = await statResp.json();
     const chartRuntimeBody = await chartResp.json();

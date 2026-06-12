@@ -120,10 +120,17 @@ async function fetchPageByPid(page: Page, pid: string): Promise<Record<string, a
   return body.data ?? {};
 }
 
-async function publishListRuntimePage(page: Page, pid: string, savedPage: Record<string, any>) {
+async function createAndPublishListRuntimePage(
+  page: Page,
+  savedPage: Record<string, any>,
+): Promise<string> {
   const savedBlocks = Array.isArray(savedPage.blocks) ? savedPage.blocks : [];
+  const runtimePageKey = uniqueId('pd_chart_refresh_runtime').replace(/-/g, '_');
+  const runtimeTitle = `Chart refresh runtime ${runtimePageKey}`;
   const runtimePayload = {
-    ...savedPage,
+    name: runtimeTitle,
+    pageKey: runtimePageKey,
+    title: runtimeTitle,
     kind: 'list',
     modelCode: 'page_schema',
     profile: 'admin',
@@ -145,23 +152,31 @@ async function publishListRuntimePage(page: Page, pid: string, savedPage: Record
       hideFilterChips: true,
       miscBlocksPosition: 'beforeTable',
     },
+    dataSources: savedPage.dataSources || {},
+    layout: savedPage.layout || { type: 'stack', gap: 12 },
+    schemaVersion: savedPage.schemaVersion ?? 4,
+    metaInfo: { ...(savedPage.metaInfo || {}), chartRefreshRuntime: true },
+    semver: savedPage.semver ?? '0.1.0',
   };
 
-  const updateResp = await page.request.put(`/api/pages/${pid}`, { data: runtimePayload });
+  const createResp = await page.request.post('/api/pages', { data: runtimePayload });
   expect(
-    updateResp.ok(),
-    `Update chart refresh runtime page failed: ${updateResp.status()}`,
+    createResp.ok(),
+    `Create chart refresh runtime page failed: ${createResp.status()}`,
   ).toBeTruthy();
-  const updateBody = await updateResp.json();
-  expect(updateBody.code, 'update chart refresh runtime page API code').toBe('0');
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create chart refresh runtime page API code').toBe('0');
+  const runtimePid = String(createBody.data?.pid || '');
+  expect(runtimePid, 'created chart refresh runtime pid').toBeTruthy();
 
-  const publishResp = await page.request.post(`/api/pages/${pid}/publish`);
+  const publishResp = await page.request.post(`/api/pages/${runtimePid}/publish`);
   expect(
     publishResp.ok(),
     `Publish chart refresh runtime page failed: ${publishResp.status()}`,
   ).toBeTruthy();
   const publishBody = await publishResp.json();
   expect(publishBody.code, 'publish chart refresh runtime page API code').toBe('0');
+  return runtimePageKey;
 }
 
 test.describe('Page Designer chart refresh authoring', () => {
@@ -170,7 +185,7 @@ test.describe('Page Designer chart refresh authoring', () => {
   test('saves chart refresh interval and auto-refreshes the published runtime chart', async ({
     page,
   }) => {
-    const { pid, pageKey } = await createChartRefreshAuthoringPage(page);
+    const { pid } = await createChartRefreshAuthoringPage(page);
 
     await openDesignerByPid(page, pid);
     const chartBlockId = await addBlockViaPalette(page, 'chart-card');
@@ -208,7 +223,7 @@ test.describe('Page Designer chart refresh authoring', () => {
       String(REFRESH_INTERVAL_MS),
     );
 
-    await publishListRuntimePage(page, pid, savedPage);
+    const runtimePageKey = await createAndPublishListRuntimePage(page, savedPage);
 
     const chartResponses: unknown[] = [];
     page.on('response', async (response) => {
@@ -217,7 +232,7 @@ test.describe('Page Designer chart refresh authoring', () => {
       }
     });
 
-    await page.goto(`/p/c/${pageKey}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/p/c/${runtimePageKey}`, { waitUntil: 'domcontentloaded' });
     await expect
       .poll(
         () =>
