@@ -49,6 +49,21 @@ type CreatedAnnouncement = {
   pinned: boolean;
 };
 
+type CreatedInboxFixture = {
+  recordIds: string[];
+  testRunId: string;
+  metadata?: {
+    itemType?: string;
+    tenantId?: string | number;
+    userId?: string | number;
+  };
+};
+
+type CurrentUserContext = {
+  tenantId: string;
+  userId: string;
+};
+
 const SVG_DATA_URL =
   'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22480%22%20height%3D%22200%22%20viewBox%3D%220%200%20480%20200%22%3E%3Crect%20width%3D%22480%22%20height%3D%22200%22%20fill%3D%22%23eef6ff%22%2F%3E%3Ctext%20x%3D%22240%22%20y%3D%22108%22%20font-size%3D%2232%22%20text-anchor%3D%22middle%22%20fill%3D%22%231d4ed8%22%3ERuntime%20Image%3C%2Ftext%3E%3C%2Fsvg%3E';
 
@@ -294,6 +309,41 @@ function announcementWidgets(): DashboardWidgetFixture[] {
         visualization: {
           maxItems: 5,
         },
+      },
+    },
+  ];
+}
+
+function inboxCalendarWidgets(): DashboardWidgetFixture[] {
+  return [
+    {
+      id: 'runtime-inbox',
+      type: 'smart-inbox',
+      title: 'Runtime Inbox',
+      x: 0,
+      y: 0,
+      w: 7,
+      h: 4,
+      config: {
+        title: 'Runtime Inbox',
+        dataSource: { type: 'static' },
+        visualization: {
+          maxItems: 5,
+          itemTypes: 'approval',
+        },
+      },
+    },
+    {
+      id: 'runtime-calendar',
+      type: 'smart-calendar',
+      title: 'Runtime Calendar',
+      x: 7,
+      y: 0,
+      w: 5,
+      h: 4,
+      config: {
+        title: 'Runtime Calendar',
+        dataSource: { type: 'static' },
       },
     },
   ];
@@ -592,6 +642,81 @@ async function expectAnnouncementListContains(
   const match = listBody.data?.find((item) => item.title === title);
   expect(match, `${context} should include ${title}`).toBeTruthy();
   return match!;
+}
+
+async function createInboxFixture(page: Page): Promise<CreatedInboxFixture> {
+  const testRunId = `dwr-inbox-${Date.now()}`;
+  const currentUser = await getCurrentUserContext(page);
+  const response = await page.request.post('/api/test/fixture', {
+    data: {
+      name: 'approval',
+      testRunId,
+      params: {
+        count: 1,
+        tenantId: currentUser.tenantId,
+        userId: currentUser.userId,
+      },
+    },
+  });
+  const body = await parseJsonResponse<CreatedInboxFixture>(response, 'create inbox fixture');
+  expect(body.recordIds, 'created inbox record ids').toHaveLength(1);
+  expect(body.metadata?.itemType, 'created inbox item type').toBe('approval');
+  expect(String(body.metadata?.tenantId), 'created inbox tenant id').toBe(currentUser.tenantId);
+  expect(String(body.metadata?.userId), 'created inbox user id').toBe(currentUser.userId);
+  await expectInboxListContains(page, testRunId, 'inbox list immediately after fixture create');
+  return body;
+}
+
+async function getCurrentUserContext(page: Page): Promise<CurrentUserContext> {
+  const response = await page.request.get('/api/auth/me');
+  const body = await parseJsonResponse<{
+    data?: {
+      user?: {
+        id?: string | number;
+        tenantId?: string | number;
+      };
+      tenantId?: string | number;
+    };
+  }>(response, 'read current user');
+  const userId = body.data?.user?.id;
+  const tenantId = body.data?.user?.tenantId ?? body.data?.tenantId;
+  expect(userId, 'current user id').toBeTruthy();
+  expect(tenantId, 'current tenant id').toBeTruthy();
+  return {
+    userId: String(userId),
+    tenantId: String(tenantId),
+  };
+}
+
+async function cleanupInboxFixture(page: Page, fixture?: CreatedInboxFixture): Promise<void> {
+  if (!fixture) return;
+  await Promise.all(
+    fixture.recordIds.map((id) =>
+      page.request.put(`/api/inbox/${id}/dismiss`).catch(() => undefined),
+    ),
+  );
+}
+
+async function expectInboxListContains(
+  page: Page,
+  testRunId: string,
+  context: string,
+  response?: APIResponse | PlaywrightResponse,
+): Promise<void> {
+  const listResponse = response ?? await page.request.get('/api/inbox', {
+    params: {
+      status: 'pending',
+      itemType: 'approval',
+      pageNum: '1',
+      pageSize: '10',
+    },
+  });
+  const body = await parseJsonResponse<{ data?: { records?: Array<{ title?: string }> } }>(
+    listResponse,
+    context,
+  );
+  const match = body.data?.records?.find((item) => item.title?.includes(testRunId));
+  expect(match, `${context} should include ${testRunId}`).toBeTruthy();
 }
 
 async function expectRuntimeBlock(page: Page, id: string, type: string): Promise<Locator> {
@@ -913,6 +1038,55 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       await expect(announcementBlock).toContainText(/Urgent|紧急/);
     } finally {
       await cleanupAnnouncement(page, announcement?.id);
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
+  test('DWR-007: inbox and calendar widgets render pending inbox API data', async ({ page }) => {
+    let dashboard: CreatedDashboard | undefined;
+    let inboxFixture: CreatedInboxFixture | undefined;
+
+    try {
+      inboxFixture = await createInboxFixture(page);
+      dashboard = await createPublishedDashboard(
+        page,
+        inboxCalendarWidgets(),
+        'Runtime Inbox Calendar Widget Matrix',
+      );
+
+      const inboxResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/inbox') &&
+          response.url().includes('status=pending') &&
+          response.request().method() === 'GET' &&
+          response.status() === 200,
+        { timeout: 10_000 },
+      );
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expectInboxListContains(
+        page,
+        inboxFixture.testRunId,
+        'inbox list consumed by viewer',
+        await inboxResponse,
+      );
+
+      const inboxBlock = await expectRuntimeBlock(page, 'runtime-inbox', 'smart-inbox');
+      const expectedInboxTitle = `E2E Approval Request [${inboxFixture.testRunId}-1]`;
+      await expect(inboxBlock).toContainText(expectedInboxTitle);
+      const inboxRow = inboxBlock.getByRole('row').filter({ hasText: expectedInboxTitle });
+      await expect(inboxRow).toBeVisible();
+      await expect(inboxRow.getByTestId('inbox-type-badge')).toContainText(/Approval|审批/);
+
+      const calendarBlock = await expectRuntimeBlock(page, 'runtime-calendar', 'smart-calendar');
+      await expect(calendarBlock.getByTestId('calendar-widget')).toBeVisible();
+      await expect(calendarBlock.getByTestId('calendar-dot-red')).toBeVisible({
+        timeout: 10_000,
+      });
+    } finally {
+      await cleanupInboxFixture(page, inboxFixture);
       await cleanupDashboard(page, dashboard?.pid);
     }
   });

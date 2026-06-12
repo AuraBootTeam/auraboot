@@ -214,6 +214,7 @@ export function CalendarWidget({ className = '' }: CalendarWidgetProps) {
           {cells.map((cell, i) => (
             <div
               key={i}
+              data-testid={`calendar-day-${cell.year}-${String(cell.month + 1).padStart(2, '0')}-${String(cell.date).padStart(2, '0')}`}
               className={`relative flex flex-col items-center justify-center py-1 ${
                 cell.isCurrentMonth ? '' : 'opacity-30'
               }`}
@@ -231,6 +232,7 @@ export function CalendarWidget({ className = '' }: CalendarWidgetProps) {
               </span>
               {cell.dotColor && (
                 <span
+                  data-testid={`calendar-dot-${cell.dotColor}`}
                   className={`absolute bottom-0 h-1 w-1 rounded-full ${
                     cell.dotColor === 'red' ? 'bg-red-500' : 'bg-blue-400'
                   }`}
