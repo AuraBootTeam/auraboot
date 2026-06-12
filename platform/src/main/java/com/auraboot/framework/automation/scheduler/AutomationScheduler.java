@@ -79,7 +79,9 @@ public class AutomationScheduler {
      * Check ON_INACTIVITY triggers every 5 minutes.
      * Scans dynamic tables for records that haven't been updated within the configured threshold.
      */
-    @Scheduled(fixedDelay = 300_000, initialDelay = 60_000)
+    @Scheduled(
+            fixedDelayString = "${automation.inactivity.fixed-delay-ms:300000}",
+            initialDelayString = "${automation.inactivity.initial-delay-ms:60000}")
     public void checkInactivityAutomations() {
         try {
             List<Automation> inactivityRules = automationMapper.findEnabledInactivity();

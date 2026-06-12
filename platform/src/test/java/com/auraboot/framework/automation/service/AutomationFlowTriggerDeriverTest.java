@@ -127,6 +127,33 @@ class AutomationFlowTriggerDeriverTest {
                 .containsExactly("process_started", "task_completed");
     }
 
+    // ==================== Inactivity trigger ====================
+
+    @Test
+    void derive_inactivityTrigger_extractsModelThresholdFieldAndStates() {
+        Map<String, Object> cfg = Map.of(
+                "triggerType", "on_inactivity",
+                "modelCode", "crm_lead",
+                "inactivityHours", 24,
+                "inactivityField", "last_contacted_at",
+                "stateField", "lead_status",
+                "inactivityStates", List.of("open", "nurturing"));
+        Map<String, Object> fc = flowConfig(List.of(
+                triggerNode("trigger-inactivity", cfg)));
+
+        DerivedTrigger result = deriver.derive(fc);
+
+        assertThat(result.isEmpty()).isFalse();
+        assertThat(result.triggerType()).isEqualTo("on_inactivity");
+        assertThat(result.modelCode()).isEqualTo("crm_lead");
+        assertThat(result.triggerConfig()).isNotNull();
+        assertThat(result.triggerConfig().getInactivityHours()).isEqualTo(24);
+        assertThat(result.triggerConfig().getInactivityField()).isEqualTo("last_contacted_at");
+        assertThat(result.triggerConfig().getStateField()).isEqualTo("lead_status");
+        assertThat(result.triggerConfig().getInactivityStates())
+                .containsExactly("open", "nurturing");
+    }
+
     // ==================== data.config path verification ====================
 
     /**

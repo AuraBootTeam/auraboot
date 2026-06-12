@@ -11,7 +11,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
@@ -116,6 +118,17 @@ class AutomationSchedulerTest {
         when(automationMapper.findEnabledInactivity()).thenReturn(Collections.emptyList());
         scheduler.checkInactivityAutomations();
         verifyNoInteractions(jdbcTemplate);
+    }
+
+    @Test
+    void checkInactivity_scheduleDelayIsConfigurableForGoldenE2E() throws Exception {
+        Method method = AutomationScheduler.class.getMethod("checkInactivityAutomations");
+        Scheduled scheduled = method.getAnnotation(Scheduled.class);
+
+        org.assertj.core.api.Assertions.assertThat(scheduled.fixedDelayString())
+                .isEqualTo("${automation.inactivity.fixed-delay-ms:300000}");
+        org.assertj.core.api.Assertions.assertThat(scheduled.initialDelayString())
+                .isEqualTo("${automation.inactivity.initial-delay-ms:60000}");
     }
 
     @Test

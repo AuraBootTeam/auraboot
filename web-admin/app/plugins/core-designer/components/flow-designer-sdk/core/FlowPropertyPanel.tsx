@@ -203,6 +203,8 @@ function GroupedFields({ schema, nodeId }: { schema: PropertySchema[]; nodeId: s
               <button
                 type="button"
                 onClick={() => toggleGroup(g)}
+                aria-expanded={!isCollapsed}
+                data-testid={`prop-group-toggle-${g}`}
                 className="mb-2 mt-3 flex w-full items-center justify-between text-left"
               >
                 <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">

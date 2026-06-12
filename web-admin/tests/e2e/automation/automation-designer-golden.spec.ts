@@ -86,13 +86,14 @@ async function fireCreate(
   page: Page,
   amount: number,
   title: string,
+  orderDate = '2026-05-30',
 ): Promise<string> {
   const resp = await page.request.post(`/api/meta/commands/execute/${CREATE_COMMAND}`, {
     data: {
       operationType: 'create',
       payload: {
         e2et_order_title: title,
-        e2et_order_date: '2026-05-30',
+        e2et_order_date: orderDate,
         e2et_order_type: 'normal',
         e2et_order_amount: amount,
       },
@@ -1615,6 +1616,76 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       statuses.find((s) => s.nodeId === action)?.status,
       `the scheduled create-record node persisted a record: ${JSON.stringify(statuses)}`,
     ).toBe('completed');
+  });
+
+  test('N-TRIGGER-INACTIVITY: drag trigger-inactivity→action-create-record, configure stale-date/state filters, wait for scheduler → inactive record fires @golden', async ({
+    page,
+  }) => {
+    const inactivityPollTimeout = Number(
+      process.env.AUTOMATION_INACTIVITY_E2E_TIMEOUT_MS ||
+        (process.env.AUTOMATION_INACTIVITY_FIXED_DELAY_MS ? '120000' : '420000'),
+    );
+    test.setTimeout(inactivityPollTimeout + 90_000);
+    const itemName = `NINACT-item-${uniqueId()}`;
+    const inactiveOrderId = await fireCreate(
+      page,
+      100,
+      `NINACT-order ${uniqueId()}`,
+      '2000-01-01',
+    );
+    await fireCancel(page, inactiveOrderId);
+
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-INACTIVITY ${uniqueId()}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-inactivity', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, {
+      modelCode: MODEL_LABEL,
+      inactivityHours: '100000',
+      inactivityField: '下单日期',
+      stateField: '订单状态',
+      inactivityStates: ['已取消'],
+    });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields:
+        '{"e2et_order_id":"${recordId}","e2et_item_name":"' +
+        itemName +
+        '","e2et_item_spec":"inactivity","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const triggerNode = saved.flowConfig.nodes.find((n: any) => n.id === trigger);
+    expect(triggerNode.data.config.modelCode, 'inactivity model persisted as model code').toBe(MODEL_CODE);
+    expect(triggerNode.data.config.inactivityHours, 'inactivityHours persisted from number input').toBe(100000);
+    expect(triggerNode.data.config.inactivityField, 'inactivity date field persisted as field code').toBe(
+      'e2et_order_date',
+    );
+    expect(triggerNode.data.config.stateField, 'state field persisted as field code').toBe(
+      'e2et_order_status',
+    );
+    expect(triggerNode.data.config.inactivityStates, 'inactivity state filter persisted as dict code').toContain(
+      'cancelled',
+    );
+
+    const firedAt = Date.now();
+    await enableViaListToggle(page, pid);
+    const log = await pollLogTerminal(page, pid, firedAt, inactivityPollTimeout);
+    expect(log, 'the inactivity scheduler should create a run log').not.toBeNull();
+    expect(String(log!.status).toLowerCase(), `inactivity run should succeed: ${JSON.stringify(log)}`).toBe(
+      'success',
+    );
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(statusesNodeCompleted(statuses, action), `create-record node completed: ${JSON.stringify(statuses)}`).toBe(true);
+    const items = await pollItemsByName(page, itemName, 30_000);
+    expect(
+      items.some((item) => String(item.e2et_order_id) === inactiveOrderId),
+      `inactive order ${inactiveOrderId} should receive the created child item: ${JSON.stringify(items)}`,
+    ).toBe(true);
   });
 
   // ── golden EDGE (real UI) — field-change filter precision: only the watched field fires ──
