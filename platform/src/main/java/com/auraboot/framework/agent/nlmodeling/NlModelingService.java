@@ -742,7 +742,9 @@ public class NlModelingService {
         manifest.put("models", res.getModels() != null ? res.getModels() : List.of());
         manifest.put("fields", fields);
         manifest.put("modelFieldBindings", synthesizeBindings(res.getModels(), fields, res.getBindings()));
-        manifest.put("commands", lowercaseStringKey(res.getCommands(), "type"));
+        List<Map<String, Object>> commands =
+                synthesizeCrudCommands(pluginCode, res.getModels(), fields, res.getCommands());
+        manifest.put("commands", lowercaseStringKey(commands, "type"));
         manifest.put("pages", res.getPages() != null ? res.getPages() : List.of());
         manifest.put("menus", deriveDynamicMenuPageKeys(res.getMenus()));
         manifest.put("i18nResources", res.getI18n() != null ? res.getI18n() : List.of());
@@ -873,6 +875,63 @@ public class NlModelingService {
             out.add(b);
         }
         return out;
+    }
+
+    /** Action verb → zh-CN label for synthesized CRUD command display names. */
+    private static final Map<String, String> CRUD_LABEL_ZH =
+            Map.of("create", "新建", "update", "编辑", "delete", "删除");
+
+    /**
+     * Synthesizes default CRUD commands (create / update / delete) for a single-model
+     * generation that carries none. Permission actions are DERIVED from commands
+     * ({@code CommandActionDeriver}: a command with {@code type} create/update/delete
+     * yields {@code model.<code>.<action>}), so a model with no commands gets no
+     * fine-grained permissions and the dynamic CRUD API — gated by
+     * {@code @RequirePermission("model.{pageKey}.create")} — returns 403: the generated
+     * app imports but cannot be operated. Multi-model is left untouched (the
+     * command→model assignment is ambiguous without per-field hints) and logged.
+     */
+    static List<Map<String, Object>> synthesizeCrudCommands(String pluginCode,
+                                                           List<Map<String, Object>> models,
+                                                           List<Map<String, Object>> fields,
+                                                           List<Map<String, Object>> commands) {
+        if (commands != null && !commands.isEmpty()) {
+            return commands;
+        }
+        if (models == null || models.size() != 1
+                || !(models.get(0).get("code") instanceof String modelCode)) {
+            if (models != null && models.size() > 1) {
+                log.warn("NL modeling generated {} models but no commands; cannot safely "
+                        + "synthesize CRUD commands for ambiguous command→model assignment", models.size());
+            }
+            return commands != null ? commands : new ArrayList<>();
+        }
+        List<String> fieldCodes = new ArrayList<>();
+        if (fields != null) {
+            for (Map<String, Object> f : fields) {
+                if (f != null && f.get("code") instanceof String fc) {
+                    fieldCodes.add(fc);
+                }
+            }
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        out.add(crudCommand(pluginCode, modelCode, "create", fieldCodes));
+        out.add(crudCommand(pluginCode, modelCode, "update", fieldCodes));
+        out.add(crudCommand(pluginCode, modelCode, "delete", List.of()));
+        return out;
+    }
+
+    private static Map<String, Object> crudCommand(String pluginCode, String modelCode,
+                                                  String type, List<String> inputFields) {
+        Map<String, Object> c = new LinkedHashMap<>();
+        c.put("code", pluginCode + ":" + type + "_" + modelCode);
+        c.put("displayName:zh-CN", CRUD_LABEL_ZH.getOrDefault(type, type) + modelCode);
+        c.put("displayName:en",
+                Character.toUpperCase(type.charAt(0)) + type.substring(1) + " " + modelCode);
+        c.put("type", type);
+        c.put("modelCode", modelCode);
+        c.put("inputFields", new ArrayList<>(inputFields));
+        return c;
     }
 
     // =========================================================================

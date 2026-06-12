@@ -139,4 +139,37 @@ class NlModelingManifestPostProcessingTest {
         assertEquals("enum", fields.get(0).get("dataType"), "enum with a defined dict must be kept");
         assertEquals("status_dict", fields.get(0).get("dictCode"));
     }
+
+    @Test
+    void buildManifest_synthesizesCrudCommands_whenNoneGenerated() throws Exception {
+        // Permissions are derived from commands; a model with no commands gets no
+        // model.<code>.create permission, so dynamic CRUD 403s. Conformance must
+        // synthesize default CRUD commands for the single-model case.
+        NlModelingResponse.Resources res = NlModelingResponse.Resources.builder()
+                .models(List.of(mutable("code", "equipment")))
+                .fields(List.of(mutable("code", "name", "dataType", "string"),
+                        mutable("code", "location", "dataType", "string")))
+                .build();
+
+        JsonNode m = mapper.readTree(service.buildPluginManifestJson("equipment_mgmt", res));
+
+        JsonNode cmds = m.get("commands");
+        assertEquals(3, cmds.size(), "create/update/delete must be synthesized");
+        assertEquals("equipment_mgmt:create_equipment", cmds.get(0).get("code").asText());
+        assertEquals("create", cmds.get(0).get("type").asText());
+        assertEquals("equipment", cmds.get(0).get("modelCode").asText());
+        assertEquals(2, cmds.get(0).get("inputFields").size(), "create binds all fields");
+        assertEquals("delete", cmds.get(2).get("type").asText());
+        assertEquals(0, cmds.get(2).get("inputFields").size(), "delete needs no input fields");
+    }
+
+    @Test
+    void synthesizeCrudCommands_keepsExistingAndSkipsMultiModel() {
+        var existing = List.of(mutable("code", "x:create_y", "type", "create"));
+        assertSame(existing, NlModelingService.synthesizeCrudCommands("x", List.of(mutable("code", "y")),
+                List.of(), existing), "existing LLM commands must be left untouched");
+        assertTrue(NlModelingService.synthesizeCrudCommands("x",
+                List.of(mutable("code", "a"), mutable("code", "b")), List.of(), List.of()).isEmpty(),
+                "ambiguous multi-model must not be guessed");
+    }
 }
