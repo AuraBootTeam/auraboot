@@ -4,6 +4,7 @@ import { uniqueId } from '../helpers';
 
 const FORM_BLOCK_ID = 'pd_undo_redo_section';
 const BLOCK_TITLE_SECTION_ID = 'pd_undo_redo_block_title_section';
+const BLOCK_DELETE_TEXT_ID = 'pd_undo_redo_delete_text';
 const SHOWCASE_MODEL = 'showcase_all_fields';
 const RATING_FIELD = 'sc_rating';
 
@@ -111,6 +112,43 @@ async function createBlockAddUndoRedoPage(page: Page) {
   return { pid, pageKey, title };
 }
 
+async function createBlockDeleteUndoRedoPage(page: Page) {
+  const id = uniqueId('pd_block_delete_undo_redo_authoring');
+  const pageKey = id.replace(/-/g, '_');
+  const title = `Block delete undo redo authoring ${id}`;
+  const payload = {
+    name: title,
+    pageKey,
+    title,
+    kind: 'form',
+    modelCode: SHOWCASE_MODEL,
+    profile: 'admin',
+    layout: { type: 'stack', gap: 12 },
+    blocks: [
+      {
+        id: BLOCK_DELETE_TEXT_ID,
+        blockType: 'text',
+        props: { content: 'Delete undo redo seed text' },
+      },
+    ],
+    dataSources: {},
+    schemaVersion: 4,
+    metaInfo: { runtimeE2E: true, undoRedoBlockDelete: true },
+    semver: '0.1.0',
+  };
+
+  const createResp = await page.request.post('/api/pages', { data: payload });
+  expect(
+    createResp.ok(),
+    `Create block delete undo/redo authoring page failed: ${createResp.status()}`,
+  ).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created block delete undo/redo authoring pid').toBeTruthy();
+  return { pid, pageKey, title };
+}
+
 async function fetchModelFieldType(page: Page, modelCode: string, fieldCode: string) {
   const modelResp = await page.request.get(`/api/meta/models/code/${modelCode}`);
   expect(modelResp.ok(), `Fetch model ${modelCode} failed: ${modelResp.status()}`).toBeTruthy();
@@ -172,6 +210,15 @@ async function selectCanvasBlock(page: Page, blockId: string) {
   const block = page.locator(`[data-testid="sortable-block"][data-block-id="${blockId}"]`);
   await expect(block).toBeVisible({ timeout: 5_000 });
   await block.click();
+}
+
+async function deleteCanvasBlock(page: Page, blockId: string) {
+  const block = page.locator(`[data-testid="sortable-block"][data-block-id="${blockId}"]`);
+  await expect(block).toBeVisible({ timeout: 5_000 });
+  await block.click();
+  await expect(block.locator('[data-testid="block-delete"]')).toBeVisible({ timeout: 5_000 });
+  await block.locator('[data-testid="block-delete"]').click();
+  await expect(block).toBeHidden({ timeout: 5_000 });
 }
 
 async function selectComponentForField(page: Page, component: string) {
@@ -326,5 +373,43 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
       id: textBlockId,
       blockType: 'text',
     });
+  });
+
+  test('saves the undone schema and then saves the redone schema for a block delete action', async ({
+    page,
+  }) => {
+    const { pid } = await createBlockDeleteUndoRedoPage(page);
+    await openDesignerByPid(page, pid);
+
+    const initialBlockIds = await canvasBlockIds(page);
+    expect(initialBlockIds, 'initial canvas contains delete target').toContain(BLOCK_DELETE_TEXT_ID);
+
+    await deleteCanvasBlock(page, BLOCK_DELETE_TEXT_ID);
+    const afterDeleteBlockIds = initialBlockIds.filter((blockId) => blockId !== BLOCK_DELETE_TEXT_ID);
+    await expect
+      .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
+      .toEqual(afterDeleteBlockIds);
+
+    await page.getByTestId('toolbar-undo').click();
+    await expect
+      .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
+      .toEqual(initialBlockIds);
+    await saveDesignerAndWait(page, pid);
+    const undonePage = await fetchPageByPid(page, pid);
+    expect(savedBlockById(undonePage, BLOCK_DELETE_TEXT_ID)).toMatchObject({
+      id: BLOCK_DELETE_TEXT_ID,
+      blockType: 'text',
+      props: { content: 'Delete undo redo seed text' },
+    });
+
+    await page.getByTestId('toolbar-redo').click();
+    await expect
+      .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
+      .toEqual(afterDeleteBlockIds);
+    await saveDesignerAndWait(page, pid);
+    const redonePage = await fetchPageByPid(page, pid);
+    expect((redonePage.blocks ?? []).map((block: any) => block.id)).not.toContain(
+      BLOCK_DELETE_TEXT_ID,
+    );
   });
 });

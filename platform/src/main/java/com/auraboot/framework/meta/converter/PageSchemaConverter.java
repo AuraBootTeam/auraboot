@@ -252,8 +252,11 @@ public abstract class PageSchemaConverter {
 
     @Named("listToString")
     public String listToString(List<Object> list) {
-        if (list == null || list.isEmpty()) {
+        if (list == null) {
             return null;
+        }
+        if (list.isEmpty()) {
+            return "[]";
         }
         try {
             return objectMapper.writeValueAsString(list);
