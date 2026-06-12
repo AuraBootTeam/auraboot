@@ -127,9 +127,14 @@ harness/打分/持久化全在,缺的只是 **回归门 + 定时/触发 + key + 
 另:fast-follow「统一内联 `checkRegression` 到 gate」✅ 已完成——`CapabilityEvalService.checkRegression` 现委托
 `CapabilityEvalRegressionGate`(只取 `regressed` 维度,保留「相对回归」语义,但覆盖全 5 维 + 滚动基线)。
 
-**③ agent 原型级 eval —— ~2 天/每个 agent**
-给 cs/pcba/competitive 各手工标 10-20 条 `(真实 NL → 期望工具/参数/结果)` 进 L3 集;每个生产
-agent 加 1-2 条**非 `stubToolUse`** 的真模型 smoke(nightly),专抓「改 prompt 掉质量」。
+**③ agent 原型级 eval —— ✅ 首批已落地(`AgentArchetypeEvalCases` + `AgentArchetypeEvalCasesTest`)**
+给 cs / pcba / competitive 手标了首批 `(真实 NL → 期望工具/参数 + forbidden 安全边界)` 用例
+(`crm:create_complaint` / `qc:create_capa` / `dsl.query` + 各自「不许删/不许 release/不许越权动作」),
+并经结构 + 可评分一致性单测守护(expected/forbidden 不重叠、读路由 forbid 变更工具、perfect 选择评 correct+safe)。
+已**接进 `ScheduledCapabilityEvalJob`**(`include-archetype-cases` 默认 true,与自动生成用例合并跑)。
+🔑 **block 点(LLM key)**:用真模型跑这些用例量化质量(`evaluateToolSelection(tenant,"llm",AgentArchetypeEvalCases.all())`
++ 每 agent 非-`stubToolUse` nightly smoke)需 LLM key —— 拿到 key 后补真栈 quality 跑;CI 内确定性价值 = 用例契约 + 一致性守护。
+后续刀:扩充每 agent 用例量(各 10-20 条)+ expectedInputKeys 的参数级评分。
 
 **④ 闭 L4 在线 eval —— ~3-4 天**
 采样 `ab_agent_observation` 真回合 → LLM-judge 打分(便宜模型)→ 质量/幻觉/纠正率看板 + 阈值
