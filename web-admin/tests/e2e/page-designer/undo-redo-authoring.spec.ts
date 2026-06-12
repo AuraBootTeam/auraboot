@@ -9,10 +9,12 @@ const BLOCK_REORDER_FIRST_ID = 'pd_undo_redo_reorder_first';
 const BLOCK_REORDER_SECOND_ID = 'pd_undo_redo_reorder_second';
 const NESTED_TABS_BLOCK_ID = 'pd_undo_redo_nested_tabs';
 const NESTED_TEXT_CHILD_ID = 'pd_undo_redo_nested_text';
+const NESTED_SECOND_TEXT_CHILD_ID = 'pd_undo_redo_nested_second_text';
 const SHOWCASE_MODEL = 'showcase_all_fields';
 const RATING_FIELD = 'sc_rating';
 const NESTED_TEXT_ORIGINAL = 'Original nested undo copy';
 const NESTED_TEXT_EDITED = 'Edited nested undo copy';
+const NESTED_SECOND_TEXT_CONTENT = 'Second nested undo copy';
 
 async function createUndoRedoAuthoringPage(page: Page) {
   const id = uniqueId('pd_undo_redo_authoring');
@@ -246,6 +248,64 @@ async function createNestedTabsUndoRedoPage(page: Page) {
   expect(createBody.code, 'create page API code').toBe('0');
   const pid = String(createBody.data?.pid || '');
   expect(pid, 'created nested tabs undo/redo authoring pid').toBeTruthy();
+  return { pid, pageKey, title };
+}
+
+async function createNestedTabsReorderUndoRedoPage(page: Page) {
+  const id = uniqueId('pd_nested_tabs_reorder_undo_redo');
+  const pageKey = id.replace(/-/g, '_');
+  const title = `Nested tabs reorder undo redo ${id}`;
+  const payload = {
+    name: title,
+    pageKey,
+    title,
+    kind: 'form',
+    modelCode: SHOWCASE_MODEL,
+    profile: 'admin',
+    layout: { type: 'stack', gap: 12 },
+    blocks: [
+      {
+        id: NESTED_TABS_BLOCK_ID,
+        blockType: 'tabs',
+        title: 'Nested reorder tabs',
+        tabs: [
+          {
+            key: 'overview',
+            label: { 'en-US': 'Overview', 'zh-CN': '概览' },
+            filter: null,
+            blocks: [
+              {
+                id: NESTED_TEXT_CHILD_ID,
+                blockType: 'text',
+                title: { 'en-US': 'Nested first text', 'zh-CN': '第一嵌套文本' },
+                props: { content: NESTED_TEXT_ORIGINAL },
+              },
+              {
+                id: NESTED_SECOND_TEXT_CHILD_ID,
+                blockType: 'text',
+                title: { 'en-US': 'Nested second text', 'zh-CN': '第二嵌套文本' },
+                props: { content: NESTED_SECOND_TEXT_CONTENT },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    dataSources: {},
+    schemaVersion: 4,
+    metaInfo: { runtimeE2E: true, undoRedoNestedTabsReorder: true },
+    semver: '0.1.0',
+  };
+
+  const createResp = await page.request.post('/api/pages', { data: payload });
+  expect(
+    createResp.ok(),
+    `Create nested tabs reorder undo/redo page failed: ${createResp.status()}`,
+  ).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created nested tabs reorder undo/redo pid').toBeTruthy();
   return { pid, pageKey, title };
 }
 
@@ -749,5 +809,47 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
       title: { 'en-US': 'Text', 'zh-CN': '文本内容' },
       props: { content: '' },
     });
+  });
+
+  test('saves the undone schema and then saves the redone schema for a tabs child reorder action', async ({
+    page,
+  }) => {
+    const { pid } = await createNestedTabsReorderUndoRedoPage(page);
+    await openDesignerByPid(page, pid);
+    await selectCanvasBlock(page, NESTED_TABS_BLOCK_ID);
+
+    await expect(page.getByTestId('tab-child-text-content-0')).toHaveValue(NESTED_TEXT_ORIGINAL);
+    await expect(page.getByTestId('tab-child-text-content-1')).toHaveValue(
+      NESTED_SECOND_TEXT_CONTENT,
+    );
+    await page.getByTestId('tab-child-move-down-0').click();
+    await expect(page.getByTestId('tab-child-text-content-0')).toHaveValue(
+      NESTED_SECOND_TEXT_CONTENT,
+    );
+    await expect(page.getByTestId('tab-child-text-content-1')).toHaveValue(NESTED_TEXT_ORIGINAL);
+
+    await clickEnabledToolbarButton(page, 'toolbar-undo');
+    await expect(page.getByTestId('tab-child-text-content-0')).toHaveValue(NESTED_TEXT_ORIGINAL);
+    await expect(page.getByTestId('tab-child-text-content-1')).toHaveValue(
+      NESTED_SECOND_TEXT_CONTENT,
+    );
+    await saveDesignerAndWait(page, pid);
+    const undonePage = await fetchPageByPid(page, pid);
+    expect(savedNestedChildBlocks(undonePage).map((child) => child.id)).toEqual([
+      NESTED_TEXT_CHILD_ID,
+      NESTED_SECOND_TEXT_CHILD_ID,
+    ]);
+
+    await clickEnabledToolbarButton(page, 'toolbar-redo');
+    await expect(page.getByTestId('tab-child-text-content-0')).toHaveValue(
+      NESTED_SECOND_TEXT_CONTENT,
+    );
+    await expect(page.getByTestId('tab-child-text-content-1')).toHaveValue(NESTED_TEXT_ORIGINAL);
+    await saveDesignerAndWait(page, pid);
+    const redonePage = await fetchPageByPid(page, pid);
+    expect(savedNestedChildBlocks(redonePage).map((child) => child.id)).toEqual([
+      NESTED_SECOND_TEXT_CHILD_ID,
+      NESTED_TEXT_CHILD_ID,
+    ]);
   });
 });

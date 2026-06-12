@@ -328,6 +328,21 @@ export function TabFilterEditor({
     [tabs, updateTab],
   );
 
+  const moveChildBlock = useCallback(
+    (tabIndex: number, blockIndex: number, direction: -1 | 1) => {
+      const childBlocks = getTabBlocks(tabs[tabIndex]);
+      const nextIndex = blockIndex + direction;
+      if (nextIndex < 0 || nextIndex >= childBlocks.length) return;
+      const nextBlocks = [...childBlocks];
+      [nextBlocks[blockIndex], nextBlocks[nextIndex]] = [
+        nextBlocks[nextIndex],
+        nextBlocks[blockIndex],
+      ];
+      updateTab(tabIndex, { blocks: nextBlocks });
+    },
+    [tabs, updateTab],
+  );
+
   const currentTab = tabs[selectedIndex];
   const currentTabBlocks = getTabBlocks(currentTab);
   const currentTabDropId =
@@ -483,15 +498,35 @@ export function TabFilterEditor({
                       <span className="font-mono text-[10px] text-gray-500">
                         {block.blockType}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => removeChildBlock(selectedIndex, index)}
-                        className="text-[10px] text-red-500 hover:text-red-700 disabled:opacity-40"
-                        disabled={readonly}
-                        data-testid={`tab-child-remove-${index}`}
-                      >
-                        Remove
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moveChildBlock(selectedIndex, index, -1)}
+                          className="rounded border px-1 py-0.5 text-[10px] text-gray-500 hover:bg-gray-100 disabled:opacity-30"
+                          disabled={readonly || index === 0}
+                          data-testid={`tab-child-move-up-${index}`}
+                        >
+                          Up
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveChildBlock(selectedIndex, index, 1)}
+                          className="rounded border px-1 py-0.5 text-[10px] text-gray-500 hover:bg-gray-100 disabled:opacity-30"
+                          disabled={readonly || index === currentTabBlocks.length - 1}
+                          data-testid={`tab-child-move-down-${index}`}
+                        >
+                          Down
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeChildBlock(selectedIndex, index)}
+                          className="text-[10px] text-red-500 hover:text-red-700 disabled:opacity-40"
+                          disabled={readonly}
+                          data-testid={`tab-child-remove-${index}`}
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                     <div className="mb-1.5 grid grid-cols-2 gap-1.5">
                       <label className="text-[10px] text-gray-500">

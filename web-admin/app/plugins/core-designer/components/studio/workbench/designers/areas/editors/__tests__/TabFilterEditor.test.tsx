@@ -145,6 +145,53 @@ describe('TabFilterEditor', () => {
     });
   });
 
+  it('reorders child blocks on the selected tab', () => {
+    const onCommit = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'overview',
+            label: { 'en-US': 'Overview', 'zh-CN': '概览' },
+            filter: null,
+            blocks: [
+              {
+                id: 'first_text',
+                blockType: 'text',
+                title: { 'en-US': 'First text', 'zh-CN': '第一文本' },
+                props: { content: 'First child copy' },
+              },
+              {
+                id: 'second_text',
+                blockType: 'text',
+                title: { 'en-US': 'Second text', 'zh-CN': '第二文本' },
+                props: { content: 'Second child copy' },
+              },
+            ],
+          },
+        ]}
+        onCommit={onCommit}
+      />,
+    );
+
+    expect(screen.getByTestId('tab-child-text-content-0')).toHaveValue('First child copy');
+    expect(screen.getByTestId('tab-child-text-content-1')).toHaveValue('Second child copy');
+
+    fireEvent.click(screen.getByTestId('tab-child-move-down-0'));
+    expect(serializedTabs()[0].blocks?.map((block) => block.id)).toEqual([
+      'second_text',
+      'first_text',
+    ]);
+    expect(screen.getByTestId('tab-child-text-content-0')).toHaveValue('Second child copy');
+    expect(screen.getByTestId('tab-child-text-content-1')).toHaveValue('First child copy');
+
+    fireEvent.click(screen.getByTestId('tab-child-move-up-1'));
+    expect(serializedTabs()[0].blocks?.map((block) => block.id)).toEqual([
+      'first_text',
+      'second_text',
+    ]);
+  });
+
   it('edits stat child block data settings on the selected tab', () => {
     const onCommit = vi.fn();
     render(
