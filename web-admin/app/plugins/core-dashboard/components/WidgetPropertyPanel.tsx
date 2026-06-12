@@ -93,11 +93,13 @@ const PropertyField: React.FC<{
 
       case 'icon':
         return (
-          <IconPicker
-            value={typeof value === 'string' ? value : ''}
-            onChange={(next) => onChange(next)}
-            className="w-full"
-          />
+          <div data-testid={fieldTestId}>
+            <IconPicker
+              value={typeof value === 'string' ? value : ''}
+              onChange={(next) => onChange(next)}
+              className="w-full"
+            />
+          </div>
         );
 
       case 'model':

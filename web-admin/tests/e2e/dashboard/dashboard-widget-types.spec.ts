@@ -15,6 +15,8 @@
  */
 
 import type { Page } from '@playwright/test';
+import { widgetDefinitions } from '../../../app/plugins/core-dashboard/widgets/widgetRegistry';
+import type { PropertySchema } from '../../../app/plugins/core-dashboard/types';
 import { test, expect } from '../../fixtures';
 import { DashboardDesignerPage } from '../../pages';
 
@@ -77,6 +79,12 @@ const STATIC_PAYLOAD_DATA_SOURCE = {
   type: 'static',
   staticData: PAYLOAD_MATRIX_STATIC_ROWS,
 };
+
+const CONFIG_SCHEMA_WIDGETS = widgetDefinitions.map((widget) => ({
+  label: widget.label,
+  type: widget.type,
+  configSchema: widget.configSchema ?? [],
+}));
 
 const SAVED_PAYLOAD_WIDGETS: WidgetPayloadCase[] = [
   {
@@ -504,6 +512,46 @@ async function setWidgetProperty(page: Page, edit: WidgetPropertyEdit): Promise<
       await expect(field).toHaveValue(String(edit.value));
       break;
   }
+}
+
+async function setSchemaDependency(page: Page, fieldKey: string, value: unknown): Promise<void> {
+  const dependencyField = page.getByTestId(widgetPropertyTestId(fieldKey));
+  await expect(dependencyField).toBeVisible({ timeout: 5000 });
+  await dependencyField.selectOption(String(value));
+  await expect(dependencyField).toHaveValue(String(value));
+}
+
+function getAlternateDependencyValue(schema: PropertySchema): string | undefined {
+  if (!schema.dependsOn || Array.isArray(schema.dependsOn.value)) return undefined;
+  if (schema.dependsOn.field === 'dataSource.type') {
+    return schema.dependsOn.value === 'aggregate' ? 'namedQuery' : 'aggregate';
+  }
+  return undefined;
+}
+
+async function expectWidgetConfigSchemaFieldVisible(
+  page: Page,
+  schema: PropertySchema,
+  context: string,
+): Promise<void> {
+  const field = page.getByTestId(widgetPropertyTestId(schema.key));
+
+  if (schema.dependsOn) {
+    const alternateValue = getAlternateDependencyValue(schema);
+    if (alternateValue !== undefined) {
+      await setSchemaDependency(page, schema.dependsOn.field, alternateValue);
+      await expect(field, `${context}: ${schema.key} should be hidden outside dependsOn branch`)
+        .toBeHidden({ timeout: 5000 });
+    }
+
+    const requiredValue = Array.isArray(schema.dependsOn.value)
+      ? schema.dependsOn.value[0]
+      : schema.dependsOn.value;
+    await setSchemaDependency(page, schema.dependsOn.field, requiredValue);
+  }
+
+  await field.scrollIntoViewIfNeeded().catch(() => {});
+  await expect(field, `${context}: ${schema.key} (${schema.type})`).toBeVisible({ timeout: 5000 });
 }
 
 async function setStaticDataSource(
@@ -1115,6 +1163,30 @@ test.describe('Dashboard Widget Types — Property Panel', () => {
       await expect(groupLabel).toBeVisible();
     }
   });
+});
+
+test.describe('Dashboard Widget Types — Config Schema Matrix', () => {
+  for (const [index, widget] of CONFIG_SCHEMA_WIDGETS.entries()) {
+    test(`DW-074-${String(index + 1).padStart(2, '0')}: ${widget.type} exposes every configSchema field`, async ({
+      page,
+    }) => {
+      const designer = new DashboardDesignerPage(page);
+      const loaded = await ensureDesignerLoaded(page, designer);
+      if (!loaded) {
+        throw new Error('Designer not available');
+      }
+
+      await expectWidgetAdded(designer, widget);
+      expect(
+        widget.configSchema.length,
+        `${widget.type} must have registry configSchema entries for matrix coverage`,
+      ).toBeGreaterThan(0);
+
+      for (const schema of widget.configSchema) {
+        await expectWidgetConfigSchemaFieldVisible(page, schema, widget.type);
+      }
+    });
+  }
 });
 
 test.describe('Dashboard Widget Types — Saved Payload', () => {
