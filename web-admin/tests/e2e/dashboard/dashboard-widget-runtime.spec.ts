@@ -1143,15 +1143,6 @@ async function getCurrentUserContext(page: Page): Promise<CurrentUserContext> {
   };
 }
 
-async function cleanupInboxFixture(page: Page, fixture?: CreatedInboxFixture): Promise<void> {
-  if (!fixture) return;
-  await Promise.all(
-    fixture.recordIds.map((id) =>
-      page.request.put(`/api/inbox/${id}/dismiss`).catch(() => undefined),
-    ),
-  );
-}
-
 async function expectInboxListContains(
   page: Page,
   testRunId: string,
@@ -1966,7 +1957,6 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
         timeout: 10_000,
       });
     } finally {
-      await cleanupInboxFixture(page, inboxFixture);
       await cleanupDashboard(page, dashboard?.pid);
     }
   });
