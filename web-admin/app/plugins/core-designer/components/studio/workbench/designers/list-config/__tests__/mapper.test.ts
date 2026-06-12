@@ -157,6 +157,51 @@ describe('list mapper', () => {
     expect(back.toolbar.customButtons).toEqual([]);
   });
 
+  it('serializes designer-authored custom refresh buttons with targeted data source flow actions', () => {
+    const vm = emptyListViewModel();
+    vm.toolbar.customButtons = [
+      {
+        label: 'Refresh orders',
+        command: '',
+        code: 'refresh_orders',
+        actionKind: 'refresh',
+        targetDataSource: 'ds_orders',
+      },
+    ];
+
+    const toolbar = viewModelToBlocks(vm).find((b) => b.blockType === 'toolbar')!;
+
+    expect(toolbar.buttons).toEqual([
+      {
+        code: 'refresh_orders',
+        label: 'Refresh orders',
+        action: {
+          type: 'flow',
+          steps: [
+            {
+              action: 'dataSource.reload',
+              args: { target: 'ds_orders' },
+            },
+          ],
+        },
+        events: {
+          onClick: {
+            action: 'dataSource.reload',
+            args: { target: 'ds_orders' },
+          },
+        },
+      },
+    ]);
+
+    const back = blocksToViewModel([toolbar, { id: 'table', blockType: 'table' } as DslBlock]);
+    expect(back.toolbar.customButtons[0]).toMatchObject({
+      label: 'Refresh orders',
+      code: 'refresh_orders',
+      actionKind: 'refresh',
+      targetDataSource: 'ds_orders',
+    });
+  });
+
   it('preserves rich refresh preset fields across roundtrip', () => {
     const originalButton = {
       code: 'refresh',

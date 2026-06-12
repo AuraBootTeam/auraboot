@@ -73,7 +73,7 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
 
   const addCustomButton = () => {
     if (readonly) return;
-    const next: CustomButton = { label: '', command: '' };
+    const next: CustomButton = { label: '', command: '', actionKind: 'command' };
     const nextButtons = [...vm.toolbar.customButtons, next];
     setVm({ ...vm, toolbar: { ...vm.toolbar, customButtons: nextButtons } });
     setSelectedBtnIdx(nextButtons.length - 1);
@@ -238,7 +238,9 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
                         {b.label || '(未命名)'}
                       </span>
                       <span className="mt-1 block truncate text-xs text-slate-500">
-                        {b.command || '尚未绑定 command'}
+                        {b.actionKind === 'refresh'
+                          ? `刷新 ${b.targetDataSource || '未选择数据源'}`
+                          : b.command || '尚未绑定 command'}
                       </span>
                       <span className="mt-3 flex flex-wrap gap-2">
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
@@ -308,7 +310,7 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
             {selected ? `按钮属性 · ${selected.label || '未命名按钮'}` : '按钮属性'}
           </h3>
           <p className="mt-2 text-sm text-slate-500">
-            在这里定义按钮文案、命令和是否依赖选中行，避免按钮语义含糊。
+            在这里定义按钮文案、行为和是否依赖选中行，避免按钮语义含糊。
           </p>
         </div>
         {selected && selectedBtnIdx !== null ? (
