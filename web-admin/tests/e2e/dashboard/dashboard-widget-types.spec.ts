@@ -17,6 +17,32 @@
 import { test, expect } from '../../fixtures';
 import { DashboardDesignerPage } from '../../pages';
 
+interface WidgetMatrixRow {
+  label: string;
+  type: string;
+}
+
+const BASE_WIDGETS: WidgetMatrixRow[] = [
+  { label: '数字卡片', type: 'smart-number-card' },
+  { label: '柱状图', type: 'smart-bar-chart' },
+  { label: '折线图', type: 'smart-line-chart' },
+  { label: '饼图', type: 'smart-pie-chart' },
+  { label: '面积图', type: 'smart-area-chart' },
+];
+
+const EXTENDED_WIDGETS: WidgetMatrixRow[] = [
+  ...BASE_WIDGETS,
+  { label: '漏斗图', type: 'smart-funnel-chart' },
+  { label: '散点图', type: 'smart-scatter-chart' },
+  { label: '雷达图', type: 'smart-radar-chart' },
+  { label: '数据表格', type: 'smart-table-chart' },
+  { label: '词云', type: 'smart-wordcloud-chart' },
+  { label: '组合图', type: 'smart-combo-chart' },
+  { label: 'NPS 图', type: 'smart-nps-chart' },
+  { label: '画册', type: 'smart-gallery' },
+  { label: '看板', type: 'smart-kanban' },
+];
+
 /**
  * Navigate to dashboard designer and verify it loaded.
  */
@@ -45,6 +71,48 @@ async function ensureDesignerLoaded(
       (await designerPage.propertyPanel.isVisible({ timeout: 2000 }).catch(() => false))
     );
   }
+}
+
+async function expectWidgetAdded(
+  designer: DashboardDesignerPage,
+  widget: WidgetMatrixRow,
+): Promise<void> {
+  const beforeCount = await designer.getWidgetCount();
+  await designer.addWidget(widget.label);
+  await expect(designer.propertyPanel.locator(`h2:has-text("${widget.label}")`)).toBeVisible({
+    timeout: 5000,
+  });
+  await expect
+    .poll(() => designer.getWidgetCount(), { timeout: 5000 })
+    .toBe(beforeCount + 1);
+  await expect(designer.canvas.locator(`[data-widget-type="${widget.type}"]`)).toBeVisible({
+    timeout: 5000,
+  });
+}
+
+async function saveDashboardAndReadBack(
+  page: import('@playwright/test').Page,
+  designer: DashboardDesignerPage,
+): Promise<Record<string, any>> {
+  const saveResponsePromise = page.waitForResponse((response) => {
+    const pathname = new URL(response.url()).pathname;
+    return (
+      /^\/api\/dashboards(?:\/[^/]+)?$/.test(pathname) &&
+      ['POST', 'PUT'].includes(response.request().method()) &&
+      response.status() === 200
+    );
+  });
+
+  await designer.saveButton.click();
+  const saveResponse = await saveResponsePromise;
+  const savedBody = await saveResponse.json();
+  const pid = savedBody.data?.pid;
+  expect(pid, `dashboard save response includes pid: ${JSON.stringify(savedBody)}`).toBeTruthy();
+
+  const getResponse = await page.request.get(`/api/dashboards/${pid}`);
+  expect(getResponse.ok(), `dashboard readback failed: ${getResponse.status()}`).toBeTruthy();
+  const readBody = await getResponse.json();
+  return readBody.data;
 }
 
 test.describe('Dashboard Widget Types — Palette Verification', () => {
@@ -304,9 +372,7 @@ test.describe('Dashboard Widget Types — Add to Canvas', () => {
       throw new Error('Designer not available');
     }
 
-    await designer.addWidget('数字卡片');
-    const widgetCount = await designer.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    await expectWidgetAdded(designer, BASE_WIDGETS[0]);
   });
 
   /**
@@ -319,9 +385,7 @@ test.describe('Dashboard Widget Types — Add to Canvas', () => {
       throw new Error('Designer not available');
     }
 
-    await designer.addWidget('柱状图');
-    const widgetCount = await designer.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    await expectWidgetAdded(designer, BASE_WIDGETS[1]);
   });
 
   /**
@@ -334,9 +398,7 @@ test.describe('Dashboard Widget Types — Add to Canvas', () => {
       throw new Error('Designer not available');
     }
 
-    await designer.addWidget('折线图');
-    const widgetCount = await designer.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    await expectWidgetAdded(designer, BASE_WIDGETS[2]);
   });
 
   /**
@@ -349,9 +411,7 @@ test.describe('Dashboard Widget Types — Add to Canvas', () => {
       throw new Error('Designer not available');
     }
 
-    await designer.addWidget('饼图');
-    const widgetCount = await designer.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    await expectWidgetAdded(designer, BASE_WIDGETS[3]);
   });
 
   /**
@@ -364,9 +424,7 @@ test.describe('Dashboard Widget Types — Add to Canvas', () => {
       throw new Error('Designer not available');
     }
 
-    await designer.addWidget('面积图');
-    const widgetCount = await designer.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    await expectWidgetAdded(designer, BASE_WIDGETS[4]);
   });
 
   /**
@@ -379,9 +437,7 @@ test.describe('Dashboard Widget Types — Add to Canvas', () => {
       throw new Error('Designer not available');
     }
 
-    await designer.addWidget('词云');
-    const widgetCount = await designer.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    await expectWidgetAdded(designer, EXTENDED_WIDGETS[9]);
   });
 
   /**
@@ -394,9 +450,7 @@ test.describe('Dashboard Widget Types — Add to Canvas', () => {
       throw new Error('Designer not available');
     }
 
-    await designer.addWidget('组合图');
-    const widgetCount = await designer.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    await expectWidgetAdded(designer, EXTENDED_WIDGETS[10]);
   });
 
   /**
@@ -409,9 +463,7 @@ test.describe('Dashboard Widget Types — Add to Canvas', () => {
       throw new Error('Designer not available');
     }
 
-    await designer.addWidget('NPS 图');
-    const widgetCount = await designer.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    await expectWidgetAdded(designer, EXTENDED_WIDGETS[11]);
   });
 
   /**
@@ -424,9 +476,7 @@ test.describe('Dashboard Widget Types — Add to Canvas', () => {
       throw new Error('Designer not available');
     }
 
-    await designer.addWidget('画册');
-    const widgetCount = await designer.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    await expectWidgetAdded(designer, EXTENDED_WIDGETS[12]);
   });
 
   /**
@@ -439,9 +489,7 @@ test.describe('Dashboard Widget Types — Add to Canvas', () => {
       throw new Error('Designer not available');
     }
 
-    await designer.addWidget('看板');
-    const widgetCount = await designer.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    await expectWidgetAdded(designer, EXTENDED_WIDGETS[13]);
   });
 });
 
@@ -662,6 +710,54 @@ test.describe('Dashboard Widget Types — Property Panel', () => {
   });
 });
 
+test.describe('Dashboard Widget Types — Saved Payload', () => {
+  /**
+   * DW-037: UI-added widget persists exact type/componentType and registry defaults
+   */
+  test('DW-037: Area Chart saves exact widget payload and default visualization', async ({
+    page,
+  }) => {
+    const designer = new DashboardDesignerPage(page);
+    const loaded = await ensureDesignerLoaded(page, designer);
+    if (!loaded) {
+      throw new Error('Designer not available');
+    }
+
+    const staticRows = [
+      { month: 'Jan', cases: 7 },
+      { month: 'Feb', cases: 11 },
+    ];
+
+    await expectWidgetAdded(designer, BASE_WIDGETS[4]);
+    await page.getByTestId('dashboard-datasource-type-select').selectOption('static');
+    await page
+      .getByTestId('dashboard-datasource-static-json')
+      .fill(JSON.stringify(staticRows, null, 2));
+
+    const dashboard = await saveDashboardAndReadBack(page, designer);
+    expect(dashboard.widgets).toHaveLength(1);
+
+    const widget = dashboard.widgets[0];
+    expect(widget.type).toBe('smart-area-chart');
+    expect(widget.componentType).toBe('smart-area-chart');
+    expect(widget.w).toBe(6);
+    expect(widget.h).toBe(4);
+    expect(widget.minW).toBe(4);
+    expect(widget.minH).toBe(3);
+    expect(widget.config).toMatchObject({
+      title: '面积图',
+      dataSource: {
+        type: 'static',
+        staticData: staticRows,
+      },
+      visualization: {
+        smooth: true,
+        fillOpacity: 0.6,
+      },
+    });
+  });
+});
+
 test.describe('Dashboard Widget Types — Categories & Counts', () => {
   /**
    * DW-019: Widget palette has category headers
@@ -692,71 +788,40 @@ test.describe('Dashboard Widget Types — Categories & Counts', () => {
   });
 
   /**
-   * DW-020: At least 5 base widget types present @smoke
+   * DW-020: Base widget types present @smoke
    */
-  test('DW-020: at least 5 base widget types present @smoke', async ({ page }) => {
+  test('DW-020: base widget types present @smoke', async ({ page }) => {
     const designer = new DashboardDesignerPage(page);
     const loaded = await ensureDesignerLoaded(page, designer);
     if (!loaded) {
       throw new Error('Designer not available');
     }
 
-    const baseWidgets = ['数字卡片', '柱状图', '折线图', '饼图', '面积图'];
-    let foundCount = 0;
-
-    for (const widgetLabel of baseWidgets) {
-      const isVisible = await designer
-        .paletteItem(widgetLabel)
-        .isVisible({ timeout: 2000 })
-        .catch(() => false);
-      if (isVisible) foundCount++;
+    const foundLabels: string[] = [];
+    for (const widget of BASE_WIDGETS) {
+      await expect(designer.paletteItem(widget.label)).toBeVisible({ timeout: 5000 });
+      foundLabels.push(widget.label);
     }
 
-    expect(foundCount).toBeGreaterThanOrEqual(5);
+    expect(foundLabels).toEqual(BASE_WIDGETS.map((widget) => widget.label));
   });
 
   /**
-   * DW-021: Extended widget types count (up to 14 with extensions)
+   * DW-021: Extended widget types present
    */
-  test('DW-021: extended widget types count', async ({ page }) => {
+  test('DW-021: extended widget types present', async ({ page }) => {
     const designer = new DashboardDesignerPage(page);
     const loaded = await ensureDesignerLoaded(page, designer);
     if (!loaded) {
       throw new Error('Designer not available');
     }
 
-    const allWidgets = [
-      '数字卡片',
-      '柱状图',
-      '折线图',
-      '饼图',
-      '面积图',
-      '漏斗图',
-      '散点图',
-      '雷达图',
-      '数据表格',
-      // New widgets
-      '词云',
-      '组合图',
-      'NPS 图',
-      '画册',
-      '看板',
-    ];
-
-    let foundCount = 0;
-    for (const widgetLabel of allWidgets) {
-      const isVisible = await designer
-        .paletteItem(widgetLabel)
-        .isVisible({ timeout: 2000 })
-        .catch(() => false);
-      if (isVisible) foundCount++;
+    const foundLabels: string[] = [];
+    for (const widget of EXTENDED_WIDGETS) {
+      await expect(designer.paletteItem(widget.label)).toBeVisible({ timeout: 5000 });
+      foundLabels.push(widget.label);
     }
 
-    // At least 5 base types required, up to 14 with extensions
-    expect(foundCount).toBeGreaterThanOrEqual(5);
-
-    if (foundCount < allWidgets.length) {
-      console.log(`Found ${foundCount}/${allWidgets.length} widget types in palette`);
-    }
+    expect(foundLabels).toEqual(EXTENDED_WIDGETS.map((widget) => widget.label));
   });
 });
