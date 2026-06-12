@@ -1,7 +1,7 @@
 /**
  * ActivitiesWidget — Timeline of recent CRM activities.
  *
- * Data source: GET /crm_activity/list (dynamic controller)
+ * Data source: GET /api/dynamic/crm_activity/list (dynamic controller)
  * Sorted by created_at desc, top N items.
  */
 
@@ -11,6 +11,8 @@ import { useI18n } from '~/contexts/I18nContext';
 
 interface ActivityRecord {
   id: string;
+  crm_act_type?: string;
+  crm_act_subject?: string;
   crm_activity_type?: string;
   crm_activity_subject?: string;
   crm_activity_related_model?: string;
@@ -72,7 +74,7 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
       setLoading(true);
       try {
         const result = await get<ActivityListResponse>(
-          `/crm_activity/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
+          `/api/dynamic/crm_activity/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
         );
         if (!cancelled && result.code === '0' && result.data) {
           setActivities(result.data.records || []);
@@ -148,7 +150,8 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
 
         <div className="space-y-3">
           {activities.map((activity) => {
-            const actType = activity.crm_activity_type || 'note';
+            const actType = activity.crm_act_type || activity.crm_activity_type || 'note';
+            const subject = activity.crm_act_subject || activity.crm_activity_subject;
             const icon = TYPE_ICONS[actType] || '\uD83D\uDCCC';
             const colorClass = TYPE_COLORS[actType] || TYPE_COLORS.note;
             const timeStr = activity.created_at
@@ -179,7 +182,7 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
                 <div className="min-w-0 flex-1 pt-1">
                   <div className="text-[13px] text-gray-900">
                     <span className="font-medium">
-                      {activity.crm_activity_subject || t(`workbench.activities.type.${actType}`, {}, actType)}
+                      {subject || t(`workbench.activities.type.${actType}`, {}, actType)}
                     </span>
                     {activity.crm_activity_related_name && (
                       <span className="text-gray-500">

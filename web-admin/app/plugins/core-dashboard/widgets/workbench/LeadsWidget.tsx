@@ -1,7 +1,7 @@
 /**
  * LeadsWidget — List of recent CRM leads.
  *
- * Data source: GET /crm_lead/list (dynamic controller)
+ * Data source: GET /api/dynamic/crm_lead/list (dynamic controller)
  * Sorted by created_at desc, top N items.
  */
 
@@ -65,7 +65,7 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
       setLoading(true);
       try {
         const result = await get<LeadListResponse>(
-          `/crm_lead/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
+          `/api/dynamic/crm_lead/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
         );
         if (!cancelled && result.code === '0' && result.data) {
           setLeads(result.data.records || []);

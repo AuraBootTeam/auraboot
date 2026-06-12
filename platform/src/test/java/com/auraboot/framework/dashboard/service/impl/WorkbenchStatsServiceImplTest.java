@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,7 +19,9 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -102,6 +105,19 @@ class WorkbenchStatsServiceImplTest {
         WorkbenchPipelineDTO p = service.getPipeline();
         assertEquals(5, p.getStages().size());
         assertEquals(2, p.getTotalCount());
+    }
+
+    @Test
+    @DisplayName("getPipeline queries the canonical CRM opportunity expected amount field")
+    void getPipelineUsesExpectedAmountField() {
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        when(jdbcTemplate.queryForList(sql.capture(), (Object) any(), (Object) any()))
+                .thenReturn(List.of());
+
+        service.getPipeline();
+
+        assertTrue(sql.getValue().contains("crm_opp_expected_amount"));
+        assertFalse(sql.getValue().contains("crm_opp_amount"));
     }
 
     @Test

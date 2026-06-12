@@ -14,6 +14,10 @@
 
 import { test, expect } from '../../fixtures';
 import type { APIResponse, Page, Locator, Response as PlaywrightResponse } from '@playwright/test';
+import { existsSync, readFileSync } from 'fs';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { executeCommandViaApi, uniqueId } from '../helpers';
 
 type DashboardWidgetFixture = {
   id: string;
@@ -64,8 +68,50 @@ type CurrentUserContext = {
   userId: string;
 };
 
+type CreatedCrmWorkbenchFixture = {
+  accountId: string;
+  leadId: string;
+  opportunityId: string;
+  activityId: string;
+  leadCompany: string;
+  leadContact: string;
+  activitySubject: string;
+  opportunityStage: string;
+  opportunityAmount: number;
+};
+
+type DynamicListResponse<T> = {
+  records?: T[];
+  total?: number;
+};
+
+type CrmLeadRecord = {
+  id?: string | number;
+  crm_lead_company?: string;
+  crm_lead_contact_name?: string;
+};
+
+type CrmActivityRecord = {
+  id?: string | number;
+  crm_act_subject?: string;
+  crm_activity_subject?: string;
+};
+
+type PipelineStageRecord = {
+  code?: string;
+  label?: string;
+  count?: number;
+  amount?: string | number;
+};
+
 const SVG_DATA_URL =
   'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22480%22%20height%3D%22200%22%20viewBox%3D%220%200%20480%20200%22%3E%3Crect%20width%3D%22480%22%20height%3D%22200%22%20fill%3D%22%23eef6ff%22%2F%3E%3Ctext%20x%3D%22240%22%20y%3D%22108%22%20font-size%3D%2232%22%20text-anchor%3D%22middle%22%20fill%3D%22%231d4ed8%22%3ERuntime%20Image%3C%2Ftext%3E%3C%2Fsvg%3E';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const BACKEND_PLUGIN_ROOT =
+  process.env.OSS_PLUGIN_ROOT ??
+  process.env.BACKEND_PLUGIN_ROOT ??
+  resolve(__dirname, '../../../../plugins');
 
 function futureIsoDate(daysFromNow: number): string {
   return new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000).toISOString();
@@ -344,6 +390,56 @@ function inboxCalendarWidgets(): DashboardWidgetFixture[] {
       config: {
         title: 'Runtime Calendar',
         dataSource: { type: 'static' },
+      },
+    },
+  ];
+}
+
+function crmWorkbenchWidgets(): DashboardWidgetFixture[] {
+  return [
+    {
+      id: 'runtime-pipeline',
+      type: 'smart-pipeline',
+      title: 'Runtime CRM Pipeline',
+      x: 0,
+      y: 0,
+      w: 4,
+      h: 4,
+      config: {
+        title: 'Runtime CRM Pipeline',
+        dataSource: { type: 'static' },
+      },
+    },
+    {
+      id: 'runtime-leads',
+      type: 'smart-leads',
+      title: 'Runtime CRM Leads',
+      x: 4,
+      y: 0,
+      w: 4,
+      h: 4,
+      config: {
+        title: 'Runtime CRM Leads',
+        dataSource: { type: 'static' },
+        visualization: {
+          maxItems: 5,
+        },
+      },
+    },
+    {
+      id: 'runtime-activities',
+      type: 'smart-activities',
+      title: 'Runtime CRM Activities',
+      x: 8,
+      y: 0,
+      w: 4,
+      h: 4,
+      config: {
+        title: 'Runtime CRM Activities',
+        dataSource: { type: 'static' },
+        visualization: {
+          maxItems: 6,
+        },
       },
     },
   ];
@@ -719,6 +815,271 @@ async function expectInboxListContains(
   expect(match, `${context} should include ${testRunId}`).toBeTruthy();
 }
 
+async function createCrmWorkbenchFixture(page: Page): Promise<CreatedCrmWorkbenchFixture> {
+  await ensureCrmStarterPluginImported(page);
+
+  const suffix = uniqueId('DWRCRM');
+  const leadCompany = `DWR CRM Lead ${suffix}`;
+  const leadContact = `DWR Contact ${suffix}`;
+  const activitySubject = `DWR CRM Activity ${suffix}`;
+  const opportunityAmount = 87654321;
+
+  const account = await executeCommandViaApi(
+    page,
+    'crm:create_account',
+    {
+      crm_acc_name: `DWR CRM Account ${suffix}`,
+      crm_acc_industry: 'technology',
+      crm_acc_phone: '555-0101',
+    },
+    undefined,
+    'create',
+  );
+  expect(account.code, 'create CRM account command code').toBe('0');
+  expect(account.recordId, 'created CRM account id').toBeTruthy();
+
+  const lead = await executeCommandViaApi(
+    page,
+    'crm:create_lead',
+    {
+      crm_lead_company: leadCompany,
+      crm_lead_contact_name: leadContact,
+      crm_lead_source: 'referral',
+      crm_lead_contact_email: `${suffix.toLowerCase()}@example.test`,
+    },
+    undefined,
+    'create',
+  );
+  expect(lead.code, 'create CRM lead command code').toBe('0');
+  expect(lead.recordId, 'created CRM lead id').toBeTruthy();
+
+  const opportunity = await executeCommandViaApi(
+    page,
+    'crm:create_opportunity',
+    {
+      crm_opp_name: `DWR CRM Opportunity ${suffix}`,
+      crm_opp_account_id: account.recordId,
+      crm_opp_expected_amount: opportunityAmount,
+      crm_opp_probability: 80,
+    },
+    undefined,
+    'create',
+  );
+  expect(opportunity.code, 'create CRM opportunity command code').toBe('0');
+  expect(opportunity.recordId, 'created CRM opportunity id').toBeTruthy();
+
+  const qualify = await executeCommandViaApi(
+    page,
+    'crm:qualify_opportunity',
+    {},
+    opportunity.recordId,
+    'state_transition',
+  );
+  expect(qualify.code, 'qualify CRM opportunity command code').toBe('0');
+
+  const activity = await executeCommandViaApi(
+    page,
+    'crm:create_activity',
+    {
+      crm_act_type: 'call',
+      crm_act_subject: activitySubject,
+      crm_act_content: `Runtime activity content ${suffix}`,
+    },
+    undefined,
+    'create',
+  );
+  expect(activity.code, 'create CRM activity command code').toBe('0');
+  expect(activity.recordId, 'created CRM activity id').toBeTruthy();
+
+  const fixture = {
+    accountId: account.recordId,
+    leadId: lead.recordId,
+    opportunityId: opportunity.recordId,
+    activityId: activity.recordId,
+    leadCompany,
+    leadContact,
+    activitySubject,
+    opportunityStage: 'qualification',
+    opportunityAmount,
+  };
+
+  await expectCrmLeadListContains(page, fixture, 'CRM lead list immediately after fixture create');
+  await expectCrmActivityListContains(
+    page,
+    fixture,
+    'CRM activity list immediately after fixture create',
+  );
+  await expectPipelineIncludesStageAmount(
+    page,
+    fixture,
+    'CRM pipeline immediately after fixture create',
+  );
+
+  return fixture;
+}
+
+async function ensureCrmStarterPluginImported(page: Page): Promise<void> {
+  if (await hasCommand(page, 'crm_account', 'crm:create_account')) {
+    return;
+  }
+
+  const pluginDir = resolve(BACKEND_PLUGIN_ROOT, 'crm-starter');
+  const manifestPath = resolve(pluginDir, 'plugin.json');
+  expect(existsSync(manifestPath), `crm-starter manifest missing: ${manifestPath}`).toBe(true);
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+  expect(manifest?.pluginId, `unexpected crm-starter manifest: ${manifestPath}`).toBe(
+    'com.auraboot.crm-starter',
+  );
+
+  const importResponse = await page.request.post('/api/plugins/import/import-directory-sync', {
+    data: {
+      path: pluginDir,
+      conflictStrategy: 'OVERWRITE',
+      validateReferences: true,
+      autoDeployProcesses: false,
+      autoPublishModels: true,
+      autoPublishFields: true,
+      autoPublishCommands: true,
+      autoPublishPages: true,
+      createResourcePermissions: true,
+    },
+    timeout: 120_000,
+  });
+  const rawBody = await importResponse.text();
+  expect(importResponse.ok(), `import crm-starter HTTP ${importResponse.status()}: ${rawBody}`).toBe(
+    true,
+  );
+  const body = JSON.parse(rawBody) as {
+    data?: { success?: boolean; status?: string; errorMessage?: string };
+    success?: boolean;
+    status?: string;
+    errorMessage?: string;
+  };
+  const result = body?.data && typeof body.data === 'object' ? body.data : body;
+  expect(
+    result?.success,
+    `import crm-starter did not succeed (status=${result?.status ?? '?'}, msg=${
+      result?.errorMessage ?? '?'
+    })`,
+  ).toBe(true);
+  expect(await hasCommand(page, 'crm_account', 'crm:create_account')).toBe(true);
+}
+
+async function hasCommand(page: Page, modelCode: string, commandCode: string): Promise<boolean> {
+  const response = await page.request.get('/api/meta/commands', {
+    params: { modelCode },
+  });
+  if (!response.ok()) return false;
+  const body = await response.json().catch(() => ({}));
+  const commands = Array.isArray(body?.data) ? body.data : [];
+  return commands.some((command: { code?: string }) => command?.code === commandCode);
+}
+
+async function cleanupCrmWorkbenchFixture(
+  page: Page,
+  fixture?: CreatedCrmWorkbenchFixture,
+): Promise<void> {
+  if (!fixture) return;
+  await executeCommandViaApi(
+    page,
+    'crm:delete_activity',
+    {},
+    fixture.activityId,
+    'delete',
+    { allowHttpError: true },
+  ).catch(() => undefined);
+  await executeCommandViaApi(
+    page,
+    'crm:delete_lead',
+    {},
+    fixture.leadId,
+    'delete',
+    { allowHttpError: true },
+  ).catch(() => undefined);
+  await executeCommandViaApi(
+    page,
+    'crm:delete_opportunity',
+    {},
+    fixture.opportunityId,
+    'delete',
+    { allowHttpError: true },
+  ).catch(() => undefined);
+  await executeCommandViaApi(
+    page,
+    'crm:delete_account',
+    {},
+    fixture.accountId,
+    'delete',
+    { allowHttpError: true },
+  ).catch(() => undefined);
+}
+
+async function expectCrmLeadListContains(
+  page: Page,
+  fixture: CreatedCrmWorkbenchFixture,
+  context: string,
+  response?: APIResponse | PlaywrightResponse,
+): Promise<void> {
+  const listResponse = response ?? await page.request.get('/api/dynamic/crm_lead/list', {
+    params: {
+      pageNum: '1',
+      pageSize: '20',
+      keyword: fixture.leadCompany,
+    },
+  });
+  const body = await parseJsonResponse<{ data?: DynamicListResponse<CrmLeadRecord> }>(
+    listResponse,
+    context,
+  );
+  const match = body.data?.records?.find((record) =>
+    record.crm_lead_company === fixture.leadCompany &&
+    record.crm_lead_contact_name === fixture.leadContact,
+  );
+  expect(match, `${context} should include ${fixture.leadCompany}`).toBeTruthy();
+}
+
+async function expectCrmActivityListContains(
+  page: Page,
+  fixture: CreatedCrmWorkbenchFixture,
+  context: string,
+  response?: APIResponse | PlaywrightResponse,
+): Promise<void> {
+  const listResponse = response ?? await page.request.get('/api/dynamic/crm_activity/list', {
+    params: {
+      pageNum: '1',
+      pageSize: '20',
+      keyword: fixture.activitySubject,
+    },
+  });
+  const body = await parseJsonResponse<{ data?: DynamicListResponse<CrmActivityRecord> }>(
+    listResponse,
+    context,
+  );
+  const match = body.data?.records?.find((record) =>
+    (record.crm_act_subject ?? record.crm_activity_subject) === fixture.activitySubject,
+  );
+  expect(match, `${context} should include ${fixture.activitySubject}`).toBeTruthy();
+}
+
+async function expectPipelineIncludesStageAmount(
+  page: Page,
+  fixture: CreatedCrmWorkbenchFixture,
+  context: string,
+  response?: APIResponse | PlaywrightResponse,
+): Promise<void> {
+  const pipelineResponse = response ?? await page.request.get('/api/workbench/pipeline');
+  const body = await parseJsonResponse<{ data?: { stages?: PipelineStageRecord[] } }>(
+    pipelineResponse,
+    context,
+  );
+  const stage = body.data?.stages?.find((item) => item.code === fixture.opportunityStage);
+  expect(stage, `${context} should include stage ${fixture.opportunityStage}`).toBeTruthy();
+  expect(Number(stage?.count ?? 0), `${context} stage count`).toBeGreaterThanOrEqual(1);
+  expect(Number(stage?.amount ?? 0), `${context} stage amount`).toBeGreaterThanOrEqual(
+    fixture.opportunityAmount,
+  );
+}
+
 async function expectRuntimeBlock(page: Page, id: string, type: string): Promise<Locator> {
   const block = page.getByTestId(`dashboard-block-${id}`);
   await block.scrollIntoViewIfNeeded();
@@ -1087,6 +1448,84 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       });
     } finally {
       await cleanupInboxFixture(page, inboxFixture);
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
+  test('DWR-008: CRM workbench widgets render live dynamic CRM data', async ({ page }) => {
+    let dashboard: CreatedDashboard | undefined;
+    let crmFixture: CreatedCrmWorkbenchFixture | undefined;
+
+    try {
+      crmFixture = await createCrmWorkbenchFixture(page);
+      dashboard = await createPublishedDashboard(
+        page,
+        crmWorkbenchWidgets(),
+        'Runtime CRM Workbench Widget Matrix',
+      );
+
+      const pipelineResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/workbench/pipeline') &&
+          response.request().method() === 'GET' &&
+          response.status() === 200,
+        { timeout: 10_000 },
+      );
+      const leadResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/dynamic/crm_lead/list') &&
+          response.request().method() === 'GET' &&
+          response.status() === 200,
+        { timeout: 10_000 },
+      );
+      const activityResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/dynamic/crm_activity/list') &&
+          response.request().method() === 'GET' &&
+          response.status() === 200,
+        { timeout: 10_000 },
+      );
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expectPipelineIncludesStageAmount(
+        page,
+        crmFixture,
+        'CRM pipeline consumed by viewer',
+        await pipelineResponse,
+      );
+      await expectCrmLeadListContains(page, crmFixture, 'CRM lead list consumed by viewer', await leadResponse);
+      await expectCrmActivityListContains(
+        page,
+        crmFixture,
+        'CRM activity list consumed by viewer',
+        await activityResponse,
+      );
+
+      const pipelineBlock = await expectRuntimeBlock(page, 'runtime-pipeline', 'smart-pipeline');
+      await expect(pipelineBlock.getByTestId('pipeline-widget')).toBeVisible();
+      const qualificationStage = pipelineBlock.getByTestId('pipeline-stage-qualification');
+      await expect(qualificationStage).toBeVisible({ timeout: 10_000 });
+      await expect(qualificationStage).toContainText(/Qualification|资质审查/);
+      await expect(pipelineBlock).not.toContainText('workbench.pipeline.');
+
+      const leadsBlock = await expectRuntimeBlock(page, 'runtime-leads', 'smart-leads');
+      await expect(leadsBlock.getByTestId('leads-widget')).toBeVisible();
+      await expect(leadsBlock).toContainText(crmFixture.leadCompany);
+      await expect(leadsBlock).toContainText(crmFixture.leadContact);
+      await expect(leadsBlock).not.toContainText(/No leads yet|暂无线索|CRM module not installed/);
+
+      const activitiesBlock = await expectRuntimeBlock(
+        page,
+        'runtime-activities',
+        'smart-activities',
+      );
+      await expect(activitiesBlock.getByTestId('activities-widget')).toBeVisible();
+      await expect(activitiesBlock).toContainText(crmFixture.activitySubject);
+      await expect(activitiesBlock).not.toContainText(/No recent activities|暂无活动/);
+    } finally {
+      await cleanupCrmWorkbenchFixture(page, crmFixture);
       await cleanupDashboard(page, dashboard?.pid);
     }
   });

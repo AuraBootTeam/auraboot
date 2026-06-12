@@ -29,12 +29,21 @@ interface PipelineWidgetProps {
 }
 
 const DEFAULT_COLORS: Record<string, string> = {
-  prospecting: '#3B82F6',
+  discovery: '#3B82F6',
   qualification: '#8B5CF6',
   proposal: '#F59E0B',
   negotiation: '#EF4444',
   closed_won: '#10B981',
   closed_lost: '#6B7280',
+};
+
+const STAGE_LABEL_FALLBACKS: Record<string, string> = {
+  discovery: 'Discovery',
+  qualification: 'Qualification',
+  proposal: 'Proposal',
+  negotiation: 'Negotiation',
+  closed_won: 'Closed Won',
+  closed_lost: 'Closed Lost',
 };
 
 function formatAmount(amount: number): string {
@@ -171,6 +180,11 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
         {data.stages.map((stage) => {
           const barWidth = Math.max((stage.count / maxCount) * 100, 8);
           const color = stage.color || DEFAULT_COLORS[stage.code] || '#6B7280';
+          const stageLabel = t(
+            stage.label,
+            {},
+            STAGE_LABEL_FALLBACKS[stage.code] || stage.label || stage.code,
+          );
 
           return (
             <button
@@ -178,10 +192,11 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
               type="button"
               onClick={() => handleStageClick(stage.code)}
               className="group block w-full cursor-pointer text-left"
+              data-testid={`pipeline-stage-${stage.code}`}
             >
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-xs text-gray-600 group-hover:text-gray-900">
-                  {stage.label}
+                  {stageLabel}
                 </span>
                 <span className="text-[11px] text-gray-400">
                   {stage.count} &middot; {formatAmount(stage.amount)}

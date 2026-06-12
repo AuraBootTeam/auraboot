@@ -153,7 +153,7 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
         // CATCH: non-transactional query, CRM plugin may not be installed so table may not exist
         return safeQuery(() -> {
             Double amount = jdbcTemplate.queryForObject(
-                    "SELECT COALESCE(SUM(CAST(crm_opp_amount AS NUMERIC)), 0) FROM mt_crm_opportunity " +
+                    "SELECT COALESCE(SUM(CAST(crm_opp_expected_amount AS NUMERIC)), 0) FROM mt_crm_opportunity " +
                             "WHERE tenant_id = ? AND crm_opp_stage NOT IN ('closed_lost', 'closed_won')",
                     Double.class, tenantId
             );
@@ -216,7 +216,7 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
             String sql = "SELECT COALESCE(c.amount, 0) AS amount " +
                     "FROM generate_series(current_date - interval '6 day', current_date, interval '1 day') AS d " +
                     "LEFT JOIN (" +
-                    "  SELECT DATE(created_at) AS day, SUM(CAST(crm_opp_amount AS NUMERIC)) AS amount " +
+                    "  SELECT DATE(created_at) AS day, SUM(CAST(crm_opp_expected_amount AS NUMERIC)) AS amount " +
                     "  FROM mt_crm_opportunity " +
                     "  WHERE tenant_id = ? AND crm_opp_stage NOT IN ('closed_lost', 'closed_won') " +
                     "    AND created_at >= current_date - interval '6 day' " +
@@ -316,21 +316,21 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
 
     // --- Pipeline stage constants ---
 
+    private static final String STAGE_DISCOVERY = "discovery";
     private static final String STAGE_QUALIFICATION = "qualification";
-    private static final String STAGE_NEEDS_ANALYSIS = "needs_analysis";
     private static final String STAGE_PROPOSAL = "proposal";
     private static final String STAGE_NEGOTIATION = "negotiation";
     private static final String STAGE_CLOSED_WON = "closed_won";
     private static final String STAGE_CLOSED_LOST = "closed_lost";
 
     private static final List<String> PIPELINE_STAGE_ORDER = List.of(
-            STAGE_QUALIFICATION, STAGE_NEEDS_ANALYSIS, STAGE_PROPOSAL,
+            STAGE_DISCOVERY, STAGE_QUALIFICATION, STAGE_PROPOSAL,
             STAGE_NEGOTIATION, STAGE_CLOSED_WON
     );
 
     private static final Map<String, String> PIPELINE_STAGE_COLORS = Map.of(
-            STAGE_QUALIFICATION, "#93c5fd",
-            STAGE_NEEDS_ANALYSIS, "#60a5fa",
+            STAGE_DISCOVERY, "#93c5fd",
+            STAGE_QUALIFICATION, "#60a5fa",
             STAGE_PROPOSAL, "#3b82f6",
             STAGE_NEGOTIATION, "#2563eb",
             STAGE_CLOSED_WON, "#1d4ed8"
@@ -350,7 +350,7 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                     "SELECT crm_opp_stage AS stage, COUNT(*) AS cnt, " +
-                            "COALESCE(SUM(CAST(crm_opp_amount AS NUMERIC)), 0) AS total_amount " +
+                            "COALESCE(SUM(CAST(crm_opp_expected_amount AS NUMERIC)), 0) AS total_amount " +
                             "FROM mt_crm_opportunity " +
                             "WHERE tenant_id = ? AND crm_opp_stage != ? " +
                             "GROUP BY crm_opp_stage",
