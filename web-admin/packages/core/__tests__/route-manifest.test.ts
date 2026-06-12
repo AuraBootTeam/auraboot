@@ -26,6 +26,25 @@ describe('coreRoutes', () => {
     expect(coreRoutes()).toEqual(adminRuntimeRoutes());
   });
 
+  it('registers custom low-code pages before generic /p pages and catch-all', () => {
+    const routes = coreRoutes();
+    const customPageIndex = routes.findIndex((entry) => entry.path === '/p/c/:pageKey');
+    const genericPageIndex = routes.findIndex((entry) => entry.path === '/p/:pageKey');
+    const catchAllIndex = routes.findIndex((entry) => entry.path === '/*');
+
+    expect(routes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: '/p/c/:pageKey',
+          file: './routes/p.c.$pageKey.tsx',
+        }),
+      ]),
+    );
+    expect(customPageIndex).toBeGreaterThanOrEqual(0);
+    expect(customPageIndex).toBeLessThan(genericPageIndex);
+    expect(customPageIndex).toBeLessThan(catchAllIndex);
+  });
+
   it('exposes empty commerce runtime route hooks for future plugin-owned routes', () => {
     expect(merchantRuntimeRoutes()).toEqual([]);
     expect(storefrontRuntimeRoutes()).toEqual([]);

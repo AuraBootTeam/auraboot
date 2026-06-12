@@ -152,7 +152,8 @@ export function useDynamicPageSetup(
           navigate,
           locale,
           t,
-          disableAutoFetch: true,
+          disableAutoFetch: false,
+          skipDataSourceRegistration: true,
         },
   );
 

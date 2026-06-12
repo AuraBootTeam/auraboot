@@ -63,7 +63,8 @@ export const DesignerPreview: React.FC<DesignerPreviewProps> = ({ schema, locale
     navigate: fallbackNavigate,
     locale,
     t: (key) => key,
-    disableAutoFetch: true,
+    disableAutoFetch: false,
+    skipDataSourceRegistration: true,
   });
 
   if (!runtime) {
