@@ -312,4 +312,75 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     );
     await expect(page.getByTestId('tab-child-chart-height-input-0')).toHaveValue('240');
   });
+
+  test('drags a custom child block and edits its runtime props', async ({ page }) => {
+    const { pid, tabsBlockId } = await createTabsChildDropAuthoringPage(page);
+    await openDesignerByPid(page, pid);
+
+    await selectCanvasBlock(page, tabsBlockId);
+    await expect(page.getByTestId('tab-child-blocks-editor')).toBeVisible();
+
+    await page.getByTestId('tab-filter-key-input').fill('custom');
+    await page.getByTestId('tab-filter-label-en-input').fill('Custom');
+    await page.getByTestId('tab-filter-label-zh-input').fill('自定义');
+
+    const beforeTopLevelIds = await canvasBlockIds(page);
+    await dragPaletteBlockToTabChildDropZone(page, 'custom');
+
+    await expect(page.getByTestId('tab-child-block-0')).toBeVisible();
+    await expect(page.getByTestId('tab-child-block-0')).toContainText('custom');
+    await page.getByTestId('tab-child-title-en-input-0').fill('Nested custom runtime');
+    await page.getByTestId('tab-child-title-zh-input-0').fill('嵌套自定义运行时');
+    await page.getByTestId('tab-child-custom-component-input-0').fill('decision-field-impact');
+    await page.getByTestId('tab-child-custom-props-json-input-0').fill(
+      JSON.stringify({ initialCurrentDataType: 'number', tone: 'critical' }, null, 2),
+    );
+    await page.getByTestId('tab-child-custom-value-field-input-0').fill('pid');
+    await expect.poll(() => canvasBlockIds(page)).toEqual(beforeTopLevelIds);
+
+    await saveDesignerAndWait(page, pid);
+    const savedPage = await fetchPageByPid(page, pid);
+    const savedBlock = savedBlockById(savedPage, tabsBlockId);
+    expect(savedBlock).toMatchObject({
+      blockType: 'tabs',
+      tabs: [
+        {
+          key: 'custom',
+          label: { 'en-US': 'Custom', 'zh-CN': '自定义' },
+          filter: null,
+          blocks: [
+            {
+              blockType: 'custom',
+              title: { 'en-US': 'Nested custom runtime', 'zh-CN': '嵌套自定义运行时' },
+              component: 'decision-field-impact',
+              props: {
+                initialCurrentDataType: 'number',
+                tone: 'critical',
+                valueField: 'pid',
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    await openDesignerByPid(page, pid);
+    await selectCanvasBlock(page, tabsBlockId);
+    await expect(page.getByTestId('tab-child-title-en-input-0')).toHaveValue(
+      'Nested custom runtime',
+    );
+    await expect(page.getByTestId('tab-child-title-zh-input-0')).toHaveValue(
+      '嵌套自定义运行时',
+    );
+    await expect(page.getByTestId('tab-child-custom-component-input-0')).toHaveValue(
+      'decision-field-impact',
+    );
+    await expect(page.getByTestId('tab-child-custom-value-field-input-0')).toHaveValue('pid');
+    await expect(page.getByTestId('tab-child-custom-props-json-input-0')).toContainText(
+      'initialCurrentDataType',
+    );
+    await expect(page.getByTestId('tab-child-custom-props-json-input-0')).toContainText(
+      'critical',
+    );
+  });
 });

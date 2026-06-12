@@ -54,6 +54,14 @@ function getChildBlockTitle(block: TabChildBlock, lang: 'en-US' | 'zh-CN'): stri
   return block.title?.[lang] || '';
 }
 
+function formatChildBlockProps(props: Record<string, any> | undefined): string {
+  try {
+    return JSON.stringify(props || {}, null, 2);
+  } catch {
+    return '{}';
+  }
+}
+
 function createTextChildBlock(index: number): TabChildBlock {
   return {
     id: `tab_text_${Date.now()}_${index}`,
@@ -209,6 +217,42 @@ export function TabFilterEditor({
       });
     },
     [tabs, updateChildBlock],
+  );
+
+  const updateCustomChildBlockComponent = useCallback(
+    (tabIndex: number, blockIndex: number, component: string) => {
+      updateChildBlock(tabIndex, blockIndex, { component: component || undefined });
+    },
+    [updateChildBlock],
+  );
+
+  const updateCustomChildBlockValueField = useCallback(
+    (tabIndex: number, blockIndex: number, valueField: string) => {
+      const childBlock = getTabBlocks(tabs[tabIndex])[blockIndex];
+      if (!childBlock) return;
+      updateChildBlock(tabIndex, blockIndex, {
+        props: {
+          ...(childBlock.props || {}),
+          valueField: valueField || undefined,
+        },
+      });
+    },
+    [tabs, updateChildBlock],
+  );
+
+  const updateCustomChildBlockProps = useCallback(
+    (tabIndex: number, blockIndex: number, propsJson: string) => {
+      try {
+        const parsed = propsJson.trim() ? JSON.parse(propsJson) : {};
+        if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+          return;
+        }
+        updateChildBlock(tabIndex, blockIndex, { props: parsed });
+      } catch {
+        return;
+      }
+    },
+    [updateChildBlock],
   );
 
   const updateChildBlockRefreshInterval = useCallback(
@@ -747,6 +791,60 @@ export function TabFilterEditor({
                         </div>
                       </div>
                     )}
+                    {block.blockType === 'custom' && (
+                      <div className="mb-1.5 space-y-1.5">
+                        <label className="block text-[10px] text-gray-500">
+                          Component
+                          <input
+                            className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
+                            value={String(block.component || '')}
+                            onChange={(event) =>
+                              updateCustomChildBlockComponent(
+                                selectedIndex,
+                                index,
+                                event.target.value,
+                              )
+                            }
+                            disabled={readonly}
+                            placeholder="decision-field-impact"
+                            data-testid={`tab-child-custom-component-input-${index}`}
+                          />
+                        </label>
+                        <label className="block text-[10px] text-gray-500">
+                          Value field
+                          <input
+                            className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
+                            value={String(block.props?.valueField || '')}
+                            onChange={(event) =>
+                              updateCustomChildBlockValueField(
+                                selectedIndex,
+                                index,
+                                event.target.value,
+                              )
+                            }
+                            disabled={readonly}
+                            placeholder="pid"
+                            data-testid={`tab-child-custom-value-field-input-${index}`}
+                          />
+                        </label>
+                        <label className="block text-[10px] text-gray-500">
+                          Props JSON
+                          <textarea
+                            className="mt-0.5 min-h-24 w-full resize-y rounded border px-1.5 py-1 font-mono text-xs"
+                            value={formatChildBlockProps(block.props)}
+                            onChange={(event) =>
+                              updateCustomChildBlockProps(
+                                selectedIndex,
+                                index,
+                                event.target.value,
+                              )
+                            }
+                            disabled={readonly}
+                            data-testid={`tab-child-custom-props-json-input-${index}`}
+                          />
+                        </label>
+                      </div>
+                    )}
                     {block.blockType === 'text' ? (
                       <textarea
                         className="min-h-16 w-full resize-y rounded border px-1.5 py-1 text-xs"
@@ -757,7 +855,9 @@ export function TabFilterEditor({
                         disabled={readonly}
                         data-testid={`tab-child-text-content-${index}`}
                       />
-                    ) : block.blockType === 'stat-card' || block.blockType === 'chart-card' ? null : (
+                    ) : block.blockType === 'stat-card' ||
+                      block.blockType === 'chart-card' ||
+                      block.blockType === 'custom' ? null : (
                       <div className="rounded border border-dashed px-2 py-2 text-[10px] text-gray-400">
                         This block type is preserved but not editable here.
                       </div>

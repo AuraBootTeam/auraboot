@@ -368,4 +368,76 @@ describe('TabFilterEditor', () => {
       },
     });
   });
+
+  it('edits custom child block runtime props on the selected tab', () => {
+    const onCommit = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'custom',
+            label: { 'en-US': 'Custom', 'zh-CN': '自定义' },
+            filter: null,
+            blocks: [
+              {
+                id: 'custom_child',
+                blockType: 'custom',
+                title: { 'en-US': 'Custom child', 'zh-CN': '自定义子块' },
+                component: 'legacy-runtime-block',
+                props: {
+                  initialCurrentDataType: 'string',
+                  valueField: 'oldPid',
+                },
+              },
+            ],
+          },
+        ]}
+        onCommit={onCommit}
+      />,
+    );
+
+    expect(screen.getByTestId('tab-child-custom-component-input-0')).toHaveValue(
+      'legacy-runtime-block',
+    );
+    expect(screen.getByTestId('tab-child-custom-value-field-input-0')).toHaveValue('oldPid');
+    expect(screen.getByTestId('tab-child-custom-props-json-input-0')).toHaveValue(
+      JSON.stringify(
+        {
+          initialCurrentDataType: 'string',
+          valueField: 'oldPid',
+        },
+        null,
+        2,
+      ),
+    );
+
+    fireEvent.change(screen.getByTestId('tab-child-custom-component-input-0'), {
+      target: { value: 'decision-field-impact' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-custom-props-json-input-0'), {
+      target: {
+        value: JSON.stringify(
+          {
+            initialCurrentDataType: 'number',
+            tone: 'critical',
+          },
+          null,
+          2,
+        ),
+      },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-custom-value-field-input-0'), {
+      target: { value: 'pid' },
+    });
+
+    expect(serializedTabs()[0].blocks?.[0]).toMatchObject({
+      blockType: 'custom',
+      component: 'decision-field-impact',
+      props: {
+        initialCurrentDataType: 'number',
+        tone: 'critical',
+        valueField: 'pid',
+      },
+    });
+  });
 });
