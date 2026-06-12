@@ -29,6 +29,7 @@ import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
+import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
 import { BlockErrorBoundary } from '~/framework/meta/rendering/BlockErrorBoundary';
 import type { SubTableColumn } from '~/framework/meta/components/types';
 import { resolveExtensionDisplayName } from '~/framework/meta/utils/i18nResolver';
@@ -665,16 +666,36 @@ export function FormPageContent(props: PageContentProps) {
     [loadMainRecord],
   );
 
+  const syncRuntimeFormScope = useCallback(
+    (nextFormData: Record<string, any>) => {
+      if (!runtime) return;
+      const scopeId = runtime.getScopeId();
+      runtime.getStateManager().updateScope(scopeId, {
+        form: recordId ? { ...nextFormData, pid: recordId } : nextFormData,
+      });
+    },
+    [runtime, recordId],
+  );
+
+  const syncRuntimeFieldValue = useCallback(
+    (fieldCode: string, value: unknown) => {
+      if (!runtime) return;
+      const scopeId = runtime.getScopeId();
+      runtime.getStateManager().updateScope(scopeId, (prev) => ({
+        form: {
+          ...(prev.form || {}),
+          [fieldCode]: value,
+          ...(recordId ? { pid: recordId } : {}),
+        },
+      }));
+    },
+    [runtime, recordId],
+  );
+
   // Sync formData with runtime scope state
   useEffect(() => {
-    if (runtime) {
-      const scopeId = runtime.getScopeId();
-      // Update the form data in the scope so handlers can access it via {{state.form}}
-      runtime.getStateManager().updateScope(scopeId, {
-        form: formData,
-      });
-    }
-  }, [runtime, formData]);
+    syncRuntimeFormScope(formData);
+  }, [formData, syncRuntimeFormScope]);
 
   // Use unified action handler hook with SchemaRuntime support
   const { handleAction, loading, error, setError } = useActionHandler({
@@ -852,6 +873,7 @@ export function FormPageContent(props: PageContentProps) {
     formData,
     enabled: computedFieldDefs.length > 0,
     onChange: (fieldCode, value) => {
+      syncRuntimeFieldValue(fieldCode, value);
       setFormData((prev) => {
         if (prev[fieldCode] === value) return prev;
         return {
@@ -1500,11 +1522,12 @@ export function FormPageContent(props: PageContentProps) {
   // Render smart field using utility
   const renderSmartField = useMemo(
     () =>
-      createFieldRenderer(formData, setFormData, pageContext, fieldErrors, (fieldCode) => {
+      createFieldRenderer(formData, setFormData, pageContext, fieldErrors, (fieldCode, value) => {
         dirtyFieldsRef.current.add(fieldCode);
         clearFieldError(fieldCode);
+        syncRuntimeFieldValue(fieldCode, value);
       }),
-    [formData, pageContext, fieldErrors, clearFieldError],
+    [formData, pageContext, fieldErrors, clearFieldError, syncRuntimeFieldValue],
   );
 
   // Stable runtime context for custom blocks. Memoized so the props
@@ -1549,6 +1572,7 @@ export function FormPageContent(props: PageContentProps) {
   const allBlocks = schema.blocks || [];
 
   const formBlocks = allBlocks.filter((block: any) => block.blockType === 'form-section');
+  const layoutBlocks = allBlocks.filter((block: any) => block.blockType === 'tabs');
   // Custom block support — surfaces blockType:"custom" entries that DSL
   // pages declare for visual companions to the form (e.g. position
   // ruler, designer panels). Rendered above the form-section blocks so
@@ -1786,6 +1810,19 @@ export function FormPageContent(props: PageContentProps) {
                   })}
                 </div>
               )}
+              {runtime &&
+                layoutBlocks.length > 0 && (
+                  <div className="mt-5 space-y-5" data-testid="form-layout-blocks">
+                    {layoutBlocks.map((block: any, blockIndex: number) => (
+                      <BlockRenderer
+                        key={block.id || `form-layout-${blockIndex}`}
+                        block={block}
+                        runtime={runtime}
+                        areaId={`form-layout-${blockIndex}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </>
             )}
 

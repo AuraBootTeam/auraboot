@@ -12,7 +12,11 @@ async function readPageByPid(page: Page, pid: string): Promise<PageSchemaPayload
   return body.data ?? {};
 }
 
-async function createEditablePageRecord(page: Page, name: string, pageKey: string): Promise<string> {
+async function createEditablePageRecord(
+  page: Page,
+  name: string,
+  pageKey: string,
+): Promise<string> {
   const payload = {
     name,
     pageKey,
@@ -87,9 +91,87 @@ async function createPublishedRefreshFormPage(page: Page): Promise<string> {
   expect(pid, 'created refresh form page pid').toBeTruthy();
 
   const publishResp = await page.request.post(`/api/pages/${pid}/publish`);
-  expect(publishResp.ok(), `Publish refresh form page failed: ${publishResp.status()}`).toBeTruthy();
+  expect(
+    publishResp.ok(),
+    `Publish refresh form page failed: ${publishResp.status()}`,
+  ).toBeTruthy();
   const publishBody = await publishResp.json();
   expect(publishBody.code, 'publish refresh form page API code').toBe('0');
+  return pageKey;
+}
+
+async function createPublishedNestedFormButtonsPage(page: Page): Promise<string> {
+  const pageKey = uniqueId('form_nested_buttons').replace(/-/g, '_');
+  const title = `Form nested buttons ${pageKey}`;
+  const payload = {
+    name: title,
+    pageKey,
+    title,
+    kind: 'form',
+    modelCode: 'page_schema',
+    profile: 'admin',
+    layout: { type: 'stack', gap: 12 },
+    blocks: [
+      {
+        id: 'form_nested_fields',
+        blockType: 'form-section',
+        title: 'Nested button form section',
+        fields: [
+          { field: 'name', label: 'Name', required: true, span: 12 },
+          { field: 'page_key', label: 'Page Key', readonly: true, span: 12 },
+        ],
+      },
+      {
+        id: 'form_runtime_nested_actions_tabs',
+        blockType: 'tabs',
+        title: 'Nested runtime actions',
+        tabs: [
+          {
+            key: 'actions',
+            label: 'Nested actions',
+            blocks: [
+              {
+                id: 'form_runtime_nested_update_buttons',
+                blockType: 'form-buttons',
+                buttons: [
+                  {
+                    code: 'nested_update',
+                    label: 'Nested update',
+                    primary: true,
+                    action: {
+                      type: 'command',
+                      command: 'pgm:update_page_schema',
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    schemaVersion: 4,
+    metaInfo: { runtimeE2E: true, nestedFormButtonsRuntime: true },
+    semver: '0.1.0',
+  };
+
+  const createResp = await page.request.post('/api/pages', { data: payload });
+  expect(
+    createResp.ok(),
+    `Create nested form buttons page failed: ${createResp.status()}`,
+  ).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create nested form buttons page API code').toBe('0');
+  const pid = String(createBody.data?.pid ?? '');
+  expect(pid, 'created nested form buttons page pid').toBeTruthy();
+
+  const publishResp = await page.request.post(`/api/pages/${pid}/publish`);
+  expect(
+    publishResp.ok(),
+    `Publish nested form buttons page failed: ${publishResp.status()}`,
+  ).toBeTruthy();
+  const publishBody = await publishResp.json();
+  expect(publishBody.code, 'publish nested form buttons page API code').toBe('0');
   return pageKey;
 }
 
@@ -137,6 +219,62 @@ test.describe('Page Designer form-buttons refresh runtime', () => {
     await page.getByTestId('form-btn-refresh').click();
     expect((await reloadResponse).ok(), 'form refresh record reload response').toBeTruthy();
     await expect(nameInput).toHaveValue(refreshedName);
-    await expect(page.getByTestId('field-name')).not.toContainText(/required|必填|不能为空|请填写/i);
+    await expect(page.getByTestId('field-name')).not.toContainText(
+      /required|必填|不能为空|请填写/i,
+    );
+  });
+
+  test('nested tabs form button executes an update command with persisted side effects', async ({
+    page,
+  }) => {
+    const formPageKey = await createPublishedNestedFormButtonsPage(page);
+    const targetPageKey = uniqueId('form_nested_target').replace(/-/g, '_');
+    const initialName = `Nested form initial ${targetPageKey}`;
+    const updatedName = `Nested form updated ${targetPageKey}`;
+    const targetPid = await createEditablePageRecord(page, initialName, targetPageKey);
+
+    await page.goto(`/p/c/${formPageKey}/edit/${targetPid}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('dynamic-form')).toBeVisible();
+    const nameInput = page.getByTestId('field-name').locator('input, textarea').first();
+    await expect(nameInput).toHaveValue(initialName);
+    await expect(page.getByRole('tab', { name: 'Nested actions' })).toBeVisible();
+    await expect(page.getByTestId('form-btn-nested_update')).toBeVisible();
+
+    await nameInput.fill(updatedName);
+    const commandRequestCapture: { body?: Record<string, any> } = {};
+    page.on('request', (request) => {
+      if (
+        request.url().includes('/api/meta/commands/execute/pgm:update_page_schema') &&
+        request.method() === 'POST'
+      ) {
+        const postData = request.postData();
+        commandRequestCapture.body = postData ? JSON.parse(postData) : undefined;
+      }
+    });
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/meta/commands/execute/pgm:update_page_schema') &&
+        response.request().method() === 'POST',
+      { timeout: 15_000 },
+    );
+    await page.getByTestId('form-btn-nested_update').click();
+    const response = await updateResponse;
+    expect(response.ok(), 'nested form button update command response').toBeTruthy();
+    const body = await response.json();
+    expect(body.code, 'nested form button update command code').toBe('0');
+    const commandRequestBody = commandRequestCapture.body;
+    expect(commandRequestBody?.targetRecordId, 'nested form button command target').toBe(targetPid);
+    expect(commandRequestBody?.operationType, 'nested form button command operation').toBe(
+      'UPDATE',
+    );
+    expect(commandRequestBody?.payload?.name, 'nested form button command payload name').toBe(
+      updatedName,
+    );
+
+    await expect
+      .poll(async () => String((await readPageByPid(page, targetPid)).name ?? ''), {
+        timeout: 10_000,
+      })
+      .toBe(updatedName);
   });
 });
