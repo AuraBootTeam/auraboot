@@ -234,6 +234,27 @@ async function createPublishedStandardFormPage(page: Page) {
           component: 'SmartInput',
           layout: { colSpan: 6 },
         },
+        {
+          field: 'kind',
+          label: 'Runtime kind',
+          component: 'SmartSelect',
+          defaultValue: 'list',
+          layout: { colSpan: 4 },
+        },
+        {
+          field: 'model_code',
+          label: 'Runtime model code',
+          component: 'SmartInput',
+          defaultValue: 'page_schema',
+          layout: { colSpan: 4 },
+        },
+        {
+          field: 'profile',
+          label: 'Runtime profile',
+          component: 'SmartInput',
+          defaultValue: 'admin',
+          layout: { colSpan: 4 },
+        },
       ],
     },
     {
@@ -244,6 +265,7 @@ async function createPublishedStandardFormPage(page: Page) {
           code: 'submit',
           label: 'Runtime save',
           primary: true,
+          action: { type: 'command', command: 'pgm:create_page_schema' },
         },
         {
           code: 'cancel',
@@ -264,6 +286,48 @@ async function createPublishedStandardFormPage(page: Page) {
 
   await publishPage(page, payload);
   return { pageKey, blocks };
+}
+
+async function fillPageSchemaForm(
+  page: Page,
+  values: {
+    name: string;
+    pageKey: string;
+    kind?: string;
+    modelCode?: string;
+    profile?: string;
+  },
+) {
+  await page.getByTestId('field-name').locator('input, textarea').first().fill(values.name);
+  await page
+    .getByTestId('field-page_key')
+    .locator('input, textarea')
+    .first()
+    .fill(values.pageKey);
+
+  if (values.kind) {
+    await page.getByTestId('field-kind').locator('select').first().selectOption(values.kind);
+  }
+  if (values.modelCode) {
+    await page
+      .getByTestId('field-model_code')
+      .locator('input, textarea')
+      .first()
+      .fill(values.modelCode);
+  }
+  if (values.profile) {
+    const profileInput = page.getByTestId('field-profile').locator('input, textarea').first();
+    if (await profileInput.isVisible().catch(() => false)) {
+      await profileInput.fill(values.profile);
+    } else {
+      await expect(profileInput).toHaveValue(values.profile);
+    }
+  }
+}
+
+function extractCommandRecordId(body: Record<string, any>): string {
+  const resultData = body?.data?.data ?? body?.data ?? {};
+  return String(resultData.recordId ?? resultData.pid ?? resultData.id ?? '');
 }
 
 async function createE2etOrder(page: Page, title: string): Promise<string> {
@@ -316,6 +380,14 @@ async function fetchPageByKey(page: Page, pageKey: string): Promise<Record<strin
   expect(resp.ok(), `Fetch page by key failed: ${resp.status()}`).toBeTruthy();
   const body = await resp.json();
   expect(body.code, 'fetch page by key code').toBe('0');
+  return body.data ?? {};
+}
+
+async function fetchPageByPid(page: Page, pid: string): Promise<Record<string, any>> {
+  const resp = await page.request.get(`/api/pages/${pid}`);
+  expect(resp.ok(), `Fetch page by pid failed: ${resp.status()}`).toBeTruthy();
+  const body = await resp.json();
+  expect(body.code, 'fetch page by pid code').toBe('0');
   return body.data ?? {};
 }
 
@@ -554,6 +626,75 @@ test.describe('Page Designer standard block runtime', () => {
     await page.getByTestId('form-btn-cancel').click();
     await expect(page).toHaveURL(/\/p\/page_schema/);
     await expect(page.locator('body')).not.toContainText('Unknown block type');
+  });
+
+  test('form buttons execute create and update commands with persisted side effects', async ({
+    page,
+  }) => {
+    const { pageKey } = await createPublishedStandardFormPage(page);
+    const createdPageKey = uniqueId('form_cmd_page').replace(/-/g, '_');
+    const createdName = `Form command ${createdPageKey}`;
+    const updatedName = `Updated ${createdName}`;
+
+    await page.goto(`/p/c/${pageKey}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('dynamic-form')).toBeVisible({ timeout: 15_000 });
+    await fillPageSchemaForm(page, {
+      name: createdName,
+      pageKey: createdPageKey,
+      kind: 'list',
+      modelCode: 'page_schema',
+      profile: 'admin',
+    });
+
+    const createCommandResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/meta/commands/execute/pgm:create_page_schema') &&
+        response.request().method() === 'POST',
+      { timeout: 15_000 },
+    );
+    await page.getByTestId('form-btn-submit').click();
+    const createResp = await createCommandResponse;
+    expect(createResp.ok(), 'form create command response').toBeTruthy();
+    const createBody = await createResp.json();
+    expect(createBody.code, 'form create command code').toBe('0');
+    const createdPid = extractCommandRecordId(createBody);
+    expect(createdPid, 'form create command record id').toBeTruthy();
+
+    await expect
+      .poll(async () => String((await fetchPageByPid(page, createdPid)).name ?? ''), {
+        timeout: 10_000,
+      })
+      .toBe(createdName);
+    expect(String((await fetchPageByPid(page, createdPid)).pageKey ?? '')).toBe(createdPageKey);
+
+    await page.goto(
+      `/p/page_schema/edit/${createdPid}?commandCode=${encodeURIComponent('pgm:update_page_schema')}`,
+      { waitUntil: 'domcontentloaded' },
+    );
+    await expect(page.getByTestId('dynamic-form')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('field-name').locator('input, textarea').first()).toHaveValue(
+      createdName,
+      { timeout: 15_000 },
+    );
+    await page.getByTestId('field-name').locator('input, textarea').first().fill(updatedName);
+
+    const updateCommandResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/meta/commands/execute/pgm:update_page_schema') &&
+        response.request().method() === 'POST',
+      { timeout: 15_000 },
+    );
+    await page.getByTestId('form-btn-submit').click();
+    const updateResp = await updateCommandResponse;
+    expect(updateResp.ok(), 'form update command response').toBeTruthy();
+    const updateBody = await updateResp.json();
+    expect(updateBody.code, 'form update command code').toBe('0');
+
+    await expect
+      .poll(async () => String((await fetchPageByPid(page, createdPid)).name ?? ''), {
+        timeout: 10_000,
+      })
+      .toBe(updatedName);
   });
 
   test('sub-table runtime creates, edits, deletes child rows, and updates aggregate state', async ({
