@@ -40,7 +40,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
   const columnsCount = (block.props as any)?.columns || 2;
 
   // Generate sortable IDs for fields
-  const fieldIds = fields.slice(0, 8).map((fieldRef, index) => {
+  const fieldIds = fields.map((fieldRef, index) => {
     const field = parseFieldShorthand(fieldRef);
     return `${block.id}:field:${field.field || index}`;
   });
@@ -92,7 +92,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
               className="grid gap-4"
               style={{ gridTemplateColumns: `repeat(${columnsCount}, 1fr)` }}
             >
-              {fields.slice(0, 8).map((fieldRef, index) => {
+              {fields.map((fieldRef, index) => {
                 const field = parseFieldShorthand(fieldRef);
                 const fieldId = `${block.id}:field:${field.field || index}`;
 
@@ -119,11 +119,6 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
               })}
             </div>
           </SortableContext>
-        )}
-        {fields.length > 8 && (
-          <div className="mt-3 text-center text-xs text-gray-400">
-            {l(`+${fields.length - 8} 更多字段`, `+${fields.length - 8} more fields`)}
-          </div>
         )}
       </div>
     </div>
