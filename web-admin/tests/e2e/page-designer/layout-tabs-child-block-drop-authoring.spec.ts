@@ -72,6 +72,7 @@ async function dragPaletteBlockToTabChildDropZone(page: Page, blockType: string)
   await expect(source).toBeVisible();
   await expect(target).toBeVisible();
 
+  await source.scrollIntoViewIfNeeded();
   await source.dragTo(target);
 }
 
@@ -149,5 +150,53 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     await expect(page.getByTestId('tab-child-text-content-0')).toHaveValue(
       'Dragged nested overview copy',
     );
+  });
+
+  test('drags a stat card child block and edits its title', async ({ page }) => {
+    const { pid, tabsBlockId } = await createTabsChildDropAuthoringPage(page);
+    await openDesignerByPid(page, pid);
+
+    await selectCanvasBlock(page, tabsBlockId);
+    await expect(page.getByTestId('tab-child-blocks-editor')).toBeVisible();
+
+    await page.getByTestId('tab-filter-key-input').fill('metrics');
+    await page.getByTestId('tab-filter-label-en-input').fill('Metrics');
+    await page.getByTestId('tab-filter-label-zh-input').fill('指标');
+
+    const beforeTopLevelIds = await canvasBlockIds(page);
+    await dragPaletteBlockToTabChildDropZone(page, 'stat-card');
+
+    await expect(page.getByTestId('tab-child-block-0')).toBeVisible();
+    await expect(page.getByTestId('tab-child-block-0')).toContainText('stat-card');
+    await page.getByTestId('tab-child-title-en-input-0').fill('Nested metric card');
+    await page.getByTestId('tab-child-title-zh-input-0').fill('嵌套指标卡片');
+    await expect.poll(() => canvasBlockIds(page)).toEqual(beforeTopLevelIds);
+
+    await saveDesignerAndWait(page, pid);
+    const savedPage = await fetchPageByPid(page, pid);
+    const savedBlock = savedBlockById(savedPage, tabsBlockId);
+    expect(savedBlock).toMatchObject({
+      blockType: 'tabs',
+      tabs: [
+        {
+          key: 'metrics',
+          label: { 'en-US': 'Metrics', 'zh-CN': '指标' },
+          filter: null,
+          blocks: [
+            {
+              blockType: 'stat-card',
+              title: { 'en-US': 'Nested metric card', 'zh-CN': '嵌套指标卡片' },
+            },
+          ],
+        },
+      ],
+    });
+
+    await openDesignerByPid(page, pid);
+    await selectCanvasBlock(page, tabsBlockId);
+    await expect(page.getByTestId('tab-child-title-en-input-0')).toHaveValue(
+      'Nested metric card',
+    );
+    await expect(page.getByTestId('tab-child-title-zh-input-0')).toHaveValue('嵌套指标卡片');
   });
 });

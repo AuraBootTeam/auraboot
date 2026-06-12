@@ -49,6 +49,11 @@ function getTabBlocks(tab: ListTabConfig | undefined): TabChildBlock[] {
   return Array.isArray(tab?.blocks) ? tab.blocks : [];
 }
 
+function getChildBlockTitle(block: TabChildBlock, lang: 'en-US' | 'zh-CN'): string {
+  if (typeof block.title === 'string') return lang === 'en-US' ? block.title : '';
+  return block.title?.[lang] || '';
+}
+
 function createTextChildBlock(index: number): TabChildBlock {
   return {
     id: `tab_text_${Date.now()}_${index}`,
@@ -122,17 +127,41 @@ export function TabFilterEditor({
     [tabs, updateTab],
   );
 
-  const updateTextChildBlock = useCallback(
-    (tabIndex: number, blockIndex: number, content: string) => {
+  const updateChildBlock = useCallback(
+    (tabIndex: number, blockIndex: number, updates: Partial<TabChildBlock>) => {
       const childBlocks = getTabBlocks(tabs[tabIndex]);
       const nextBlocks = childBlocks.map((block, index) =>
-        index === blockIndex
-          ? { ...block, props: { ...(block.props || {}), content } }
-          : block,
+        index === blockIndex ? { ...block, ...updates } : block,
       );
       updateTab(tabIndex, { blocks: nextBlocks });
     },
     [tabs, updateTab],
+  );
+
+  const updateChildBlockTitle = useCallback(
+    (tabIndex: number, blockIndex: number, lang: 'en-US' | 'zh-CN', value: string) => {
+      const childBlock = getTabBlocks(tabs[tabIndex])[blockIndex];
+      if (!childBlock) return;
+      const currentTitle =
+        typeof childBlock.title === 'string'
+          ? { 'en-US': childBlock.title }
+          : { ...(childBlock.title || {}) };
+      updateChildBlock(tabIndex, blockIndex, {
+        title: { ...currentTitle, [lang]: value },
+      });
+    },
+    [tabs, updateChildBlock],
+  );
+
+  const updateTextChildBlock = useCallback(
+    (tabIndex: number, blockIndex: number, content: string) => {
+      const childBlock = getTabBlocks(tabs[tabIndex])[blockIndex];
+      if (!childBlock) return;
+      updateChildBlock(tabIndex, blockIndex, {
+        props: { ...(childBlock.props || {}), content },
+      });
+    },
+    [tabs, updateChildBlock],
   );
 
   const removeChildBlock = useCallback(
@@ -307,6 +336,42 @@ export function TabFilterEditor({
                       >
                         Remove
                       </button>
+                    </div>
+                    <div className="mb-1.5 grid grid-cols-2 gap-1.5">
+                      <label className="text-[10px] text-gray-500">
+                        Title (en-US)
+                        <input
+                          className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                          value={getChildBlockTitle(block, 'en-US')}
+                          onChange={(event) =>
+                            updateChildBlockTitle(
+                              selectedIndex,
+                              index,
+                              'en-US',
+                              event.target.value,
+                            )
+                          }
+                          disabled={readonly}
+                          data-testid={`tab-child-title-en-input-${index}`}
+                        />
+                      </label>
+                      <label className="text-[10px] text-gray-500">
+                        Title (zh-CN)
+                        <input
+                          className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                          value={getChildBlockTitle(block, 'zh-CN')}
+                          onChange={(event) =>
+                            updateChildBlockTitle(
+                              selectedIndex,
+                              index,
+                              'zh-CN',
+                              event.target.value,
+                            )
+                          }
+                          disabled={readonly}
+                          data-testid={`tab-child-title-zh-input-${index}`}
+                        />
+                      </label>
                     </div>
                     {block.blockType === 'text' ? (
                       <textarea

@@ -103,4 +103,45 @@ describe('TabFilterEditor', () => {
     fireEvent.click(screen.getByTestId('tab-child-remove-0'));
     expect(serializedTabs()[0].blocks).toEqual([]);
   });
+
+  it('edits localized titles for non-text child blocks on the selected tab', () => {
+    const onCommit = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'overview',
+            label: { 'en-US': 'Overview', 'zh-CN': '概览' },
+            filter: null,
+            blocks: [
+              {
+                id: 'overview_stat',
+                blockType: 'stat-card',
+                title: { 'en-US': 'Metric', 'zh-CN': '指标' },
+                props: { valueField: 'name' },
+              },
+            ],
+          },
+        ]}
+        onCommit={onCommit}
+      />,
+    );
+
+    expect(screen.getByTestId('tab-child-block-0')).toBeVisible();
+    expect(screen.getByTestId('tab-child-title-en-input-0')).toHaveValue('Metric');
+    expect(screen.getByTestId('tab-child-title-zh-input-0')).toHaveValue('指标');
+
+    fireEvent.change(screen.getByTestId('tab-child-title-en-input-0'), {
+      target: { value: 'Nested metric' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-title-zh-input-0'), {
+      target: { value: '嵌套指标' },
+    });
+
+    expect(serializedTabs()[0].blocks?.[0]).toMatchObject({
+      blockType: 'stat-card',
+      title: { 'en-US': 'Nested metric', 'zh-CN': '嵌套指标' },
+      props: { valueField: 'name' },
+    });
+  });
 });
