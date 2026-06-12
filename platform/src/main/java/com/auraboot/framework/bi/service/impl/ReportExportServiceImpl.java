@@ -5,9 +5,15 @@ import com.auraboot.framework.bi.dto.ReportExportRequest;
 import com.auraboot.framework.bi.service.ReportExportService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.dto.DynamicQueryRequest;
+import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
+import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.NamedQueryService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +35,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayOutputStream;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -52,9 +61,38 @@ public class ReportExportServiceImpl implements ReportExportService {
     private static final String PDF_CONTENT_TYPE = "application/pdf";
     private static final float PDF_MARGIN = 48f;
     private static final float PDF_LINE_HEIGHT = 15f;
+    private static final String DATA_SOURCE_STATIC = "static";
+    private static final String DATA_SOURCE_MODEL = "model";
+    private static final String DATA_SOURCE_TABLE = "table";
+    private static final String DATA_SOURCE_NAMED_QUERY = "namedQuery";
+    private static final String DATA_SOURCE_API = "api";
+    private static final int DEFAULT_EXPORT_ROW_LIMIT = 200;
+    private static final int MAX_EXPORT_ROW_LIMIT = 1000;
+    private static final Set<String> CANONICAL_API_DATA_SOURCE_ENDPOINTS = Set.of(
+            "/api/datasource/list",
+            "/api/datasources/list"
+    );
+    private static final Set<String> DATA_SOURCE_CONTROL_PARAMS = Set.of(
+            "datasourceId",
+            "dataSourceId",
+            "format",
+            "maxItems",
+            "limit",
+            "page",
+            "pageNum",
+            "pageSize",
+            "size",
+            "valueField",
+            "labelField",
+            "searchField",
+            "keyword",
+            "reportingCurrency"
+    );
 
     private final PageSchemaMapper pageSchemaMapper;
     private final ObjectMapper objectMapper;
+    private final DynamicDataService dynamicDataService;
+    private final NamedQueryService namedQueryService;
 
     @Override
     public ReportExportFile exportExcel(ReportExportRequest request) {
@@ -455,15 +493,189 @@ public class ReportExportServiceImpl implements ReportExportService {
                 continue;
             }
             Map<String, Object> dataSource = (Map<String, Object>) rawDataSource;
-            String type = stringValue(dataSource.get("type"), "");
-            if ("static".equals(type)) {
-                Object rows = firstPresent(dataSource, "data", "rows", "records");
-                result.put(key, normalizeRows(rows));
-            } else {
-                result.put(key, List.of());
+            result.put(key, resolveDataSourceRows(dataSource));
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> resolveDataSourceRows(Map<String, Object> dataSource) {
+        String type = stringValue(dataSource.get("type"), "");
+        Object inlineRows = firstPresent(dataSource, "data", "rows", "records");
+        if (!StringUtils.hasText(type) && inlineRows != null) {
+            return normalizeRows(inlineRows);
+        }
+
+        return switch (type) {
+            case DATA_SOURCE_STATIC -> normalizeRows(inlineRows);
+            case DATA_SOURCE_MODEL, DATA_SOURCE_TABLE -> resolveModelRows(dataSource);
+            case DATA_SOURCE_NAMED_QUERY -> {
+                String queryCode = stringValue(firstPresent(dataSource, "queryCode", "code", "namedQueryCode"), "");
+                yield resolveNamedQueryRows(queryCode, dataSource, dataSourceParams(dataSource));
+            }
+            case DATA_SOURCE_API -> resolveApiRows(dataSource);
+            default -> throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Unsupported report dataSource type: " + type);
+        };
+    }
+
+    private List<Map<String, Object>> resolveModelRows(Map<String, Object> dataSource) {
+        String modelCode = stringValue(firstPresent(dataSource, "modelCode", "model", "entityCode"), "");
+        if (!StringUtils.hasText(modelCode)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report model dataSource requires modelCode");
+        }
+
+        Map<String, Object> params = dataSourceParams(dataSource);
+        DynamicQueryRequest request = DynamicQueryRequest.builder()
+                .pageNum(1)
+                .pageSize(resolveRowLimit(dataSource, params))
+                .keyword(stringValue(firstPresent(dataSource, "keyword"), null))
+                .conditions(resolveModelConditions(dataSource, params))
+                .extraParams(removeControlParams(params))
+                .build();
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, request);
+        return result == null ? List.of() : normalizeRows(result.getRecords());
+    }
+
+    private List<Map<String, Object>> resolveNamedQueryRows(String queryCode,
+                                                           Map<String, Object> dataSource,
+                                                           Map<String, Object> params) {
+        if (!StringUtils.hasText(queryCode)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report namedQuery dataSource requires queryCode");
+        }
+
+        NamedQueryTestRequest request = new NamedQueryTestRequest();
+        request.setPage(1);
+        request.setSize(resolveRowLimit(dataSource, params));
+        request.setExecuteQuery(true);
+        request.setParameters(removeControlParams(params));
+        PaginationResult<Map<String, Object>> result = namedQueryService.executeQuery(queryCode, request);
+        return result == null ? List.of() : normalizeRows(result.getRecords());
+    }
+
+    private List<Map<String, Object>> resolveApiRows(Map<String, Object> dataSource) {
+        String endpoint = stringValue(firstPresent(dataSource, "endpoint", "url"), "");
+        if (!StringUtils.hasText(endpoint)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report api dataSource requires endpoint");
+        }
+
+        String endpointPath = endpointPath(endpoint);
+        if (!CANONICAL_API_DATA_SOURCE_ENDPOINTS.contains(endpointPath)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report api dataSource export supports only /api/datasource/list");
+        }
+
+        Map<String, Object> params = new LinkedHashMap<>(endpointQueryParams(endpoint));
+        params.putAll(dataSourceParams(dataSource));
+        String datasourceId = stringValue(firstPresent(params, "datasourceId", "dataSourceId"), "");
+        if (!datasourceId.startsWith("nq:") || datasourceId.length() <= 3) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report api dataSource export requires datasourceId=nq:{queryCode}");
+        }
+        return resolveNamedQueryRows(datasourceId.substring(3), dataSource, params);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> dataSourceParams(Map<String, Object> dataSource) {
+        Object paramsObject = firstPresent(dataSource, "params", "parameters", "query");
+        if (!(paramsObject instanceof Map<?, ?> rawParams)) {
+            return Map.of();
+        }
+        return new LinkedHashMap<>(toStringObjectMap((Map<Object, Object>) rawParams));
+    }
+
+    private Map<String, Object> removeControlParams(Map<String, Object> params) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : params.entrySet()) {
+            if (!DATA_SOURCE_CONTROL_PARAMS.contains(entry.getKey())) {
+                result.put(entry.getKey(), entry.getValue());
             }
         }
         return result;
+    }
+
+    private List<QueryCondition> resolveModelConditions(Map<String, Object> dataSource,
+                                                        Map<String, Object> params) {
+        Object filters = firstPresent(dataSource, "filters", "conditions");
+        if (filters == null && params != null) {
+            filters = firstPresent(params, "filters", "conditions");
+        }
+        if (filters == null) {
+            return null;
+        }
+
+        try {
+            List<QueryCondition> conditions;
+            if (filters instanceof String filterText) {
+                if (!StringUtils.hasText(filterText)) {
+                    return null;
+                }
+                conditions = objectMapper.readValue(filterText, new TypeReference<List<QueryCondition>>() {});
+            } else if (filters instanceof List<?>) {
+                conditions = objectMapper.convertValue(filters, new TypeReference<List<QueryCondition>>() {});
+            } else if (filters instanceof Map<?, ?>) {
+                QueryCondition condition = objectMapper.convertValue(filters, QueryCondition.class);
+                conditions = List.of(condition);
+            } else {
+                throw new IllegalArgumentException("unsupported filters payload");
+            }
+            return conditions.isEmpty() ? null : conditions;
+        } catch (Exception e) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report model dataSource filters must be a QueryCondition array");
+        }
+    }
+
+    private int resolveRowLimit(Map<String, Object> dataSource, Map<String, Object> params) {
+        Object rawLimit = firstPresent(dataSource, "maxItems", "limit", "pageSize", "size");
+        if (rawLimit == null && params != null) {
+            rawLimit = firstPresent(params, "maxItems", "limit", "pageSize", "size");
+        }
+        if (rawLimit == null) {
+            return DEFAULT_EXPORT_ROW_LIMIT;
+        }
+        try {
+            int parsed = Integer.parseInt(rawLimit.toString());
+            return Math.max(1, Math.min(parsed, MAX_EXPORT_ROW_LIMIT));
+        } catch (NumberFormatException e) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report dataSource row limit must be a number");
+        }
+    }
+
+    private String endpointPath(String endpoint) {
+        URI uri = URI.create(endpoint);
+        if (uri.isAbsolute()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report api dataSource export requires a relative endpoint");
+        }
+        return uri.getPath();
+    }
+
+    private Map<String, Object> endpointQueryParams(String endpoint) {
+        URI uri = URI.create(endpoint);
+        String rawQuery = uri.getRawQuery();
+        if (!StringUtils.hasText(rawQuery)) {
+            return Map.of();
+        }
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        for (String pair : rawQuery.split("&")) {
+            if (!StringUtils.hasText(pair)) {
+                continue;
+            }
+            String[] keyValue = pair.split("=", 2);
+            String key = URLDecoder.decode(keyValue[0], StandardCharsets.UTF_8);
+            if (StringUtils.hasText(key)) {
+                String value = keyValue.length > 1
+                        ? URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8)
+                        : "";
+                params.put(key, value);
+            }
+        }
+        return params;
     }
 
     private void writeTableSheet(Workbook workbook,

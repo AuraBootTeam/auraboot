@@ -7,7 +7,7 @@
  *   - Report-level operations (save, export, undo/redo)
  *
  * IDs: RPT-DT-01..13, RPT-GT-01..07, RPT-SC-01..06, RPT-RT-01..06,
- *      RPT-CT-01..09, RPT-CH-01..08, RPT-BD-01..08, RPT-OP-01..07,
+ *      RPT-CT-01..09, RPT-CH-01..08, RPT-BD-01..08, RPT-OP-01..11,
  *      RPT-BC-01..07, RPT-WM-01..06
  *
  * @since 6.0.0
@@ -18,7 +18,7 @@ import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { inflateSync } from 'node:zlib';
-import { uniqueId } from '../helpers';
+import { executeCommandViaApi, uniqueId } from '../helpers';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -257,6 +257,223 @@ async function createReportNonTableExportPage(page: Page) {
   expect(pid, 'created non-table report page pid').toBeTruthy();
 
   return { pid, title, exportRows };
+}
+
+async function ensureNamedQuery(
+  page: Page,
+  request: {
+    code: string;
+    title: string;
+    description: string;
+    fromSql: string;
+  },
+) {
+  const createResp = await page.request.post('/api/meta/named-queries', { data: request });
+  if (createResp.ok()) {
+    const createBody = await createResp.json();
+    expect(createBody.code).toBe('0');
+    return;
+  }
+
+  const createText = await createResp.text();
+  const lookupResp = await page.request.get(
+    `/api/meta/named-queries/by-code/${encodeURIComponent(request.code)}`,
+  );
+  if (lookupResp.ok()) {
+    const lookupBody = await lookupResp.json();
+    if (lookupBody.code === '0' && lookupBody.data?.code === request.code) return;
+  }
+
+  throw new Error(`Failed to create or reuse named query ${request.code}: ${createText}`);
+}
+
+async function ensureNamedQueryField(
+  page: Page,
+  queryCode: string,
+  field: {
+    fieldCode: string;
+    columnExpr: string;
+    dataType: string;
+    displayName: string;
+    sortable: boolean;
+    searchable: boolean;
+    sortOrder: number;
+  },
+) {
+  const encodedQueryCode = encodeURIComponent(queryCode);
+  const encodedFieldCode = encodeURIComponent(field.fieldCode);
+  const addResp = await page.request.post(`/api/meta/named-queries/${encodedQueryCode}/fields`, {
+    data: field,
+  });
+  if (addResp.ok()) {
+    const addBody = await addResp.json();
+    expect(addBody.code).toBe('0');
+    return;
+  }
+
+  const addText = await addResp.text();
+  throw new Error(`Failed to create named query field ${queryCode}.${encodedFieldCode}: ${addText}`);
+}
+
+async function createReportNonStaticDataSourceExportPage(page: Page) {
+  const uid = uniqueId('ReportDataSourceExport');
+  const title = uid;
+  const pageKey = title.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+  const queryCode = `rpt_export_${uid.toLowerCase().replace(/[^a-z0-9_]+/g, '_')}`;
+  const modelTitle = `${uid} Model`;
+  const namedQueryTitle = `${uid} NamedQuery`;
+  const apiTitle = `${uid} API`;
+
+  for (const [orderTitle, customer] of [
+    [modelTitle, 'Report Model Customer'],
+    [namedQueryTitle, 'Report NamedQuery Customer'],
+    [apiTitle, 'Report API Customer'],
+  ]) {
+    const created = await executeCommandViaApi(
+      page,
+      'e2et:create_order',
+      {
+        e2et_order_title: orderTitle,
+        e2et_order_type: 'normal',
+        e2et_order_customer: customer,
+        e2et_order_urgent: false,
+      },
+      undefined,
+      'create',
+    );
+    expect(created.code).toBe('0');
+    expect(created.recordId).toBeTruthy();
+  }
+
+  await ensureNamedQuery(page, {
+    code: queryCode,
+    title: `Report export ${uid}`,
+    description: 'Auto-generated for Report Designer non-static dataSource export E2E',
+    fromSql:
+      'SELECT o.e2et_order_title, o.e2et_order_customer, o.e2et_order_type ' +
+      'FROM mt_e2et_order o ' +
+      'WHERE o.tenant_id = #{params.tenantId} AND o.e2et_order_title = #{params.reportTitle}',
+  });
+
+  for (const field of [
+    {
+      fieldCode: 'e2et_order_title',
+      columnExpr: 'e2et_order_title',
+      dataType: 'string',
+      displayName: 'Title',
+      sortable: true,
+      searchable: true,
+      sortOrder: 1,
+    },
+    {
+      fieldCode: 'e2et_order_customer',
+      columnExpr: 'e2et_order_customer',
+      dataType: 'string',
+      displayName: 'Customer',
+      sortable: true,
+      searchable: true,
+      sortOrder: 2,
+    },
+    {
+      fieldCode: 'e2et_order_type',
+      columnExpr: 'e2et_order_type',
+      dataType: 'string',
+      displayName: 'Type',
+      sortable: true,
+      searchable: true,
+      sortOrder: 3,
+    },
+  ]) {
+    await ensureNamedQueryField(page, queryCode, field);
+  }
+
+  const tableColumns = [
+    { field: 'e2et_order_title', label: 'Title' },
+    { field: 'e2et_order_customer', label: 'Customer' },
+    { field: 'e2et_order_type', label: 'Type' },
+  ];
+  const reportDsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title,
+    page: {
+      size: 'A4',
+      orientation: 'portrait',
+      margin: { top: 20, right: 20, bottom: 20, left: 20 },
+    },
+    dataSources: {
+      modelOrders: {
+        type: 'model',
+        modelCode: 'e2et_order',
+        maxItems: 5,
+        filters: [{ fieldName: 'e2et_order_title', operator: 'EQ', value: modelTitle }],
+      },
+      namedQueryOrders: {
+        type: 'namedQuery',
+        queryCode,
+        maxItems: 5,
+        params: { reportTitle: namedQueryTitle },
+      },
+      apiOrders: {
+        type: 'api',
+        endpoint: '/api/datasource/list',
+        params: {
+          datasourceId: `nq:${queryCode}`,
+          format: 'records',
+          maxItems: 5,
+          reportTitle: apiTitle,
+        },
+      },
+    },
+    body: [
+      {
+        id: 'model_orders',
+        blockType: 'table',
+        title: 'Model Orders',
+        dataSource: 'modelOrders',
+        showHeader: true,
+        columns: tableColumns,
+      },
+      {
+        id: 'named_query_orders',
+        blockType: 'table',
+        title: 'NamedQuery Orders',
+        dataSource: 'namedQueryOrders',
+        showHeader: true,
+        columns: tableColumns,
+      },
+      {
+        id: 'api_orders',
+        blockType: 'table',
+        title: 'API Orders',
+        dataSource: 'apiOrders',
+        showHeader: true,
+        columns: tableColumns,
+      },
+    ],
+  };
+
+  const createResp = await page.request.post('/api/pages', {
+    data: {
+      pageKey,
+      name: title,
+      title,
+      kind: 'list',
+      profile: 'report',
+      blocks: [],
+      schemaVersion: 4,
+      semver: '0.1.0',
+      metaInfo: { e2eArtifact: 'report-non-static-data-source-export' },
+      extension: { reportDsl },
+    },
+  });
+  expect(createResp.ok(), `Create non-static report page failed: ${createResp.status()}`).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create non-static report page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created non-static report page pid').toBeTruthy();
+
+  return { pid, title, modelTitle, namedQueryTitle, apiTitle };
 }
 
 function extractPdfContentText(bytes: Buffer): string {
@@ -1130,6 +1347,76 @@ test.describe('Report Operations', () => {
       expect(pdfText).toContain('/Type /Page');
       expect(pdfContentText).toContain('OPS-2026-EXPORT');
       expect(pdfContentText).toContain('CONFIDENTIAL');
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
+
+  test('RPT-OP-11: Export Excel includes model, namedQuery, and api dataSource rows', async ({
+    page,
+  }, testInfo) => {
+    const { pid, title, modelTitle, namedQueryTitle, apiTitle } =
+      await createReportNonStaticDataSourceExportPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const excelBtn = page.getByRole('button', { name: /export excel/i });
+      await expect(excelBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/excel') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
+      await excelBtn.click();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `Excel export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(download.suggestedFilename()).toBe(`${title}.xlsx`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const bytes = await readFile(savedPath);
+      expect(bytes.subarray(0, 2).toString()).toBe('PK');
+
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.read(bytes, { type: 'buffer' });
+      expect(workbook.SheetNames).toEqual(['Model Orders', 'NamedQuery Orders', 'API Orders']);
+
+      const modelRows = XLSX.utils.sheet_to_json(workbook.Sheets['Model Orders'], {
+        header: 1,
+        raw: true,
+      }) as unknown[][];
+      expect(modelRows.slice(0, 3)).toEqual([
+        ['Model Orders'],
+        ['Title', 'Customer', 'Type'],
+        [modelTitle, 'Report Model Customer', 'normal'],
+      ]);
+
+      const namedQueryRows = XLSX.utils.sheet_to_json(workbook.Sheets['NamedQuery Orders'], {
+        header: 1,
+        raw: true,
+      }) as unknown[][];
+      expect(namedQueryRows.slice(0, 3)).toEqual([
+        ['NamedQuery Orders'],
+        ['Title', 'Customer', 'Type'],
+        [namedQueryTitle, 'Report NamedQuery Customer', 'normal'],
+      ]);
+
+      const apiRows = XLSX.utils.sheet_to_json(workbook.Sheets['API Orders'], {
+        header: 1,
+        raw: true,
+      }) as unknown[][];
+      expect(apiRows.slice(0, 3)).toEqual([
+        ['API Orders'],
+        ['Title', 'Customer', 'Type'],
+        [apiTitle, 'Report API Customer', 'normal'],
+      ]);
     } finally {
       await page.request.delete(`/api/pages/${pid}`).catch(() => {});
     }

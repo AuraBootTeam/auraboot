@@ -6,7 +6,13 @@ import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
+import com.auraboot.framework.meta.dto.DynamicQueryRequest;
+import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
+import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.NamedQueryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -25,6 +31,10 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.mockito.ArgumentCaptor;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,11 +43,18 @@ class ReportExportServiceTest {
     @Mock
     private PageSchemaMapper pageSchemaMapper;
 
+    @Mock
+    private DynamicDataService dynamicDataService;
+
+    @Mock
+    private NamedQueryService namedQueryService;
+
     private ReportExportServiceImpl reportExportService;
 
     @BeforeEach
     void setUp() {
-        reportExportService = new ReportExportServiceImpl(pageSchemaMapper, new ObjectMapper());
+        reportExportService = new ReportExportServiceImpl(pageSchemaMapper, new ObjectMapper(),
+                dynamicDataService, namedQueryService);
     }
 
     @Test
@@ -163,6 +180,65 @@ class ReportExportServiceTest {
             assertThat(textSheet.getRow(4).getCell(0).getStringCellValue()).isEqualTo("Page Footer");
             assertThat(textSheet.getRow(4).getCell(1).getStringCellValue()).isEqualTo("Operations Footer");
         }
+    }
+
+    @Test
+    void exportExcel_withModelNamedQueryAndApiDataSources_rendersResolvedRows() throws Exception {
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", nonStaticDataSourceReportDsl());
+        page.setExtension(extension);
+
+        when(pageSchemaMapper.selectByPid("rpt-non-static")).thenReturn(page);
+        when(dynamicDataService.list(eq("rpt_case_model"), any(DynamicQueryRequest.class)))
+                .thenReturn(PaginationResult.of(
+                        List.of(Map.of("source", "Model", "cases", 31)),
+                        1L,
+                        1,
+                        20));
+        when(namedQueryService.executeQuery(eq("rpt_named_cases"), any(NamedQueryTestRequest.class)))
+                .thenReturn(PaginationResult.of(
+                        List.of(Map.of("source", "NamedQuery", "cases", 27)),
+                        1L,
+                        1,
+                        20));
+        when(namedQueryService.executeQuery(eq("rpt_api_cases"), any(NamedQueryTestRequest.class)))
+                .thenReturn(PaginationResult.of(
+                        List.of(Map.of("source", "API", "cases", 19)),
+                        1L,
+                        1,
+                        20));
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-non-static");
+
+        ReportExportFile file = reportExportService.exportExcel(request);
+
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file.getBytes()))) {
+            assertThat(workbook.getSheet("Model Cases").getRow(2).getCell(0).getStringCellValue())
+                    .isEqualTo("Model");
+            assertThat(workbook.getSheet("Model Cases").getRow(2).getCell(1).getNumericCellValue())
+                    .isEqualTo(31.0);
+            assertThat(workbook.getSheet("NamedQuery Cases").getRow(2).getCell(0).getStringCellValue())
+                    .isEqualTo("NamedQuery");
+            assertThat(workbook.getSheet("NamedQuery Cases").getRow(2).getCell(1).getNumericCellValue())
+                    .isEqualTo(27.0);
+            assertThat(workbook.getSheet("API Cases").getRow(2).getCell(0).getStringCellValue())
+                    .isEqualTo("API");
+            assertThat(workbook.getSheet("API Cases").getRow(2).getCell(1).getNumericCellValue())
+                    .isEqualTo(19.0);
+        }
+
+        ArgumentCaptor<DynamicQueryRequest> modelRequestCaptor =
+                ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("rpt_case_model"), modelRequestCaptor.capture());
+        DynamicQueryRequest modelRequest = modelRequestCaptor.getValue();
+        assertThat(modelRequest.getConditions()).hasSize(1);
+        assertThat(modelRequest.getConditions().get(0).getFieldName()).isEqualTo("e2et_order_title");
+        assertThat(modelRequest.getConditions().get(0).getOperator()).isEqualTo(QueryCondition.Operator.EQ);
+        assertThat(modelRequest.getConditions().get(0).getValue()).isEqualTo("Model");
+        verify(namedQueryService).executeQuery(eq("rpt_named_cases"), any(NamedQueryTestRequest.class));
+        verify(namedQueryService).executeQuery(eq("rpt_api_cases"), any(NamedQueryTestRequest.class));
     }
 
     @Test
@@ -347,5 +423,62 @@ class ReportExportServiceTest {
         dsl.put("dataSources", Map.of("ops", dataSource));
         dsl.put("body", List.of(header, groupedTable, crossTab, stat, richText, chart, barcode, watermark, footer));
         return dsl;
+    }
+
+    private Map<String, Object> nonStaticDataSourceReportDsl() {
+        Map<String, Object> modelDataSource = new LinkedHashMap<>();
+        modelDataSource.put("type", "model");
+        modelDataSource.put("modelCode", "rpt_case_model");
+        modelDataSource.put("maxItems", 20);
+        modelDataSource.put("filters", List.of(Map.of(
+                "fieldName", "e2et_order_title",
+                "operator", "EQ",
+                "value", "Model"
+        )));
+
+        Map<String, Object> namedQueryDataSource = new LinkedHashMap<>();
+        namedQueryDataSource.put("type", "namedQuery");
+        namedQueryDataSource.put("queryCode", "rpt_named_cases");
+        namedQueryDataSource.put("maxItems", 20);
+
+        Map<String, Object> apiDataSource = new LinkedHashMap<>();
+        apiDataSource.put("type", "api");
+        apiDataSource.put("endpoint", "/api/datasource/list");
+        apiDataSource.put("params", Map.of(
+                "datasourceId", "nq:rpt_api_cases",
+                "format", "records",
+                "maxItems", 20,
+                "region", "West"
+        ));
+
+        Map<String, Object> dsl = new LinkedHashMap<>();
+        dsl.put("$schema", "auraboot://schemas/report/v1");
+        dsl.put("version", "1.0.0");
+        dsl.put("title", "Operations Data Source Export");
+        dsl.put("dataSources", Map.of(
+                "modelCases", modelDataSource,
+                "namedQueryCases", namedQueryDataSource,
+                "apiCases", apiDataSource
+        ));
+        dsl.put("body", List.of(
+                tableBlock("model-table", "Model Cases", "modelCases"),
+                tableBlock("named-query-table", "NamedQuery Cases", "namedQueryCases"),
+                tableBlock("api-table", "API Cases", "apiCases")
+        ));
+        return dsl;
+    }
+
+    private Map<String, Object> tableBlock(String id, String title, String dataSource) {
+        Map<String, Object> table = new LinkedHashMap<>();
+        table.put("id", id);
+        table.put("blockType", "table");
+        table.put("title", title);
+        table.put("dataSource", dataSource);
+        table.put("showHeader", true);
+        table.put("columns", List.of(
+                Map.of("field", "source", "label", "Source"),
+                Map.of("field", "cases", "label", "Cases")
+        ));
+        return table;
     }
 }
