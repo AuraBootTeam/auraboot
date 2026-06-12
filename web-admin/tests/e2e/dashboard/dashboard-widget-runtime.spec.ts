@@ -13,7 +13,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import type { APIResponse, Page, Locator } from '@playwright/test';
+import type { APIResponse, Page, Locator, Response as PlaywrightResponse } from '@playwright/test';
 
 type DashboardWidgetFixture = {
   id: string;
@@ -39,6 +39,14 @@ type CreatedEngagement = {
   targetContext?: {
     path?: string;
   };
+};
+
+type CreatedAnnouncement = {
+  id: string;
+  title: string;
+  content: string | null;
+  priority: string;
+  pinned: boolean;
 };
 
 const SVG_DATA_URL =
@@ -270,6 +278,27 @@ function recentWidgets(): DashboardWidgetFixture[] {
   ];
 }
 
+function announcementWidgets(): DashboardWidgetFixture[] {
+  return [
+    {
+      id: 'runtime-announcement',
+      type: 'smart-announcement',
+      title: 'Runtime Announcement',
+      x: 0,
+      y: 0,
+      w: 6,
+      h: 3,
+      config: {
+        title: 'Runtime Announcement',
+        dataSource: { type: 'static' },
+        visualization: {
+          maxItems: 5,
+        },
+      },
+    },
+  ];
+}
+
 function advancedRuntimeWidgets(): DashboardWidgetFixture[] {
   return [
     {
@@ -417,7 +446,10 @@ function advancedRuntimeWidgets(): DashboardWidgetFixture[] {
   ];
 }
 
-async function parseJsonResponse<T>(response: APIResponse, context: string): Promise<T> {
+async function parseJsonResponse<T>(
+  response: APIResponse | PlaywrightResponse,
+  context: string,
+): Promise<T> {
   const text = await response.text();
   expect(response.ok(), `${context} failed: status=${response.status()} body=${text}`).toBe(true);
   return JSON.parse(text) as T;
@@ -500,7 +532,7 @@ async function expectRecentListContains(
   page: Page,
   targetId: string,
   context: string,
-  response?: APIResponse,
+  response?: APIResponse | PlaywrightResponse,
 ): Promise<CreatedEngagement> {
   const listResponse = response ?? await page.request.get('/api/user-engagement', {
     params: {
@@ -514,6 +546,51 @@ async function expectRecentListContains(
   );
   const match = listBody.data?.find((item) => item.targetId === targetId);
   expect(match, `${context} should include ${targetId}`).toBeTruthy();
+  return match!;
+}
+
+async function createAnnouncementFixture(page: Page): Promise<CreatedAnnouncement> {
+  const title = `Runtime Announcement ${Date.now()}`;
+  const response = await page.request.post('/api/announcements', {
+    data: {
+      title,
+      content: `Runtime announcement body ${title}`,
+      priority: 'urgent',
+      status: 'active',
+      pinned: true,
+    },
+  });
+  const body = await parseJsonResponse<{ data?: CreatedAnnouncement }>(
+    response,
+    'create announcement',
+  );
+  expect(body.data?.id, 'created announcement id').toMatch(/^\d+$/);
+  expect(typeof body.data?.id, 'created announcement id should be a JS-safe string').toBe('string');
+  expect(body.data?.title, 'created announcement title').toBe(title);
+  await expectAnnouncementListContains(page, title, 'announcement list immediately after create');
+  return body.data!;
+}
+
+async function cleanupAnnouncement(page: Page, id?: string): Promise<void> {
+  if (!id) return;
+  await page.request.delete(`/api/announcements/${id}`).catch(() => undefined);
+}
+
+async function expectAnnouncementListContains(
+  page: Page,
+  title: string,
+  context: string,
+  response?: APIResponse | PlaywrightResponse,
+): Promise<CreatedAnnouncement> {
+  const listResponse = response ?? await page.request.get('/api/announcements', {
+    params: { limit: '10' },
+  });
+  const listBody = await parseJsonResponse<{ data?: CreatedAnnouncement[] }>(
+    listResponse,
+    context,
+  );
+  const match = listBody.data?.find((item) => item.title === title);
+  expect(match, `${context} should include ${title}`).toBeTruthy();
   return match!;
 }
 
@@ -790,6 +867,52 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       await expect(recentBlock).not.toContainText(/暂无访问记录|No recent visits/);
     } finally {
       await cleanupEngagement(page, recent?.id);
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
+  test('DWR-006: announcement widget renders active announcement API data', async ({ page }) => {
+    let dashboard: CreatedDashboard | undefined;
+    let announcement: CreatedAnnouncement | undefined;
+
+    try {
+      announcement = await createAnnouncementFixture(page);
+      dashboard = await createPublishedDashboard(
+        page,
+        announcementWidgets(),
+        'Runtime Announcement Widget Matrix',
+      );
+
+      const announcementListResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/announcements') &&
+          response.request().method() === 'GET' &&
+          response.status() === 200,
+        { timeout: 10_000 },
+      );
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expectAnnouncementListContains(
+        page,
+        announcement.title,
+        'announcement list consumed by viewer',
+        await announcementListResponse,
+      );
+
+      const announcementBlock = await expectRuntimeBlock(
+        page,
+        'runtime-announcement',
+        'smart-announcement',
+      );
+      await expect(announcementBlock.getByTestId('announcement-widget')).toBeVisible();
+      await expect(announcementBlock).toContainText(announcement.title);
+      await expect(announcementBlock).toContainText(announcement.content ?? '');
+      await expect(announcementBlock).toContainText(/Pinned|置顶/);
+      await expect(announcementBlock).toContainText(/Urgent|紧急/);
+    } finally {
+      await cleanupAnnouncement(page, announcement?.id);
       await cleanupDashboard(page, dashboard?.pid);
     }
   });
