@@ -458,4 +458,64 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
       page.getByTestId('tab-child-section-default-collapsed-switch-0'),
     ).toHaveAttribute('aria-checked', 'true');
   });
+
+  test('drags a form buttons child block and edits layout settings', async ({ page }) => {
+    const { pid, tabsBlockId } = await createTabsChildDropAuthoringPage(page);
+    await openDesignerByPid(page, pid);
+
+    await selectCanvasBlock(page, tabsBlockId);
+    await expect(page.getByTestId('tab-child-blocks-editor')).toBeVisible();
+
+    await page.getByTestId('tab-filter-key-input').fill('actions');
+    await page.getByTestId('tab-filter-label-en-input').fill('Actions');
+    await page.getByTestId('tab-filter-label-zh-input').fill('操作');
+
+    const beforeTopLevelIds = await canvasBlockIds(page);
+    await dragPaletteBlockToTabChildDropZone(page, 'form-buttons');
+
+    await expect(page.getByTestId('tab-child-block-0')).toBeVisible();
+    await expect(page.getByTestId('tab-child-block-0')).toContainText('form-buttons');
+    await page.getByTestId('tab-child-title-en-input-0').fill('Nested footer actions');
+    await page.getByTestId('tab-child-title-zh-input-0').fill('嵌套底部操作');
+    await page.getByTestId('tab-child-visible-input-0').fill('{{ record.status != "CLOSED" }}');
+    await page.getByTestId('tab-child-span-select-0').selectOption('8');
+    await page.getByTestId('tab-child-button-align-select-0').selectOption('right');
+    await expect.poll(() => canvasBlockIds(page)).toEqual(beforeTopLevelIds);
+
+    await saveDesignerAndWait(page, pid);
+    const savedPage = await fetchPageByPid(page, pid);
+    const savedBlock = savedBlockById(savedPage, tabsBlockId);
+    expect(savedBlock).toMatchObject({
+      blockType: 'tabs',
+      tabs: [
+        {
+          key: 'actions',
+          label: { 'en-US': 'Actions', 'zh-CN': '操作' },
+          filter: null,
+          blocks: [
+            {
+              blockType: 'form-buttons',
+              title: { 'en-US': 'Nested footer actions', 'zh-CN': '嵌套底部操作' },
+              visible: '{{ record.status != "CLOSED" }}',
+              span: 8,
+              buttons: [],
+              props: { align: 'right' },
+            },
+          ],
+        },
+      ],
+    });
+
+    await openDesignerByPid(page, pid);
+    await selectCanvasBlock(page, tabsBlockId);
+    await expect(page.getByTestId('tab-child-title-en-input-0')).toHaveValue(
+      'Nested footer actions',
+    );
+    await expect(page.getByTestId('tab-child-title-zh-input-0')).toHaveValue('嵌套底部操作');
+    await expect(page.getByTestId('tab-child-visible-input-0')).toHaveValue(
+      '{{ record.status != "CLOSED" }}',
+    );
+    await expect(page.getByTestId('tab-child-span-select-0')).toHaveValue('8');
+    await expect(page.getByTestId('tab-child-button-align-select-0')).toHaveValue('right');
+  });
 });

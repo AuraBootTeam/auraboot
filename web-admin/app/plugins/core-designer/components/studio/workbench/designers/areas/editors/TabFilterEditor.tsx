@@ -216,6 +216,17 @@ export function TabFilterEditor({
     [updateChildBlock],
   );
 
+  const updateButtonChildBlockAlign = useCallback(
+    (tabIndex: number, blockIndex: number, align: string) => {
+      const childBlock = getTabBlocks(tabs[tabIndex])[blockIndex];
+      if (!childBlock) return;
+      updateChildBlock(tabIndex, blockIndex, {
+        props: { ...(childBlock.props || {}), align },
+      });
+    },
+    [tabs, updateChildBlock],
+  );
+
   const updateStatChildBlockDataSource = useCallback(
     (tabIndex: number, blockIndex: number, dataSource: string) => {
       updateChildBlock(tabIndex, blockIndex, { dataSource: dataSource || undefined });
@@ -657,6 +668,30 @@ export function TabFilterEditor({
                         </div>
                       </div>
                     )}
+                    {(block.blockType === 'toolbar' || block.blockType === 'form-buttons') && (
+                      <div className="mb-1.5">
+                        <label className="block text-[10px] text-gray-500">
+                          Button alignment
+                          <select
+                            className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                            value={String(block.props?.align || 'left')}
+                            onChange={(event) =>
+                              updateButtonChildBlockAlign(
+                                selectedIndex,
+                                index,
+                                event.target.value,
+                              )
+                            }
+                            disabled={readonly}
+                            data-testid={`tab-child-button-align-select-${index}`}
+                          >
+                            <option value="left">Left</option>
+                            <option value="center">Center</option>
+                            <option value="right">Right</option>
+                          </select>
+                        </label>
+                      </div>
+                    )}
                     {block.blockType === 'stat-card' && (
                       <div className="mb-1.5 space-y-1.5">
                         <div className="grid grid-cols-2 gap-1.5">
@@ -1042,7 +1077,9 @@ export function TabFilterEditor({
                       block.blockType === 'chart-card' ||
                       block.blockType === 'custom' ||
                       block.blockType === 'form-section' ||
-                      block.blockType === 'detail-section' ? null : (
+                      block.blockType === 'detail-section' ||
+                      block.blockType === 'toolbar' ||
+                      block.blockType === 'form-buttons' ? null : (
                       <div className="rounded border border-dashed px-2 py-2 text-[10px] text-gray-400">
                         This block type is preserved but not editable here.
                       </div>

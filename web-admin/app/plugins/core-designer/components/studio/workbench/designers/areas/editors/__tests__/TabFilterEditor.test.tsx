@@ -501,4 +501,53 @@ describe('TabFilterEditor', () => {
       defaultCollapsed: true,
     });
   });
+
+  it('edits form buttons child block layout on the selected tab', () => {
+    const onCommit = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'actions',
+            label: { 'en-US': 'Actions', 'zh-CN': '操作' },
+            filter: null,
+            blocks: [
+              {
+                id: 'actions_buttons',
+                blockType: 'form-buttons',
+                title: { 'en-US': 'Footer actions', 'zh-CN': '底部操作' },
+                visible: '{{ canEdit }}',
+                span: 12,
+                buttons: [],
+                props: { align: 'left' },
+              },
+            ],
+          },
+        ]}
+        onCommit={onCommit}
+      />,
+    );
+
+    expect(screen.getByTestId('tab-child-visible-input-0')).toHaveValue('{{ canEdit }}');
+    expect(screen.getByTestId('tab-child-span-select-0')).toHaveValue('12');
+    expect(screen.getByTestId('tab-child-button-align-select-0')).toHaveValue('left');
+
+    fireEvent.change(screen.getByTestId('tab-child-visible-input-0'), {
+      target: { value: '{{ record.status != "CLOSED" }}' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-span-select-0'), {
+      target: { value: '8' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-button-align-select-0'), {
+      target: { value: 'right' },
+    });
+
+    expect(serializedTabs()[0].blocks?.[0]).toMatchObject({
+      blockType: 'form-buttons',
+      visible: '{{ record.status != "CLOSED" }}',
+      span: 8,
+      buttons: [],
+      props: { align: 'right' },
+    });
+  });
 });
