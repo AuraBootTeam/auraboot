@@ -842,6 +842,42 @@ test.describe('Report Operations', () => {
       await page.request.delete(`/api/pages/${pid}`).catch(() => {});
     }
   });
+
+  test('RPT-OP-08: Export PDF downloads a non-empty PDF artifact', async ({ page }, testInfo) => {
+    const { pid, title } = await createReportExportPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const pdfBtn = page.getByRole('button', { name: /export pdf/i });
+      await expect(pdfBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/pdf') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
+      await pdfBtn.click();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `PDF export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(download.suggestedFilename()).toBe(`${title}.pdf`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const bytes = await readFile(savedPath);
+      const pdfText = bytes.toString('latin1');
+      expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      expect(bytes.length).toBeGreaterThan(1_000);
+      expect(pdfText).toContain('/Type /Page');
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
 });
 
 // ===================================================================

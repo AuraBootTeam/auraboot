@@ -12,6 +12,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
@@ -44,6 +49,9 @@ public class ReportExportServiceImpl implements ReportExportService {
     private static final String REPORT_DSL_EXTENSION_KEY = "reportDsl";
     private static final String XLSX_CONTENT_TYPE =
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private static final String PDF_CONTENT_TYPE = "application/pdf";
+    private static final float PDF_MARGIN = 48f;
+    private static final float PDF_LINE_HEIGHT = 15f;
 
     private final PageSchemaMapper pageSchemaMapper;
     private final ObjectMapper objectMapper;
@@ -80,6 +88,29 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
     }
 
+    @Override
+    public ReportExportFile exportPdf(ReportExportRequest request) {
+        if (request == null || !StringUtils.hasText(request.getReportPid())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "reportPid is required");
+        }
+
+        Map<String, Object> reportDsl = loadReportDsl(request.getReportPid());
+        String title = stringValue(reportDsl.get("title"), "report");
+
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(reportDsl);
+            List<PdfLine> lines = renderPdfLines(reportDsl, dataSets, title);
+            writePdfLines(document, lines, resolvePdfPageSize(reportDsl));
+            document.save(output);
+            return new ReportExportFile(output.toByteArray(), safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
+        } catch (ValidationException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to export report as PDF: reportPid={}", request.getReportPid(), e);
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "PDF export failed: " + e.getMessage());
+        }
+    }
+
     private Map<String, Object> loadReportDsl(String reportPid) {
         PageSchema page = pageSchemaMapper.selectByPid(reportPid);
         if (page == null) {
@@ -94,6 +125,148 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
 
         return objectMapper.convertValue(reportDsl, new TypeReference<Map<String, Object>>() {});
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<PdfLine> renderPdfLines(Map<String, Object> reportDsl,
+                                         Map<String, List<Map<String, Object>>> dataSets,
+                                         String title) {
+        List<PdfLine> lines = new ArrayList<>();
+        lines.add(PdfLine.heading(title));
+
+        Object bodyObject = reportDsl.get("body");
+        if (!(bodyObject instanceof List<?> body) || body.isEmpty()) {
+            lines.add(PdfLine.text("No exportable data blocks found in this report."));
+            return lines;
+        }
+
+        int renderedBlocks = 0;
+        for (Object blockObject : body) {
+            if (!(blockObject instanceof Map<?, ?> rawBlock)) {
+                continue;
+            }
+
+            Map<String, Object> block = (Map<String, Object>) rawBlock;
+            String blockType = stringValue(block.get("blockType"), "");
+            String blockTitle = stringValue(block.get("title"), blockType.isBlank() ? "Block" : blockType);
+            switch (blockType) {
+                case "table", "grouped-table", "cross-tab" -> {
+                    appendTablePdfLines(lines, block, dataSets, blockTitle);
+                    renderedBlocks++;
+                }
+                case "stat-card" -> {
+                    lines.add(PdfLine.subheading(blockTitle));
+                    lines.add(PdfLine.text(stringValue(block.get("label"), blockTitle) + ": "
+                            + aggregateStat(block, rowsForBlock(block, dataSets))));
+                    renderedBlocks++;
+                }
+                case "rich-text" -> {
+                    lines.add(PdfLine.subheading(blockTitle));
+                    String content = stringValue(block.get("content"), "");
+                    for (String paragraph : content.split("\\R")) {
+                        if (StringUtils.hasText(paragraph)) {
+                            lines.add(PdfLine.text(paragraph));
+                        }
+                    }
+                    renderedBlocks++;
+                }
+                default -> {
+                    // Visual-only blocks need richer PDF semantics; keep them out of this DONE scope.
+                }
+            }
+        }
+
+        if (renderedBlocks == 0) {
+            lines.add(PdfLine.text("No exportable data blocks found in this report."));
+        }
+        return lines;
+    }
+
+    private void appendTablePdfLines(List<PdfLine> lines,
+                                     Map<String, Object> block,
+                                     Map<String, List<Map<String, Object>>> dataSets,
+                                     String blockTitle) {
+        lines.add(PdfLine.subheading(blockTitle));
+        List<Map<String, Object>> rows = rowsForBlock(block, dataSets);
+        List<ReportColumn> columns = resolveColumns(block, rows);
+        if (!columns.isEmpty()) {
+            lines.add(PdfLine.text(columns.stream().map(ReportColumn::label).toList()));
+        }
+        if (rows.isEmpty()) {
+            lines.add(PdfLine.text("No data rows"));
+            return;
+        }
+        for (Map<String, Object> row : rows) {
+            List<String> values = columns.stream()
+                    .map(column -> stringValue(row.get(column.field()), ""))
+                    .toList();
+            lines.add(PdfLine.text(values));
+        }
+    }
+
+    private void writePdfLines(PDDocument document, List<PdfLine> lines, PDRectangle pageSize) throws java.io.IOException {
+        PDPage page = new PDPage(pageSize);
+        document.addPage(page);
+        PDPageContentStream content = new PDPageContentStream(document, page);
+        float y = pageSize.getHeight() - PDF_MARGIN;
+        try {
+            for (PdfLine line : lines) {
+                for (String wrappedLine : wrapPdfLine(line.text())) {
+                    if (y < PDF_MARGIN) {
+                        content.close();
+                        page = new PDPage(pageSize);
+                        document.addPage(page);
+                        content = new PDPageContentStream(document, page);
+                        y = pageSize.getHeight() - PDF_MARGIN;
+                    }
+                    content.beginText();
+                    content.setFont(line.bold() ? PDType1Font.HELVETICA_BOLD : PDType1Font.HELVETICA, line.fontSize());
+                    content.newLineAtOffset(PDF_MARGIN, y);
+                    content.showText(sanitizePdfText(wrappedLine));
+                    content.endText();
+                    y -= line.lineHeight();
+                }
+            }
+        } finally {
+            content.close();
+        }
+    }
+
+    private List<String> wrapPdfLine(String line) {
+        String text = sanitizePdfText(line);
+        int maxChars = 100;
+        if (text.length() <= maxChars) {
+            return List.of(text);
+        }
+        List<String> result = new ArrayList<>();
+        for (int start = 0; start < text.length(); start += maxChars) {
+            result.add(text.substring(start, Math.min(text.length(), start + maxChars)));
+        }
+        return result;
+    }
+
+    private String sanitizePdfText(String text) {
+        return stringValue(text, "").replaceAll("[^\\x20-\\x7E]", "?");
+    }
+
+    @SuppressWarnings("unchecked")
+    private PDRectangle resolvePdfPageSize(Map<String, Object> reportDsl) {
+        Object pageObject = reportDsl.get("page");
+        Map<String, Object> page = pageObject instanceof Map<?, ?> rawPage
+                ? (Map<String, Object>) rawPage
+                : Map.of();
+        String size = stringValue(page.get("size"), "A4").toUpperCase(Locale.ROOT);
+        PDRectangle rectangle = switch (size) {
+            case "A3" -> PDRectangle.A3;
+            case "LETTER" -> PDRectangle.LETTER;
+            case "LEGAL" -> PDRectangle.LEGAL;
+            default -> PDRectangle.A4;
+        };
+        String orientation = stringValue(page.get("orientation"), "portrait").toLowerCase(Locale.ROOT);
+        if ("landscape".equals(orientation)) {
+            return new PDRectangle(rectangle.getHeight(), rectangle.getWidth());
+        }
+        return rectangle;
     }
 
     @SuppressWarnings("unchecked")
@@ -387,5 +560,23 @@ public class ReportExportServiceImpl implements ReportExportService {
     }
 
     private record ReportColumn(String field, String label) {
+    }
+
+    private record PdfLine(String text, boolean bold, float fontSize, float lineHeight) {
+        static PdfLine heading(String text) {
+            return new PdfLine(text, true, 16f, PDF_LINE_HEIGHT + 6f);
+        }
+
+        static PdfLine subheading(String text) {
+            return new PdfLine(text, true, 12f, PDF_LINE_HEIGHT + 3f);
+        }
+
+        static PdfLine text(String text) {
+            return new PdfLine(text, false, 10f, PDF_LINE_HEIGHT);
+        }
+
+        static PdfLine text(List<String> cells) {
+            return text(String.join(" | ", cells));
+        }
     }
 }

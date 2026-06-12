@@ -8,6 +8,8 @@ import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +69,34 @@ class ReportExportServiceTest {
             assertThat(sheet.getRow(2).getCell(1).getNumericCellValue()).isEqualTo(12.0);
             assertThat(sheet.getRow(3).getCell(0).getStringCellValue()).isEqualTo("South");
             assertThat(sheet.getRow(3).getCell(1).getNumericCellValue()).isEqualTo(9.0);
+        }
+    }
+
+    @Test
+    void exportPdf_withStaticTableData_rendersPdfArtifact() throws Exception {
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", reportDsl());
+        page.setExtension(extension);
+
+        when(pageSchemaMapper.selectByPid("rpt-pdf")).thenReturn(page);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-pdf");
+
+        ReportExportFile file = reportExportService.exportPdf(request);
+
+        assertThat(file.getFilename()).isEqualTo("Operations Export.pdf");
+        assertThat(file.getContentType()).isEqualTo("application/pdf");
+        assertThat(file.getBytes()).startsWith((byte) '%', (byte) 'P', (byte) 'D', (byte) 'F', (byte) '-');
+
+        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(file.getBytes()))) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("Operations Export");
+            assertThat(text).contains("Orders Export");
+            assertThat(text).contains("Region | Cases");
+            assertThat(text).contains("North | 12");
+            assertThat(text).contains("South | 9");
         }
     }
 

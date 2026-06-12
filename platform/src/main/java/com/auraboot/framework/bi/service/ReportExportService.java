@@ -9,4 +9,6 @@ import com.auraboot.framework.bi.dto.ReportExportRequest;
 public interface ReportExportService {
 
     ReportExportFile exportExcel(ReportExportRequest request);
+
+    ReportExportFile exportPdf(ReportExportRequest request);
 }

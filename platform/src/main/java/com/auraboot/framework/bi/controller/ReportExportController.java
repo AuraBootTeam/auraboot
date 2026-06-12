@@ -45,4 +45,19 @@ public class ReportExportController {
                                 .toString())
                 .body(file.getBytes());
     }
+
+    @PostMapping("/export/pdf")
+    @Operation(summary = "Export report as PDF", description = "Renders a saved Report Designer DSL as a PDF artifact")
+    @RequirePermission(MetaPermission.REPORT_GENERATE)
+    public ResponseEntity<byte[]> exportPdf(@Valid @RequestBody ReportExportRequest request) {
+        ReportExportFile file = reportExportService.exportPdf(request);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(file.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment()
+                                .filename(file.getFilename(), StandardCharsets.UTF_8)
+                                .build()
+                                .toString())
+                .body(file.getBytes());
+    }
 }

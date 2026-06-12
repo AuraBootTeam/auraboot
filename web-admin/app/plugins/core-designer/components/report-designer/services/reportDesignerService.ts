@@ -120,18 +120,13 @@ export const reportDesignerService = {
   },
 
   /**
-   * Export report as PDF via render-html endpoint
+   * Export report as PDF via report export endpoint
    */
-  async exportPdf(
-    html: string,
-    pageSize: string,
-    orientation: string,
-    filename: string,
-  ): Promise<Blob> {
-    const response = await fetch('/api/print/render-html', {
+  async exportPdf(reportPid: string, parameters?: Record<string, unknown>): Promise<Blob> {
+    const response = await fetch('/api/reports/export/pdf', {
       method: 'post',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html, pageSize, orientation, filename }),
+      body: JSON.stringify({ reportPid, parameters }),
     });
 
     if (!response.ok) {

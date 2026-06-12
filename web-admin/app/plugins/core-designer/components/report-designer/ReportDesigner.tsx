@@ -12,7 +12,6 @@ import { BlockPalette } from './components/BlockPalette';
 import { ReportCanvas } from './components/ReportCanvas';
 import { BlockPropertyPanel } from './components/BlockPropertyPanel';
 import { ReportPageContent } from './renderers/ReportPageContent';
-import { reportToHtml } from './services/reportToHtml';
 import { fetchReportData } from './services/fetchReportData';
 import { reportDesignerService } from './services/reportDesignerService';
 import { useVersioning, VersionHistoryPanel } from '~/shared/versioning';
@@ -170,20 +169,18 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
 
   // PDF Export
   const handleExportPdf = useCallback(async () => {
-    if (!report) return;
+    const state = useReportStore.getState();
+    const pid = state.pageId;
+    if (!pid) {
+      alert('Please save the report before exporting to PDF.');
+      return;
+    }
     try {
-      const dataSets = await fetchReportData(report);
-      const html = reportToHtml(report, dataSets);
-      const blob = await reportDesignerService.exportPdf(
-        html,
-        report.page.size,
-        report.page.orientation,
-        `${report.title || 'report'}.pdf`,
-      );
+      const blob = await reportDesignerService.exportPdf(pid);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${report.title || 'report'}.pdf`;
+      a.download = `${report?.title || 'report'}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
