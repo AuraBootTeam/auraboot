@@ -418,10 +418,18 @@ function savedBlockById(savedPage: Record<string, any>, blockId: string): Record
   return block;
 }
 
-function savedNestedTextChild(savedPage: Record<string, any>): Record<string, any> {
+function savedNestedChildBlocks(savedPage: Record<string, any>): Record<string, any>[] {
   const tabsBlock = savedBlockById(savedPage, NESTED_TABS_BLOCK_ID);
-  const child = tabsBlock.tabs?.[0]?.blocks?.find((item: any) => item.id === NESTED_TEXT_CHILD_ID);
-  expect(child, `saved nested child ${NESTED_TEXT_CHILD_ID}`).toBeTruthy();
+  const children = tabsBlock.tabs?.[0]?.blocks;
+  expect(Array.isArray(children), `saved nested children for ${NESTED_TABS_BLOCK_ID}`).toBeTruthy();
+  return children;
+}
+
+function savedNestedTextChild(savedPage: Record<string, any>): Record<string, any> {
+  const child = savedNestedChildBlocks(savedPage).find((item) => item.id === NESTED_TEXT_CHILD_ID);
+  if (!child) {
+    throw new Error(`Missing saved nested child ${NESTED_TEXT_CHILD_ID}`);
+  }
   return child;
 }
 
@@ -617,5 +625,76 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
       blockType: 'text',
       props: { content: NESTED_TEXT_EDITED },
     });
+  });
+
+  test('saves the undone schema and then saves the redone schema for a tabs child add action', async ({
+    page,
+  }) => {
+    const { pid } = await createNestedTabsUndoRedoPage(page);
+    await openDesignerByPid(page, pid);
+    await selectCanvasBlock(page, NESTED_TABS_BLOCK_ID);
+
+    await expect(page.getByTestId('tab-child-block-0')).toBeVisible();
+    await expect(page.getByTestId('tab-child-block-1')).toHaveCount(0);
+    await page.getByTestId('tab-child-add-text-block').click();
+    await expect(page.getByTestId('tab-child-block-1')).toBeVisible();
+    await expect(page.getByTestId('tab-child-text-content-1')).toHaveValue('');
+
+    await clickEnabledToolbarButton(page, 'toolbar-undo');
+    await expect(page.getByTestId('tab-child-block-0')).toBeVisible();
+    await expect(page.getByTestId('tab-child-block-1')).toHaveCount(0);
+    await saveDesignerAndWait(page, pid);
+    const undonePage = await fetchPageByPid(page, pid);
+    const undoneChildren = savedNestedChildBlocks(undonePage);
+    expect(undoneChildren).toHaveLength(1);
+    expect(undoneChildren[0]).toMatchObject({
+      id: NESTED_TEXT_CHILD_ID,
+      blockType: 'text',
+      props: { content: NESTED_TEXT_ORIGINAL },
+    });
+
+    await clickEnabledToolbarButton(page, 'toolbar-redo');
+    await expect(page.getByTestId('tab-child-block-1')).toBeVisible();
+    await saveDesignerAndWait(page, pid);
+    const redonePage = await fetchPageByPid(page, pid);
+    const redoneChildren = savedNestedChildBlocks(redonePage);
+    expect(redoneChildren).toHaveLength(2);
+    expect(redoneChildren[0]).toMatchObject({ id: NESTED_TEXT_CHILD_ID, blockType: 'text' });
+    expect(redoneChildren[1]).toMatchObject({
+      blockType: 'text',
+      title: { 'en-US': 'Text', 'zh-CN': '文本内容' },
+      props: { content: '' },
+    });
+  });
+
+  test('saves the undone schema and then saves the redone schema for a tabs child remove action', async ({
+    page,
+  }) => {
+    const { pid } = await createNestedTabsUndoRedoPage(page);
+    await openDesignerByPid(page, pid);
+    await selectCanvasBlock(page, NESTED_TABS_BLOCK_ID);
+
+    await expect(page.getByTestId('tab-child-block-0')).toBeVisible();
+    await page.getByTestId('tab-child-remove-0').click();
+    await expect(page.getByTestId('tab-child-block-0')).toHaveCount(0);
+
+    await clickEnabledToolbarButton(page, 'toolbar-undo');
+    await expect(page.getByTestId('tab-child-block-0')).toBeVisible();
+    await expect(page.getByTestId('tab-child-text-content-0')).toHaveValue(NESTED_TEXT_ORIGINAL);
+    await saveDesignerAndWait(page, pid);
+    const undonePage = await fetchPageByPid(page, pid);
+    const undoneChildren = savedNestedChildBlocks(undonePage);
+    expect(undoneChildren).toHaveLength(1);
+    expect(undoneChildren[0]).toMatchObject({
+      id: NESTED_TEXT_CHILD_ID,
+      blockType: 'text',
+      props: { content: NESTED_TEXT_ORIGINAL },
+    });
+
+    await clickEnabledToolbarButton(page, 'toolbar-redo');
+    await expect(page.getByTestId('tab-child-block-0')).toHaveCount(0);
+    await saveDesignerAndWait(page, pid);
+    const redonePage = await fetchPageByPid(page, pid);
+    expect(savedNestedChildBlocks(redonePage)).toHaveLength(0);
   });
 });
