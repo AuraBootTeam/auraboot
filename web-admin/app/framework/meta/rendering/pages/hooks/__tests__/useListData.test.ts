@@ -30,7 +30,7 @@ describe('useListData fixedFilters', () => {
     fetchResultMock.mockResolvedValue({ code: 0, data: { records: [], total: 0, page: 1 } });
 
     const { result } = renderHook(() =>
-      useListData({ schema, tableName: 'bom_standard_item', fixedFilters: { bom_std_task_id: 'T-1' } }),
+      useListData({ schema, tableName: 'bom_standard_line_pcba', fixedFilters: { bom_std_task_id: 'T-1' } }),
     );
 
     await act(async () => {
@@ -47,7 +47,7 @@ describe('useListData fixedFilters', () => {
     fetchResultMock.mockResolvedValue({ code: 0, data: { records: [], total: 0, page: 1 } });
 
     const { result } = renderHook(() =>
-      useListData({ schema, tableName: 'bom_standard_item', fixedFilters: { bom_std_task_id: 'T-1' } }),
+      useListData({ schema, tableName: 'bom_standard_line_pcba', fixedFilters: { bom_std_task_id: 'T-1' } }),
     );
 
     await act(async () => {
@@ -63,7 +63,7 @@ describe('useListData fixedFilters', () => {
   it('maps chip filters (LIKE wildcard) and passes keyword + sort params', async () => {
     fetchResultMock.mockResolvedValue({ code: 0, data: { records: [], total: 0, page: 1 } });
 
-    const { result } = renderHook(() => useListData({ schema, tableName: 'bom_standard_item' }));
+    const { result } = renderHook(() => useListData({ schema, tableName: 'bom_standard_line_pcba' }));
 
     await act(async () => {
       await result.current.loadData({
@@ -88,7 +88,7 @@ describe('useListData fixedFilters', () => {
   it('omits filters param entirely when no fixed or user filters are present', async () => {
     fetchResultMock.mockResolvedValue({ code: 0, data: { records: [], total: 0, page: 1 } });
 
-    const { result } = renderHook(() => useListData({ schema, tableName: 'bom_standard_item' }));
+    const { result } = renderHook(() => useListData({ schema, tableName: 'bom_standard_line_pcba' }));
 
     await act(async () => {
       await result.current.loadData();

@@ -19,7 +19,7 @@ class AbstractCoreLiteITTest {
 
     @Test
     void buildsDynamicListPath() {
-        assertThat(AbstractCoreLiteIT.dynamicListPath("bom_convert_task"))
-                .isEqualTo("/api/dynamic/bom_convert_task/list");
+        assertThat(AbstractCoreLiteIT.dynamicListPath("bom_conversion_task_pcba"))
+                .isEqualTo("/api/dynamic/bom_conversion_task_pcba/list");
     }
 }

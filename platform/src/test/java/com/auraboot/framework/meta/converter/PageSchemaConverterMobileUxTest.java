@@ -86,7 +86,7 @@ class PageSchemaConverterMobileUxTest {
                 "dataSources", Map.of(
                         "standardLines", Map.of(
                                 "type", "api",
-                                "endpoint", "/api/dynamic/bom_standard_item/list"
+                                "endpoint", "/api/dynamic/bom_standard_line_pcba/list"
                         )
                 )
         ));
@@ -109,7 +109,7 @@ class PageSchemaConverterMobileUxTest {
     void createAndUpdateRequestsPersistTopLevelDataSourcesThroughExtension() {
         PageSchemaConverter converter = buildConverter();
         Map<String, Object> dataSources = Map.of(
-                "standardLines", Map.of("type", "api", "endpoint", "/api/dynamic/bom_standard_item/list")
+                "standardLines", Map.of("type", "api", "endpoint", "/api/dynamic/bom_standard_line_pcba/list")
         );
 
         PageSchemaCreateRequest createRequest = new PageSchemaCreateRequest();

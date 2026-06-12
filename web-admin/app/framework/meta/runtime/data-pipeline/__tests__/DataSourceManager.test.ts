@@ -135,7 +135,7 @@ describe('DataSourceManager', () => {
     );
     manager.register('taskSummary', {
       type: 'api',
-      endpoint: '/api/dynamic/bom_convert_task/list',
+      endpoint: '/api/dynamic/bom_conversion_task_pcba/list',
       method: 'get',
       adaptor: 'table',
       autoFetch: false,
@@ -147,7 +147,7 @@ describe('DataSourceManager', () => {
 
     await manager.fetch('taskSummary');
 
-    expect(mockedFetchResult).toHaveBeenCalledWith('/api/dynamic/bom_convert_task/list', {
+    expect(mockedFetchResult).toHaveBeenCalledWith('/api/dynamic/bom_conversion_task_pcba/list', {
       method: 'get',
       params: {
         pidFromForm: 'task-2',
@@ -319,7 +319,7 @@ describe('DataSourceManager', () => {
     );
     manager.register('standardLines', {
       type: 'api',
-      endpoint: '/api/dynamic/bom_standard_item/list',
+      endpoint: '/api/dynamic/bom_standard_line_pcba/list',
       method: 'get',
       adaptor: 'table',
       autoFetch: false,
@@ -363,7 +363,7 @@ describe('DataSourceManager', () => {
     );
     manager.register('standardLines', {
       type: 'api',
-      endpoint: '/api/dynamic/bom_standard_item/list',
+      endpoint: '/api/dynamic/bom_standard_line_pcba/list',
       method: 'get',
       adaptor: 'table',
       autoFetch: false,

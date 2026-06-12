@@ -52,7 +52,7 @@ auraboot/scripts/dev/stop-isolated.sh --slug=core-lite
 ## Verified evidence (red line #1, 2026-06-01)
 
 Isolated OSS-core stack `core-lite` (BE_PORT=6531): bom config imported via docker cp +
-import-directory-sync → `success:true`; `GET /api/dynamic/bom_convert_task_list/list` → 200 with a
+import-directory-sync → `success:true`; `GET /api/dynamic/bom_conversion_task_pcba_list/list` → 200 with a
 real `{records,total}` envelope (model-driven DDL built the table); idempotent re-import
 `success:true`. `BomCoreLiteHarnessIT` 2/2 + `TwoPluginCoexistenceIT` 1/1 PASSED.
 
