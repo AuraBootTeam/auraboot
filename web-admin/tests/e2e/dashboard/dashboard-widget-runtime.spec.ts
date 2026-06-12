@@ -180,14 +180,36 @@ function runtimeWidgets(): DashboardWidgetFixture[] {
   ];
 }
 
+function quickNoteWidgets(): DashboardWidgetFixture[] {
+  return [
+    {
+      id: 'runtime-quick-note',
+      type: 'smart-quick-note',
+      title: 'Runtime Quick Note',
+      x: 0,
+      y: 0,
+      w: 4,
+      h: 3,
+      config: {
+        title: 'Runtime Quick Note',
+        dataSource: { type: 'static' },
+      },
+    },
+  ];
+}
+
 async function parseJsonResponse<T>(response: APIResponse, context: string): Promise<T> {
   const text = await response.text();
   expect(response.ok(), `${context} failed: status=${response.status()} body=${text}`).toBe(true);
   return JSON.parse(text) as T;
 }
 
-async function createPublishedDashboard(page: Page): Promise<CreatedDashboard> {
-  const title = `Runtime Widget Matrix ${Date.now()}`;
+async function createPublishedDashboard(
+  page: Page,
+  widgets: DashboardWidgetFixture[] = runtimeWidgets(),
+  titlePrefix = 'Runtime Widget Matrix',
+): Promise<CreatedDashboard> {
+  const title = `${titlePrefix} ${Date.now()}`;
   const createResponse = await page.request.post('/api/dashboards', {
     data: {
       title,
@@ -198,7 +220,7 @@ async function createPublishedDashboard(page: Page): Promise<CreatedDashboard> {
         gap: 12,
         compactType: 'vertical',
       },
-      widgets: runtimeWidgets(),
+      widgets,
     },
   });
   const createBody = await parseJsonResponse<{ data?: { pid?: string; code?: string } }>(
@@ -229,6 +251,32 @@ async function expectRuntimeBlock(page: Page, id: string, type: string): Promise
   await expect(block.locator(`[data-widget-type="${type}"]`)).toBeVisible({ timeout: 10_000 });
   await expect(block).not.toContainText('Unknown widget');
   return block;
+}
+
+async function currentUserNoteContent(page: Page): Promise<string> {
+  const response = await page.request.get('/api/user-notes');
+  const body = await parseJsonResponse<{ data?: { content?: string | null } }>(
+    response,
+    'read user note',
+  );
+  return body.data?.content ?? '';
+}
+
+async function saveQuickNoteThroughUi(page: Page, content: string): Promise<void> {
+  const textarea = page.getByTestId('quick-note-textarea');
+  await textarea.scrollIntoViewIfNeeded();
+  await expect(textarea).toBeVisible({ timeout: 10_000 });
+
+  const saveResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/user-notes') &&
+      response.request().method() === 'PUT' &&
+      response.status() === 200,
+    { timeout: 10_000 },
+  );
+  await textarea.fill(content);
+  await textarea.evaluate((node: HTMLTextAreaElement) => node.blur());
+  await saveResponse;
 }
 
 test.describe('Dashboard Widget Runtime Semantics', () => {
@@ -278,6 +326,44 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       await expect(statsRow.getByTestId('stats-row')).toBeVisible();
       await expect(statsRow.locator('[data-testid^="stat-card-"]')).toHaveCount(4);
     } finally {
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
+  test('DWR-002: quick-note widget persists note through viewer interaction', async ({ page }) => {
+    const originalNote = await currentUserNoteContent(page);
+    const noteContent = `Quick note runtime ${Date.now()}`;
+    let dashboard: CreatedDashboard | undefined;
+
+    try {
+      dashboard = await createPublishedDashboard(
+        page,
+        quickNoteWidgets(),
+        'Runtime Quick Note Matrix',
+      );
+
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      await expectRuntimeBlock(page, 'runtime-quick-note', 'smart-quick-note');
+      await saveQuickNoteThroughUi(page, noteContent);
+      await expect(page.getByText(/刚刚保存|Just saved|Last saved/)).toBeVisible({
+        timeout: 10_000,
+      });
+
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.getByTestId('quick-note-textarea')).toHaveValue(noteContent, {
+        timeout: 10_000,
+      });
+    } finally {
+      if (dashboard) {
+        await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' }).catch(
+          () => undefined,
+        );
+        await saveQuickNoteThroughUi(page, originalNote).catch(() => undefined);
+      }
       await cleanupDashboard(page, dashboard?.pid);
     }
   });
