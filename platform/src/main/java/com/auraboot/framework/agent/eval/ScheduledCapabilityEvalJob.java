@@ -55,6 +55,10 @@ public class ScheduledCapabilityEvalJob {
     @Value("${aura.agent.eval.scheduled.max-cases:20}")
     private int maxCases;
 
+    /** Include the curated agent-archetype eval cases (item ③) alongside auto-generated ones. */
+    @Value("${aura.agent.eval.scheduled.include-archetype-cases:true}")
+    private boolean includeArchetypeCases;
+
     @Value("${aura.agent.eval.scheduled.min-tool-accuracy:0.70}")
     private double minToolAccuracy;
     @Value("${aura.agent.eval.scheduled.min-parameter-completion:0.60}")
@@ -104,7 +108,14 @@ public class ScheduledCapabilityEvalJob {
             MetaContext.setSystemTenantContext(tenantId);
         }
         try {
-            List<CapabilityEvalCase> cases = evalService.generateEvalCases(tenantId, null, maxCases);
+            // Auto-generated breadth cases + curated agent-archetype cases (item ③):
+            // the auto generator covers the capability catalog, the curated set covers
+            // the production agents' real NL tasks + "must not do" guardrails.
+            List<CapabilityEvalCase> cases = new java.util.ArrayList<>(
+                    evalService.generateEvalCases(tenantId, null, maxCases));
+            if (includeArchetypeCases) {
+                cases.addAll(AgentArchetypeEvalCases.all());
+            }
             Map<String, Object> report = cases.isEmpty()
                     ? evalService.evaluateToolSelection(tenantId, mode)        // no cases → harness returns no_cases
                     : evalService.evaluateToolSelection(tenantId, mode, cases);
