@@ -344,6 +344,19 @@ async function dragBlockBelow(page: Page, sourceBlockId: string, targetBlockId: 
   await page.mouse.move(20, 20);
 }
 
+async function dragPaletteBlockToTabChildDropZone(page: Page, blockType: string) {
+  await page.getByTestId('designer-tab-blocks').click();
+  await expect(page.getByTestId('library-tab-blocks')).toBeVisible({ timeout: 5_000 });
+
+  const source = page.getByTestId(`block-palette-item-${blockType}`);
+  const target = page.getByTestId('tab-child-drop-zone');
+  await expect(source).toBeVisible({ timeout: 5_000 });
+  await expect(target).toBeVisible({ timeout: 5_000 });
+
+  await source.scrollIntoViewIfNeeded();
+  await source.dragTo(target);
+}
+
 async function selectComponentForField(page: Page, component: string) {
   const componentSelect = page.getByTestId('field-property-component-select');
   await expect(componentSelect).toBeVisible({ timeout: 5_000 });
@@ -696,5 +709,45 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
     await saveDesignerAndWait(page, pid);
     const redonePage = await fetchPageByPid(page, pid);
     expect(savedNestedChildBlocks(redonePage)).toHaveLength(0);
+  });
+
+  test('saves the undone schema and then saves the redone schema for a tabs child drag action', async ({
+    page,
+  }) => {
+    const { pid } = await createNestedTabsUndoRedoPage(page);
+    await openDesignerByPid(page, pid);
+    await selectCanvasBlock(page, NESTED_TABS_BLOCK_ID);
+
+    await expect(page.getByTestId('tab-child-block-0')).toBeVisible();
+    await expect(page.getByTestId('tab-child-block-1')).toHaveCount(0);
+    await dragPaletteBlockToTabChildDropZone(page, 'text');
+    await expect(page.getByTestId('tab-child-block-1')).toBeVisible();
+    await expect(page.getByTestId('tab-child-text-content-1')).toHaveValue('');
+
+    await clickEnabledToolbarButton(page, 'toolbar-undo');
+    await expect(page.getByTestId('tab-child-block-0')).toBeVisible();
+    await expect(page.getByTestId('tab-child-block-1')).toHaveCount(0);
+    await saveDesignerAndWait(page, pid);
+    const undonePage = await fetchPageByPid(page, pid);
+    const undoneChildren = savedNestedChildBlocks(undonePage);
+    expect(undoneChildren).toHaveLength(1);
+    expect(undoneChildren[0]).toMatchObject({
+      id: NESTED_TEXT_CHILD_ID,
+      blockType: 'text',
+      props: { content: NESTED_TEXT_ORIGINAL },
+    });
+
+    await clickEnabledToolbarButton(page, 'toolbar-redo');
+    await expect(page.getByTestId('tab-child-block-1')).toBeVisible();
+    await saveDesignerAndWait(page, pid);
+    const redonePage = await fetchPageByPid(page, pid);
+    const redoneChildren = savedNestedChildBlocks(redonePage);
+    expect(redoneChildren).toHaveLength(2);
+    expect(redoneChildren[0]).toMatchObject({ id: NESTED_TEXT_CHILD_ID, blockType: 'text' });
+    expect(redoneChildren[1]).toMatchObject({
+      blockType: 'text',
+      title: { 'en-US': 'Text', 'zh-CN': '文本内容' },
+      props: { content: '' },
+    });
   });
 });
