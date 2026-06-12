@@ -128,9 +128,14 @@ harness/打分/持久化全在,缺的只是 **回归门 + 定时/触发 + key + 
 给 cs/pcba/competitive 各手工标 10-20 条 `(真实 NL → 期望工具/参数/结果)` 进 L3 集;每个生产
 agent 加 1-2 条**非 `stubToolUse`** 的真模型 smoke(nightly),专抓「改 prompt 掉质量」。
 
-**④ 闭 L4 在线 eval —— ~3-4 天**
-采样 `ab_agent_observation` 真回合 → LLM-judge 打分(便宜模型)→ 质量/幻觉/纠正率看板 + 阈值
-告警。唯一覆盖真实分布的层。
+**④ 闭 L4 在线 eval —— ✅ 骨架+确定性判官已落地(`AgentOnlineEvalService` + `AgentTurnQualityJudge` + `HeuristicTurnQualityJudge`)**
+`AgentOnlineEvalService.sampleAndJudge(tenant, sinceHours, maxRuns)` 采样 `ab_agent_observation` 真回合
+(按 `source_id` 分组成 turn)→ `AgentTurnQualityJudge` 打分 → `OnlineEvalSummary` 聚合
+(healthyRate / failRate / costFlaggedRate / avgScore / unhealthy turns)。默认判官 = **确定性 `HeuristicTurnQualityJudge`**
+(从 observable 信号:完成/失败/error severity/`alert_*`/`cost_warning` 打分,**零 token**),
+pure 信号折叠 + 判分 + 聚合全单测守护(12 测)。这是唯一覆盖**真实生产分布**的层。
+🔑 **block 点(LLM key)**:把判官换成**真模型读 turn detail 评细粒度质量/幻觉/纠正**(同 `AgentTurnQualityJudge` 接口)需 LLM key;拿到 key 后加 `LlmTurnQualityJudge` 实现。
+后续刀:定时触发 `sampleAndJudge` + 越阈值 emit 观测告警(同 ① 的 scheduler 模式)+ 质量看板 NQ/页面。
 
 ### 节奏/门禁矩阵
 
