@@ -59,6 +59,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private static final String XLSX_CONTENT_TYPE =
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static final String PDF_CONTENT_TYPE = "application/pdf";
+    private static final String JSON_CONTENT_TYPE = "application/json";
     private static final float PDF_MARGIN = 48f;
     private static final float PDF_LINE_HEIGHT = 15f;
     private static final String DATA_SOURCE_STATIC = "static";
@@ -146,6 +147,31 @@ public class ReportExportServiceImpl implements ReportExportService {
         } catch (Exception e) {
             log.error("Failed to export report as PDF: reportPid={}", request.getReportPid(), e);
             throw new ValidationException(ResponseCode.CommonValidationFailed, "PDF export failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ReportExportFile exportJson(ReportExportRequest request) {
+        if (request == null || !StringUtils.hasText(request.getReportPid())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "reportPid is required");
+        }
+
+        Map<String, Object> reportDsl = loadReportDsl(request.getReportPid());
+        String title = stringValue(reportDsl.get("title"), "report");
+
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("format", "auraboot.report.export.v1");
+            payload.put("reportPid", request.getReportPid());
+            payload.put("reportDsl", reportDsl);
+            payload.put("dataSets", resolveDataSets(reportDsl));
+            byte[] bytes = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(payload);
+            return new ReportExportFile(bytes, safeFilename(title) + ".report.json", JSON_CONTENT_TYPE);
+        } catch (ValidationException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to export report as JSON: reportPid={}", request.getReportPid(), e);
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "JSON export failed: " + e.getMessage());
         }
     }
 

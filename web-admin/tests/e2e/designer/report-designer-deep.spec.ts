@@ -7,7 +7,7 @@
  *   - Report-level operations (save, export, undo/redo)
  *
  * IDs: RPT-DT-01..13, RPT-GT-01..07, RPT-SC-01..06, RPT-RT-01..06,
- *      RPT-CT-01..09, RPT-CH-01..08, RPT-BD-01..08, RPT-OP-01..11,
+ *      RPT-CT-01..09, RPT-CH-01..08, RPT-BD-01..08, RPT-OP-01..12,
  *      RPT-BC-01..07, RPT-WM-01..06
  *
  * @since 6.0.0
@@ -1417,6 +1417,65 @@ test.describe('Report Operations', () => {
         ['Title', 'Customer', 'Type'],
         [apiTitle, 'Report API Customer', 'normal'],
       ]);
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
+
+  test('RPT-OP-12: Export JSON includes round-trip DSL and resolved dataSource rows', async ({
+    page,
+  }, testInfo) => {
+    const { pid, title, modelTitle, namedQueryTitle, apiTitle } =
+      await createReportNonStaticDataSourceExportPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const jsonBtn = page.getByRole('button', { name: /export json/i });
+      await expect(jsonBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/json') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
+      await jsonBtn.click();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `JSON export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(exportResponse.headers()['content-type']).toContain('application/json');
+      expect(download.suggestedFilename()).toBe(`${title}.report.json`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const payload = JSON.parse((await readFile(savedPath)).toString('utf8')) as {
+        format?: string;
+        reportPid?: string;
+        reportDsl?: {
+          title?: string;
+          dataSources?: Record<string, { type?: string }>;
+          body?: Array<{ blockType?: string; title?: string; dataSource?: string }>;
+        };
+        dataSets?: Record<string, Array<Record<string, unknown>>>;
+      };
+      expect(payload.format).toBe('auraboot.report.export.v1');
+      expect(payload.reportPid).toBe(pid);
+      expect(payload.reportDsl?.title).toBe(title);
+      expect(payload.reportDsl?.dataSources?.modelOrders?.type).toBe('model');
+      expect(payload.reportDsl?.dataSources?.namedQueryOrders?.type).toBe('namedQuery');
+      expect(payload.reportDsl?.dataSources?.apiOrders?.type).toBe('api');
+      expect(payload.reportDsl?.body?.map((block) => block.title)).toEqual([
+        'Model Orders',
+        'NamedQuery Orders',
+        'API Orders',
+      ]);
+      expect(payload.dataSets?.modelOrders?.[0]?.e2et_order_title).toBe(modelTitle);
+      expect(payload.dataSets?.namedQueryOrders?.[0]?.e2et_order_title).toBe(namedQueryTitle);
+      expect(payload.dataSets?.apiOrders?.[0]?.e2et_order_title).toBe(apiTitle);
     } finally {
       await page.request.delete(`/api/pages/${pid}`).catch(() => {});
     }

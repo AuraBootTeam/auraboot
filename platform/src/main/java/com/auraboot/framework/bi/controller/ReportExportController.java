@@ -60,4 +60,19 @@ public class ReportExportController {
                                 .toString())
                 .body(file.getBytes());
     }
+
+    @PostMapping("/export/json")
+    @Operation(summary = "Export report as JSON", description = "Exports a saved Report Designer DSL and resolved data sets as JSON")
+    @RequirePermission(MetaPermission.REPORT_GENERATE)
+    public ResponseEntity<byte[]> exportJson(@Valid @RequestBody ReportExportRequest request) {
+        ReportExportFile file = reportExportService.exportJson(request);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(file.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment()
+                                .filename(file.getFilename(), StandardCharsets.UTF_8)
+                                .build()
+                                .toString())
+                .body(file.getBytes());
+    }
 }

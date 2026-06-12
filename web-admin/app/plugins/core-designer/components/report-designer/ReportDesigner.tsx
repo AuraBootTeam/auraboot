@@ -167,6 +167,30 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
     }
   }, [report]);
 
+  // JSON Export
+  const handleExportJson = useCallback(async () => {
+    const state = useReportStore.getState();
+    const pid = state.pageId;
+    if (!pid) {
+      alert('Please save the report before exporting to JSON.');
+      return;
+    }
+    try {
+      const blob = await reportDesignerService.exportJson(pid);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${report?.title || 'report'}.report.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('JSON export failed:', error);
+      alert(error instanceof Error ? error.message : 'JSON export failed');
+    }
+  }, [report]);
+
   // PDF Export
   const handleExportPdf = useCallback(async () => {
     const state = useReportStore.getState();
@@ -211,6 +235,7 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
           onPreview={handlePreview}
           onExportPdf={handleExportPdf}
           onExportExcel={handleExportExcel}
+          onExportJson={handleExportJson}
           onToggleVersionHistory={versioning.togglePanel}
           versionCount={versioning.versions.length}
         />
@@ -228,6 +253,7 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
         onPreview={handlePreview}
         onExportPdf={handleExportPdf}
         onExportExcel={handleExportExcel}
+        onExportJson={handleExportJson}
         onToggleVersionHistory={versioning.togglePanel}
         versionCount={versioning.versions.length}
       />

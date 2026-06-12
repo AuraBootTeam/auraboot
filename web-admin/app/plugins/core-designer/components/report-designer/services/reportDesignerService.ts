@@ -154,4 +154,22 @@ export const reportDesignerService = {
 
     return response.blob();
   },
+
+  /**
+   * Export report as JSON via report export endpoint
+   */
+  async exportJson(reportPid: string, parameters?: Record<string, unknown>): Promise<Blob> {
+    const response = await fetch('/api/reports/export/json', {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reportPid, parameters }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.desc || error.message || `JSON export failed: ${response.status}`);
+    }
+
+    return response.blob();
+  },
 };

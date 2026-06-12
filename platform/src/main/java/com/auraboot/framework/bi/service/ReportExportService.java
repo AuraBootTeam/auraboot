@@ -11,4 +11,6 @@ public interface ReportExportService {
     ReportExportFile exportExcel(ReportExportRequest request);
 
     ReportExportFile exportPdf(ReportExportRequest request);
+
+    ReportExportFile exportJson(ReportExportRequest request);
 }

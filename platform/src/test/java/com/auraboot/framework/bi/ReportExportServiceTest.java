@@ -13,6 +13,7 @@ import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -115,6 +116,43 @@ class ReportExportServiceTest {
             assertThat(text).contains("North | 12");
             assertThat(text).contains("South | 9");
         }
+    }
+
+    @Test
+    void exportJson_withReportDslAndResolvedRows_rendersRoundTripArtifact() throws Exception {
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", reportDsl());
+        page.setExtension(extension);
+
+        when(pageSchemaMapper.selectByPid("rpt-json")).thenReturn(page);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-json");
+
+        ReportExportFile file = reportExportService.exportJson(request);
+
+        assertThat(file.getFilename()).isEqualTo("Operations Export.report.json");
+        assertThat(file.getContentType()).isEqualTo("application/json");
+
+        Map<String, Object> payload = new ObjectMapper().readValue(
+                file.getBytes(),
+                new TypeReference<>() {}
+        );
+        assertThat(payload.get("format")).isEqualTo("auraboot.report.export.v1");
+        assertThat(payload.get("reportPid")).isEqualTo("rpt-json");
+
+        Map<String, Object> exportedDsl = castMap(payload.get("reportDsl"));
+        assertThat(exportedDsl.get("title")).isEqualTo("Operations Export");
+        List<Map<String, Object>> body = castList(exportedDsl.get("body"));
+        assertThat(body.get(0).get("blockType")).isEqualTo("table");
+        assertThat(body.get(0).get("title")).isEqualTo("Orders Export");
+
+        Map<String, Object> dataSets = castMap(payload.get("dataSets"));
+        List<Map<String, Object>> rows = castList(dataSets.get("orders"));
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0).get("region")).isEqualTo("North");
+        assertThat(rows.get(0).get("cases")).isEqualTo(12);
     }
 
     @Test
@@ -321,6 +359,16 @@ class ReportExportServiceTest {
         dsl.put("dataSources", Map.of("orders", dataSource));
         dsl.put("body", List.of(table));
         return dsl;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> castMap(Object value) {
+        return (Map<String, Object>) value;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> castList(Object value) {
+        return (List<Map<String, Object>>) value;
     }
 
     private Map<String, Object> nonTableReportDsl() {
