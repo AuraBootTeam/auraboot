@@ -1,6 +1,7 @@
 package com.auraboot.framework.p1demo;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.ai.AiFieldLockSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -54,13 +55,18 @@ public class WdLeaveAiController {
         WdLeaveAiFillService.AiFillResult result =
                 aiFillService.extractFields(req.nlInput(), currentDate, tenantId);
 
+        // D5: never let an AI-locked field be persisted or returned, even if the
+        // model produced a value for it.
+        Map<String, Object> fields =
+                AiFieldLockSupport.stripLockedFields(result.fields(), req.lockedFields());
+
         Long targetId = req.targetId() != null ? req.targetId() : -1L;
         Long annotationId = annotationRepository.insertGrounding(
                 tenantId, TARGET_MODEL_CODE, targetId, result.turnId(),
-                req.nlInput(), result.fields());
+                req.nlInput(), fields);
 
         return ResponseEntity.ok(new AiFillResponse(
-                result.turnId(), result.fields(), annotationId, result.totalTokens(),
+                result.turnId(), fields, annotationId, result.totalTokens(),
                 result.totalDollars(), null));
     }
 
@@ -103,7 +109,12 @@ public class WdLeaveAiController {
         return ResponseEntity.ok(row);
     }
 
-    public record AiFillRequest(String nlInput, String currentDate, Long targetId) {}
+    /**
+     * @param lockedFields field codes the form marked AI-locked (D5); the server
+     *     strips these from the generated field map so they are never overwritten.
+     */
+    public record AiFillRequest(String nlInput, String currentDate, Long targetId,
+                                List<String> lockedFields) {}
 
     /** errorKey is an i18n key the frontend resolves; never a hardcoded zh-CN string. */
     public record AiFillResponse(String turnId, Map<String, Object> fields, Long annotationId,
