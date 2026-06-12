@@ -65,3 +65,24 @@ created: 2026-05-29
 
 ### W-FU-11 · Lift retro lessons G-W1..G-W5 into canonical AGENTS.md
 - **Owner:** done in a sibling PR against `auraboot-enterprise` (see retro doc §3).
+
+## P0 — regressions found in live visual verification (2026-05-29)
+
+Discovered during Item 1 (manual visual verification of `/home` at 1440×900, light + dark). Top bar redesign renders as designed, but 3 regressions need follow-up:
+
+### W-FU-12 · Top-bar "Dev" chip is hardcoded
+- `web-admin/app/routes/Header.tsx` renders a literal `"Dev"` chip next to the AuraBoot wordmark.
+- Will display `"Dev"` in production. Should read `import.meta.env.MODE` (or equivalent) and render env-appropriate label, or hide entirely in `production`.
+
+### W-FU-13 · Tenant indicator duplicates with Dev chip
+- `Header.tsx` lines ~170-175 still render `· {user.tenantName}` as a sibling of the brand link.
+- When tenant is named e.g. "AuraBoot Dev", visible output becomes: `[logo] AuraBoot [Dev chip] · AuraBoot Dev` — visually duplicated.
+- Decide: remove the `· {tenantName}` indicator (spec direction — chip replaces it), or hide chip when tenantName already encodes env.
+
+### W-FU-14 · Empty-state branch bypasses the new header band
+- `web-admin/app/plugins/core-dashboard/pages/home/index.tsx` lines 61-69 early-return a centered empty state when `!dashboard || !dashboard.widgets?.length`.
+- This early return skips the new `<div className="px-8 py-6 ..."><header>...</header>...` chrome added in this round, so tenants without a seeded workbench config see the old bare empty state, not the redesigned page shell.
+- Fix: wrap the empty state inside the new page chrome (`px-8 py-6 bg-[#fafbfc] dark:bg-gray-900 min-h-full` + `<header>` title/subline) and keep the centered "no widgets" CTA as the body.
+
+### W-FU-15 · Re-screenshot after W-FU-12/13/14 land
+- Screenshots taken on 2026-05-29 captured the regressions above; re-take light+dark after fixes merge and update success-criteria evidence.
