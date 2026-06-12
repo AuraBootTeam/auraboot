@@ -74,10 +74,8 @@ public class ComputedFieldsPhase implements CommandPhase {
             sortedFields = new ArrayList<>(computedFields.entrySet());
         }
 
-        Map<String, Object> combinedContext = new HashMap<>(payload);
-        combinedContext.putAll(fieldMapResults);
-
-        EvaluationContext spelContext = spelEvaluator.buildSpelContext(combinedContext);
+        Map<String, Object> combinedContext = buildComputedContext(
+                payload, fieldMapResults, tenantId, command, request);
 
         Map<String, Object> computedValues = new HashMap<>();
         for (Map.Entry<String, String> entry : sortedFields) {
@@ -85,10 +83,12 @@ public class ComputedFieldsPhase implements CommandPhase {
             String expression = entry.getValue();
 
             try {
+                EvaluationContext spelContext = spelEvaluator.buildSpelContext(combinedContext);
                 Object result = spelEvaluator.evaluate(expression, spelContext);
                 if (result != null) {
                     computedValues.put(fieldCode, result);
                     payload.put(fieldCode, result);
+                    combinedContext.put(fieldCode, result);
                     log.debug("COMPUTED: {} = {} (expr={})", fieldCode, result, expression);
                 }
             } catch (Exception e) {
@@ -118,6 +118,32 @@ public class ComputedFieldsPhase implements CommandPhase {
                 dynamicDataMapper.update(tableName, computedValues, conditions);
             }
         }
+    }
+
+    private Map<String, Object> buildComputedContext(Map<String, Object> payload,
+                                                     Map<String, Object> fieldMapResults,
+                                                     Long tenantId,
+                                                     CommandDefinition command,
+                                                     CommandExecuteRequest request) {
+        Map<String, Object> combinedContext = new HashMap<>();
+        Object fieldMapRecordId = fieldMapResults != null ? fieldMapResults.get("recordId") : null;
+        String recordIdStr = (request != null && StringUtils.hasText(request.getTargetRecordId()))
+                ? request.getTargetRecordId()
+                : fieldMapRecordId != null ? String.valueOf(fieldMapRecordId) : null;
+        if (StringUtils.hasText(recordIdStr) && command != null && StringUtils.hasText(command.getModelCode())) {
+            Map<String, Object> currentSnapshot =
+                    snapshotReader.readRecordSnapshot(tenantId, command.getModelCode(), recordIdStr);
+            if (currentSnapshot != null) {
+                combinedContext.putAll(currentSnapshot);
+            }
+        }
+        if (payload != null) {
+            combinedContext.putAll(payload);
+        }
+        if (fieldMapResults != null) {
+            combinedContext.putAll(fieldMapResults);
+        }
+        return combinedContext;
     }
 
     private void recordChangeTracking(CommandDefinition command, CommandExecuteRequest request,

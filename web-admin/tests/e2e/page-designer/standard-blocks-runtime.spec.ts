@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
-import { uniqueId } from '../helpers';
+import { executeCommandViaApi, uniqueId } from '../helpers';
 
 const STANDARD_LIST_BLOCK_TYPES = [
   'filters',
@@ -266,6 +266,60 @@ async function createPublishedStandardFormPage(page: Page) {
   return { pageKey, blocks };
 }
 
+async function createE2etOrder(page: Page, title: string): Promise<string> {
+  const result = await executeCommandViaApi(page, 'e2et:create_order', {
+    e2et_order_title: title,
+    e2et_order_type: 'normal',
+    e2et_order_urgent: false,
+  });
+  expect(result.code, 'create e2et_order code').toBe('0');
+  expect(result.recordId, 'created e2et_order pid').toBeTruthy();
+  return result.recordId;
+}
+
+async function deleteE2etOrder(page: Page, orderPid: string): Promise<void> {
+  await executeCommandViaApi(
+    page,
+    'e2et:delete_order',
+    {},
+    orderPid,
+    'delete',
+    { allowHttpError: true },
+  );
+}
+
+async function listOrderItems(page: Page, orderPid: string): Promise<Record<string, any>[]> {
+  const filters = JSON.stringify([
+    { fieldName: 'e2et_order_id', operator: 'EQ', value: orderPid },
+  ]);
+  const resp = await page.request.get('/api/dynamic/e2et_order_item/list', {
+    params: {
+      pageNum: '1',
+      pageSize: '20',
+      filters,
+    },
+  });
+  expect(resp.ok(), `List e2et_order_item failed: ${resp.status()}`).toBeTruthy();
+  const body = await resp.json();
+  return body.data?.records ?? [];
+}
+
+async function fetchOrder(page: Page, orderPid: string): Promise<Record<string, any>> {
+  const resp = await page.request.get(`/api/dynamic/e2et_order/${orderPid}`);
+  expect(resp.ok(), `Fetch e2et_order failed: ${resp.status()}`).toBeTruthy();
+  const body = await resp.json();
+  return body.data ?? {};
+}
+
+async function clickSubTableAdd(page: Page) {
+  const emptyAction = page.getByTestId('subtable-empty-action');
+  if (await emptyAction.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await emptyAction.click();
+    return;
+  }
+  await page.getByTestId('subtable-add-row').click();
+}
+
 test.describe('Page Designer standard block runtime', () => {
   test('persists and renders list-oriented standard blocks in a real custom page', async ({
     page,
@@ -402,5 +456,97 @@ test.describe('Page Designer standard block runtime', () => {
     await page.getByTestId('form-btn-cancel').click();
     await expect(page).toHaveURL(/\/p\/page_schema/);
     await expect(page.locator('body')).not.toContainText('Unknown block type');
+  });
+
+  test('sub-table runtime creates, edits, deletes child rows, and updates aggregate state', async ({
+    page,
+  }) => {
+    const orderTitle = `Sub-table runtime ${uniqueId('std_subtable')}`;
+    const itemName = `Runtime child ${uniqueId('line')}`;
+    const orderPid = await createE2etOrder(page, orderTitle);
+
+    try {
+      await page.goto(
+        `/p/e2et_order/${orderPid}/edit?commandCode=${encodeURIComponent('e2et:update_order')}`,
+        { waitUntil: 'domcontentloaded' },
+      );
+      await expect(page.getByTestId('dynamic-form')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: /订单明细|Order Items/ })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(page.getByTestId('subtable-viewer')).toBeVisible({ timeout: 15_000 });
+
+      await clickSubTableAdd(page);
+      await expect(page.getByTestId('subtable-add-form')).toBeVisible({ timeout: 5_000 });
+      await page.getByTestId('subtable-add-e2et_item_name').fill(itemName);
+      await page.getByTestId('subtable-add-e2et_item_spec').fill('spec_m');
+      await page.getByTestId('subtable-add-e2et_item_qty').fill('3');
+      await page.getByTestId('subtable-add-e2et_item_price').fill('7');
+
+      const createLineResp = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/meta/commands/execute/e2et:create_order_item') &&
+          response.request().method() === 'POST',
+        { timeout: 15_000 },
+      );
+      await page.getByTestId('subtable-save-btn').click();
+      expect((await createLineResp).ok(), 'create child command response').toBeTruthy();
+
+      await expect(page.getByTestId('subtable-table')).toContainText(itemName, {
+        timeout: 15_000,
+      });
+      await expect(page.getByTestId('subtable-table')).toContainText('21', { timeout: 15_000 });
+
+      const createdItems = await listOrderItems(page, orderPid);
+      const createdItem = createdItems.find((item) => item.e2et_item_name === itemName);
+      expect(createdItem, 'created sub-table child row persisted').toBeTruthy();
+      expect(Number(createdItem?.e2et_item_subtotal), 'created subtotal persisted').toBe(21);
+
+      await expect
+        .poll(async () => Number((await fetchOrder(page, orderPid)).e2et_order_amount ?? 0), {
+          timeout: 10_000,
+        })
+        .toBe(21);
+
+      await page.getByTestId('subtable-edit-0').click();
+      await page.getByTestId('inline-edit-e2et_item_qty').fill('4');
+      const updateLineResp = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/meta/commands/execute/e2et:update_order_item') &&
+          response.request().method() === 'POST',
+        { timeout: 15_000 },
+      );
+      await page.getByTestId('subtable-edit-save-0').click();
+      expect((await updateLineResp).ok(), 'update child command response').toBeTruthy();
+
+      await expect(page.getByTestId('subtable-table')).toContainText('28', { timeout: 15_000 });
+      await expect
+        .poll(async () => {
+          const [item] = await listOrderItems(page, orderPid);
+          return Number(item?.e2et_item_subtotal ?? 0);
+        }, { timeout: 10_000 })
+        .toBe(28);
+      await expect
+        .poll(async () => Number((await fetchOrder(page, orderPid)).e2et_order_amount ?? 0), {
+          timeout: 10_000,
+        })
+        .toBe(28);
+
+      const deleteLineResp = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/meta/commands/execute/e2et:delete_order_item') &&
+          response.request().method() === 'POST',
+        { timeout: 15_000 },
+      );
+      await page.getByTestId('subtable-delete-0').click();
+      expect((await deleteLineResp).ok(), 'delete child command response').toBeTruthy();
+
+      await expect
+        .poll(async () => (await listOrderItems(page, orderPid)).length, { timeout: 10_000 })
+        .toBe(0);
+      await expect(page.getByTestId('subtable-empty-state')).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await deleteE2etOrder(page, orderPid);
+    }
   });
 });

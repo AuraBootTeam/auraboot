@@ -508,8 +508,8 @@ class CommandExecutorDslEnhancementTest {
                 """.formatted(suffix, suffix, suffix);
 
         String commandCode = createCommand(modelCode, execConfig,
-                Map.of("sales_amount", "sales_amount_" + suffix,
-                       "sales_qty", "sales_qty_" + suffix));
+                Map.of("sales_amount_" + suffix, "sales_amount_" + suffix,
+                       "sales_qty_" + suffix, "sales_qty_" + suffix));
 
         CommandExecuteRequest req = new CommandExecuteRequest();
         req.setPayload(new HashMap<>(Map.of(
@@ -532,6 +532,53 @@ class CommandExecutorDslEnhancementTest {
         // 10000.0 / 250 = 40.0
         double avgPriceVal = ((Number) avgPrice).doubleValue();
         assertEquals(40.0, avgPriceVal, 0.01, "avg_price should be 10000/250 = 40.0");
+    }
+
+    @Test
+    @Order(21)
+    @DisplayName("P0-BE-2: computedFields merges current record values on partial UPDATE")
+    void test21_computedFields_partialUpdateUsesCurrentRecordSnapshot() {
+        String suffix = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 4);
+        String modelCode = createModel(suffix,
+                "sales_amount_" + suffix + ":DECIMAL",
+                "sales_qty_" + suffix + ":INTEGER",
+                "avg_price_" + suffix + ":DECIMAL");
+
+        String recordId = insertRecord(modelCode, Map.of(
+                "sales_amount_" + suffix, 10000.0,
+                "sales_qty_" + suffix, 250,
+                "avg_price_" + suffix, 0.0
+        ));
+
+        String execConfig = """
+                {
+                    "computedFields": {
+                        "avg_price_%s": "#sales_amount_%s / #sales_qty_%s"
+                    }
+                }
+                """.formatted(suffix, suffix, suffix);
+
+        String commandCode = createCommand(modelCode, execConfig,
+                Map.of("sales_amount_" + suffix, "sales_amount_" + suffix,
+                       "sales_qty_" + suffix, "sales_qty_" + suffix));
+
+        CommandExecuteRequest req = new CommandExecuteRequest();
+        req.setPayload(new HashMap<>(Map.of("sales_qty_" + suffix, 200)));
+        req.setOperationType("update");
+        req.setTargetRecordId(recordId);
+        req.setClientRequestId("req_" + UUID.randomUUID());
+
+        CommandExecuteResult result = commandExecutor.execute(commandCode, req);
+
+        assertNotNull(result, "Command should succeed");
+
+        Map<String, Object> record = readRecord(modelCode, recordId);
+        assertNotNull(record);
+        assertEquals(200, ((Number) record.get("sales_qty_" + suffix)).intValue());
+        Object avgPrice = record.get("avg_price_" + suffix);
+        assertNotNull(avgPrice, "avg_price should be computed with the persisted sales_amount");
+        assertEquals(50.0, ((Number) avgPrice).doubleValue(), 0.01,
+                "avg_price should be 10000/200 after a partial update");
     }
 
     // ==================== P0-BE-3: cascadeDelete Tests ====================
