@@ -288,7 +288,7 @@ export function shouldBypassFormSubmit(
   actionType: string,
 ): boolean {
   const normalizedActionType = String(actionType || '').toLowerCase();
-  if (['navigate', 'cancel', 'back', 'close'].includes(normalizedActionType)) {
+  if (['navigate', 'cancel', 'back', 'close', 'refresh', 'reload'].includes(normalizedActionType)) {
     return true;
   }
 
@@ -297,7 +297,7 @@ export function shouldBypassFormSubmit(
     action && typeof action === 'object' ? (action as Record<string, unknown>).command : undefined;
   const buttonCode = String(button?.code || '').toLowerCase();
   return (
-    ['cancel', 'back', 'close'].includes(buttonCode) &&
+    ['cancel', 'back', 'close', 'refresh', 'reload'].includes(buttonCode) &&
     !button?.commandCode &&
     typeof actionCommand !== 'string'
   );
@@ -631,6 +631,40 @@ export function FormPageContent(props: PageContentProps) {
     });
   }, [locale, t, formData, dataSourceManager, user, permissions, mode]);
 
+  const [mainRecordLoaded, setMainRecordLoaded] = useState(!isEditMode);
+  const loadMainRecord = useCallback(
+    async (options?: { preserveDirty?: boolean }) => {
+      if (!recordId) return;
+      const preserveDirty = options?.preserveDirty ?? true;
+      dirtyFieldsRef.current.clear();
+      setMainRecordLoaded(false);
+      try {
+        const resp = await fetchResult<any>(`/api/dynamic/${tableName}/${recordId}`, {
+          method: 'get',
+          token: token || undefined,
+        });
+        if (ResultHelper.isSuccess(resp) && resp.data) {
+          setFormData((prev) =>
+            preserveDirty
+              ? mergeLoadedRecordWithDirtyFields(resp.data, prev, dirtyFieldsRef.current)
+              : resp.data,
+          );
+          setInitialFormData(resp.data);
+        }
+      } catch {
+        // Keep the form usable when a transient refresh request fails; callers
+        // surface action errors separately when needed.
+      } finally {
+        setMainRecordLoaded(true);
+      }
+    },
+    [recordId, tableName, token],
+  );
+  const reloadMainRecord = useCallback(
+    () => loadMainRecord({ preserveDirty: false }),
+    [loadMainRecord],
+  );
+
   // Sync formData with runtime scope state
   useEffect(() => {
     if (runtime) {
@@ -650,6 +684,7 @@ export function FormPageContent(props: PageContentProps) {
     context: {
       data: formData,
       setData: setFormData,
+      loadData: reloadMainRecord,
     },
     dataSourceManager,
     locale,
@@ -1289,28 +1324,10 @@ export function FormPageContent(props: PageContentProps) {
   }, [isEditMode, schemaDefaultValues, urlDefaultValues]);
 
   // Edit mode: fetch existing record data to populate form
-  const [mainRecordLoaded, setMainRecordLoaded] = useState(!isEditMode);
   useEffect(() => {
     if (!recordId) return;
-    dirtyFieldsRef.current.clear();
-    setMainRecordLoaded(false);
-    fetchResult<any>(`/api/dynamic/${tableName}/${recordId}`, {
-      method: 'get',
-      token: token || undefined,
-    })
-      .then((resp) => {
-        if (ResultHelper.isSuccess(resp) && resp.data) {
-          setFormData((prev) =>
-            mergeLoadedRecordWithDirtyFields(resp.data, prev, dirtyFieldsRef.current),
-          );
-          setInitialFormData(resp.data);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        setMainRecordLoaded(true);
-      });
-  }, [recordId, tableName, token]);
+    void loadMainRecord({ preserveDirty: true });
+  }, [recordId, loadMainRecord]);
 
   // L1 SDK: merge external initialValues into form state (overlay on top of loaded data)
   useEffect(() => {

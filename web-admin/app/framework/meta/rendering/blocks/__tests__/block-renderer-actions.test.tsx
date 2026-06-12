@@ -144,6 +144,28 @@ describe('FormButtonsBlockRenderer', () => {
     expect(passedButton.code).toBe('submit');
     expect(passedButton.events?.onClick?.handler).toBe('submitForm');
   });
+
+  it('dispatches builtin refresh buttons without explicit action config', () => {
+    const runtime = makeRuntime();
+    const block = {
+      type: 'form-buttons',
+      buttons: [
+        {
+          code: 'refresh',
+          label: 'Refresh',
+        },
+      ],
+    };
+
+    const { getByTestId } = render(
+      <FormButtonsBlockRenderer block={block as any} runtime={runtime} />,
+    );
+    fireEvent.click(getByTestId('form-btn-refresh'));
+
+    expect(handleActionSpy).toHaveBeenCalledTimes(1);
+    const [passedButton] = handleActionSpy.mock.calls[0];
+    expect(passedButton.code).toBe('refresh');
+  });
 });
 
 // ---------------------------------------------------------------------------

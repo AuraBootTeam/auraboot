@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getFormFieldValueWithAlias, mergeLoadedRecordWithDirtyFields } from '../FormPageContent';
+import {
+  getFormFieldValueWithAlias,
+  mergeLoadedRecordWithDirtyFields,
+  shouldBypassFormSubmit,
+} from '../FormPageContent';
 
 describe('mergeLoadedRecordWithDirtyFields', () => {
   it('keeps user-edited fields when a late edit-record fetch resolves', () => {
@@ -52,5 +56,12 @@ describe('getFormFieldValueWithAlias', () => {
         'rule_binding',
       ),
     ).toEqual({ bindingKind: 'EXACT' });
+  });
+});
+
+describe('shouldBypassFormSubmit', () => {
+  it('treats refresh as a non-submit form button action', () => {
+    expect(shouldBypassFormSubmit({ code: 'refresh' }, '')).toBe(true);
+    expect(shouldBypassFormSubmit({ code: 'reload', action: 'refresh' }, 'refresh')).toBe(true);
   });
 });

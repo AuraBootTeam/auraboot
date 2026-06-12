@@ -41,6 +41,7 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
     tableName,
     context: {
       data: (context.form as Record<string, any>) || (context.data as Record<string, any>),
+      loadData: typeof context.loadData === 'function' ? context.loadData : undefined,
     },
     dataSourceManager,
     locale,
@@ -52,7 +53,8 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
   const handleButtonClick = (button: ButtonConfig) => {
     // Only dispatch buttons that have at least one recognizable action source
     // (preserves original behavior: buttons without events.onClick were no-ops)
-    if (!button.events?.onClick && !button.action && !button.commandCode && !button.navigateTo && !button.apiAction && !button.handler) {
+    const isBuiltinRefresh = String(button.code || '').toLowerCase() === 'refresh';
+    if (!isBuiltinRefresh && !button.events?.onClick && !button.action && !button.commandCode && !button.navigateTo && !button.apiAction && !button.handler) {
       return;
     }
     handleAction(button, (context.form as Record<string, any>) || (context.data as Record<string, any>));
