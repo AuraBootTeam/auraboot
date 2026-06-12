@@ -255,6 +255,21 @@ async function createPublishedStandardFormPage(page: Page) {
           defaultValue: 'admin',
           layout: { colSpan: 4 },
         },
+        {
+          field: 'runtime_readonly_note',
+          label: 'Runtime readonly note',
+          component: 'SmartInput',
+          defaultValue: 'Read only seed',
+          readOnly: true,
+          layout: { colSpan: 6 },
+        },
+        {
+          field: 'runtime_conditional_note',
+          label: 'Runtime conditional note',
+          component: 'SmartInput',
+          visibleWhen: '${form.name === "show-extra"}',
+          layout: { colSpan: 6 },
+        },
       ],
     },
     {
@@ -695,6 +710,40 @@ test.describe('Page Designer standard block runtime', () => {
         timeout: 10_000,
       })
       .toBe(updatedName);
+  });
+
+  test('form fields enforce required, readonly, and visibleWhen semantics', async ({ page }) => {
+    const { pageKey } = await createPublishedStandardFormPage(page);
+    const commandRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('/api/meta/commands/execute/pgm:create_page_schema')) {
+        commandRequests.push(request.url());
+      }
+    });
+
+    await page.goto(`/p/c/${pageKey}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('dynamic-form')).toBeVisible({ timeout: 15_000 });
+
+    const readonlyInput = page
+      .getByTestId('field-runtime_readonly_note')
+      .locator('input, textarea')
+      .first();
+    await expect(readonlyInput).toHaveValue('Read only seed');
+    await expect(readonlyInput).toHaveJSProperty('readOnly', true);
+    await expect(page.getByTestId('field-runtime_conditional_note')).toHaveCount(0);
+
+    await page.getByTestId('form-btn-submit').click();
+    await expect(page.getByTestId('field-name')).toContainText(/required|必填|不能为空|请填写/i, {
+      timeout: 5_000,
+    });
+    expect(commandRequests, 'invalid required submit must not execute create command').toHaveLength(
+      0,
+    );
+
+    await page.getByTestId('field-name').locator('input, textarea').first().fill('show-extra');
+    await expect(page.getByTestId('field-runtime_conditional_note')).toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test('sub-table runtime creates, edits, deletes child rows, and updates aggregate state', async ({
