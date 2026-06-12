@@ -83,6 +83,9 @@ export function adminRuntimeEngineRoutes() {
     // Custom page route uses the pageKey directly and must be registered
     // before /p/:pageKey so /p/c/{pageKey} does not fall through to the
     // menu-driven catch-all.
+    route('/p/c/:pageKey/edit/:recordId', './routes/p.c.$pageKey.edit.tsx', {
+      id: 'p-custom-edit',
+    }),
     route('/p/c/:pageKey', './routes/p.c.$pageKey.tsx'),
     route('/p/:pageKey', './routes/p.$pageKey.tsx'),
     route('/p/:pageKey/new', './routes/p.$pageKey.new.tsx'),

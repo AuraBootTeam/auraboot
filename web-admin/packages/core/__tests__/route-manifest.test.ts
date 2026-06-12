@@ -28,6 +28,9 @@ describe('coreRoutes', () => {
 
   it('registers custom low-code pages before generic /p pages and catch-all', () => {
     const routes = coreRoutes();
+    const customEditIndex = routes.findIndex(
+      (entry) => entry.path === '/p/c/:pageKey/edit/:recordId',
+    );
     const customPageIndex = routes.findIndex((entry) => entry.path === '/p/c/:pageKey');
     const genericPageIndex = routes.findIndex((entry) => entry.path === '/p/:pageKey');
     const catchAllIndex = routes.findIndex((entry) => entry.path === '/*');
@@ -38,9 +41,17 @@ describe('coreRoutes', () => {
           path: '/p/c/:pageKey',
           file: './routes/p.c.$pageKey.tsx',
         }),
+        expect.objectContaining({
+          path: '/p/c/:pageKey/edit/:recordId',
+          file: './routes/p.c.$pageKey.edit.tsx',
+        }),
       ]),
     );
+    expect(customEditIndex).toBeGreaterThanOrEqual(0);
     expect(customPageIndex).toBeGreaterThanOrEqual(0);
+    expect(customEditIndex).toBeLessThan(customPageIndex);
+    expect(customEditIndex).toBeLessThan(genericPageIndex);
+    expect(customEditIndex).toBeLessThan(catchAllIndex);
     expect(customPageIndex).toBeLessThan(genericPageIndex);
     expect(customPageIndex).toBeLessThan(catchAllIndex);
   });
