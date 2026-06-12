@@ -469,6 +469,14 @@ describe('Inspector schema registry', () => {
     expect(sectionSchema.find((field) => field.key === 'props.visibleWhen')?.type).toBe('json');
   });
 
+  it('exposes props.aiLocked as a boolean inspector field on form fields (D5 AI lock)', () => {
+    const registry = createDefaultInspectorSchemaRegistry();
+    const formFieldSchema = registry.getFields('field');
+    const aiLocked = formFieldSchema.find((field) => field.key === 'props.aiLocked');
+    expect(aiLocked).toBeDefined();
+    expect(aiLocked?.type).toBe('boolean');
+  });
+
   it('returns structured inspector schemas for page containers and dashboard layout', () => {
     const registry = createDefaultInspectorSchemaRegistry();
 
