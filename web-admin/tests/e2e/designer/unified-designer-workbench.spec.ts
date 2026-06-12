@@ -6543,30 +6543,34 @@ async function ensureNamedQueryField(
   }
 
   const addText = await addResp.text();
-  const updateResp = await page.request.put(
-    `/api/meta/named-queries/${encodedQueryCode}/fields/${encodedFieldCode}`,
-    { data: field },
-  );
-  if (updateResp.ok()) {
-    const updateBody = await updateResp.json();
-    expect(updateBody.code).toBe('0');
-    return;
-  }
 
   const fieldsResp = await page.request.get(`/api/meta/named-queries/${encodedQueryCode}/fields`);
   if (fieldsResp.ok()) {
     const fieldsBody = await fieldsResp.json();
     const fields = Array.isArray(fieldsBody.data) ? fieldsBody.data : [];
-    if (
-      fieldsBody.code === '0' &&
-      fields.some((item: { fieldCode?: unknown }) => item.fieldCode === field.fieldCode)
-    ) {
-      return;
+    if (fieldsBody.code === '0') {
+      const existing = fields.find(
+        (item: { fieldCode?: unknown }) => item.fieldCode === field.fieldCode,
+      ) as
+        | {
+            fieldCode?: unknown;
+            columnExpr?: unknown;
+            dataType?: unknown;
+            displayName?: unknown;
+            sortable?: unknown;
+            searchable?: unknown;
+            sortOrder?: unknown;
+          }
+        | undefined;
+      if (existing) {
+        expect(existing).toMatchObject(field);
+        return;
+      }
     }
   }
 
   throw new Error(
-    `Failed to create or update named query field ${queryCode}.${field.fieldCode}: ${addText}`,
+    `Failed to create or reuse matching named query field ${queryCode}.${field.fieldCode}: ${addText}`,
   );
 }
 
