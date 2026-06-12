@@ -60,6 +60,7 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   // crmUnavailable: true when the CRM module is not installed (API error, e.g. table does not exist)
   const [crmUnavailable, setCrmUnavailable] = useState(false);
 
@@ -69,6 +70,9 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError(false);
+      setPermissionDenied(false);
+      setCrmUnavailable(false);
       try {
         const result = await get<LeadListResponse>(
           `/api/dynamic/crm_lead/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
@@ -76,6 +80,8 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
         if (!cancelled && result.code === '0' && result.data) {
           setLeads(result.data.records || []);
           setTotal(result.data.total || 0);
+        } else if (!cancelled && result.code === '403') {
+          setPermissionDenied(true);
         } else if (!cancelled) {
           setError(true);
         }
@@ -118,6 +124,26 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
               <div className="h-5 w-14 animate-pulse rounded-full bg-gray-100" />
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Permission denied ---
+  if (permissionDenied) {
+    return (
+      <div className={`flex h-full flex-col ${className}`} data-testid="leads-permission-denied">
+        <div className="mb-3 flex items-center justify-between px-1">
+          <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
+          <span className="mb-1 text-2xl">{'\uD83D\uDD12'}</span>
+          <span className="text-sm font-medium text-gray-500">
+            {t('workbench.leads.permissionDenied', {}, 'No permission to view leads')}
+          </span>
+          <span className="mt-1 text-xs text-gray-400">
+            {t('workbench.leads.permissionDeniedHint', {}, 'Ask an administrator for CRM lead access')}
+          </span>
         </div>
       </div>
     );

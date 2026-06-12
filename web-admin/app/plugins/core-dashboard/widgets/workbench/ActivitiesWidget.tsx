@@ -71,6 +71,7 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const resolvedTitle = title || t('workbench.activities.title', {}, 'Recent Activities');
 
@@ -78,12 +79,16 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError(false);
+      setPermissionDenied(false);
       try {
         const result = await get<ActivityListResponse>(
           `/api/dynamic/crm_activity/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
         );
         if (!cancelled && result.code === '0' && result.data) {
           setActivities(result.data.records || []);
+        } else if (!cancelled && result.code === '403') {
+          setPermissionDenied(true);
         } else if (!cancelled) {
           setError(true);
         }
@@ -124,6 +129,26 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Permission denied ---
+  if (permissionDenied) {
+    return (
+      <div className={`flex h-full flex-col ${className}`} data-testid="activities-permission-denied">
+        <div className="mb-3 flex items-center justify-between px-1">
+          <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
+          <span className="mb-1 text-2xl">{'\uD83D\uDD12'}</span>
+          <span className="text-sm font-medium text-gray-500">
+            {t('workbench.activities.permissionDenied', {}, 'No permission to view activities')}
+          </span>
+          <span className="mt-1 text-xs text-gray-400">
+            {t('workbench.activities.permissionDeniedHint', {}, 'Ask an administrator for CRM activity access')}
+          </span>
         </div>
       </div>
     );

@@ -1983,6 +1983,71 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
     }
   });
 
+  test('DWR-013: CRM workbench widgets distinguish permission denial from empty CRM data', async ({
+    page,
+  }) => {
+    let dashboard: CreatedDashboard | undefined;
+    const forbiddenBody = {
+      code: '403',
+      message: 'Access forbidden',
+      data: null,
+    };
+
+    try {
+      dashboard = await createPublishedDashboard(
+        page,
+        crmWorkbenchWidgets(),
+        'Runtime CRM Workbench Permission Matrix',
+      );
+      await page.route('**/api/workbench/pipeline**', async (route) => {
+        await route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify(forbiddenBody),
+        });
+      });
+      await page.route('**/api/dynamic/crm_lead/list**', async (route) => {
+        await route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify(forbiddenBody),
+        });
+      });
+      await page.route('**/api/dynamic/crm_activity/list**', async (route) => {
+        await route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify(forbiddenBody),
+        });
+      });
+
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      const pipelineBlock = await expectRuntimeBlock(page, 'runtime-pipeline', 'smart-pipeline');
+      await expect(pipelineBlock.getByTestId('pipeline-permission-denied')).toBeVisible();
+      await expect(pipelineBlock).not.toContainText('No opportunity data');
+      await expect(pipelineBlock).not.toContainText('CRM module not installed');
+
+      const leadsBlock = await expectRuntimeBlock(page, 'runtime-leads', 'smart-leads');
+      await expect(leadsBlock.getByTestId('leads-permission-denied')).toBeVisible();
+      await expect(leadsBlock).not.toContainText('No leads yet');
+      await expect(leadsBlock).not.toContainText('CRM module not installed');
+
+      const activitiesBlock = await expectRuntimeBlock(
+        page,
+        'runtime-activities',
+        'smart-activities',
+      );
+      await expect(activitiesBlock.getByTestId('activities-permission-denied')).toBeVisible();
+      await expect(activitiesBlock).not.toContainText('No recent activities');
+    } finally {
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
   test('DWR-009: BPM workbench widgets render live BPM runtime data', async ({ page }) => {
     let dashboard: CreatedDashboard | undefined;
     let bpmFixture: CreatedBpmWorkbenchFixture | undefined;

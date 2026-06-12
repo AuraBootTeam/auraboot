@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.util.StringUtils;
 
@@ -47,6 +48,7 @@ public class UserEngagementServiceImpl implements UserEngagementService {
     @Override
     @Transactional
     public UserEngagementDTO upsert(Long userId, Long tenantId, UserEngagementDTO dto) {
+        OffsetDateTime now = OffsetDateTime.now();
         // Look up by composite unique key
         UserEngagement existing = engagementMapper.selectOne(
                 new LambdaQueryWrapper<UserEngagement>()
@@ -62,7 +64,7 @@ public class UserEngagementServiceImpl implements UserEngagementService {
             // Update mutable fields
             existing.setTargetLabel(dto.getTargetLabel());
             existing.setTargetContext(dto.getTargetContext());
-            existing.setUpdatedAt(OffsetDateTime.now());
+            existing.setUpdatedAt(now);
             engagementMapper.updateById(existing);
             entity = existing;
         } else {
@@ -75,7 +77,8 @@ public class UserEngagementServiceImpl implements UserEngagementService {
             entity.setTargetContext(dto.getTargetContext());
             entity.setEngagementType(dto.getEngagementType());
             entity.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
-            // createdAt / updatedAt filled by MetaObjectHandler via @TableField(fill)
+            entity.setCreatedAt(now);
+            entity.setUpdatedAt(now);
             engagementMapper.insert(entity);
         }
 
@@ -120,7 +123,6 @@ public class UserEngagementServiceImpl implements UserEngagementService {
 
     /**
      * Prune the oldest recent_view records beyond the RECENT_VIEW_MAX cap.
-     * Selects all records ordered by createdAt ASC and deletes everything past the limit.
      */
     private void pruneRecentViews(Long userId, Long tenantId) {
         List<UserEngagement> all = engagementMapper.selectList(
@@ -128,17 +130,29 @@ public class UserEngagementServiceImpl implements UserEngagementService {
                         .eq(UserEngagement::getUserId, userId)
                         .eq(UserEngagement::getTenantId, tenantId)
                         .eq(UserEngagement::getEngagementType, TYPE_RECENT_VIEW)
-                        .orderByAsc(UserEngagement::getCreatedAt)
         );
 
         if (all.size() > RECENT_VIEW_MAX) {
-            List<UserEngagement> toDelete = all.subList(0, all.size() - RECENT_VIEW_MAX);
+            List<UserEngagement> toDelete = all.stream()
+                    .sorted(Comparator
+                            .comparing(
+                                    this::recentViewTimestamp,
+                                    Comparator.nullsFirst(Comparator.naturalOrder()))
+                            .thenComparing(
+                                    UserEngagement::getId,
+                                    Comparator.nullsFirst(Comparator.naturalOrder())))
+                    .limit(all.size() - RECENT_VIEW_MAX)
+                    .toList();
             for (UserEngagement old : toDelete) {
                 engagementMapper.deleteById(old.getId());
             }
             log.debug("Pruned {} oldest recent_view records for userId={} tenantId={}",
                     toDelete.size(), userId, tenantId);
         }
+    }
+
+    private OffsetDateTime recentViewTimestamp(UserEngagement entity) {
+        return entity.getUpdatedAt() != null ? entity.getUpdatedAt() : entity.getCreatedAt();
     }
 
     /**
