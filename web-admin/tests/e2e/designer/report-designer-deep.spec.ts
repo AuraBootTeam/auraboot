@@ -7,7 +7,7 @@
  *   - Report-level operations (save, export, undo/redo)
  *
  * IDs: RPT-DT-01..13, RPT-GT-01..07, RPT-SC-01..06, RPT-RT-01..06,
- *      RPT-CT-01..09, RPT-CH-01..08, RPT-BD-01..08, RPT-OP-01..12,
+ *      RPT-CT-01..09, RPT-CH-01..08, RPT-BD-01..08, RPT-OP-01..13,
  *      RPT-BC-01..07, RPT-WM-01..06
  *
  * @since 6.0.0
@@ -135,6 +135,62 @@ async function createReportExportPage(page: Page) {
   expect(pid, 'created report page pid').toBeTruthy();
 
   return { pid, title, exportRows };
+}
+
+async function createReportPdfVisualFidelityPage(page: Page) {
+  const title = uniqueId('ReportPdfVisual');
+  const pageKey = title.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+  const reportDsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title,
+    page: {
+      size: 'A4',
+      orientation: 'landscape',
+      margin: { top: 15, right: 10, bottom: 12, left: 35 },
+    },
+    dataSources: {
+      layoutRows: {
+        type: 'static',
+        data: [{ region: 'North', cases: 12 }],
+      },
+    },
+    body: [
+      {
+        id: 'layout_table',
+        blockType: 'table',
+        title: 'Layout Table',
+        dataSource: 'layoutRows',
+        showHeader: true,
+        columns: [
+          { field: 'region', label: 'Region' },
+          { field: 'cases', label: 'Cases' },
+        ],
+      },
+    ],
+  };
+
+  const createResp = await page.request.post('/api/pages', {
+    data: {
+      pageKey,
+      name: title,
+      title,
+      kind: 'list',
+      profile: 'report',
+      blocks: [],
+      schemaVersion: 4,
+      semver: '0.1.0',
+      metaInfo: { e2eArtifact: 'report-pdf-visual-fidelity' },
+      extension: { reportDsl },
+    },
+  });
+  expect(createResp.ok(), `Create visual fidelity report page failed: ${createResp.status()}`).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create visual fidelity report page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created visual fidelity report page pid').toBeTruthy();
+
+  return { pid, title };
 }
 
 async function createReportNonTableExportPage(page: Page) {
@@ -500,6 +556,44 @@ function extractPdfContentText(bytes: Buffer): string {
     offset = streamEnd + 'endstream'.length;
   }
   return chunks.join('\n');
+}
+
+function extractPdfMediaBox(bytes: Buffer): { width: number; height: number } {
+  const match = bytes
+    .toString('latin1')
+    .match(/\/MediaBox\s*\[\s*0(?:\.0+)?\s+0(?:\.0+)?\s+([0-9.]+)\s+([0-9.]+)/);
+  expect(match, 'PDF MediaBox must be present').toBeTruthy();
+  return { width: Number(match?.[1]), height: Number(match?.[2]) };
+}
+
+function extractPdfTextObjects(bytes: Buffer): Array<{ text: string; x: number; y: number; fontSize: number }> {
+  const content = extractPdfContentText(bytes);
+  const objects: Array<{ text: string; x: number; y: number; fontSize: number }> = [];
+  const textObjectPattern =
+    /\/[A-Za-z0-9]+\s+(-?\d+(?:\.\d+)?)\s+Tf\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+Td\s+\(([^()]*)\)\s+Tj/g;
+  let match: RegExpExecArray | null;
+  while ((match = textObjectPattern.exec(content)) != null) {
+    objects.push({
+      fontSize: Number(match[1]),
+      x: Number(match[2]),
+      y: Number(match[3]),
+      text: match[4].replace(/\\([()\\])/g, '$1'),
+    });
+  }
+  return objects;
+}
+
+function requirePdfTextObject(
+  objects: Array<{ text: string; x: number; y: number; fontSize: number }>,
+  text: string,
+) {
+  const object = objects.find((entry) => entry.text === text);
+  expect(object, `PDF text object not found: ${text}`).toBeTruthy();
+  return object!;
+}
+
+function pdfMmToPoints(millimeters: number): number {
+  return (millimeters * 72) / 25.4;
 }
 
 // ===================================================================
@@ -1476,6 +1570,60 @@ test.describe('Report Operations', () => {
       expect(payload.dataSets?.modelOrders?.[0]?.e2et_order_title).toBe(modelTitle);
       expect(payload.dataSets?.namedQueryOrders?.[0]?.e2et_order_title).toBe(namedQueryTitle);
       expect(payload.dataSets?.apiOrders?.[0]?.e2et_order_title).toBe(apiTitle);
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
+
+  test('RPT-OP-13: Export PDF preserves page settings and text hierarchy', async ({
+    page,
+  }, testInfo) => {
+    const { pid, title } = await createReportPdfVisualFidelityPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const pdfBtn = page.getByRole('button', { name: /export pdf/i });
+      await expect(pdfBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/pdf') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
+      await pdfBtn.click();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `PDF export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(exportResponse.headers()['content-type']).toContain('application/pdf');
+      expect(download.suggestedFilename()).toBe(`${title}.pdf`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const bytes = await readFile(savedPath);
+      expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      const mediaBox = extractPdfMediaBox(bytes);
+      expect(mediaBox.width).toBeGreaterThan(mediaBox.height);
+      expect(mediaBox.width).toBeGreaterThan(841);
+      expect(mediaBox.width).toBeLessThan(842);
+      expect(mediaBox.height).toBeGreaterThan(595);
+      expect(mediaBox.height).toBeLessThan(596);
+
+      const textObjects = extractPdfTextObjects(bytes);
+      const titleObject = requirePdfTextObject(textObjects, title);
+      const blockTitleObject = requirePdfTextObject(textObjects, 'Layout Table');
+      const expectedLeft = pdfMmToPoints(35);
+      expect(titleObject.x).toBeGreaterThan(expectedLeft - 1);
+      expect(titleObject.x).toBeLessThan(expectedLeft + 1);
+      expect(titleObject.fontSize).toBe(16);
+      expect(blockTitleObject.x).toBeGreaterThan(expectedLeft - 1);
+      expect(blockTitleObject.x).toBeLessThan(expectedLeft + 1);
+      expect(blockTitleObject.fontSize).toBe(12);
+      expect(titleObject.y).toBeGreaterThan(blockTitleObject.y);
     } finally {
       await page.request.delete(`/api/pages/${pid}`).catch(() => {});
     }

@@ -61,6 +61,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private static final String PDF_CONTENT_TYPE = "application/pdf";
     private static final String JSON_CONTENT_TYPE = "application/json";
     private static final float PDF_MARGIN = 48f;
+    private static final float PDF_POINTS_PER_MM = 72f / 25.4f;
     private static final float PDF_LINE_HEIGHT = 15f;
     private static final String DATA_SOURCE_STATIC = "static";
     private static final String DATA_SOURCE_MODEL = "model";
@@ -139,7 +140,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(reportDsl);
             List<PdfLine> lines = renderPdfLines(reportDsl, dataSets, title);
-            writePdfLines(document, lines, resolvePdfPageSize(reportDsl));
+            writePdfLines(document, lines, resolvePdfPageSize(reportDsl), resolvePdfMargins(reportDsl));
             document.save(output);
             return new ReportExportFile(output.toByteArray(), safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
         } catch (ValidationException e) {
@@ -379,24 +380,28 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
     }
 
-    private void writePdfLines(PDDocument document, List<PdfLine> lines, PDRectangle pageSize) throws java.io.IOException {
+    private void writePdfLines(PDDocument document,
+                               List<PdfLine> lines,
+                               PDRectangle pageSize,
+                               PdfMargins margins) throws java.io.IOException {
         PDPage page = new PDPage(pageSize);
         document.addPage(page);
         PDPageContentStream content = new PDPageContentStream(document, page);
-        float y = pageSize.getHeight() - PDF_MARGIN;
+        float y = pageSize.getHeight() - margins.top();
+        float availableWidth = Math.max(72f, pageSize.getWidth() - margins.left() - margins.right());
         try {
             for (PdfLine line : lines) {
-                for (String wrappedLine : wrapPdfLine(line.text())) {
-                    if (y < PDF_MARGIN) {
+                for (String wrappedLine : wrapPdfLine(line.text(), line.fontSize(), availableWidth)) {
+                    if (y < margins.bottom()) {
                         content.close();
                         page = new PDPage(pageSize);
                         document.addPage(page);
                         content = new PDPageContentStream(document, page);
-                        y = pageSize.getHeight() - PDF_MARGIN;
+                        y = pageSize.getHeight() - margins.top();
                     }
                     content.beginText();
                     content.setFont(line.bold() ? PDType1Font.HELVETICA_BOLD : PDType1Font.HELVETICA, line.fontSize());
-                    content.newLineAtOffset(PDF_MARGIN, y);
+                    content.newLineAtOffset(margins.left(), y);
                     content.showText(sanitizePdfText(wrappedLine));
                     content.endText();
                     y -= line.lineHeight();
@@ -407,9 +412,9 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
     }
 
-    private List<String> wrapPdfLine(String line) {
+    private List<String> wrapPdfLine(String line, float fontSize, float availableWidth) {
         String text = sanitizePdfText(line);
-        int maxChars = 100;
+        int maxChars = Math.max(20, (int) Math.floor(availableWidth / Math.max(4f, fontSize * 0.5f)));
         if (text.length() <= maxChars) {
             return List.of(text);
         }
@@ -442,6 +447,40 @@ public class ReportExportServiceImpl implements ReportExportService {
             return new PDRectangle(rectangle.getHeight(), rectangle.getWidth());
         }
         return rectangle;
+    }
+
+    @SuppressWarnings("unchecked")
+    private PdfMargins resolvePdfMargins(Map<String, Object> reportDsl) {
+        Object pageObject = reportDsl.get("page");
+        Map<String, Object> page = pageObject instanceof Map<?, ?> rawPage
+                ? (Map<String, Object>) rawPage
+                : Map.of();
+        Object marginObject = page.get("margin");
+        if (!(marginObject instanceof Map<?, ?> rawMargin)) {
+            return PdfMargins.defaultMargins();
+        }
+
+        Map<String, Object> margin = (Map<String, Object>) rawMargin;
+        return new PdfMargins(
+                marginMmToPoints(margin.get("top")),
+                marginMmToPoints(margin.get("right")),
+                marginMmToPoints(margin.get("bottom")),
+                marginMmToPoints(margin.get("left"))
+        );
+    }
+
+    private float marginMmToPoints(Object value) {
+        if (value == null) {
+            return PDF_MARGIN;
+        }
+        if (value instanceof Number number) {
+            return Math.max(0f, number.floatValue() * PDF_POINTS_PER_MM);
+        }
+        try {
+            return Math.max(0f, Float.parseFloat(value.toString()) * PDF_POINTS_PER_MM);
+        } catch (NumberFormatException ignored) {
+            return PDF_MARGIN;
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -1300,6 +1339,12 @@ public class ReportExportServiceImpl implements ReportExportService {
 
         static PdfLine text(List<String> cells) {
             return text(String.join(" | ", cells));
+        }
+    }
+
+    private record PdfMargins(float top, float right, float bottom, float left) {
+        static PdfMargins defaultMargins() {
+            return new PdfMargins(PDF_MARGIN, PDF_MARGIN, PDF_MARGIN, PDF_MARGIN);
         }
     }
 }

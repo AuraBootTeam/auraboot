@@ -16,7 +16,9 @@ import com.auraboot.framework.meta.service.NamedQueryService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.text.TextPosition;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +28,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -115,6 +119,38 @@ class ReportExportServiceTest {
             assertThat(text).contains("Region | Cases");
             assertThat(text).contains("North | 12");
             assertThat(text).contains("South | 9");
+        }
+    }
+
+    @Test
+    void exportPdf_withPageSettings_preservesMediaBoxMarginsAndTextHierarchy() throws Exception {
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", visualFidelityReportDsl());
+        page.setExtension(extension);
+
+        when(pageSchemaMapper.selectByPid("rpt-visual-pdf")).thenReturn(page);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-visual-pdf");
+
+        ReportExportFile file = reportExportService.exportPdf(request);
+
+        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(file.getBytes()))) {
+            PDRectangle mediaBox = document.getPage(0).getMediaBox();
+            assertThat(mediaBox.getWidth()).isBetween(841f, 842f);
+            assertThat(mediaBox.getHeight()).isBetween(595f, 596f);
+
+            List<PdfTextLine> lines = extractPdfTextLines(document);
+            PdfTextLine title = requirePdfTextLine(lines, "Visual Fidelity Export");
+            PdfTextLine blockTitle = requirePdfTextLine(lines, "Layout Table");
+            float expectedLeft = mmToPoints(35);
+
+            assertThat(title.x()).isBetween(expectedLeft - 1f, expectedLeft + 1f);
+            assertThat(title.fontSize()).isBetween(15.5f, 16.5f);
+            assertThat(blockTitle.x()).isBetween(expectedLeft - 1f, expectedLeft + 1f);
+            assertThat(blockTitle.fontSize()).isBetween(11.5f, 12.5f);
+            assertThat(title.y()).isLessThan(blockTitle.y());
         }
     }
 
@@ -361,6 +397,40 @@ class ReportExportServiceTest {
         return dsl;
     }
 
+    private Map<String, Object> visualFidelityReportDsl() {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("region", "North");
+        row.put("cases", 12);
+
+        Map<String, Object> dataSource = new LinkedHashMap<>();
+        dataSource.put("type", "static");
+        dataSource.put("data", List.of(row));
+
+        Map<String, Object> table = new LinkedHashMap<>();
+        table.put("id", "layout_table");
+        table.put("blockType", "table");
+        table.put("title", "Layout Table");
+        table.put("dataSource", "layoutRows");
+        table.put("showHeader", true);
+        table.put("columns", List.of(
+                Map.of("field", "region", "label", "Region"),
+                Map.of("field", "cases", "label", "Cases")
+        ));
+
+        Map<String, Object> dsl = new LinkedHashMap<>();
+        dsl.put("$schema", "auraboot://schemas/report/v1");
+        dsl.put("version", "1.0.0");
+        dsl.put("title", "Visual Fidelity Export");
+        dsl.put("page", Map.of(
+                "size", "A4",
+                "orientation", "landscape",
+                "margin", Map.of("top", 15, "right", 10, "bottom", 12, "left", 35)
+        ));
+        dsl.put("dataSources", Map.of("layoutRows", dataSource));
+        dsl.put("body", List.of(table));
+        return dsl;
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> castMap(Object value) {
         return (Map<String, Object>) value;
@@ -369,6 +439,41 @@ class ReportExportServiceTest {
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> castList(Object value) {
         return (List<Map<String, Object>>) value;
+    }
+
+    private List<PdfTextLine> extractPdfTextLines(PDDocument document) throws IOException {
+        List<PdfTextLine> lines = new ArrayList<>();
+        PDFTextStripper stripper = new PDFTextStripper() {
+            @Override
+            protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
+                if (text != null && !text.isBlank() && !textPositions.isEmpty()) {
+                    TextPosition first = textPositions.get(0);
+                    lines.add(new PdfTextLine(
+                            text.trim(),
+                            first.getXDirAdj(),
+                            first.getYDirAdj(),
+                            first.getFontSizeInPt()
+                    ));
+                }
+                super.writeString(text, textPositions);
+            }
+        };
+        stripper.getText(document);
+        return lines;
+    }
+
+    private PdfTextLine requirePdfTextLine(List<PdfTextLine> lines, String text) {
+        return lines.stream()
+                .filter(line -> line.text().equals(text))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("PDF text line not found: " + text + " in " + lines));
+    }
+
+    private float mmToPoints(float millimeters) {
+        return millimeters * 72f / 25.4f;
+    }
+
+    private record PdfTextLine(String text, float x, float y, float fontSize) {
     }
 
     private Map<String, Object> nonTableReportDsl() {
