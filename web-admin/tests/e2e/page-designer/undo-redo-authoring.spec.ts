@@ -80,6 +80,37 @@ async function createBlockTitleUndoRedoPage(page: Page) {
   return { pid, pageKey, title };
 }
 
+async function createBlockAddUndoRedoPage(page: Page) {
+  const id = uniqueId('pd_block_add_undo_redo_authoring');
+  const pageKey = id.replace(/-/g, '_');
+  const title = `Block add undo redo authoring ${id}`;
+  const payload = {
+    name: title,
+    pageKey,
+    title,
+    kind: 'form',
+    modelCode: SHOWCASE_MODEL,
+    profile: 'admin',
+    layout: { type: 'stack', gap: 12 },
+    blocks: [],
+    dataSources: {},
+    schemaVersion: 4,
+    metaInfo: { runtimeE2E: true, undoRedoBlockAdd: true },
+    semver: '0.1.0',
+  };
+
+  const createResp = await page.request.post('/api/pages', { data: payload });
+  expect(
+    createResp.ok(),
+    `Create block add undo/redo authoring page failed: ${createResp.status()}`,
+  ).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created block add undo/redo authoring pid').toBeTruthy();
+  return { pid, pageKey, title };
+}
+
 async function fetchModelFieldType(page: Page, modelCode: string, fieldCode: string) {
   const modelResp = await page.request.get(`/api/meta/models/code/${modelCode}`);
   expect(modelResp.ok(), `Fetch model ${modelCode} failed: ${modelResp.status()}`).toBeTruthy();
@@ -102,6 +133,33 @@ async function openDesignerByPid(page: Page, pid: string) {
   await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('toolbar-save')).toBeVisible({ timeout: 10_000 });
+}
+
+async function canvasBlockIds(page: Page): Promise<string[]> {
+  return page.locator('[data-testid="sortable-block"][data-block-id]').evaluateAll((elements) =>
+    elements
+      .map((element) => (element as HTMLElement).getAttribute('data-block-id') || '')
+      .filter(Boolean),
+  );
+}
+
+async function addBlockViaPalette(page: Page, blockType: string): Promise<string> {
+  await page.getByTestId('designer-tab-blocks').click();
+  await expect(page.getByTestId('library-tab-blocks')).toBeVisible({ timeout: 5_000 });
+
+  const beforeIds = await canvasBlockIds(page);
+  const paletteItem = page.getByTestId(`block-palette-item-${blockType}`);
+  await expect(paletteItem).toBeVisible({ timeout: 5_000 });
+  await paletteItem.evaluate((element: HTMLElement) => element.click());
+
+  await expect
+    .poll(async () => (await canvasBlockIds(page)).length, { timeout: 5_000 })
+    .toBe(beforeIds.length + 1);
+
+  const afterIds = await canvasBlockIds(page);
+  const newId = afterIds.find((blockId) => !beforeIds.includes(blockId));
+  expect(newId, `new ${blockType} block id`).toBeTruthy();
+  return newId!;
 }
 
 async function selectDesignerField(page: Page, fieldCode: string) {
@@ -236,5 +294,37 @@ test.describe('Page Designer undo/redo authoring persistence', () => {
     await saveDesignerAndWait(page, pid);
     const redonePage = await fetchPageByPid(page, pid);
     expect(savedBlockById(redonePage, BLOCK_TITLE_SECTION_ID).title).toBe('Edited block title');
+  });
+
+  test('saves the undone schema and then saves the redone schema for a block add action', async ({
+    page,
+  }) => {
+    const { pid } = await createBlockAddUndoRedoPage(page);
+    await openDesignerByPid(page, pid);
+
+    const baselineBlockIds = await canvasBlockIds(page);
+    const textBlockId = await addBlockViaPalette(page, 'text');
+    await expect
+      .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
+      .toEqual([...baselineBlockIds, textBlockId]);
+
+    await page.getByTestId('toolbar-undo').click();
+    await expect
+      .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
+      .toEqual(baselineBlockIds);
+    await saveDesignerAndWait(page, pid);
+    const undonePage = await fetchPageByPid(page, pid);
+    expect((undonePage.blocks ?? []).map((block: any) => block.id)).not.toContain(textBlockId);
+
+    await page.getByTestId('toolbar-redo').click();
+    await expect
+      .poll(async () => canvasBlockIds(page), { timeout: 5_000 })
+      .toEqual([...baselineBlockIds, textBlockId]);
+    await saveDesignerAndWait(page, pid);
+    const redonePage = await fetchPageByPid(page, pid);
+    expect(savedBlockById(redonePage, textBlockId)).toMatchObject({
+      id: textBlockId,
+      blockType: 'text',
+    });
   });
 });
