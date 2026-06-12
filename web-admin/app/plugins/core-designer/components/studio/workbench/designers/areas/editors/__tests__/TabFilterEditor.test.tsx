@@ -202,7 +202,13 @@ describe('TabFilterEditor', () => {
                 title: { 'en-US': 'Metric', 'zh-CN': '指标' },
                 dataSource: 'old_stats',
                 refreshInterval: 1000,
-                props: { valueField: 'oldCount', suffix: 'items', color: 'blue' },
+                props: {
+                  valueField: 'oldCount',
+                  changeField: 'oldDelta',
+                  prefix: '$',
+                  suffix: 'items',
+                  color: 'blue',
+                },
               },
             ],
           },
@@ -212,9 +218,17 @@ describe('TabFilterEditor', () => {
     );
 
     expect(screen.getByTestId('tab-child-stat-suffix-input-0')).toHaveValue('items');
+    expect(screen.getByTestId('tab-child-stat-prefix-input-0')).toHaveValue('$');
+    expect(screen.getByTestId('tab-child-stat-change-field-input-0')).toHaveValue('oldDelta');
     expect(screen.getByTestId('tab-child-stat-color-select-0')).toHaveValue('blue');
     expect(screen.getByTestId('tab-child-stat-refresh-interval-input-0')).toHaveValue(1000);
 
+    fireEvent.change(screen.getByTestId('tab-child-stat-prefix-input-0'), {
+      target: { value: 'USD ' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-stat-change-field-input-0'), {
+      target: { value: 'deltaRate' },
+    });
     fireEvent.change(screen.getByTestId('tab-child-stat-suffix-input-0'), {
       target: { value: 'records' },
     });
@@ -228,7 +242,13 @@ describe('TabFilterEditor', () => {
     expect(serializedTabs()[0].blocks?.[0]).toMatchObject({
       blockType: 'stat-card',
       refreshInterval: 1500,
-      props: { valueField: 'oldCount', suffix: 'records', color: 'green' },
+      props: {
+        valueField: 'oldCount',
+        changeField: 'deltaRate',
+        prefix: 'USD ',
+        suffix: 'records',
+        color: 'green',
+      },
     });
   });
 

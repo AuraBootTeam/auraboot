@@ -172,6 +172,8 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     await page.getByTestId('tab-child-title-zh-input-0').fill('嵌套指标卡片');
     await page.getByTestId('tab-child-stat-data-source-input-0').fill('nested_stats');
     await page.getByTestId('tab-child-stat-value-field-input-0').fill('totalCount');
+    await page.getByTestId('tab-child-stat-change-field-input-0').fill('deltaRate');
+    await page.getByTestId('tab-child-stat-prefix-input-0').fill('USD ');
     await page.getByTestId('tab-child-stat-suffix-input-0').fill('records');
     await page.getByTestId('tab-child-stat-color-select-0').selectOption('green');
     await page.getByTestId('tab-child-stat-refresh-interval-input-0').fill('1500');
@@ -193,7 +195,13 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
               title: { 'en-US': 'Nested metric card', 'zh-CN': '嵌套指标卡片' },
               dataSource: 'nested_stats',
               refreshInterval: 1500,
-              props: { valueField: 'totalCount', suffix: 'records', color: 'green' },
+              props: {
+                valueField: 'totalCount',
+                changeField: 'deltaRate',
+                prefix: 'USD ',
+                suffix: 'records',
+                color: 'green',
+              },
             },
           ],
         },
@@ -212,6 +220,10 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
     await expect(page.getByTestId('tab-child-stat-value-field-input-0')).toHaveValue(
       'totalCount',
     );
+    await expect(page.getByTestId('tab-child-stat-change-field-input-0')).toHaveValue(
+      'deltaRate',
+    );
+    await expect(page.getByTestId('tab-child-stat-prefix-input-0')).toHaveValue('USD ');
     await expect(page.getByTestId('tab-child-stat-suffix-input-0')).toHaveValue('records');
     await expect(page.getByTestId('tab-child-stat-color-select-0')).toHaveValue('green');
     await expect(page.getByTestId('tab-child-stat-refresh-interval-input-0')).toHaveValue('1500');

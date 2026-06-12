@@ -468,6 +468,42 @@ export function TabFilterEditor({
                         </div>
                         <div className="grid grid-cols-2 gap-1.5">
                           <label className="text-[10px] text-gray-500">
+                            Change field
+                            <input
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
+                              value={String(block.props?.changeField || '')}
+                              onChange={(event) =>
+                                updateStatChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'changeField',
+                                  event.target.value,
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-stat-change-field-input-${index}`}
+                            />
+                          </label>
+                          <label className="text-[10px] text-gray-500">
+                            Prefix
+                            <input
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                              value={String(block.props?.prefix || '')}
+                              onChange={(event) =>
+                                updateStatChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'prefix',
+                                  event.target.value,
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-stat-prefix-input-${index}`}
+                            />
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <label className="text-[10px] text-gray-500">
                             Suffix
                             <input
                               className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
