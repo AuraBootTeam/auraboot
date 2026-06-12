@@ -218,7 +218,6 @@ test.describe('Dashboard Tab Reorder', () => {
    * DTR-002: Tabs can be dragged to reorder
    */
   test('DTR-002: tabs can be dragged to reorder', async ({ page }) => {
-    test.fixme(true, 'Tab order preference API not reliably setting initial order — A/B order reversed');
     // Place A/B at top so first two tabs are deterministic.
     await setTabOrderPreference(page, [dashACode, dashBCode]);
 
@@ -241,7 +240,7 @@ test.describe('Dashboard Tab Reorder', () => {
   /**
    * DTR-003: Tab order persists after page reload
    */
-  test.fixme('DTR-003: tab order persists after reload', async ({ page }) => {
+  test('DTR-003: tab order persists after reload', async ({ page }) => {
     // Place A/B at top so first two tabs are deterministic.
     await setTabOrderPreference(page, [dashACode, dashBCode]);
 
