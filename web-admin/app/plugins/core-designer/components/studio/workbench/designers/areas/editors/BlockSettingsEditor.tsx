@@ -124,6 +124,37 @@ interface PropertyEditorProps {
   readonly?: boolean;
 }
 
+interface DataSourceReferenceFieldProps extends PropertyEditorProps {
+  fieldTestId: string;
+  inputTestId: string;
+  placeholder: string;
+}
+
+const DataSourceReferenceField: React.FC<DataSourceReferenceFieldProps> = ({
+  block,
+  onChange,
+  readonly,
+  fieldTestId,
+  inputTestId,
+  placeholder,
+}) => {
+  const value = typeof block.dataSource === 'string' ? block.dataSource : '';
+
+  return (
+    <PropertyField label="数据源" testId={fieldTestId}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange({ dataSource: e.target.value || undefined })}
+        disabled={readonly}
+        className="property-input font-mono text-xs"
+        placeholder={placeholder}
+        data-testid={inputTestId}
+      />
+    </PropertyField>
+  );
+};
+
 /**
  * Basic properties (title, id, visibility)
  */
@@ -280,17 +311,14 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
       {/* Data source (for table) */}
       {block.blockType === 'table' && (
         <>
-          <PropertyField label="数据源" testId="data-source">
-            <input
-              type="text"
-              value={block.dataSource || ''}
-              onChange={(e) => onChange({ dataSource: e.target.value || undefined })}
-              disabled={readonly}
-              className="property-input font-mono text-xs"
-              placeholder="tableData"
-              data-testid="data-source-input"
-            />
-          </PropertyField>
+          <DataSourceReferenceField
+            block={block}
+            onChange={onChange}
+            readonly={readonly}
+            fieldTestId="data-source"
+            inputTestId="data-source-input"
+            placeholder="tableData"
+          />
 
           <PropertyField label="选择绑定" hint="绑定选中行" testId="selection-bind">
             <input
@@ -325,6 +353,15 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
       {/* Stat card data */}
       {block.blockType === 'stat-card' && (
         <>
+          <DataSourceReferenceField
+            block={block}
+            onChange={onChange}
+            readonly={readonly}
+            fieldTestId="stat-data-source"
+            inputTestId="stat-data-source-input"
+            placeholder="ds_stats"
+          />
+
           <PropertyField label="数值字段" testId="stat-value-field">
             <input
               type="text"
@@ -354,6 +391,15 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
       {/* Chart data */}
       {block.blockType === 'chart-card' && (
         <>
+          <DataSourceReferenceField
+            block={block}
+            onChange={onChange}
+            readonly={readonly}
+            fieldTestId="chart-data-source"
+            inputTestId="chart-data-source-input"
+            placeholder="ds_chart"
+          />
+
           <PropertyField label="图表类型" testId="chart-type">
             <select
               value={props.chartType || 'bar'}
