@@ -383,4 +383,79 @@ test.describe('Page Designer layout tabs child block drop authoring', () => {
       'critical',
     );
   });
+
+  test('drags a detail section child block and edits layout behavior settings', async ({ page }) => {
+    const { pid, tabsBlockId } = await createTabsChildDropAuthoringPage(page);
+    await openDesignerByPid(page, pid);
+
+    await selectCanvasBlock(page, tabsBlockId);
+    await expect(page.getByTestId('tab-child-blocks-editor')).toBeVisible();
+
+    await page.getByTestId('tab-filter-key-input').fill('details');
+    await page.getByTestId('tab-filter-label-en-input').fill('Details');
+    await page.getByTestId('tab-filter-label-zh-input').fill('详情');
+
+    const beforeTopLevelIds = await canvasBlockIds(page);
+    await dragPaletteBlockToTabChildDropZone(page, 'detail-section');
+
+    await expect(page.getByTestId('tab-child-block-0')).toBeVisible();
+    await expect(page.getByTestId('tab-child-block-0')).toContainText('detail-section');
+    await page.getByTestId('tab-child-title-en-input-0').fill('Nested detail section');
+    await page.getByTestId('tab-child-title-zh-input-0').fill('嵌套详情区段');
+    await page.getByTestId('tab-child-visible-input-0').fill('{{ record.status == "OPEN" }}');
+    await page.getByTestId('tab-child-span-select-0').selectOption('6');
+    await page.getByTestId('tab-child-section-columns-select-0').selectOption('3');
+    await page.getByTestId('tab-child-section-gutter-select-0').selectOption('24');
+    await page.getByTestId('tab-child-section-collapsible-switch-0').click();
+    await page.getByTestId('tab-child-section-default-collapsed-switch-0').click();
+    await expect.poll(() => canvasBlockIds(page)).toEqual(beforeTopLevelIds);
+
+    await saveDesignerAndWait(page, pid);
+    const savedPage = await fetchPageByPid(page, pid);
+    const savedBlock = savedBlockById(savedPage, tabsBlockId);
+    expect(savedBlock).toMatchObject({
+      blockType: 'tabs',
+      tabs: [
+        {
+          key: 'details',
+          label: { 'en-US': 'Details', 'zh-CN': '详情' },
+          filter: null,
+          blocks: [
+            {
+              blockType: 'detail-section',
+              title: { 'en-US': 'Nested detail section', 'zh-CN': '嵌套详情区段' },
+              visible: '{{ record.status == "OPEN" }}',
+              span: 6,
+              props: {
+                columns: 3,
+                gutter: 24,
+              },
+              collapsible: true,
+              defaultCollapsed: true,
+            },
+          ],
+        },
+      ],
+    });
+
+    await openDesignerByPid(page, pid);
+    await selectCanvasBlock(page, tabsBlockId);
+    await expect(page.getByTestId('tab-child-title-en-input-0')).toHaveValue(
+      'Nested detail section',
+    );
+    await expect(page.getByTestId('tab-child-title-zh-input-0')).toHaveValue('嵌套详情区段');
+    await expect(page.getByTestId('tab-child-visible-input-0')).toHaveValue(
+      '{{ record.status == "OPEN" }}',
+    );
+    await expect(page.getByTestId('tab-child-span-select-0')).toHaveValue('6');
+    await expect(page.getByTestId('tab-child-section-columns-select-0')).toHaveValue('3');
+    await expect(page.getByTestId('tab-child-section-gutter-select-0')).toHaveValue('24');
+    await expect(page.getByTestId('tab-child-section-collapsible-switch-0')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(
+      page.getByTestId('tab-child-section-default-collapsed-switch-0'),
+    ).toHaveAttribute('aria-checked', 'true');
+  });
 });

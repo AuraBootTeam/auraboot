@@ -440,4 +440,65 @@ describe('TabFilterEditor', () => {
       },
     });
   });
+
+  it('edits detail section child block layout and behavior on the selected tab', () => {
+    const onCommit = vi.fn();
+    render(
+      <StatefulTabFilterEditor
+        initialTabs={[
+          {
+            key: 'details',
+            label: { 'en-US': 'Details', 'zh-CN': '详情' },
+            filter: null,
+            blocks: [
+              {
+                id: 'details_section',
+                blockType: 'detail-section',
+                title: { 'en-US': 'Detail child', 'zh-CN': '详情子块' },
+                visible: '{{ record.active }}',
+                span: 12,
+                props: { columns: 2, gutter: 16 },
+                collapsible: false,
+                defaultCollapsed: false,
+              },
+            ],
+          },
+        ]}
+        onCommit={onCommit}
+      />,
+    );
+
+    expect(screen.getByTestId('tab-child-visible-input-0')).toHaveValue('{{ record.active }}');
+    expect(screen.getByTestId('tab-child-span-select-0')).toHaveValue('12');
+    expect(screen.getByTestId('tab-child-section-columns-select-0')).toHaveValue('2');
+    expect(screen.getByTestId('tab-child-section-gutter-select-0')).toHaveValue('16');
+    expect(screen.getByTestId('tab-child-section-collapsible-switch-0')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+
+    fireEvent.change(screen.getByTestId('tab-child-visible-input-0'), {
+      target: { value: '{{ record.status == "OPEN" }}' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-span-select-0'), {
+      target: { value: '6' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-section-columns-select-0'), {
+      target: { value: '3' },
+    });
+    fireEvent.change(screen.getByTestId('tab-child-section-gutter-select-0'), {
+      target: { value: '24' },
+    });
+    fireEvent.click(screen.getByTestId('tab-child-section-collapsible-switch-0'));
+    fireEvent.click(screen.getByTestId('tab-child-section-default-collapsed-switch-0'));
+
+    expect(serializedTabs()[0].blocks?.[0]).toMatchObject({
+      blockType: 'detail-section',
+      visible: '{{ record.status == "OPEN" }}',
+      span: 6,
+      props: { columns: 3, gutter: 24 },
+      collapsible: true,
+      defaultCollapsed: true,
+    });
+  });
 });

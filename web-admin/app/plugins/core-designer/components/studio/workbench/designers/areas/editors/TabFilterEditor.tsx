@@ -172,6 +172,50 @@ export function TabFilterEditor({
     [tabs, updateChildBlock],
   );
 
+  const updateChildBlockVisible = useCallback(
+    (tabIndex: number, blockIndex: number, visible: string) => {
+      updateChildBlock(tabIndex, blockIndex, { visible: visible || undefined });
+    },
+    [updateChildBlock],
+  );
+
+  const updateChildBlockSpan = useCallback(
+    (tabIndex: number, blockIndex: number, span: string) => {
+      updateChildBlock(tabIndex, blockIndex, {
+        span: span ? Number(span) : undefined,
+      });
+    },
+    [updateChildBlock],
+  );
+
+  const updateSectionChildBlockProp = useCallback(
+    (tabIndex: number, blockIndex: number, propKey: string, value: any) => {
+      const childBlock = getTabBlocks(tabs[tabIndex])[blockIndex];
+      if (!childBlock) return;
+      updateChildBlock(tabIndex, blockIndex, {
+        props: { ...(childBlock.props || {}), [propKey]: value },
+      });
+    },
+    [tabs, updateChildBlock],
+  );
+
+  const updateSectionChildBlockCollapsible = useCallback(
+    (tabIndex: number, blockIndex: number, collapsible: boolean) => {
+      updateChildBlock(tabIndex, blockIndex, {
+        collapsible,
+        defaultCollapsed: collapsible ? undefined : false,
+      });
+    },
+    [updateChildBlock],
+  );
+
+  const updateSectionChildBlockDefaultCollapsed = useCallback(
+    (tabIndex: number, blockIndex: number, defaultCollapsed: boolean) => {
+      updateChildBlock(tabIndex, blockIndex, { defaultCollapsed });
+    },
+    [updateChildBlock],
+  );
+
   const updateStatChildBlockDataSource = useCallback(
     (tabIndex: number, blockIndex: number, dataSource: string) => {
       updateChildBlock(tabIndex, blockIndex, { dataSource: dataSource || undefined });
@@ -474,6 +518,145 @@ export function TabFilterEditor({
                         />
                       </label>
                     </div>
+                    <div className="mb-1.5 grid grid-cols-2 gap-1.5">
+                      <label className="text-[10px] text-gray-500">
+                        Visibility condition
+                        <input
+                          className="mt-0.5 w-full rounded border px-1.5 py-1 font-mono text-xs"
+                          value={String(block.visible || '')}
+                          onChange={(event) =>
+                            updateChildBlockVisible(selectedIndex, index, event.target.value)
+                          }
+                          disabled={readonly}
+                          placeholder="{{ true }}"
+                          data-testid={`tab-child-visible-input-${index}`}
+                        />
+                      </label>
+                      <label className="text-[10px] text-gray-500">
+                        Grid span
+                        <select
+                          className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                          value={block.span || ''}
+                          onChange={(event) =>
+                            updateChildBlockSpan(selectedIndex, index, event.target.value)
+                          }
+                          disabled={readonly}
+                          data-testid={`tab-child-span-select-${index}`}
+                        >
+                          <option value="">Auto</option>
+                          {[1, 2, 3, 4, 6, 8, 12].map((span) => (
+                            <option key={span} value={span}>
+                              {span} columns
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    {(block.blockType === 'form-section' ||
+                      block.blockType === 'detail-section') && (
+                      <div className="mb-1.5 space-y-1.5">
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <label className="text-[10px] text-gray-500">
+                            Columns
+                            <select
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                              value={Number(block.props?.columns ?? 2)}
+                              onChange={(event) =>
+                                updateSectionChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'columns',
+                                  Number(event.target.value),
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-section-columns-select-${index}`}
+                            >
+                              {[1, 2, 3, 4].map((columns) => (
+                                <option key={columns} value={columns}>
+                                  {columns} columns
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="text-[10px] text-gray-500">
+                            Gutter
+                            <select
+                              className="mt-0.5 w-full rounded border px-1.5 py-1 text-xs"
+                              value={Number(block.props?.gutter ?? 16)}
+                              onChange={(event) =>
+                                updateSectionChildBlockProp(
+                                  selectedIndex,
+                                  index,
+                                  'gutter',
+                                  Number(event.target.value),
+                                )
+                              }
+                              disabled={readonly}
+                              data-testid={`tab-child-section-gutter-select-${index}`}
+                            >
+                              {[8, 16, 24, 32].map((gutter) => (
+                                <option key={gutter} value={gutter}>
+                                  {gutter}px
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <div className="flex items-center justify-between gap-2 rounded border px-1.5 py-1">
+                            <span className="text-[10px] text-gray-500">Collapsible</span>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={Boolean(block.collapsible ?? false)}
+                              onClick={() =>
+                                updateSectionChildBlockCollapsible(
+                                  selectedIndex,
+                                  index,
+                                  !Boolean(block.collapsible ?? false),
+                                )
+                              }
+                              disabled={readonly}
+                              className={`h-4 w-8 rounded-full text-[8px] ${
+                                block.collapsible ?? false
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-gray-200 text-gray-500'
+                              } disabled:opacity-40`}
+                              data-testid={`tab-child-section-collapsible-switch-${index}`}
+                            >
+                              {block.collapsible ?? false ? 'On' : 'Off'}
+                            </button>
+                          </div>
+                          {block.collapsible && (
+                            <div className="flex items-center justify-between gap-2 rounded border px-1.5 py-1">
+                              <span className="text-[10px] text-gray-500">Default collapsed</span>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={Boolean(block.defaultCollapsed ?? false)}
+                                onClick={() =>
+                                  updateSectionChildBlockDefaultCollapsed(
+                                    selectedIndex,
+                                    index,
+                                    !Boolean(block.defaultCollapsed ?? false),
+                                  )
+                                }
+                                disabled={readonly}
+                                className={`h-4 w-8 rounded-full text-[8px] ${
+                                  block.defaultCollapsed ?? false
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-gray-200 text-gray-500'
+                                } disabled:opacity-40`}
+                                data-testid={`tab-child-section-default-collapsed-switch-${index}`}
+                              >
+                                {block.defaultCollapsed ?? false ? 'On' : 'Off'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     {block.blockType === 'stat-card' && (
                       <div className="mb-1.5 space-y-1.5">
                         <div className="grid grid-cols-2 gap-1.5">
@@ -857,7 +1040,9 @@ export function TabFilterEditor({
                       />
                     ) : block.blockType === 'stat-card' ||
                       block.blockType === 'chart-card' ||
-                      block.blockType === 'custom' ? null : (
+                      block.blockType === 'custom' ||
+                      block.blockType === 'form-section' ||
+                      block.blockType === 'detail-section' ? null : (
                       <div className="rounded border border-dashed px-2 py-2 text-[10px] text-gray-400">
                         This block type is preserved but not editable here.
                       </div>
