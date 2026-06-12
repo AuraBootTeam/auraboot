@@ -159,13 +159,13 @@ class WorkbenchStatsServiceImplBranchTest {
     @DisplayName("getBpmStats with zero completed and zero running yields 0% completion rate")
     void bpmStatsZeroDivision() {
         // Running = 0
-        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any(), any(), any(), any()))
-                .thenReturn(0L);
-        // 2-arg Long queries (completed week, completed last week, total completed) all return 0
         when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any()))
                 .thenReturn(0L);
+        // 1-arg Long queries (completed week, completed last week, total completed) all return 0
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any()))
+                .thenReturn(0L);
         // Avg duration null → 0.0
-        when(jdbcTemplate.queryForObject(anyString(), eq(Double.class), any(), any(), any()))
+        when(jdbcTemplate.queryForObject(anyString(), eq(Double.class), any()))
                 .thenReturn(null);
 
         WorkbenchBpmStatsDTO out = service.getBpmStats();
@@ -179,11 +179,11 @@ class WorkbenchStatsServiceImplBranchTest {
     @Test
     @DisplayName("getBpmStats with null Long queries treats counts as zero")
     void bpmStatsNullCounts() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any(), any(), any(), any()))
-                .thenReturn(null);
         when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any()))
                 .thenReturn(null);
-        when(jdbcTemplate.queryForObject(anyString(), eq(Double.class), any(), any(), any()))
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any()))
+                .thenReturn(null);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Double.class), any()))
                 .thenReturn(2.0);
 
         WorkbenchBpmStatsDTO out = service.getBpmStats();

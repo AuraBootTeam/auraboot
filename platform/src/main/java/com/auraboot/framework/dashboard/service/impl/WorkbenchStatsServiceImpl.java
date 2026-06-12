@@ -185,14 +185,20 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
     }
 
     private StatItem computeBpmRunning(Long tenantId) {
-        // CATCH: non-transactional query, BPM execution log tracks process events
+        // CATCH: non-transactional query, BPM audit tracks SmartEngine process starts
         return safeQuery(() -> {
             Long count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(DISTINCT execution_id) FROM ab_bpm_execution_log " +
-                            "WHERE tenant_id = ? AND event_type = 'PROCESS_STARTED' " +
-                            "AND execution_id NOT IN (" +
-                            "  SELECT execution_id FROM ab_bpm_execution_log " +
-                            "  WHERE tenant_id = ? AND event_type IN ('PROCESS_COMPLETED', 'PROCESS_CANCELLED')" +
+                    "SELECT COUNT(DISTINCT s.process_instance_id) FROM ab_bpm_audit_record s " +
+                            "WHERE s.tenant_id = ? AND s.operation = '" + BPM_AUDIT_PROCESS_START + "' " +
+                            "AND s.process_instance_id IS NOT NULL " +
+                            "AND NOT EXISTS (" +
+                            "  SELECT 1 FROM ab_bpm_audit_record e " +
+                            "  WHERE e.tenant_id = ? " +
+                            "    AND e.process_instance_id = s.process_instance_id " +
+                            "    AND (e.operation = '" + BPM_AUDIT_PROCESS_TERMINATE + "' " +
+                            "      OR (e.operation = '" + BPM_AUDIT_PROCESS_EVENT + "' " +
+                            "        AND e.details ->> 'eventType' = '" + BPM_AUDIT_EVENT_PROCESS_END + "')" +
+                            "    )" +
                             ")",
                     Long.class, tenantId, tenantId
             );
@@ -276,9 +282,10 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
             String sql = "SELECT COALESCE(c.cnt, 0) AS cnt " +
                     "FROM generate_series(current_date - interval '6 day', current_date, interval '1 day') AS d " +
                     "LEFT JOIN (" +
-                    "  SELECT DATE(created_at) AS day, COUNT(DISTINCT execution_id) AS cnt " +
-                    "  FROM ab_bpm_execution_log " +
-                    "  WHERE tenant_id = ? AND event_type = 'PROCESS_STARTED' " +
+                    "  SELECT DATE(created_at) AS day, COUNT(DISTINCT process_instance_id) AS cnt " +
+                    "  FROM ab_bpm_audit_record " +
+                    "  WHERE tenant_id = ? AND operation = '" + BPM_AUDIT_PROCESS_START + "' " +
+                    "    AND process_instance_id IS NOT NULL " +
                     "    AND created_at >= current_date - interval '6 day' " +
                     "  GROUP BY DATE(created_at)" +
                     ") c ON c.day = d::date " +
@@ -298,11 +305,12 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
     }
 
     private StatItem computeBpmCompletedWeek(Long tenantId) {
-        // CATCH: non-transactional query, BPM execution log tracks process events
+        // CATCH: non-transactional query, BPM audit tracks process lifecycle events
         return safeQuery(() -> {
             Long count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(DISTINCT execution_id) FROM ab_bpm_execution_log " +
-                            "WHERE tenant_id = ? AND event_type = 'PROCESS_COMPLETED' " +
+                    "SELECT COUNT(DISTINCT process_instance_id) FROM ab_bpm_audit_record " +
+                            "WHERE tenant_id = ? AND operation = '" + BPM_AUDIT_PROCESS_EVENT + "' " +
+                            "AND details ->> 'eventType' = '" + BPM_AUDIT_EVENT_PROCESS_END + "' " +
                             "AND created_at >= NOW() - INTERVAL '7 days'",
                     Long.class, tenantId
             );
@@ -338,9 +346,10 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
 
     // --- BPM event type constants ---
 
-    private static final String BPM_EVENT_STARTED = "PROCESS_STARTED";
-    private static final String BPM_EVENT_COMPLETED = "PROCESS_COMPLETED";
-    private static final String BPM_EVENT_CANCELLED = "PROCESS_CANCELLED";
+    private static final String BPM_AUDIT_PROCESS_START = "process_start";
+    private static final String BPM_AUDIT_PROCESS_TERMINATE = "process_terminate";
+    private static final String BPM_AUDIT_PROCESS_EVENT = "process_event";
+    private static final String BPM_AUDIT_EVENT_PROCESS_END = "process_end";
 
     @Override
     public WorkbenchPipelineDTO getPipeline() {
@@ -405,44 +414,53 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
     public WorkbenchBpmStatsDTO getBpmStats() {
         Long tenantId = MetaContext.getCurrentTenantId();
 
-        // CATCH: non-transactional read-only query — BPM execution log table may not exist
+        // CATCH: non-transactional read-only query — BPM audit table may not exist
         try {
             // Running count: started but not completed/cancelled
             Long runningCount = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(DISTINCT execution_id) FROM ab_bpm_execution_log " +
-                            "WHERE tenant_id = ? AND event_type = ? " +
-                            "AND execution_id NOT IN (" +
-                            "  SELECT execution_id FROM ab_bpm_execution_log " +
-                            "  WHERE tenant_id = ? AND event_type IN (?, ?)" +
+                    "SELECT COUNT(DISTINCT s.process_instance_id) FROM ab_bpm_audit_record s " +
+                            "WHERE s.tenant_id = ? AND s.operation = '" + BPM_AUDIT_PROCESS_START + "' " +
+                            "AND s.process_instance_id IS NOT NULL " +
+                            "AND NOT EXISTS (" +
+                            "  SELECT 1 FROM ab_bpm_audit_record e " +
+                            "  WHERE e.tenant_id = ? " +
+                            "    AND e.process_instance_id = s.process_instance_id " +
+                            "    AND (e.operation = '" + BPM_AUDIT_PROCESS_TERMINATE + "' " +
+                            "      OR (e.operation = '" + BPM_AUDIT_PROCESS_EVENT + "' " +
+                            "        AND e.details ->> 'eventType' = '" + BPM_AUDIT_EVENT_PROCESS_END + "')" +
+                            "    )" +
                             ")",
-                    Long.class, tenantId, BPM_EVENT_STARTED, tenantId, BPM_EVENT_COMPLETED, BPM_EVENT_CANCELLED
+                    Long.class, tenantId, tenantId
             );
             int running = runningCount != null ? runningCount.intValue() : 0;
 
             // Completed this week
             Long completedThisWeekCount = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(DISTINCT execution_id) FROM ab_bpm_execution_log " +
-                            "WHERE tenant_id = ? AND event_type = ? " +
+                    "SELECT COUNT(DISTINCT process_instance_id) FROM ab_bpm_audit_record " +
+                            "WHERE tenant_id = ? AND operation = '" + BPM_AUDIT_PROCESS_EVENT + "' " +
+                            "AND details ->> 'eventType' = '" + BPM_AUDIT_EVENT_PROCESS_END + "' " +
                             "AND created_at >= NOW() - INTERVAL '7 days'",
-                    Long.class, tenantId, BPM_EVENT_COMPLETED
+                    Long.class, tenantId
             );
             int completedThisWeek = completedThisWeekCount != null ? completedThisWeekCount.intValue() : 0;
 
             // Completed last week
             Long completedLastWeekCount = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(DISTINCT execution_id) FROM ab_bpm_execution_log " +
-                            "WHERE tenant_id = ? AND event_type = ? " +
+                    "SELECT COUNT(DISTINCT process_instance_id) FROM ab_bpm_audit_record " +
+                            "WHERE tenant_id = ? AND operation = '" + BPM_AUDIT_PROCESS_EVENT + "' " +
+                            "AND details ->> 'eventType' = '" + BPM_AUDIT_EVENT_PROCESS_END + "' " +
                             "AND created_at >= NOW() - INTERVAL '14 days' " +
                             "AND created_at < NOW() - INTERVAL '7 days'",
-                    Long.class, tenantId, BPM_EVENT_COMPLETED
+                    Long.class, tenantId
             );
             int completedLastWeek = completedLastWeekCount != null ? completedLastWeekCount.intValue() : 0;
 
             // Total completed (all time) for completion rate
             Long totalCompleted = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(DISTINCT execution_id) FROM ab_bpm_execution_log " +
-                            "WHERE tenant_id = ? AND event_type = ?",
-                    Long.class, tenantId, BPM_EVENT_COMPLETED
+                    "SELECT COUNT(DISTINCT process_instance_id) FROM ab_bpm_audit_record " +
+                            "WHERE tenant_id = ? AND operation = '" + BPM_AUDIT_PROCESS_EVENT + "' " +
+                            "AND details ->> 'eventType' = '" + BPM_AUDIT_EVENT_PROCESS_END + "'",
+                    Long.class, tenantId
             );
             int completed = totalCompleted != null ? totalCompleted.intValue() : 0;
 
@@ -452,14 +470,16 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
                 completionRate = (double) completed / (completed + running) * 100.0;
             }
 
-            // Average duration: time between PROCESS_STARTED and PROCESS_COMPLETED for same execution_id
+            // Average duration: time between process_start and process_end for same process_instance_id
             Double avgDuration = jdbcTemplate.queryForObject(
                     "SELECT AVG(EXTRACT(EPOCH FROM (c.created_at - s.created_at)) / 3600.0) " +
-                            "FROM ab_bpm_execution_log s " +
-                            "JOIN ab_bpm_execution_log c ON s.execution_id = c.execution_id " +
-                            "WHERE s.tenant_id = ? AND s.event_type = ? " +
-                            "AND c.event_type = ?",
-                    Double.class, tenantId, BPM_EVENT_STARTED, BPM_EVENT_COMPLETED
+                            "FROM ab_bpm_audit_record s " +
+                            "JOIN ab_bpm_audit_record c ON s.process_instance_id = c.process_instance_id " +
+                            "WHERE s.tenant_id = ? " +
+                            "AND s.operation = '" + BPM_AUDIT_PROCESS_START + "' " +
+                            "AND c.operation = '" + BPM_AUDIT_PROCESS_EVENT + "' " +
+                            "AND c.details ->> 'eventType' = '" + BPM_AUDIT_EVENT_PROCESS_END + "'",
+                    Double.class, tenantId
             );
             double avgDurationHours = avgDuration != null ? avgDuration : 0.0;
 

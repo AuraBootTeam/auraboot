@@ -104,7 +104,7 @@ export function ProcessStatsWidget({
   // --- Skeleton loading ---
   if (loading) {
     return (
-      <div className={`flex h-full flex-col ${className}`}>
+      <div data-testid="process-stats-widget" className={`flex h-full flex-col ${className}`}>
         {renderHeader()}
         <div className="flex flex-1 items-center gap-3">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -121,7 +121,7 @@ export function ProcessStatsWidget({
   // --- No data ---
   if (!stats) {
     return (
-      <div className={`flex h-full flex-col ${className}`}>
+      <div data-testid="process-stats-widget" className={`flex h-full flex-col ${className}`}>
         {renderHeader()}
         <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
           <span className="text-sm">
@@ -135,7 +135,7 @@ export function ProcessStatsWidget({
   const ringColor = getRingColor(stats.completionRate);
 
   return (
-    <div className={`flex h-full flex-col ${className}`}>
+    <div data-testid="process-stats-widget" className={`flex h-full flex-col ${className}`}>
       {renderHeader()}
       <div className="flex flex-1 items-start gap-3">
         {/* Completion Rate */}
@@ -164,7 +164,10 @@ export function ProcessStatsWidget({
         {/* Running */}
         <div className="flex flex-1 flex-col items-center p-3 text-center">
           <div className="flex h-16 items-center justify-center">
-            <span className="text-2xl font-bold text-gray-900">
+            <span
+              data-testid="process-stats-running-count"
+              className="text-2xl font-bold text-gray-900"
+            >
               {stats.runningCount}
             </span>
           </div>

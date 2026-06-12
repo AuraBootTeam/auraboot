@@ -11,6 +11,7 @@ import { get } from '~/shared/services/http-client';
 import {
   getCompletedTasks,
   getInstanceForRecord,
+  getStartedProcesses,
   getTodoTasks,
   getWorkbench,
 } from '~/plugins/core-bpm/services/bpmWorkbenchService';
@@ -57,6 +58,37 @@ describe('bpmWorkbenchService query param wiring', () => {
       processKey: 'wd_leave_approval',
     });
     expect(instance?.instanceId).toBe('pi-1');
+  });
+
+  it('reads started processes from the BPM workbench contract', async () => {
+    mockedGet.mockResolvedValue({
+      code: '0',
+      data: {
+        todoTasks: [],
+        completedTasks: [],
+        startedProcesses: [
+          {
+            instanceId: 'pi-started-1',
+            processDefinitionId: 'dwr_process',
+            bizUniqueId: 'DWR-BPM-1',
+            startUserId: '10001',
+            startTime: '2026-06-12T08:00:00Z',
+            status: 'running',
+          },
+        ],
+      },
+    } as any);
+
+    await expect(getStartedProcesses()).resolves.toEqual([
+      expect.objectContaining({
+        instanceId: 'pi-started-1',
+        processDefinitionKey: 'dwr_process',
+        businessKey: 'DWR-BPM-1',
+        status: 'running',
+      }),
+    ]);
+
+    expect(mockedGet).toHaveBeenCalledWith('/api/bpm/workbench', {});
   });
 
   it('returns null when the backend reports missing process instance', async () => {

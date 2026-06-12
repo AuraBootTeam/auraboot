@@ -117,6 +117,23 @@ function mapTaskInstance(raw: Record<string, unknown>): TaskInstance {
   };
 }
 
+function mapProcessInstance(raw: Record<string, unknown>): ProcessInstance {
+  const r = raw as Record<string, string | number | null | undefined>;
+  return {
+    instanceId: (r.instanceId as string) || (r.processInstanceId as string) || '',
+    processDefinitionId: (r.processDefinitionId as string) || '',
+    processDefinitionKey:
+      (r.processDefinitionKey as string) || (r.processDefinitionId as string) || '',
+    businessKey: (r.businessKey as string) || (r.bizUniqueId as string) || '',
+    startUserId: (r.startUserId as string) || (r.startUser as string) || '',
+    startTime: (r.startTime as string) || (r.createdAt as string) || '',
+    endTime: (r.endTime as string) || undefined,
+    status: (r.status as string) || 'running',
+    title: (r.title as string) || undefined,
+    variables: (raw.variables as Record<string, unknown>) || undefined,
+  };
+}
+
 function mapWorkbenchData(raw: Record<string, unknown>): WorkbenchData {
   const d = raw as Record<string, unknown>;
   const todoTasks = Array.isArray(d.todoTasks)
@@ -125,13 +142,16 @@ function mapWorkbenchData(raw: Record<string, unknown>): WorkbenchData {
   const completedTasks = Array.isArray(d.completedTasks)
     ? d.completedTasks.map((t: Record<string, unknown>) => mapTaskInstance(t))
     : [];
+  const startedProcesses = Array.isArray(d.startedProcesses)
+    ? d.startedProcesses.map((p: Record<string, unknown>) => mapProcessInstance(p))
+    : [];
   return {
     todoTasks,
     completedTasks,
-    startedProcesses: (d.startedProcesses as ProcessInstance[]) || [],
+    startedProcesses,
     todoCount: (d.todoCount as number) || todoTasks.length,
     completedCount: (d.completedCount as number) || completedTasks.length,
-    startedCount: (d.startedCount as number) || 0,
+    startedCount: (d.startedCount as number) || startedProcesses.length,
   };
 }
 
@@ -345,12 +365,8 @@ export async function getProcessDetail(processInstanceId: string): Promise<Proce
  * Get started processes by current user
  */
 export async function getStartedProcesses(userId?: string): Promise<ProcessInstance[]> {
-  const params = userId ? { userId } : {};
-  const result = await get<ProcessInstance[]>('/api/bpm/process-instances', params);
-  if (!isSuccess(result.code) || !result.data) {
-    throw new Error(result.desc || 'Failed to get started processes');
-  }
-  return result.data || [];
+  const workbench = await getWorkbench(userId);
+  return workbench.startedProcesses;
 }
 
 /**

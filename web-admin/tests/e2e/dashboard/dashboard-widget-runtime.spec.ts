@@ -80,6 +80,14 @@ type CreatedCrmWorkbenchFixture = {
   opportunityAmount: number;
 };
 
+type CreatedBpmWorkbenchFixture = {
+  processPid: string;
+  processKey: string;
+  processName: string;
+  processInstanceId: string;
+  businessKey: string;
+};
+
 type DynamicListResponse<T> = {
   records?: T[];
   total?: number;
@@ -102,6 +110,23 @@ type PipelineStageRecord = {
   label?: string;
   count?: number;
   amount?: string | number;
+};
+
+type BpmStartedProcessRecord = {
+  instanceId?: string;
+  processInstanceId?: string;
+  processDefinitionId?: string;
+  processDefinitionKey?: string;
+  bizUniqueId?: string;
+  businessKey?: string;
+  status?: string;
+};
+
+type BpmStatsRecord = {
+  completionRate?: number;
+  avgDurationHours?: number;
+  runningCount?: number;
+  completedThisWeek?: number;
 };
 
 const SVG_DATA_URL =
@@ -445,6 +470,40 @@ function crmWorkbenchWidgets(): DashboardWidgetFixture[] {
   ];
 }
 
+function bpmWorkbenchWidgets(): DashboardWidgetFixture[] {
+  return [
+    {
+      id: 'runtime-my-process',
+      type: 'smart-my-process',
+      title: 'Runtime BPM My Process',
+      x: 0,
+      y: 0,
+      w: 6,
+      h: 4,
+      config: {
+        title: 'Runtime BPM My Process',
+        dataSource: { type: 'static' },
+        visualization: {
+          maxItems: 5,
+        },
+      },
+    },
+    {
+      id: 'runtime-process-stats',
+      type: 'smart-process-stats',
+      title: 'Runtime BPM Process Stats',
+      x: 6,
+      y: 0,
+      w: 6,
+      h: 4,
+      config: {
+        title: 'Runtime BPM Process Stats',
+        dataSource: { type: 'static' },
+      },
+    },
+  ];
+}
+
 function advancedRuntimeWidgets(): DashboardWidgetFixture[] {
   return [
     {
@@ -590,6 +649,22 @@ function advancedRuntimeWidgets(): DashboardWidgetFixture[] {
       },
     },
   ];
+}
+
+function generateMinimalBpmn(processKey: string, processName: string): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             targetNamespace="http://auraboot.com/bpm"
+             id="definitions_${processKey}">
+  <process id="${processKey}" name="${processName}" isExecutable="true">
+    <startEvent id="start"/>
+    <userTask id="runtimeApproval" name="Runtime BPM Approval"/>
+    <endEvent id="end"/>
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="runtimeApproval"/>
+    <sequenceFlow id="flow2" sourceRef="runtimeApproval" targetRef="end"/>
+  </process>
+</definitions>`;
 }
 
 async function parseJsonResponse<T>(
@@ -1080,6 +1155,116 @@ async function expectPipelineIncludesStageAmount(
   );
 }
 
+async function createBpmWorkbenchFixture(page: Page): Promise<CreatedBpmWorkbenchFixture> {
+  const suffix = uniqueId('DWRBPM');
+  const processKey = `dwr_bpm_${suffix.toLowerCase()}`;
+  const processName = `DWR BPM Process ${suffix}`;
+  const businessKey = `DWR-BPM-${suffix}`;
+  const bpmnContent = generateMinimalBpmn(processKey, processName);
+
+  const createResponse = await page.request.post('/api/bpm/process-definitions', {
+    data: {
+      processKey,
+      processName,
+      description: 'Runtime dashboard BPM widget fixture',
+      category: 'dashboard-runtime',
+      bpmnContent,
+    },
+    timeout: 30_000,
+  });
+  const createBody = await parseJsonResponse<{ data?: { pid?: string } }>(
+    createResponse,
+    'create BPM process definition',
+  );
+  const processPid = createBody.data?.pid;
+  expect(processPid, 'created BPM process pid').toBeTruthy();
+
+  const deployResponse = await page.request.post(`/api/bpm/process-definitions/${processPid}/deploy`, {
+    timeout: 30_000,
+  });
+  await parseJsonResponse(deployResponse, 'deploy BPM process definition');
+
+  const startResponse = await page.request.post('/api/bpm/process-instances', {
+    data: {
+      processDefinitionId: processKey,
+      businessKey,
+      variables: {
+        title: processName,
+        source: 'dashboard-widget-runtime',
+      },
+    },
+    timeout: 30_000,
+  });
+  const startBody = await parseJsonResponse<{
+    data?: { instanceId?: string; processInstanceId?: string; id?: string };
+  }>(startResponse, 'start BPM process instance');
+  const processInstanceId =
+    startBody.data?.instanceId ?? startBody.data?.processInstanceId ?? startBody.data?.id;
+  expect(processInstanceId, 'started BPM process instance id').toBeTruthy();
+
+  const fixture = {
+    processPid: processPid!,
+    processKey,
+    processName,
+    processInstanceId: processInstanceId!,
+    businessKey,
+  };
+  await expectBpmWorkbenchContainsProcess(
+    page,
+    fixture,
+    'BPM workbench immediately after fixture create',
+  );
+  await expectBpmStatsIncludesRunning(page, 'BPM stats immediately after fixture create');
+  return fixture;
+}
+
+async function cleanupBpmWorkbenchFixture(
+  page: Page,
+  fixture?: CreatedBpmWorkbenchFixture,
+): Promise<void> {
+  if (!fixture) return;
+  await page.request
+    .post(`/api/bpm/process-instances/${fixture.processInstanceId}/terminate`, {
+      data: { reason: 'dashboard runtime fixture cleanup' },
+    })
+    .catch(() => undefined);
+  await page.request
+    .post(`/api/bpm/process-definitions/${fixture.processPid}/undeploy`)
+    .catch(() => undefined);
+  await page.request
+    .delete(`/api/bpm/process-definitions/${fixture.processPid}`)
+    .catch(() => undefined);
+}
+
+async function expectBpmWorkbenchContainsProcess(
+  page: Page,
+  fixture: CreatedBpmWorkbenchFixture,
+  context: string,
+  response?: APIResponse | PlaywrightResponse,
+): Promise<void> {
+  const workbenchResponse = response ?? await page.request.get('/api/bpm/workbench');
+  const body = await parseJsonResponse<{
+    data?: { startedProcesses?: BpmStartedProcessRecord[] };
+  }>(workbenchResponse, context);
+  const match = body.data?.startedProcesses?.find((process) => {
+    const instanceId = process.instanceId ?? process.processInstanceId;
+    const businessKey = process.businessKey ?? process.bizUniqueId;
+    return instanceId === fixture.processInstanceId || businessKey === fixture.businessKey;
+  });
+  expect(match, `${context} should include ${fixture.businessKey}`).toBeTruthy();
+}
+
+async function expectBpmStatsIncludesRunning(
+  page: Page,
+  context: string,
+  response?: APIResponse | PlaywrightResponse,
+): Promise<void> {
+  const statsResponse = response ?? await page.request.get('/api/workbench/bpm-stats');
+  const body = await parseJsonResponse<{ data?: BpmStatsRecord }>(statsResponse, context);
+  // The seeded BPM instance creates a lower-bound contract; pre-existing live data may be higher.
+  expect(body.data?.runningCount ?? 0, `${context} runningCount`).toBeGreaterThanOrEqual(1);
+}
+
 async function expectRuntimeBlock(page: Page, id: string, type: string): Promise<Locator> {
   const block = page.getByTestId(`dashboard-block-${id}`);
   await block.scrollIntoViewIfNeeded();
@@ -1526,6 +1711,80 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       await expect(activitiesBlock).not.toContainText(/No recent activities|暂无活动/);
     } finally {
       await cleanupCrmWorkbenchFixture(page, crmFixture);
+      await cleanupDashboard(page, dashboard?.pid);
+    }
+  });
+
+  test('DWR-009: BPM workbench widgets render live BPM runtime data', async ({ page }) => {
+    let dashboard: CreatedDashboard | undefined;
+    let bpmFixture: CreatedBpmWorkbenchFixture | undefined;
+
+    try {
+      bpmFixture = await createBpmWorkbenchFixture(page);
+      dashboard = await createPublishedDashboard(
+        page,
+        bpmWorkbenchWidgets(),
+        'Runtime BPM Workbench Widget Matrix',
+      );
+
+      const workbenchResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/bpm/workbench') &&
+          response.request().method() === 'GET' &&
+          response.status() === 200,
+        { timeout: 10_000 },
+      );
+      const statsResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/workbench/bpm-stats') &&
+          response.request().method() === 'GET' &&
+          response.status() === 200,
+        { timeout: 10_000 },
+      );
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expectBpmWorkbenchContainsProcess(
+        page,
+        bpmFixture,
+        'BPM workbench consumed by viewer',
+        await workbenchResponse,
+      );
+      await expectBpmStatsIncludesRunning(page, 'BPM stats consumed by viewer', await statsResponse);
+
+      const myProcessBlock = await expectRuntimeBlock(
+        page,
+        'runtime-my-process',
+        'smart-my-process',
+      );
+      await expect(myProcessBlock.getByTestId('my-process-widget')).toBeVisible();
+      await expect(myProcessBlock).toContainText(bpmFixture.businessKey);
+      await expect(myProcessBlock).not.toContainText(/No processes started|暂无流程/);
+
+      const runningFilter = myProcessBlock.getByRole('button', { name: /Running|运行中/ });
+      await runningFilter.click();
+      await expect(myProcessBlock).toContainText(bpmFixture.businessKey);
+
+      const processRow = myProcessBlock.getByTestId(`my-process-row-${bpmFixture.processInstanceId}`);
+      await processRow.click();
+      await expect(page).toHaveURL(
+        new RegExp(`/bpm/process-status\\?processInstanceId=${bpmFixture.processInstanceId}`),
+      );
+
+      await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
+      const statsBlock = await expectRuntimeBlock(
+        page,
+        'runtime-process-stats',
+        'smart-process-stats',
+      );
+      await expect(statsBlock.getByTestId('process-stats-widget')).toBeVisible();
+      await expect(statsBlock.getByTestId('process-stats-running-count')).not.toHaveText('0', {
+        timeout: 10_000,
+      });
+      await expect(statsBlock).toContainText(/Completion Rate|完成率/);
+    } finally {
+      await cleanupBpmWorkbenchFixture(page, bpmFixture);
       await cleanupDashboard(page, dashboard?.pid);
     }
   });
