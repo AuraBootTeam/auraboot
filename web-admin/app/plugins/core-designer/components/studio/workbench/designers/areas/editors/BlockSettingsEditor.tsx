@@ -374,6 +374,9 @@ const CustomPropsJsonEditor: React.FC<CustomPropsJsonEditorProps> = ({
  */
 const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readonly }) => {
   const props = (block.props || {}) as Record<string, any>;
+  const chartRefreshInterval =
+    block.refreshInterval ??
+    (typeof props.refreshInterval === 'number' ? props.refreshInterval : undefined);
 
   return (
     <div className="space-y-4">
@@ -505,6 +508,25 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
               className="property-input font-mono text-xs"
               placeholder="value"
               data-testid="chart-y-field-input"
+            />
+          </PropertyField>
+
+          <PropertyField label="刷新间隔(ms)" testId="chart-refresh-interval">
+            <input
+              type="number"
+              value={chartRefreshInterval ?? ''}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                onChange({
+                  refreshInterval: Number.isFinite(next) && next > 0 ? next : undefined,
+                });
+              }}
+              disabled={readonly}
+              className="property-input"
+              min={0}
+              step={500}
+              placeholder="0"
+              data-testid="chart-refresh-interval-input"
             />
           </PropertyField>
         </>

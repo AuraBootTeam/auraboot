@@ -14,7 +14,10 @@
 import React, { Suspense, useMemo } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import { getChartComponent, getSupportedChartTypes } from '~/framework/smart/charts/SharedChartFactory';
+import {
+  getChartComponent,
+  getSupportedChartTypes,
+} from '~/framework/smart/charts/SharedChartFactory';
 
 export interface ChartBlockRendererProps {
   block: BlockConfig;
@@ -113,10 +116,18 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
       // Advanced features (previously Dashboard-only, now available in DSL)
       linkage: (block as any).linkage,
       drillDown: (block as any).drillDown,
-      refreshInterval: (block as any).refreshInterval,
+      refreshInterval: (block as any).refreshInterval ?? props.refreshInterval,
       className: block.className,
     };
-  }, [block, props.chartType, props.xField, props.yField, props.height, runtime]);
+  }, [
+    block,
+    props.chartType,
+    props.xField,
+    props.yField,
+    props.height,
+    props.refreshInterval,
+    runtime,
+  ]);
 
   if (!ChartComponent) {
     return (

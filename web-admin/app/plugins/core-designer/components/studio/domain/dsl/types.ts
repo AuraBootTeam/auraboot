@@ -168,6 +168,7 @@ export interface DslBlock {
   // Data binding
   dataSource?: string;
   bind?: string;
+  refreshInterval?: number;
 
   // Data table selection
   selection?: {
