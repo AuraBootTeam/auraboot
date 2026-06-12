@@ -117,6 +117,7 @@ export type BlockType =
   | 'artifact-timeline'
   | 'review-drawer'
   | 'chart-card'
+  | 'tabs'
   | 'custom'
   | 'text';
 
@@ -142,6 +143,12 @@ export interface DslBlock {
   columns?: DslColumnRef[]; // table
   buttons?: DslButton[]; // toolbar, form-buttons
   actions?: string[]; // shorthand for buttons
+  tabs?: Array<{
+    key: string;
+    label: string | { [locale: string]: string };
+    filter?: { field?: string; fieldName?: string; operator?: string; value?: unknown } | null;
+    blocks?: DslBlock[];
+  }>;
 
   // Block-specific props
   props?: Record<string, unknown>;

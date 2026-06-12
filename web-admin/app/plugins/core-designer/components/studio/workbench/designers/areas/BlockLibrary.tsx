@@ -139,6 +139,15 @@ const BLOCK_TYPES: BlockTypeInfo[] = [
     category: 'layout',
     keywords: ['selection', 'selected', '选中', '批量'],
   },
+  {
+    type: 'tabs',
+    name: '标签页',
+    icon: 'TAB',
+    description: '多标签视图与过滤条件',
+    availableIn: ['form'],
+    category: 'layout',
+    keywords: ['tabs', 'tab', 'layout', 'filter', '标签', '页签'],
+  },
 
   // Chart category
   {
@@ -233,6 +242,7 @@ const BLOCK_TYPE_EN: Record<BlockType, { name: string; description: string }> = 
   text: { name: 'Text Content', description: 'Static text or description' },
   toolbar: { name: 'Toolbar Buttons', description: 'Action button group' },
   'selection-info': { name: 'Selection Info', description: 'Show selected item information' },
+  tabs: { name: 'Tabs', description: 'Tabbed views and filter conditions' },
   'stat-card': { name: 'Stat Card', description: 'Metric summary card' },
   'metric-strip': { name: 'Metric Strip', description: 'Horizontal metrics and filter entry' },
   'record-inspector': { name: 'Record Inspector', description: 'Selection-bound detail panel' },

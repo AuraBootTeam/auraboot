@@ -21,6 +21,7 @@ const BLOCK_INFO: Record<BlockType, { name: string; icon: string }> = {
   'form-buttons': { name: 'Form Buttons', icon: '✅' },
   'toolbar': { name: 'Toolbar Buttons', icon: '🔘' },
   'selection-info': { name: 'Selection Info', icon: '☑️' },
+  'tabs': { name: 'Tabs', icon: 'TAB' },
   'table': { name: 'Data Table', icon: '📊' },
   'stat-card': { name: 'Stat Card', icon: '📈' },
   'metric-strip': { name: 'Metric Strip', icon: 'KPI' },

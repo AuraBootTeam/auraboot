@@ -191,6 +191,16 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
         case 'form-buttons':
           newBlock.buttons = [];
           break;
+        case 'tabs':
+          newBlock.title = { 'zh-CN': '标签页', 'en-US': 'Tabs' };
+          newBlock.tabs = [
+            {
+              key: 'all',
+              label: { 'en-US': 'All', 'zh-CN': '全部' },
+              filter: null,
+            },
+          ];
+          break;
         case 'custom':
           newBlock.title = { 'zh-CN': '自定义区块', 'en-US': 'Custom Block' };
           newBlock.component = 'decision-field-impact';

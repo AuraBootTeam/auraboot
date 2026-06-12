@@ -107,6 +107,7 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
           className="px-2 py-1 text-xs text-blue-500 hover:text-blue-700"
           onClick={addTab}
           disabled={readonly}
+          data-testid="tab-filter-add-tab"
         >
           +
         </button>
@@ -123,6 +124,7 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
               value={currentTab.key}
               onChange={(e) => updateTab(selectedIndex, { key: e.target.value })}
               disabled={readonly}
+              data-testid="tab-filter-key-input"
             />
           </div>
 
@@ -135,6 +137,7 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
                 value={getLabel(currentTab.label, 'en-US')}
                 onChange={(e) => updateLabel(selectedIndex, 'en-US', e.target.value)}
                 disabled={readonly}
+                data-testid="tab-filter-label-en-input"
               />
             </div>
             <div>
@@ -144,6 +147,7 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
                 value={getLabel(currentTab.label, 'zh-CN')}
                 onChange={(e) => updateLabel(selectedIndex, 'zh-CN', e.target.value)}
                 disabled={readonly}
+                data-testid="tab-filter-label-zh-input"
               />
             </div>
           </div>
@@ -233,6 +237,7 @@ function FilterConditionEditor({
           className="mt-1 text-blue-500"
           onClick={() => onChange({ field: '', operator: 'EQ', value: '' })}
           disabled={readonly}
+          data-testid="tab-filter-add-condition"
         >
           + Add filter
         </button>
@@ -249,6 +254,7 @@ function FilterConditionEditor({
           onChange={(e) => onChange({ ...filter, field: e.target.value })}
           placeholder="field"
           disabled={readonly}
+          data-testid="tab-filter-field-input"
         />
         <select
           className="rounded border bg-white px-1 py-0.5 text-xs"
@@ -260,6 +266,7 @@ function FilterConditionEditor({
             })
           }
           disabled={readonly}
+          data-testid="tab-filter-operator-select"
         >
           <option value="EQ">EQ</option>
           <option value="NE">NE</option>
@@ -272,6 +279,7 @@ function FilterConditionEditor({
           onChange={(e) => onChange({ ...filter, value: e.target.value })}
           placeholder="value"
           disabled={readonly}
+          data-testid="tab-filter-value-input"
         />
         <button
           onClick={() => onChange(null)}
