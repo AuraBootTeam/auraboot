@@ -658,20 +658,31 @@ export async function clickRowActionByLocator(
   // 2. Open "more actions" dropdown and look inside
   const moreBtn = row.locator('[data-testid="row-action-more"]').first();
   if (await moreBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await moreBtn.evaluate((el: HTMLElement) => el.click());
-    const dropdown = page.locator('[data-testid="row-action-dropdown"]');
+    await moreBtn.click({ force: true }).catch(async () => {
+      await moreBtn.evaluate((el: HTMLElement) => el.click());
+    });
+    const dropdown = page.locator('[data-testid="row-action-dropdown"]').first();
+    if (!(await dropdown.isVisible({ timeout: 1000 }).catch(() => false))) {
+      await moreBtn.press('Enter').catch(() => null);
+    }
+    if (!(await dropdown.isVisible({ timeout: 1000 }).catch(() => false))) {
+      await moreBtn.dispatchEvent('click').catch(() => null);
+    }
     await dropdown.waitFor({ state: 'visible', timeout: 5000 });
     const actionInDropdown = dropdown.locator(`[data-testid="row-action-${actionCode}"]`).first();
     if (await actionInDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Use evaluate to bypass viewport checks — portal dropdowns may render outside visible area
-      await actionInDropdown.evaluate((el: HTMLElement) => el.click());
+      await actionInDropdown.click({ force: true }).catch(async () => {
+        await actionInDropdown.evaluate((el: HTMLElement) => el.click());
+      });
       return;
     }
     // Fallback: search by text in dropdown
     if (fallbackText) {
       const byText = dropdown.locator(`button:has-text("${fallbackText}")`).first();
       if (await byText.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await byText.evaluate((el: HTMLElement) => el.click());
+        await byText.click({ force: true }).catch(async () => {
+          await byText.evaluate((el: HTMLElement) => el.click());
+        });
         return;
       }
     }

@@ -2246,6 +2246,8 @@ test.describe('E2E Test Fixtures Setup', () => {
                 {
                   id: 'block_table',
                   blockType: 'table',
+                  onRowClick: 'navigate',
+                  detailUrl: '/dashboard-designer/{pid}',
                   table: {
                     rowKey: 'pid',
                     columns: [
