@@ -3,7 +3,7 @@ package com.auraboot.framework.billing.account.service;
 /**
  * Service for managing {@link com.auraboot.framework.billing.account.entity.BillingAccount} lifecycle.
  */
-public interface BillingAccountService {
+public interface BillingAccountIdentityService {
 
     /**
      * Create a new billing account with the given code and name.

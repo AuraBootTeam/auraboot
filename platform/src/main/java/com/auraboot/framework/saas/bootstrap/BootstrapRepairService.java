@@ -1,7 +1,7 @@
 package com.auraboot.framework.saas.bootstrap;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.billing.account.service.BillingAccountService;
+import com.auraboot.framework.billing.account.service.BillingAccountIdentityService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.mapper.MenuMapper;
@@ -101,7 +101,7 @@ public class BootstrapRepairService {
     private final UserRoleMapper userRoleMapper;
     private final MenuMapper menuMapper;
     private final TenantBootstrapService tenantBootstrapService;
-    private final BillingAccountService billingAccountService;
+    private final BillingAccountIdentityService billingAccountIdentityService;
     private final JdbcTemplate jdbcTemplate;
 
     // ────────────────────────────────────────────────────────────────────
@@ -467,7 +467,7 @@ public class BootstrapRepairService {
             }
 
             // Create a new billing account for the default tenant
-            Long accountId = billingAccountService.createAccount(
+            Long accountId = billingAccountIdentityService.createAccount(
                     "default",
                     "Default Billing Account");
 
