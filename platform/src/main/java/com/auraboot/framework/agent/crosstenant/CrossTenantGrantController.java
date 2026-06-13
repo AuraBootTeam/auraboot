@@ -100,6 +100,11 @@ public class CrossTenantGrantController {
         Long total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_cross_tenant_grant " + where, Long.class);
 
+        // Snowflake ids exceed 2^53 — serialize them as strings so the browser's
+        // JSON.parse does not silently lose precision (a mangled `id` would make
+        // revoke/audit target the wrong grant).
+        stringifyIds(rows, "id", "parent_tenant_id", "child_tenant_id", "granted_by", "revoked_by");
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("records", rows);
         body.put("total", total == null ? 0L : total);
@@ -140,9 +145,9 @@ public class CrossTenantGrantController {
         crossTenantAclService.invalidate(req.parentTenantId, req.childTenantId, grantType);
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("id", id);
-        body.put("parentTenantId", req.parentTenantId);
-        body.put("childTenantId", req.childTenantId);
+        body.put("id", String.valueOf(id));
+        body.put("parentTenantId", String.valueOf(req.parentTenantId));
+        body.put("childTenantId", String.valueOf(req.childTenantId));
         body.put("grantType", grantType);
         log.info("CrossTenantGrantController: created grant id={} ({} → {}, type={}, grantedBy={})",
                 id, req.parentTenantId, req.childTenantId, grantType, grantedBy);
@@ -179,8 +184,8 @@ public class CrossTenantGrantController {
         crossTenantAclService.invalidate(parent, child, grantType);
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("id", id);
-        body.put("revokedBy", revokedBy);
+        body.put("id", String.valueOf(id));
+        body.put("revokedBy", revokedBy == null ? null : String.valueOf(revokedBy));
         log.info("CrossTenantGrantController: revoked grant id={} (revokedBy={})", id, revokedBy);
         return ApiResponse.ok(body);
     }
@@ -225,12 +230,36 @@ public class CrossTenantGrantController {
                         + "   OR (grant_id IS NULL AND parent_tenant_id = ? AND child_tenant_id = ?)",
                 Long.class, id, parent, child);
 
+        stringifyIds(auditRows, "id", "grant_id", "parent_tenant_id", "child_tenant_id");
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("records", auditRows);
         body.put("total", total == null ? 0L : total);
         body.put("pageNum", pageNum);
         body.put("pageSize", limit);
         return ApiResponse.ok(body);
+    }
+
+    /**
+     * Converts the given snowflake-id columns of each row to {@code String} in place,
+     * so they serialize as JSON strings (a JS number loses precision beyond 2^53).
+     * Null values are left as null; non-id columns are untouched.
+     */
+    private static void stringifyIds(List<Map<String, Object>> rows, String... idColumns) {
+        if (rows == null) {
+            return;
+        }
+        for (Map<String, Object> row : rows) {
+            if (row == null) {
+                continue;
+            }
+            for (String column : idColumns) {
+                Object value = row.get(column);
+                if (value != null) {
+                    row.put(column, String.valueOf(value));
+                }
+            }
+        }
     }
 
     /** Request DTO for {@link #create(CreateGrantRequest)}. */

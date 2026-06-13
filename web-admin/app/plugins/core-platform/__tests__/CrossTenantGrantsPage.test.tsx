@@ -197,11 +197,12 @@ describe('GrantFormModal', () => {
 
 describe('RevokeConfirmModal', () => {
   const TARGET = {
-    id: 7,
-    parent_tenant_id: 100,
-    child_tenant_id: 200,
+    // Snowflake ids are precision-safe strings end-to-end.
+    id: '7',
+    parent_tenant_id: '100',
+    child_tenant_id: '200',
     grant_type: 'spawn_sub_agent',
-    granted_by: 9,
+    granted_by: '9',
     granted_at: new Date().toISOString(),
     expires_at: null,
     revoked_at: null,
@@ -210,14 +211,14 @@ describe('RevokeConfirmModal', () => {
   };
 
   it('confirmsRevoke: clicking confirm calls revokeGrant(targetId) and fires onRevoked', async () => {
-    revokeGrantMock.mockResolvedValueOnce({ success: true, data: { id: 7 } });
+    revokeGrantMock.mockResolvedValueOnce({ success: true, data: { id: '7' } });
     const onRevoked = vi.fn();
     render(<RevokeConfirmModal target={TARGET} onClose={() => {}} onRevoked={onRevoked} />);
 
     fireEvent.click(screen.getByTestId('grant-revoke-confirm'));
 
     await waitFor(() => {
-      expect(revokeGrantMock).toHaveBeenCalledWith(7);
+      expect(revokeGrantMock).toHaveBeenCalledWith('7');
     });
     expect(onRevoked).toHaveBeenCalled();
   });
