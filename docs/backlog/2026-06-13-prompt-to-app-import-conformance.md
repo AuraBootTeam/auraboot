@@ -47,7 +47,10 @@ created: 2026-06-13
     - **可达 / 可渲染**:`/api/pages/key/visit_log_list` 返回正确装配的页面(toolbar+create / table 列 `[visit_code, customer_name, visit_date, summary, actions]`);`/api/menu/user` 含 `Visit Log → /dynamic/visit-log → visit_log_list`。合成 DSL 通过平台 S-PAGE-* 可渲染性 validator,且与生产 golden 页 `tcrm_lead_{list,form}` 结构同构。
 
 ## 残留(非本切片)
-- ⚠️ **像素级浏览器 golden 未过(infra 友 friction,非产品)**:host-first 起 Vite:5273+BFF:3600→backend:6600 后,**tenant-selection 的 `POST /api/tenant-selection/process` 经 SSR→BFF 链路报 Authorization Error**(同一选择经直连 API / 我的 python 脚本 / enterprise 常驻 :5173 栈均正常)—— ad-hoc dev SSR 栈的 auth 管道问题,与本合成特性正交。生成应用的可渲染性已由「页面装配 API + 菜单 API + 数据 API + 与生产 golden 同构 + 平台可渲染性 validator」多层佐证。**后续**:用标准 golden 栈补像素 drive(导航→list 渲染→create→提交→行出现)。
+- ✅ **像素级浏览器 golden 已补(2026-06-13)**:标准 host-first 栈 `Vite:5274 → BFF:3601 → Backend:6543`(后端 `AGENT_LLM_STUB_MODE=true`,用于替代外部 LLM key)已补 `web-admin/tests/e2e/ai/prompt-to-app-dynamic-form-submit-golden.spec.ts`。覆盖两条真实浏览器路径:
+  1. 生产随附 legacy 动态表单 `/p/tasset_category/new`:按钮同时含 `action:"save"` + `commandCode:"tasset:create_category"` 时,浏览器点击提交必须打到 `/api/meta/commands/execute/tasset:create_category`,并在列表看到新建分类行。
+  2. Prompt-to-App 合成应用:通过 `/api/agent/nl-modeling/apply` 只给 model+fields,平台合成 list/form/menu/command;浏览器从侧边栏进入 `/p/<generated-model>`,点击 Create → 填表 → Submit,必须打到 `<plugin>:create_<model>` 并在列表看到新行。实测生成路由示例:`/p/p2a_lead_mqbq44m0`。
+  3. 证据:focused unit `canonicalizePageDsl.test.ts` 16 passed;`pnpm typecheck` passed;`nl-modeling-smoke.spec.ts` 25 passed / 2 skipped;`prompt-to-app-dynamic-form-submit-golden.spec.ts` 21 passed / 1 skipped。
 - **生成质量**:弱模型(deepseek-chat→v4-flash)只生成 model+fields。生成质量 = prompt/model 调优,独立项。
 - **MD-3 in-designer AI 副驾**:复用本 generate/refine(现 import-ready)→ 限定到设计器当前面片段。
 - ✅ DeepSeek key:本验证用后**已清** `aura_boot_auraqr` CloudConfig(`DELETE ab_cloud_config ... provider_code=deepseek`,验 0 行);chat 暴露的 key 仍须 owner 端轮换。

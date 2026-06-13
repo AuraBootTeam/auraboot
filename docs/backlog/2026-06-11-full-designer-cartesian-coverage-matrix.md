@@ -56,6 +56,16 @@ relates_to:
 6. `/e2e-feature-coverage` 思路矩阵已更新，`/e2e-truth` 红线 grep 已跑，新增或本轮引用证据中不含 skip/fixme/fixed wait/retry/PUT 绕 UI/visible-only 假覆盖。
 7. 文档回填每轮测试命令、结果、剩余风险。
 
+## 2026-06-13 后续任务证据记录 — Prompt-to-App golden
+
+本记录只关闭 Prompt-to-App 生成应用的像素级浏览器 follow-up,不外推为“全量设计器笛卡尔积矩阵完成”。
+
+- 已关闭平台级动态表单提交回归:`canonicalizePageDsl.normalizeButton` 过去把 truthy legacy `action:"save"` 当成已规范化 action,导致 `commandCode` 被删除,浏览器提交落到未注册的 `ActionRegistry("save")`。修复后只有结构化 action object 会被保留;legacy action string 可作为 label 兜底,但 `commandCode` 会规范化为 `{ type:"command", command:"..." }`。
+- 新增真实浏览器 golden:`web-admin/tests/e2e/ai/prompt-to-app-dynamic-form-submit-golden.spec.ts`。覆盖生产随附 legacy form `/p/tasset_category/new` 和 Prompt-to-App 合成 list/form/menu/command 的生成应用;两条路径均通过 UI 点击提交,断言真实 command POST、列表行出现并附截图。
+- 验证栈:`Vite:5274 → BFF:3601 → Backend:6543`,后端使用 `AGENT_LLM_STUB_MODE=true` 仅替代外部 LLM key,内部 dynamic form / command / DB seam 走真栈。
+- 验证结果:focused unit `canonicalizePageDsl.test.ts` 16 passed;`pnpm typecheck` passed;`nl-modeling-smoke.spec.ts` 25 passed / 2 skipped;`prompt-to-app-dynamic-form-submit-golden.spec.ts` 21 passed / 1 skipped。
+- 关联 backlog:`docs/backlog/2026-06-13-dynamic-form-submit-save-action-bug.md` 已标 closed;`docs/backlog/2026-06-13-prompt-to-app-import-conformance.md` 已将旧的“像素级浏览器 golden 未过”更新为 2026-06-13 已补证据。
+
 ## 统一矩阵模板
 
 每个设计器至少维护一张矩阵：
