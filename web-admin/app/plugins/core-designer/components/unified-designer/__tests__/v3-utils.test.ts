@@ -642,13 +642,130 @@ describe('Recursive PageSchema V3 utilities', () => {
       'candidate_filter_status',
     ]);
 
+    const actionBarBeforeSchema: PageSchemaV3 = {
+      ...crossContainerSchema,
+      blocks: [
+        {
+          id: 'list_root',
+          blockType: 'list',
+          blocks: [
+            {
+              id: 'tabs_holder',
+              blockType: 'tabs',
+              blocks: [
+                {
+                  id: 'tab_source',
+                  blockType: 'tab',
+                  blocks: [
+                    {
+                      id: 'action_bar_move_candidate',
+                      blockType: 'action-bar',
+                      region: 'toolbar',
+                      blocks: [
+                        { id: 'candidate_action_submit', blockType: 'action', actionType: 'submit' },
+                        { id: 'candidate_action_refresh', blockType: 'action', actionType: 'refresh' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'action_bar_target',
+              blockType: 'action-bar',
+              blocks: [{ id: 'target_action_create', blockType: 'action', actionType: 'create' }],
+            },
+            {
+              id: 'table_target',
+              blockType: 'table',
+              blocks: [{ id: 'target_col_title', blockType: 'column', field: 'title' }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const actionBarBeforeTarget = moveBlockBefore(
+      actionBarBeforeSchema.blocks,
+      'action_bar_move_candidate',
+      'action_bar_target',
+    );
+    const listAfterActionBarMove = findBlockById(actionBarBeforeTarget, 'list_root')?.block;
+    const tabAfterActionBarMove = findBlockById(actionBarBeforeTarget, 'tab_source')?.block;
+    const movedActionBarBefore = findBlockById(
+      actionBarBeforeTarget,
+      'action_bar_move_candidate',
+    )?.block;
+
+    expect(listAfterActionBarMove?.blocks?.map((block) => block.id)).toEqual([
+      'tabs_holder',
+      'action_bar_move_candidate',
+      'action_bar_target',
+      'table_target',
+    ]);
+    expect(tabAfterActionBarMove?.blocks?.map((block) => block.id)).toEqual([]);
+    expect(movedActionBarBefore?.blocks?.map((block) => block.id)).toEqual([
+      'candidate_action_submit',
+      'candidate_action_refresh',
+    ]);
+
+    const actionBarInsideTabSchema: PageSchemaV3 = {
+      ...crossContainerSchema,
+      blocks: [
+        {
+          id: 'list_root',
+          blockType: 'list',
+          blocks: [
+            {
+              id: 'action_bar_move_candidate',
+              blockType: 'action-bar',
+              region: 'toolbar',
+              blocks: [
+                { id: 'candidate_action_submit', blockType: 'action', actionType: 'submit' },
+                { id: 'candidate_action_refresh', blockType: 'action', actionType: 'refresh' },
+              ],
+            },
+            {
+              id: 'tabs_holder',
+              blockType: 'tabs',
+              blocks: [{ id: 'tab_empty', blockType: 'tab', blocks: [] }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const actionBarInsideTab = moveBlockToParent(
+      actionBarInsideTabSchema.blocks,
+      'action_bar_move_candidate',
+      'tab_empty',
+    );
+    const listAfterActionBarInside = findBlockById(actionBarInsideTab, 'list_root')?.block;
+    const tabAfterActionBarInside = findBlockById(actionBarInsideTab, 'tab_empty')?.block;
+    const movedActionBarInside = findBlockById(
+      actionBarInsideTab,
+      'action_bar_move_candidate',
+    )?.block;
+
+    expect(listAfterActionBarInside?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(tabAfterActionBarInside?.blocks?.map((block) => block.id)).toEqual([
+      'action_bar_move_candidate',
+    ]);
+    expect(movedActionBarInside?.blocks?.map((block) => block.id)).toEqual([
+      'candidate_action_submit',
+      'candidate_action_refresh',
+    ]);
+
     const registry = createDefaultBlockRegistryV3();
     expect(registry.canContain('list', 'table')).toBe(true);
     expect(registry.canContain('list', 'filter-bar')).toBe(true);
+    expect(registry.canContain('list', 'action-bar')).toBe(true);
     expect(registry.canContain('tab', 'table')).toBe(true);
     expect(registry.canContain('tab', 'filter-bar')).toBe(true);
+    expect(registry.canContain('tab', 'action-bar')).toBe(true);
     expect(registry.canContain('table', 'column')).toBe(true);
     expect(registry.canContain('filter-bar', 'filter-field')).toBe(true);
+    expect(registry.canContain('action-bar', 'action')).toBe(true);
     expect(registry.canContain('filter-bar', 'table')).toBe(false);
   });
 
