@@ -3,6 +3,7 @@ package com.auraboot.framework.bpm.chain;
 import com.auraboot.smart.framework.engine.context.ExecutionContext;
 import com.auraboot.smart.framework.engine.delegation.JavaDelegation;
 import com.auraboot.smart.framework.engine.model.assembly.IdBasedElement;
+import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.framework.bpm.service.ExecutionLogService;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
@@ -60,6 +61,13 @@ public class CommandServiceTaskDelegate implements JavaDelegation {
         if (processVars == null) {
             processVars = new HashMap<>();
         }
+
+        // 0. Expose the process's persisted business key to expression resolution. Unlike
+        // start-time request variables, the businessKey is persisted on the ProcessInstance
+        // and reloaded on continuation, so a serviceTask placed after a userTask wait can
+        // still resolve the record it operates on (e.g. targetRecordId=${processBusinessKey})
+        // even though the start-time variables are no longer in getRequest().
+        injectProcessBusinessKey(executionContext, processVars);
 
         // 1. Determine current activity ID
         String activityId = resolveActivityId(executionContext);
@@ -161,9 +169,34 @@ public class CommandServiceTaskDelegate implements JavaDelegation {
 
     // ==================== Internal Methods ====================
 
+    /**
+     * Variable name exposing the process's persisted business key
+     * ({@link ProcessInstance#getBizUniqueId()}) to BPMN expressions, e.g.
+     * {@code smart:targetRecordId="${processBusinessKey}"}.
+     */
+    static final String PROCESS_BUSINESS_KEY_VAR = "processBusinessKey";
+
     /** smart:property names consumed as command config; everything else is a payload param. */
     private static final Set<String> RESERVED_PROPERTY_KEYS =
             Set.of("commandCode", "operationType", "onFail", "condition", "targetRecordId");
+
+    /**
+     * Make the process's persisted business key available to expression resolution under
+     * {@link #PROCESS_BUSINESS_KEY_VAR}. The businessKey is persisted on the ProcessInstance
+     * and reloaded on continuation, so it survives userTask waits whereas start-time request
+     * variables do not — letting a serviceTask after a userTask resolve the record it operates
+     * on. Never overwrites an explicit same-named process variable.
+     */
+    private void injectProcessBusinessKey(ExecutionContext context, Map<String, Object> processVars) {
+        ProcessInstance instance = context.getProcessInstance();
+        if (instance == null) {
+            return;
+        }
+        String businessKey = instance.getBizUniqueId();
+        if (businessKey != null && !businessKey.isBlank()) {
+            processVars.putIfAbsent(PROCESS_BUSINESS_KEY_VAR, businessKey);
+        }
+    }
 
     /**
      * Resolve the command config for the current node, preferring the per-node config
