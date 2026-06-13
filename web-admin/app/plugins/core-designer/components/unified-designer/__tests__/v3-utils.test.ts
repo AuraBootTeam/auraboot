@@ -1526,6 +1526,19 @@ describe('Inspector schema registry', () => {
     expect(aiLocked?.type).toBe('boolean');
   });
 
+  it('MD-2: getFieldsForBlock exposes props.aiLocked on any block (block-level lock)', () => {
+    const registry = createDefaultInspectorSchemaRegistry();
+    for (const blockType of ['form-section', 'table', 'detail-section', 'widget', 'tabs']) {
+      const fields = registry.getFieldsForBlock({ id: 'x', blockType });
+      const aiLocked = fields.find((field) => field.key === 'props.aiLocked');
+      expect(aiLocked, `${blockType} must be lockable`).toBeDefined();
+      expect(aiLocked?.type).toBe('boolean');
+    }
+    // field blocks (which declare it in their own schema) keep exactly one entry.
+    const fieldFields = registry.getFieldsForBlock({ id: 'f', blockType: 'field' });
+    expect(fieldFields.filter((field) => field.key === 'props.aiLocked')).toHaveLength(1);
+  });
+
   it('returns structured inspector schemas for page containers and dashboard layout', () => {
     const registry = createDefaultInspectorSchemaRegistry();
 
