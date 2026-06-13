@@ -183,4 +183,79 @@ class OpenAiCompatibleLlmProviderTest {
         assertThat(body).doesNotContainKey("tool_choice");
         assertThat(body).doesNotContainKey("tools");
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildRequestBodySanitizesCommandCodeToolNames() throws Exception {
+        // AuraBoot command tools are named with command codes ("plugin:command"),
+        // but OpenAI/DeepSeek reject a ':' (400 — name must match ^[a-zA-Z0-9_-]+$).
+        OpenAiCompatibleLlmProvider provider = createProvider();
+
+        LlmChatRequest request = LlmChatRequest.builder()
+                .model("deepseek-chat")
+                .maxTokens(256)
+                .messages(List.of(LlmChatRequest.Message.text("user", "Create a lead.")))
+                .tools(List.of(LlmChatRequest.Tool.builder()
+                        .name("sales_lead_crm:create_sales_lead")
+                        .description("Create a sales lead")
+                        .inputSchema(Map.of("type", "object", "properties", Map.of()))
+                        .build()))
+                .build();
+
+        Map<String, Object> body = provider.buildOpenAiRequestBody(request);
+        List<Map<String, Object>> tools = (List<Map<String, Object>>) body.get("tools");
+        Map<String, Object> fn = (Map<String, Object>) tools.get(0).get("function");
+        String wireName = (String) fn.get("name");
+
+        assertThat(wireName).matches("[a-zA-Z0-9_-]+");
+        assertThat(wireName).isEqualTo("sales_lead_crm_create_sales_lead");
+    }
+
+    @Test
+    void sanitizeToolNameReplacesInvalidCharsAndIsNullSafe() {
+        assertThat(OpenAiCompatibleLlmProvider.sanitizeToolName("a:b.c d")).isEqualTo("a_b_c_d");
+        assertThat(OpenAiCompatibleLlmProvider.sanitizeToolName("already_valid-1")).isEqualTo("already_valid-1");
+        assertThat(OpenAiCompatibleLlmProvider.sanitizeToolName(null)).isNull();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildRequestBodyNormalizesEmptyToolParametersToObjectSchema() throws Exception {
+        // A tool with an empty/typeless inputSchema makes DeepSeek 400
+        // ("schema must be 'type: object', got 'type: null'").
+        OpenAiCompatibleLlmProvider provider = createProvider();
+
+        LlmChatRequest request = LlmChatRequest.builder()
+                .model("deepseek-chat")
+                .maxTokens(256)
+                .messages(List.of(LlmChatRequest.Message.text("user", "Run it.")))
+                .tools(List.of(LlmChatRequest.Tool.builder()
+                        .name("platform_execute_sql")
+                        .description("Execute SQL")
+                        .inputSchema(Map.of()) // empty — the real ToolDiscoveryPort case
+                        .build()))
+                .build();
+
+        Map<String, Object> body = provider.buildOpenAiRequestBody(request);
+        List<Map<String, Object>> tools = (List<Map<String, Object>>) body.get("tools");
+        Map<String, Object> params = (Map<String, Object>) ((Map<String, Object>) tools.get(0).get("function")).get("parameters");
+        assertThat(params).containsEntry("type", "object");
+        assertThat(params).containsKey("properties");
+    }
+
+    @Test
+    void normalizeToolParametersEnsuresObjectType() {
+        assertThat(OpenAiCompatibleLlmProvider.normalizeToolParameters(null))
+                .containsEntry("type", "object");
+        assertThat(OpenAiCompatibleLlmProvider.normalizeToolParameters(Map.of()))
+                .containsEntry("type", "object");
+        // non-empty but type-less: add type, preserve existing keys
+        Map<String, Object> typeless = OpenAiCompatibleLlmProvider.normalizeToolParameters(
+                Map.of("properties", Map.of("q", Map.of("type", "string"))));
+        assertThat(typeless).containsEntry("type", "object");
+        assertThat(typeless).containsKey("properties");
+        // already valid: returned as-is
+        Map<String, Object> valid = Map.of("type", "object", "properties", Map.of());
+        assertThat(OpenAiCompatibleLlmProvider.normalizeToolParameters(valid)).isSameAs(valid);
+    }
 }
