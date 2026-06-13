@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * SmartEngine ServiceTask → AuraBoot Command bridge.
@@ -29,7 +30,11 @@ import java.util.Map;
  *
  * <h3>How it works:</h3>
  * <ol>
- *   <li>Read chain node configuration from process variable {@code _chain_nodes} (Map&lt;nodeId, nodeConfig&gt;)</li>
+ *   <li>Read the node config: prefer the per-node config injected by CommandChainService
+ *       ({@code _chain_nodes}, the JSON command-chain path); fall back to the serviceTask's
+ *       own {@code smart:properties} so a hand-authored BPMN can drive a command directly
+ *       ({@code commandCode}/{@code operationType}/{@code targetRecordId}/{@code condition}/
+ *       {@code onFail} are reserved; every other property is a payload param)</li>
  *   <li>Resolve SpEL expressions in params against current process variables</li>
  *   <li>Build {@link CommandExecuteRequest} and call {@link CommandExecutor#execute}</li>
  *   <li>Write results back to process variables for downstream steps</li>
@@ -60,20 +65,17 @@ public class CommandServiceTaskDelegate implements JavaDelegation {
         String activityId = resolveActivityId(executionContext);
         String executionId = resolveExecutionId(executionContext);
 
-        // 2. Load chain node configuration for this activity
-        @SuppressWarnings("unchecked")
-        Map<String, Map<String, Object>> chainNodes =
-                (Map<String, Map<String, Object>>) processVars.get("_chain_nodes");
-
-        if (chainNodes == null) {
-            throw new CommandChainStepException(activityId, "unknown",
-                    "_chain_nodes not found in process variables. Was this process started via CommandChainService?");
-        }
-
-        Map<String, Object> nodeConfig = chainNodes.get(activityId);
+        // 2. Load node configuration: prefer the per-node config injected by
+        // CommandChainService (_chain_nodes); fall back to the serviceTask's own
+        // smart:properties so a hand-authored BPMN can drive a command without the
+        // JSON command-chain designer (same way the other serviceTask delegates read
+        // their config). Returns null when neither source carries a command config.
+        Map<String, Object> nodeConfig = loadNodeConfig(executionContext, processVars, activityId);
         if (nodeConfig == null) {
             throw new CommandChainStepException(activityId, "unknown",
-                    "No configuration found for node '" + activityId + "' in _chain_nodes");
+                    "commandServiceTaskDelegate: no command config for node '" + activityId
+                            + "'. Provide smart:properties (commandCode, operationType, ...) on the "
+                            + "serviceTask, or start the process via CommandChainService (_chain_nodes).");
         }
 
         String commandCode = (String) nodeConfig.get("commandCode");
@@ -158,6 +160,82 @@ public class CommandServiceTaskDelegate implements JavaDelegation {
     }
 
     // ==================== Internal Methods ====================
+
+    /** smart:property names consumed as command config; everything else is a payload param. */
+    private static final Set<String> RESERVED_PROPERTY_KEYS =
+            Set.of("commandCode", "operationType", "onFail", "condition", "targetRecordId");
+
+    /**
+     * Resolve the command config for the current node, preferring the per-node config
+     * injected by CommandChainService ({@code _chain_nodes}) and falling back to the
+     * serviceTask's own {@code smart:properties}. Returns {@code null} when neither source
+     * carries a command config.
+     */
+    private Map<String, Object> loadNodeConfig(ExecutionContext executionContext,
+                                               Map<String, Object> processVars, String activityId) {
+        Object chainNodesObj = processVars.get("_chain_nodes");
+        if (chainNodesObj instanceof Map<?, ?> chainNodes) {
+            Object nodeConfig = chainNodes.get(activityId);
+            if (nodeConfig instanceof Map<?, ?> map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> typed = (Map<String, Object>) map;
+                return typed;
+            }
+        }
+        return configFromProperties(executionContext);
+    }
+
+    /**
+     * Build a node config from the serviceTask's {@code smart:properties}: the reserved keys
+     * map to the command fields and every other property becomes a payload param (its value
+     * may be a {@code ${...}} SpEL expression resolved against process variables). Returns
+     * {@code null} when there is no {@code commandCode} (nothing to execute).
+     */
+    private Map<String, Object> configFromProperties(ExecutionContext executionContext) {
+        Map<String, String> props = resolveProperties(executionContext);
+        String commandCode = props.get("commandCode");
+        if (commandCode == null || commandCode.isBlank()) {
+            return null;
+        }
+        Map<String, Object> cfg = new HashMap<>();
+        cfg.put("commandCode", commandCode);
+        cfg.put("operationType", props.get("operationType"));
+        cfg.put("onFail", props.getOrDefault("onFail", "abort"));
+        if (props.get("condition") != null) {
+            cfg.put("condition", props.get("condition"));
+        }
+        if (props.get("targetRecordId") != null) {
+            // execute() resolves targetRecordId as a bare SpEL expression (the chain path
+            // stores it bare). Unwrap the ${...} the BPMN author writes for consistency with
+            // params/conditions so a hand-authored ${recordIdVar} resolves the same way.
+            cfg.put("targetRecordId", unwrapExpression(props.get("targetRecordId")));
+        }
+        Map<String, Object> params = new HashMap<>();
+        for (Map.Entry<String, String> e : props.entrySet()) {
+            if (!RESERVED_PROPERTY_KEYS.contains(e.getKey())) {
+                params.put(e.getKey(), e.getValue());
+            }
+        }
+        cfg.put("params", params);
+        return cfg;
+    }
+
+    /** Strip a {@code ${...}} wrapper so the inner SpEL is left for direct evaluation. */
+    private static String unwrapExpression(String value) {
+        if (value != null && value.startsWith("${") && value.endsWith("}")) {
+            return value.substring(2, value.length() - 1);
+        }
+        return value;
+    }
+
+    /** Read the current serviceTask's {@code smart:properties} (name → value). */
+    private Map<String, String> resolveProperties(ExecutionContext executionContext) {
+        if (executionContext.getBaseElement() instanceof IdBasedElement idBased
+                && idBased.getProperties() != null) {
+            return idBased.getProperties();
+        }
+        return Map.of();
+    }
 
     private void handleFailure(String activityId, String commandCode, String errorMessage,
                                String onFail, String executionId, long durationMs,
