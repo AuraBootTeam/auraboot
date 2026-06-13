@@ -25,8 +25,29 @@ created: 2026-06-13
   - 修复前:generate(model+5 fields)→ apply **400 FAILED**(上面两个错)。
   - 修复后:同 generate → apply **200 success:true status:SUCCESS**,`resourceCounts: {MODEL:1, FIELD:5, MODEL_FIELD_BINDING:5}`(5 个 binding 自动合成落库 + status enum 降 string)。
 
+## 续做切片 — 默认 pages/menus 合成(生成的应用有 UI,本切片)
+取证发现:弱模型只生成 model+fields(`pages=0 menus=0`)→ 生成的应用**只有 dynamic API、没有可点的页面/导航**。本切片让后处理合成默认 list+form 页 + 导航菜单,生成的应用开箱即用、侧边栏可达。
+
+- 🔴 **真缺口 + 真错**(`/apply` 真栈逐个暴露,非推断):
+  1. `pages[*]: layout is required. Page JSON must use the latest V2 flat format with top-level kind/layout/blocks` —— 最初按 prompt few-shot(**嵌套 areas 格式**)合成页面被 validator 拒。**few-shot 本身是过时格式**(LLM 历来 `pages=0` 从没暴露)。对照真生产 golden 页 `crm-quick-start/config/pages/tcrm_lead_{list,form}.json` 才知真 V2 flat:顶层 `kind/schemaVersion:4/modelCode/title/layout:{type:stack}/blocks[]`,`blocks` 扁平、每块带 `blockType`(toolbar/table/form-section/form-buttons)+ `area`。
+  2. `Model '<code>' has missing modelType` —— 弱模型可能漏 `modelType`。
+  3. `[S-PAGE-LABEL] ... missing a business label at columns[*].label` —— 列标签由字段 `displayName` 解析;字段无 business displayName(或 displayName==code/含 `_`)→ 列头无标签被拒。
+- **修复**(`buildPluginManifestJson` 续加确定性后处理):
+  - `synthesizePages(plugin, models, fields, pages)`:pages 空且**单 model** 时合成 list+form 页(真 V2 flat,镜像 tcrm 生产 golden 结构);多 model 不瞎猜 + log。`listPage` = toolbar(create 按钮)+ table(每字段一列 + actions 列 edit/delete);`formPage` = form-section(required 字段标 `required:true` 满足 S-PAGE-FORM-REQUIRED)+ form-buttons(submit→`<plugin>:create_<model>` / cancel)。
+  - `synthesizeMenus(models, menus)`:menus 空且单 model 时合成 `{path:/dynamic/<kebab>}` → `deriveDynamicMenuPageKeys` 派生 `pageKey=<model>_list`。
+  - `conformModels`:漏 `modelType` 默认 `entity`。
+  - `conformFieldLabels` + `humanize`:字段无 business label → 合成 `displayName:en/zh-CN = humanize(code)`(`unit_price`→`Unit Price`),解析列头/表单标签。
+  - few-shot 的 pages 同步改成真 V2 flat(避免强模型跟着生成被拒的嵌套格式)。
+- **验证**(本切片):
+  - **单测** `NlModelingManifestPostProcessingTest` 15/15(+ list/form 页结构 + menu pageKey + conformModels + conformFieldLabels + humanize)。
+  - **真栈 apply golden**(零 docker host-first,backend :6600 / DB `aura_boot_auraqr`):
+    - hand-crafted resources(model+2 fields,无 pages)→ apply **200** `{MODEL:1, FIELD:2, MODEL_FIELD_BINDING:2, COMMAND:3, PAGE:2, MENU:1}`。
+    - **真 LLM**(真 DeepSeek):"customer visit log" → generate(model+4 fields,`pages=0 menus=0 commands=0`)→ 后处理 → apply **200** `{PAGE:2, MENU:1, COMMAND:3, ...}` = **NL_TO_APP_WITH_UI_OK**。
+    - **后端联动 golden**:合成命令 `customer_visit_log:create_visit_log` 执行 **200** → 行落 `mt_visit_log`(字段值正确)→ dynamic `/api/dynamic/visit_log/list` **200 total=1**(list 页数据源)。
+    - **可达 / 可渲染**:`/api/pages/key/visit_log_list` 返回正确装配的页面(toolbar+create / table 列 `[visit_code, customer_name, visit_date, summary, actions]`);`/api/menu/user` 含 `Visit Log → /dynamic/visit-log → visit_log_list`。合成 DSL 通过平台 S-PAGE-* 可渲染性 validator,且与生产 golden 页 `tcrm_lead_{list,form}` 结构同构。
+
 ## 残留(非本切片)
-- **生成质量**:本轮弱模型(deepseek-chat→v4-flash)只生成 model+fields,`pages=0 commands=0`(D5 用 v4-pro 得全量)。pages/commands 生成质量 = prompt/model 调优,独立项。
-- ✅ **CRUD 可用(本切片续做,#后续 PR)**:取证发现 dynamic CRUD 403 真因 = 生成 model 无 commands → `CommandActionDeriver` 派生不出 `model.<code>.create` → `AutoPermissionAssignmentService` 没建该权限。修:`synthesizeCrudCommands`(commands 空且单 model 时合成 create/update/delete)→ 派生权限 → 自动授予。真栈 golden:generate→apply(`COMMAND:{CREATE:3}`)→ 重登 → `POST /api/dynamic/equipment/create` **200** + list rows=1 = **CRUD_OK**。
+- ⚠️ **像素级浏览器 golden 未过(infra 友 friction,非产品)**:host-first 起 Vite:5273+BFF:3600→backend:6600 后,**tenant-selection 的 `POST /api/tenant-selection/process` 经 SSR→BFF 链路报 Authorization Error**(同一选择经直连 API / 我的 python 脚本 / enterprise 常驻 :5173 栈均正常)—— ad-hoc dev SSR 栈的 auth 管道问题,与本合成特性正交。生成应用的可渲染性已由「页面装配 API + 菜单 API + 数据 API + 与生产 golden 同构 + 平台可渲染性 validator」多层佐证。**后续**:用标准 golden 栈补像素 drive(导航→list 渲染→create→提交→行出现)。
+- **生成质量**:弱模型(deepseek-chat→v4-flash)只生成 model+fields。生成质量 = prompt/model 调优,独立项。
 - **MD-3 in-designer AI 副驾**:复用本 generate/refine(现 import-ready)→ 限定到设计器当前面片段。
-- ⚠️ DeepSeek key:本验证用 key(已轮换提醒);`aura_boot_auraqr` CloudConfig 仍存旧 D5 leaked key,须清。
+- ✅ DeepSeek key:本验证用后**已清** `aura_boot_auraqr` CloudConfig(`DELETE ab_cloud_config ... provider_code=deepseek`,验 0 行);chat 暴露的 key 仍须 owner 端轮换。

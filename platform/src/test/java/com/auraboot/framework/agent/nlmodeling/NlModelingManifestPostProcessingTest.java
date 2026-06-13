@@ -172,4 +172,95 @@ class NlModelingManifestPostProcessingTest {
                 List.of(mutable("code", "a"), mutable("code", "b")), List.of(), List.of()).isEmpty(),
                 "ambiguous multi-model must not be guessed");
     }
+
+    @Test
+    void buildManifest_synthesizesListFormPages_andMenu() throws Exception {
+        NlModelingResponse.Resources res = NlModelingResponse.Resources.builder()
+                .models(List.of(mutable("code", "equipment")))
+                .fields(List.of(mutable("code", "name", "dataType", "string"),
+                        mutable("code", "location", "dataType", "string")))
+                .build();
+
+        JsonNode m = mapper.readTree(service.buildPluginManifestJson("equipment_mgmt", res));
+
+        JsonNode pages = m.get("pages");
+        assertEquals(2, pages.size(), "a list + form page must be synthesized");
+        JsonNode listPage = pages.get(0);
+        assertEquals("equipment_list", listPage.get("pageKey").asText());
+        assertEquals("list", listPage.get("kind").asText());
+        // V2 flat format: top-level kind/layout/blocks (the strict import requires these)
+        assertEquals("stack", listPage.get("layout").get("type").asText(),
+                "V2 flat page must carry a top-level layout");
+        assertEquals(4, listPage.get("schemaVersion").asInt());
+        JsonNode blocks = listPage.get("blocks");
+        assertEquals("toolbar", blocks.get(0).get("blockType").asText());
+        assertEquals("create", blocks.get(0).get("buttons").get(0).get("action").asText());
+        JsonNode table = blocks.get(1);
+        assertEquals("table", table.get("blockType").asText());
+        // one column per field + a trailing action column
+        assertEquals(3, table.get("columns").size());
+        JsonNode actionCol = table.get("columns").get(2);
+        assertTrue(actionCol.get("isActionColumn").asBoolean());
+        assertEquals("equipment_mgmt:delete_equipment",
+                actionCol.get("buttons").get(1).get("commandCode").asText());
+
+        JsonNode formPage = pages.get(1);
+        assertEquals("equipment_form", formPage.get("pageKey").asText());
+        assertEquals("form", formPage.get("kind").asText());
+        assertEquals("stack", formPage.get("layout").get("type").asText());
+        JsonNode formButtons = formPage.get("blocks").get(1);
+        assertEquals("form-buttons", formButtons.get("blockType").asText());
+        assertEquals("equipment_mgmt:create_equipment",
+                formButtons.get("buttons").get(0).get("commandCode").asText());
+
+        // menu wired to the list page via the dynamic path → pageKey
+        JsonNode menus = m.get("menus");
+        assertEquals(1, menus.size());
+        assertEquals("equipment_list", menus.get(0).get("pageKey").asText(),
+                "synthesized menu must resolve to the list page");
+    }
+
+    @Test
+    void conformFieldLabels_synthesizesBusinessLabelFromCode() {
+        var noLabel = mutable("code", "unit_price", "dataType", "decimal");
+        var rawLabel = mutable("code", "name", "dataType", "string", "displayName:en", "name");
+        var goodLabel = mutable("code", "status", "dataType", "string", "displayName:zh-CN", "状态");
+        NlModelingService.conformFieldLabels(List.of(noLabel, rawLabel, goodLabel));
+        // snake_case humanized, both locales filled
+        assertEquals("Unit Price", noLabel.get("displayName:en"));
+        assertEquals("Unit Price", noLabel.get("displayName:zh-CN"));
+        // a raw label equal to the code is overwritten with a business label
+        assertEquals("Name", rawLabel.get("displayName:en"));
+        // an existing business label (any locale) is left untouched
+        assertEquals("状态", goodLabel.get("displayName:zh-CN"));
+        assertFalse(goodLabel.containsKey("displayName:en"), "fields with a business label must not be rewritten");
+    }
+
+    @Test
+    void humanize_splitsSnakeAndKebab() {
+        assertEquals("Unit Price", NlModelingService.humanize("unit_price"));
+        assertEquals("Order Line Item", NlModelingService.humanize("order-line-item"));
+        assertEquals("Name", NlModelingService.humanize("name"));
+        assertNull(NlModelingService.humanize(null));
+    }
+
+    @Test
+    void conformModels_defaultsMissingModelType() {
+        var withType = mutable("code", "a", "modelType", "lookup");
+        var noType = mutable("code", "b");
+        var blankType = mutable("code", "c", "modelType", "");
+        NlModelingService.conformModels(List.of(withType, noType, blankType));
+        assertEquals("lookup", withType.get("modelType"), "an explicit modelType must be preserved");
+        assertEquals("entity", noType.get("modelType"), "missing modelType must default to entity");
+        assertEquals("entity", blankType.get("modelType"), "blank modelType must default to entity");
+    }
+
+    @Test
+    void synthesizePages_keepsExistingAndSkipsMultiModel() {
+        var existing = List.of(mutable("pageKey", "x_list"));
+        assertSame(existing, NlModelingService.synthesizePages("x", List.of(mutable("code", "x")),
+                List.of(), existing));
+        assertTrue(NlModelingService.synthesizePages("x",
+                List.of(mutable("code", "a"), mutable("code", "b")), List.of(), List.of()).isEmpty());
+    }
 }
