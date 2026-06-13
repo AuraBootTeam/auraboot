@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolvePromptUploadFilenameKey, resolvePromptUploadKey, uploadCommandFile } from '../promptUpload';
+import {
+  resolvePromptUploadAccept,
+  resolvePromptUploadFilenameKey,
+  resolvePromptUploadKey,
+  uploadCommandFile,
+} from '../promptUpload';
 
 describe('resolvePromptUploadKey', () => {
   it('defaults to source_file_id when promptUpload is boolean true', () => {
@@ -8,6 +13,11 @@ describe('resolvePromptUploadKey', () => {
 
   it('uses the explicit string key when provided', () => {
     expect(resolvePromptUploadKey('bom_lib_source_file_id')).toBe('bom_lib_source_file_id');
+  });
+
+  it('uses the explicit object key when provided', () => {
+    expect(resolvePromptUploadKey({ key: 'rfq_source_file_id', accept: '.zip' })).toBe('rfq_source_file_id');
+    expect(resolvePromptUploadKey({ fileIdKey: 'gerber_file_id' })).toBe('gerber_file_id');
   });
 
   it('falls back to source_file_id for blank/invalid values', () => {
@@ -29,6 +39,19 @@ describe('resolvePromptUploadFilenameKey', () => {
 
   it('falls back to appending _filename for non-standard keys', () => {
     expect(resolvePromptUploadFilenameKey('attachment')).toBe('attachment_filename');
+  });
+});
+
+describe('resolvePromptUploadAccept', () => {
+  it('returns an object accept string when provided', () => {
+    expect(resolvePromptUploadAccept({ key: 'source_file_id', accept: '.zip,.gbr,.drl,.cpl' })).toBe(
+      '.zip,.gbr,.drl,.cpl',
+    );
+  });
+
+  it('keeps legacy boolean and string promptUpload on the default picker accept', () => {
+    expect(resolvePromptUploadAccept(true)).toBeUndefined();
+    expect(resolvePromptUploadAccept('corrected_bom_file_id')).toBeUndefined();
   });
 });
 

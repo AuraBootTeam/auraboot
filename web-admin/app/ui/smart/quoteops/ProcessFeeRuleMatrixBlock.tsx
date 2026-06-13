@@ -18,7 +18,8 @@ type RuleField =
   | 'qo_pfrl_unit_price'
   | 'qo_pfrl_point_count'
   | 'qo_pfrl_min_charge'
-  | 'qo_pfrl_note';
+  | 'qo_pfrl_note'
+  | 'qo_pfrl_source_row_no';
 
 interface MatrixRow {
   __rowId: string;
@@ -31,6 +32,7 @@ interface MatrixRow {
   qo_pfrl_point_count: string;
   qo_pfrl_min_charge: string;
   qo_pfrl_note: string;
+  qo_pfrl_source_row_no: string;
 }
 
 interface ValidationIssue {
@@ -51,6 +53,7 @@ const COLUMNS: Array<{
   { field: 'qo_pfrl_unit_price', label: '单价', width: '110px', align: 'right' },
   { field: 'qo_pfrl_point_count', label: '计费点数', width: '110px', align: 'right' },
   { field: 'qo_pfrl_min_charge', label: '最低收费', width: '110px', align: 'right' },
+  { field: 'qo_pfrl_source_row_no', label: '模板来源行', width: '120px', align: 'right' },
   { field: 'qo_pfrl_note', label: '备注', width: '260px' },
 ];
 
@@ -76,6 +79,9 @@ const HEADER_ALIASES: Record<string, RuleField> = {
   points: 'qo_pfrl_point_count',
   最低收费: 'qo_pfrl_min_charge',
   mincharge: 'qo_pfrl_min_charge',
+  模板来源行: 'qo_pfrl_source_row_no',
+  sourcerow: 'qo_pfrl_source_row_no',
+  sourcerowno: 'qo_pfrl_source_row_no',
   备注: 'qo_pfrl_note',
   note: 'qo_pfrl_note',
   remark: 'qo_pfrl_note',
@@ -425,6 +431,7 @@ function toMatrixRows(rows: Array<Record<string, unknown>>): MatrixRow[] {
     qo_pfrl_point_count: value(row.qo_pfrl_point_count),
     qo_pfrl_min_charge: value(row.qo_pfrl_min_charge),
     qo_pfrl_note: value(row.qo_pfrl_note),
+    qo_pfrl_source_row_no: value(row.qo_pfrl_source_row_no),
   }));
 }
 
@@ -439,6 +446,7 @@ function emptyRow(rowId: string): MatrixRow {
     qo_pfrl_point_count: '',
     qo_pfrl_min_charge: '',
     qo_pfrl_note: '',
+    qo_pfrl_source_row_no: '',
   };
 }
 
@@ -518,6 +526,7 @@ function toPayloadRow(row: MatrixRow): Record<string, string | undefined> {
     qo_pfrl_point_count: row.qo_pfrl_point_count,
     qo_pfrl_min_charge: row.qo_pfrl_min_charge,
     qo_pfrl_note: row.qo_pfrl_note,
+    qo_pfrl_source_row_no: row.qo_pfrl_source_row_no,
   };
 }
 

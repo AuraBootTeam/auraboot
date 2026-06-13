@@ -65,6 +65,7 @@ import {
   uploadCommandFile,
   resolvePromptUploadKey,
   resolvePromptUploadFilenameKey,
+  resolvePromptUploadAccept,
 } from '~/framework/meta/utils/promptUpload';
 import type { AsyncTask } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
 import { useAsyncTaskModalSink } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
@@ -103,6 +104,21 @@ function resolveRuntimeTemplate(value: unknown, runtimeContext: Record<string, u
   return value.replace(/\$\{([^}]+)\}/g, (_match, path) =>
     String(readPath(runtimeContext, path) ?? ''),
   );
+}
+
+function resolveRuntimeValue(value: unknown, runtimeContext: Record<string, unknown>): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => resolveRuntimeValue(item, runtimeContext));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+        key,
+        resolveRuntimeValue(item, runtimeContext),
+      ]),
+    );
+  }
+  return resolveRuntimeTemplate(value, runtimeContext);
 }
 
 function resolveCommandTargetRecordId(
@@ -480,7 +496,13 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               record,
               context,
             );
-            let payload = record || context.data || {};
+            let payload = {
+              ...(record || context.data || {}),
+              ...((resolveRuntimeValue((actionDef as any).payload, runtimeContext) as Record<
+                string,
+                unknown
+              > | undefined) || {}),
+            };
             // `promptUpload`: collect a file from the user, upload it, and inject the
             // resulting file id into the payload before the command runs. Strictly
             // guarded by the flag, so non-upload buttons are unaffected.
@@ -490,7 +512,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               // some browsers don't fire a 'cancel' event, so awaiting pickFile()
               // would otherwise hang the loading state and leave the button stuck.
               setLoading(false);
-              const file = await pickFile();
+              const file = await pickFile(resolvePromptUploadAccept(promptUpload));
               if (!file) return; // user dismissed the picker — nothing to do
               setLoading(true);
               const fileId = await uploadCommandFile(file, token);

@@ -349,4 +349,62 @@ describe('useActionHandler - handlerParams.async polling', () => {
     );
     expect(reload).toHaveBeenCalledWith(['lines', 'quoteSummary']);
   });
+
+  it('passes object promptUpload accept filters to the file picker', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { attachmentId: 'ATT-1' } });
+    const pickFileSpy = vi.spyOn(promptUpload, 'pickFile').mockResolvedValueOnce(
+      new File(['gerber bytes'], 'rfq-gerber.zip'),
+    );
+    vi.spyOn(promptUpload, 'uploadCommandFile').mockResolvedValueOnce('FILE-GERBER');
+
+    const runtime = makeRuntime({ form: { pid: 'RFQ-123' } });
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime,
+        navigate: vi.fn() as any,
+        tableName: 'crm_customer_request_pcba_rfq',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: {} as any,
+      }),
+    );
+
+    const button = {
+      code: 'upload_gerber_package',
+      label: 'Upload Gerber',
+      promptUpload: {
+        key: 'source_file_id',
+        accept: '.zip,.rar,.gbr,.gtl,.gbl,.drl,.xln,.cpl,.pos',
+      },
+      action: {
+        type: 'command',
+        command: 'crm_customer_request_pcba_rfq:upload_source_attachment',
+        targetRecordId: '${form.pid}',
+        payload: {
+          attachment_type: 'gerber_package',
+        },
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button);
+    });
+
+    expect(pickFileSpy).toHaveBeenCalledWith('.zip,.rar,.gbr,.gtl,.gbl,.drl,.xln,.cpl,.pos');
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/crm_customer_request_pcba_rfq:upload_source_attachment',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          targetRecordId: 'RFQ-123',
+          operationType: 'UPDATE',
+          payload: expect.objectContaining({
+            attachment_type: 'gerber_package',
+            source_file_id: 'FILE-GERBER',
+            source_filename: 'rfq-gerber.zip',
+          }),
+        }),
+      }),
+    );
+  });
 });

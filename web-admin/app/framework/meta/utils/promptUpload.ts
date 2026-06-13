@@ -1,13 +1,13 @@
 /**
  * Helpers for command buttons configured with `promptUpload`.
  *
- * A toolbar/command button may declare `promptUpload: true` (or
- * `promptUpload: "<payloadKey>"`) to collect a file from the user *before* the
- * command runs — the file is uploaded via the platform file-upload API and its
- * id is injected into the command payload. The original browser filename is
- * injected under a companion key so command handlers can preserve artifact
- * provenance. Without this, such buttons fire the command with an empty payload
- * and the handler rejects it (e.g. `source_file_id is required`).
+ * A toolbar/command button may declare `promptUpload: true`,
+ * `promptUpload: "<payloadKey>"`, or
+ * `promptUpload: { "key": "<payloadKey>", "accept": ".zip,.gbr" }`
+ * to collect a file from the user before the command runs. The file is uploaded
+ * via the platform file-upload API and its id is injected into the command
+ * payload. The original browser filename is injected under a companion key so
+ * command handlers can preserve artifact provenance.
  */
 
 /**
@@ -79,9 +79,19 @@ export async function uploadCommandFile(
  * `promptUpload: "<key>"` → that explicit key.
  */
 export function resolvePromptUploadKey(promptUpload: unknown): string {
-  return typeof promptUpload === 'string' && promptUpload.trim()
-    ? promptUpload.trim()
-    : 'source_file_id';
+  if (typeof promptUpload === 'string' && promptUpload.trim()) {
+    return promptUpload.trim();
+  }
+  if (promptUpload && typeof promptUpload === 'object') {
+    const config = promptUpload as Record<string, unknown>;
+    for (const key of ['key', 'fileIdKey', 'payloadKey']) {
+      const value = config[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+  }
+  return 'source_file_id';
 }
 
 /**
@@ -104,4 +114,14 @@ export function resolvePromptUploadFilenameKey(promptUpload: unknown): string {
     return `${fileIdKey.slice(0, -'FileId'.length)}Filename`;
   }
   return `${fileIdKey}_filename`;
+}
+
+export function resolvePromptUploadAccept(promptUpload: unknown): string | undefined {
+  if (promptUpload && typeof promptUpload === 'object') {
+    const accept = (promptUpload as Record<string, unknown>).accept;
+    if (typeof accept === 'string' && accept.trim()) {
+      return accept.trim();
+    }
+  }
+  return undefined;
 }
