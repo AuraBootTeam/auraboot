@@ -314,10 +314,10 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
     private Document parseXml(String dmnXml) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(true);
-        secure(factory, "http://apache.org/xml/features/disallow-doctype-decl", true);
-        secure(factory, "http://xml.org/sax/features/external-general-entities", false);
-        secure(factory, "http://xml.org/sax/features/external-parameter-entities", false);
-        secure(factory, "http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
         factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
         factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
         factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
@@ -326,10 +326,6 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
         DocumentBuilder builder = factory.newDocumentBuilder();
         builder.setEntityResolver((publicId, systemId) -> new InputSource(new StringReader("")));
         return builder.parse(new InputSource(new StringReader(dmnXml)));
-    }
-
-    private void secure(DocumentBuilderFactory factory, String feature, boolean value) throws Exception {
-        factory.setFeature(feature, value);
     }
 
     private List<Element> children(Element parent, String localName) {
