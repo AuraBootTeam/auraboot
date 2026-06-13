@@ -152,6 +152,12 @@ export function initBlockRegistry(): void {
       'EvidencePanelBlockRenderer',
     ),
   });
+  BlockRegistry.register('gerber-viewer', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/GerberViewerBlockRenderer'),
+      'GerberViewerBlockRenderer',
+    ),
+  });
   BlockRegistry.register('artifact-timeline', {
     component: lazy(
       () => import('~/framework/meta/rendering/blocks/ArtifactTimelineBlockRenderer'),

@@ -150,6 +150,7 @@ const FALLBACK_REGISTRY: DslRegistryData = {
       { code: 'candidate-list', label: 'Candidate List' },
       { code: 'workbench-action-bar', label: 'Workbench Action Bar' },
       { code: 'evidence-panel', label: 'Evidence Panel' },
+      { code: 'gerber-viewer', label: 'Gerber Viewer' },
       { code: 'artifact-timeline', label: 'Artifact Timeline' },
       { code: 'review-drawer', label: 'Review Drawer' },
       { code: 'custom', label: 'Custom' },

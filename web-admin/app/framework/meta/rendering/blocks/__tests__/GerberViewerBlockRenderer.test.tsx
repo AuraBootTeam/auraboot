@@ -1,0 +1,313 @@
+import React from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { BlockConfig } from '~/framework/meta/schemas/types';
+import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
+import { evaluateCondition as evaluateExpressionCondition } from '~/framework/meta/runtime/expression/evaluator';
+
+import { GerberViewerBlockRenderer } from '../GerberViewerBlockRenderer';
+
+const INSPECTION = {
+  project: { code: 'A00104001', name: 'PCBA RFQ demo board' },
+  board: { xMinMm: 0, yMinMm: 0, xMaxMm: 98, yMaxMm: 33, widthMm: 98, heightMm: 33 },
+  summary: {
+    bomRefCount: 3,
+    cplRefCount: 3,
+    smdCount: 2,
+    thtCount: 1,
+    excludedBomRefCount: 1,
+    errorCount: 1,
+    warningCount: 1,
+  },
+  layerManifest: [
+    { filename: 'Gerber_TopLayer.GTL', role: 'top_copper', side: 'top', kind: 'gerber', flashCount: 258 },
+    { filename: 'Gerber_BottomLayer.GBL', role: 'bottom_copper', side: 'bottom', kind: 'gerber', flashCount: 101 },
+  ],
+  drillFiles: [{ filename: 'Drill_PTH_Through.DRL', plated: true, hitCount: 101 }],
+  issues: [
+    { severity: 'error', code: 'outside_board', refdes: 'U1', message: 'U1 is outside the board outline.' },
+    { severity: 'warning', code: 'bom_process_mismatch', refdes: 'J1', message: 'J1 process differs from CPL.' },
+  ],
+  excludedBomRefs: [{ refdes: 'TP1', bomItem: { materialCode: 'TP', materialName: 'test point' } }],
+  components: [
+    {
+      refdes: 'C4',
+      footprint: '0603',
+      xMm: 12,
+      yMm: 8,
+      side: 'top',
+      smd: true,
+      pins: 2,
+      rotation: 90,
+      issues: [],
+      bomItem: { materialName: 'Capacitor', process: 'SMT' },
+    },
+    {
+      refdes: 'U1',
+      footprint: 'QFN32',
+      xMm: 92,
+      yMm: 31,
+      side: 'top',
+      smd: true,
+      pins: 32,
+      rotation: 0,
+      issues: [{ severity: 'error', code: 'outside_board', refdes: 'U1', message: 'U1 is outside.' }],
+      bomItem: { materialName: 'MCU', process: 'SMT' },
+    },
+    {
+      refdes: 'J1',
+      footprint: 'HDR',
+      xMm: 40,
+      yMm: 15,
+      side: 'bottom',
+      smd: false,
+      pins: 4,
+      rotation: 180,
+      issues: [{ severity: 'warning', code: 'bom_process_mismatch', refdes: 'J1', message: 'J1 mismatch.' }],
+      bomItem: { materialName: 'Header', process: 'DIP' },
+    },
+  ],
+};
+
+function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
+  const context: Record<string, any> = {
+    locale: 'en-US',
+    t: (key: string) => key,
+    form: {},
+    global: {},
+    state: {
+      selectedLine: {
+        qo_ql_description: 'Demo PCBA',
+        qo_ql_gerber_parse_status: 'parsed',
+        qo_ql_gerber_validation_status: 'warning',
+        qo_ql_board_width_mm: 98,
+        qo_ql_board_height_mm: 33,
+      },
+    },
+  };
+  const data = overrides.data ?? {};
+  return {
+    getContext: () => context,
+    getEvaluator: () => ({
+      evaluateCondition: (expr: string, expressionContext = context) =>
+        evaluateExpressionCondition(expr, expressionContext as any),
+      evaluateTemplate: (tpl: string) => tpl,
+      evaluateObject: (obj: any) => obj,
+    }),
+    getDataSourceManager: () => ({
+      getData: (id: string) => data[id],
+      getState: () => ({ data: null, loading: false, error: null }),
+      has: (id: string) => Object.prototype.hasOwnProperty.call(data, id),
+      register: vi.fn(),
+      reload: vi.fn(),
+    }),
+    getStateManager: () => ({
+      updateState: vi.fn(),
+      getContext: () => context,
+      getStore: () => ({ subscribe: () => () => undefined }),
+    }),
+    getScopeId: () => 'scope-1',
+    getSchema: () => ({ id: 'test_schema', modelCode: 'test_model' }),
+    ...overrides,
+  } as unknown as SchemaRuntime;
+}
+
+describe('GerberViewerBlockRenderer', () => {
+  it('renders inline inspection metrics, board layers and selected line facts', () => {
+    const runtime = makeRuntime();
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: INSPECTION,
+      lineContext: '${state.selectedLine}',
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('gerber-viewer')).toHaveTextContent('A00104001');
+    expect(screen.getByTestId('gerber-viewer-board')).toBeInTheDocument();
+    expect(screen.getByTestId('gerber-metric-board')).toHaveTextContent('98 x 33 mm');
+    expect(screen.getByTestId('gerber-metric-parse')).toHaveTextContent('parsed / warning');
+    expect(screen.getByTestId('gerber-layer-top_copper')).toHaveTextContent('258');
+    expect(screen.getByTestId('gerber-marker-C4')).toBeInTheDocument();
+  });
+
+  it('lets selected quote-line Gerber facts override the inline sample', () => {
+    const runtime = makeRuntime();
+    const context = runtime.getContext() as any;
+    context.state.selectedLine = {
+      pid: 'LINE-REAL',
+      qo_ql_description: 'Uploaded corrected PCBA package',
+      qo_ql_smt_points: 17,
+      qo_ql_tht_points: 9,
+      qo_ql_board_width_mm: 120,
+      qo_ql_board_height_mm: 45,
+      qo_ql_gerber_parse_status: 'parsed',
+      qo_ql_gerber_validation_status: 'warning',
+      qo_ql_gerber_validation_messages: ['NO_EXCELLON_FILE'],
+    };
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: INSPECTION,
+      lineContext: '${state.selectedLine}',
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('gerber-metric-board')).toHaveTextContent('120 x 45 mm');
+    expect(screen.getByTestId('gerber-metric-smt-tht')).toHaveTextContent('17 / 9');
+    expect(screen.getByTestId('gerber-metric-drill')).toHaveTextContent('9');
+    expect(screen.getByTestId('gerber-issue-NO_EXCELLON_FILE-0')).toHaveTextContent('NO_EXCELLON_FILE');
+    expect(screen.getByTestId('gerber-layer-smt_points')).toHaveTextContent('17');
+  });
+
+  it('renders persisted line inspection JSON before falling back to the DSL sample', () => {
+    const runtime = makeRuntime();
+    const context = runtime.getContext() as any;
+    context.state.selectedLine = {
+      pid: 'LINE-INSPECTION',
+      qo_ql_description: 'Persisted inspection',
+      qo_ql_gerber_inspection: JSON.stringify({
+        project: { code: 'REAL-INSPECTION', name: 'Persisted sidecar inspection' },
+        board: { widthMm: 42, heightMm: 24 },
+        summary: { bomRefCount: 1, cplRefCount: 1, smdCount: 1, thtCount: 0 },
+        components: [
+          {
+            refdes: 'R7',
+            footprint: '0402',
+            xMm: 10,
+            yMm: 8,
+            side: 'top',
+            smd: true,
+            bomItem: { materialName: 'Resistor', process: 'SMT' },
+          },
+        ],
+      }),
+    };
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: INSPECTION,
+      lineContext: '${state.selectedLine}',
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('gerber-viewer')).toHaveTextContent('REAL-INSPECTION');
+    expect(screen.getByTestId('gerber-metric-board')).toHaveTextContent('42 x 24 mm');
+    expect(screen.getByTestId('gerber-marker-R7')).toBeInTheDocument();
+    expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
+  });
+
+  it('falls back to a parsed line from the bound data source when the selected line has no Gerber facts', () => {
+    const runtime = makeRuntime({
+      data: {
+        lines: [
+          {
+            pid: 'LINE-UNPARSED',
+            qo_ql_description: 'Unparsed resistor',
+          },
+          {
+            pid: 'LINE-PARSED',
+            qo_ql_description: 'Parsed MCU package',
+            qo_ql_gerber_parse_status: 'parsed',
+            qo_ql_gerber_validation_status: 'failed',
+            qo_ql_gerber_inspection: JSON.stringify({
+              project: { code: 'REAL-LINE-INSPECTION', name: 'Runtime sidecar result' },
+              board: { widthMm: 106.6, heightMm: 6.6 },
+              summary: { bomRefCount: 5, cplRefCount: 5, smdCount: 0, thtCount: 5, errorCount: 5, warningCount: 4 },
+              issues: [
+                {
+                  severity: 'error',
+                  code: 'COMPONENT_OUTSIDE_BOARD',
+                  refdes: 'ORPHAN',
+                  message: 'ORPHAN coordinate is outside the board outline.',
+                },
+              ],
+              components: [
+                {
+                  refdes: 'ORPHAN',
+                  footprint: 'R0603',
+                  xMm: 200,
+                  yMm: 0.1,
+                  side: 'top',
+                  smd: false,
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'COMPONENT_OUTSIDE_BOARD',
+                      refdes: 'ORPHAN',
+                      message: 'ORPHAN coordinate is outside.',
+                    },
+                  ],
+                  bomItem: { materialName: 'Missing BOM', process: 'SMT' },
+                },
+              ],
+            }),
+          },
+        ],
+      },
+    });
+    const context = runtime.getContext() as any;
+    context.state.selectedLine = {
+      pid: 'LINE-UNPARSED',
+      qo_ql_description: 'Unparsed resistor',
+    };
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      dataSource: 'lines',
+      inspection: INSPECTION,
+      lineContext: '${state.selectedLine}',
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('gerber-viewer')).toHaveTextContent('LINE-PARSED');
+    expect(screen.getByTestId('gerber-viewer')).toHaveTextContent('Parsed MCU package');
+    expect(screen.getByTestId('gerber-viewer')).not.toHaveTextContent('A00104001');
+    expect(screen.getByTestId('gerber-metric-board')).toHaveTextContent('107 x 7 mm');
+    expect(screen.getByTestId('gerber-issue-COMPONENT_OUTSIDE_BOARD-ORPHAN')).toHaveTextContent('ORPHAN');
+    expect(screen.getByTestId('gerber-issue-COMPONENT_OUTSIDE_BOARD-ORPHAN')).toHaveTextContent('COMPONENT_OUTSIDE_BOARD');
+    expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
+  });
+
+  it('filters issues and markers by severity and search query', () => {
+    const runtime = makeRuntime();
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: INSPECTION,
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Warnings' }));
+    expect(screen.queryByTestId('gerber-issue-outside_board-U1')).toBeNull();
+    expect(screen.getByTestId('gerber-issue-bom_process_mismatch-J1')).toHaveTextContent('J1');
+    expect(screen.queryByTestId('gerber-marker-U1')).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Gerber viewer search'), { target: { value: 'Header' } });
+    expect(screen.getByTestId('gerber-component-row-J1')).toHaveTextContent('Header');
+    expect(screen.queryByTestId('gerber-component-row-C4')).toBeNull();
+  });
+
+  it('updates selected component details when a board marker is clicked', async () => {
+    const runtime = makeRuntime();
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: INSPECTION,
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    fireEvent.click(screen.getByTestId('gerber-marker-U1'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('gerber-selected-component')).toHaveTextContent('U1');
+      expect(screen.getByTestId('gerber-selected-component')).toHaveTextContent('QFN32');
+    });
+  });
+});
