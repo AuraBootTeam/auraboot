@@ -87,6 +87,24 @@ export function moveBlockBefore(
   return insertion.changed ? insertion.blocks : blocks;
 }
 
+export function moveBlockToParent(
+  blocks: DslBlockV3[],
+  movingBlockId: string,
+  parentBlockId: string,
+): DslBlockV3[] {
+  if (movingBlockId === parentBlockId) return blocks;
+  const movingResult = findBlockById(blocks, movingBlockId);
+  const parentResult = findBlockById(blocks, parentBlockId);
+  if (!movingResult || !parentResult) return blocks;
+  if (parentResult.path.some((item) => item.id === movingBlockId)) return blocks;
+
+  const extraction = extractBlockById(blocks, movingBlockId);
+  if (!extraction) return blocks;
+
+  const insertion = insertBlockIntoParentId(extraction.blocks, parentBlockId, extraction.block);
+  return insertion.changed ? insertion.blocks : blocks;
+}
+
 function extractBlockById(
   blocks: DslBlockV3[],
   blockId: string,
@@ -127,6 +145,29 @@ function insertBlockBeforeId(
     const block = blocks[index];
     if (!block.blocks?.length) continue;
     const insertion = insertBlockBeforeId(block.blocks, targetBlockId, movingBlock);
+    if (!insertion.changed) continue;
+    const next = [...blocks];
+    next[index] = { ...block, blocks: insertion.blocks };
+    return { blocks: next, changed: true };
+  }
+
+  return { blocks, changed: false };
+}
+
+function insertBlockIntoParentId(
+  blocks: DslBlockV3[],
+  parentBlockId: string,
+  movingBlock: DslBlockV3,
+): { blocks: DslBlockV3[]; changed: boolean } {
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index];
+    if (block.id === parentBlockId) {
+      const next = [...blocks];
+      next[index] = { ...block, blocks: [...(block.blocks ?? []), movingBlock] };
+      return { blocks: next, changed: true };
+    }
+    if (!block.blocks?.length) continue;
+    const insertion = insertBlockIntoParentId(block.blocks, parentBlockId, movingBlock);
     if (!insertion.changed) continue;
     const next = [...blocks];
     next[index] = { ...block, blocks: insertion.blocks };

@@ -26,6 +26,48 @@ export const canvasDraggableId = (blockId: string) => `canvas:${blockId}`;
 export const blockDroppableId = (blockId: string) => `drop-block:${blockId}`;
 export const ROOT_DROPPABLE_ID = 'drop-root';
 
+type CollisionIdentifier = string | number;
+type CollisionRect = { width: number; height: number };
+
+export function prioritizeNestedDropCollisions<T extends { id: CollisionIdentifier }>(
+  collisions: T[],
+  droppableRects: { get(id: CollisionIdentifier): CollisionRect | undefined },
+): T[] {
+  if (collisions.length < 2) return collisions;
+
+  return collisions
+    .map((collision, index) => ({ collision, index }))
+    .sort((left, right) => {
+      const areaDiff =
+        getCollisionRectArea(droppableRects.get(left.collision.id)) -
+        getCollisionRectArea(droppableRects.get(right.collision.id));
+      return areaDiff === 0 ? left.index - right.index : areaDiff;
+    })
+    .map(({ collision }) => collision);
+}
+
+export function buildDesignerCollisionCandidates<T extends { id: CollisionIdentifier }>(
+  pointerHits: T[],
+  closestHits: T[],
+  droppableRects: { get(id: CollisionIdentifier): CollisionRect | undefined },
+): T[] {
+  if (pointerHits.length === 0) return closestHits;
+
+  const candidates = [...pointerHits];
+  const closest = closestHits[0];
+  if (closest && !candidates.some((candidate) => candidate.id === closest.id)) {
+    candidates.push(closest);
+  }
+  return prioritizeNestedDropCollisions(candidates, droppableRects);
+}
+
+function getCollisionRectArea(rect: CollisionRect | undefined): number {
+  if (!rect || !Number.isFinite(rect.width) || !Number.isFinite(rect.height)) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  return Math.max(0, rect.width) * Math.max(0, rect.height);
+}
+
 export function readDragData(data: unknown): DragData | null {
   if (!data || typeof data !== 'object') return null;
   const candidate = data as Partial<DragData>;
@@ -63,6 +105,7 @@ export interface DropCapabilities {
   canAddModelFieldBeforeTarget(targetBlockId: string, field: ModelFieldDefinition): boolean;
   canAddModelFieldToParent(parentBlockId: string, field: ModelFieldDefinition): boolean;
   canMoveBlockBeforeTarget(movingBlockId: string, targetBlockId: string): boolean;
+  canMoveBlockToParent(movingBlockId: string, parentBlockId: string): boolean;
 }
 
 /** Resolve the drop intent for a drag over an existing block, or null if not droppable. */
@@ -82,7 +125,9 @@ export function resolveBlockDropIntent(
     return null;
   }
   if (drag.blockId === targetBlockId) return null;
-  return caps.canMoveBlockBeforeTarget(drag.blockId, targetBlockId) ? 'before' : null;
+  if (caps.canMoveBlockBeforeTarget(drag.blockId, targetBlockId)) return 'before';
+  if (caps.canMoveBlockToParent(drag.blockId, targetBlockId)) return 'inside';
+  return null;
 }
 
 export type DragEndAction =
@@ -92,6 +137,7 @@ export type DragEndAction =
   | { type: 'add-field-before'; targetBlockId: string; field: ModelFieldDefinition }
   | { type: 'add-field-inside'; parentBlockId: string; field: ModelFieldDefinition }
   | { type: 'move-before'; movingBlockId: string; targetBlockId: string }
+  | { type: 'move-inside'; movingBlockId: string; parentBlockId: string }
   | null;
 
 export interface DragEndCapabilities extends DropCapabilities {
@@ -134,6 +180,9 @@ export function resolveDragEndAction(
   }
   if (drag.blockId !== targetBlockId && caps.canMoveBlockBeforeTarget(drag.blockId, targetBlockId)) {
     return { type: 'move-before', movingBlockId: drag.blockId, targetBlockId };
+  }
+  if (drag.blockId !== targetBlockId && caps.canMoveBlockToParent(drag.blockId, targetBlockId)) {
+    return { type: 'move-inside', movingBlockId: drag.blockId, parentBlockId: targetBlockId };
   }
   return null;
 }

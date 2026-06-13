@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildDesignerCollisionCandidates,
+  prioritizeNestedDropCollisions,
   resolveBlockDropIntent,
   resolveDragEndAction,
   type DragData,
@@ -17,6 +19,7 @@ function caps(overrides: Partial<DragEndCapabilities> = {}): DragEndCapabilities
     canAddModelFieldToParent: () => false,
     canAddBlockToRoot: () => false,
     canMoveBlockBeforeTarget: () => false,
+    canMoveBlockToParent: () => false,
     ...overrides,
   };
 }
@@ -44,7 +47,7 @@ describe('resolveBlockDropIntent', () => {
     expect(resolveBlockDropIntent(drag, 't', caps())).toBeNull();
   });
 
-  it('reorders a canvas block before any other block but not itself', () => {
+  it('moves a canvas block before another block, or inside a compatible container', () => {
     expect(
       resolveBlockDropIntent(
         { kind: 'canvas-block', blockId: 'a' },
@@ -52,6 +55,13 @@ describe('resolveBlockDropIntent', () => {
         caps({ canMoveBlockBeforeTarget: () => true }),
       ),
     ).toBe('before');
+    expect(
+      resolveBlockDropIntent(
+        { kind: 'canvas-block', blockId: 'a' },
+        'section',
+        caps({ canMoveBlockToParent: () => true }),
+      ),
+    ).toBe('inside');
     expect(resolveBlockDropIntent({ kind: 'canvas-block', blockId: 'a' }, 'b', caps())).toBeNull();
     expect(resolveBlockDropIntent({ kind: 'canvas-block', blockId: 'a' }, 'a', caps())).toBeNull();
   });
@@ -106,5 +116,52 @@ describe('resolveDragEndAction', () => {
     expect(
       resolveDragEndAction({ kind: 'canvas-block', blockId: 'a' }, { kind: 'block', blockId: 'a' }, caps()),
     ).toBeNull();
+  });
+
+  it('moves a canvas block inside a compatible target container', () => {
+    expect(
+      resolveDragEndAction(
+        { kind: 'canvas-block', blockId: 'field_a' },
+        { kind: 'block', blockId: 'section_target' },
+        caps({ canMoveBlockToParent: () => true }),
+      ),
+    ).toEqual({ type: 'move-inside', movingBlockId: 'field_a', parentBlockId: 'section_target' });
+  });
+});
+
+describe('prioritizeNestedDropCollisions', () => {
+  it('prefers the smallest nested droppable hit over an outer canvas block', () => {
+    const collisions = [
+      { id: 'drop-block:form_root' },
+      { id: 'drop-block:section_target' },
+    ];
+    const droppableRects = new Map([
+      ['drop-block:form_root', { width: 360, height: 520 }],
+      ['drop-block:section_target', { width: 320, height: 96 }],
+    ]);
+
+    expect(
+      prioritizeNestedDropCollisions(collisions, droppableRects).map((collision) => collision.id),
+    ).toEqual(['drop-block:section_target', 'drop-block:form_root']);
+  });
+});
+
+describe('buildDesignerCollisionCandidates', () => {
+  it('adds the closest-center candidate when pointerWithin only reports an outer block', () => {
+    const pointerHits = [{ id: 'drop-block:form_root' }];
+    const closestHits = [
+      { id: 'drop-block:section_target' },
+      { id: 'drop-block:form_root' },
+    ];
+    const droppableRects = new Map([
+      ['drop-block:form_root', { width: 360, height: 520 }],
+      ['drop-block:section_target', { width: 320, height: 96 }],
+    ]);
+
+    expect(
+      buildDesignerCollisionCandidates(pointerHits, closestHits, droppableRects).map(
+        (collision) => collision.id,
+      ),
+    ).toEqual(['drop-block:section_target', 'drop-block:form_root']);
   });
 });
