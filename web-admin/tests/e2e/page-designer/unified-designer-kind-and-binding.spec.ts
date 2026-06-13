@@ -1477,6 +1477,191 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     });
   });
 
+  test('adds a columns container from the palette with undo, redo, save, and readback', async ({
+    page,
+  }) => {
+    const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
+
+    await page.getByTestId('outline-item-form_root').click();
+    await openBlocksResourceTab(page);
+
+    await expect(page.getByTestId('palette-add-columns')).toBeEnabled();
+    await page.getByTestId('palette-add-columns').click();
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await expect(page.getByTestId('inspector-selected-id')).toHaveText('columns_new_columns');
+    await openBlocksResourceTab(page);
+    await expect(page.getByTestId('palette-add-form-section')).toBeEnabled();
+    await page.getByTestId('palette-add-form-section').click();
+    await expect(
+      page
+        .getByTestId('canvas-block-columns_new_columns')
+        .getByTestId('canvas-block-form_section_new_section'),
+    ).toBeVisible();
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toBeVisible();
+    await expect(page.getByTestId('canvas-block-form_section_new_section')).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+    await expect(
+      page
+        .getByTestId('canvas-block-columns_new_columns')
+        .getByTestId('canvas-block-form_section_new_section'),
+    ).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'form_root');
+    const savedColumns = findBlock(savedBlocks, 'columns_new_columns');
+    const savedNestedSection = findBlock(savedBlocks, 'form_section_new_section');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+      'section_main',
+      'columns_new_columns',
+    ]);
+    expect(savedColumns).toMatchObject({
+      blockType: 'columns',
+      title: { en: 'New columns', 'zh-CN': '新分栏' },
+      layout: { span: 12, columns: 2, gap: 16 },
+    });
+    expect(savedColumns?.blocks?.map((block) => block.id)).toEqual([
+      'form_section_new_section',
+    ]);
+    expect(savedNestedSection).toMatchObject({
+      blockType: 'form-section',
+      title: { en: 'New section', 'zh-CN': '新分组' },
+      layout: { span: 12 },
+      blocks: [],
+    });
+  });
+
+  test('undoes and redoes deleting a saved palette-created columns container before saving readback', async ({
+    page,
+  }) => {
+    const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
+
+    await page.getByTestId('outline-item-form_root').click();
+    await openBlocksResourceTab(page);
+    await page.getByTestId('palette-add-columns').click();
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toBeVisible();
+
+    await openBlocksResourceTab(page);
+    await page.getByTestId('palette-add-form-section').click();
+    await expect(page.getByTestId('canvas-block-form_section_new_section')).toBeVisible();
+    await saveDesignerPage(page, pid);
+
+    await expect(page.getByTestId('block-delete-columns_new_columns')).toBeVisible();
+    await page.getByTestId('block-delete-columns_new_columns').click();
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toHaveCount(0);
+    await expect(page.getByTestId('canvas-block-form_section_new_section')).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toBeVisible();
+    await expect(page.getByTestId('canvas-block-form_section_new_section')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toHaveCount(0);
+    await expect(page.getByTestId('canvas-block-form_section_new_section')).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'form_root');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['section_main']);
+    expect(findBlock(savedBlocks, 'columns_new_columns')).toBeNull();
+    expect(findBlock(savedBlocks, 'form_section_new_section')).toBeNull();
+  });
+
+  test('undoes and redoes reordering a saved palette-created columns container before saving readback', async ({
+    page,
+  }) => {
+    const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
+
+    await page.getByTestId('outline-item-form_root').click();
+    await openBlocksResourceTab(page);
+    await page.getByTestId('palette-add-columns').click();
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toBeVisible();
+
+    await openBlocksResourceTab(page);
+    await page.getByTestId('palette-add-form-section').click();
+    await expect(page.getByTestId('canvas-block-form_section_new_section')).toBeVisible();
+    await saveDesignerPage(page, pid);
+
+    const formRoot = page.getByTestId('canvas-block-form_root');
+    expect(await isBeforeInDom(formRoot, 'section_main', 'columns_new_columns')).toBe(true);
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockBeforeHeader(page, 'columns_new_columns', 'section_main');
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toBeVisible();
+    await expect(page.getByTestId('canvas-block-form_section_new_section')).toBeVisible();
+    expect(await isBeforeInDom(formRoot, 'columns_new_columns', 'section_main')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toBeVisible();
+    await expect(page.getByTestId('canvas-block-form_section_new_section')).toBeVisible();
+    expect(await isBeforeInDom(formRoot, 'section_main', 'columns_new_columns')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+    await expect(page.getByTestId('canvas-block-columns_new_columns')).toBeVisible();
+    await expect(page.getByTestId('canvas-block-form_section_new_section')).toBeVisible();
+    expect(await isBeforeInDom(formRoot, 'columns_new_columns', 'section_main')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'form_root');
+    const savedColumns = findBlock(savedBlocks, 'columns_new_columns');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+      'columns_new_columns',
+      'section_main',
+    ]);
+    expect(savedColumns?.blocks?.map((block) => block.id)).toEqual([
+      'form_section_new_section',
+    ]);
+  });
+
   test('undoes and redoes deleting a saved palette-created container before saving readback', async ({ page }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
     await openDesigner(page, formKey);
@@ -3382,8 +3567,33 @@ async function clickDesignerToolbarButton(page: Page, testId: string) {
   await expect
     .poll(() => receivesPointerAtCenter(button))
     .toBe(true);
-  await button.hover();
-  await button.click();
+  const expectedHistoryTransition =
+    testId === 'designer-undo'
+      ? page.getByTestId('designer-redo')
+      : testId === 'designer-redo'
+        ? page.getByTestId('designer-redo')
+        : null;
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await button.hover();
+      await button.click();
+      if (testId === 'designer-undo' && expectedHistoryTransition) {
+        await expect(expectedHistoryTransition).toBeEnabled({ timeout: 1000 });
+      } else if (testId === 'designer-redo' && expectedHistoryTransition) {
+        await expect(expectedHistoryTransition).toBeDisabled({ timeout: 1000 });
+      }
+      return;
+    } catch (error) {
+      lastError = error;
+      await expect(button).toBeEnabled();
+      await expect
+        .poll(() => receivesPointerAtCenter(button))
+        .toBe(true);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(`${testId} click did not apply.`);
 }
 
 async function receivesPointerAtCenter(locator: Locator): Promise<boolean> {
