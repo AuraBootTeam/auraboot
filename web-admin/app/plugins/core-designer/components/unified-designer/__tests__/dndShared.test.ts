@@ -3,6 +3,7 @@ import {
   buildDesignerCollisionCandidates,
   prioritizeNestedDropCollisions,
   resolveBlockDropIntent,
+  resolveCanvasBlockAncestorDropAction,
   resolveDragEndAction,
   type DragData,
   type DragEndCapabilities,
@@ -126,6 +127,23 @@ describe('resolveDragEndAction', () => {
         caps({ canMoveBlockToParent: () => true }),
       ),
     ).toEqual({ type: 'move-inside', movingBlockId: 'field_a', parentBlockId: 'section_target' });
+  });
+
+  it('falls back from a descendant drop target to the nearest movable ancestor target', () => {
+    expect(
+      resolveCanvasBlockAncestorDropAction(
+        'sub_table_move_candidate',
+        ['form_root', 'section_target', 'sub_table_target', 'target_col_status'],
+        caps({
+          canMoveBlockBeforeTarget: (_movingBlockId, targetBlockId) =>
+            targetBlockId === 'sub_table_target',
+        }),
+      ),
+    ).toEqual({
+      type: 'move-before',
+      movingBlockId: 'sub_table_move_candidate',
+      targetBlockId: 'sub_table_target',
+    });
   });
 });
 
