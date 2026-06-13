@@ -169,6 +169,37 @@ describe('canonicalizePageSchemaDto', () => {
     expect(validateStructure(schema)).toEqual([]);
   });
 
+  it('folds commandCode into a command action for a legacy form-persist verb (save)', () => {
+    // Regression: a form-buttons submit button uses the legacy { action: "save",
+    // commandCode } shape (every built-in plugin form does, e.g. asset-management).
+    // "save" is not an ActionRegistry action, so if commandCode is dropped without
+    // being folded into the action the submit falls through to an unregistered
+    // builtin and the form cannot persist. The verb must fold the commandCode in.
+    const schema = canonicalizePageSchemaDto({
+      pageKey: 'persist_form',
+      modelCode: 'persist_model',
+      modelCategory: null,
+      kind: 'form',
+      layout: { type: 'stack' },
+      blocks: [
+        {
+          id: 'buttons',
+          blockType: 'form-buttons',
+          buttons: [
+            { code: 'submit', action: 'save', commandCode: 'persist:create_x', primary: true },
+            { code: 'cancel', action: 'cancel' },
+          ],
+        },
+      ],
+    });
+
+    const [submit, cancel] = (schema.blocks[0] as any).buttons;
+    expect(submit.action).toEqual({ type: 'command', command: 'persist:create_x' });
+    expect(submit.commandCode).toBeUndefined();
+    // a non-persist verb (cancel) is a registry action and is left as the string verb
+    expect(cancel.action).toBe('cancel');
+  });
+
   it('normalizes refresh toolbar preset shorthand into an executable builtin button', () => {
     const schema = canonicalizePageSchemaDto({
       pageKey: 'refresh_preset_list',
