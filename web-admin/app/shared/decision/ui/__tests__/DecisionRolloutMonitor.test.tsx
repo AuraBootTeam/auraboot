@@ -312,7 +312,9 @@ describe('DecisionRolloutMonitor', () => {
     await waitFor(() =>
       expect(api.promoteRollout).toHaveBeenCalledWith('rollout-1', { note: 'metrics accepted' }),
     );
-    expect(screen.getByTestId('rollout-status-message')).toHaveTextContent('已执行 promote');
+    await waitFor(() =>
+      expect(screen.getByTestId('rollout-status-message')).toHaveTextContent('已执行 promote'),
+    );
 
     fireEvent.click(screen.getByTestId('rollout-rollback-rollout-1'));
     fireEvent.change(screen.getByLabelText('rollout-action-note'), {
@@ -325,6 +327,8 @@ describe('DecisionRolloutMonitor', () => {
         note: 'candidate regression',
       }),
     );
-    expect(screen.getByTestId('rollout-status-message')).toHaveTextContent('已执行 rollback');
+    await waitFor(() =>
+      expect(screen.getByTestId('rollout-status-message')).toHaveTextContent('已执行 rollback'),
+    );
   });
 });
