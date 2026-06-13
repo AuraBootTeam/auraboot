@@ -194,6 +194,9 @@ const BlockContent: React.FC<{
     case 'evidence-panel':
       return <EvidencePanelPreview block={block} />;
 
+    case 'gerber-viewer':
+      return <GerberViewerPreview block={block} />;
+
     case 'artifact-timeline':
       return <ArtifactTimelinePreview block={block} />;
 
@@ -358,6 +361,33 @@ const EvidencePanelPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
         <div className="rounded bg-gray-50 p-2">
           <div className="h-2 w-2/3 rounded bg-gray-200" />
           <div className="mt-2 h-2 w-1/2 rounded bg-gray-100" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Gerber viewer preview
+ */
+const GerberViewerPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const { locale } = useI18n();
+  return (
+    <div className="p-3">
+      <div className="mb-2 text-sm font-medium text-gray-900">
+        {resolveLocalizedText(block.title, locale) || 'Gerber Viewer'}
+      </div>
+      <div className="space-y-2 rounded border border-gray-200 bg-white p-3">
+        <div className="grid grid-cols-4 gap-2">
+          {[0, 1, 2, 3].map((index) => (
+            <div key={index} className="h-8 rounded border border-gray-100 bg-gray-50" />
+          ))}
+        </div>
+        <div className="relative aspect-[16/5] overflow-hidden rounded border border-gray-300 bg-slate-900">
+          <div className="absolute inset-3 rounded bg-emerald-700/70" />
+          <div className="absolute left-[18%] top-[38%] h-2 w-2 rounded-full bg-sky-300 ring-2 ring-white" />
+          <div className="absolute left-[62%] top-[54%] h-2 w-2 rounded-full bg-amber-400 ring-2 ring-white" />
+          <div className="absolute left-[80%] top-[24%] h-2 w-2 rounded-full bg-rose-400 ring-2 ring-white" />
         </div>
       </div>
     </div>
