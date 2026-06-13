@@ -23,7 +23,10 @@ import java.nio.charset.StandardCharsets;
 /**
  * REST controller for Report Designer artifact exports.
  */
-@RestController
+// Explicit bean name: the default "reportExportController" collides with the enterprise
+// overlay's com.auraboot.framework.print.controller.ReportExportController during component
+// scan (ConflictingBeanDefinitionException). Namespacing this BI controller avoids it.
+@RestController("biReportExportController")
 @RequestMapping("/api/reports")
 @RequiredArgsConstructor
 @Tag(name = "Report Export", description = "Report Designer artifact export API")
