@@ -7,7 +7,7 @@ order: 1
 category: "overview"
 ---
 
-# AuraBoot 是什么
+## AuraBoot 是什么
 
 **AuraBoot 是一个 AI 原生的企业应用运行时——以模型驱动、以命令治理、以插件交付。**
 

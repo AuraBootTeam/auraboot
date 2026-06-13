@@ -6,8 +6,8 @@ status: active
 # User Soul Profile — Subsystem Reference
 
 **Status**: Phases 1-10 + Round-1/2/3 fixes shipped. Admin audit extended to list+stats.
-**Plan**: [2026-04-19 design](../plans/2026-04/2026-04-19-user-soul-profile-design.md)
-**Follow-up design**: [Memory L1→L2 promotion](../plans/2026-04/2026-04-19-memory-l1-l2-promotion-design.md)
+**Plan**: historical design archived outside this docs tree; this subsystem reference is the canonical maintained entry.
+**Follow-up design**: see [Memory L1→L2 promotion](./memory-tier-promotion.md).
 
 Per-user, dynamically-derived personalisation profile used to ground AuraBot responses. Distinct from `ab_agent_definition.soul_profile` (the **Agent** Soul Profile — manually authored per-agent persona) — this profile captures what the LLM should know about the **user**: persona, communication style, domain vocabulary, working hours, recurring habits, expertise, boundaries, preferred language.
 

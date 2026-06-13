@@ -136,7 +136,7 @@ harness/打分/持久化全在,缺的只是 **回归门 + 定时/触发 + key + 
 并经结构 + 可评分一致性单测守护(expected/forbidden 不重叠、读路由 forbid 变更工具、perfect 选择评 correct+safe)。
 已**接进 `ScheduledCapabilityEvalJob`**(`include-archetype-cases` 默认 true,与自动生成用例合并跑)。
 🔑 **block 点(LLM key)**:用真模型跑这些用例量化质量(`evaluateToolSelection(tenant,"llm",AgentArchetypeEvalCases.all())`
-+ 每 agent 非-`stubToolUse` nightly smoke)需 LLM key —— 拿到 key 后补真栈 quality 跑;CI 内确定性价值 = 用例契约 + 一致性守护。
+- 每 agent 非-`stubToolUse` nightly smoke)需 LLM key —— 拿到 key 后补真栈 quality 跑;CI 内确定性价值 = 用例契约 + 一致性守护。
 后续刀:扩充每 agent 用例量(各 10-20 条)+ expectedInputKeys 的参数级评分。
 
 **④ 闭 L4 在线 eval —— ✅ 骨架+确定性判官已落地(`AgentOnlineEvalService` + `AgentTurnQualityJudge` + `HeuristicTurnQualityJudge`)**

@@ -36,9 +36,9 @@ Without the env vars the test skips (assumption-based gate), so the default suit
 
 ---
 
-# Run report (verbatim)
+## Run report (verbatim)
 
-# RAG golden-query evaluation — Phase 2 run 20260610-235450
+### RAG golden-query evaluation — Phase 2 run 20260610-235450
 
 | Run metadata | Value |
 |---|---|

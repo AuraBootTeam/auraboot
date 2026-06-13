@@ -6,6 +6,8 @@ owner: platform
 topic: RAG review→G1-G10 endgame session — full process reflection, root-cause taxonomy, precipitation decisions
 ---
 
+<!-- no-precipitation: durable RAG lessons were already precipitated into enterprise agent-rules/gotchas outside this OSS docs tree; this file is a closed session record. -->
+
 # RAG Endgame Session — Deep Retro (2026-06-11)
 
 Covers the whole arc: RAG system review → gap tracker → /aura-endgame G1-G9 remediation
@@ -50,7 +52,7 @@ prompt quality?
 
 | # | Problem | Detail |
 |---|---------|--------|
-| B1 | **P0: API shape change broke CommandPalette silently** | `/retrieve` → `{results, warnings}`; I updated the consumers I *remembered* (playground, E2E) instead of grepping the path. `resp.data?.length` became undefined → palette doc search silently empty; tsc green; companion E2E only counted requests | 
+| B1 | **P0: API shape change broke CommandPalette silently** | `/retrieve` → `{results, warnings}`; I updated the consumers I *remembered* (playground, E2E) instead of grepping the path. `resp.data?.length` became undefined → palette doc search silently empty; tsc green; companion E2E only counted requests |
 | B2 | **P1: surrogate-pair bigrams** | char-indexed slicing of a codepoint-filled buffer → lone surrogates → runtime `?::tsquery` cast error for supplementary-plane CJK (U+20BB7). My test matrix had zh/mixed/punctuation but no supplementary plane |
 | B3 | **P1: missing migrations file** | I was *confident* schema.sql was the only schema source and even hand-ALTERed the shared dev DB. The repo has `database/migrations/` with 15 dated files — review's repo-convention check caught it. My P0 "开场 30 秒" didn't include `ls database/migrations/` |
 | B4 | P2: query-side tsquery not lowercased (index side is) | Pre-existing, but I rewrote buildTsQuery wholesale and didn't notice |

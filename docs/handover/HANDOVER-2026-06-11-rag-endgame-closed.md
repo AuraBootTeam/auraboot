@@ -6,6 +6,8 @@ owner: platform
 topic: RAG review → G1-G10 endgame session, fully merged and closed
 ---
 
+<!-- no-precipitation: durable RAG lessons were already precipitated into enterprise agent-rules/gotchas outside this OSS docs tree; this file is a closed session record. -->
+
 # Session Handover — 2026-06-11 — RAG endgame closed
 
 ## Session Summary
@@ -37,7 +39,7 @@ G1-G9(PR #545)→ 残留三项收口含 Phase-2 评估 harness 首轮 live 跑(P
 
 ## Files Changed(全部已 merge)
 
-- 后端 `platform/.../rag/`:`KbChunkIngestPipeline`(新)、`CjkBigramSegmenter`(新)、`D7RagFusion`(新)、`RagRetrievalMetrics`(新)、`EmbeddingRetryService`(新)、`RetrievalOutcome`(新)、`RagEvaluationPhase2IT`(新)+ RagRetrievalService/KnowledgeBaseService/Controller/D7ContextAssembler/RagContextProviderImpl/4 个 ingest 服务改造;`MetaPermission` + `default-bootstrap.json`(ai.knowledge.* + billing.*);`schema.sql` + `migrations/2026-06-11-rag-embedding-retry.sql`;`SystemTaskInitializer` 注册重试任务
+- 后端 `platform/.../rag/`:`KbChunkIngestPipeline`(新)、`CjkBigramSegmenter`(新)、`D7RagFusion`(新)、`RagRetrievalMetrics`(新)、`EmbeddingRetryService`(新)、`RetrievalOutcome`(新)、`RagEvaluationPhase2IT`(新)+ RagRetrievalService/KnowledgeBaseService/Controller/D7ContextAssembler/RagContextProviderImpl/4 个 ingest 服务改造;`MetaPermission` + `default-bootstrap.json`(ai.knowledge.\* + billing.\*);`schema.sql` + `migrations/2026-06-11-rag-embedding-retry.sql`;`SystemTaskInitializer` 注册重试任务
 - 前端:`knowledge.$kbPid.tsx`(Reindex 按钮 + warnings toast)、`CommandPalette.tsx`(新 shape)
 - 测试:rag 包 208→~230 测试;`tests/e2e/ai/knowledge-base-smoke.spec.ts` 加 reindex 用例;golden-queries.json 52 条
 - 文档:gap tracker、review、retro ×2、eval 首跑报告、本 handover;enterprise 5 个 gotcha/agent-rules 文件

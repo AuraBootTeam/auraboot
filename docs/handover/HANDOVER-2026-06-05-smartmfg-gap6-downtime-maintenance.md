@@ -45,8 +45,8 @@ sideEffect** (§2.2 gate-gap). This wires + golden-verifies them. Worktree/branc
    `(String)` cast on the timestamptz start_time → `end_equipment_downtime` threw
    `java.sql.Timestamp cannot be cast to String`. Source was already fixed; **the reused jar was stale**
    (its mtime was newer than #12 but its bytecode was older — don't trust mtime, check bytecode/`javap`).
-   Fix: rebuild the jar from source (`gradle :<plugin>:backend:jar -x test -Dmaven.repo.local=$M2`) + restage
-   + `docker restart <slug>-backend`.
+   Fix: rebuild the jar from source (`gradle :<plugin>:backend:jar -x test -Dmaven.repo.local=$M2`), restage,
+   then `docker restart <slug>-backend`.
 
 ## 🚨 Process lessons (carry forward — these generalize beyond this slice)
 
