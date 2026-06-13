@@ -3,6 +3,7 @@ import {
   buildDesignCopilotPrompt,
   parseDesignCopilotResponse,
   applyDesignBlocks,
+  isBlockLocked,
 } from '../designCopilot';
 import type { PageSchemaV3 } from '../../types';
 
@@ -142,5 +143,73 @@ describe('applyDesignBlocks', () => {
     const snapshot = JSON.stringify(doc);
     applyDesignBlocks(doc, { mergeMode: 'replace', blocks: [{ id: 'ai-1', blockType: 'field' }] }, 'form');
     expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+describe('MD-2 — provenance + locked-block preservation', () => {
+  it('parser stamps source:ai provenance on generated blocks (and children)', () => {
+    const res = parseDesignCopilotResponse(
+      JSON.stringify({ blocks: [{ blockType: 'form-section', blocks: [{ blockType: 'field' }] }] }),
+    );
+    expect((res.blocks[0].extension as any)?.source).toBe('ai');
+    expect((res.blocks[0].blocks?.[0].extension as any)?.source).toBe('ai');
+  });
+
+  it('isBlockLocked detects props.aiLocked', () => {
+    expect(isBlockLocked({ id: 'a', blockType: 'field', props: { aiLocked: true } })).toBe(true);
+    expect(isBlockLocked({ id: 'b', blockType: 'field', props: { aiLocked: false } })).toBe(false);
+    expect(isBlockLocked({ id: 'c', blockType: 'field' })).toBe(false);
+  });
+
+  const docWithLock = (): PageSchemaV3 => ({
+    schemaVersion: 3,
+    kind: 'form',
+    id: 'p',
+    blocks: [
+      {
+        id: 'form-root',
+        blockType: 'form',
+        blocks: [
+          { id: 'locked-1', blockType: 'form-section', props: { aiLocked: true } },
+          { id: 'unlocked-1', blockType: 'form-section' },
+        ],
+      },
+    ],
+  });
+
+  it('replace preserves locked blocks and drops unlocked ones, then adds AI blocks', () => {
+    const next = applyDesignBlocks(
+      docWithLock(),
+      { mergeMode: 'replace', blocks: [{ id: 'ai-1', blockType: 'form-section' }] },
+      'form',
+    );
+    const ids = next.blocks[0].blocks?.map((b) => b.id);
+    expect(ids).toContain('locked-1'); // locked manual block survived AI re-gen
+    expect(ids).not.toContain('unlocked-1'); // unlocked manual block replaced
+    expect(ids).toContain('ai-1');
+    expect(ids?.[0]).toBe('locked-1'); // locked blocks kept first, AI after
+  });
+
+  it('append keeps all existing (locked + unlocked) and adds AI', () => {
+    const next = applyDesignBlocks(
+      docWithLock(),
+      { mergeMode: 'append', blocks: [{ id: 'ai-1', blockType: 'form-section' }] },
+      'form',
+    );
+    expect(next.blocks[0].blocks?.map((b) => b.id)).toEqual(['locked-1', 'unlocked-1', 'ai-1']);
+  });
+
+  it('composite: replace preserves locked blocks at the page root', () => {
+    const doc: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'composite',
+      id: 'p',
+      blocks: [
+        { id: 'lk', blockType: 'widget', props: { aiLocked: true } },
+        { id: 'free', blockType: 'widget' },
+      ],
+    };
+    const next = applyDesignBlocks(doc, { mergeMode: 'replace', blocks: [{ id: 'ai-1', blockType: 'widget' }] }, null);
+    expect(next.blocks.map((b) => b.id)).toEqual(['lk', 'ai-1']);
   });
 });
