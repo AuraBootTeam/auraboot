@@ -4,6 +4,8 @@ import com.auraboot.framework.i18n.compiler.I18nCompiler;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.service.I18nResourceService;
 import com.auraboot.framework.i18n.service.I18nService;
+import com.auraboot.framework.notification.entity.NotificationTemplate;
+import com.auraboot.framework.notification.mapper.NotificationTemplateMapper;
 import com.auraboot.framework.view.entity.SavedView;
 import com.auraboot.framework.view.entity.ViewConfig;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
@@ -111,6 +113,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final PluginQualityScorer qualityScorer;
     private final com.auraboot.framework.plugin.validation.PageSchemaImportGate pageSchemaImportGate;
     private final SavedViewMapper savedViewMapper;
+    private final NotificationTemplateMapper notificationTemplateMapper;
     private final AutoPermissionAssignmentService autoPermissionAssignmentService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final com.auraboot.framework.meta.template.generator.DocumentCommandGenerator documentCommandGenerator;
@@ -451,6 +454,16 @@ public class PluginImportServiceImpl implements PluginImportService {
                         files, resourceDirs.get("savedViews"), SavedViewDefinitionDTO.class);
                 if (!savedViews.isEmpty()) {
                     manifest.setSavedViews(mergeResourceList(manifest.getSavedViews(), savedViews));
+                }
+            }
+
+            // Load notification templates
+            if (resourceDirs.containsKey("notificationTemplates")) {
+                List<NotificationTemplateDefinitionDTO> templates = loadResourceListFromZip(
+                        files, resourceDirs.get("notificationTemplates"), NotificationTemplateDefinitionDTO.class);
+                if (!templates.isEmpty()) {
+                    manifest.setNotificationTemplates(
+                            mergeResourceList(manifest.getNotificationTemplates(), templates));
                 }
             }
 
@@ -949,6 +962,20 @@ public class PluginImportServiceImpl implements PluginImportService {
                         .build());
             }
         }
+
+        // Preview notification templates
+        if (manifest.getNotificationTemplates() != null) {
+            for (NotificationTemplateDefinitionDTO template : manifest.getNotificationTemplates()) {
+                NotificationTemplate existingTemplate =
+                        notificationTemplateMapper.findByCodeForUpsert(tenantId, template.getCode());
+                result.addChange(ResourceType.NOTIFICATION_TEMPLATE, ImportPreviewResult.ResourceChange.builder()
+                        .resourceType(ResourceType.NOTIFICATION_TEMPLATE)
+                        .resourceCode(template.getCode())
+                        .resourceName(template.getName())
+                        .action(existingTemplate != null ? ResourceAction.UPDATE : ResourceAction.CREATE)
+                        .build());
+            }
+        }
     }
 
     /**
@@ -1439,6 +1466,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                     importDashboards(manifest, request, result, pluginPid, importId, tenantId);
                 }
                 case SAVED_VIEW -> importSavedViews(manifest, result, tenantId);
+                case NOTIFICATION_TEMPLATE -> importNotificationTemplates(manifest, result, tenantId);
                 case PROCESS -> importProcesses(manifest, request, result, pluginPid, importId, tenantId);
                 case I18N -> importI18nResources(manifest, result, tenantId);
                 default -> {} // Skip DICT_ITEM as it's handled with DICT
@@ -2197,6 +2225,55 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
     }
 
+    /**
+     * Import notification templates (table {@code ab_notification_template}), upserted by
+     * {@code (tenant_id, code)}. Mirrors {@link #importSavedViews}: tenant-scoped data, no
+     * {@code PluginResource} record (avoids enum/CHECK-constraint churn). Lets a plugin deliver
+     * its own BPMN/automation notifications instead of {@code NotificationService.send()} logging
+     * "template not found, skipping".
+     */
+    private void importNotificationTemplates(PluginManifestExtended manifest, ImportExecuteResult result, Long tenantId) {
+        if (manifest.getNotificationTemplates() == null || manifest.getNotificationTemplates().isEmpty()) return;
+
+        for (NotificationTemplateDefinitionDTO dto : manifest.getNotificationTemplates()) {
+            if (!dto.isValid()) {
+                log.warn("Skipping invalid notification template: {}", logSafe(dto.getCode()));
+                continue;
+            }
+
+            NotificationTemplate existing = notificationTemplateMapper.findByCodeForUpsert(tenantId, dto.getCode());
+            if (existing != null) {
+                existing.setName(dto.getName());
+                existing.setChannel(dto.getChannel());
+                if (dto.getChannels() != null) existing.setChannels(dto.getChannels());
+                if (dto.getCategory() != null) existing.setCategory(dto.getCategory());
+                existing.setSubjectTemplate(dto.getSubjectTemplate());
+                existing.setBodyTemplate(dto.getBodyTemplate());
+                existing.setVariables(dto.getVariables());
+                existing.setEnabled(dto.isEnabledOrDefault());
+                notificationTemplateMapper.updateById(existing);
+                result.incrementResourceCount(ResourceType.NOTIFICATION_TEMPLATE, ResourceAction.UPDATE);
+                log.info("Updated notification template: {}", logSafe(dto.getCode()));
+            } else {
+                NotificationTemplate template = new NotificationTemplate();
+                template.setPid(UlidGenerator.generate());
+                template.setTenantId(tenantId);
+                template.setCode(dto.getCode());
+                template.setName(dto.getName());
+                template.setChannel(dto.getChannel());
+                if (dto.getChannels() != null) template.setChannels(dto.getChannels());
+                if (dto.getCategory() != null) template.setCategory(dto.getCategory());
+                template.setSubjectTemplate(dto.getSubjectTemplate());
+                template.setBodyTemplate(dto.getBodyTemplate());
+                template.setVariables(dto.getVariables());
+                template.setEnabled(dto.isEnabledOrDefault());
+                notificationTemplateMapper.insert(template);
+                result.incrementResourceCount(ResourceType.NOTIFICATION_TEMPLATE, ResourceAction.CREATE);
+                log.info("Created notification template: {}", logSafe(dto.getCode()));
+            }
+        }
+    }
+
     // ==================== Rollback ====================
 
     @Override
@@ -2770,6 +2847,25 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
                 if (isBlank(sv.getName())) {
                     errors.add("SavedView has missing name");
+                }
+            }
+        }
+
+        // NotificationTemplates: require code + name + channel + bodyTemplate
+        if (manifest.getNotificationTemplates() != null) {
+            for (NotificationTemplateDefinitionDTO tpl : manifest.getNotificationTemplates()) {
+                if (tpl == null) continue;
+                if (isBlank(tpl.getCode())) {
+                    errors.add("NotificationTemplate '" + tpl.getName() + "' has missing code");
+                }
+                if (isBlank(tpl.getName())) {
+                    errors.add("NotificationTemplate '" + tpl.getCode() + "' has missing name");
+                }
+                if (isBlank(tpl.getChannel())) {
+                    errors.add("NotificationTemplate '" + tpl.getCode() + "' has missing channel");
+                }
+                if (isBlank(tpl.getBodyTemplate())) {
+                    errors.add("NotificationTemplate '" + tpl.getCode() + "' has missing bodyTemplate");
                 }
             }
         }

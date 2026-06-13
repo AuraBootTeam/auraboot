@@ -28,11 +28,14 @@ public class ExtensionRegistry {
 
     private final AuraPluginManager pluginManager;
     private final ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider;
+    private final ObjectProvider<ServiceTaskActionExtension> coreServiceTaskActionProvider;
 
     public ExtensionRegistry(AuraPluginManager pluginManager,
-                             ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider) {
+                             ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider,
+                             ObjectProvider<ServiceTaskActionExtension> coreServiceTaskActionProvider) {
         this.pluginManager = pluginManager;
         this.coreCommandHandlerProvider = coreCommandHandlerProvider;
+        this.coreServiceTaskActionProvider = coreServiceTaskActionProvider;
     }
 
     // Extension caches by type
@@ -41,6 +44,7 @@ public class ExtensionRegistry {
     private final Map<String, List<DataProviderExtension>> dataProviders = new ConcurrentHashMap<>();
     private final Map<String, List<ValidatorExtension>> validators = new ConcurrentHashMap<>();
     private final Map<String, List<MenuProviderExtension>> menuProviders = new ConcurrentHashMap<>();
+    private final Map<String, List<ServiceTaskActionExtension>> serviceTaskActions = new ConcurrentHashMap<>();
 
     // Global caches
     private volatile List<CommandHandlerExtension> allCommandHandlers;
@@ -48,6 +52,7 @@ public class ExtensionRegistry {
     private volatile List<DataProviderExtension> allDataProviders;
     private volatile List<ValidatorExtension> allValidators;
     private volatile List<MenuProviderExtension> allMenuProviders;
+    private volatile List<ServiceTaskActionExtension> allServiceTaskActions;
 
     @PostConstruct
     public void init() {
@@ -116,6 +121,48 @@ public class ExtensionRegistry {
     public List<CommandHandlerExtension> getCommandHandlers(String pluginId) {
         return commandHandlers.computeIfAbsent(pluginId,
                 id -> pluginManager.getExtensionsOfType(CommandHandlerExtension.class, id));
+    }
+
+    // ========== ServiceTask Actions ==========
+
+    /**
+     * Get the service-task action extension for a specific action type — the highest-priority
+     * extension whose {@link ServiceTaskActionExtension#supports(String)} matches.
+     *
+     * @param actionType the {@code smart:action} value
+     * @return optional service-task action extension
+     */
+    public Optional<ServiceTaskActionExtension> getServiceTaskAction(String actionType) {
+        return getAllServiceTaskActions().stream()
+                .filter(a -> a.supports(actionType))
+                .max(Comparator.comparingInt(ServiceTaskActionExtension::getPriority));
+    }
+
+    /**
+     * Get all service-task action extensions. Merges two sources (same pattern as command
+     * handlers): PF4J plugin extensions and core Spring beans baked into the platform/host.
+     *
+     * @return list of service-task action extensions
+     */
+    public List<ServiceTaskActionExtension> getAllServiceTaskActions() {
+        if (allServiceTaskActions == null) {
+            List<ServiceTaskActionExtension> pluginActions =
+                    pluginManager.getExtensionsOfType(ServiceTaskActionExtension.class);
+            List<ServiceTaskActionExtension> coreActions = coreServiceTaskActionProvider.stream().toList();
+            allServiceTaskActions = Stream.concat(pluginActions.stream(), coreActions.stream()).toList();
+        }
+        return allServiceTaskActions;
+    }
+
+    /**
+     * Get service-task action extensions from a specific plugin.
+     *
+     * @param pluginId the plugin ID
+     * @return list of service-task action extensions
+     */
+    public List<ServiceTaskActionExtension> getServiceTaskActions(String pluginId) {
+        return serviceTaskActions.computeIfAbsent(pluginId,
+                id -> pluginManager.getExtensionsOfType(ServiceTaskActionExtension.class, id));
     }
 
     // ========== Event Listeners ==========
@@ -289,12 +336,14 @@ public class ExtensionRegistry {
         dataProviders.clear();
         validators.clear();
         menuProviders.clear();
+        serviceTaskActions.clear();
 
         allCommandHandlers = null;
         allEventListeners = null;
         allDataProviders = null;
         allValidators = null;
         allMenuProviders = null;
+        allServiceTaskActions = null;
     }
 
     /**
@@ -311,6 +360,7 @@ public class ExtensionRegistry {
         dataProviders.remove(pluginId);
         validators.remove(pluginId);
         menuProviders.remove(pluginId);
+        serviceTaskActions.remove(pluginId);
 
         // Clear global caches to force refresh
         allCommandHandlers = null;
@@ -318,6 +368,7 @@ public class ExtensionRegistry {
         allDataProviders = null;
         allValidators = null;
         allMenuProviders = null;
+        allServiceTaskActions = null;
     }
 
     /**

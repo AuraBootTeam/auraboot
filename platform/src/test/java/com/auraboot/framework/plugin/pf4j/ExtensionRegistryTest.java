@@ -4,6 +4,7 @@ import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.DataProviderExtension;
 import com.auraboot.framework.plugin.extension.EventListenerExtension;
 import com.auraboot.framework.plugin.extension.MenuProviderExtension;
+import com.auraboot.framework.plugin.extension.ServiceTaskActionExtension;
 import com.auraboot.framework.plugin.extension.ValidatorExtension;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ class ExtensionRegistryTest {
 
     @Mock private AuraPluginManager pluginManager;
     @Mock private ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider;
+    @Mock private ObjectProvider<ServiceTaskActionExtension> coreServiceTaskActionProvider;
     @Mock private PluginWrapper pluginWrapper;
 
     private ExtensionRegistry registry;
@@ -82,18 +84,29 @@ class ExtensionRegistryTest {
         @Override public List<MenuItem> getMenuItems(MenuContext context) { return Collections.emptyList(); }
     }
 
+    static class TestAction implements ServiceTaskActionExtension {
+        private final String type;
+        private final int priority;
+        TestAction(String type, int priority) { this.type = type; this.priority = priority; }
+        @Override public String getActionType() { return type; }
+        @Override public int getPriority() { return priority; }
+        @Override public Object execute(ServiceTaskActionExtension.ActionContext context) { return null; }
+    }
+
     @BeforeEach
     void setUp() {
         // default empty providers
         lenient().when(coreCommandHandlerProvider.stream()).thenAnswer(inv -> Stream.empty());
+        lenient().when(coreServiceTaskActionProvider.stream()).thenAnswer(inv -> Stream.empty());
         lenient().when(pluginManager.getExtensionsOfType(eq(CommandHandlerExtension.class))).thenReturn(List.of());
         lenient().when(pluginManager.getExtensionsOfType(eq(EventListenerExtension.class))).thenReturn(List.of());
         lenient().when(pluginManager.getExtensionsOfType(eq(DataProviderExtension.class))).thenReturn(List.of());
         lenient().when(pluginManager.getExtensionsOfType(eq(ValidatorExtension.class))).thenReturn(List.of());
         lenient().when(pluginManager.getExtensionsOfType(eq(MenuProviderExtension.class))).thenReturn(List.of());
+        lenient().when(pluginManager.getExtensionsOfType(eq(ServiceTaskActionExtension.class))).thenReturn(List.of());
         lenient().when(pluginManager.getAllPlugins()).thenReturn(List.of());
 
-        registry = new ExtensionRegistry(pluginManager, coreCommandHandlerProvider);
+        registry = new ExtensionRegistry(pluginManager, coreCommandHandlerProvider, coreServiceTaskActionProvider);
         registry.init();
     }
 
@@ -107,6 +120,32 @@ class ExtensionRegistryTest {
         Optional<CommandHandlerExtension> r = registry.getCommandHandler("ship");
         assertThat(r).isPresent().get().isSameAs(high);
         assertThat(registry.getCommandHandler("nope")).isEmpty();
+    }
+
+    @Test
+    void getServiceTaskAction_picks_highest_priority_and_empty_for_unknown() {
+        TestAction low = new TestAction("iot:recalibrate", 1);
+        TestAction high = new TestAction("iot:recalibrate", 10);
+        when(pluginManager.getExtensionsOfType(eq(ServiceTaskActionExtension.class)))
+                .thenReturn(List.of(low, high));
+        registry.refreshAllCaches();
+
+        assertThat(registry.getServiceTaskAction("iot:recalibrate")).isPresent().get().isSameAs(high);
+        assertThat(registry.getServiceTaskAction("unknown:action")).isEmpty();
+    }
+
+    @Test
+    void getServiceTaskAction_merges_core_beans_with_plugin_extensions() {
+        TestAction pluginAction = new TestAction("plugin:do", 1);
+        TestAction coreAction = new TestAction("core:do", 1);
+        when(pluginManager.getExtensionsOfType(eq(ServiceTaskActionExtension.class)))
+                .thenReturn(List.of(pluginAction));
+        when(coreServiceTaskActionProvider.stream()).thenAnswer(inv -> Stream.of(coreAction));
+        registry.refreshAllCaches();
+
+        assertThat(registry.getServiceTaskAction("plugin:do")).isPresent().get().isSameAs(pluginAction);
+        assertThat(registry.getServiceTaskAction("core:do")).isPresent().get().isSameAs(coreAction);
+        assertThat(registry.getAllServiceTaskActions()).hasSize(2);
     }
 
     @Test
