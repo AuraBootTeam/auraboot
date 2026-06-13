@@ -1115,8 +1115,11 @@ public class NlModelingService {
 
     /**
      * Synthesizes a navigation menu pointing at the model's list page when the LLM
-     * generated none (single-model). The dynamic path lets
-     * {@link #deriveDynamicMenuPageKeys} wire the pageKey.
+     * generated none (single-model). Uses the canonical {@code /p/<model>} dynamic-page
+     * route (the convention every built-in plugin menu uses, e.g. {@code /p/tasset_asset});
+     * the frontend resolves {@code /p/<model>} to the model's {@code <model>_list} page.
+     * The model code must stay snake_case — kebab-casing it (e.g. {@code visit-log}) makes
+     * the frontend derive {@code visit-log_list}, which does not match the published page.
      */
     static List<Map<String, Object>> synthesizeMenus(List<Map<String, Object>> models,
                                                     List<Map<String, Object>> menus) {
@@ -1129,7 +1132,8 @@ public class NlModelingService {
         }
         return new ArrayList<>(List.of(om(
                 "code", "menu_" + model, "name:en", humanize(model), "icon", "table",
-                "path", "/dynamic/" + model.replace('_', '-'))));
+                "type", 1, "visible", true,
+                "path", "/p/" + model)));
     }
 
     // =========================================================================

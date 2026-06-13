@@ -83,7 +83,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   } else if (action === 'join') {
     requestData.inviteCode = formData.get('inviteCode');
   } else if (action === 'select') {
-    requestData.tenantId = Number(formData.get('tenantId'));
+    // tenantId is a snowflake id that routinely exceeds 2^53 (Number.MAX_SAFE_INTEGER).
+    // Number() silently loses precision (e.g. ...699456 -> ...699460), so the backend
+    // receives a non-existent tenant id and rejects selection with an auth error. Keep
+    // the raw string — the backend's Long tenantId field accepts a JSON string value.
+    requestData.tenantId = formData.get('tenantId');
   }
 
   try {
