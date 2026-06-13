@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { PageSchemaV3 } from '../types';
-import { findBlockById, updateBlockById, moveBlockBefore } from '../utils/recursiveBlockWalker';
+import {
+  findBlockById,
+  updateBlockById,
+  moveBlockBefore,
+  moveBlockToParent,
+} from '../utils/recursiveBlockWalker';
 import { setByPath } from '../utils/dotPath';
 import { migrateDashboardResourceToV3, migratePageSchemaV2ToV3 } from '../migration/migrateToV3';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
@@ -99,6 +104,51 @@ describe('Recursive PageSchema V3 utilities', () => {
       'field_phone',
       'field_email',
       'field_status',
+    ]);
+    expect(findBlockById(crossContainerSchema.blocks, 'section_basic')?.block.blocks?.map((block) => block.id)).toEqual([
+      'field_name',
+      'field_phone',
+    ]);
+  });
+
+  it('moves a block into another compatible container as the last child', () => {
+    const crossContainerSchema: PageSchemaV3 = {
+      ...schema,
+      blocks: [
+        {
+          id: 'form_1',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'section_basic',
+              blockType: 'form-section',
+              blocks: [
+                { id: 'field_name', blockType: 'field', field: 'name' },
+                { id: 'field_phone', blockType: 'field', field: 'phone' },
+              ],
+            },
+            {
+              id: 'section_secondary',
+              blockType: 'form-section',
+              blocks: [
+                { id: 'field_email', blockType: 'field', field: 'email' },
+                { id: 'field_status', blockType: 'field', field: 'status' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const next = moveBlockToParent(crossContainerSchema.blocks, 'field_phone', 'section_secondary');
+    const sourceSection = findBlockById(next, 'section_basic')?.block;
+    const targetSection = findBlockById(next, 'section_secondary')?.block;
+
+    expect(sourceSection?.blocks?.map((block) => block.id)).toEqual(['field_name']);
+    expect(targetSection?.blocks?.map((block) => block.id)).toEqual([
+      'field_email',
+      'field_status',
+      'field_phone',
     ]);
     expect(findBlockById(crossContainerSchema.blocks, 'section_basic')?.block.blocks?.map((block) => block.id)).toEqual([
       'field_name',

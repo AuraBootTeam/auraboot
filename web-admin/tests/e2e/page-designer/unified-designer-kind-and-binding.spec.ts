@@ -76,9 +76,30 @@ async function createFormPage(page: Page): Promise<string> {
   return pageKey;
 }
 
-async function createCrossContainerFormPage(page: Page): Promise<CreatedDesignerPage> {
+async function createCrossContainerFormPage(
+  page: Page,
+  options: { emptyTarget?: boolean } = {},
+): Promise<CreatedDesignerPage> {
   const id = uniqueId('udw_cross_container');
   const pageKey = `udw_cross_container_${id}`;
+  const targetBlocks = options.emptyTarget
+    ? []
+    : [
+        {
+          id: 'field_target_email',
+          blockType: 'field',
+          field: 'description',
+          layout: { span: 6 },
+          props: { label: 'Target email', component: 'textarea' },
+        },
+        {
+          id: 'field_target_status',
+          blockType: 'field',
+          field: 'status',
+          layout: { span: 6 },
+          props: { label: 'Target status', component: 'select' },
+        },
+      ];
   const resp = await page.request.post('/api/pages', {
     data: {
       name: `UDW cross container ${id}`,
@@ -122,22 +143,7 @@ async function createCrossContainerFormPage(page: Page): Promise<CreatedDesigner
               blockType: 'form-section',
               title: 'Target section',
               layout: { span: 12 },
-              blocks: [
-                {
-                  id: 'field_target_email',
-                  blockType: 'field',
-                  field: 'description',
-                  layout: { span: 6 },
-                  props: { label: 'Target email', component: 'textarea' },
-                },
-                {
-                  id: 'field_target_status',
-                  blockType: 'field',
-                  field: 'status',
-                  layout: { span: 6 },
-                  props: { label: 'Target status', component: 'select' },
-                },
-              ],
+              blocks: targetBlocks,
             },
           ],
         },
@@ -289,6 +295,34 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     ]);
   });
 
+  test('moves an existing field block inside an empty form-section container and persists schema order', async ({ page }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerFormPage(page, { emptyTarget: true });
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockInto(page, 'field_move_candidate', 'section_target');
+
+    const sourceSection = page.getByTestId('canvas-block-section_source');
+    const targetSection = page.getByTestId('canvas-block-section_target');
+    await expect(sourceSection.getByTestId('canvas-block-field_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-field_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedSource = findBlock(savedBlocks, 'section_source');
+    const savedTarget = findBlock(savedBlocks, 'section_target');
+
+    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['field_move_candidate']);
+  });
+
   // Guards Playwright `.dragTo()` compatibility with @dnd-kit. The wider designer
   // E2E suite (unified-designer-workbench UDW-*) drives drags via `.dragTo()`,
   // whose single jump-move pointerWithin can miss — the workbench's
@@ -358,6 +392,23 @@ async function dragCanvasBlockBefore(page: Page, sourceBlockId: string, targetBl
   await page.mouse.move(src!.x + src!.width / 2 + 12, src!.y + src!.height / 2 + 12, { steps: 6 });
   await page.mouse.move(dst!.x + dst!.width / 2, dst!.y + dst!.height / 2, { steps: 18 });
   await page.mouse.move(dst!.x + dst!.width / 2 + 3, dst!.y + dst!.height / 2 + 3, { steps: 4 });
+  await page.mouse.up();
+}
+
+async function dragCanvasBlockInto(page: Page, sourceBlockId: string, parentBlockId: string) {
+  const sourceHandle = page.getByTestId(`block-drag-handle-${sourceBlockId}`);
+  const targetBlock = page.getByTestId(`canvas-block-${parentBlockId}`);
+  await expect(sourceHandle).toBeVisible();
+  await expect(targetBlock).toBeVisible();
+
+  const src = await sourceHandle.boundingBox();
+  const dst = await targetBlock.boundingBox();
+  expect(src && dst).toBeTruthy();
+  await page.mouse.move(src!.x + src!.width / 2, src!.y + src!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(src!.x + src!.width / 2 + 12, src!.y + src!.height / 2 + 12, { steps: 6 });
+  await page.mouse.move(dst!.x + dst!.width / 2, dst!.y + dst!.height / 2, { steps: 18 });
+  await page.mouse.move(dst!.x + dst!.width / 2 + 4, dst!.y + dst!.height / 2 + 4, { steps: 4 });
   await page.mouse.up();
 }
 

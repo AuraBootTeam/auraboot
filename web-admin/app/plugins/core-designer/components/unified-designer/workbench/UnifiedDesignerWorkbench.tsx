@@ -23,6 +23,7 @@ import type {
 import {
   findBlockById,
   moveBlockBefore,
+  moveBlockToParent,
   removeBlockById,
   updateBlockById,
 } from '../utils/recursiveBlockWalker';
@@ -44,6 +45,7 @@ import {
 } from '../registry/createBlockTemplate';
 import { collectBlockIds } from '../utils/blockIds';
 import {
+  buildDesignerCollisionCandidates,
   readDragData,
   readDropData,
   resolveBlockDropIntent,
@@ -60,8 +62,11 @@ import { defaultRuntimeExecutionServices } from '../runtime/runtimeExecution';
 // Pointer-based collision for real users, with a closestCenter fallback when the
 // pointer isn't inside any droppable.
 const designerCollisionDetection: CollisionDetection = (args) => {
-  const within = pointerWithin(args);
-  return within.length > 0 ? within : closestCenter(args);
+  return buildDesignerCollisionCandidates(
+    pointerWithin(args),
+    closestCenter(args),
+    args.droppableRects,
+  );
 };
 
 export interface UnifiedDesignerWorkbenchProps {
@@ -159,6 +164,14 @@ export function UnifiedDesignerWorkbench({
     }));
   };
 
+  const handleMoveToParent = (movingBlockId: string, parentBlockId: string) => {
+    updateDocument((current) => ({
+      ...current,
+      blocks: moveBlockToParent(current.blocks, movingBlockId, parentBlockId),
+    }));
+    setSelectedBlockId(movingBlockId);
+  };
+
   // The single top-level kind container (form/list/detail/dashboard root) defines
   // the page; it cannot be deleted, only its descendants can.
   const canDeleteBlock = (blockId: string) => {
@@ -254,6 +267,16 @@ export function UnifiedDesignerWorkbench({
 
     const parentBlock = targetResult.path[targetResult.path.length - 2].block;
     return blockRegistry.canContain(parentBlock.blockType, movingBlockType);
+  };
+
+  const canMoveBlockToParent = (movingBlockId: string, parentBlockId: string) => {
+    if (movingBlockId === parentBlockId) return false;
+    const movingResult = findBlockById(document.blocks, movingBlockId);
+    const parentResult = findBlockById(document.blocks, parentBlockId);
+    if (!movingResult || !parentResult) return false;
+    if (parentResult.path.some((item) => item.id === movingBlockId)) return false;
+
+    return blockRegistry.canContain(parentResult.block.blockType, movingResult.block.blockType);
   };
 
   const canAddBlockToRoot = (blockType: string) => {
@@ -494,6 +517,7 @@ export function UnifiedDesignerWorkbench({
     canAddModelFieldBeforeTarget,
     canAddModelFieldToParent,
     canMoveBlockBeforeTarget,
+    canMoveBlockToParent,
   };
   const rootAccepts = activeDrag?.kind === 'palette-block' && canAddBlockToRoot(activeDrag.blockType);
 
@@ -545,6 +569,9 @@ export function UnifiedDesignerWorkbench({
         break;
       case 'move-before':
         handleMoveBefore(action.movingBlockId, action.targetBlockId);
+        break;
+      case 'move-inside':
+        handleMoveToParent(action.movingBlockId, action.parentBlockId);
         break;
     }
   };
