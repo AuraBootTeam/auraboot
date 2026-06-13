@@ -118,6 +118,27 @@ public class NlModelingService {
     }
 
     /**
+     * Tools-off, single-shot LLM completion for the in-designer page-generation copilot
+     * ({@code AiPageGenerateDialog}). The aurabot chat agent injects its own system prompt
+     * and resolves business-command tools, so routing page generation through it makes the
+     * model reply conversationally / call tools instead of emitting page DSL. This runs the
+     * caller's page-generation system prompt as a plain completion (no tools, no agent prompt)
+     * and returns the raw model text for the client's {@code parsePageDslResponse}.
+     *
+     * @return the model's text response, or {@code null} if no LLM provider is configured
+     *         or the model returned no text.
+     */
+    public String generatePageDsl(String systemPrompt, String userMessage) {
+        if (userMessage == null || userMessage.isBlank()) {
+            return null;
+        }
+        List<LlmChatRequest.Message> messages = List.of(
+                LlmChatRequest.Message.builder().role("user").content(userMessage).build());
+        LlmChatResponse response = callLlm(systemPrompt, messages);
+        return response == null ? null : extractText(response);
+    }
+
+    /**
      * Refine existing DSL via conversational instruction.
      */
     public NlModelingResponse refine(NlRefineRequest request) {
