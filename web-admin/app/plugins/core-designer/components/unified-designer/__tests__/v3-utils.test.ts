@@ -756,16 +756,125 @@ describe('Recursive PageSchema V3 utilities', () => {
       'candidate_action_refresh',
     ]);
 
+    const widgetBeforeSchema: PageSchemaV3 = {
+      ...crossContainerSchema,
+      blocks: [
+        {
+          id: 'list_root',
+          blockType: 'list',
+          blocks: [
+            {
+              id: 'tabs_holder',
+              blockType: 'tabs',
+              blocks: [
+                {
+                  id: 'tab_source',
+                  blockType: 'tab',
+                  blocks: [
+                    {
+                      id: 'widget_move_candidate',
+                      blockType: 'widget',
+                      widgetType: 'number-card',
+                      layout: { span: 12, x: 0, y: 0, w: 3, h: 2 },
+                      props: { title: 'Candidate metric', value: '42', suffix: 'widgets' },
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'widget_anchor_table',
+              blockType: 'table',
+              blocks: [{ id: 'anchor_col_title', blockType: 'column', field: 'title' }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const widgetBeforeTarget = moveBlockBefore(
+      widgetBeforeSchema.blocks,
+      'widget_move_candidate',
+      'widget_anchor_table',
+    );
+    const listAfterWidgetMove = findBlockById(widgetBeforeTarget, 'list_root')?.block;
+    const tabAfterWidgetMove = findBlockById(widgetBeforeTarget, 'tab_source')?.block;
+    const movedWidgetBefore = findBlockById(widgetBeforeTarget, 'widget_move_candidate')?.block;
+
+    expect(listAfterWidgetMove?.blocks?.map((block) => block.id)).toEqual([
+      'tabs_holder',
+      'widget_move_candidate',
+      'widget_anchor_table',
+    ]);
+    expect(tabAfterWidgetMove?.blocks?.map((block) => block.id)).toEqual([]);
+    expect(movedWidgetBefore?.blocks ?? []).toEqual([]);
+    expect(movedWidgetBefore?.widgetType).toBe('number-card');
+    expect(movedWidgetBefore?.props).toMatchObject({
+      title: 'Candidate metric',
+      value: '42',
+      suffix: 'widgets',
+    });
+    expect(movedWidgetBefore?.layout).toMatchObject({ span: 12, w: 3, h: 2 });
+
+    const widgetInsideTabSchema: PageSchemaV3 = {
+      ...crossContainerSchema,
+      blocks: [
+        {
+          id: 'list_root',
+          blockType: 'list',
+          blocks: [
+            {
+              id: 'widget_move_candidate',
+              blockType: 'widget',
+              widgetType: 'number-card',
+              layout: { span: 12, x: 0, y: 0, w: 3, h: 2 },
+              props: { title: 'Candidate metric', value: '42', suffix: 'widgets' },
+            },
+            {
+              id: 'tabs_holder',
+              blockType: 'tabs',
+              blocks: [{ id: 'tab_empty', blockType: 'tab', blocks: [] }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const widgetInsideTab = moveBlockToParent(
+      widgetInsideTabSchema.blocks,
+      'widget_move_candidate',
+      'tab_empty',
+    );
+    const listAfterWidgetInside = findBlockById(widgetInsideTab, 'list_root')?.block;
+    const tabAfterWidgetInside = findBlockById(widgetInsideTab, 'tab_empty')?.block;
+    const movedWidgetInside = findBlockById(widgetInsideTab, 'widget_move_candidate')?.block;
+
+    expect(listAfterWidgetInside?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(tabAfterWidgetInside?.blocks?.map((block) => block.id)).toEqual([
+      'widget_move_candidate',
+    ]);
+    expect(movedWidgetInside?.blocks ?? []).toEqual([]);
+    expect(movedWidgetInside?.widgetType).toBe('number-card');
+    expect(movedWidgetInside?.props).toMatchObject({
+      title: 'Candidate metric',
+      value: '42',
+      suffix: 'widgets',
+    });
+    expect(movedWidgetInside?.layout).toMatchObject({ span: 12, w: 3, h: 2 });
+
     const registry = createDefaultBlockRegistryV3();
     expect(registry.canContain('list', 'table')).toBe(true);
     expect(registry.canContain('list', 'filter-bar')).toBe(true);
     expect(registry.canContain('list', 'action-bar')).toBe(true);
+    expect(registry.canContain('list', 'widget')).toBe(true);
     expect(registry.canContain('tab', 'table')).toBe(true);
     expect(registry.canContain('tab', 'filter-bar')).toBe(true);
     expect(registry.canContain('tab', 'action-bar')).toBe(true);
+    expect(registry.canContain('tab', 'widget')).toBe(true);
     expect(registry.canContain('table', 'column')).toBe(true);
     expect(registry.canContain('filter-bar', 'filter-field')).toBe(true);
     expect(registry.canContain('action-bar', 'action')).toBe(true);
+    expect(registry.canContain('widget', 'action')).toBe(false);
     expect(registry.canContain('filter-bar', 'table')).toBe(false);
   });
 

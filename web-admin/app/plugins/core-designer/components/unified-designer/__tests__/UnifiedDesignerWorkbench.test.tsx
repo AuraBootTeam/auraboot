@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { UnifiedDesignerWorkbench } from '../workbench/UnifiedDesignerWorkbench';
 import { samplePageSchemaV3 } from '../fixtures/samplePageSchemaV3';
 import { findBlockById } from '../utils/recursiveBlockWalker';
+import type { PageSchemaV3 } from '../types';
 
 const testModelFields = {
   customer: [
@@ -447,6 +448,38 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('widget_trend');
     expect(screen.getByTestId('inspector-field-layout.w')).toHaveValue(8);
     expect(screen.getByTestId('inspector-field-layout.h')).toHaveValue(4);
+  });
+
+  it('keeps list-kind widgets draggable as ordinary canvas blocks', () => {
+    const listWidgetDocument: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'list',
+      id: 'list_widget_document',
+      blocks: [
+        {
+          id: 'list_root',
+          blockType: 'list',
+          dataSource: { model: 'page_schema' },
+          blocks: [
+            {
+              id: 'widget_move_candidate',
+              blockType: 'widget',
+              widgetType: 'number-card',
+              layout: { span: 12, x: 0, y: 0, w: 3, h: 2 },
+              props: { title: 'Candidate metric' },
+            },
+          ],
+        },
+      ],
+    };
+
+    render(<UnifiedDesignerWorkbench initialDocument={listWidgetDocument} />);
+
+    fireEvent.click(screen.getByTestId('designer-mode-layout'));
+
+    expect(screen.getByTestId('block-drag-handle-widget_move_candidate')).toBeInTheDocument();
+    expect(screen.queryByTestId('widget-resize-widget_move_candidate')).not.toBeInTheDocument();
+    expect(screen.getByTestId('field-span-controls-widget_move_candidate')).toBeInTheDocument();
   });
 
   it('changes form field span from layout mode quick controls', () => {

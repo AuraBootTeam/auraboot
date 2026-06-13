@@ -172,7 +172,7 @@ function BlockFrame(props: BlockFrameProps) {
     onDeleteBlock,
   } = props;
   const selected = selectedBlockId === block.id;
-  const isDashboardWidget = block.blockType === 'widget';
+  const isDashboardWidget = block.blockType === 'widget' && Boolean(dashboardSiblings);
   const siblingIndex = siblingBlocks?.findIndex((sibling) => sibling.id === block.id) ?? -1;
   const previousSibling = siblingIndex > 0 ? siblingBlocks?.[siblingIndex - 1] : undefined;
   const nextSibling =
@@ -354,7 +354,7 @@ function BlockFrame(props: BlockFrameProps) {
         canDeleteBlock={canDeleteBlock}
         onDeleteBlock={onDeleteBlock}
       />
-      {mode === 'layout' && block.blockType === 'widget' ? (
+      {mode === 'layout' && isDashboardWidget ? (
         <button
           type="button"
           aria-label={`Resize ${getBlockLabel(block, locale)}`}
