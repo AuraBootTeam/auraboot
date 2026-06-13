@@ -288,7 +288,9 @@ export default function EntitlementAdminPage() {
       method: 'post',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        tenantId: Number(grantForm.tenantId),
+        // tenantId is a snowflake id; Number() loses precision beyond 2^53. Send the
+        // raw string — the backend's Long field accepts a JSON string value.
+        tenantId: grantForm.tenantId,
         pluginId: grantForm.pluginId,
         planCode: grantForm.planCode || undefined,
         expiresAt: grantForm.expiresAt || undefined,
@@ -345,7 +347,9 @@ export default function EntitlementAdminPage() {
     if (!tokenForm.pluginId) return;
     setIssuing(true);
     const payload: Record<string, unknown> = {
-      tenantId: Number(tokenForm.tenantId),
+      // tenantId is a snowflake id; Number() loses precision beyond 2^53. Send the
+      // raw string — the backend's Long field accepts a JSON string value.
+      tenantId: tokenForm.tenantId,
       pluginId: tokenForm.pluginId,
       planCode: tokenForm.planCode || undefined,
       expiresAt: tokenForm.expiresAt || undefined,

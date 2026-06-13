@@ -57,8 +57,10 @@ export interface CrossTenantSpawnAuditPage {
 }
 
 export interface CreateGrantRequest {
-  parentTenantId: number;
-  childTenantId: number;
+  // Snowflake tenant ids exceed 2^53, so they must be carried as strings end-to-end
+  // (a JS number loses precision). The backend's Long fields accept a JSON string.
+  parentTenantId: string;
+  childTenantId: string;
   grantType?: string;
   expiresAt?: string;
   note?: string;
