@@ -90,17 +90,71 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             normalizedBase = normalizedBase.substring(0, normalizedBase.length() - 3);
         }
 
-        String responseBody = webClient.post()
-                .uri(normalizedBase + "/v1/chat/completions")
-                .header("Authorization", "Bearer " + apiKey)
-                .header("content-type", "application/json")
-                .bodyValue(objectMapper.writeValueAsString(body))
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
+        String responseBody;
+        try {
+            responseBody = webClient.post()
+                    .uri(normalizedBase + "/v1/chat/completions")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("content-type", "application/json")
+                    .bodyValue(objectMapper.writeValueAsString(body))
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+        } catch (org.springframework.web.reactive.function.client.WebClientResponseException wce) {
+            // Surface the provider's error body — a bare "400 Bad Request" hides the
+            // actual reason (e.g. an invalid tool name or schema).
+            log.error("LLM provider request failed: model={} status={} body={}",
+                    request.getModel(), wce.getStatusCode(), wce.getResponseBodyAsString());
+            throw wce;
+        }
 
         Map<String, Object> resp = objectMapper.readValue(responseBody, Map.class);
-        return convertResponse(resp);
+        return convertResponse(resp, buildToolNameReverseMap(request));
+    }
+
+    /**
+     * Maps each tool's sanitized (wire) name back to its original name, so a tool_call
+     * the model returns (by the sanitized name) is dispatched against the real command
+     * code. Built from the request tools — the only names the model can call.
+     */
+    private static Map<String, String> buildToolNameReverseMap(LlmChatRequest request) {
+        Map<String, String> reverse = new LinkedHashMap<>();
+        if (request.getTools() != null) {
+            for (LlmChatRequest.Tool t : request.getTools()) {
+                if (t.getName() != null) {
+                    reverse.putIfAbsent(sanitizeToolName(t.getName()), t.getName());
+                }
+            }
+        }
+        return reverse;
+    }
+
+    /**
+     * Sanitizes a tool/function name to the OpenAI-compatible pattern
+     * {@code ^[a-zA-Z0-9_-]+$} by replacing every other character (notably the ':' in
+     * command codes) with '_'. Deterministic, so the request and history agree.
+     */
+    static String sanitizeToolName(String name) {
+        return name == null ? null : name.replaceAll("[^a-zA-Z0-9_-]", "_");
+    }
+
+    /**
+     * Ensures a tool's {@code parameters} is a valid JSON Schema object. OpenAI/DeepSeek
+     * reject a null/empty/type-less schema ("schema must be 'type: object'"). An empty or
+     * null schema becomes {@code {type:object, properties:{}}}; a non-empty schema missing
+     * {@code type} gets {@code type:object} added while preserving its other keys.
+     */
+    static Map<String, Object> normalizeToolParameters(Map<String, Object> schema) {
+        if (schema == null || schema.isEmpty()) {
+            return Map.of("type", "object", "properties", Map.of());
+        }
+        if (!schema.containsKey("type")) {
+            Map<String, Object> copy = new LinkedHashMap<>(schema);
+            copy.put("type", "object");
+            copy.putIfAbsent("properties", Map.of());
+            return copy;
+        }
+        return schema;
     }
 
     Map<String, Object> buildOpenAiRequestBody(LlmChatRequest request) throws Exception {
@@ -130,12 +184,18 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                     // LLM-native tool: pass config directly (e.g. {"type": "web_search_preview"})
                     tools.add(t.getNativeToolConfig());
                 } else {
-                    // Standard function tool
+                    // Standard function tool. OpenAI-compatible APIs (OpenAI, DeepSeek, …)
+                    // require the function name to match ^[a-zA-Z0-9_-]+$ — but AuraBoot
+                    // command tools are named with command codes like
+                    // "sales_lead_crm:create_sales_lead" (a ':'), which DeepSeek rejects
+                    // with a 400. Sanitize on the wire; convertResponse maps the name back.
                     Map<String, Object> fn = new LinkedHashMap<>();
-                    fn.put("name", t.getName());
+                    fn.put("name", sanitizeToolName(t.getName()));
                     fn.put("description", t.getDescription());
-                    fn.put("parameters", t.getInputSchema() != null ? t.getInputSchema()
-                            : Map.of("type", "object", "properties", Map.of()));
+                    // OpenAI/DeepSeek require parameters to be a JSON Schema of type:"object".
+                    // A tool with an empty or type-less inputSchema (e.g. {}) makes DeepSeek
+                    // 400 ("schema must be 'type: object', got 'type: null'"), so normalize.
+                    fn.put("parameters", normalizeToolParameters(t.getInputSchema()));
                     tools.add(Map.<String, Object>of("type", "function", "function", fn));
                 }
             }
@@ -247,7 +307,9 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                             tc.put("id", bMap.get("id"));
                             tc.put("type", "function");
                             Map<String, Object> fn = new LinkedHashMap<>();
-                            fn.put("name", bMap.get("name"));
+                            // Same sanitization as the tools array (above) so prior-round
+                            // assistant tool_calls in the history match the function names.
+                            fn.put("name", sanitizeToolName((String) bMap.get("name")));
                             try {
                                 fn.put("arguments", objectMapper.writeValueAsString(bMap.get("input")));
                             } catch (Exception e) {
@@ -331,7 +393,7 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
     }
 
     @SuppressWarnings("unchecked")
-    private LlmChatResponse convertResponse(Map<String, Object> resp) {
+    private LlmChatResponse convertResponse(Map<String, Object> resp, Map<String, String> toolNameReverse) {
         List<Map<String, Object>> choices = (List<Map<String, Object>>) resp.get("choices");
         if (choices == null || choices.isEmpty()) {
             return LlmChatResponse.builder()
@@ -368,10 +430,13 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                     }
                 } catch (Exception ignored) {}
 
+                String wireName = (String) fn.get("name");
                 content.add(LlmChatResponse.ContentBlock.builder()
                         .type("tool_use")
                         .id((String) tc.get("id"))
-                        .name((String) fn.get("name"))
+                        // Map the sanitized wire name back to the original command code
+                        // so the tool-loop dispatches against the real tool.
+                        .name(toolNameReverse.getOrDefault(wireName, wireName))
                         .input(args)
                         .build());
             }

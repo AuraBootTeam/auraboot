@@ -19,7 +19,16 @@ Earlier I reported "the weak model only emits model+fields (model-capability-bou
 
 So generation richness is **NOT** model-capability-bound; capable models produce the full operable set when options are on (the default intent).
 
-## 2. MD-3 in-designer AI copilot — wired & functional; blocked by a separate aurabot↔DeepSeek tool-loop 400
+## 2. MD-3 in-designer AI copilot — wired & functional; the aurabot↔DeepSeek tool-loop 400 is now FIXED
+
+> **RESOLVED 2026-06-13 (PR follows)**. Captured the exact DeepSeek 400 (provider request-body + response-body logging) — **two** OpenAI-compatible tool-call defects, both fixed in `OpenAiCompatibleLlmProvider`:
+> 1. **Tool name with `:`** — AuraBoot command tools are named with command codes (`sales_lead_crm:create_sales_lead`); DeepSeek/OpenAI require `^[a-zA-Z0-9_-]+$` → `400 Invalid 'tools[0].function.name': does not match pattern`. Fix: `sanitizeToolName()` on the wire (request tools + history tool_calls) + reverse-map the model's tool_call name back to the command code in `convertResponse` so dispatch is unchanged.
+> 2. **Empty/typeless tool `parameters`** — `ToolDiscoveryPort` tools carry `inputSchema = {}`; serialized as `parameters:{}` → `400 schema must be 'type: object', got 'type: null'`. Fix: `normalizeToolParameters()` → `{type:object, properties:{}}` for empty/null, adds `type:object` to a typeless non-empty schema.
+> Also: the provider now logs the 4xx **response body** (was hidden behind a bare "400 Bad Request").
+> **Verified**: `OpenAiCompatibleLlmProviderTest` 13/13 (name sanitize, empty-schema normalize, round-trip); real-stack — MD-3 designer "Add Stat Cards" → aurabot tool-loop (10 tools) → DeepSeek **no 400** (backend log clean after "resolved 10 tools"; UI shows no "provider request failed"). This unblocks **all aurabot chat tool-use with DeepSeek**, not just the designer.
+> Remaining MD-3 nuance (separate, low-pri): `AiPageGenerateDialog` routes its page-gen prompt through the general aurabot agent tool-loop, which may respond conversationally / call tools rather than emit clean page DSL for `parsePageDslResponse`. Functional copilot + working LLM now; tightening the page-gen path to a dedicated completion is a follow-up.
+
+### (original finding, kept for history)
 
 `AiPageGenerateDialog` (page designer toolbar → "AI 助手") is correctly implemented and wired end-to-end: real-browser golden confirmed the designer opens, the AI panel opens (quick commands Add Chart/Filters/Stat Cards/Optimize Layout + free-text), and a command sends the prompt through `auraBotApi.chatStream` → the **aurabot agent chat tool-loop**.
 
