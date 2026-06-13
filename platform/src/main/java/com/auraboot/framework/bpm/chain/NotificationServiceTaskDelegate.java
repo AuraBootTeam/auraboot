@@ -69,9 +69,22 @@ public class NotificationServiceTaskDelegate implements JavaDelegation {
             throw new BusinessException(ERR_EVENT_CODE_REQUIRED);
         }
 
-        String recipientFrom = properties.get(BpmServiceTaskConstants.ATTR_RECIPIENT_FROM);
-        String recipientId = resolveRecipient(recipientFrom, processVars);
-        if (recipientId == null) {
+        // Two recipient modes:
+        //  - explicit: smart:recipientType (user|role|group) + smart:recipient (value or ${var})
+        //              — lets a task notify a whole role/team, not just a single user.
+        //  - legacy:   smart:recipientFrom (applicant|assignee) -> a process-variable user id.
+        String recipient = properties.get(BpmServiceTaskConstants.ATTR_RECIPIENT);
+        String recipientType;
+        String recipientId;
+        if (recipient != null && !recipient.isBlank()) {
+            recipientType = properties.getOrDefault(BpmServiceTaskConstants.ATTR_RECIPIENT_TYPE, "user");
+            recipientId = resolveValue(recipient, processVars);
+        } else {
+            recipientType = "user";
+            recipientId = resolveRecipient(
+                    properties.get(BpmServiceTaskConstants.ATTR_RECIPIENT_FROM), processVars);
+        }
+        if (recipientId == null || recipientId.isBlank()) {
             throw new BusinessException(ERR_RECIPIENT_UNRESOLVED);
         }
 
@@ -80,6 +93,7 @@ public class NotificationServiceTaskDelegate implements JavaDelegation {
 
         NotificationSendRequest request = NotificationSendRequest.builder()
                 .templateCode(eventCode)
+                .recipientType(recipientType)
                 .recipientId(recipientId)
                 .variables(templateParams)
                 .sourceType("bpm")
@@ -117,6 +131,19 @@ public class NotificationServiceTaskDelegate implements JavaDelegation {
             }
             default -> throw new BusinessException(ERR_RECIPIENT_FROM_INVALID);
         }
+    }
+
+    /** Resolve a recipient value: {@code ${var}} reads a process variable, otherwise literal. */
+    private String resolveValue(String raw, Map<String, Object> processVars) {
+        if (raw == null) {
+            return null;
+        }
+        String v = raw.trim();
+        if (v.startsWith("${") && v.endsWith("}")) {
+            Object resolved = processVars.get(v.substring(2, v.length() - 1).trim());
+            return resolved != null ? resolved.toString() : null;
+        }
+        return v;
     }
 
     private Map<String, Object> buildTemplateParams(String templateParamsVars,
