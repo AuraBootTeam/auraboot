@@ -1,7 +1,7 @@
 package com.auraboot.framework.billing.account;
 
 import com.auraboot.framework.billing.account.entity.BillingAccount;
-import com.auraboot.framework.billing.account.service.BillingAccountService;
+import com.auraboot.framework.billing.account.service.BillingAccountIdentityService;
 import com.auraboot.framework.billing.account.spi.AccountResolver;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AccountResolverCrossTenantIT extends BaseIntegrationTest {
 
     @Autowired
-    private BillingAccountService billingAccountService;
+    private BillingAccountIdentityService billingAccountService;
 
     @Autowired
     private AccountResolver accountResolver;

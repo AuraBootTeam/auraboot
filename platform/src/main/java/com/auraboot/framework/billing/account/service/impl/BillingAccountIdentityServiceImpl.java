@@ -2,7 +2,7 @@ package com.auraboot.framework.billing.account.service.impl;
 
 import com.auraboot.framework.billing.account.entity.BillingAccount;
 import com.auraboot.framework.billing.account.mapper.BillingAccountMapper;
-import com.auraboot.framework.billing.account.service.BillingAccountService;
+import com.auraboot.framework.billing.account.service.BillingAccountIdentityService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,12 +13,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Default DB-backed implementation of {@link BillingAccountService}.
+ * Default DB-backed implementation of {@link BillingAccountIdentityService}.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class BillingAccountServiceImpl implements BillingAccountService {
+public class BillingAccountIdentityServiceImpl implements BillingAccountIdentityService {
 
     private final BillingAccountMapper billingAccountMapper;
 
