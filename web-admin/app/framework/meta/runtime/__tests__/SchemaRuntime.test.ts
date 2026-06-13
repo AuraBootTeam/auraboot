@@ -74,6 +74,30 @@ describe('SchemaRuntime', () => {
     expect(unregisterSpy).not.toHaveBeenCalledWith('shared');
   });
 
+  it('can leave schema data source registration to the page-level manager', () => {
+    const manager = createManager();
+    const schema: UnifiedSchema = {
+      ...minimalSchema,
+      dataSources: {
+        runtimeOnly: {
+          endpoint: '/api/runtime',
+        },
+      },
+    };
+
+    const runtime = new SchemaRuntime({
+      schema,
+      globalState: createGlobalState(),
+      dataSourceManager: manager,
+      disableAutoFetch: true,
+      skipDataSourceRegistration: true,
+    });
+
+    expect(manager.getConfig('runtimeOnly')).toBeUndefined();
+
+    runtime.destroy();
+  });
+
   it('delegates flow actions to the ActionRegistry', async () => {
     const manager = createManager();
     const actionName = '__test.action__';

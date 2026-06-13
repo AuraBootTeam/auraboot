@@ -17,18 +17,60 @@
  */
 
 import { test, expect } from '../../fixtures';
+import type { Page } from '@playwright/test';
+import { uniqueId } from '../helpers';
 
-async function findFormPageKey(page: import('@playwright/test').Page): Promise<string | null> {
-  await page.goto('/home', { waitUntil: 'domcontentloaded' });
-  return page.evaluate(async () => {
-    const res = await fetch('/api/pages?pageSize=300', { headers: { Accept: 'application/json' } });
-    if (!res.ok) return null;
-    const json = await res.json();
-    const data = json?.data?.records ?? json?.data ?? [];
-    const arr = Array.isArray(data) ? data : (data.records ?? []);
-    const form = arr.find((p: { kind?: string }) => p?.kind === 'form');
-    return form?.pageKey ?? null;
+async function createFormPage(page: Page): Promise<string> {
+  const id = uniqueId('udw_kind');
+  const pageKey = `udw_kind_${id}`;
+  const resp = await page.request.post('/api/pages', {
+    data: {
+      name: `UDW kind ${id}`,
+      pageKey,
+      title: `UDW kind ${id}`,
+      kind: 'form',
+      modelCode: 'page_schema',
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          title: 'Form root',
+          dataSource: { model: 'page_schema' },
+          layout: { span: 12 },
+          blocks: [
+            {
+              id: 'section_main',
+              blockType: 'form-section',
+              title: 'Main section',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'field_seed_name',
+                  blockType: 'field',
+                  field: 'name',
+                  layout: { span: 6 },
+                  props: { label: 'Seed name', component: 'input' },
+                },
+                {
+                  id: 'field_seed_page_key',
+                  blockType: 'field',
+                  field: 'page_key',
+                  layout: { span: 6 },
+                  props: { label: 'Seed page key', component: 'input' },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      extension: { e2e: true, scenario: 'unified-designer-kind-and-binding' },
+    },
   });
+  expect(resp.ok(), await resp.text()).toBe(true);
+  const body = await resp.json();
+  expect(body.code).toBe('0');
+  return pageKey;
 }
 
 /**
@@ -36,7 +78,7 @@ async function findFormPageKey(page: import('@playwright/test').Page): Promise<s
  * navigation can race optimizeDeps and render a transient "Application Error";
  * reload once (Vite is warm by then) before asserting on the workbench.
  */
-async function openDesigner(page: import('@playwright/test').Page, pageKey: string) {
+async function openDesigner(page: Page, pageKey: string) {
   const workbench = page.getByTestId('unified-designer-workbench');
   const attempts = 4;
   for (let i = 0; i < attempts; i++) {
@@ -52,7 +94,6 @@ async function openDesigner(page: import('@playwright/test').Page, pageKey: stri
       return;
     } catch {
       if (i === attempts - 1) throw new Error('unified-designer-workbench never became visible');
-      await page.waitForTimeout(2000);
     }
   }
 }
@@ -64,10 +105,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test('a form page collapses the palette and renders zh-CN copy', async ({ page }) => {
-    const formKey = await findFormPageKey(page);
-    test.skip(!formKey, 'no form-kind page seeded in this environment');
-
-    await openDesigner(page, formKey!);
+    const formKey = await createFormPage(page);
+    await openDesigner(page, formKey);
 
     // Canvas band shows the localized form kind label, not the old Composite text.
     const band = page.getByTestId('canvas-root-drop-zone');
@@ -90,10 +129,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   });
 
   test('dragging a model field into a section binds a field block via @dnd-kit', async ({ page }) => {
-    const formKey = await findFormPageKey(page);
-    test.skip(!formKey, 'no form-kind page seeded in this environment');
-
-    await openDesigner(page, formKey!);
+    const formKey = await createFormPage(page);
+    await openDesigner(page, formKey);
 
     // Wait for the outline tree to populate before querying it.
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({
@@ -105,7 +142,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       .locator('button[data-testid^="outline-item-"]')
       .filter({ hasText: 'form-section' })
       .first();
-    test.skip((await sectionItem.count()) === 0, 'form page has no form-section');
+    await expect(sectionItem).toBeVisible();
     const sectionTestId = await sectionItem.getAttribute('data-testid');
     const sectionId = sectionTestId!.replace('outline-item-', '');
     await sectionItem.click();
@@ -118,7 +155,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       .waitFor({ state: 'visible', timeout: 10000 })
       .catch(() => {});
     const fieldItem = page.locator('[data-testid^="model-field-"][data-used="false"]').first();
-    test.skip((await fieldItem.count()) === 0, 'no bindable model field for this page');
+    await expect(fieldItem).toBeVisible();
 
     const beforeFields = await page.locator('[data-testid^="canvas-block-field_"]').count();
 
@@ -144,24 +181,22 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   // whose single jump-move pointerWithin can miss — the workbench's
   // pointerWithin→closestCenter fallback is what keeps those green.
   test('binds a model field via Playwright .dragTo() (UDW drag-driver guard)', async ({ page }) => {
-    const formKey = await findFormPageKey(page);
-    test.skip(!formKey, 'no form-kind page seeded in this environment');
-
-    await openDesigner(page, formKey!);
+    const formKey = await createFormPage(page);
+    await openDesigner(page, formKey);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     const sectionItem = page
       .locator('button[data-testid^="outline-item-"]')
       .filter({ hasText: 'form-section' })
       .first();
-    test.skip((await sectionItem.count()) === 0, 'form page has no form-section');
+    await expect(sectionItem).toBeVisible();
     const sectionId = (await sectionItem.getAttribute('data-testid'))!.replace('outline-item-', '');
     await sectionItem.click();
 
     await page.getByTestId('resource-tab-fields').click();
     const fieldItem = page.locator('[data-testid^="model-field-"][data-used="false"]').first();
     await fieldItem.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    test.skip((await fieldItem.count()) === 0, 'no bindable model field for this page');
+    await expect(fieldItem).toBeVisible();
 
     const before = await page.locator('[data-testid^="canvas-block-field_"]').count();
     await fieldItem.dragTo(page.getByTestId(`canvas-block-${sectionId}`));
@@ -173,10 +208,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   // Block deletion: a designer must let users remove blocks (golden-standard
   // delete). The top-level kind container is protected; descendants are deletable.
   test('deletes a canvas block via the delete control and persists the removal', async ({ page }) => {
-    const formKey = await findFormPageKey(page);
-    test.skip(!formKey, 'no form-kind page seeded in this environment');
-
-    await openDesigner(page, formKey!);
+    const formKey = await createFormPage(page);
+    await openDesigner(page, formKey);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     // The root form container has no delete control (it defines the page kind).

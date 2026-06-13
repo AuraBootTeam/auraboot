@@ -27,13 +27,15 @@ interface PresetDescriptor {
   key: ToolbarPresetKey;
   label: string;
   /** Capability gate: preset is disabled when this capability is false. */
-  capability: keyof ModelCapabilities;
+  capability?: keyof ModelCapabilities;
+  description: string;
 }
 
 const PRESETS: PresetDescriptor[] = [
-  { key: 'create', label: '新增', capability: 'create' },
-  { key: 'export', label: '导出', capability: 'export' },
-  { key: 'bulkDelete', label: '批量删除', capability: 'bulkDelete' },
+  { key: 'create', label: '新增', capability: 'create', description: '当前模型支持该预设动作' },
+  { key: 'refresh', label: '刷新', description: '刷新当前列表数据，不依赖模型写入能力' },
+  { key: 'export', label: '导出', capability: 'export', description: '当前模型支持该预设动作' },
+  { key: 'bulkDelete', label: '批量删除', capability: 'bulkDelete', description: '当前模型支持该预设动作' },
 ];
 
 export const ToolbarTab: React.FC<ToolbarTabProps> = ({
@@ -71,7 +73,7 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
 
   const addCustomButton = () => {
     if (readonly) return;
-    const next: CustomButton = { label: '', command: '' };
+    const next: CustomButton = { label: '', command: '', actionKind: 'command' };
     const nextButtons = [...vm.toolbar.customButtons, next];
     setVm({ ...vm, toolbar: { ...vm.toolbar, customButtons: nextButtons } });
     setSelectedBtnIdx(nextButtons.length - 1);
@@ -131,7 +133,7 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
             </div>
           )}
           {PRESETS.map((preset) => {
-            const allowed = capabilities ? !!capabilities[preset.capability] : false;
+            const allowed = preset.capability ? !!capabilities?.[preset.capability] : true;
             const active = activePresets.has(preset.key);
             return (
               <label
@@ -150,10 +152,10 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium text-slate-800">{preset.label}</span>
                   <span className="mt-1 block text-xs text-slate-500">
-                    {capabilityError
+                    {capabilityError && preset.capability
                       ? '当前无法读取模型能力，请修复模型绑定后再切换预设动作'
                       : allowed
-                      ? '当前模型支持该预设动作'
+                      ? preset.description
                       : `当前模型未开启 ${String(preset.capability)} 能力`}
                   </span>
                 </span>
@@ -236,7 +238,9 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
                         {b.label || '(未命名)'}
                       </span>
                       <span className="mt-1 block truncate text-xs text-slate-500">
-                        {b.command || '尚未绑定 command'}
+                        {b.actionKind === 'refresh'
+                          ? `刷新 ${b.targetDataSource || '未选择数据源'}`
+                          : b.command || '尚未绑定 command'}
                       </span>
                       <span className="mt-3 flex flex-wrap gap-2">
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
@@ -306,7 +310,7 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
             {selected ? `按钮属性 · ${selected.label || '未命名按钮'}` : '按钮属性'}
           </h3>
           <p className="mt-2 text-sm text-slate-500">
-            在这里定义按钮文案、命令和是否依赖选中行，避免按钮语义含糊。
+            在这里定义按钮文案、行为和是否依赖选中行，避免按钮语义含糊。
           </p>
         </div>
         {selected && selectedBtnIdx !== null ? (

@@ -20,7 +20,7 @@ export interface ShortcutItem {
   icon: string;
   path: string;
   color?: string;
-  engagementId?: number;
+  engagementId?: string;
 }
 
 interface ShortcutsWidgetProps {
@@ -104,7 +104,7 @@ export function ShortcutsWidget({
   }, [loadFavorites]);
 
   const handleRemove = useCallback(
-    async (engagementId: number, e: React.MouseEvent) => {
+    async (engagementId: string, e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       await removeFavorite(engagementId);

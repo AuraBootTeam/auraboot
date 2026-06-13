@@ -12,7 +12,8 @@
   "minPlatformVersion": "1.0.0",
   "dependencies": [],
   "resourceDirs": {
-    "menus": "config/menus.json"
+    "menus": "config/menus.json",
+    "pages": "config/pages.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",

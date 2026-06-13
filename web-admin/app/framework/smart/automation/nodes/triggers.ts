@@ -1,6 +1,21 @@
 // web-admin/app/smart/automation/nodes/triggers.ts
 import type { FlowNodeDefinition } from '~/plugins/core-designer/components/flow-designer-sdk';
 
+const automationRuleBindingFields: NonNullable<FlowNodeDefinition['configSchema']> = [
+  {
+    key: 'ruleBinding',
+    label: '$i18n:automation.field.ruleBinding',
+    type: 'rule-binding',
+    description: '$i18n:automation.field.ruleBinding.desc',
+    group: 'filter',
+    ruleBindingMode: 'decision',
+    ruleBindingConsumerType: 'AUTOMATION',
+    ruleBindingConsumerNodeId: 'trigger',
+    ruleBindingShowImpactPreview: true,
+    ruleBindingShowTestRunner: true,
+  },
+];
+
 export const triggerNodes: FlowNodeDefinition[] = [
   {
     type: 'trigger-record-create',
@@ -17,6 +32,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
         description: '$i18n:automation.field.modelCode.desc',
         group: 'trigger_source',
       },
+      ...automationRuleBindingFields,
     ],
     defaultConfig: {
       triggerType: 'on_record_create',
@@ -44,6 +60,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
         dependsOn: { field: 'modelCode' },
         group: 'filter',
       },
+      ...automationRuleBindingFields,
     ],
     defaultConfig: {
       triggerType: 'on_record_update',
@@ -87,6 +104,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
         dependsOn: { field: 'fieldCode' },
         group: 'filter',
       },
+      ...automationRuleBindingFields,
     ],
     defaultConfig: {
       triggerType: 'on_field_change',
@@ -134,6 +152,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
         optionSource: 'dict',
         group: 'filter',
       },
+      ...automationRuleBindingFields,
     ],
     defaultConfig: {
       triggerType: 'on_state_change',
@@ -174,6 +193,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
         description: '$i18n:automation.field.maxExecutionTime.desc',
         group: 'advanced',
       },
+      ...automationRuleBindingFields,
     ],
     defaultConfig: {
       triggerType: 'scheduled',
@@ -212,6 +232,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
         description: '$i18n:automation.field.expectedHeaders.desc',
         group: 'advanced',
       },
+      ...automationRuleBindingFields,
     ],
     defaultConfig: {
       triggerType: 'webhook',
@@ -251,6 +272,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
           { label: '$i18n:automation.field.eventTypes.task_assigned', value: 'task_assigned' },
         ],
       },
+      ...automationRuleBindingFields,
     ],
     defaultConfig: {
       triggerType: 'on_bpm_event',
@@ -310,6 +332,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
         optionSource: 'dict',
         group: 'filter',
       },
+      ...automationRuleBindingFields,
     ],
     defaultConfig: {
       triggerType: 'on_inactivity',

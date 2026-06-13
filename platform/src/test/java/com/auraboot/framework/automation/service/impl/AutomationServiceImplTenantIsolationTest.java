@@ -3,10 +3,12 @@ package com.auraboot.framework.automation.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.dto.AutomationUpdateRequest;
 import com.auraboot.framework.automation.entity.Automation;
+import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.mapper.AutomationLogMapper;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.automation.service.AutomationFlowTriggerDeriver;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.exception.ValidationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -16,6 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -50,6 +55,8 @@ class AutomationServiceImplTenantIsolationTest {
     private AutomationTriggerService automationTriggerService;
     @Mock
     private com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
+    @Mock
+    private DecisionUsageIndexService usageIndexService;
 
     private AutomationServiceImpl service;
 
@@ -57,7 +64,7 @@ class AutomationServiceImplTenantIsolationTest {
     void setUp() {
         AutomationFlowTriggerDeriver deriver = new AutomationFlowTriggerDeriver(new ObjectMapper());
         service = new AutomationServiceImpl(automationMapper, automationLogMapper, automationTriggerService,
-                automationProcessRuntime, deriver);
+                automationProcessRuntime, deriver, usageIndexService);
         MetaContext.setContext(CURRENT_TENANT, 10L, "user-1", "tester");
     }
 
@@ -113,6 +120,36 @@ class AutomationServiceImplTenantIsolationTest {
         assertThatCode(() -> service.delete("auto-x")).doesNotThrowAnyException();
 
         verify(automationMapper).deleteById(99L);
+        verify(usageIndexService).deleteSource("AUTOMATION", "auto-x");
+    }
+
+    @Test
+    void update_sameTenantAutomation_refreshesDecisionUsageIndexSource() {
+        when(automationMapper.findByPid("auto-x")).thenReturn(automationOwnedBy(CURRENT_TENANT));
+        AutomationUpdateRequest request = new AutomationUpdateRequest();
+        request.setName("Updated Automation");
+
+        assertThatCode(() -> service.update("auto-x", request)).doesNotThrowAnyException();
+
+        verify(automationMapper).updateAutomation(any(Automation.class));
+        verify(usageIndexService).refreshSource("AUTOMATION", "auto-x");
+    }
+
+    @Test
+    void enable_sameTenantFlatActionsAutomation_deploysProcessRuntime() {
+        Automation automation = automationOwnedBy(CURRENT_TENANT);
+        automation.setEnabled(false);
+        automation.setActions(List.of(AutomationAction.builder()
+                .type("send_notification")
+                .config(Map.of("message", "Runtime regression"))
+                .build()));
+        when(automationMapper.findByPid("auto-x")).thenReturn(automation);
+
+        assertThatCode(() -> service.enable("auto-x")).doesNotThrowAnyException();
+
+        verify(automationMapper).updateEnabled("auto-x", true, "user-1");
+        verify(usageIndexService).refreshSource("AUTOMATION", "auto-x");
+        verify(automationProcessRuntime).deploy(automation);
     }
 
     @Test

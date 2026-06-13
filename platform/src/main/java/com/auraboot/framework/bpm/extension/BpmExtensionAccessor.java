@@ -3,6 +3,7 @@ package com.auraboot.framework.bpm.extension;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.model.CcPolicy;
 import com.auraboot.framework.bpm.model.WithdrawPolicy;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import com.auraboot.smart.framework.engine.SmartEngine;
 import com.auraboot.smart.framework.engine.constant.ExtensionElementsConstant;
 import com.auraboot.smart.framework.engine.model.assembly.ExtensionElementContainer;
@@ -118,6 +119,54 @@ public class BpmExtensionAccessor {
                     "Malformed aura.requiredPermissions JSON on activity '" + activityId
                             + "' of process '" + processKey + "': " + json, e);
         }
+    }
+
+    /**
+     * Resolve a node-level rule-center binding from {@code <smart:properties>}.
+     * Missing value means the activity has no rule-center integration; malformed
+     * JSON is a deployment/configuration error and is surfaced loudly.
+     */
+    public Optional<RuleConsumerBinding> getRuleConsumerBinding(String processKey, String activityId) {
+        return getActivityProperty(processKey, activityId, BpmExtensionKeys.RULE_BINDING)
+                .map(raw -> parseRuleConsumerBinding(raw, processKey, activityId));
+    }
+
+    /**
+     * Parse a rule binding from an already resolved activity extension container.
+     * This is used by SmartEngine SPIs that already hold the activity object and
+     * should not round-trip through the repository cache.
+     */
+    public Optional<RuleConsumerBinding> getRuleConsumerBinding(
+            ExtensionElementContainer activity,
+            String processKey,
+            String activityId) {
+        return readExtensionProperty(activity, BpmExtensionKeys.RULE_BINDING)
+                .map(raw -> parseRuleConsumerBinding(raw, processKey, activityId));
+    }
+
+    private RuleConsumerBinding parseRuleConsumerBinding(
+            String raw,
+            String processKey,
+            String activityId) {
+        try {
+            RuleConsumerBinding parsed = objectMapper.readValue(raw, RuleConsumerBinding.class);
+            return new RuleConsumerBinding(
+                    hasText(parsed.consumerType()) ? parsed.consumerType() : "BPM",
+                    hasText(parsed.consumerCode()) ? parsed.consumerCode() : processKey,
+                    hasText(parsed.consumerNodeId()) ? parsed.consumerNodeId() : activityId,
+                    parsed.bindingKind(),
+                    parsed.conditionSpec(),
+                    parsed.decisionBinding(),
+                    parsed.enabled());
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Malformed aura.ruleBinding JSON on activity '" + activityId
+                            + "' of process '" + processKey + "': " + raw, e);
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     /**

@@ -3,7 +3,7 @@
  *
  * Call `registerAllWidgets()` once at app bootstrap (e.g. in StudioProvider or
  * the Page Designer entry point) to populate the WidgetRegistry singleton with
- * all 28 built-in widget definitions.
+ * all built-in widget definitions and server-facing aliases.
  *
  * NOTE: B9 `coordinatespicker` widget was removed 2026-04-19 — product decision
  * not to ship a real map SDK; the prior mock runtime was confusing.
@@ -23,7 +23,7 @@ import { datetimeWidget } from './datetime';
 import { checkboxWidget } from './checkbox';
 import { switchWidget } from './switch';
 import { radioWidget } from './radio';
-import { fileWidget } from './file';
+import { fileWidget, uploadWidget } from './file';
 import { referenceWidget } from './reference';
 
 // Phase 4.4 — Phase W widgets (18)
@@ -46,7 +46,7 @@ import { richtextWidget } from './richtext';
 import { fileattachmentWidget } from './fileattachment';
 
 /**
- * Register all 29 built-in form widget definitions into the WidgetRegistry.
+ * Register all built-in form widget definitions into the WidgetRegistry.
  * Safe to call multiple times — subsequent calls overwrite existing entries
  * (idempotent by component key).
  */
@@ -71,6 +71,9 @@ export function registerAllWidgets(): void {
   WidgetRegistry.register(switchWidget);
   WidgetRegistry.register(radioWidget);
   WidgetRegistry.register(fileWidget);
+  // Server renderComponents exposes file upload as `upload`; keep this alias
+  // schema aligned with SmartUpload runtime prop names.
+  WidgetRegistry.register(uploadWidget);
   WidgetRegistry.register(referenceWidget);
 
   // Phase 4.4 — Phase W widgets
@@ -107,6 +110,7 @@ export {
   switchWidget,
   radioWidget,
   fileWidget,
+  uploadWidget,
   referenceWidget,
 };
 

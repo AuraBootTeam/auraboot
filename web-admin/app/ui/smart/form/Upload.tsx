@@ -187,14 +187,15 @@ const Upload: React.FC<UploadProps> = ({
             if (idx !== -1) {
               if (resp.ok && (result.code === '0' || result.success)) {
                 const fileData = result.data || result;
+                const uploadedFileId = fileData.fileId || fileData.pid || '';
                 updatedList[idx] = {
                   ...updatedList[idx],
                   status: 'done',
                   percent: 100,
                   url:
-                    fileData.url ||
-                    fileData.downloadUrl ||
-                    `/api/file/download/${fileData.fileId || fileData.pid || ''}`,
+                    uploadedFileId
+                      ? `/api/file/download/${encodeURIComponent(String(uploadedFileId))}`
+                      : fileData.downloadUrl || fileData.url,
                   response: fileData,
                 };
               } else {
@@ -232,10 +233,38 @@ const Upload: React.FC<UploadProps> = ({
     }
   };
 
+  const deleteRemoteFile = useCallback(
+    async (file: UploadFile): Promise<boolean> => {
+      const response = (file as any).response || {};
+      const fileId = response.fileId || response.pid || response.id;
+      if (!fileId) return true;
+
+      try {
+        const resp = await fetch(`/api/file/${encodeURIComponent(String(fileId))}`, {
+          method: 'delete',
+          credentials: 'include',
+          headers: headers as Record<string, string>,
+        });
+        const result = await resp.json().catch(() => ({}));
+        if (!resp.ok) return false;
+        if (result?.code !== undefined && result.code !== '0') return false;
+        return result?.data !== false;
+      } catch {
+        return false;
+      }
+    },
+    [headers],
+  );
+
   const handleRemove = async (file: UploadFile) => {
     if (onRemove) {
       const result = await onRemove(file);
       if (result === false) return;
+    }
+    const remoteRemoved = await deleteRemoteFile(file);
+    if (!remoteRemoved) {
+      console.warn(`Failed to delete uploaded file ${file.name}`);
+      return;
     }
     const newList = fileList.filter((f) => f.uid !== file.uid);
     field.setValue(newList);
@@ -365,11 +394,29 @@ const Upload: React.FC<UploadProps> = ({
             {fileList.map((file) => (
               <div
                 key={file.uid}
+                role={file.status === 'done' && (file.url || file.thumbUrl) ? 'button' : undefined}
+                tabIndex={file.status === 'done' && (file.url || file.thumbUrl) ? 0 : undefined}
+                data-testid={`upload-file-${name}`}
                 className={`group relative ${
                   listType === 'picture-card'
                     ? 'h-28 w-28 overflow-hidden rounded-lg border'
                     : 'flex items-center gap-3 rounded-lg bg-gray-50 p-2'
                 } `}
+                onClick={() => {
+                  if (file.status === 'done' && (file.url || file.thumbUrl)) {
+                    handlePreview(file);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    (event.key === 'Enter' || event.key === ' ') &&
+                    file.status === 'done' &&
+                    (file.url || file.thumbUrl)
+                  ) {
+                    event.preventDefault();
+                    handlePreview(file);
+                  }
+                }}
               >
                 {/* Thumbnail or icon */}
                 {listType !== 'text' && file.thumbUrl ? (
@@ -443,7 +490,10 @@ const Upload: React.FC<UploadProps> = ({
                   <button
                     type="button"
                     data-testid="btn-remove-file"
-                    onClick={() => handleRemove(file)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handleRemove(file);
+                    }}
                     className={` ${
                       listType === 'picture-card'
                         ? 'absolute top-1 right-1 opacity-0 group-hover:opacity-100'

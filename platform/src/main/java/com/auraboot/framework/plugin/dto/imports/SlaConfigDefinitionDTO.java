@@ -2,6 +2,7 @@ package com.auraboot.framework.plugin.dto.imports;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -48,6 +49,9 @@ public class SlaConfigDefinitionDTO {
 
     /** Warning rules configuration. */
     private List<Map<String, Object>> warningRules;
+
+    /** Platform rule-center binding for deadline/breach/escalation decisions. */
+    private RuleConsumerBinding ruleBinding;
 
     /** Associated model code. */
     private String modelCode;

@@ -118,19 +118,19 @@ export function ListToolbar({
     <>
       {/* Main toolbar row */}
       <div
-        className="print-hide flex items-center gap-2 border-b border-gray-100 px-6 py-2"
+        className="print-hide flex flex-wrap items-center gap-2 border-b border-gray-100 px-4 py-2 sm:px-6"
         data-print="hide"
         data-testid="list-toolbar"
       >
         {/* Search input */}
-        <div className="relative flex-shrink-0">
+        <div className="relative min-w-0 flex-1 basis-full sm:flex-none sm:basis-auto">
           <input
             type="text"
             value={keyword}
             onChange={(e) => onKeywordChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('common.search', undefined, 'Search') + '...'}
-            className="h-8 w-[240px] rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:outline-none"
+            className="h-8 w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:outline-none sm:w-[240px]"
             data-testid="list-search-input"
           />
           <svg
@@ -149,7 +149,7 @@ export function ListToolbar({
         </div>
 
         {/* Separator */}
-        {showInlineControls && <div className="mx-1 h-6 w-px bg-gray-200" />}
+        {showInlineControls && <div className="mx-1 hidden h-6 w-px bg-gray-200 sm:block" />}
 
         {/* Sort popover trigger */}
         {!hideSort && (
@@ -244,11 +244,14 @@ export function ListToolbar({
         )}
 
         {/* Spacer */}
-        <div className="flex-1" />
+        <div className="hidden flex-1 sm:block" />
 
         {/* Quick filter chips */}
         {!hideQuickFilters && (
-          <div className="flex gap-1.5" data-testid="quick-filters">
+          <div
+            className="flex max-w-full basis-full gap-1.5 overflow-x-auto sm:basis-auto"
+            data-testid="quick-filters"
+          >
             {quickFilters.map((qf) => (
               <button
                 key={qf.key}

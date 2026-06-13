@@ -301,6 +301,8 @@ export type ActionDef =
 // Button 配置
 export interface ButtonConfig {
   code: string;
+  /** Designer-authored shorthand for common toolbar buttons. */
+  preset?: string;
   /** @deprecated Use `label` for i18n display text. Kept for backward compatibility. */
   action?: string | ActionDef; // Legacy: i18n key string. New: ActionDef object.
   content?: string | LocalizedText;
@@ -545,6 +547,8 @@ export interface PageDataSourceConfig {
   version?: number | null;
   /** API endpoint (when type = "api") */
   endpoint?: string;
+  /** Optional detail endpoint template, e.g. "/api/items/{pid}" */
+  detailEndpoint?: string;
   /** HTTP method (when type = "api", default: "get") */
   method?: 'get' | 'post';
   /** Whether the API supports pagination (default: true) */

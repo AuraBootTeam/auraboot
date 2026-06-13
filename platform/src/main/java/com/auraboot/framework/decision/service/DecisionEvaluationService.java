@@ -3,6 +3,7 @@ package com.auraboot.framework.decision.service;
 import com.auraboot.framework.decision.dto.DrtEvaluateRequest;
 import com.auraboot.framework.decision.dto.DrtLogDTO;
 import com.auraboot.framework.decision.dto.DrtTestRunRequest;
+import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.decision.model.DecisionResult;
 import com.auraboot.framework.decision.model.DecisionValidateResult;
 import com.auraboot.framework.decision.dto.DrtValidateRequest;
@@ -49,4 +50,24 @@ public interface DecisionEvaluationService {
      * Query evaluation logs by trace_id (tenant-scoped).
      */
     List<DrtLogDTO> findLogsByTraceId(String traceId);
+
+    /**
+     * Query one tenant-scoped evaluation log by public PID.
+     */
+    DrtLogDTO findLogByPid(String pid);
+
+    /**
+     * Query newest tenant-scoped evaluation logs for API-backed DSL list pages.
+     */
+    PageResult<DrtLogDTO> findRecentLogs(
+            String keyword,
+            String decisionCode,
+            String status,
+            String callerType,
+            Boolean matched,
+            String rolloutArm,
+            Long minDurationMs,
+            Long maxDurationMs,
+            int page,
+            int size);
 }

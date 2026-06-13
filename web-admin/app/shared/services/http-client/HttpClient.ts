@@ -139,7 +139,7 @@ export async function get<T>(
  */
 export async function post<T>(
   path: string,
-  params?: Record<string, any>,
+  params?: FetchOptions['params'],
   options?: Omit<FetchOptions, 'method' | 'params'>,
   request?: Request,
 ): Promise<Result<T>> {
@@ -173,7 +173,7 @@ export async function post<T>(
  */
 export async function put<T>(
   path: string,
-  params?: Record<string, any>,
+  params?: FetchOptions['params'],
   options?: Omit<FetchOptions, 'method' | 'params'>,
   request?: Request,
 ): Promise<Result<T>> {
@@ -191,9 +191,8 @@ export async function put<T>(
 /**
  * DELETE request convenience method
  *
- * Note: For DELETE requests, remaining params (after PathVariable replacement)
- * are sent as JSON body, NOT as query string parameters. This differs from
- * typical REST conventions where DELETE params are query parameters.
+ * Note: For DELETE requests, object params remain query parameters after
+ * PathVariable replacement. Array params are sent as JSON bodies for batch APIs.
  *
  * @param path API path
  * @param params PathVariables and request body
@@ -206,16 +205,16 @@ export async function put<T>(
  * const result = await del<void>('/api/user/{userId}', { userId: 123 });
  *
  * @example
- * // DELETE with body params (NOT query params)
+ * // DELETE with extra object params
  * const result = await del<void>('/api/user/{userId}', {
  *   userId: 123,
  *   reason: 'inactive'
  * });
- * // Sends: DELETE /api/user/123 with body {"reason":"inactive"}
+ * // Sends: DELETE /api/user/123?reason=inactive
  */
 export async function del<T>(
   path: string,
-  params?: Record<string, any>,
+  params?: FetchOptions['params'],
   options?: Omit<FetchOptions, 'method' | 'params'>,
   request?: Request,
 ): Promise<Result<T>> {

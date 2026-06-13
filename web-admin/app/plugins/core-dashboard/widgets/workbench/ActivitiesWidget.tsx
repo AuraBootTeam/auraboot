@@ -1,7 +1,7 @@
 /**
  * ActivitiesWidget — Timeline of recent CRM activities.
  *
- * Data source: GET /crm_activity/list (dynamic controller)
+ * Data source: GET /api/dynamic/crm_activity/list (dynamic controller)
  * Sorted by created_at desc, top N items.
  */
 
@@ -10,7 +10,11 @@ import { get } from '~/shared/services/http-client';
 import { useI18n } from '~/contexts/I18nContext';
 
 interface ActivityRecord {
-  id: string;
+  id?: string;
+  pid?: string;
+  recordId?: string;
+  crm_act_type?: string;
+  crm_act_subject?: string;
   crm_activity_type?: string;
   crm_activity_subject?: string;
   crm_activity_related_model?: string;
@@ -58,11 +62,16 @@ function formatRelativeTime(dateStr: string, t: (key: string, params?: Record<st
   return date.toLocaleDateString();
 }
 
+function getActivityRecordId(activity: ActivityRecord): string {
+  return activity.pid || activity.id || activity.recordId || '';
+}
+
 export function ActivitiesWidget({ title, maxItems = 6, className = '' }: ActivitiesWidgetProps) {
   const { t } = useI18n();
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const resolvedTitle = title || t('workbench.activities.title', {}, 'Recent Activities');
 
@@ -70,12 +79,16 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError(false);
+      setPermissionDenied(false);
       try {
         const result = await get<ActivityListResponse>(
-          `/crm_activity/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
+          `/api/dynamic/crm_activity/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
         );
         if (!cancelled && result.code === '0' && result.data) {
           setActivities(result.data.records || []);
+        } else if (!cancelled && result.code === '403') {
+          setPermissionDenied(true);
         } else if (!cancelled) {
           setError(true);
         }
@@ -90,7 +103,12 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
 
   const handleActivityClick = (activity: ActivityRecord) => {
     if (activity.crm_activity_related_model && activity.crm_activity_related_id) {
-      window.location.href = `/${activity.crm_activity_related_model}/${activity.crm_activity_related_id}`;
+      window.location.href = `/p/${encodeURIComponent(activity.crm_activity_related_model)}/view/${encodeURIComponent(activity.crm_activity_related_id)}`;
+      return;
+    }
+    const recordId = getActivityRecordId(activity);
+    if (recordId) {
+      window.location.href = `/p/crm_activity/view/${encodeURIComponent(recordId)}`;
     }
   };
 
@@ -111,6 +129,26 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Permission denied ---
+  if (permissionDenied) {
+    return (
+      <div className={`flex h-full flex-col ${className}`} data-testid="activities-permission-denied">
+        <div className="mb-3 flex items-center justify-between px-1">
+          <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
+          <span className="mb-1 text-2xl">{'\uD83D\uDD12'}</span>
+          <span className="text-sm font-medium text-gray-500">
+            {t('workbench.activities.permissionDenied', {}, 'No permission to view activities')}
+          </span>
+          <span className="mt-1 text-xs text-gray-400">
+            {t('workbench.activities.permissionDeniedHint', {}, 'Ask an administrator for CRM activity access')}
+          </span>
         </div>
       </div>
     );
@@ -147,18 +185,24 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
         <div className="absolute bottom-0 left-[17px] top-0 w-px bg-gray-200" />
 
         <div className="space-y-3">
-          {activities.map((activity) => {
-            const actType = activity.crm_activity_type || 'note';
+          {activities.map((activity, index) => {
+            const recordId = getActivityRecordId(activity);
+            const actType = activity.crm_act_type || activity.crm_activity_type || 'note';
+            const subject = activity.crm_act_subject || activity.crm_activity_subject;
             const icon = TYPE_ICONS[actType] || '\uD83D\uDCCC';
             const colorClass = TYPE_COLORS[actType] || TYPE_COLORS.note;
             const timeStr = activity.created_at
               ? formatRelativeTime(activity.created_at, t)
               : '';
-            const isClickable = !!(activity.crm_activity_related_model && activity.crm_activity_related_id);
+            const isClickable = !!(
+              recordId ||
+              (activity.crm_activity_related_model && activity.crm_activity_related_id)
+            );
 
             return (
               <button
-                key={activity.id}
+                key={recordId || `${subject ?? 'activity'}-${index}`}
+                data-testid={recordId ? `activity-row-${recordId}` : undefined}
                 type="button"
                 onClick={() => handleActivityClick(activity)}
                 disabled={!isClickable}
@@ -170,6 +214,7 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
               >
                 {/* Circle icon */}
                 <div
+                  data-testid={`activity-type-${actType}`}
                   className={`relative z-10 flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full text-sm ${colorClass}`}
                 >
                   {icon}
@@ -179,7 +224,7 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
                 <div className="min-w-0 flex-1 pt-1">
                   <div className="text-[13px] text-gray-900">
                     <span className="font-medium">
-                      {activity.crm_activity_subject || t(`workbench.activities.type.${actType}`, {}, actType)}
+                      {subject || t(`workbench.activities.type.${actType}`, {}, actType)}
                     </span>
                     {activity.crm_activity_related_name && (
                       <span className="text-gray-500">

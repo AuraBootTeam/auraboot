@@ -85,7 +85,7 @@ describe('useTreeData', () => {
     const { result } = renderHook(() => useTreeData(rows, treeConfig));
     const children = result.current.getChildren('1');
     expect(children).toHaveLength(2);
-    expect(children.map((c) => c.id)).toEqual(expect.arrayContaining(['2', '3']));
+    expect(children.map((c: { id: string }) => c.id)).toEqual(expect.arrayContaining(['2', '3']));
   });
 
   it('getChildren returns empty array for leaf node', () => {

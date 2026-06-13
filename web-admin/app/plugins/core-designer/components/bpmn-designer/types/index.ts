@@ -3,6 +3,7 @@
  */
 
 import type { Node, Edge } from '@xyflow/react';
+import type { RuleConsumerBindingDraft } from '~/ui/smart/decision/DecisionRuleBindingBlock';
 
 // BPMN节点类型枚举
 export enum BPMNNodeType {
@@ -52,6 +53,11 @@ export interface TaskBaseConfig {
 // 用户任务配置
 export interface UserTaskConfig extends TaskBaseConfig {
   assignee?: AssigneeConfig; // 人员分配
+  /**
+   * Optional Rule Center binding used to derive assignee/candidate groups at runtime.
+   * The BPM designer property panel edits this with the shared DecisionRuleBindingBlock.
+   */
+  assignmentRuleBinding?: RuleConsumerBindingDraft;
   candidateUsers?: string[]; // 候选用户
   candidateGroups?: string[]; // 候选组
   skipable?: boolean; // 是否可跳过
@@ -103,6 +109,8 @@ export interface ExclusiveGatewayConfig {
   name: string;
   description?: string;
   defaultFlow?: string; // 默认流向
+  /** Optional Rule Center binding for gateway routing decisions. */
+  ruleBinding?: RuleConsumerBindingDraft;
 }
 
 // Parallel gateway config
@@ -117,6 +125,8 @@ export interface InclusiveGatewayConfig {
   name: string;
   description?: string;
   defaultFlow?: string;
+  /** Optional Rule Center binding for gateway routing decisions. */
+  ruleBinding?: RuleConsumerBindingDraft;
 }
 
 // Multi-instance configuration (for userTask/serviceTask)

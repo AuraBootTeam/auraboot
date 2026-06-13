@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.connector.service.ApiConnectorService;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.entity.NamedQueryField;
@@ -55,6 +56,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     private final DynamicDataMapper dynamicDataMapper;
     private final NamedQueryRateLimiter rateLimiter;
     private final ApiConnectorService apiConnectorService;
+    private final DecisionUsageIndexService usageIndexService;
 
     // DANGEROUS_SQL_PATTERN removed — replaced by SqlSafetyUtils.validateSelectOnlySql()
 
@@ -116,6 +118,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
 
         log.info("Created named query: code={}, pid={}", entity.getCode(), entity.getPid());
+        usageIndexService.refreshSource("NAMED_QUERY", entity.getPid());
         return toDTO(entity, true);
     }
 
@@ -142,8 +145,36 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             if (frozen) {
                 throw new MetaServiceException("Cannot modify FROM SQL: query is " + entity.getStatus() + " (frozen)");
             }
+            if (trimToNull(request.getConnectorPid()) != null) {
+                throw new MetaServiceException("fromSql and connectorPid are mutually exclusive");
+            }
             validateFromSql(request.getFromSql());
             entity.setFromSql(request.getFromSql());
+            entity.setConnectorPid(null);
+            entity.setConnectorEndpointCode(null);
+        }
+        if (request.getConnectorPid() != null || request.getConnectorEndpointCode() != null) {
+            if (frozen) {
+                throw new MetaServiceException("Cannot modify connector binding: query is "
+                        + entity.getStatus() + " (frozen)");
+            }
+            String connectorPid = request.getConnectorPid() != null
+                    ? trimToNull(request.getConnectorPid())
+                    : trimToNull(entity.getConnectorPid());
+            String endpointCode = request.getConnectorEndpointCode() != null
+                    ? trimToNull(request.getConnectorEndpointCode())
+                    : trimToNull(entity.getConnectorEndpointCode());
+            if (connectorPid == null) {
+                entity.setConnectorPid(null);
+                entity.setConnectorEndpointCode(null);
+            } else {
+                if (endpointCode == null) {
+                    throw new MetaServiceException("connectorEndpointCode is required when connectorPid is set");
+                }
+                entity.setConnectorPid(connectorPid);
+                entity.setConnectorEndpointCode(endpointCode);
+                entity.setFromSql(null);
+            }
         }
         if (request.getBaseWhere() != null) {
             if (frozen) {
@@ -168,6 +199,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         namedQueryMapper.updateById(entity);
 
         log.info("Updated named query: pid={}", pid);
+        usageIndexService.refreshSource("NAMED_QUERY", entity.getPid());
         return toDTO(entity, false);
     }
 
@@ -185,6 +217,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         namedQueryFieldMapper.deleteByQuery(tenantId, entity.getCode());
         // Delete query
         namedQueryMapper.deleteById(entity.getId());
+        usageIndexService.deleteSource("NAMED_QUERY", entity.getPid());
 
         log.info("Deleted named query: pid={}, code={}", pid, entity.getCode());
     }
@@ -314,6 +347,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         namedQueryMapper.updateById(entity);
 
         log.info("Updated named query status: pid={}, {} → {}", pid, currentStatus, targetStatus);
+        usageIndexService.refreshSource("NAMED_QUERY", entity.getPid());
         return toDTO(entity, false);
     }
 
@@ -327,6 +361,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             try {
                 int updated = namedQueryMapper.updateStatusByPid(pid, request.getTargetStatus());
                 if (updated > 0) {
+                    usageIndexService.refreshSource("NAMED_QUERY", pid);
                     result.addSuccess(pid);
                 } else {
                     result.addFailure(pid, "Named query not found: " + pid);
@@ -1107,6 +1142,14 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 throw new MetaServiceException("FROM SQL contains dangerous patterns: " + e.getMessage());
             }
         }
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private NamedQueryField createFieldEntity(Long tenantId, String queryCode, NamedQueryFieldRequest request) {

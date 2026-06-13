@@ -92,7 +92,7 @@ describe('usePerformance — marks', () => {
     expect(duration).toBeGreaterThanOrEqual(0);
     // Should also be recorded as a metric
     const metrics = result.current.getMetrics();
-    expect(metrics.some((m) => m.name === 'gap')).toBe(true);
+    expect(metrics.some((m: { name: string }) => m.name === 'gap')).toBe(true);
   });
 });
 

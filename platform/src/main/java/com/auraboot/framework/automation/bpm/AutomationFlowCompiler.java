@@ -110,7 +110,7 @@ public class AutomationFlowCompiler {
 
             if (type.startsWith("trigger")) {
                 on.put("type", "startEvent");
-            } else if (type.startsWith("action")) {
+            } else if (type.startsWith("action") || "control-delay".equals(type)) {
                 on.put("type", "serviceTask");
                 od.putObject("config").put("className", AutomationActionServiceTaskDelegate.BEAN_NAME);
                 Map<String, Object> spec = new HashMap<>();
@@ -303,6 +303,9 @@ public class AutomationFlowCompiler {
         Object at = config.get("actionType");
         if (at != null) {
             return String.valueOf(at);
+        }
+        if ("control-delay".equals(nodeType)) {
+            return "delay";
         }
         return nodeType.startsWith("action-")
                 ? nodeType.substring("action-".length()).replace('-', '_')

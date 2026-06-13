@@ -62,6 +62,19 @@ const OUTBOUND_HOST = process.env.E2E_OUTBOUND_HOST || 'host.docker.internal';
 const CALLAPI_OK_URL = process.env.E2E_CALLAPI_OK_URL || 'http://host.docker.internal:6444/actuator/health';
 const CALLAPI_404_URL = process.env.E2E_CALLAPI_404_URL || 'http://host.docker.internal:6444/api/this-endpoint-does-not-exist-404';
 
+async function delay(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function observeFor(ms: number, assertion: () => void, intervalMs = 100): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    assertion();
+    await delay(intervalMs);
+  }
+  assertion();
+}
+
 // ───────────────────────── fire + assert helpers (no UI surface) ─────────────────────────
 
 /**
@@ -73,13 +86,14 @@ async function fireCreate(
   page: Page,
   amount: number,
   title: string,
+  orderDate = '2026-05-30',
 ): Promise<string> {
   const resp = await page.request.post(`/api/meta/commands/execute/${CREATE_COMMAND}`, {
     data: {
       operationType: 'create',
       payload: {
         e2et_order_title: title,
-        e2et_order_date: '2026-05-30',
+        e2et_order_date: orderDate,
         e2et_order_type: 'normal',
         e2et_order_amount: amount,
       },
@@ -110,7 +124,7 @@ async function pollRecordField(
   while (Date.now() < deadline) {
     last = await getOrderRecord(page, recordId);
     if (last[field] === expected) return last;
-    await page.waitForTimeout(1_000);
+    await delay(1_000);
   }
   return last;
 }
@@ -134,7 +148,7 @@ async function pollLogTerminal(
     if (last && ['success', 'failed', 'partial_success'].includes(String(last.status).toLowerCase())) {
       return last;
     }
-    await page.waitForTimeout(1_000);
+    await delay(1_000);
   }
   return last;
 }
@@ -397,8 +411,9 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await expect(page.getByText(/存在错误|Errors/).first()).toBeVisible();
 
     // The validation gate truly blocked the write.
-    await page.waitForTimeout(1_000);
-    expect(wroteApi, 'save must NOT fire an /api/automations write when invalid').toBe(false);
+    await observeFor(1_000, () => {
+      expect(wroteApi, 'save must NOT fire an /api/automations write when invalid').toBe(false);
+    });
     // And the store validation confirms the field-level error for the trigger.
     const validation = await page.evaluate(
       () => (window as unknown as { __flowDesignerStore?: any }).__flowDesignerStore?.getState().validationResult,
@@ -519,8 +534,8 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   // Each case below drives the REAL designer (drag the node-under-test, configure via
   // the real property panel, connect, save, enable via the list toggle, fire a real
   // trigger) then verifies the backend ran correctly. Reuses only proven H1 patterns
-  // (model-select by label, json field). SmartEngine-dependent nodes (start-process,
-  // bpm-event, control-delay) are excluded per the directive.
+  // (model-select by label, json field). SmartEngine-dependent nodes are covered only
+  // when the live runtime seam is proven in this spec.
 
   /** Poll the dynamic list for an e2et_order_item carrying `name` (create-record side effect). */
   async function pollItemsByName(page: Page, name: string, timeoutMs = 20_000): Promise<any[]> {
@@ -536,9 +551,75 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
         const hit = rows.filter((r) => r?.e2et_item_name === name);
         if (hit.length) return hit;
       }
-      await page.waitForTimeout(1_000);
+      await delay(1_000);
     }
     return rows.filter((r) => r?.e2et_item_name === name);
+  }
+
+  async function fetchItemsByName(page: Page, name: string): Promise<any[]> {
+    const resp = await page.request.get(`/api/dynamic/e2et_order_item/list`, {
+      params: { pageNum: 1, pageSize: 50, keyword: name },
+    });
+    if (!resp.ok()) return [];
+    const data = (await resp.json())?.data;
+    const rows = data?.records ?? data?.list ?? data?.content ?? data?.rows ?? (Array.isArray(data) ? data : []);
+    return rows.filter((r: any) => r?.e2et_item_name === name);
+  }
+
+  async function expectNoItemsByNameFor(
+    page: Page,
+    name: string,
+    observationMs: number,
+    message: string,
+  ): Promise<void> {
+    const deadline = Date.now() + observationMs;
+    while (Date.now() < deadline) {
+      expect(await fetchItemsByName(page, name), message).toHaveLength(0);
+      await delay(1_000);
+    }
+    expect(await fetchItemsByName(page, name), message).toHaveLength(0);
+  }
+
+  async function pollProcessStatusByBusinessKey(
+    page: Page,
+    businessKey: string,
+    processKey: string,
+    timeoutMs = 30_000,
+  ): Promise<any | null> {
+    const deadline = Date.now() + timeoutMs;
+    let last: any = null;
+    while (Date.now() < deadline) {
+      const resp = await page.request.get('/api/bpm/process-instances/by-business-key/status', {
+        params: { businessKey, processKey },
+      });
+      if (resp.ok()) {
+        last = (await resp.json())?.data ?? null;
+        if (last?.instanceId) return last;
+      }
+      await delay(1_000);
+    }
+    return last;
+  }
+
+  async function startBpmProcess(
+    page: Page,
+    processKey: string,
+    businessKey: string,
+    variables: Record<string, unknown>,
+  ): Promise<string> {
+    const resp = await page.request.post('/api/bpm/process-instances', {
+      data: {
+        processDefinitionId: processKey,
+        businessKey,
+        variables,
+      },
+    });
+    expect(resp.ok(), `BPM start failed with ${resp.status()}: ${await resp.text()}`).toBe(true);
+    const body = await resp.json();
+    expect(String(body.code), `BPM start response: ${JSON.stringify(body)}`).toBe('0');
+    const instanceId = body.data?.instanceId as string | undefined;
+    expect(instanceId, `BPM start missing instanceId: ${JSON.stringify(body)}`).toBeTruthy();
+    return instanceId!;
   }
 
   test('N-CREATE-RECORD: drag trigger-record-create→action-create-record, configure via panel, save, enable, fire → a child order_item is created (happy) @golden', async ({
@@ -843,6 +924,140 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'downstream action completed on webhook fire').toBe(true);
   });
 
+  test('N-START-PROCESS: drag trigger-webhook→action-start-process, pick a BPM process, fire webhook → BPM instance is started and correlated by businessKey @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const processKey = 'e2et_payment_approval';
+    const businessKey = `NSP-${tag}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-START-PROCESS ${tag}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-webhook', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-start-process', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, action, {
+      processKey: '付款审批流程',
+      businessKey: '${bizKey}',
+      variables: `{"origin":"designer-start-process","tag":"${tag}"}`,
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const startNode = saved.flowConfig.nodes.find((n: any) => n.id === action);
+    expect(startNode.data.config.processKey, 'process-select persisted the picked process key').toBe(
+      processKey,
+    );
+    expect(startNode.data.config.businessKey, 'businessKey expression persisted from the panel').toBe(
+      '${bizKey}',
+    );
+    expect(startNode.data.config.variables, 'variables JSON persisted as an object').toMatchObject({
+      origin: 'designer-start-process',
+      tag,
+    });
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
+      data: { bizKey: businessKey },
+    });
+    expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
+    expect(String((await resp.json())?.code), 'webhook POST accepted').toBe('0');
+
+    const log = await pollLogTerminal(page, pid, firedAt, 60_000);
+    expect(String(log!.status).toLowerCase(), `N-START-PROCESS run: ${JSON.stringify(log)}`).toBe(
+      'success',
+    );
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(
+      statuses.find((s) => s.nodeId === action)?.status,
+      `start-process node completed: ${JSON.stringify(statuses)}`,
+    ).toBe('completed');
+
+    const bpmStatus = await pollProcessStatusByBusinessKey(page, businessKey, processKey);
+    expect(bpmStatus?.processDefinitionId, `BPM status by businessKey: ${JSON.stringify(bpmStatus)}`).toBe(
+      processKey,
+    );
+    expect(bpmStatus?.status, 'started BPM process remains at the manager review wait state').toBe(
+      'running',
+    );
+    expect(
+      bpmStatus?.currentNodes?.some((n: any) => n.nodeId === 'manager_review' && n.status === 'active'),
+      'manager_review userTask is active',
+    ).toBe(true);
+    expect(
+      bpmStatus?.completedNodes?.some((n: any) => n.nodeId === 'start_1' && n.status === 'completed'),
+      'start event completed',
+    ).toBe(true);
+    expect(bpmStatus?.variables, 'process variables from the automation node reached BPM runtime').toMatchObject({
+      origin: 'designer-start-process',
+      tag,
+    });
+  });
+
+  test('N-TRIGGER-BPM-EVENT: drag trigger-bpm-event→action-create-record, pick a BPM process and event type, start BPM → automation runs from task_assigned @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const processKey = 'e2et_payment_approval';
+    const businessKey = `NBE-${tag}`;
+    const itemName = `NBE-item-${tag}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-BPM-EVENT ${tag}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-bpm-event', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, {
+      modelCode: '付款审批流程',
+      eventTypes: ['任务分配'],
+    });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields:
+        '{"e2et_order_id":"${instanceId}","e2et_item_name":"' +
+        itemName +
+        '","e2et_item_spec":"bpm-event","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const triggerNode = saved.flowConfig.nodes.find((n: any) => n.id === trigger);
+    expect(triggerNode.data.config.modelCode, 'BPM process-select persisted process key').toBe(processKey);
+    expect(triggerNode.data.config.eventTypes, 'eventTypes persisted as raw BPM event values').toContain(
+      'task_assigned',
+    );
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    const instanceId = await startBpmProcess(page, processKey, businessKey, {
+      origin: 'designer-bpm-event',
+      tag,
+    });
+    const log = await pollLogTerminal(page, pid, firedAt, 60_000);
+    expect(String(log!.status).toLowerCase(), `N-TRIGGER-BPM-EVENT run: ${JSON.stringify(log)}`).toBe(
+      'success',
+    );
+    expect(log?.errorMessage ?? '', 'BPM event trigger run should not carry an error').toBe('');
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(
+      statuses.find((s) => s.nodeId === action)?.status,
+      `create-record node completed after BPM event: ${JSON.stringify(statuses)}`,
+    ).toBe('completed');
+    expect((await pollItemsByName(page, itemName)).length, 'child item created by BPM event trigger').toBeGreaterThanOrEqual(1);
+
+    const bpmStatus = await pollProcessStatusByBusinessKey(page, businessKey, processKey);
+    expect(bpmStatus?.instanceId, `BPM status by businessKey: ${JSON.stringify(bpmStatus)}`).toBe(instanceId);
+    expect(
+      bpmStatus?.currentNodes?.some((n: any) => n.nodeId === 'manager_review' && n.status === 'active'),
+      'task_assigned came from the active manager_review userTask',
+    ).toBe(true);
+  });
+
   // ── golden SAD path (real UI) — a runtime failure surfaces on the node ──────────
   test('N-CALL-API-SAD: drag trigger-record-create→action-call-api with a 404 URL, save, enable, fire → the call-api node FAILS with the upstream status (sad path) @golden', async ({
     page,
@@ -901,6 +1116,25 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     return new Set(rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n)));
   }
 
+  async function expectNoNewLogIdsFor(
+    page: Page,
+    pid: string,
+    before: Set<number>,
+    observationMs: number,
+    message: string,
+  ): Promise<void> {
+    const deadline = Date.now() + observationMs;
+    while (Date.now() < deadline) {
+      const current = await fetchLogIds(page, pid);
+      const newIds = [...current].filter((id) => !before.has(id));
+      expect(newIds, message).toHaveLength(0);
+      await delay(1_000);
+    }
+    const current = await fetchLogIds(page, pid);
+    const newIds = [...current].filter((id) => !before.has(id));
+    expect(newIds, message).toHaveLength(0);
+  }
+
   // ── golden CORNER path (real UI) — lifecycle: enable / disable / re-enable ──────
   test('N-CORNER-LIFECYCLE: enable→fire runs, disable→fire does NOT run, re-enable→fire runs (lifecycle via real UI toggle) @golden', async ({
     page,
@@ -944,9 +1178,13 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       .toBe(false);
     const idsBefore = await fetchLogIds(page, pid);
     await fireCreate(page, 100, `NCL-off ${uniqueId()}`);
-    await page.waitForTimeout(6_000); // give the engine a chance to (not) run
-    const newWhileDisabled = [...(await fetchLogIds(page, pid))].filter((id) => !idsBefore.has(id));
-    expect(newWhileDisabled, `a disabled automation must NOT run (new logs: ${newWhileDisabled})`).toHaveLength(0);
+    await expectNoNewLogIdsFor(
+      page,
+      pid,
+      idsBefore,
+      6_000,
+      'a disabled automation must NOT create a new run log during the observation window',
+    );
 
     // RE-ENABLED → fire → runs again, a distinct newer log. Confirm enabled=true committed
     // (the deploy/re-enable can lag the badge) before firing, so the run is not missed.
@@ -1304,11 +1542,12 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     // CONTROL: a plain create (no state transition) must NOT fire a toStates-filtered
     // on_state_change automation — confirms the filter is actually applied.
     await fireCreate(page, 100, `NSF-noop ${uniqueId()}`);
-    await page.waitForTimeout(5_000);
-    expect(
-      (await pollItemsByName(page, itemName, 3_000)).length,
+    await expectNoItemsByNameFor(
+      page,
+      itemName,
+      5_000,
       'a plain create must NOT fire the toStates-filtered on_state_change automation',
-    ).toBe(0);
+    );
 
     // MATCH: cancel an order (draft→cancelled). toState=cancelled = the filter → fires,
     // creating the child item. Before FINDING-4b the read-back toState was null (the
@@ -1379,6 +1618,76 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     ).toBe('completed');
   });
 
+  test('N-TRIGGER-INACTIVITY: drag trigger-inactivity→action-create-record, configure stale-date/state filters, wait for scheduler → inactive record fires @golden', async ({
+    page,
+  }) => {
+    const inactivityPollTimeout = Number(
+      process.env.AUTOMATION_INACTIVITY_E2E_TIMEOUT_MS ||
+        (process.env.AUTOMATION_INACTIVITY_FIXED_DELAY_MS ? '120000' : '420000'),
+    );
+    test.setTimeout(inactivityPollTimeout + 90_000);
+    const itemName = `NINACT-item-${uniqueId()}`;
+    const inactiveOrderId = await fireCreate(
+      page,
+      100,
+      `NINACT-order ${uniqueId()}`,
+      '2000-01-01',
+    );
+    await fireCancel(page, inactiveOrderId);
+
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-TRIGGER-INACTIVITY ${uniqueId()}`);
+    const trigger = await dragNodeToCanvas(page, 'trigger-inactivity', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, {
+      modelCode: MODEL_LABEL,
+      inactivityHours: '100000',
+      inactivityField: '下单日期',
+      stateField: '订单状态',
+      inactivityStates: ['已取消'],
+    });
+    await fillNodeConfig(page, action, {
+      modelCode: '订单明细',
+      fields:
+        '{"e2et_order_id":"${recordId}","e2et_item_name":"' +
+        itemName +
+        '","e2et_item_spec":"inactivity","e2et_item_qty":1,"e2et_item_price":10}',
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const triggerNode = saved.flowConfig.nodes.find((n: any) => n.id === trigger);
+    expect(triggerNode.data.config.modelCode, 'inactivity model persisted as model code').toBe(MODEL_CODE);
+    expect(triggerNode.data.config.inactivityHours, 'inactivityHours persisted from number input').toBe(100000);
+    expect(triggerNode.data.config.inactivityField, 'inactivity date field persisted as field code').toBe(
+      'e2et_order_date',
+    );
+    expect(triggerNode.data.config.stateField, 'state field persisted as field code').toBe(
+      'e2et_order_status',
+    );
+    expect(triggerNode.data.config.inactivityStates, 'inactivity state filter persisted as dict code').toContain(
+      'cancelled',
+    );
+
+    const firedAt = Date.now();
+    await enableViaListToggle(page, pid);
+    const log = await pollLogTerminal(page, pid, firedAt, inactivityPollTimeout);
+    expect(log, 'the inactivity scheduler should create a run log').not.toBeNull();
+    expect(String(log!.status).toLowerCase(), `inactivity run should succeed: ${JSON.stringify(log)}`).toBe(
+      'success',
+    );
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(statusesNodeCompleted(statuses, action), `create-record node completed: ${JSON.stringify(statuses)}`).toBe(true);
+    const items = await pollItemsByName(page, itemName, 30_000);
+    expect(
+      items.some((item) => String(item.e2et_order_id) === inactiveOrderId),
+      `inactive order ${inactiveOrderId} should receive the created child item: ${JSON.stringify(items)}`,
+    ).toBe(true);
+  });
+
   // ── golden EDGE (real UI) — field-change filter precision: only the watched field fires ──
   // AutomationTriggerServiceImpl#onFieldChange skips when the changed field != config.fieldCode
   // (`fieldCode.equals(config.getFieldCode())`); the command bridge emits a per-field change
@@ -1408,11 +1717,12 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     // EDGE: update an UNWATCHED field (remark, not the title) → the fieldCode filter must
     // skip it → NO child item created.
     await fireUpdate(page, orderId, { e2et_order_remark: `unwatched ${uniqueId()}` });
-    await page.waitForTimeout(5_000); // give the @Async bridge a chance to (not) fire
-    expect(
-      (await pollItemsByName(page, itemName, 3_000)).length,
+    await expectNoItemsByNameFor(
+      page,
+      itemName,
+      5_000,
       'changing an unwatched field must NOT fire the field-change automation',
-    ).toBe(0);
+    );
 
     // POSITIVE CONTROL: update the WATCHED field (title) → fires → child item created.
     const firedAt = Date.now();
@@ -1461,11 +1771,58 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const log = await pollLogTerminal(page, pid, firedAt);
     expect(String(log!.status).toLowerCase(), `N-LOOP-EDGE empty-collection run should still succeed: ${JSON.stringify(log)}`).toBe('success');
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), body), 'the loop body node completes with 0 iterations').toBe(true);
-    await page.waitForTimeout(3_000);
-    expect(
-      (await pollItemsByName(page, itemName, 3_000)).length,
+    await expectNoItemsByNameFor(
+      page,
+      itemName,
+      3_000,
       'an empty collection creates no child items',
-    ).toBe(0);
+    );
+  });
+
+  // ── control-delay: real designer + SmartEngine runtime seam ────────────────────
+  // The visual node persists duration/unit from the property panel; the backend compiler
+  // must map control-delay to a SmartEngine serviceTask and ControlNodeExecutor must consume
+  // duration/unit, not only legacy delayMs/delaySeconds. The downstream create-record side
+  // effect proves the graph continued after the delay node.
+  test('N-DELAY: build trigger-webhook→control-delay(1 second)→create-record in the designer; fire webhook → delay node and downstream action complete (runtime seam) @golden', async ({
+    page,
+  }) => {
+    const tag = uniqueId();
+    const itemName = `NDELAY-item-${tag}`;
+    const parentOrderId = await fireCreate(page, 100, `NDELAY-parent ${tag}`);
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-DELAY ${tag}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-webhook', { x: 150, y: 70 });
+    const delayNode = await dragNodeToCanvas(page, 'control-delay', { x: 150, y: 200 });
+    const body = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 330 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, delayNode);
+    await connectEdge(page, delayNode, body);
+    await fillNodeConfig(page, delayNode, { duration: '1', unit: '秒' });
+    await fillNodeConfig(page, body, {
+      modelCode: '订单明细',
+      fields: `{"e2et_order_id":"${parentOrderId}","e2et_item_name":"${itemName}","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}`,
+    });
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const dnode = saved.flowConfig.nodes.find((n: any) => n.id === delayNode);
+    expect(String(dnode.data.config.duration), 'delay duration persisted from the panel').toBe('1');
+    expect(dnode.data.config.unit, 'delay unit persisted as the backend value').toBe('seconds');
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
+      data: { parentOrderId },
+    });
+    expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
+    const log = await pollLogTerminal(page, pid, firedAt, 60_000);
+    expect(String(log!.status).toLowerCase(), `N-DELAY run: ${JSON.stringify(log)}`).toBe('success');
+    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+    expect(statuses.find((s) => s.nodeId === delayNode)?.status, `delay node completed: ${JSON.stringify(statuses)}`).toBe('completed');
+    expect(statuses.find((s) => s.nodeId === body)?.status, `downstream body completed after delay: ${JSON.stringify(statuses)}`).toBe('completed');
+    expect((await pollItemsByName(page, itemName)).length, 'downstream create-record ran after the delay').toBeGreaterThanOrEqual(1);
   });
 
   // ── golden CORNER (real UI) — re-entrancy: the same enabled automation fires twice ──────
@@ -1545,7 +1902,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
         const rows = data?.records ?? data?.list ?? data?.content ?? data?.rows ?? (Array.isArray(data) ? data : []);
         found = rows.find((r: any) => r?.e2et_item_name === itemName);
       }
-      if (!found) await page.waitForTimeout(1_500);
+      if (!found) await delay(1_500);
     }
     expect(found, 'the unicode item name round-tripped and persisted exactly').toBeTruthy();
     expect(found.e2et_item_name, 'the persisted name matches the unicode source byte-exact').toBe(itemName);

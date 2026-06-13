@@ -15,7 +15,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.postgresql.util.PGobject;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -118,6 +120,48 @@ class PermissionMatrixServiceImplTest {
         assertThat(matrix.modules().get(0).resources().get(0).actions().get(0).granted()).isTrue();
         assertThat(matrix.modules().get(0).resources().get(0).actions().get(0).scopeType()).isEqualTo("dept");
         assertThat(matrix.modules().get(0).resources().get(0).actions().get(0).mergeStrategy()).isEqualTo("MAX");
+    }
+
+    @Test
+    void getMatrixForRoleSerializesJsonbPolicySchemaFromPgObject() throws SQLException {
+        PermissionDTO module = permission(1L, "function.abac", 1, null, "function", "abac", "module");
+        PermissionDTO resource = permission(2L, "function.abac_resource", 2, 1L, "function", "abac_resource", "resource");
+        PermissionDTO action = permission(3L, "function.abac_resource.approve", 3, 2L, "function", "abac_resource", "approve");
+        PGobject policySchema = new PGobject();
+        policySchema.setType("jsonb");
+        policySchema.setValue("{\"dynamicAbac\":{\"type\":\"rule-center\",\"label\":\"Dynamic ABAC\"}}");
+        action.setPolicySchema(policySchema);
+
+        when(permissionService.findAllActive()).thenReturn(List.of(module, resource, action));
+        when(rolePermissionService.getPermissionIdsByRoleId(7L)).thenReturn(Set.of(3L));
+        when(dataScopeService.getScopesByRole(100L, 7L)).thenReturn(List.of());
+        when(policyService.getPoliciesByRoleId(7L)).thenReturn(Map.of());
+
+        PermissionMatrixDTO matrix = service.getMatrixForRole(100L, 7L);
+
+        assertThat(matrix.modules().get(0).resources().get(0).actions().get(0).policySchema())
+                .isEqualTo("{\"dynamicAbac\":{\"type\":\"rule-center\",\"label\":\"Dynamic ABAC\"}}");
+    }
+
+    @Test
+    void getMatrixForRoleSerializesJsonbPolicySchemaFromMapWrapper() {
+        PermissionDTO module = permission(1L, "function.abac", 1, null, "function", "abac", "module");
+        PermissionDTO resource = permission(2L, "function.abac_resource", 2, 1L, "function", "abac_resource", "resource");
+        PermissionDTO action = permission(3L, "function.abac_resource.approve", 3, 2L, "function", "abac_resource", "approve");
+        action.setPolicySchema(Map.of(
+                "type", "jsonb",
+                "value", "{\"dynamicAbac\":{\"type\":\"rule-center\",\"label\":\"Dynamic ABAC\"}}",
+                "null", false));
+
+        when(permissionService.findAllActive()).thenReturn(List.of(module, resource, action));
+        when(rolePermissionService.getPermissionIdsByRoleId(7L)).thenReturn(Set.of(3L));
+        when(dataScopeService.getScopesByRole(100L, 7L)).thenReturn(List.of());
+        when(policyService.getPoliciesByRoleId(7L)).thenReturn(Map.of());
+
+        PermissionMatrixDTO matrix = service.getMatrixForRole(100L, 7L);
+
+        assertThat(matrix.modules().get(0).resources().get(0).actions().get(0).policySchema())
+                .isEqualTo("{\"dynamicAbac\":{\"type\":\"rule-center\",\"label\":\"Dynamic ABAC\"}}");
     }
 
     @Test

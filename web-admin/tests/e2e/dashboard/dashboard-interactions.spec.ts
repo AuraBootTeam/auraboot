@@ -92,36 +92,28 @@ test.describe('Dashboard Interactions', () => {
     // Auto-accept confirm dialog (widget deletion uses window.confirm)
     page.on('dialog', (dialog) => dialog.accept());
 
+    const beforeCount = await designer.getWidgetCount();
+
     // Add a Bar Chart widget
     await designer.addWidget('柱状图');
 
-    const initialCount = await designer.getWidgetCount();
-    expect(initialCount).toBeGreaterThanOrEqual(1);
+    await expect
+      .poll(async () => designer.getWidgetCount(), { timeout: 5000 })
+      .toBe(beforeCount + 1);
 
     // Click the widget on canvas to select it
-    const widget = designer.widget(0);
+    const widget = designer.widget(beforeCount);
     await widget.click();
 
     // Look for the delete button in the property panel
     const deleteBtn = designer.deleteButton;
-    const hasDeleteBtn = await deleteBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    await expect(deleteBtn).toBeVisible({ timeout: 5000 });
 
-    if (hasDeleteBtn) {
-      await deleteBtn.click();
+    await deleteBtn.click();
 
-      // Widget count should decrease
-      await expect
-        .poll(async () => designer.getWidgetCount(), { timeout: 5000 })
-        .toBeLessThan(initialCount);
-    } else {
-      // Try keyboard delete
-      await page.keyboard.press('Delete');
-
-      // Check if widget was removed
-      const afterCount = await designer.getWidgetCount();
-      // May or may not have been deleted depending on keyboard handling
-      expect(afterCount).toBeLessThanOrEqual(initialCount);
-    }
+    await expect
+      .poll(async () => designer.getWidgetCount(), { timeout: 5000 })
+      .toBe(beforeCount);
   });
 
   /**
@@ -135,35 +127,28 @@ test.describe('Dashboard Interactions', () => {
       return;
     }
 
+    const beforeCount = await designer.getWidgetCount();
+
     // Add a Pie Chart widget
     await designer.addWidget('饼图');
 
-    const initialCount = await designer.getWidgetCount();
-    expect(initialCount).toBeGreaterThanOrEqual(1);
+    await expect
+      .poll(async () => designer.getWidgetCount(), { timeout: 5000 })
+      .toBe(beforeCount + 1);
 
     // Click the widget on canvas to select it
-    const widget = designer.widget(0);
+    const widget = designer.widget(beforeCount);
     await widget.click();
 
     // Look for the duplicate/copy button
     const duplicateBtn = designer.duplicateButton;
-    const hasDuplicateBtn = await duplicateBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    await expect(duplicateBtn).toBeVisible({ timeout: 5000 });
 
-    if (hasDuplicateBtn) {
-      await duplicateBtn.click();
+    await duplicateBtn.click();
 
-      // Widget count should increase
-      await expect
-        .poll(async () => designer.getWidgetCount(), { timeout: 5000 })
-        .toBeGreaterThan(initialCount);
-    } else {
-      // Try keyboard shortcut for copy
-      await page.keyboard.press('Control+D');
-
-      const afterCount = await designer.getWidgetCount();
-      // Copy may or may not work depending on implementation
-      expect(afterCount).toBeGreaterThanOrEqual(initialCount);
-    }
+    await expect
+      .poll(async () => designer.getWidgetCount(), { timeout: 5000 })
+      .toBe(beforeCount + 2);
   });
 
   /**
@@ -177,22 +162,22 @@ test.describe('Dashboard Interactions', () => {
       return;
     }
 
-    // Ensure at least two widgets exist for layout assertions.
-    // Single add clicks may occasionally be dropped during UI hydration.
+    const beforeCount = await designer.getWidgetCount();
     const candidates = ['数字卡片', '柱状图'];
-    for (let i = 0; i < 4; i++) {
-      const current = await designer.getWidgetCount();
-      if (current >= 2) break;
-      await designer.addWidget(candidates[i % candidates.length]);
+    for (const [index, widgetLabel] of candidates.entries()) {
+      await designer.addWidget(widgetLabel);
+      await expect
+        .poll(async () => designer.getWidgetCount(), { timeout: 5000 })
+        .toBe(beforeCount + index + 1);
     }
 
     const widgetCount = await designer.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(2);
+    expect(widgetCount).toBe(beforeCount + candidates.length);
 
     // Verify canvas uses react-grid-layout (has .react-grid-item elements)
     const gridItems = designer.canvas.locator('.react-grid-item');
     const gridItemCount = await gridItems.count();
-    expect(gridItemCount).toBeGreaterThanOrEqual(2);
+    expect(gridItemCount).toBe(widgetCount);
 
     // Each grid item should be positioned (inline style OR measurable bounding box)
     const firstWidget = gridItems.first();

@@ -242,6 +242,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
       const fieldValue = (fieldData as any)[fieldConfig.field];
       const colSpan = fieldConfig.layout?.colSpan || 1;
       const isDisabled = readonly || fieldConfig.props?.disabled;
+      const controlTestId = `field-property-${fieldConfig.field}`;
 
       // Get options for select
       let options: Array<{ label: string; value: string }> = fieldConfig.props?.options || [];
@@ -261,6 +262,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
                 {fieldConfig.props.label}
               </label>
               <input
+                data-testid={`${controlTestId}-input`}
                 type={fieldConfig.props.type || 'text'}
                 value={fieldValue ?? ''}
                 onChange={(e) => {
@@ -288,6 +290,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
                 {fieldConfig.props.label}
               </label>
               <select
+                data-testid={`${controlTestId}-select`}
                 value={fieldValue ?? ''}
                 onChange={(e) => {
                   const val = e.target.value === '' ? undefined : e.target.value;
@@ -331,6 +334,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
               <button
                 type="button"
                 role="switch"
+                data-testid={`${controlTestId}-switch`}
                 aria-checked={!!fieldValue}
                 disabled={isDisabled}
                 onClick={() => handleFieldChange(fieldConfig.field, !fieldValue)}
@@ -349,7 +353,11 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
       }
 
       return (
-        <div key={fieldConfig.field} style={{ gridColumn: `span ${colSpan}` }}>
+        <div
+          key={fieldConfig.field}
+          data-testid={controlTestId}
+          style={{ gridColumn: `span ${colSpan}` }}
+        >
           {component}
         </div>
       );

@@ -36,7 +36,7 @@ export function createFieldRenderer(
   setData: React.Dispatch<React.SetStateAction<Record<string, any>>>,
   context: ExpressionContext,
   fieldErrors: Record<string, string> = {},
-  onFieldChange?: (fieldCode: string) => void,
+  onFieldChange?: (fieldCode: string, newValue: unknown) => void,
 ) {
   return (field: FieldConfig) => (
     <ControlledFieldRenderer
@@ -44,7 +44,7 @@ export function createFieldRenderer(
       field={field}
       value={data[field.field]}
       onChange={(newValue) => {
-        onFieldChange?.(field.field);
+        onFieldChange?.(field.field, newValue);
         setData((prev) => ({
           ...prev,
           [field.field]: newValue,

@@ -147,4 +147,44 @@ describe('dashboardService.normalizeDashboard', () => {
     expect(config.suffix).toBe('元');
     expect(config.label).toEqual({ 'zh-CN': '回款金额', en: 'Collected' });
   });
+
+  it('preserves authored shortcut rows through the dataSource branch', () => {
+    const dashboard = normalizeDashboard(
+      baseDashboard([
+        {
+          id: 'shortcut_widget',
+          type: 'smart-shortcuts',
+          x: 0,
+          y: 0,
+          w: 6,
+          h: 2,
+          config: {
+            title: 'Runtime Shortcuts',
+            dataSource: { type: 'static' },
+            shortcuts: [
+              {
+                label: 'Runtime Dashboards',
+                icon: '>',
+                path: '/dashboards',
+                color: 'bg-blue-50',
+              },
+            ],
+          },
+        },
+      ]),
+    );
+
+    const config = dashboard.widgets[0].config as typeof dashboard.widgets[0]['config'] & {
+      shortcuts?: Array<{ label: string; path: string }>;
+    };
+    expect(config.dataSource).toMatchObject({ type: 'static' });
+    expect(config.shortcuts).toEqual([
+      {
+        label: 'Runtime Dashboards',
+        icon: '>',
+        path: '/dashboards',
+        color: 'bg-blue-50',
+      },
+    ]);
+  });
 });

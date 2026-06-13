@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Condition AST evaluator — happy / sad / edge / corner from user-journey A1 (docs/1.md §14).
@@ -85,6 +86,25 @@ class ConditionAstEvaluatorTest {
         var between = cmp(recPath("amount", DataType.DECIMAL), Operator.BETWEEN, lit(List.of(1000, 5000), DataType.DECIMAL));
         assertThat(evaluator.evaluate(between, ctxOf(Map.of("amount", 3000))).result()).isEqualTo(Truth.TRUE);
         assertThat(evaluator.evaluate(between, ctxOf(Map.of("amount", 9000))).result()).isEqualTo(Truth.FALSE);
+    }
+
+    @Test
+    void dateAndDatetimeComparisonsUseIsoOrdering() {
+        var dateGte = cmp(recPath("submittedOn", DataType.DATE), Operator.GTE, lit("2026-06-01", DataType.DATE));
+        assertThat(evaluator.evaluate(dateGte, ctxOf(Map.of("submittedOn", "2026-06-15"))).result())
+                .isEqualTo(Truth.TRUE);
+        assertThat(evaluator.evaluate(dateGte, ctxOf(Map.of("submittedOn", "2026-05-31"))).result())
+                .isEqualTo(Truth.FALSE);
+
+        var dateBetween = cmp(recPath("submittedOn", DataType.DATE), Operator.BETWEEN,
+                lit(List.of("2026-06-01", "2026-06-30"), DataType.DATE));
+        assertThat(evaluator.evaluate(dateBetween, ctxOf(Map.of("submittedOn", "2026-06-15"))).result())
+                .isEqualTo(Truth.TRUE);
+
+        var datetimeLt = cmp(recPath("submittedAt", DataType.DATETIME), Operator.LT,
+                lit("2026-06-15T10:30:00Z", DataType.DATETIME));
+        assertThat(evaluator.evaluate(datetimeLt, ctxOf(Map.of("submittedAt", "2026-06-15T09:00:00Z"))).result())
+                .isEqualTo(Truth.TRUE);
     }
 
     // ── sad ──────────────────────────────────────────────────────────────
@@ -193,5 +213,37 @@ class ConditionAstEvaluatorTest {
         var node = cmp(fn, Operator.GT, lit(3, DataType.INTEGER));
         assertThat(evaluator.evaluate(node, ctxOf(Map.of("title", "abcd"))).result()).isEqualTo(Truth.TRUE);
         assertThat(evaluator.evaluate(node, ctxOf(Map.of("title", "ab"))).result()).isEqualTo(Truth.FALSE);
+    }
+
+    @Test
+    void dateTimeAndDurationFunctionsAreWhitelisted() {
+        var dateFn = new Operand.FunctionCallOperand("date",
+                List.of(lit(2026, DataType.INTEGER), lit(6, DataType.INTEGER), lit(10, DataType.INTEGER)),
+                DataType.DATE);
+        var dateNode = cmp(recPath("submittedOn", DataType.DATE), Operator.GTE, dateFn);
+        assertThat(evaluator.evaluate(dateNode, ctxOf(Map.of("submittedOn", "2026-06-11"))).result())
+                .isEqualTo(Truth.TRUE);
+
+        var dateTimeFn = new Operand.FunctionCallOperand("date and time",
+                List.of(lit("2026-06-10T09:30:00Z", DataType.STRING)), DataType.DATETIME);
+        var dateTimeNode = cmp(recPath("submittedAt", DataType.DATETIME), Operator.LTE, dateTimeFn);
+        assertThat(evaluator.evaluate(dateTimeNode, ctxOf(Map.of("submittedAt", "2026-06-10T09:00:00Z"))).result())
+                .isEqualTo(Truth.TRUE);
+
+        var durationFn = new Operand.FunctionCallOperand("duration",
+                List.of(lit("P2D", DataType.STRING)), DataType.DURATION);
+        var durationNode = cmp(recPath("sla", DataType.DURATION), Operator.LTE, durationFn);
+        assertThat(evaluator.evaluate(durationNode, ctxOf(Map.of("sla", "P1D"))).result())
+                .isEqualTo(Truth.TRUE);
+    }
+
+    @Test
+    void unregisteredFunctionThrowsInsteadOfSilentlyMatching() {
+        var fn = new Operand.FunctionCallOperand("evil.exec", List.of(), DataType.INTEGER);
+        var node = cmp(fn, Operator.GT, lit(1, DataType.INTEGER));
+
+        assertThatThrownBy(() -> evaluator.evaluate(node, ctxOf(Map.of("amount", 1))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Function not whitelisted");
     }
 }

@@ -12,15 +12,20 @@ import type {
 } from '~/plugins/core-designer/components/bpmn-designer/types';
 import { AssigneePicker } from './AssigneePicker';
 import { MultiInstanceSection, FormBindingSection, HookConfigSection } from './shared';
+import { RuleCenterBindingSection } from './RuleCenterBindingSection';
 import { useI18n } from '~/contexts/I18nContext';
 
 const CC_POLICY_OVERRIDE_OPTIONS: CcPolicy[] = ['initiator', 'assignee', 'all'];
 
 export function UserTaskEditor({
   config,
+  processKey,
+  nodeId,
   onChange,
 }: {
   config?: UserTaskConfig;
+  processKey?: string;
+  nodeId?: string;
   onChange: (config: UserTaskConfig) => void;
 }) {
   const { t } = useI18n();
@@ -158,6 +163,19 @@ export function UserTaskEditor({
           <option value="sequential">{t('bpmn.prop.usertask.modeSequential')}</option>
         </select>
       </div>
+
+      <RuleCenterBindingSection
+        title="规则中心分派"
+        enabledLabel=""
+        enabled={Boolean(config?.assignmentRuleBinding)}
+        value={config?.assignmentRuleBinding}
+        mode="decision"
+        consumerCode={processKey}
+        consumerNodeId={nodeId}
+        testId="usertask-rule-binding"
+        onToggle={(_, initialValue) => handleChange('assignmentRuleBinding', initialValue)}
+        onChange={(assignmentRuleBinding) => handleChange('assignmentRuleBinding', assignmentRuleBinding)}
+      />
 
       <div className="mb-4">
         <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.usertask.priority')}</label>

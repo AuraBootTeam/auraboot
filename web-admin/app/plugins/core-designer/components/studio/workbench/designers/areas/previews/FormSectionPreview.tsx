@@ -40,7 +40,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
   const columnsCount = (block.props as any)?.columns || 2;
 
   // Generate sortable IDs for fields
-  const fieldIds = fields.slice(0, 8).map((fieldRef, index) => {
+  const fieldIds = fields.map((fieldRef, index) => {
     const field = parseFieldShorthand(fieldRef);
     return `${block.id}:field:${field.field || index}`;
   });
@@ -92,13 +92,14 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
               className="grid gap-4"
               style={{ gridTemplateColumns: `repeat(${columnsCount}, 1fr)` }}
             >
-              {fields.slice(0, 8).map((fieldRef, index) => {
+              {fields.map((fieldRef, index) => {
                 const field = parseFieldShorthand(fieldRef);
                 const fieldId = `${block.id}:field:${field.field || index}`;
 
                 return (
                   <SortableFieldItem
                     key={fieldId}
+                    fieldCode={field.field || String(index)}
                     id={fieldId}
                     fieldName={
                       resolveLocalizedText(field.label, locale) ||
@@ -119,11 +120,6 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
             </div>
           </SortableContext>
         )}
-        {fields.length > 8 && (
-          <div className="mt-3 text-center text-xs text-gray-400">
-            {l(`+${fields.length - 8} 更多字段`, `+${fields.length - 8} more fields`)}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -134,6 +130,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
  */
 interface SortableFieldItemProps {
   id: string;
+  fieldCode: string;
   fieldName: string;
   placeholder?: string;
   required?: boolean;
@@ -147,6 +144,7 @@ interface SortableFieldItemProps {
 
 const SortableFieldItem: React.FC<SortableFieldItemProps> = ({
   id,
+  fieldCode,
   fieldName,
   placeholder,
   required,
@@ -184,6 +182,8 @@ const SortableFieldItem: React.FC<SortableFieldItemProps> = ({
       ref={setNodeRef}
       style={style}
       onClick={handleClick}
+      data-testid={`designer-field-${fieldCode}`}
+      data-field-code={fieldCode}
       className={`group/field relative transition-all duration-200 ${
         !disabled ? 'cursor-pointer' : ''
       } ${isSelected ? 'rounded-lg bg-blue-50/50 ring-2 ring-blue-500' : ''} ${

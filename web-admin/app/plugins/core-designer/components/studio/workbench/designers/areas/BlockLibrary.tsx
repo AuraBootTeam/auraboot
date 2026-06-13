@@ -110,6 +110,15 @@ const BLOCK_TYPES: BlockTypeInfo[] = [
     category: 'display',
     keywords: ['text', 'content', '文本', '说明'],
   },
+  {
+    type: 'custom',
+    name: '自定义区块',
+    icon: 'EXT',
+    description: '运行时扩展组件',
+    availableIn: ['list', 'form'],
+    category: 'display',
+    keywords: ['custom', 'extension', 'component', '自定义', '扩展'],
+  },
 
   // Layout category
   {
@@ -129,6 +138,15 @@ const BLOCK_TYPES: BlockTypeInfo[] = [
     availableIn: ['list'],
     category: 'layout',
     keywords: ['selection', 'selected', '选中', '批量'],
+  },
+  {
+    type: 'tabs',
+    name: '标签页',
+    icon: 'TAB',
+    description: '多标签视图与过滤条件',
+    availableIn: ['form'],
+    category: 'layout',
+    keywords: ['tabs', 'tab', 'layout', 'filter', '标签', '页签'],
   },
 
   // Chart category
@@ -224,6 +242,7 @@ const BLOCK_TYPE_EN: Record<BlockType, { name: string; description: string }> = 
   text: { name: 'Text Content', description: 'Static text or description' },
   toolbar: { name: 'Toolbar Buttons', description: 'Action button group' },
   'selection-info': { name: 'Selection Info', description: 'Show selected item information' },
+  tabs: { name: 'Tabs', description: 'Tabbed views and filter conditions' },
   'stat-card': { name: 'Stat Card', description: 'Metric summary card' },
   'metric-strip': { name: 'Metric Strip', description: 'Horizontal metrics and filter entry' },
   'record-inspector': { name: 'Record Inspector', description: 'Selection-bound detail panel' },
@@ -233,6 +252,7 @@ const BLOCK_TYPE_EN: Record<BlockType, { name: string; description: string }> = 
   'artifact-timeline': { name: 'Artifact Timeline', description: 'Revision and artifact timeline' },
   'review-drawer': { name: 'Review Drawer', description: 'Row review drawer with candidates and export impact' },
   'chart-card': { name: 'Chart Card', description: 'Chart visualization' },
+  custom: { name: 'Custom Block', description: 'Runtime extension component' },
 };
 
 function blockName(blockInfo: BlockTypeInfo, locale: string): string {

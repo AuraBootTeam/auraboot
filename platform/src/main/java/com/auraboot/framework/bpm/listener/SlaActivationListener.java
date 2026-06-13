@@ -5,6 +5,15 @@ import com.auraboot.framework.bpm.entity.SlaConfigEntity;
 import com.auraboot.framework.bpm.event.BpmEvent;
 import com.auraboot.framework.bpm.service.SlaConfigService;
 import com.auraboot.framework.bpm.service.SlaRecordService;
+import com.auraboot.framework.decision.ast.Scope;
+import com.auraboot.framework.decision.rule.DecisionBinding;
+import com.auraboot.framework.decision.rule.DecisionVersionPolicy;
+import com.auraboot.framework.decision.rule.RuleEvaluationContext;
+import com.auraboot.framework.decision.rule.RuleEvaluationService;
+import com.auraboot.framework.decision.rule.RuleEvaluationTrace;
+import com.auraboot.framework.decision.rule.RuleValueSource;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.decision.rule.RuleBindingKind;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -13,6 +22,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Listens to {@code task_assigned} BPM events and creates an SLA record for each
@@ -41,6 +51,9 @@ public class SlaActivationListener {
      */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.decision.service.DecisionEvaluationService decisionEvaluationService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RuleEvaluationService ruleEvaluationService;
 
     @EventListener
     public void onBpmEvent(BpmEvent event) {
@@ -125,6 +138,20 @@ public class SlaActivationListener {
         String mode = config.getDeadlineMode();
         String value = config.getDeadlineValue();
 
+        RuleConsumerBinding ruleBinding = config.getRuleBinding();
+        if (ruleEvaluationService != null
+                && ruleBinding != null
+                && ruleBinding.active()
+                && ruleBinding.bindingKind() == RuleBindingKind.DECISION_REF
+                && ruleBinding.decisionBinding() != null) {
+            Long minutes = resolveRuleDeadlineMinutesWithBinding(config, ruleBinding.decisionBinding());
+            if (minutes != null && minutes > 0) {
+                return now.plus(Duration.ofMinutes(minutes));
+            }
+            log.warn("SLA rule binding did not yield deadlineMinutes for config={} — falling back to legacy/default",
+                    config.getPid());
+        }
+
         if ("FIXED".equalsIgnoreCase(mode) && value != null && !value.isBlank()) {
             try {
                 Duration duration = Duration.parse(value);
@@ -158,6 +185,9 @@ public class SlaActivationListener {
      * Package-private for unit testing. Degrades on failure (logged) rather than crashing activation.
      */
     Long resolveRuleDeadlineMinutes(SlaConfigEntity config, String decisionCode) {
+        if (ruleEvaluationService != null) {
+            return resolveRuleDeadlineMinutesWithBinding(config, decisionCode);
+        }
         if (decisionEvaluationService == null) {
             return null;
         }
@@ -174,21 +204,79 @@ public class SlaActivationListener {
                 return null;
             }
             Object m = result.outputs().get("deadlineMinutes");
-            if (m instanceof Number n) {
-                return n.longValue();
-            }
-            if (m != null) {
-                try {
-                    return Long.parseLong(String.valueOf(m).trim());
-                } catch (NumberFormatException ignore) {
-                    return null;
-                }
-            }
-            return null;
+            return parseDeadlineMinutes(m);
         } catch (RuntimeException e) {
             log.warn("SLA deadline decision '{}' evaluation failed for config={}: {}",
                     decisionCode, config.getPid(), e.getMessage());
             return null;
         }
+    }
+
+    private Long resolveRuleDeadlineMinutesWithBinding(SlaConfigEntity config, String decisionCode) {
+        DecisionBinding binding = new DecisionBinding(
+                decisionCode,
+                DecisionVersionPolicy.LATEST_PUBLISHED,
+                null,
+                null,
+                null,
+                List.of(
+                        new DecisionBinding.InputMapping(
+                                "targetType",
+                                RuleValueSource.field(Scope.RECORD, "data.targetType")),
+                        new DecisionBinding.InputMapping(
+                                "targetKey",
+                                RuleValueSource.field(Scope.RECORD, "data.targetKey"))),
+                List.of(),
+                DecisionBinding.FallbackPolicy.failClosed(),
+                200,
+                DecisionBinding.TraceMode.SAMPLED,
+                true,
+                null,
+                null);
+        return resolveRuleDeadlineMinutesWithBinding(config, binding);
+    }
+
+    private Long resolveRuleDeadlineMinutesWithBinding(SlaConfigEntity config, DecisionBinding binding) {
+        try {
+            Map<String, Object> sla = new java.util.HashMap<>();
+            sla.put("targetType", config.getTargetType());
+            sla.put("targetKey", config.getTargetKey());
+            sla.put("deadlineMode", config.getDeadlineMode());
+            sla.put("deadlineValue", config.getDeadlineValue());
+            sla.put("domainCode", config.getDomainCode());
+            sla.put("modelCode", config.getModelCode());
+            RuleEvaluationTrace trace = ruleEvaluationService.evaluateDecisionBinding(
+                    binding,
+                    new RuleEvaluationContext(
+                            Map.of(Scope.RECORD, Map.of("data", sla)),
+                            "SLA",
+                            config.getPid(),
+                            config.getTargetKey(),
+                            null,
+                            null,
+                            null));
+            if (!trace.matched()) {
+                return null;
+            }
+            return parseDeadlineMinutes(trace.outputSnapshot().get("deadlineMinutes"));
+        } catch (RuntimeException e) {
+            log.warn("SLA rule binding decision '{}' evaluation failed for config={}: {}",
+                    binding == null ? null : binding.decisionCode(), config.getPid(), e.getMessage());
+            return null;
+        }
+    }
+
+    private Long parseDeadlineMinutes(Object minutes) {
+        if (minutes instanceof Number n) {
+            return n.longValue();
+        }
+        if (minutes != null) {
+            try {
+                return Long.parseLong(String.valueOf(minutes).trim());
+            } catch (NumberFormatException ignore) {
+                return null;
+            }
+        }
+        return null;
     }
 }

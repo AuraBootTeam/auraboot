@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { DndContext } from '@dnd-kit/core';
 
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({ locale: 'en-US' }),
@@ -51,5 +52,29 @@ describe('BlockPreview workbench blocks', () => {
 
     renderPreview('review-drawer');
     expect(screen.getByText('Review Drawer')).toBeInTheDocument();
+  });
+
+  it('renders every form-section field so hidden overflow fields remain editable', () => {
+    const fields = Array.from({ length: 9 }, (_, index) => `field_${index + 1}`);
+
+    render(
+      <DndContext>
+        <BlockPreview
+          block={{
+            id: 'form_section_overflow',
+            blockType: 'form-section',
+            title: 'Overflow fields',
+            fields,
+          }}
+          isSelected={false}
+          onClick={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      </DndContext>,
+    );
+
+    expect(screen.getByTestId('designer-field-field_1')).toBeInTheDocument();
+    expect(screen.getByTestId('designer-field-field_9')).toBeInTheDocument();
+    expect(screen.queryByText('+1 more fields')).not.toBeInTheDocument();
   });
 });

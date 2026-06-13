@@ -1,12 +1,15 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { useDataTable } from '../useDataTable';
+import { useDataTable, type DataTableParams } from '../useDataTable';
+
+type TableRow = { id: number };
+type FetchData = (params: DataTableParams) => Promise<{ data: TableRow[]; total: number }>;
 
 describe('useDataTable', () => {
-  let fetchData: ReturnType<typeof vi.fn>;
+  let fetchData: ReturnType<typeof vi.fn<FetchData>>;
 
   beforeEach(() => {
-    fetchData = vi.fn().mockResolvedValue({ data: [{ id: 1 }, { id: 2 }], total: 2 });
+    fetchData = vi.fn<FetchData>().mockResolvedValue({ data: [{ id: 1 }, { id: 2 }], total: 2 });
   });
 
   it('starts with loading true when autoFetch=true and fetches data on mount', async () => {

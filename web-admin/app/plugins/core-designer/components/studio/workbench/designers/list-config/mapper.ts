@@ -38,12 +38,15 @@ export interface FilterConfig {
   displayMode?: 'inline' | 'drawer' | 'top-bar';
 }
 
-export type ToolbarPresetKey = 'create' | 'export' | 'bulkDelete';
+export type ToolbarPresetKey = 'create' | 'refresh' | 'export' | 'bulkDelete';
 
 export interface CustomButton {
   label: string;
   icon?: string;
+  code?: string;
+  actionKind?: 'command' | 'refresh';
   command: string;
+  targetDataSource?: string;
   requiresSelection?: boolean;
   /**
    * Original button JSON from the source blocks. Preserved verbatim across a
@@ -97,7 +100,7 @@ export function emptyListViewModel(): ListViewModel {
 }
 
 // Known preset keys — must match ToolbarPresetKey.
-const PRESET_KEYS: readonly ToolbarPresetKey[] = ['create', 'export', 'bulkDelete'];
+const PRESET_KEYS: readonly ToolbarPresetKey[] = ['create', 'refresh', 'export', 'bulkDelete'];
 const PRESET_KEY_SET = new Set<string>(PRESET_KEYS);
 
 // ---------------------------------------------------------------------------
@@ -295,40 +298,83 @@ function serializePresetButton(
 }
 
 function serializeCustomButton(b: CustomButton): Record<string, unknown> {
+  const serializeEditableFields = (
+    base: Record<string, unknown>,
+    options?: { preserveRaw?: boolean },
+  ): Record<string, unknown> => {
+    const preserveRaw = options?.preserveRaw ?? false;
+    base.label = b.label;
+    if (b.code !== undefined) base.code = b.code;
+    else if (!preserveRaw) delete base.code;
+    if (b.icon !== undefined) base.icon = b.icon;
+    else delete base.icon;
+    if (b.requiresSelection) base.requiresSelection = true;
+    else delete base.requiresSelection;
+
+    const actionKind = b.actionKind ?? (b.targetDataSource ? 'refresh' : 'command');
+    if (actionKind === 'refresh') {
+      const target = b.targetDataSource?.trim();
+      delete base.command;
+      if (target) {
+        base.action = {
+          type: 'flow',
+          steps: [{ action: 'dataSource.reload', args: { target } }],
+        };
+        base.events = {
+          onClick: { action: 'dataSource.reload', args: { target } },
+        };
+      } else {
+        delete base.action;
+        delete base.events;
+      }
+      return base;
+    }
+
+    base.command = b.command;
+    if (!preserveRaw) {
+      delete base.action;
+      delete base.events;
+      delete base.targetDataSource;
+    }
+    return base;
+  };
+
   if (b.raw && typeof b.raw === 'object') {
     // Merge editable VM fields on top of the preserved raw payload so in-panel
     // edits win, while unknown fields (code/variant/action/confirm/...) are
     // retained verbatim.
-    const merged: Record<string, unknown> = { ...b.raw };
-    merged.label = b.label;
-    merged.command = b.command;
-    if (b.icon !== undefined) merged.icon = b.icon;
-    else delete merged.icon;
-    if (b.requiresSelection) merged.requiresSelection = true;
-    else delete merged.requiresSelection;
-    return merged;
+    return serializeEditableFields({ ...b.raw }, { preserveRaw: true });
   }
-  const out: Record<string, unknown> = { label: b.label, command: b.command };
-  if (b.icon !== undefined) out.icon = b.icon;
-  if (b.requiresSelection) out.requiresSelection = true;
-  return out;
+  return serializeEditableFields({});
 }
 
 const CUSTOM_BUTTON_KNOWN_KEYS = new Set([
   'label',
   'command',
   'icon',
+  'code',
+  'actionKind',
+  'targetDataSource',
   'requiresSelection',
 ]);
 
 function parseCustomButton(b: unknown): CustomButton {
   if (b && typeof b === 'object') {
     const obj = b as Record<string, unknown>;
+    const refreshTarget = readRefreshTarget(obj);
     const result: CustomButton = {
       label: String(obj.label ?? ''),
       command: String(obj.command ?? ''),
     };
+    if (obj.actionKind === 'refresh' || obj.actionKind === 'command') {
+      result.actionKind = obj.actionKind;
+    }
+    if (obj.code !== undefined) result.code = String(obj.code);
     if (obj.icon !== undefined) result.icon = String(obj.icon);
+    if (refreshTarget) {
+      result.actionKind = 'refresh';
+      result.targetDataSource = refreshTarget;
+    }
     if (obj.requiresSelection) result.requiresSelection = true;
     // Preserve the full source payload only when it carries fields beyond the
     // VM-editable surface (e.g. code/variant/action/confirm). This keeps
@@ -340,6 +386,36 @@ function parseCustomButton(b: unknown): CustomButton {
     return result;
   }
   return { label: String(b), command: '' };
+}
+
+function readRefreshTarget(obj: Record<string, unknown>): string | undefined {
+  const fromAction = extractTargetFromFlowAction(obj.action);
+  if (fromAction) return fromAction;
+  const events = obj.events as Record<string, unknown> | undefined;
+  const onClick = events?.onClick as Record<string, unknown> | undefined;
+  const directAction = onClick?.action === 'dataSource.reload' ? onClick?.args : undefined;
+  return extractTargetValue(directAction);
+}
+
+function extractTargetFromFlowAction(action: unknown): string | undefined {
+  if (!action || typeof action !== 'object') return undefined;
+  const actionObj = action as Record<string, unknown>;
+  if (actionObj.type !== 'flow' || !Array.isArray(actionObj.steps)) return undefined;
+  const refreshStep = actionObj.steps.find((step) => {
+    return (
+      step &&
+      typeof step === 'object' &&
+      (step as Record<string, unknown>).action === 'dataSource.reload'
+    );
+  }) as Record<string, unknown> | undefined;
+  return extractTargetValue(refreshStep?.args);
+}
+
+function extractTargetValue(args: unknown): string | undefined {
+  if (!args || typeof args !== 'object') return undefined;
+  const argObj = args as Record<string, unknown>;
+  const target = argObj.target ?? argObj.dataSourceId ?? argObj.id;
+  return typeof target === 'string' && target.trim() ? target : undefined;
 }
 
 function hasExtraPresetFields(b: Record<string, unknown>): boolean {

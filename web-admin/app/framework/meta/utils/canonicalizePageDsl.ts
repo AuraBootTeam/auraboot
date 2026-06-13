@@ -133,6 +133,11 @@ function normalizeDataSourceMap(
 
 function normalizeButton(button: ButtonConfig): ButtonConfig {
   const result: ButtonConfig = { ...button };
+  if (result.preset === 'refresh' && !result.code) {
+    result.code = 'refresh';
+    result.label = result.label ?? { 'zh-CN': '刷新', 'en-US': 'Refresh' };
+  }
+
   const visibleWhen = normalizeConditionExpression((result as any).visibleWhen);
   if (visibleWhen) {
     result.visibleWhen = visibleWhen;
@@ -363,6 +368,9 @@ function normalizeBlock(
       normalizedTableDataSource = id;
     }
     const tableColumns = Array.isArray(result.table.columns) ? result.table.columns : result.columns;
+    const tableRowActions = Array.isArray(result.table.rowActions)
+      ? result.table.rowActions.map(normalizeButton)
+      : result.table.rowActions;
 
     result.table = {
       ...result.table,
@@ -370,10 +378,11 @@ function normalizeBlock(
       ...(Array.isArray(tableColumns)
         ? { columns: normalizeColumns(tableColumns) as ColumnConfig[] }
         : {}),
-      rowActions: Array.isArray(result.table.rowActions)
-        ? result.table.rowActions.map(normalizeButton)
-        : result.table.rowActions,
+      rowActions: tableRowActions,
     };
+    if (!Array.isArray(result.rowActions) && Array.isArray(tableRowActions)) {
+      result.rowActions = tableRowActions;
+    }
   }
 
   if (result.subTable?.columns) {

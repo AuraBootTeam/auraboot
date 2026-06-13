@@ -62,6 +62,12 @@ describe('canonicalizePageSchemaDto', () => {
                 valueType: 'meta_model_code',
               },
             ],
+            rowActions: [
+              {
+                code: 'detail',
+                navigateTo: '/p/meta_models/view/{code}',
+              },
+            ],
           },
         },
       ],
@@ -85,6 +91,18 @@ describe('canonicalizePageSchemaDto', () => {
       cellRenderer: 'meta_model_code',
     });
     expect((schema.blocks[0] as any).table.columns[0].valueType).toBeUndefined();
+    expect((schema.blocks[0] as any).rowActions[0]).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/meta_models/view/{code}',
+      },
+    });
+    expect((schema.blocks[0] as any).table.rowActions[0]).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/meta_models/view/{code}',
+      },
+    });
     expect(schema.dataSource).toEqual({
       type: 'api',
       endpoint: '/api/meta/models',
@@ -147,6 +165,31 @@ describe('canonicalizePageSchemaDto', () => {
       type: 'namedQuery',
       queryCode: 'legacy_summary',
       endpoint: '/api/datasource/list',
+    });
+    expect(validateStructure(schema)).toEqual([]);
+  });
+
+  it('normalizes refresh toolbar preset shorthand into an executable builtin button', () => {
+    const schema = canonicalizePageSchemaDto({
+      pageKey: 'refresh_preset_list',
+      modelCode: 'page_schema',
+      modelCategory: null,
+      kind: 'list',
+      layout: { type: 'stack' },
+      blocks: [
+        {
+          id: 'toolbar',
+          blockType: 'toolbar',
+          buttons: [{ preset: 'refresh' }],
+        },
+      ],
+    });
+
+    const button = (schema.blocks[0] as any).buttons[0];
+    expect(button).toMatchObject({
+      preset: 'refresh',
+      code: 'refresh',
+      label: { 'zh-CN': '刷新', 'en-US': 'Refresh' },
     });
     expect(validateStructure(schema)).toEqual([]);
   });
@@ -349,5 +392,240 @@ describe('canonicalizePageSchemaDto', () => {
     );
 
     expect(failures).toEqual([]);
+  });
+
+  it('keeps DecisionOps connector row actions as governance and platform-management links', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const page = readPages(pagesFile).find((candidate) => candidate.pageKey === 'decisionops_connectors_list');
+
+    expect(page).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(page!);
+    const rowActions = (schema.blocks[0] as any).table.rowActions;
+    const detailAction = rowActions.find((action: any) => action.code === 'detail');
+    const manageAction = rowActions.find((action: any) => action.code === 'manage');
+
+    expect(rowActions.map((action: any) => action.code)).not.toEqual(
+      expect.arrayContaining(['test', 'delete', 'console']),
+    );
+    expect(JSON.stringify(page)).not.toContain('/decision-ops');
+    expect(detailAction).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/decisionops_connectors/view/{pid}',
+      },
+    });
+    expect(manageAction).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/api_connector',
+      },
+    });
+  });
+
+  it('keeps DecisionOps data-model row actions scoped to field impact', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const page = readPages(pagesFile).find((candidate) => candidate.pageKey === 'decisionops_model_fields_list');
+
+    expect(page).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(page!);
+    const rowActions = (schema.blocks[0] as any).table.rowActions;
+
+    expect(rowActions.map((action: any) => action.code)).toEqual(['impact']);
+    expect(rowActions[0]).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/decisionops_model_fields_impact?fieldRef={entityCode}.{path}&currentDataType={dataType}',
+      },
+    });
+    expect(JSON.stringify(page)).not.toContain('/decision-ops');
+  });
+
+  it('keeps DecisionOps webhook row actions as governance and platform-management links', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const pages = readPages(pagesFile);
+    const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_webhooks_list');
+    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_webhooks_detail');
+
+    expect(listPage).toBeDefined();
+    expect(detailPage).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(listPage!);
+    const rowActions = (schema.blocks[0] as any).table.rowActions;
+    const detailAction = rowActions.find((action: any) => action.code === 'detail');
+    const manageAction = rowActions.find((action: any) => action.code === 'manage');
+
+    expect(rowActions.map((action: any) => action.code)).not.toEqual(
+      expect.arrayContaining(['create', 'edit', 'delete']),
+    );
+    expect(detailAction).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/decisionops_webhooks/view/{pid}',
+      },
+    });
+    expect(manageAction).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/webhook',
+      },
+    });
+    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+      component: 'DecisionIntegrationImpactBlock',
+      props: {
+        targetType: 'WEBHOOK',
+        targetCodeField: 'event_type',
+      },
+    });
+  });
+
+  it('hosts DecisionDefinition impact and lifecycle actions in a DSL custom block', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const pages = readPages(pagesFile);
+    const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_definitions_list');
+    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_definitions_detail');
+
+    expect(listPage).toBeDefined();
+    expect(detailPage).toBeDefined();
+
+    const listSchema = canonicalizePageSchemaDto(listPage!);
+    const tableBlock = listSchema.blocks.find((block: any) => block.blockType === 'table') as any;
+    const rowActions = tableBlock.table.rowActions;
+
+    expect(rowActions.map((action: any) => action.code)).toEqual(['detail', 'rollout']);
+    expect(rowActions.find((action: any) => action.code === 'rollout')).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/decisionops_rollouts?decisionCode={decisionCode}',
+      },
+    });
+    expect(rowActions.map((action: any) => action.action?.to)).not.toEqual(
+      expect.arrayContaining(['/decision-ops']),
+    );
+    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+      component: 'DecisionDefinitionActionsBlock',
+      props: {
+        mode: 'detail',
+        rolloutUrl:
+          '/p/decisionops_rollouts?decisionCode={decisionCode}&baselineVersion={baselineVersion}&candidateVersion={candidateVersion}',
+      },
+    });
+  });
+
+  it('hosts SLA rule-center binding in the platform-admin DSL form', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/platform-admin/config/pages.json');
+    const pages = readPages(pagesFile);
+    const formPage = pages.find((candidate) => candidate.pageKey === 'sla_config_form');
+
+    expect(formPage).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(formPage!);
+    expect(validateStructure(schema)).toEqual([]);
+    const ruleBlock = schema.blocks.find((block: any) => block.id === 'sla_rule_binding') as any;
+
+    expect(ruleBlock).toMatchObject({
+      blockType: 'custom',
+      component: 'DecisionRuleBindingBlock',
+      props: {
+        mode: 'decision',
+        valueField: 'rule_binding',
+        consumerType: 'SLA',
+        initialDecisionCode: 'complaint_sla_deadline',
+      },
+    });
+  });
+
+  it('hosts the visual decision-table editor in a DSL custom workbench block', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const pages = readPages(pagesFile);
+    const tablePage = pages.find((candidate) => candidate.pageKey === 'decisionops_tables_list');
+
+    expect(tablePage).toBeDefined();
+    expect((tablePage!.extension as any).customOnly).toBe(true);
+    expect(JSON.stringify(tablePage)).not.toContain('/decision-ops');
+
+    const schema = canonicalizePageSchemaDto(tablePage!);
+    expect(schema.blocks).toHaveLength(1);
+    expect(schema.blocks[0]).toMatchObject({
+      blockType: 'custom',
+      component: 'DecisionTableWorkbenchBlock',
+      props: {
+        mode: 'workbench',
+      },
+    });
+  });
+
+  it('hosts EventPolicy actions and designer in DSL custom blocks instead of console row actions', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const pages = readPages(pagesFile);
+    const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policies_list');
+    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policies_detail');
+    const designerPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policy_designer_list');
+
+    expect(listPage).toBeDefined();
+    expect(detailPage).toBeDefined();
+    expect(designerPage).toBeDefined();
+
+    const listSchema = canonicalizePageSchemaDto(listPage!);
+    const tableBlock = listSchema.blocks.find((block: any) => block.blockType === 'table') as any;
+    const rowActions = tableBlock.table.rowActions;
+
+    expect(listSchema.blocks[0]).toMatchObject({
+      component: 'EventPolicyActionsBlock',
+      props: { mode: 'list' },
+    });
+    expect(rowActions.map((action: any) => action.code)).toEqual(['detail', 'design', 'logs']);
+    expect(rowActions.find((action: any) => action.code === 'design')).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/p/decisionops_event_policy_designer?policyCode={policyCode}',
+      },
+    });
+    expect(rowActions.map((action: any) => action.action?.to)).not.toEqual(
+      expect.arrayContaining(['/decision-ops']),
+    );
+    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+      component: 'EventPolicyActionsBlock',
+      props: { mode: 'detail' },
+    });
+    expect((designerPage!.blocks?.[0] as any)).toMatchObject({
+      component: 'EventPolicyDesignerBlock',
+    });
+    expect((designerPage!.extension as any).customOnly).toBe(true);
+  });
+
+  it('hosts ExecutionLog advanced filters and trace chain in DSL custom blocks', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
+    const pages = readPages(pagesFile);
+    const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_execution_logs_list');
+    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_execution_logs_detail');
+
+    expect(listPage).toBeDefined();
+    expect(detailPage).toBeDefined();
+
+    const listSchema = canonicalizePageSchemaDto(listPage!);
+    expect((listPage!.extension as any).customOnly).toBe(true);
+    expect(listSchema.blocks).toHaveLength(1);
+    expect(listSchema.blocks[0]).toMatchObject({
+      component: 'ExecutionLogTraceBlock',
+      props: {
+        mode: 'list',
+        pageSize: 50,
+      },
+    });
+    expect(JSON.stringify(listPage)).not.toContain('/decision-ops');
+    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+      component: 'ExecutionLogTraceBlock',
+      props: { mode: 'detail' },
+    });
   });
 });

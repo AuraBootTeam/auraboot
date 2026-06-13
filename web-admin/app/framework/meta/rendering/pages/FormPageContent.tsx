@@ -29,6 +29,7 @@ import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
+import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
 import { BlockErrorBoundary } from '~/framework/meta/rendering/BlockErrorBoundary';
 import type { SubTableColumn } from '~/framework/meta/components/types';
 import { resolveExtensionDisplayName } from '~/framework/meta/utils/i18nResolver';
@@ -154,6 +155,28 @@ export function mergeLoadedRecordWithDirtyFields(
   return merged;
 }
 
+function snakeToCamel(value: string): string {
+  return value.replace(/_([a-zA-Z0-9])/g, (_, char: string) => char.toUpperCase());
+}
+
+function camelToSnake(value: string): string {
+  return value.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
+}
+
+export function getFormFieldValueWithAlias(
+  formData: Record<string, any>,
+  fieldCode: string,
+): unknown {
+  if (Object.prototype.hasOwnProperty.call(formData, fieldCode)) {
+    return formData[fieldCode];
+  }
+  const alias = fieldCode.includes('_') ? snakeToCamel(fieldCode) : camelToSnake(fieldCode);
+  if (alias !== fieldCode && Object.prototype.hasOwnProperty.call(formData, alias)) {
+    return formData[alias];
+  }
+  return undefined;
+}
+
 function isJsonLikeDataType(dataType?: string): boolean {
   return ['json', 'jsonb'].includes(String(dataType || '').toLowerCase());
 }
@@ -266,7 +289,7 @@ export function shouldBypassFormSubmit(
   actionType: string,
 ): boolean {
   const normalizedActionType = String(actionType || '').toLowerCase();
-  if (['navigate', 'cancel', 'back', 'close'].includes(normalizedActionType)) {
+  if (['navigate', 'cancel', 'back', 'close', 'refresh', 'reload'].includes(normalizedActionType)) {
     return true;
   }
 
@@ -275,7 +298,7 @@ export function shouldBypassFormSubmit(
     action && typeof action === 'object' ? (action as Record<string, unknown>).command : undefined;
   const buttonCode = String(button?.code || '').toLowerCase();
   return (
-    ['cancel', 'back', 'close'].includes(buttonCode) &&
+    ['cancel', 'back', 'close', 'refresh', 'reload'].includes(buttonCode) &&
     !button?.commandCode &&
     typeof actionCommand !== 'string'
   );
@@ -609,16 +632,70 @@ export function FormPageContent(props: PageContentProps) {
     });
   }, [locale, t, formData, dataSourceManager, user, permissions, mode]);
 
+  const [mainRecordLoaded, setMainRecordLoaded] = useState(!isEditMode);
+  const loadMainRecord = useCallback(
+    async (options?: { preserveDirty?: boolean }) => {
+      if (!recordId) return;
+      const preserveDirty = options?.preserveDirty ?? true;
+      dirtyFieldsRef.current.clear();
+      setMainRecordLoaded(false);
+      try {
+        const resp = await fetchResult<any>(`/api/dynamic/${tableName}/${recordId}`, {
+          method: 'get',
+          token: token || undefined,
+        });
+        if (ResultHelper.isSuccess(resp) && resp.data) {
+          setFormData((prev) =>
+            preserveDirty
+              ? mergeLoadedRecordWithDirtyFields(resp.data, prev, dirtyFieldsRef.current)
+              : resp.data,
+          );
+          setInitialFormData(resp.data);
+        }
+      } catch {
+        // Keep the form usable when a transient refresh request fails; callers
+        // surface action errors separately when needed.
+      } finally {
+        setMainRecordLoaded(true);
+      }
+    },
+    [recordId, tableName, token],
+  );
+  const reloadMainRecord = useCallback(
+    () => loadMainRecord({ preserveDirty: false }),
+    [loadMainRecord],
+  );
+
+  const syncRuntimeFormScope = useCallback(
+    (nextFormData: Record<string, any>) => {
+      if (!runtime) return;
+      const scopeId = runtime.getScopeId();
+      runtime.getStateManager().updateScope(scopeId, {
+        form: recordId ? { ...nextFormData, pid: recordId } : nextFormData,
+      });
+    },
+    [runtime, recordId],
+  );
+
+  const syncRuntimeFieldValue = useCallback(
+    (fieldCode: string, value: unknown) => {
+      if (!runtime) return;
+      const scopeId = runtime.getScopeId();
+      runtime.getStateManager().updateScope(scopeId, (prev) => ({
+        form: {
+          ...(prev.form || {}),
+          [fieldCode]: value,
+          ...(recordId ? { pid: recordId } : {}),
+        },
+      }));
+    },
+    [runtime, recordId],
+  );
+
   // Sync formData with runtime scope state
   useEffect(() => {
-    if (runtime) {
-      const scopeId = runtime.getScopeId();
-      // Update the form data in the scope so handlers can access it via {{state.form}}
-      runtime.getStateManager().updateScope(scopeId, {
-        form: formData,
-      });
-    }
-  }, [runtime, formData]);
+    syncRuntimeFormScope(formData);
+  }, [formData, syncRuntimeFormScope]);
 
   // Use unified action handler hook with SchemaRuntime support
   const { handleAction, loading, error, setError } = useActionHandler({
@@ -628,6 +705,7 @@ export function FormPageContent(props: PageContentProps) {
     context: {
       data: formData,
       setData: setFormData,
+      loadData: reloadMainRecord,
     },
     dataSourceManager,
     locale,
@@ -795,6 +873,7 @@ export function FormPageContent(props: PageContentProps) {
     formData,
     enabled: computedFieldDefs.length > 0,
     onChange: (fieldCode, value) => {
+      syncRuntimeFieldValue(fieldCode, value);
       setFormData((prev) => {
         if (prev[fieldCode] === value) return prev;
         return {
@@ -1267,28 +1346,10 @@ export function FormPageContent(props: PageContentProps) {
   }, [isEditMode, schemaDefaultValues, urlDefaultValues]);
 
   // Edit mode: fetch existing record data to populate form
-  const [mainRecordLoaded, setMainRecordLoaded] = useState(!isEditMode);
   useEffect(() => {
     if (!recordId) return;
-    dirtyFieldsRef.current.clear();
-    setMainRecordLoaded(false);
-    fetchResult<any>(`/api/dynamic/${tableName}/${recordId}`, {
-      method: 'get',
-      token: token || undefined,
-    })
-      .then((resp) => {
-        if (ResultHelper.isSuccess(resp) && resp.data) {
-          setFormData((prev) =>
-            mergeLoadedRecordWithDirtyFields(resp.data, prev, dirtyFieldsRef.current),
-          );
-          setInitialFormData(resp.data);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        setMainRecordLoaded(true);
-      });
-  }, [recordId, tableName, token]);
+    void loadMainRecord({ preserveDirty: true });
+  }, [recordId, loadMainRecord]);
 
   // L1 SDK: merge external initialValues into form state (overlay on top of loaded data)
   useEffect(() => {
@@ -1461,11 +1522,12 @@ export function FormPageContent(props: PageContentProps) {
   // Render smart field using utility
   const renderSmartField = useMemo(
     () =>
-      createFieldRenderer(formData, setFormData, pageContext, fieldErrors, (fieldCode) => {
+      createFieldRenderer(formData, setFormData, pageContext, fieldErrors, (fieldCode, value) => {
         dirtyFieldsRef.current.add(fieldCode);
         clearFieldError(fieldCode);
+        syncRuntimeFieldValue(fieldCode, value);
       }),
-    [formData, pageContext, fieldErrors, clearFieldError],
+    [formData, pageContext, fieldErrors, clearFieldError, syncRuntimeFieldValue],
   );
 
   // Stable runtime context for custom blocks. Memoized so the props
@@ -1484,9 +1546,21 @@ export function FormPageContent(props: PageContentProps) {
       token,
       locale,
       t,
+      getFieldValue: (fieldCode: string) => getFormFieldValueWithAlias(formData, fieldCode),
+      updateField: (fieldCode: string, value: unknown) => {
+        dirtyFieldsRef.current.add(fieldCode);
+        clearFieldError(fieldCode);
+        setFormData((prev) => {
+          if (prev[fieldCode] === value) return prev;
+          return {
+            ...prev,
+            [fieldCode]: value,
+          };
+        });
+      },
       getContext: () => ({ record: formData, pageContext }),
     }),
-    [formData, initialFormData, recordId, tableName, token, locale, t, pageContext],
+    [formData, initialFormData, recordId, tableName, token, locale, t, clearFieldError, pageContext],
   );
 
   // Null schema guard
@@ -1498,6 +1572,7 @@ export function FormPageContent(props: PageContentProps) {
   const allBlocks = schema.blocks || [];
 
   const formBlocks = allBlocks.filter((block: any) => block.blockType === 'form-section');
+  const layoutBlocks = allBlocks.filter((block: any) => block.blockType === 'tabs');
   // Custom block support — surfaces blockType:"custom" entries that DSL
   // pages declare for visual companions to the form (e.g. position
   // ruler, designer panels). Rendered above the form-section blocks so
@@ -1735,6 +1810,19 @@ export function FormPageContent(props: PageContentProps) {
                   })}
                 </div>
               )}
+              {runtime &&
+                layoutBlocks.length > 0 && (
+                  <div className="mt-5 space-y-5" data-testid="form-layout-blocks">
+                    {layoutBlocks.map((block: any, blockIndex: number) => (
+                      <BlockRenderer
+                        key={block.id || `form-layout-${blockIndex}`}
+                        block={block}
+                        runtime={runtime}
+                        areaId={`form-layout-${blockIndex}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </>
             )}
 

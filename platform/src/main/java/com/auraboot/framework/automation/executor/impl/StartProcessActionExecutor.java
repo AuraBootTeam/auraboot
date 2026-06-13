@@ -4,6 +4,8 @@ import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
 import com.auraboot.framework.bpm.service.BpmIntegrationService;
 import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
+import com.auraboot.smart.framework.engine.storage.StorageMode;
+import com.auraboot.smart.framework.engine.storage.StorageModeHolder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -70,7 +72,7 @@ public class StartProcessActionExecutor implements ActionExecutor {
 
         log.info("START_PROCESS starting process: key={}, businessKey={}", processKey, businessKey);
 
-        ProcessInstance instance = bpmIntegrationService.startBusinessProcess(
+        ProcessInstance instance = startBusinessProcessInDatabaseMode(
                 processKey, businessKey, variables, title);
 
         Map<String, Object> result = new HashMap<>();
@@ -86,6 +88,30 @@ public class StartProcessActionExecutor implements ActionExecutor {
     @Override
     public boolean supports(String actionType) {
         return "start_process".equals(actionType);
+    }
+
+    /**
+     * Automation flows run their own SmartEngine process in CUSTOM storage mode. A
+     * start-process action is different: it must create a durable business BPM instance,
+     * so temporarily switch the thread-local SmartEngine storage mode to DATABASE and
+     * then restore the outer automation mode.
+     */
+    private ProcessInstance startBusinessProcessInDatabaseMode(
+            String processKey,
+            String businessKey,
+            Map<String, Object> variables,
+            String title) {
+        StorageMode previousMode = StorageModeHolder.get();
+        StorageModeHolder.set(StorageMode.DATABASE);
+        try {
+            return bpmIntegrationService.startBusinessProcess(processKey, businessKey, variables, title);
+        } finally {
+            if (previousMode == null) {
+                StorageModeHolder.clear();
+            } else {
+                StorageModeHolder.set(previousMode);
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")

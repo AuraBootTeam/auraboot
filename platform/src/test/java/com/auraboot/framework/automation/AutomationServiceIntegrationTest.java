@@ -63,8 +63,8 @@ public class AutomationServiceIntegrationTest extends BaseIntegrationTest {
         // A degenerate flowConfig WITHOUT nodes does NOT bypass it (the validation was
         // tightened — see AutomationServiceImpl#validateCreateRequest line ~469: a
         // flowConfig is "designer mode" only when flowConfig.nodes is a non-empty list).
-        // enable() skips the SmartEngine deploy for flat-actions automations, so
-        // create → enable → state-transition → search → logs all work on this path.
+        // enable() deploys both visual flows and flat-actions automations because trigger
+        // execution uses SmartEngine for every enabled automation.
         req.setActions(List.of(
                 AutomationAction.builder()
                         .type("update_record")

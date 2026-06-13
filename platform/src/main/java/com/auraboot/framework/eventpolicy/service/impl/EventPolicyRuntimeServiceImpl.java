@@ -4,7 +4,11 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.Scope;
+import com.auraboot.framework.decision.ast.Truth;
 import com.auraboot.framework.decision.model.VersionStatus;
+import com.auraboot.framework.decision.rule.RuleEvaluationContext;
+import com.auraboot.framework.decision.rule.RuleEvaluationService;
+import com.auraboot.framework.decision.rule.RuleEvaluationTrace;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyDefinitionEntity;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyDefinitionMapper;
@@ -25,8 +29,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -49,6 +56,7 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
     private final DrtPolicyVersionMapper versionMapper;
     private final ObjectMapper objectMapper;
     private final com.auraboot.framework.eventpolicy.executor.PolicyExecutor policyExecutor;
+    private final ObjectProvider<RuleEvaluationService> ruleEvaluationServiceProvider;
 
     private final EventPolicyEvaluator evaluator = new EventPolicyEvaluator();
 
@@ -121,7 +129,7 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
         DecisionContext ctx = buildContext(context);
 
         // 6. Evaluate
-        EventPolicyResult result = evaluator.evaluate(policy, ctx);
+        EventPolicyResult result = evaluatorFor(context).evaluate(policy, ctx);
 
         log.info("EventPolicy evaluated: code={}, version={}, status={}",
                 def.getPolicyCode(), ver.getVersion(), result.status());
@@ -168,19 +176,65 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
      * parse scope keys via Scope.valueOf(key.toUpperCase()), silently skip unknown scopes.
      */
     private DecisionContext buildContext(Map<String, Map<String, Object>> raw) {
-        if (raw == null || raw.isEmpty()) {
+        Map<Scope, Map<String, Object>> scopes = buildScopes(raw);
+        if (scopes.isEmpty()) {
             return DecisionContext.of(Map.of());
         }
         DecisionContext.Builder builder = DecisionContext.builder();
+        scopes.forEach(builder::scope);
+        return builder.build();
+    }
+
+    private Map<Scope, Map<String, Object>> buildScopes(Map<String, Map<String, Object>> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return Map.of();
+        }
+        Map<Scope, Map<String, Object>> scopes = new EnumMap<>(Scope.class);
         for (Map.Entry<String, Map<String, Object>> entry : raw.entrySet()) {
             try {
                 Scope scope = Scope.valueOf(entry.getKey().toUpperCase());
-                builder.scope(scope, entry.getValue());
+                scopes.put(scope, entry.getValue() == null ? Map.of() : new LinkedHashMap<>(entry.getValue()));
             } catch (IllegalArgumentException ignored) {
                 log.debug("Skipping unknown context scope: {}", entry.getKey());
             }
         }
-        return builder.build();
+        return Map.copyOf(scopes);
+    }
+
+    private EventPolicyEvaluator evaluatorFor(Map<String, Map<String, Object>> rawContext) {
+        RuleEvaluationService ruleEvaluationService = ruleEvaluationServiceProvider.getIfAvailable();
+        if (ruleEvaluationService == null) {
+            return evaluator;
+        }
+        Map<Scope, Map<String, Object>> scopes = buildScopes(rawContext);
+        return new EventPolicyEvaluator((policy, rule, context) ->
+                evaluateDecisionBinding(ruleEvaluationService, policy, rule, scopes));
+    }
+
+    private Truth evaluateDecisionBinding(RuleEvaluationService ruleEvaluationService,
+                                          EventPolicy policy,
+                                          PolicyRule rule,
+                                          Map<Scope, Map<String, Object>> scopes) {
+        if (rule.decisionBinding() == null) {
+            return Truth.UNKNOWN;
+        }
+        try {
+            RuleEvaluationTrace trace = ruleEvaluationService.evaluateDecisionBinding(
+                    rule.decisionBinding(),
+                    new RuleEvaluationContext(
+                            scopes,
+                            "EVENT_POLICY",
+                            policy.policyCode(),
+                            rule.ruleCode(),
+                            null,
+                            null,
+                            null));
+            return trace.matched() ? Truth.TRUE : Truth.FALSE;
+        } catch (RuntimeException e) {
+            log.warn("EventPolicy decision binding failed: policy={}, rule={}, decision={}, error={}",
+                    policy.policyCode(), rule.ruleCode(), rule.decisionBinding().decisionCode(), e.getMessage());
+            return Truth.FALSE;
+        }
     }
 
     // ─── tenant guard ────────────────────────────────────────────────────────

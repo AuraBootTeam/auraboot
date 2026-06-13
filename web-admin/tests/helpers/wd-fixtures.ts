@@ -11,7 +11,7 @@
  * Red lines enforced here:
  *  - No page.goto() to non-login business URLs
  *  - No multi-path response fallback — field names are exact
- *  - No waitForTimeout()
+ *  - No fixed sleeps
  *  - Throws with a descriptive error when expected data is absent
  */
 
@@ -105,14 +105,11 @@ async function ensureUser(
   const loginBody = await loginResp.json();
   const existingJwt: unknown = loginBody?.data?.jwt;
   if (typeof existingJwt === 'string' && existingJwt.trim() !== '') {
-    // User exists — ensure extra roles are assigned (idempotent: re-adding is safe).
-    // This handles the case where the user was created in a previous test run without
-    // extraRoleCodes. For example, wd_manager needs tenant_admin to access the BPM
-    // Task Center (system.process.execute permission is in tenant_admin only).
-    if (opts.extraRoleCodes && opts.extraRoleCodes.length > 0) {
-      const adminToken = await loginAs(api, 'admin@auraboot.com', 'Test2026x');
-      await ensureExtraRoles(api, adminToken, opts.email, opts.roleCode, opts.extraRoleCodes);
-    }
+    // User exists — ensure both domain role and extra roles are assigned.
+    // Some long-lived dev databases contain these users without their workflow-demo
+    // role memberships, so role repair must not depend on the domain role member list.
+    const adminToken = await loginAs(api, 'admin@auraboot.com', 'Test2026x');
+    await ensureRoles(api, adminToken, opts.email, [opts.roleCode, ...(opts.extraRoleCodes ?? [])]);
     // Re-login to get a fresh JWT that includes the newly-assigned role permissions.
     return loginAs(api, opts.email, opts.password);
   }
@@ -145,7 +142,8 @@ async function ensureUser(
       const retryBody = await retryLoginResp.json();
       const retryJwt: unknown = retryBody?.data?.jwt;
       if (typeof retryJwt === 'string' && retryJwt.trim() !== '') {
-        return retryJwt;
+        await ensureRoles(api, adminToken, opts.email, [opts.roleCode, ...(opts.extraRoleCodes ?? [])]);
+        return loginAs(api, opts.email, opts.password);
       }
     }
     const errBody = await createResp.text();
@@ -159,76 +157,75 @@ async function ensureUser(
 }
 
 /**
- * Ensure a user (identified by their existing domain roleCode) also has every role in
- * extraRoleCodes. Idempotent: re-adding is safe (server ignores duplicates).
+ * Ensure a user has all requested roles. Idempotent: re-adding is safe.
  *
  * Strategy:
- *   1. GET /api/roles?keyword={roleCode} → find domain role PID
- *   2. GET /api/roles/{domainRolePid}/members → find the user's memberPid by email
- *   3. For each extraRoleCode:
- *       GET /api/roles?keyword={extraRoleCode} → find extra role PID
- *       POST /api/roles/{extraRolePid}/members with [memberPid]
+ *   1. POST /api/tenant/members/search by email → find tenant member PID.
+ *   2. For each roleCode:
+ *       GET /api/roles?keyword={roleCode} → find role PID
+ *       POST /api/roles/{rolePid}/members with [memberPid]
  */
-async function ensureExtraRoles(
+async function ensureRoles(
   api: APIRequestContext,
   adminToken: string,
   userEmail: string,
-  domainRoleCode: string,
-  extraRoleCodes: string[],
+  roleCodes: string[],
 ): Promise<void> {
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` };
+  const memberPid = await findTenantMemberPid(api, headers, userEmail);
 
-  // Step 1: find the domain role PID
-  const rolesResp = await api.get(
-    `${BACKEND_URL}/api/roles?keyword=${encodeURIComponent(domainRoleCode)}&pageNum=1&pageSize=50`,
-    { headers },
-  );
-  const rolesBody = await rolesResp.json();
-  const domainRole = (rolesBody?.data?.records ?? []).find(
-    (r: Record<string, unknown>) => r.code === domainRoleCode,
-  ) as Record<string, unknown> | undefined;
-  if (!domainRole) {
-    throw new Error(`ensureExtraRoles: domain role "${domainRoleCode}" not found`);
-  }
-  const domainRolePid = domainRole.pid as string;
-
-  // Step 2: get the user's memberPid from the domain role's member list
-  const membersResp = await api.get(
-    `${BACKEND_URL}/api/roles/${domainRolePid}/members?pageNum=1&pageSize=200`,
-    { headers },
-  );
-  const membersBody = await membersResp.json();
-  const memberRecord = (membersBody?.data?.records ?? []).find(
-    (m: Record<string, unknown>) => m.email === userEmail,
-  ) as Record<string, unknown> | undefined;
-  if (!memberRecord) {
-    throw new Error(
-      `ensureExtraRoles: user "${userEmail}" not found in members of role "${domainRoleCode}"`,
-    );
-  }
-  const memberPid = memberRecord.memberPid as string;
-
-  // Step 3: add member to each extra role
-  for (const extraRoleCode of extraRoleCodes) {
-    const extraRolesResp = await api.get(
-      `${BACKEND_URL}/api/roles?keyword=${encodeURIComponent(extraRoleCode)}&pageNum=1&pageSize=50`,
+  for (const roleCode of Array.from(new Set(roleCodes))) {
+    const rolesResp = await api.get(
+      `${BACKEND_URL}/api/roles?keyword=${encodeURIComponent(roleCode)}&pageNum=1&pageSize=50`,
       { headers },
     );
-    const extraRolesBody = await extraRolesResp.json();
-    const extraRole = (extraRolesBody?.data?.records ?? []).find(
-      (r: Record<string, unknown>) => r.code === extraRoleCode,
+    const rolesBody = await rolesResp.json();
+    const role = (rolesBody?.data?.records ?? []).find(
+      (r: Record<string, unknown>) => r.code === roleCode,
     ) as Record<string, unknown> | undefined;
-    if (!extraRole) {
-      throw new Error(`ensureExtraRoles: extra role "${extraRoleCode}" not found`);
+    if (!role) {
+      throw new Error(`ensureRoles: role "${roleCode}" not found`);
     }
-    const extraRolePid = extraRole.pid as string;
+    const rolePid = role.pid as string;
 
     // idempotent: adding an already-assigned member is a no-op
-    await api.post(`${BACKEND_URL}/api/roles/${extraRolePid}/members`, {
+    const addResp = await api.post(`${BACKEND_URL}/api/roles/${rolePid}/members`, {
       data: [memberPid],
       headers,
     });
+    if (!addResp.ok()) {
+      throw new Error(
+        `ensureRoles: add ${userEmail} to role "${roleCode}" failed with HTTP ${addResp.status()}: ${await addResp.text()}`,
+      );
+    }
   }
+}
+
+async function findTenantMemberPid(
+  api: APIRequestContext,
+  headers: Record<string, string>,
+  userEmail: string,
+): Promise<string> {
+  const membersResp = await api.post(`${BACKEND_URL}/api/tenant/members/search`, {
+    data: { keyword: userEmail, status: 'active', pageNum: 1, pageSize: 50 },
+    headers,
+  });
+  if (!membersResp.ok()) {
+    throw new Error(
+      `findTenantMemberPid(${userEmail}): HTTP ${membersResp.status()}: ${await membersResp.text()}`,
+    );
+  }
+  const membersBody = await membersResp.json();
+  const memberRecord = (membersBody?.data?.records ?? []).find(
+    (m: Record<string, unknown>) => (m.user as Record<string, unknown> | undefined)?.email === userEmail,
+  ) as Record<string, unknown> | undefined;
+  const memberPid = memberRecord?.pid;
+  if (typeof memberPid !== 'string' || memberPid.trim() === '') {
+    throw new Error(
+      `findTenantMemberPid(${userEmail}): active tenant member not found: ${JSON.stringify(membersBody)}`,
+    );
+  }
+  return memberPid;
 }
 
 // ---------------------------------------------------------------------------

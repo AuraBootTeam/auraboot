@@ -276,6 +276,7 @@ export function AutomationEditor({
               <button
                 onClick={handleDebug}
                 className="shrink-0 rounded-md bg-gray-800 px-4 py-2 text-sm text-white hover:bg-gray-900"
+                data-testid="btn-debug-automation"
               >
                 {st('$i18n:automation.editor.debug') || 'Debug'}
               </button>

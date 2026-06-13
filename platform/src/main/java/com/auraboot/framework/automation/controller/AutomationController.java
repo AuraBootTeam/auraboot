@@ -242,8 +242,9 @@ public class AutomationController {
     @RequirePermission(MetaPermission.AUTOMATION_ADMIN)
     public ApiResponse<AutomationLogDTO> triggerManually(
             @Parameter(description = "Automation PID") @PathVariable @NotBlank String pid,
-            @RequestBody Map<String, String> request) {
-        String recordId = request.get("recordId");
+            @RequestBody(required = false) Map<String, Object> request) {
+        Object recordIdValue = request != null ? request.get("recordId") : null;
+        String recordId = recordIdValue != null ? String.valueOf(recordIdValue) : null;
         log.info("Manually triggering automation: pid={}, recordId={}", pid, recordId);
 
         AutomationLogDTO result = automationService.triggerManually(pid, recordId);

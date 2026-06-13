@@ -159,6 +159,20 @@ class ControlNodeExecutorTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void delay_durationAndUnitFromDesigner_areConvertedToMs() {
+        AutomationAction action = buildAction("delay", Map.of("duration", 1, "unit", "seconds"));
+
+        long start = System.currentTimeMillis();
+        Map<String, Object> result = (Map<String, Object>) executor.execute(action, Map.of());
+        long elapsed = System.currentTimeMillis() - start;
+
+        assertThat(result.get("delayed")).isEqualTo(true);
+        assertThat(result.get("durationMs")).isEqualTo(1_000L);
+        assertThat(elapsed).isGreaterThanOrEqualTo(1_000L);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void delay_noConfig_zeroDelay() {
         AutomationAction action = buildAction("delay", new HashMap<>());
 

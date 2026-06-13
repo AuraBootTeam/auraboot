@@ -54,6 +54,17 @@ export interface PageSchemaExtension {
   plugin?: Record<string, unknown>;
 }
 
+export interface PageDataSourceConfig {
+  type?: 'table' | 'namedQuery' | 'api' | string;
+  endpoint?: string;
+  method?: 'get' | 'post' | string;
+  pagination?: boolean;
+  queryCode?: string;
+  params?: Record<string, unknown>;
+  adaptor?: string;
+  [key: string]: unknown;
+}
+
 /**
  * Page Schema V2 — flat shape stored in ab_page_schema.blocks (JSONB).
  */
@@ -66,6 +77,7 @@ export interface PageSchema {
   title?: LocalizedText;
   profile?: 'admin' | 'report';
   layout: PageLayout;
+  dataSource?: PageDataSourceConfig;
   blocks: DslBlock[];
   extension?: PageSchemaExtension;
 }
@@ -117,6 +129,8 @@ export type BlockType =
   | 'artifact-timeline'
   | 'review-drawer'
   | 'chart-card'
+  | 'tabs'
+  | 'custom'
   | 'text';
 
 /**
@@ -136,10 +150,17 @@ export interface DslBlock {
   // `title` may be a plain string, an `$i18n:key` string, or a LocalizedText
   // object `{ "zh-CN": "...", "en-US": "..." }`. See LocalizedTextInput.
   title?: string | { [locale: string]: string };
+  component?: string;
   fields?: DslFieldRef[]; // filters, form-section
   columns?: DslColumnRef[]; // table
   buttons?: DslButton[]; // toolbar, form-buttons
   actions?: string[]; // shorthand for buttons
+  tabs?: Array<{
+    key: string;
+    label: string | { [locale: string]: string };
+    filter?: { field?: string; fieldName?: string; operator?: string; value?: unknown } | null;
+    blocks?: DslBlock[];
+  }>;
 
   // Block-specific props
   props?: Record<string, unknown>;
@@ -147,6 +168,7 @@ export interface DslBlock {
   // Data binding
   dataSource?: string;
   bind?: string;
+  refreshInterval?: number;
 
   // Data table selection
   selection?: {

@@ -15,6 +15,12 @@ const validSchema = (): CanvasSchema => ({
   title: 'My Form',
   version: '1.0.0',
   components: [],
+  layout: { type: 'vertical', columns: 1, spacing: 8, padding: 0 },
+  metadata: {
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    createdBy: 'test',
+  },
 });
 
 // ─── validateSchema ──────────────────────────────────────────────────────────

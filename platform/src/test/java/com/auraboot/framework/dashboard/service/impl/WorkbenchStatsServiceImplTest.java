@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,9 +17,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -105,9 +109,22 @@ class WorkbenchStatsServiceImplTest {
     }
 
     @Test
+    @DisplayName("getPipeline queries the canonical CRM opportunity expected amount field")
+    void getPipelineUsesExpectedAmountField() {
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        when(jdbcTemplate.queryForList(sql.capture(), (Object) any(), (Object) any()))
+                .thenReturn(List.of());
+
+        service.getPipeline();
+
+        assertTrue(sql.getValue().contains("crm_opp_expected_amount"));
+        assertFalse(sql.getValue().contains("crm_opp_amount"));
+    }
+
+    @Test
     @DisplayName("getBpmStats returns zeros when log table missing")
     void getBpmStatsFallback() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any(), any(), any(), any()))
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any()))
                 .thenThrow(new RuntimeException("table missing"));
         WorkbenchBpmStatsDTO out = service.getBpmStats();
         assertEquals(0.0, out.getCompletionRate());
@@ -118,13 +135,13 @@ class WorkbenchStatsServiceImplTest {
     @DisplayName("getBpmStats computes completion rate")
     void getBpmStatsHappy() {
         // Running count
-        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any(), any(), any(), any()))
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any()))
                 .thenReturn(2L);
         // Other Long queries
-        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any()))
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any()))
                 .thenReturn(8L);
         // Avg duration
-        when(jdbcTemplate.queryForObject(anyString(), eq(Double.class), any(), any(), any()))
+        when(jdbcTemplate.queryForObject(anyString(), eq(Double.class), any()))
                 .thenReturn(5.5);
 
         WorkbenchBpmStatsDTO out = service.getBpmStats();
@@ -132,5 +149,33 @@ class WorkbenchStatsServiceImplTest {
         // completed=8, running=2 → 8 / 10 * 100 = 80.0
         assertEquals(80.0, out.getCompletionRate());
         assertEquals(5.5, out.getAvgDurationHours());
+    }
+
+    @Test
+    @DisplayName("getBpmStats uses BPM audit records as the SmartEngine process runtime source")
+    void getBpmStatsUsesAuditRecordSource() {
+        ArgumentCaptor<String> twoArgLongSql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> oneArgLongSql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> oneArgDoubleSql = ArgumentCaptor.forClass(String.class);
+
+        when(jdbcTemplate.queryForObject(twoArgLongSql.capture(), eq(Long.class), any(), any()))
+                .thenReturn(1L);
+        when(jdbcTemplate.queryForObject(oneArgLongSql.capture(), eq(Long.class), any()))
+                .thenReturn(0L);
+        when(jdbcTemplate.queryForObject(oneArgDoubleSql.capture(), eq(Double.class), any()))
+                .thenReturn(0.0);
+
+        service.getBpmStats();
+
+        String sql = String.join("\n", Stream.of(
+                        twoArgLongSql.getAllValues(),
+                        oneArgLongSql.getAllValues(),
+                        oneArgDoubleSql.getAllValues())
+                .flatMap(List::stream)
+                .toList());
+        assertTrue(sql.contains("ab_bpm_audit_record"));
+        assertFalse(sql.contains("ab_bpm_execution_log"));
+        assertTrue(sql.contains("process_start"));
+        assertTrue(sql.contains("process_end"));
     }
 }

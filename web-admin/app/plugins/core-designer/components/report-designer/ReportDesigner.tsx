@@ -12,7 +12,6 @@ import { BlockPalette } from './components/BlockPalette';
 import { ReportCanvas } from './components/ReportCanvas';
 import { BlockPropertyPanel } from './components/BlockPropertyPanel';
 import { ReportPageContent } from './renderers/ReportPageContent';
-import { reportToHtml } from './services/reportToHtml';
 import { fetchReportData } from './services/fetchReportData';
 import { reportDesignerService } from './services/reportDesignerService';
 import { useVersioning, VersionHistoryPanel } from '~/shared/versioning';
@@ -168,22 +167,44 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
     }
   }, [report]);
 
-  // PDF Export
-  const handleExportPdf = useCallback(async () => {
-    if (!report) return;
+  // JSON Export
+  const handleExportJson = useCallback(async () => {
+    const state = useReportStore.getState();
+    const pid = state.pageId;
+    if (!pid) {
+      alert('Please save the report before exporting to JSON.');
+      return;
+    }
     try {
-      const dataSets = await fetchReportData(report);
-      const html = reportToHtml(report, dataSets);
-      const blob = await reportDesignerService.exportPdf(
-        html,
-        report.page.size,
-        report.page.orientation,
-        `${report.title || 'report'}.pdf`,
-      );
+      const blob = await reportDesignerService.exportJson(pid);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${report.title || 'report'}.pdf`;
+      a.download = `${report?.title || 'report'}.report.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('JSON export failed:', error);
+      alert(error instanceof Error ? error.message : 'JSON export failed');
+    }
+  }, [report]);
+
+  // PDF Export
+  const handleExportPdf = useCallback(async () => {
+    const state = useReportStore.getState();
+    const pid = state.pageId;
+    if (!pid) {
+      alert('Please save the report before exporting to PDF.');
+      return;
+    }
+    try {
+      const blob = await reportDesignerService.exportPdf(pid);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${report?.title || 'report'}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -214,6 +235,7 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
           onPreview={handlePreview}
           onExportPdf={handleExportPdf}
           onExportExcel={handleExportExcel}
+          onExportJson={handleExportJson}
           onToggleVersionHistory={versioning.togglePanel}
           versionCount={versioning.versions.length}
         />
@@ -231,6 +253,7 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
         onPreview={handlePreview}
         onExportPdf={handleExportPdf}
         onExportExcel={handleExportExcel}
+        onExportJson={handleExportJson}
         onToggleVersionHistory={versioning.togglePanel}
         versionCount={versioning.versions.length}
       />

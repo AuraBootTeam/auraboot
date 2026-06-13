@@ -77,14 +77,15 @@ public class ControlNodeExecutor implements ActionExecutor {
     }
 
     private Object executeDelay(Map<String, Object> config) {
-        int delayMs = config.containsKey("delayMs")
-                ? ((Number) config.get("delayMs")).intValue() : 0;
-        int delaySeconds = config.containsKey("delaySeconds")
-                ? ((Number) config.get("delaySeconds")).intValue() : 0;
+        long delayMs = config.containsKey("delayMs")
+                ? asLong(config.get("delayMs")) : 0;
+        long delaySeconds = config.containsKey("delaySeconds")
+                ? asLong(config.get("delaySeconds")) : 0;
+        long designerDurationMs = toDesignerDurationMs(config.get("duration"), config.get("unit"));
 
-        long totalMs = delayMs + (delaySeconds * 1000L);
+        long totalMs = delayMs + (delaySeconds * 1000L) + designerDurationMs;
         // Cap at 5 minutes to prevent abuse
-        totalMs = Math.min(totalMs, 300_000);
+        totalMs = Math.max(0, Math.min(totalMs, 300_000));
 
         if (totalMs > 0) {
             log.debug("DELAY: sleeping for {}ms", totalMs);
@@ -97,6 +98,31 @@ public class ControlNodeExecutor implements ActionExecutor {
         }
 
         return Map.of("delayed", true, "durationMs", totalMs);
+    }
+
+    private long toDesignerDurationMs(Object durationObj, Object unitObj) {
+        if (durationObj == null) {
+            return 0;
+        }
+        long duration = asLong(durationObj);
+        String unit = unitObj != null ? String.valueOf(unitObj) : "seconds";
+        return switch (unit) {
+            case "seconds" -> duration * 1_000L;
+            case "minutes" -> duration * 60_000L;
+            case "hours" -> duration * 3_600_000L;
+            case "days" -> duration * 86_400_000L;
+            default -> duration;
+        };
+    }
+
+    private long asLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            return Long.parseLong(text.trim());
+        }
+        return 0;
     }
 
     private Object executeLoop(Map<String, Object> config, Map<String, Object> context) {

@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Settings, FileSpreadsheet, History } from 'lucide-react';
+import { Settings, FileJson, FileSpreadsheet, History } from 'lucide-react';
 import { useReportStore } from '../store/useReportStore';
 import { DesignerToolbar } from '~/shared/designer/DesignerToolbar';
 import type { PageConfig, PageSize, PageOrientation } from '../types';
@@ -14,6 +14,7 @@ interface ReportToolbarProps {
   onPreview: () => void;
   onExportPdf: () => void;
   onExportExcel?: () => void;
+  onExportJson?: () => void;
   onToggleVersionHistory?: () => void;
   versionCount?: number;
 }
@@ -23,6 +24,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
   onPreview,
   onExportPdf,
   onExportExcel,
+  onExportJson,
   onToggleVersionHistory,
   versionCount,
 }) => {
@@ -100,6 +102,16 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
           >
             <FileSpreadsheet className="h-4 w-4" />
             Export Excel
+          </button>
+        )}
+
+        {onExportJson && (
+          <button
+            onClick={onExportJson}
+            className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <FileJson className="h-4 w-4" />
+            Export JSON
           </button>
         )}
 

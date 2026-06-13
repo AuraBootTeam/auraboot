@@ -242,6 +242,8 @@ function presetLabel(p: string): string {
   switch (p) {
     case 'create':
       return '新增';
+    case 'refresh':
+      return '刷新';
     case 'export':
       return '导出';
     case 'bulkDelete':

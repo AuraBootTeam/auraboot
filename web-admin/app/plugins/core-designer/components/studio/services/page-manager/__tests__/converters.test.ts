@@ -57,6 +57,25 @@ describe('toPageSchema', () => {
     const schema = toPageSchema({ ...baseDto, layout: undefined });
     expect(schema.layout).toEqual({ type: 'stack' });
   });
+
+  it('restores page-level custom API dataSource from extension', () => {
+    const dataSource = {
+      type: 'api',
+      method: 'get',
+      endpoint: '/api/dynamic/page_schema/list',
+      params: { pageSize: '1' },
+    };
+    const schema = toPageSchema({
+      ...baseDto,
+      extension: {
+        ...baseDto.extension,
+        customApi: { listEndpoint: '/api/dynamic/page_schema/list', method: 'GET' },
+        dataSource,
+      },
+    });
+
+    expect(schema.dataSource).toEqual(dataSource);
+  });
 });
 
 describe('toPageMeta', () => {
@@ -113,5 +132,37 @@ describe('createDslSchemaPayload', () => {
     );
 
     expect(payload.pageKey).toBe('wd_leave_request_detail_v2');
+  });
+
+  it('writes page-level custom API dataSource into extension update payload', () => {
+    const dataSource = {
+      type: 'api',
+      method: 'post',
+      endpoint: '/api/dynamic/page_schema/list',
+      adaptor: 'raw',
+      pagination: false,
+      params: { pageSize: '3' },
+    };
+    const payload = createDslSchemaPayload(
+      {
+        schemaVersion: 2,
+        kind: 'form',
+        id: 'p1',
+        pageKey: 'custom_api_form',
+        title: 'Custom API Form',
+        layout: { type: 'stack' },
+        blocks: [],
+        extension: {
+          customApi: { listEndpoint: '/api/dynamic/page_schema/list', method: 'GET' },
+        },
+        dataSource,
+      } as any,
+      0,
+    );
+
+    expect(payload.extension).toMatchObject({
+      customApi: { listEndpoint: '/api/dynamic/page_schema/list', method: 'GET' },
+      dataSource,
+    });
   });
 });

@@ -40,9 +40,9 @@ describe('modelService', () => {
       const dto = { pid: 'm1', code: 'order', displayName: 'Order' };
       getMock.mockResolvedValue(ok({ records: [dto], total: 1, size: 20, current: 2, pages: 5 }));
 
-      const result = await modelService.findByPage({ pageNum: 2, pageSize: 20 });
+      const result = await modelService.findByPage({ page: 2, size: 20 });
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models', { pageNum: 2, pageSize: 20 }, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith('/api/meta/models', { page: 2, size: 20 }, undefined, undefined);
       expect(result.data).toEqual([dto]);
       expect(result.total).toBe(1);
       expect(result.page).toBe(2);      // current → page
@@ -110,7 +110,7 @@ describe('modelService', () => {
       const dto = { pid: 'm1', code: 'order' };
       postMock.mockResolvedValue(ok(dto));
 
-      const req = { code: 'order', displayName: 'Order', tableName: 'ab_dyn_order' };
+      const req = { code: 'order', displayName: 'Order', modelType: 'entity' as const };
       const result = await modelService.create(req);
 
       expect(postMock).toHaveBeenCalledWith('/api/meta/models', req, undefined, undefined);
@@ -543,11 +543,11 @@ describe('modelService', () => {
         blob: async () => blob,
       } as any);
 
-      const result = await modelService.exportModels({ pageNum: 1 }, ['m1']);
+      const result = await modelService.exportModels({ page: 1 }, ['m1']);
 
       expect(fetchSpy).toHaveBeenCalledWith('/api/meta/models/export', expect.objectContaining({
         method: 'post',
-        body: JSON.stringify({ filters: { pageNum: 1 }, selectedIds: ['m1'] }),
+        body: JSON.stringify({ filters: { page: 1 }, selectedIds: ['m1'] }),
       }));
       expect(result).toBe(blob);
 

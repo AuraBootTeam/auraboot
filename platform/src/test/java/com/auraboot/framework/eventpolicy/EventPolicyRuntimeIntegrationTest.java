@@ -1,6 +1,12 @@
 package com.auraboot.framework.eventpolicy;
 
+import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
+import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
+import com.auraboot.framework.decision.dto.DrtVersionDTO;
+import com.auraboot.framework.decision.model.DecisionValidateResult;
 import com.auraboot.framework.decision.model.VersionStatus;
+import com.auraboot.framework.decision.service.DrtDefinitionService;
+import com.auraboot.framework.decision.service.DecisionVersionService;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyDefinitionEntity;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
 import com.auraboot.framework.eventpolicy.model.ConflictStrategy;
@@ -50,6 +56,10 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
     private EventPolicyVersionService versionService;
     @Autowired
     private EventPolicyRuntimeService runtimeService;
+    @Autowired
+    private DrtDefinitionService decisionDefinitionService;
+    @Autowired
+    private DecisionVersionService decisionVersionService;
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -130,13 +140,81 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
             """);
     }
 
+    private JsonNode amountGtAst(int threshold) throws Exception {
+        return mapper.readTree(("""
+            { "type": "compare",
+              "left": { "type": "path", "scope": "record", "path": "data.amount", "dataType": "decimal" },
+              "operator": "GT",
+              "right": { "type": "literal", "value": %d, "dataType": "decimal" } }
+            """).formatted(threshold));
+    }
+
+    private void createPublishedDecision(String decisionCode) throws Exception {
+        DrtDefinitionCreateRequest def = new DrtDefinitionCreateRequest();
+        def.setDecisionCode(decisionCode);
+        def.setDecisionName("EventPolicy Decision " + decisionCode);
+        def.setScopeType("EVENT_POLICY");
+        def.setOwnerModule("decision");
+        decisionDefinitionService.create(def);
+
+        DrtVersionCreateRequest version = new DrtVersionCreateRequest();
+        version.setKind("SIMPLE_CONDITION");
+        version.setRuntimeAdapter("AST_EVALUATOR");
+        version.setContentJson(amountGtAst(10000));
+        DrtVersionDTO draft = decisionVersionService.createDraft(decisionCode, version);
+
+        DecisionValidateResult validation = decisionVersionService.validate(draft.getPid());
+        assertThat(validation.valid()).isTrue();
+        assertThat(validation.fieldRefs()).contains("record.data.amount");
+
+        DrtVersionDTO published = decisionVersionService.publish(draft.getPid());
+        assertThat(published.getStatus()).isEqualTo(VersionStatus.PUBLISHED.name());
+    }
+
+    private JsonNode buildDecisionBindingRulesJson(String decisionCode) throws Exception {
+        return mapper.readTree(("""
+            [
+              {
+                "ruleCode": "R-DMN",
+                "ruleName": "Decision-bound large amount",
+                "priority": 1,
+                "enabled": true,
+                "decisionBinding": {
+                  "decisionCode": "%s",
+                  "versionPolicy": "LATEST_PUBLISHED",
+                  "inputMappings": [
+                    {
+                      "input": "amount",
+                      "source": { "kind": "FIELD", "scope": "record", "path": "data.amount" }
+                    }
+                  ],
+                  "fallbackPolicy": {
+                    "mode": "FAIL_CLOSED",
+                    "reason": "Decision evaluation failed"
+                  },
+                  "enabled": true
+                },
+                "actions": [
+                  {
+                    "type": "NOTIFY",
+                    "target": "ROLE:decision_manager",
+                    "order": 1,
+                    "payload": { "template": "decision_large_amount" },
+                    "idempotencyKeyTemplate": "${record.data.recordId}:${rule.ruleCode}:${action.type}"
+                  }
+                ]
+              }
+            ]
+            """).formatted(decisionCode));
+    }
+
     /**
      * Helper: create definition + draft + validate + publish, return definition entity.
      */
     private DrtPolicyDefinitionEntity createAndPublishPolicy(String policyCode) throws Exception {
         DrtPolicyDefinitionEntity def = definitionService.create(
                 policyCode, "Complaint Form Policy",
-                "FORM_SUBMITTED", "FORM", "complaint");
+                "FORM_SUBMITTED", "FORM", policyCode);
 
         JsonNode rulesJson = buildThreeRuleRulesJson();
 
@@ -163,6 +241,27 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
         return def;
     }
 
+    private void createAndPublishDecisionBoundPolicy(String policyCode, String decisionCode) throws Exception {
+        definitionService.create(policyCode, "Decision Bound Policy",
+                "FORM_SUBMITTED", "FORM", policyCode);
+
+        DrtPolicyVersionEntity draft = versionService.createDraft(
+                policyCode,
+                PolicyPhase.AFTER_COMMIT,
+                MatchMode.COLLECT_ALL,
+                ExecutionMode.ORDERED,
+                FailureStrategy.FAIL_FAST,
+                ConflictStrategy.REJECT_ON_CONFLICT,
+                DedupStrategy.BY_IDEMPOTENCY_KEY,
+                buildDecisionBindingRulesJson(decisionCode));
+
+        DrtPolicyVersionEntity validated = versionService.validate(draft.getPid());
+        assertThat(validated.getStatus()).isEqualTo(VersionStatus.VALIDATED.name());
+
+        DrtPolicyVersionEntity published = versionService.publish(validated.getPid());
+        assertThat(published.getStatus()).isEqualTo(VersionStatus.PUBLISHED.name());
+    }
+
     @Test
     void fullLifecycle_create_validate_publish_run_allThreeRulesMatch() throws Exception {
         String policyCode = "ep_complaint_" + System.nanoTime();
@@ -182,7 +281,7 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
 
         // Run: all three conditions fire (priority=HIGH, amount=20000 > 10000, customerLevel=VIP)
         EventPolicyResult result = runtimeService.run(
-                "FORM_SUBMITTED", "FORM", "complaint",
+                "FORM_SUBMITTED", "FORM", policyCode,
                 Map.of("record", Map.of(
                         "data", Map.of(
                                 "priority", "HIGH",
@@ -220,7 +319,7 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
 
         // Run: none of the conditions fire (priority=LOW, amount=500 < 10000, customerLevel=REGULAR)
         EventPolicyResult result = runtimeService.run(
-                "FORM_SUBMITTED", "FORM", "complaint",
+                "FORM_SUBMITTED", "FORM", policyCode,
                 Map.of("record", Map.of(
                         "data", Map.of(
                                 "priority", "LOW",
@@ -236,6 +335,48 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
         assertThat(result.matchedRuleCodes()).isEmpty();
         assertThat(result.actionPlans()).isEmpty();
         assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
+    void run_decisionBindingRuleEvaluatesPublishedDecision() throws Exception {
+        String decisionCode = "ep_decision_" + System.nanoTime();
+        String policyCode = "ep_decision_policy_" + System.nanoTime();
+        createPublishedDecision(decisionCode);
+        createAndPublishDecisionBoundPolicy(policyCode, decisionCode);
+
+        EventPolicyResult matched = runtimeService.run(
+                "FORM_SUBMITTED", "FORM", policyCode,
+                Map.of("record", Map.of(
+                        "data", Map.of(
+                                "amount", 20000,
+                                "entityCode", "complaint",
+                                "recordId", "CMP-D1"
+                        )
+                ))
+        );
+
+        assertThat(matched.status()).isEqualTo(EventPolicyResult.Status.MATCHED);
+        assertThat(matched.matchedRuleCodes()).containsExactly("R-DMN");
+        assertThat(matched.actionPlans()).hasSize(1);
+        assertThat(matched.actionPlans().get(0).idempotencyKey())
+                .contains("CMP-D1")
+                .contains("R-DMN")
+                .contains("NOTIFY");
+
+        EventPolicyResult notMatched = runtimeService.run(
+                "FORM_SUBMITTED", "FORM", policyCode,
+                Map.of("record", Map.of(
+                        "data", Map.of(
+                                "amount", 500,
+                                "entityCode", "complaint",
+                                "recordId", "CMP-D2"
+                        )
+                ))
+        );
+
+        assertThat(notMatched.status()).isEqualTo(EventPolicyResult.Status.NOT_MATCHED);
+        assertThat(notMatched.matchedRuleCodes()).isEmpty();
+        assertThat(notMatched.actionPlans()).isEmpty();
     }
 
     @Test

@@ -18,7 +18,7 @@
  *
  * Hard red lines (testing-e2e-web.md + spec §T3):
  *   - NO `page.goto('/automation/...')` direct — must navigate via sidebar
- *   - NO `page.request.put/post/delete` to replace UI operations in test body
+ *   - NO request PUT/POST/DELETE to replace UI operations in test body
  *   - NO `waitForTimeout`, NO `afterAll` cleanup
  *   - Real database. The OSS deploy has no stub LlmProvider — see "LLM stub
  *     strategy" comment near beforeAll for why we use `page.route` to mock
@@ -376,7 +376,6 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
   test.setTimeout(90_000);
 
   let seeded: SeededAutomation;
-  let seededOk = true;
 
   // -------------------------------------------------------------------------
   // beforeAll: seed an automation via API. UI tests below drive the editor.
@@ -387,22 +386,9 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
       storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const page = await ctx.newPage();
-    try {
-      seeded = await createLlmAutomationViaApi(page);
-    } catch (e) {
-      seededOk = false;
-      // Surface the real error to the operator. Test bodies below re-check
-      // `seededOk` and skip explicitly so a missing core-automation plugin
-      // does not turn into 4 misleading red failures.
-      // eslint-disable-next-line no-console
-      console.warn('LLM automation seed failed:', e);
-    }
+    seeded = await createLlmAutomationViaApi(page);
     await page.close();
     await ctx.close();
-  });
-
-  test.beforeEach(async () => {
-    test.skip(!seededOk, 'core-automation plugin / e2et_order fixture not available — seed failed');
   });
 
   // -------------------------------------------------------------------------
@@ -601,7 +587,7 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
 
     // The save handler issues PUT /api/automations/{pid} (see
     // AutomationEditPageImpl.handleSave). We assert the request fires AND
-    // the response is 2xx — using waitForResponse (not page.request.put).
+    // the response is 2xx through waitForResponse, not direct request mutation.
     const saveResponsePromise = page.waitForResponse(
       (r) =>
         r.url().includes(`/api/automations/${seeded.pid}`) &&
@@ -789,11 +775,15 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
       dialog.locator('[data-testid="log-action-send_notification"]').first(),
     ).toBeVisible({ timeout: 5_000 });
 
-    // Each action row should have a "success" status badge — we expect
-    // at least 2 success badges total (1 log + 2 actions = 3, depending
-    // on whether the parent badge is still rendered).
-    const successBadges = dialog.locator('span', { hasText: /^success$/i });
-    const badgeCount = await successBadges.count();
-    expect(badgeCount).toBeGreaterThanOrEqual(2);
+    await expect(
+      dialog.locator('[data-testid="log-action-llm_call"]').first().locator('span', {
+        hasText: /^success$/i,
+      }),
+    ).toBeVisible();
+    await expect(
+      dialog.locator('[data-testid="log-action-send_notification"]').first().locator('span', {
+        hasText: /^success$/i,
+      }),
+    ).toBeVisible();
   });
 });

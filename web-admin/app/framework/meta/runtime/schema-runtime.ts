@@ -35,6 +35,7 @@ export interface SchemaRuntimeConfig {
   showToast?: (message: string, level?: 'success' | 'error' | 'info' | 'warning') => void;
   dataSourceManager: DataSourceManager; // P0-3: 必需 - 外部传入的 DataSourceManager (强制单例)
   disableAutoFetch?: boolean; // 可选:禁用所有数据源的 autoFetch
+  skipDataSourceRegistration?: boolean; // Page-level hooks can own registration/fetching.
 }
 
 /**
@@ -92,15 +93,17 @@ export class SchemaRuntime {
     });
 
     // 执行初始化 (如果禁用 autoFetch,跳过数据源注册)
-    this.initialize(config.disableAutoFetch);
+    this.initialize(config.disableAutoFetch, config.skipDataSourceRegistration);
   }
 
   /**
    * 初始化
    */
-  private initialize(disableAutoFetch?: boolean): void {
+  private initialize(disableAutoFetch?: boolean, skipDataSourceRegistration?: boolean): void {
     this.initializeStateBinding();
-    this.registerSchemaDataSources(disableAutoFetch);
+    if (!skipDataSourceRegistration) {
+      this.registerSchemaDataSources(disableAutoFetch);
+    }
     this.initializeLinkageEngine();
 
     if (this.schema.handlers) {

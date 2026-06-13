@@ -25,6 +25,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useVersioning, VersionHistoryPanel, dashboardVersionService } from '~/shared/versioning';
 import { fetchCurrentUserTeams, type TeamOption } from '~/shared/services/teamService';
 import { useHydrated } from '~/hooks/useHydrated';
+import { createWidgetDraft } from './utils/createWidgetDraft';
 
 /** Auto-save delay in milliseconds */
 const AUTO_SAVE_DELAY = 30000; // 30 seconds
@@ -293,26 +294,7 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
       const widgetDef = widgetRegistry.get(widgetType);
       if (!widgetDef) return;
 
-      addWidget({
-        type: widgetType,
-        componentType: widgetType,
-        x: 0,
-        y: Infinity, // Will be placed at the bottom
-        w: widgetDef.defaultSize.w,
-        h: widgetDef.defaultSize.h,
-        minW: widgetDef.defaultSize.minW,
-        minH: widgetDef.defaultSize.minH,
-        maxW: widgetDef.defaultSize.maxW,
-        maxH: widgetDef.defaultSize.maxH,
-        props: {},
-        config: {
-          title: widgetDef.defaultConfig.title || widgetDef.label,
-          dataSource: widgetDef.defaultConfig.dataSource || {
-            type: 'aggregate',
-            metrics: [{ field: 'id', aggregation: 'count' }],
-          },
-        },
-      });
+      addWidget(createWidgetDraft(widgetDef, { x: 0, y: Infinity }));
     },
     [addWidget],
   );

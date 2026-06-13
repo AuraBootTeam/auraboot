@@ -70,6 +70,13 @@
     "extension": { "multiline": true, "placeholder:zh-CN": "JSON 数组格式", "placeholder:en": "JSON array format" }
   },
   {
+    "code": "rule_binding",
+    "displayName:zh-CN": "规则中心绑定",
+    "displayName:en": "Rule Center Binding",
+    "dataType": "jsonb",
+    "extension": { "multiline": true }
+  },
+  {
     "code": "model_code",
     "displayName:zh-CN": "关联模型",
     "displayName:en": "Model Code",

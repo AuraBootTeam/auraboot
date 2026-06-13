@@ -110,4 +110,32 @@ describe('FlowPropertyPanel extension points (G1 + G2)', () => {
     const edge = useFlowStore.getState().edges.find((x) => x.id === e)!;
     expect(edge.data?.condition?.content).toBe('injected');
   });
+
+  it('exposes grouped property toggles for collapsed advanced fields', () => {
+    nodeRegistry.register({
+      type: 'timer',
+      label: 'Timer',
+      icon: '',
+      category: 'trigger',
+      configSchema: [
+        { key: 'modelCode', label: 'Model', type: 'text', group: 'trigger_source' },
+        { key: 'inactivityField', label: 'Date field', type: 'text', group: 'advanced' },
+      ],
+    });
+    const id = useFlowStore.getState().addNode({
+      type: 'timer',
+      position: { x: 0, y: 0 },
+      data: { label: 'Timer', config: {} },
+    });
+    act(() => useFlowStore.getState().selectNode(id));
+
+    render(<FlowPropertyPanel />);
+
+    const advancedToggle = screen.getByTestId('prop-group-toggle-advanced');
+    expect(advancedToggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(advancedToggle);
+
+    expect(advancedToggle).toHaveAttribute('aria-expanded', 'true');
+  });
 });

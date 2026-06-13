@@ -669,7 +669,10 @@ public class TestFixtureController {
         Long userId = null;
         if (params != null) {
             if (params.containsKey("tenantId")) {
-                tenantId = Long.parseLong(params.get("tenantId").toString());
+                tenantId = longValue(params.get("tenantId"));
+            }
+            if (params.containsKey("userId")) {
+                userId = longValue(params.get("userId"));
             }
         }
 
@@ -688,10 +691,12 @@ public class TestFixtureController {
                     .build();
         }
 
-        // Resolve userId via test user email
-        var user = userService.findByEmail("e2e@test.local");
-        if (user != null) {
-            userId = user.getId();
+        // Resolve userId via test user email when an explicit browser user was not provided.
+        if (userId == null) {
+            var user = userService.findByEmail("e2e@test.local");
+            if (user != null) {
+                userId = user.getId();
+            }
         }
         if (userId == null) {
             return FixtureResult.builder()
@@ -733,7 +738,11 @@ public class TestFixtureController {
                     .testRunId(runId)
                     .recordsCreated(count)
                     .recordIds(itemIds)
-                    .metadata(Map.of("itemType", itemType, "tenantId", tenantId, "userId", userId))
+                    .metadata(Map.of(
+                            "itemType", itemType,
+                            "tenantId", String.valueOf(tenantId),
+                            "userId", String.valueOf(userId)
+                    ))
                     .build();
         } catch (Exception e) {
             log.error("Failed to create {} fixture: {}", itemType, e.getMessage(), e);

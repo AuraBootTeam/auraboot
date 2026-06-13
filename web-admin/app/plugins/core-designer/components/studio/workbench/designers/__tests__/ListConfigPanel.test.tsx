@@ -102,9 +102,11 @@ describe('ListConfigPanel', () => {
     });
 
     // create / bulkDelete are false in capabilities → disabled; export = true → enabled.
+    // refresh is a page-level read action and does not depend on model mutation capabilities.
     expect(screen.getByTestId('toolbar-preset-create')).toBeDisabled();
     expect(screen.getByTestId('toolbar-preset-bulkDelete')).toBeDisabled();
     expect(screen.getByTestId('toolbar-preset-export')).not.toBeDisabled();
+    expect(screen.getByTestId('toolbar-preset-refresh')).not.toBeDisabled();
   });
 
   it('renders the shared icon picker for toolbar custom buttons', async () => {
@@ -122,6 +124,60 @@ describe('ListConfigPanel', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '选择图标' })).toBeInTheDocument();
+    });
+  });
+
+  it('edits custom refresh action fields and emits targeted data source flow action', async () => {
+    const onChange = vi.fn();
+    render(<ListConfigPanel schema={baseSchema()} onSchemaChange={onChange} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('columns-tab')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('list-tab-toolbar'));
+    await waitFor(() => {
+      expect(screen.getByTestId('toolbar-tab')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('toolbar-add-custom-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('schema-config-field-code')).toBeInTheDocument();
+    });
+    const fieldTextbox = (key: string) => {
+      const input = screen
+        .getByTestId(`schema-config-field-${key}`)
+        .querySelector('[role="textbox"], input, textarea');
+      if (!input) throw new Error(`Missing textbox for ${key}`);
+      return input as HTMLElement;
+    };
+    const actionKindSelect = screen
+      .getByTestId('schema-config-field-actionKind')
+      .querySelector('[role="combobox"]');
+    if (!actionKindSelect) throw new Error('Missing actionKind combobox');
+
+    fireEvent.change(fieldTextbox('label'), { target: { value: 'Refresh orders' } });
+    fireEvent.change(fieldTextbox('code'), { target: { value: 'refresh_orders' } });
+    fireEvent.click(actionKindSelect);
+    fireEvent.click(await screen.findByText('刷新数据源'));
+    await waitFor(() => {
+      expect(screen.getByTestId('schema-config-field-targetDataSource')).toBeInTheDocument();
+    });
+    fireEvent.change(fieldTextbox('targetDataSource'), { target: { value: 'ds_orders' } });
+
+    await waitFor(() => {
+      const latest = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0];
+      const toolbar = latest?.blocks?.find((block: { blockType: string }) => block.blockType === 'toolbar');
+      expect(toolbar?.buttons?.[0]).toEqual({
+        code: 'refresh_orders',
+        label: 'Refresh orders',
+        action: {
+          type: 'flow',
+          steps: [{ action: 'dataSource.reload', args: { target: 'ds_orders' } }],
+        },
+        events: {
+          onClick: { action: 'dataSource.reload', args: { target: 'ds_orders' } },
+        },
+      });
     });
   });
 

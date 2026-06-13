@@ -19,8 +19,12 @@ interface PageSchemaRecord {
   pageKey: string;
   kind: string;
   profile?: string;
-  dslSchema: string; // JSON string of ReportDsl
-  title?: string;
+  dslSchema?: string | ReportDsl; // Legacy report schema location.
+  extension?: {
+    reportDsl?: string | ReportDsl;
+    [key: string]: unknown;
+  };
+  title?: string | Record<string, unknown>;
   status?: string;
 }
 
@@ -47,16 +51,21 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return result.data;
 }
 
+function parseReportDsl(record: PageSchemaRecord): ReportDsl {
+  const stored = record.extension?.reportDsl ?? record.dslSchema;
+  if (!stored) {
+    throw new Error(`Report DSL not found for page: ${record.pid}`);
+  }
+  return typeof stored === 'string' ? (JSON.parse(stored) as ReportDsl) : stored;
+}
+
 export const reportDesignerService = {
   /**
    * Load report by page key
    */
   async loadByPageKey(pageKey: string): Promise<{ dsl: ReportDsl; pid: string }> {
     const record = await request<PageSchemaRecord>(`${PAGES_API}/key/${pageKey}`);
-    const dsl =
-      typeof record.dslSchema === 'string'
-        ? (JSON.parse(record.dslSchema) as ReportDsl)
-        : (record.dslSchema as unknown as ReportDsl);
+    const dsl = parseReportDsl(record);
     return { dsl, pid: record.pid };
   },
 
@@ -65,10 +74,7 @@ export const reportDesignerService = {
    */
   async loadByPid(pid: string): Promise<{ dsl: ReportDsl; pid: string }> {
     const record = await request<PageSchemaRecord>(`${PAGES_API}/${pid}`);
-    const dsl =
-      typeof record.dslSchema === 'string'
-        ? (JSON.parse(record.dslSchema) as ReportDsl)
-        : (record.dslSchema as unknown as ReportDsl);
+    const dsl = parseReportDsl(record);
     return { dsl, pid: record.pid };
   },
 
@@ -86,13 +92,14 @@ export const reportDesignerService = {
 
     const payload = {
       pageKey,
-      modelCode: 'report',
       kind: 'list',
       profile: 'report',
       title: report.title,
       name: `${report.title} (${suffix})`,
       blocks: [],
-      dslSchema: report as unknown as Record<string, unknown>,
+      extension: {
+        reportDsl: report as unknown as Record<string, unknown>,
+      },
       status: 'draft',
       semver: '0.1.0',
     };
@@ -113,18 +120,13 @@ export const reportDesignerService = {
   },
 
   /**
-   * Export report as PDF via render-html endpoint
+   * Export report as PDF via report export endpoint
    */
-  async exportPdf(
-    html: string,
-    pageSize: string,
-    orientation: string,
-    filename: string,
-  ): Promise<Blob> {
-    const response = await fetch('/api/print/render-html', {
+  async exportPdf(reportPid: string, parameters?: Record<string, unknown>): Promise<Blob> {
+    const response = await fetch('/api/reports/export/pdf', {
       method: 'post',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html, pageSize, orientation, filename }),
+      body: JSON.stringify({ reportPid, parameters }),
     });
 
     if (!response.ok) {
@@ -148,6 +150,24 @@ export const reportDesignerService = {
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.desc || error.message || `Excel export failed: ${response.status}`);
+    }
+
+    return response.blob();
+  },
+
+  /**
+   * Export report as JSON via report export endpoint
+   */
+  async exportJson(reportPid: string, parameters?: Record<string, unknown>): Promise<Blob> {
+    const response = await fetch('/api/reports/export/json', {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reportPid, parameters }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.desc || error.message || `JSON export failed: ${response.status}`);
     }
 
     return response.blob();

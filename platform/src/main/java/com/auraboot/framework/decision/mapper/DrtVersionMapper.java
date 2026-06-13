@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
+
 /**
  * Mapper for {@link DrtVersionEntity}.
  *
@@ -44,7 +46,16 @@ public interface DrtVersionMapper extends BaseMapper<DrtVersionEntity> {
 
     /** All versions for a (tenant, decisionCode) — candidates for VersionSelector binding resolution. */
     @Select("SELECT * FROM ab_drt_version WHERE tenant_id = #{tenantId} AND decision_code = #{decisionCode}")
-    java.util.List<DrtVersionEntity> findAllByCode(
+    List<DrtVersionEntity> findAllByCode(
             @Param("tenantId") Long tenantId,
             @Param("decisionCode") String decisionCode);
+
+    /** Validated-or-published versions with persisted field references for the DecisionOps field catalogue. */
+    @Select("""
+            SELECT * FROM ab_drt_version
+            WHERE tenant_id = #{tenantId}
+              AND field_refs_json IS NOT NULL
+              AND status IN ('VALIDATED', 'PENDING_APPROVAL', 'PUBLISHED', 'DEPRECATED')
+            """)
+    List<DrtVersionEntity> findWithFieldRefs(@Param("tenantId") Long tenantId);
 }

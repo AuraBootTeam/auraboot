@@ -51,6 +51,9 @@ export interface UseSchemaRuntimeOptions {
   /** 禁用自动获取数据 (推荐 true) */
   disableAutoFetch?: boolean;
 
+  /** Skip SchemaRuntime-owned data source registration when a page hook owns it. */
+  skipDataSourceRegistration?: boolean;
+
   /** 用户信息 (可选，如果不提供则使用硬编码) */
   user?: {
     id: string;
@@ -128,7 +131,13 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
     [options.showToast, showSuccessToast, showErrorToast, showWarningToast, showInfoToast],
   );
 
-  const { schema, dataSourceManager, navigate, disableAutoFetch = true } = options;
+  const {
+    schema,
+    dataSourceManager,
+    navigate,
+    disableAutoFetch = true,
+    skipDataSourceRegistration = false,
+  } = options;
 
   // 使用 ref 跟踪 schema ID，避免重复创建
   const schemaIdRef = React.useRef<string | null>(null);
@@ -161,6 +170,7 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
       showToast: toastHandler,
       dataSourceManager, // P0-3: 必需参数
       disableAutoFetch,
+      skipDataSourceRegistration,
     });
 
     setRuntime(rt);

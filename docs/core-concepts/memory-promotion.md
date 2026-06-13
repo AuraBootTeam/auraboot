@@ -10,7 +10,7 @@ from personal (`scope=user`) to team-level (`scope=tenant`) — with a
 human-in-the-loop review gate, semantic deduplication, and a shadow
 observation window before a promoted memory becomes authoritative.
 
-Full design: [`docs/plans/2026-04/2026-04-18-memory-promotion-design.md`](../plans/2026-04/2026-04-18-memory-promotion-design.md).
+Full design: historical 2026-04-18 design, consolidated into this subsystem reference.
 
 ## Lifecycle
 

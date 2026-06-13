@@ -71,7 +71,7 @@ describe('useVirtualList', () => {
 
     expect(result.current.scrollOffset).toBe(400);
     // start = floor(400/40)=10; startIndex = max(0, 10-2)=8
-    const indices = result.current.virtualItems.map((i) => i.index);
+    const indices = result.current.virtualItems.map((i: { index: number }) => i.index);
     expect(indices[0]).toBe(8);
   });
 
@@ -97,7 +97,7 @@ describe('useVirtualList', () => {
       useVirtualList({ itemCount: 20, itemHeight: 40, containerHeight: 200 }),
     );
     // visible=5, overscan=3 → endIndex = 5+3=8 (0-indexed)
-    const indices = result.current.virtualItems.map((i) => i.index);
+    const indices = result.current.virtualItems.map((i: { index: number }) => i.index);
     expect(indices).toContain(0);
     expect(indices[indices.length - 1]).toBeGreaterThanOrEqual(7);
   });

@@ -74,6 +74,10 @@ async function fetchApiData(ds: ReportDataSource): Promise<Record<string, unknow
   return [];
 }
 
+async function fetchStaticData(ds: ReportDataSource): Promise<Record<string, unknown>[]> {
+  return Array.isArray(ds.data) ? ds.data : [];
+}
+
 /**
  * Fetch all data sources defined in a report
  * @returns Record<dataSourceKey, rows[]>
@@ -95,6 +99,9 @@ export async function fetchReportData(
           break;
         case 'api':
           results[key] = await fetchApiData(ds);
+          break;
+        case 'static':
+          results[key] = await fetchStaticData(ds);
           break;
         default:
           results[key] = [];

@@ -20,6 +20,12 @@ public class DrtLogDTO {
     private String correlationId;
     private String decisionCode;
     private Integer decisionVersion;
+    private Integer selectedVersion;
+    private String rolloutPolicyPid;
+    private Integer rolloutBucket;
+    private String rolloutArm;
+    private String routingKey;
+    private String rolloutResultKey;
     private String kind;
     private String runtimeAdapter;
     private String callerType;

@@ -91,7 +91,8 @@ describe('useNotificationPreferences', () => {
     });
     // After optimistic update, new pref should be in the list
     const pref = result.current.preferences.find(
-      (p) => p.channel === 'email' && p.category === 'business',
+      (p: { channel: string; category: string; enabled: boolean }) =>
+        p.channel === 'email' && p.category === 'business',
     );
     expect(pref).toBeDefined();
     expect(pref?.enabled).toBe(false);
@@ -117,7 +118,8 @@ describe('useNotificationPreferences', () => {
 
     // Should revert to original enabled=true
     const pref = result.current.preferences.find(
-      (p) => p.channel === 'email' && p.category === 'business',
+      (p: { channel: string; category: string; enabled: boolean }) =>
+        p.channel === 'email' && p.category === 'business',
     );
     expect(pref?.enabled).toBe(true);
     expect(showErrorToast).toHaveBeenCalledWith('update failed');
@@ -139,7 +141,8 @@ describe('useNotificationPreferences', () => {
     });
 
     const pref = result.current.preferences.find(
-      (p) => p.channel === 'slack' && p.category === 'alert',
+      (p: { channel: string; category: string; enabled: boolean }) =>
+        p.channel === 'slack' && p.category === 'alert',
     );
     expect(pref?.enabled).toBe(true);
     expect(showErrorToast).toHaveBeenCalled();

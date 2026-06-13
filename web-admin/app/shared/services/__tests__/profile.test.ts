@@ -34,14 +34,11 @@ function fail(desc = 'Failed', message = '') {
 const FAKE_REQUEST = new Request('http://localhost/');
 
 const PROFILE = {
-  id: 42,
-  userId: 42,
-  displayName: 'Alice',
+  userName: 'alice',
+  nickName: 'Alice',
   email: 'alice@example.com',
-  avatarUrl: null,
-  bio: null,
+  avatarUrl: undefined,
   createdAt: '2024-01-01',
-  updatedAt: '2024-01-01',
 };
 
 describe('profile service', () => {
@@ -88,10 +85,10 @@ describe('profile service', () => {
 
   describe('updateUserProfile', () => {
     it('PUTs /api/user/profile with profile data and returns updated profile', async () => {
-      const updated = { ...PROFILE, displayName: 'Alice B.' };
+      const updated = { ...PROFILE, nickName: 'Alice B.' };
       fetchResultMock.mockResolvedValue(ok(updated));
 
-      const updateData = { displayName: 'Alice B.' };
+      const updateData = { nickName: 'Alice B.' };
       const result = await updateUserProfile(FAKE_REQUEST, updateData);
 
       expect(fetchResultMock).toHaveBeenCalledWith(
@@ -99,14 +96,14 @@ describe('profile service', () => {
         { method: 'put', params: updateData },
         FAKE_REQUEST,
       );
-      expect(result?.displayName).toBe('Alice B.');
+      expect(result?.nickName).toBe('Alice B.');
     });
 
     it('throws on failure', async () => {
       fetchResultMock.mockResolvedValue(fail('Validation error'));
 
       await expect(
-        updateUserProfile(FAKE_REQUEST, { displayName: '' }),
+        updateUserProfile(FAKE_REQUEST, { nickName: '' }),
       ).rejects.toThrow('Validation error');
     });
 

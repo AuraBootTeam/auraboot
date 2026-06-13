@@ -62,11 +62,11 @@ describe('useGroupedTableData', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     act(() => result.current.toggleGroup('active'));
-    const collapsed = result.current.groups.find((g) => g.groupKey === 'active');
+    const collapsed = result.current.groups.find((g: { groupKey: string }) => g.groupKey === 'active');
     expect(collapsed!.collapsed).toBe(true);
 
     act(() => result.current.toggleGroup('active'));
-    const expanded = result.current.groups.find((g) => g.groupKey === 'active');
+    const expanded = result.current.groups.find((g: { groupKey: string }) => g.groupKey === 'active');
     expect(expanded!.collapsed).toBe(false);
   });
 
@@ -95,7 +95,7 @@ describe('useGroupedTableData', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     const groups = result.current.groups;
     expect(groups).toHaveLength(2);
-    const activeGroup = groups.find((g) => g.groupKey === 'active');
+    const activeGroup = groups.find((g: { groupKey: string }) => g.groupKey === 'active');
     expect(activeGroup).toBeDefined();
     expect(activeGroup!.rows).toHaveLength(2);
     expect(activeGroup!.aggregations['Total Amount']).toBe(300);

@@ -2,6 +2,8 @@ package com.auraboot.framework.bpm.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.auraboot.framework.bpm.typehandler.JsonListMapTypeHandler;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.decision.rule.RuleConsumerBindingTypeHandler;
 import lombok.*;
 
 import java.time.Instant;
@@ -72,6 +74,12 @@ public class SlaConfigEntity {
      */
     @TableField(typeHandler = JsonListMapTypeHandler.class)
     private List<Map<String, Object>> warningRules;
+
+    /**
+     * Platform rule-center binding used by SLA deadline/breach/escalation policies.
+     */
+    @TableField(value = "rule_binding", typeHandler = RuleConsumerBindingTypeHandler.class)
+    private RuleConsumerBinding ruleBinding;
 
     /**
      * Associated model code.

@@ -45,6 +45,11 @@ export const ExportPdfButton: React.FC<ExportPdfButtonProps> = ({
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
+        onclone: (clonedDocument, clonedTarget) => {
+          injectPdfColorFallbackStyle(clonedDocument);
+          sanitizeUnsupportedPdfColors(clonedDocument.documentElement);
+          sanitizeUnsupportedPdfColors(clonedTarget as HTMLElement);
+        },
       });
 
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -74,8 +79,13 @@ export const ExportPdfButton: React.FC<ExportPdfButtonProps> = ({
       pdf.addImage(imgData, 'jpeg', x, y, scaledWidth, scaledHeight);
       pdf.save(`${fileName}.pdf`);
     } catch (err) {
-      console.error('PDF export failed:', err);
-      showErrorToast('PDF export failed. Please try again.');
+      console.warn('PDF image export failed; falling back to text PDF:', err);
+      try {
+        await exportTextFallbackPdf(targetRef.current, fileName, orientation);
+      } catch (fallbackErr) {
+        console.error('PDF fallback export failed:', fallbackErr);
+        showErrorToast('PDF export failed. Please try again.');
+      }
     } finally {
       setExporting(false);
     }
@@ -112,5 +122,127 @@ export const ExportPdfButton: React.FC<ExportPdfButtonProps> = ({
     </button>
   );
 };
+
+async function exportTextFallbackPdf(
+  target: HTMLElement,
+  fileName: string,
+  orientation: 'portrait' | 'landscape',
+): Promise<void> {
+  const { jsPDF } = await import('jspdf');
+  const pdf = new jsPDF({
+    orientation,
+    unit: 'mm',
+    format: 'a4',
+  });
+  const margin = 12;
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const maxWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(14);
+  pdf.text(fileName || 'Dashboard export', margin, y);
+  y += 8;
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  const text = normalizeExportText(target.innerText) || 'No visible dashboard content';
+  const lines = pdf.splitTextToSize(text, maxWidth) as string[];
+  for (const line of lines) {
+    if (y > pageHeight - margin) {
+      pdf.addPage();
+      y = margin;
+    }
+    pdf.text(line, margin, y);
+    y += 5;
+  }
+  pdf.save(`${fileName}.pdf`);
+}
+
+function normalizeExportText(value: string): string {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, 8000);
+}
+
+function injectPdfColorFallbackStyle(clonedDocument: Document): void {
+  const style = clonedDocument.createElement('style');
+  style.textContent = `
+    *, *::before, *::after {
+      color: #111827 !important;
+      background-color: #ffffff !important;
+      border-color: #d1d5db !important;
+      outline-color: #2563eb !important;
+      text-decoration-color: #111827 !important;
+      caret-color: #111827 !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      background-image: none !important;
+      --tw-ring-color: rgba(37, 99, 235, 0.45) !important;
+      --tw-shadow-color: transparent !important;
+    }
+    svg, svg * {
+      color: #111827 !important;
+      fill: #111827 !important;
+      stroke: #111827 !important;
+    }
+  `;
+  clonedDocument.head.appendChild(style);
+}
+
+function sanitizeUnsupportedPdfColors(root: HTMLElement): void {
+  const view = root.ownerDocument.defaultView;
+  if (!view) return;
+  const nodes = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
+  for (const node of nodes) {
+    const style = view.getComputedStyle(node);
+    forceColor(node, 'color', '#111827');
+    forceColor(node, 'background-color', '#ffffff');
+    forceColor(node, 'border-top-color', '#d1d5db');
+    forceColor(node, 'border-right-color', '#d1d5db');
+    forceColor(node, 'border-bottom-color', '#d1d5db');
+    forceColor(node, 'border-left-color', '#d1d5db');
+    forceColor(node, 'outline-color', '#2563eb');
+    forceColor(node, 'text-decoration-color', '#111827');
+    forceColor(node, 'caret-color', '#111827');
+    forceColor(node, 'fill', '#111827');
+    forceColor(node, 'stroke', '#111827');
+    if (node instanceof view.SVGElement) {
+      node.setAttribute('color', '#111827');
+      node.setAttribute('fill', '#111827');
+      node.setAttribute('stroke', '#111827');
+    }
+    sanitizeComplexColor(node, style, 'box-shadow', 'none');
+    sanitizeComplexColor(node, style, 'text-shadow', 'none');
+    sanitizeComplexColor(node, style, 'background-image', 'none');
+  }
+}
+
+function forceColor(
+  node: HTMLElement,
+  property: string,
+  fallback: string,
+): void {
+  node.style.setProperty(property, fallback, 'important');
+}
+
+function sanitizeComplexColor(
+  node: HTMLElement,
+  style: CSSStyleDeclaration,
+  property: string,
+  fallback: string,
+): void {
+  const value = style.getPropertyValue(property);
+  if (!usesUnsupportedColor(value)) return;
+  node.style.setProperty(property, fallback, 'important');
+}
+
+function usesUnsupportedColor(value: string | null | undefined): boolean {
+  return Boolean(value?.toLowerCase().includes('oklch('));
+}
 
 export default ExportPdfButton;

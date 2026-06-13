@@ -214,6 +214,28 @@ class DebugSessionServiceImplTest {
     }
 
     @Test
+    @DisplayName("step rebuilds context when persisted executionContext is null")
+    void step_nullPersistedExecutionContext_rebuildsSafeContext() {
+        DebugSession s = baseSession("paused", 0);
+        s.setExecutionContext(null);
+        s.setTriggerPayload(Map.of("field", "value"));
+        when(debugSessionMapper.findByPid(SESSION_PID)).thenReturn(s);
+        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automationWithActions(1));
+        when(actionExecutor.execute(any(), anyMap())).thenReturn("ok");
+
+        DebugSessionDTO dto = service.step(SESSION_PID);
+
+        ArgumentCaptor<Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(actionExecutor).execute(any(), contextCaptor.capture());
+        assertThat(contextCaptor.getValue())
+                .containsEntry("field", "value")
+                .containsEntry("automationPid", AUTOMATION_PID)
+                .containsEntry("debugMode", true);
+        assertThat(dto.getStatus()).isEqualTo("completed");
+        assertThat(dto.getActionResults()).hasSize(1);
+    }
+
+    @Test
     @DisplayName("step completes the session when last action runs")
     void step_terminalAdvance() {
         DebugSession s = baseSession("paused", 0);
