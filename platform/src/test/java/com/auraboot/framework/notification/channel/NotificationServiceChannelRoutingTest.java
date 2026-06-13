@@ -47,6 +47,12 @@ class NotificationServiceChannelRoutingTest {
     @Mock
     private EmailSender emailSender;
 
+    @Mock
+    private com.auraboot.framework.rbac.mapper.UserRoleMapper userRoleMapper;
+
+    @Mock
+    private com.auraboot.framework.organization.service.TeamMemberService teamMemberService;
+
     private NotificationServiceImpl notificationService;
 
     private MockedStatic<MetaContext> metaContextMock;
@@ -63,7 +69,8 @@ class NotificationServiceChannelRoutingTest {
         when(emailChannel.send(any())).thenReturn(NotificationResult.ok());
 
         notificationService = new NotificationServiceImpl(
-                templateService, sendLogMapper, emailSender, List.of(inAppChannel, emailChannel));
+                templateService, sendLogMapper, emailSender, List.of(inAppChannel, emailChannel),
+                userRoleMapper, teamMemberService);
 
         // Mock MetaContext
         metaContextMock = Mockito.mockStatic(MetaContext.class);
@@ -99,6 +106,28 @@ class NotificationServiceChannelRoutingTest {
         assertEquals(1L, msg.getTenantId());
         assertEquals(List.of(42L), msg.getRecipientUserIds());
         assertEquals("Body with value", msg.getBody());
+    }
+
+    @Test
+    @DisplayName("send() with recipientType=role fans out to every role member")
+    void sendRoleRecipientFansOutToMembers() {
+        NotificationTemplate template = createTemplate("alarm_tpl", "in_app");
+        when(templateService.getByCode("alarm_tpl")).thenReturn(template);
+        when(userRoleMapper.findUserIdsByRoleCode("iot_operator", 1L))
+                .thenReturn(List.of(10L, 20L));
+
+        NotificationSendRequest request = NotificationSendRequest.builder()
+                .templateCode("alarm_tpl")
+                .recipientType("role")
+                .recipientId("iot_operator")
+                .variables(Map.of("key", "value"))
+                .build();
+
+        notificationService.send(request);
+
+        ArgumentCaptor<NotificationMessage> captor = ArgumentCaptor.forClass(NotificationMessage.class);
+        verify(inAppChannel).send(captor.capture());
+        assertEquals(List.of(10L, 20L), captor.getValue().getRecipientUserIds());
     }
 
     @Test

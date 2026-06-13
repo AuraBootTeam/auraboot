@@ -92,6 +92,41 @@ class NotificationServiceTaskDelegateTest {
                 .hasMessageContaining(NotificationServiceTaskDelegate.ERR_RECIPIENT_UNRESOLVED);
     }
 
+    @Test
+    void execute_explicitRoleRecipient_passesRecipientTypeAndValue() {
+        Map<String, String> props = new HashMap<>();
+        props.put(BpmServiceTaskConstants.ATTR_EVENT_CODE, "iot_alarm_raised");
+        props.put(BpmServiceTaskConstants.ATTR_RECIPIENT_TYPE, "role");
+        props.put(BpmServiceTaskConstants.ATTR_RECIPIENT, "iot_operator");
+
+        ExecutionContext ctx = mockContext(props, new HashMap<>(), "notify_operator");
+        delegate.execute(ctx);
+
+        ArgumentCaptor<NotificationSendRequest> captor = ArgumentCaptor.forClass(NotificationSendRequest.class);
+        verify(notificationService).send(captor.capture());
+        NotificationSendRequest req = captor.getValue();
+        assertThat(req.getRecipientType()).isEqualTo("role");
+        assertThat(req.getRecipientId()).isEqualTo("iot_operator");
+    }
+
+    @Test
+    void execute_explicitRecipientExpression_resolvesFromProcessVar() {
+        Map<String, String> props = new HashMap<>();
+        props.put(BpmServiceTaskConstants.ATTR_EVENT_CODE, "evt");
+        props.put(BpmServiceTaskConstants.ATTR_RECIPIENT_TYPE, "user");
+        props.put(BpmServiceTaskConstants.ATTR_RECIPIENT, "${ownerUserId}");
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("ownerUserId", "42");
+
+        ExecutionContext ctx = mockContext(props, vars, "node");
+        delegate.execute(ctx);
+
+        ArgumentCaptor<NotificationSendRequest> captor = ArgumentCaptor.forClass(NotificationSendRequest.class);
+        verify(notificationService).send(captor.capture());
+        assertThat(captor.getValue().getRecipientType()).isEqualTo("user");
+        assertThat(captor.getValue().getRecipientId()).isEqualTo("42");
+    }
+
     private ExecutionContext mockContext(Map<String, String> properties,
                                           Map<String, Object> request, String activityId) {
         ExecutionContext ctx = org.mockito.Mockito.mock(ExecutionContext.class);

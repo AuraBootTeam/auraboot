@@ -37,6 +37,10 @@ public final class BpmServiceTaskConstants {
     public static final String ATTR_EVENT_CODE = "eventCode";
     public static final String ATTR_RECIPIENT_FROM = "recipientFrom";
     public static final String ATTR_TEMPLATE_PARAMS_VARS = "templateParamsVars";
+    /** Recipient kind for the explicit-recipient notification path: user | role | group. */
+    public static final String ATTR_RECIPIENT_TYPE = "recipientType";
+    /** Recipient value (user id / role code / team pid); may be a ${var} process reference. */
+    public static final String ATTR_RECIPIENT = "recipient";
 
     // HTTP serviceTask attributes
     public static final String ATTR_SERVICE_URL = "serviceUrl";
