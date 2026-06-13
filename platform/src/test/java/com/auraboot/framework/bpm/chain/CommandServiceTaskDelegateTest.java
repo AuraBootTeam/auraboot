@@ -333,4 +333,69 @@ class CommandServiceTaskDelegateTest {
             verify(commandExecutor).execute(eq("pe:test"), any());
         }
     }
+
+    @Nested
+    @DisplayName("smart:properties config (hand-authored BPMN, no _chain_nodes)")
+    class SmartPropertiesConfig {
+
+        private void setupPropertiesContext(String nodeId, Map<String, String> props,
+                                            Map<String, Object> processVars) {
+            when(baseElement.getId()).thenReturn(nodeId);
+            when(baseElement.getProperties()).thenReturn(props);
+            when(executionContext.getBaseElement()).thenReturn(baseElement);
+            when(executionContext.getRequest()).thenReturn(processVars);
+            when(executionInstance.getInstanceId()).thenReturn("exec-props-001");
+            when(executionContext.getExecutionInstance()).thenReturn(executionInstance);
+        }
+
+        @Test
+        @DisplayName("reads commandCode/operationType/targetRecordId + payload params from smart:properties")
+        void readsCommandConfigFromProperties() {
+            Map<String, Object> processVars = new HashMap<>();
+            processVars.put("alarmEventPid", "alarm-77");
+
+            Map<String, String> props = new HashMap<>();
+            props.put("commandCode", "iot_alarm_event:clear");
+            props.put("operationType", "update");
+            props.put("targetRecordId", "${alarmEventPid}");
+            props.put("status", "CLEARED"); // a payload param, not a reserved key
+            setupPropertiesContext("auto_clear", props, processVars);
+
+            when(commandExecutor.execute(eq("iot_alarm_event:clear"), any(CommandExecuteRequest.class)))
+                    .thenReturn(CommandExecuteResult.builder()
+                            .commandCode("iot_alarm_event:clear").phaseReached("completed")
+                            .data(Map.of()).executionTimeMs(7).build());
+
+            delegate.execute(executionContext);
+
+            ArgumentCaptor<CommandExecuteRequest> captor = ArgumentCaptor.forClass(CommandExecuteRequest.class);
+            verify(commandExecutor).execute(eq("iot_alarm_event:clear"), captor.capture());
+            CommandExecuteRequest req = captor.getValue();
+            assertEquals("update", req.getOperationType());
+            assertEquals("alarm-77", req.getTargetRecordId()); // ${alarmEventPid} resolved
+            assertEquals("CLEARED", req.getPayload().get("status"));
+            // reserved keys must not leak into the command payload
+            assertFalse(req.getPayload().containsKey("commandCode"));
+            assertFalse(req.getPayload().containsKey("operationType"));
+            assertFalse(req.getPayload().containsKey("targetRecordId"));
+            assertTrue((Boolean) processVars.get("_step_auto_clear_success"));
+        }
+
+        @Test
+        @DisplayName("missing commandCode (and no _chain_nodes) throws a clear, actionable error")
+        void missingCommandCodeThrows() {
+            Map<String, String> props = new HashMap<>();
+            props.put("operationType", "update"); // no commandCode
+
+            when(baseElement.getId()).thenReturn("bad_node");
+            when(baseElement.getProperties()).thenReturn(props);
+            when(executionContext.getBaseElement()).thenReturn(baseElement);
+            when(executionContext.getRequest()).thenReturn(new HashMap<>());
+
+            CommandChainStepException ex = assertThrows(CommandChainStepException.class,
+                    () -> delegate.execute(executionContext));
+            assertTrue(ex.getMessage().contains("commandServiceTaskDelegate"));
+            verify(commandExecutor, never()).execute(any(), any());
+        }
+    }
 }
