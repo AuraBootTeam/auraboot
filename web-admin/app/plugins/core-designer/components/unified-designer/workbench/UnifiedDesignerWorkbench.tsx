@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -80,14 +80,22 @@ export interface UnifiedDesignerWorkbenchProps {
   onSave?: (document: PageSchemaV3) => Promise<void> | void;
 }
 
+const MAX_DOCUMENT_HISTORY = 50;
+
 export function UnifiedDesignerWorkbench({
   initialDocument,
   modelFieldsByModel = {},
   returnHref,
   onSave,
 }: UnifiedDesignerWorkbenchProps) {
-  const [document, setDocument] = useState<PageSchemaV3>(initialDocument);
+  const initialSnapshot = serializeDocument(initialDocument);
+  const [documentHistory, setDocumentHistory] = useState(() => ({
+    document: initialDocument,
+    history: [initialSnapshot],
+    historyIndex: 0,
+  }));
   const [savedSnapshot, setSavedSnapshot] = useState(() => serializeDocument(initialDocument));
+  const savedSnapshotRef = useRef(initialSnapshot);
   const [saveStatus, setSaveStatus] = useState<DesignerSaveStatus>('saved');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [validationErrorCount, setValidationErrorCount] = useState(0);
@@ -96,6 +104,7 @@ export function UnifiedDesignerWorkbench({
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
   const [activeDropIntent, setActiveDropIntent] = useState<ActiveDropIntent>(null);
+  const document = documentHistory.document;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor),
@@ -111,6 +120,8 @@ export function UnifiedDesignerWorkbench({
 
   const currentSnapshot = serializeDocument(document);
   const isDirty = currentSnapshot !== savedSnapshot;
+  const canUndo = documentHistory.historyIndex > 0;
+  const canRedo = documentHistory.historyIndex < documentHistory.history.length - 1;
 
   const selectedBlockResult = useMemo(
     () => (selectedBlockId ? findBlockById(document.blocks, selectedBlockId) : null),
@@ -124,10 +135,59 @@ export function UnifiedDesignerWorkbench({
   const selectedModelFields = selectedModelCode ? (modelFieldsByModel[selectedModelCode] ?? []) : [];
 
   const updateDocument = (updater: (current: PageSchemaV3) => PageSchemaV3) => {
-    setDocument(updater);
-    setSaveStatus('dirty');
+    setDocumentHistory((state) => {
+      const snapshot = serializeDocument(state.document);
+      const nextDocument = updater(state.document);
+      const serializedNext = serializeDocument(nextDocument);
+      if (serializedNext === snapshot) return state;
+
+      const nextHistory = [
+        ...state.history.slice(0, state.historyIndex + 1),
+        serializedNext,
+      ];
+      const trimmedHistory = nextHistory.slice(-MAX_DOCUMENT_HISTORY);
+      syncSaveStateForSnapshot(serializedNext);
+
+      return {
+        document: nextDocument,
+        history: trimmedHistory,
+        historyIndex: trimmedHistory.length - 1,
+      };
+    });
+  };
+
+  const syncSaveStateForSnapshot = (snapshot: string) => {
+    setSaveStatus(snapshot === savedSnapshotRef.current ? 'saved' : 'dirty');
     setSaveError(null);
     setValidationErrorCount(0);
+  };
+
+  const handleUndo = () => {
+    setDocumentHistory((state) => {
+      if (state.historyIndex <= 0) return state;
+      const nextIndex = state.historyIndex - 1;
+      const snapshot = state.history[nextIndex];
+      syncSaveStateForSnapshot(snapshot);
+      return {
+        ...state,
+        document: parseDocumentSnapshot(snapshot),
+        historyIndex: nextIndex,
+      };
+    });
+  };
+
+  const handleRedo = () => {
+    setDocumentHistory((state) => {
+      if (state.historyIndex >= state.history.length - 1) return state;
+      const nextIndex = state.historyIndex + 1;
+      const snapshot = state.history[nextIndex];
+      syncSaveStateForSnapshot(snapshot);
+      return {
+        ...state,
+        document: parseDocumentSnapshot(snapshot),
+        historyIndex: nextIndex,
+      };
+    });
   };
 
   // D6 — apply a scenario template: replace the page's blocks (and title) with a
@@ -583,7 +643,9 @@ export function UnifiedDesignerWorkbench({
     setSaveStatus('saving');
     try {
       await onSave?.(document);
-      setSavedSnapshot(serializeDocument(document));
+      const snapshot = serializeDocument(document);
+      savedSnapshotRef.current = snapshot;
+      setSavedSnapshot(snapshot);
       setSaveStatus('saved');
     } catch (error) {
       setSaveStatus('error');
@@ -593,7 +655,7 @@ export function UnifiedDesignerWorkbench({
 
   return (
     <div
-      className="flex h-[calc(100vh-64px)] min-h-[720px] flex-col overflow-hidden bg-slate-100 text-slate-900"
+      className="flex h-[calc(100vh-64px)] min-h-[656px] flex-col overflow-hidden bg-slate-100 text-slate-900"
       data-testid="unified-designer-workbench"
       data-mode={mode}
     >
@@ -604,8 +666,12 @@ export function UnifiedDesignerWorkbench({
         saveStatus={saveStatus}
         saveError={saveError}
         validationErrorCount={validationErrorCount}
+        canUndo={canUndo}
+        canRedo={canRedo}
         returnHref={returnHref}
         onModeChange={setMode}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
         onSave={handleSave}
       />
       {mode === 'preview' ? (
@@ -749,6 +815,10 @@ function localizedLabel(value: ModelFieldDefinition['label']): string {
 
 function serializeDocument(document: PageSchemaV3): string {
   return JSON.stringify(document);
+}
+
+function parseDocumentSnapshot(snapshot: string): PageSchemaV3 {
+  return JSON.parse(snapshot) as PageSchemaV3;
 }
 
 function formatValidationSaveError(errorCount: number): string {
