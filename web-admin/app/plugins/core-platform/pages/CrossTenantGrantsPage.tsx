@@ -260,8 +260,9 @@ export function GrantFormModal({
     setSubmitting(true);
     setError(null);
     const result = await createGrant({
-      parentTenantId: Number(parentTenantId),
-      childTenantId: Number(childTenantId),
+      // Pass the raw string ids — Number() would lose snowflake precision (>2^53).
+      parentTenantId: parentTenantId.trim(),
+      childTenantId: childTenantId.trim(),
       expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
       note: note || undefined,
     });
