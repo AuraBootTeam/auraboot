@@ -504,6 +504,110 @@ function expectActionBarChildren(savedBlocks: TestBlock[], movedBlockId: string)
   ]);
 }
 
+async function createCrossContainerFormSectionPage(
+  page: Page,
+  options: { source: 'tab' | 'form' },
+): Promise<CreatedDesignerPage> {
+  const id = uniqueId(`udw_form_section_${options.source}_move`);
+  const pageKey = `udw_form_section_${options.source}_move_${id}`;
+  const rootBlocks =
+    options.source === 'tab'
+      ? [
+          {
+            id: 'tabs_holder',
+            blockType: 'tabs',
+            title: 'Tabs holder',
+            layout: { span: 12 },
+            blocks: [
+              {
+                id: 'tab_source',
+                blockType: 'tab',
+                title: 'Source tab',
+                blocks: [createFormSectionMoveCandidate()],
+              },
+            ],
+          },
+          {
+            id: 'section_target',
+            blockType: 'form-section',
+            title: 'Target section',
+            layout: { span: 12 },
+            blocks: [
+              {
+                id: 'target_field_title',
+                blockType: 'field',
+                field: 'title',
+                layout: { span: 6 },
+                props: { label: 'Target title', component: 'input' },
+              },
+            ],
+          },
+        ]
+      : [
+          createFormSectionMoveCandidate(),
+          {
+            id: 'tabs_holder',
+            blockType: 'tabs',
+            title: 'Tabs holder',
+            layout: { span: 12 },
+            blocks: [{ id: 'tab_empty', blockType: 'tab', title: 'Empty target tab', blocks: [] }],
+          },
+        ];
+
+  const resp = await page.request.post('/api/pages', {
+    data: {
+      name: `UDW form-section move ${id}`,
+      pageKey,
+      title: `UDW form-section move ${id}`,
+      kind: 'form',
+      modelCode: 'page_schema',
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          title: 'Form root',
+          dataSource: { model: 'page_schema' },
+          layout: { span: 12 },
+          blocks: rootBlocks,
+        },
+      ],
+      extension: {
+        e2e: true,
+        scenario: `unified-designer-form-section-${options.source}-cross-container-move`,
+      },
+    },
+  });
+  expect(resp.ok(), await resp.text()).toBe(true);
+  const body = await resp.json();
+  expect(body.code).toBe('0');
+  expect(body.data?.pid).toBeTruthy();
+  return { pageKey, pid: body.data.pid };
+}
+
+function createFormSectionMoveCandidate() {
+  return {
+    id: 'form_section_move_candidate',
+    blockType: 'form-section',
+    title: 'Move candidate section',
+    layout: { span: 12 },
+    blocks: [
+      {
+        id: 'candidate_field_name',
+        blockType: 'field',
+        field: 'name',
+        layout: { span: 6 },
+        props: { label: 'Candidate name', component: 'input' },
+      },
+    ],
+  };
+}
+
+function expectFormSectionChildren(savedBlocks: TestBlock[], movedBlockId: string) {
+  const movedBlock = findBlock(savedBlocks, movedBlockId);
+  expect(movedBlock?.blocks?.map((block) => block.id)).toEqual(['candidate_field_name']);
+}
+
 async function createCrossContainerListBlockPage(
   page: Page,
   blockType: ListBlockMoveType,
@@ -1350,6 +1454,78 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       'action_bar_move_candidate',
     ]);
     expectActionBarChildren(savedBlocks, 'action_bar_move_candidate');
+  });
+
+  test('moves an existing form-section subtree from a tab before a form-root sibling and preserves fields', async ({
+    page,
+  }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
+      source: 'tab',
+    });
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockBeforeHeader(page, 'form_section_move_candidate', 'section_target');
+
+    const formRoot = page.getByTestId('canvas-block-form_root');
+    const sourceTab = page.getByTestId('canvas-block-tab_source');
+    await expect(sourceTab.getByTestId('canvas-block-form_section_move_candidate')).toHaveCount(0);
+    await expect(formRoot.getByTestId('canvas-block-form_section_move_candidate')).toBeVisible();
+    await expect(formRoot.getByTestId('canvas-block-section_target')).toBeVisible();
+    expect(await isBeforeInDom(formRoot, 'form_section_move_candidate', 'section_target')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'form_root');
+    const savedSourceTab = findBlock(savedBlocks, 'tab_source');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+      'tabs_holder',
+      'form_section_move_candidate',
+      'section_target',
+    ]);
+    expect(savedSourceTab?.blocks?.map((block) => block.id)).toEqual([]);
+    expectFormSectionChildren(savedBlocks, 'form_section_move_candidate');
+  });
+
+  test('moves an existing form-section subtree from form root inside an empty tab and preserves fields', async ({
+    page,
+  }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
+      source: 'form',
+    });
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockInto(page, 'form_section_move_candidate', 'tab_empty');
+
+    const targetTab = page.getByTestId('canvas-block-tab_empty');
+    await expect(targetTab.getByTestId('canvas-block-form_section_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'form_root');
+    const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
+      'form_section_move_candidate',
+    ]);
+    expectFormSectionChildren(savedBlocks, 'form_section_move_candidate');
   });
 
   test('moves an existing table subtree from a tab before another list-root table and preserves columns/actions', async ({
