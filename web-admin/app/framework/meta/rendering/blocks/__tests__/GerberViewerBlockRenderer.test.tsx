@@ -126,6 +126,7 @@ describe('GerberViewerBlockRenderer', () => {
 
     expect(screen.getByTestId('gerber-viewer')).toHaveTextContent('A00104001');
     expect(screen.getByTestId('gerber-viewer-board')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'PCB layer render' })).toBeInTheDocument();
     expect(screen.getByTestId('gerber-metric-board')).toHaveTextContent('98 x 33 mm');
     expect(screen.getByTestId('gerber-metric-parse')).toHaveTextContent('parsed / warning');
     expect(screen.getByTestId('gerber-layer-top_copper')).toHaveTextContent('258');
@@ -162,6 +163,35 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.getByTestId('gerber-layer-smt_points')).toHaveTextContent('17');
   });
 
+  it('renders real board SVG artifacts for top and bottom side views', () => {
+    const runtime = makeRuntime();
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: {
+        ...INSPECTION,
+        boardSvgUrls: {
+          top: '/artifacts/a00104001-board-top.svg',
+          bottom: '/artifacts/a00104001-board-bottom.svg',
+        },
+      },
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByRole('img', { name: 'PCB layer render' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Top' }));
+    const topRender = screen.getByRole('img', { name: 'Top Gerber board render' });
+    expect(topRender).toHaveAttribute('src', '/artifacts/a00104001-board-top.svg');
+    expect(screen.getByTestId('gerber-marker-C4')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bottom' }));
+    const bottomRender = screen.getByRole('img', { name: 'Bottom Gerber board render' });
+    expect(bottomRender).toHaveAttribute('src', '/artifacts/a00104001-board-bottom.svg');
+    expect(screen.getByTestId('gerber-marker-J1')).toBeInTheDocument();
+  });
+
   it('renders persisted line inspection JSON before falling back to the DSL sample', () => {
     const runtime = makeRuntime();
     const context = runtime.getContext() as any;
@@ -171,6 +201,10 @@ describe('GerberViewerBlockRenderer', () => {
       qo_ql_gerber_inspection: JSON.stringify({
         project: { code: 'REAL-INSPECTION', name: 'Persisted sidecar inspection' },
         board: { widthMm: 42, heightMm: 24 },
+        boardSvgUrls: {
+          top: '/line-artifacts/line-board-top.svg',
+          bottom: '/line-artifacts/line-board-bottom.svg',
+        },
         summary: { bomRefCount: 1, cplRefCount: 1, smdCount: 1, thtCount: 0 },
         components: [
           {
@@ -198,6 +232,12 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.getByTestId('gerber-metric-board')).toHaveTextContent('42 x 24 mm');
     expect(screen.getByTestId('gerber-marker-R7')).toBeInTheDocument();
     expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Top' }));
+    expect(screen.getByRole('img', { name: 'Top Gerber board render' })).toHaveAttribute(
+      'src',
+      '/line-artifacts/line-board-top.svg',
+    );
   });
 
   it('falls back to a parsed line from the bound data source when the selected line has no Gerber facts', () => {
