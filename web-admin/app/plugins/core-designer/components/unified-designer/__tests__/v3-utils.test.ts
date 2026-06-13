@@ -320,6 +320,112 @@ describe('Recursive PageSchema V3 utilities', () => {
     ).toEqual([]);
   });
 
+  it('moves action-bar subtrees between form and tab containers without losing actions', () => {
+    const crossContainerSchema: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'form_with_action_bar_moves',
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'tabs_holder',
+              blockType: 'tabs',
+              blocks: [
+                {
+                  id: 'tab_source',
+                  blockType: 'tab',
+                  blocks: [
+                    {
+                      id: 'action_bar_move_candidate',
+                      blockType: 'action-bar',
+                      region: 'toolbar',
+                      blocks: [
+                        { id: 'candidate_action_submit', blockType: 'action', actionType: 'submit' },
+                        { id: 'candidate_action_refresh', blockType: 'action', actionType: 'refresh' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'section_target',
+              blockType: 'form-section',
+              blocks: [{ id: 'field_target', blockType: 'field', field: 'name' }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const beforeTarget = moveBlockBefore(
+      crossContainerSchema.blocks,
+      'action_bar_move_candidate',
+      'section_target',
+    );
+    const formAfterBefore = findBlockById(beforeTarget, 'form_root')?.block;
+    const tabAfterBefore = findBlockById(beforeTarget, 'tab_source')?.block;
+    const movedBefore = findBlockById(beforeTarget, 'action_bar_move_candidate')?.block;
+
+    expect(formAfterBefore?.blocks?.map((block) => block.id)).toEqual([
+      'tabs_holder',
+      'action_bar_move_candidate',
+      'section_target',
+    ]);
+    expect(tabAfterBefore?.blocks?.map((block) => block.id)).toEqual([]);
+    expect(movedBefore?.blocks?.map((block) => block.id)).toEqual([
+      'candidate_action_submit',
+      'candidate_action_refresh',
+    ]);
+
+    const insideTabSchema: PageSchemaV3 = {
+      ...crossContainerSchema,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'action_bar_move_candidate',
+              blockType: 'action-bar',
+              region: 'toolbar',
+              blocks: [
+                { id: 'candidate_action_submit', blockType: 'action', actionType: 'submit' },
+                { id: 'candidate_action_refresh', blockType: 'action', actionType: 'refresh' },
+              ],
+            },
+            {
+              id: 'tabs_holder',
+              blockType: 'tabs',
+              blocks: [{ id: 'tab_empty', blockType: 'tab', blocks: [] }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const insideTab = moveBlockToParent(
+      insideTabSchema.blocks,
+      'action_bar_move_candidate',
+      'tab_empty',
+    );
+    const formAfterInside = findBlockById(insideTab, 'form_root')?.block;
+    const tabAfterInside = findBlockById(insideTab, 'tab_empty')?.block;
+    const movedInside = findBlockById(insideTab, 'action_bar_move_candidate')?.block;
+
+    expect(formAfterInside?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(tabAfterInside?.blocks?.map((block) => block.id)).toEqual([
+      'action_bar_move_candidate',
+    ]);
+    expect(movedInside?.blocks?.map((block) => block.id)).toEqual([
+      'candidate_action_submit',
+      'candidate_action_refresh',
+    ]);
+  });
+
   it('sets nested dot-path values without mutating the source object', () => {
     const source = { props: { label: 'Name' }, layout: { span: 6 } };
     const next = setByPath(source, 'props.required', true);
@@ -1141,6 +1247,10 @@ describe('Inspector schema registry', () => {
     expect(registry.canContain('form-section', 'sub-table')).toBe(true);
     expect(registry.canContain('form-section', 'repeater')).toBe(true);
     expect(registry.canContain('form-section', 'subform')).toBe(true);
+    expect(registry.canContain('form', 'action-bar')).toBe(true);
+    expect(registry.canContain('tab', 'action-bar')).toBe(true);
+    expect(registry.canContain('action-bar', 'action')).toBe(true);
+    expect(registry.canContain('form-section', 'action-bar')).toBe(false);
     expect(registry.canContain('sub-table', 'column')).toBe(true);
     expect(registry.canContain('sub-table', 'action')).toBe(true);
     expect(registry.canContain('repeater', 'field')).toBe(true);
