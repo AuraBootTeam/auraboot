@@ -55,7 +55,7 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class BootstrapEngineService {
 
-    private static final int TOTAL_STEPS = 9;
+    private static final int TOTAL_STEPS = 10;
 
     private final SystemConfigService systemConfigService;
     private final BootstrapMapper bootstrapMapper;
@@ -194,13 +194,34 @@ public class BootstrapEngineService {
             MetaContext.clear();
         }
 
+        // Step 9: Create default billing account and bind to default tenant
+        updateProgress(bootstrap, 9, "create_default_billing_account");
+        RepairStepResult billingResult =
+                bootstrapRepairService.repairDefaultBillingAccount(result.defaultTenantId);
+        throwIfError(billingResult);
+        // Record the binding on the bootstrap row if the account was newly created
+        if (billingResult.status() == RepairStepResult.Status.CREATED) {
+            String detail = billingResult.detail();
+            // Extract account id from detail string "billing account created (id=NNN) and bound..."
+            try {
+                int idxStart = detail.indexOf("id=") + 3;
+                int idxEnd = detail.indexOf(")", idxStart);
+                if (idxStart > 3 && idxEnd > idxStart) {
+                    result.defaultBillingAccountId = Long.parseLong(detail.substring(idxStart, idxEnd));
+                    bootstrap.setBillingAccountId(result.defaultBillingAccountId);
+                }
+            } catch (NumberFormatException ignored) {
+                // non-critical: the account is bound even if we can't parse the id here
+            }
+        }
+
         return result;
     }
 
-    // ── Step 9: Finalize ────────────────────────────────────────────────
+    // ── Step 10: Finalize ───────────────────────────────────────────────
 
     private void finalizeBootstrap(BootstrapEntity bootstrap, CoreBootstrapResult coreResult) {
-        updateProgress(bootstrap, 9, "finalize");
+        updateProgress(bootstrap, 10, "finalize");
 
         systemConfigService.initialize(SystemConfigKeys.SYSTEM_INITIALIZED, "true",
                 "system", "boolean", "Whether the system has been bootstrapped", true);
@@ -288,6 +309,7 @@ public class BootstrapEngineService {
         Long defaultTenantId;
         Long adminUserId;
         String adminUserPid;
+        Long defaultBillingAccountId;
     }
 
     /** Public result from the bootstrap engine. */

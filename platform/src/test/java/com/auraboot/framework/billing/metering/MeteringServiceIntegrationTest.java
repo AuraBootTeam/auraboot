@@ -1,5 +1,6 @@
 package com.auraboot.framework.billing.metering;
 
+import com.auraboot.framework.billing.BillingAccountSeedHelper;
 import com.auraboot.framework.billing.metering.mapper.UsageDedupeConflictMapper;
 import com.auraboot.framework.billing.metering.mapper.UsageEventMapper;
 import com.auraboot.framework.billing.metering.model.DedupeStatus;
@@ -14,6 +15,8 @@ import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -41,9 +44,30 @@ import static org.assertj.core.api.Assertions.*;
  *
  * <p>Tests do NOT extend {@code @Transactional} at class level — the concurrent test
  * needs real committed rows visible across threads.  Cleanup is done in {@code @AfterEach}.
+ *
+ * <p><b>IMPORTANT:</b> {@code @Transactional(propagation = NOT_SUPPORTED)} overrides
+ * the class-level {@code @Transactional} inherited from {@link BaseIntegrationTest}.
+ * {@link com.auraboot.framework.billing.metering.service.MeteringInsertHelper#tryInsertEvent}
+ * runs in {@code REQUIRES_NEW}, which commits usage_event rows independently of any outer TX.
+ * Without this override:
+ * <ol>
+ *   <li>The outer test TX from {@code BaseIntegrationTest} wraps each test method.
+ *   <li>{@code tryInsertEvent} commits a row in its own REQUIRES_NEW TX.
+ *   <li>{@code @AfterEach} cleanup() deletes that committed row — but inside the outer TX.
+ *   <li>{@code @Rollback(true)} rolls back the outer TX → the DELETE is undone → the
+ *       committed usage_event row survives into the next test, causing UNIQUE constraint
+ *       violations in {@code tryInsertEvent} → returns {@code false} →
+ *       {@code resolveConflict} gets null → returns REJECTED ("TRANSIENT_CONFLICT").
+ * </ol>
+ * With NOT_SUPPORTED each test and its {@code @BeforeEach}/{@code @AfterEach} run without
+ * an outer TX, so cleanup deletes are committed immediately and don't get rolled back.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class MeteringServiceIntegrationTest extends BaseIntegrationTest {
+
+    @Autowired
+    private BillingAccountSeedHelper billingAccountSeedHelper;
 
     @Autowired
     private MeteringService meteringService;
@@ -64,6 +88,15 @@ class MeteringServiceIntegrationTest extends BaseIntegrationTest {
     /** Tracks idempotency keys created per test so cleanup is precise */
     private final List<String> usedIdempotencyKeys = new ArrayList<>();
 
+    @BeforeEach
+    void seedParentAccount() {
+        // Seed parent ab_billing_account row so FK on ab_billing_usage_event is satisfied.
+        // Task 2 FK-ized account_id → ab_billing_account(id); bare IDs now require a parent row.
+        // Must use the committed variant: MeteringInsertHelper.tryInsertEvent() runs in
+        // REQUIRES_NEW so it cannot see uncommitted rows from the test's outer transaction.
+        billingAccountSeedHelper.ensureAccountExistsAndCommit(TEST_ACCOUNT_ID, "ACC-IT-" + TEST_ACCOUNT_ID);
+    }
+
     @AfterEach
     void cleanup() {
         if (!usedIdempotencyKeys.isEmpty()) {
@@ -80,6 +113,9 @@ class MeteringServiceIntegrationTest extends BaseIntegrationTest {
             );
             usedIdempotencyKeys.clear();
         }
+        // Remove the committed billing account row (seeded via ensureAccountExistsAndCommit).
+        // Must use the committed variant — the account row is committed, not in the test TX.
+        billingAccountSeedHelper.removeAccountAndCommit(TEST_ACCOUNT_ID);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

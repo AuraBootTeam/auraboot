@@ -16,7 +16,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
         "com.auraboot.framework.dataquality.ge.mapper",
         "com.auraboot.framework.billing.catalog.mapper",
         "com.auraboot.framework.billing.quota.mapper",
-        "com.auraboot.framework.billing.metering.mapper"})
+        "com.auraboot.framework.billing.metering.mapper",
+        "com.auraboot.framework.billing.account.mapper"})
 @EnableTransactionManagement
 @EnableScheduling
 public class MetaApplication {

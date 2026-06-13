@@ -1,6 +1,7 @@
 package com.auraboot.framework.saas.bootstrap;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.billing.account.service.BillingAccountService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.mapper.MenuMapper;
@@ -24,6 +25,7 @@ import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -71,8 +73,9 @@ public class BootstrapRepairService {
     public static final String STEP_ADMIN_ROLE_GRANT    = "admin_role_grant";
     public static final String STEP_BUSINESS_TENANT     = "business_tenant";
     public static final String STEP_BUSINESS_TENANT_BOOTSTRAP = "business_tenant_bootstrap";
-    public static final String STEP_BUILTIN_PLUGINS     = "builtin_plugins";
-    public static final String STEP_JWT_SECRET          = "jwt_secret";
+    public static final String STEP_BUILTIN_PLUGINS            = "builtin_plugins";
+    public static final String STEP_JWT_SECRET                 = "jwt_secret";
+    public static final String STEP_DEFAULT_BILLING_ACCOUNT    = "default_billing_account";
 
     /** Invariant 1: {@code system_config} must hold mode / platform_name / db_uuid / instance_url. */
     public static final List<String> ORDERED_STEPS = List.of(
@@ -98,6 +101,8 @@ public class BootstrapRepairService {
     private final UserRoleMapper userRoleMapper;
     private final MenuMapper menuMapper;
     private final TenantBootstrapService tenantBootstrapService;
+    private final BillingAccountService billingAccountService;
+    private final JdbcTemplate jdbcTemplate;
 
     // ────────────────────────────────────────────────────────────────────
     // Public step API — one method per invariant
@@ -426,6 +431,65 @@ public class BootstrapRepairService {
         } catch (Exception e) {
             log.warn("repairBuiltinPlugins failed (non-fatal)", e);
             return RepairStepResult.error(STEP_BUILTIN_PLUGINS, e.getMessage());
+        }
+    }
+
+    /**
+     * Invariant: the default (business) tenant has a bound {@code billing_account_id}.
+     *
+     * <p>Idempotent: if {@code ab_tenant.billing_account_id} is already non-null,
+     * returns {@link RepairStepResult.Status#PRESENT} without writing.
+     *
+     * <p><b>§4.1 / §8 contract</b>: this method is invoked <em>only</em> by the
+     * bootstrap engine step — never by a startup runner, {@code @PostConstruct},
+     * or any self-heal path.
+     *
+     * @param defaultTenantId id of the default (business) tenant
+     * @return repair result; {@link RepairStepResult.Status#ERROR} propagates to the engine
+     */
+    public RepairStepResult repairDefaultBillingAccount(Long defaultTenantId) {
+        try {
+            // Idempotent check: read current billing_account_id.
+            // Use query() not queryForObject() to handle the nullable column correctly
+            // without throwing EmptyResultDataAccessException if billing_account_id is NULL.
+            java.util.List<Long> rows = jdbcTemplate.query(
+                    "SELECT billing_account_id FROM ab_tenant WHERE id = ? AND deleted_flag = FALSE",
+                    (rs, i) -> rs.getObject(1, Long.class),
+                    defaultTenantId);
+            if (rows.isEmpty()) {
+                return RepairStepResult.error(STEP_DEFAULT_BILLING_ACCOUNT,
+                        "default tenant not found (id=" + defaultTenantId + ") — earlier steps must run first");
+            }
+            Long existing = rows.get(0);
+            if (existing != null) {
+                return RepairStepResult.present(STEP_DEFAULT_BILLING_ACCOUNT,
+                        "default tenant already has billing_account_id=" + existing);
+            }
+
+            // Create a new billing account for the default tenant
+            Long accountId = billingAccountService.createAccount(
+                    "default",
+                    "Default Billing Account");
+
+            // Bind: UPDATE ab_tenant SET billing_account_id = ? WHERE id = ? AND billing_account_id IS NULL
+            int updated = jdbcTemplate.update(
+                    "UPDATE ab_tenant SET billing_account_id = ? WHERE id = ? AND billing_account_id IS NULL",
+                    accountId,
+                    defaultTenantId);
+
+            if (updated == 0) {
+                // Another concurrent call beat us to it — that's fine; idempotent
+                return RepairStepResult.present(STEP_DEFAULT_BILLING_ACCOUNT,
+                        "billing account was bound concurrently (account id=" + accountId + " created but not used)");
+            }
+
+            log.info("repairDefaultBillingAccount: created account id={} and bound to tenant id={}",
+                    accountId, defaultTenantId);
+            return RepairStepResult.created(STEP_DEFAULT_BILLING_ACCOUNT,
+                    "billing account created (id=" + accountId + ") and bound to default tenant (id=" + defaultTenantId + ")");
+        } catch (Exception e) {
+            log.error("repairDefaultBillingAccount failed for defaultTenantId={}", defaultTenantId, e);
+            return RepairStepResult.error(STEP_DEFAULT_BILLING_ACCOUNT, e.getMessage());
         }
     }
 

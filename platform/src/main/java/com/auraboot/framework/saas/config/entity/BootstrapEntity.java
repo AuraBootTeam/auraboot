@@ -18,7 +18,8 @@ public class BootstrapEntity {
     private Long systemTenantId;
     private Long defaultTenantId;
     private Long adminUserId;
-    private Long platformAccountId;
+    @TableField("billing_account_id")
+    private Long billingAccountId;
     private String currentStep;
     private Integer totalSteps;
     private Integer completedSteps;
