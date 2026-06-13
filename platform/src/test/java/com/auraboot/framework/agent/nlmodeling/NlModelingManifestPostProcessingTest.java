@@ -213,11 +213,12 @@ class NlModelingManifestPostProcessingTest {
         assertEquals("equipment_mgmt:create_equipment",
                 formButtons.get("buttons").get(0).get("commandCode").asText());
 
-        // menu wired to the list page via the dynamic path → pageKey
+        // menu uses the canonical /p/<model> dynamic-page route (snake_case model code);
+        // the frontend resolves it to <model>_list. Kebab-casing would 404.
         JsonNode menus = m.get("menus");
         assertEquals(1, menus.size());
-        assertEquals("equipment_list", menus.get(0).get("pageKey").asText(),
-                "synthesized menu must resolve to the list page");
+        assertEquals("/p/equipment", menus.get(0).get("path").asText(),
+                "synthesized menu must use the canonical /p/<snake_model> route");
     }
 
     @Test
