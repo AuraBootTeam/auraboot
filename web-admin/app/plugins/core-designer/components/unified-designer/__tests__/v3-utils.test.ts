@@ -426,6 +426,132 @@ describe('Recursive PageSchema V3 utilities', () => {
     ]);
   });
 
+  it('moves list block subtrees between list and tab containers without losing children', () => {
+    const crossContainerSchema: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'list',
+      id: 'list_with_table_and_filter_moves',
+      blocks: [
+        {
+          id: 'list_root',
+          blockType: 'list',
+          blocks: [
+            {
+              id: 'tabs_holder',
+              blockType: 'tabs',
+              blocks: [
+                {
+                  id: 'tab_source',
+                  blockType: 'tab',
+                  blocks: [
+                    {
+                      id: 'table_move_candidate',
+                      blockType: 'table',
+                      blocks: [
+                        { id: 'candidate_col_name', blockType: 'column', field: 'name' },
+                        { id: 'candidate_action_view', blockType: 'action', actionType: 'view' },
+                      ],
+                    },
+                    {
+                      id: 'filter_bar_move_candidate',
+                      blockType: 'filter-bar',
+                      blocks: [
+                        { id: 'candidate_filter_status', blockType: 'filter-field', field: 'status' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'action_bar_target',
+              blockType: 'action-bar',
+              blocks: [{ id: 'target_action_create', blockType: 'action', actionType: 'create' }],
+            },
+            {
+              id: 'table_target',
+              blockType: 'table',
+              blocks: [{ id: 'target_col_title', blockType: 'column', field: 'title' }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const tableBeforeTarget = moveBlockBefore(
+      crossContainerSchema.blocks,
+      'table_move_candidate',
+      'table_target',
+    );
+    const listAfterTableMove = findBlockById(tableBeforeTarget, 'list_root')?.block;
+    const tabAfterTableMove = findBlockById(tableBeforeTarget, 'tab_source')?.block;
+    const movedTable = findBlockById(tableBeforeTarget, 'table_move_candidate')?.block;
+
+    expect(listAfterTableMove?.blocks?.map((block) => block.id)).toEqual([
+      'tabs_holder',
+      'action_bar_target',
+      'table_move_candidate',
+      'table_target',
+    ]);
+    expect(tabAfterTableMove?.blocks?.map((block) => block.id)).toEqual([
+      'filter_bar_move_candidate',
+    ]);
+    expect(movedTable?.blocks?.map((block) => block.id)).toEqual([
+      'candidate_col_name',
+      'candidate_action_view',
+    ]);
+
+    const insideTabSchema: PageSchemaV3 = {
+      ...crossContainerSchema,
+      blocks: [
+        {
+          id: 'list_root',
+          blockType: 'list',
+          blocks: [
+            {
+              id: 'filter_bar_move_candidate',
+              blockType: 'filter-bar',
+              blocks: [
+                { id: 'candidate_filter_status', blockType: 'filter-field', field: 'status' },
+              ],
+            },
+            {
+              id: 'tabs_holder',
+              blockType: 'tabs',
+              blocks: [{ id: 'tab_empty', blockType: 'tab', blocks: [] }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const filterInsideTab = moveBlockToParent(
+      insideTabSchema.blocks,
+      'filter_bar_move_candidate',
+      'tab_empty',
+    );
+    const listAfterFilterMove = findBlockById(filterInsideTab, 'list_root')?.block;
+    const tabAfterFilterMove = findBlockById(filterInsideTab, 'tab_empty')?.block;
+    const movedFilterBar = findBlockById(filterInsideTab, 'filter_bar_move_candidate')?.block;
+
+    expect(listAfterFilterMove?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(tabAfterFilterMove?.blocks?.map((block) => block.id)).toEqual([
+      'filter_bar_move_candidate',
+    ]);
+    expect(movedFilterBar?.blocks?.map((block) => block.id)).toEqual([
+      'candidate_filter_status',
+    ]);
+
+    const registry = createDefaultBlockRegistryV3();
+    expect(registry.canContain('list', 'table')).toBe(true);
+    expect(registry.canContain('list', 'filter-bar')).toBe(true);
+    expect(registry.canContain('tab', 'table')).toBe(true);
+    expect(registry.canContain('tab', 'filter-bar')).toBe(true);
+    expect(registry.canContain('table', 'column')).toBe(true);
+    expect(registry.canContain('filter-bar', 'filter-field')).toBe(true);
+    expect(registry.canContain('filter-bar', 'table')).toBe(false);
+  });
+
   it('sets nested dot-path values without mutating the source object', () => {
     const source = { props: { label: 'Name' }, layout: { span: 6 } };
     const next = setByPath(source, 'props.required', true);
