@@ -151,6 +151,11 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
         adminRoleChecker.invalidateAll();
     }
 
+    /** Snowflake ids are returned from the controller as precision-safe strings. */
+    private static long idOf(Object value) {
+        return Long.parseLong(String.valueOf(value));
+    }
+
     private CrossTenantGrantController.CreateGrantRequest makeRequest() {
         CrossTenantGrantController.CreateGrantRequest req =
                 new CrossTenantGrantController.CreateGrantRequest();
@@ -186,15 +191,19 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
         ApiResponse<Map<String, Object>> created = controller.create(makeRequest());
         assertThat(created.getCode()).isEqualTo("0");
         assertThat(created.getData().get("id")).isNotNull();
-        Long grantId = ((Number) created.getData().get("id")).longValue();
+        // Snowflake ids must be serialized as strings (a JS number loses precision
+        // beyond 2^53, which would make revoke/audit target the wrong grant).
+        assertThat(created.getData().get("id")).isInstanceOf(String.class);
+        assertThat(created.getData().get("parentTenantId")).isInstanceOf(String.class);
+        long grantId = idOf(created.getData().get("id"));
 
         // List should include the row.
         ApiResponse<Map<String, Object>> listed = controller.list(1, 50, true);
         assertThat(listed.getCode()).isEqualTo("0");
         java.util.List<Map<String, Object>> records =
                 (java.util.List<Map<String, Object>>) listed.getData().get("records");
-        boolean found = records.stream()
-                .anyMatch(r -> ((Number) r.get("id")).longValue() == grantId);
+        assertThat(records).allSatisfy(r -> assertThat(r.get("id")).isInstanceOf(String.class));
+        boolean found = records.stream().anyMatch(r -> idOf(r.get("id")) == grantId);
         assertThat(found).isTrue();
     }
 
@@ -204,7 +213,7 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
         grantPlatformAdmin();
 
         ApiResponse<Map<String, Object>> created = controller.create(makeRequest());
-        Long grantId = ((Number) created.getData().get("id")).longValue();
+        long grantId = idOf(created.getData().get("id"));
 
         // Pre-revoke: ACL allows.
         assertThat(aclService.evaluate(parentTenant, childTenant,
@@ -231,7 +240,7 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("D: list activeOnly=false includes revoked rows")
     void caseD_list_includes_revoked_when_activeOnly_false() {
         grantPlatformAdmin();
-        Long grantId = ((Number) controller.create(makeRequest()).getData().get("id")).longValue();
+        long grantId = idOf(controller.create(makeRequest()).getData().get("id"));
         controller.revoke(grantId);
 
         ApiResponse<Map<String, Object>> activeOnly = controller.list(1, 50, true);
@@ -239,7 +248,7 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
         java.util.List<Map<String, Object>> activeRows =
                 (java.util.List<Map<String, Object>>) activeOnly.getData().get("records");
         boolean foundInActive = activeRows.stream()
-                .anyMatch(r -> ((Number) r.get("id")).longValue() == grantId);
+                .anyMatch(r -> idOf(r.get("id")) == grantId);
         assertThat(foundInActive).isFalse();
 
         ApiResponse<Map<String, Object>> all = controller.list(1, 50, false);
@@ -247,7 +256,7 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
         java.util.List<Map<String, Object>> allRows =
                 (java.util.List<Map<String, Object>>) all.getData().get("records");
         boolean foundInAll = allRows.stream()
-                .anyMatch(r -> ((Number) r.get("id")).longValue() == grantId);
+                .anyMatch(r -> idOf(r.get("id")) == grantId);
         assertThat(foundInAll).isTrue();
     }
 
@@ -255,7 +264,7 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("E: audit endpoint returns rows for grant id")
     void caseE_audit_returns_rows() {
         grantPlatformAdmin();
-        Long grantId = ((Number) controller.create(makeRequest()).getData().get("id")).longValue();
+        long grantId = idOf(controller.create(makeRequest()).getData().get("id"));
         // Seed an audit row directly (we don't have a parent run here).
         jdbc.update("INSERT INTO ab_cross_tenant_spawn_audit "
                         + "(grant_id, parent_tenant_id, child_tenant_id, parent_run_pid, "
@@ -273,5 +282,9 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
                 (java.util.List<Map<String, Object>>) audit.getData().get("records");
         assertThat(rows).isNotEmpty();
         assertThat(rows.get(0).get("decision")).isEqualTo(CrossTenantDecision.ALLOWED);
+        // Audit-row snowflake ids are precision-safe strings too.
+        assertThat(rows.get(0).get("id")).isInstanceOf(String.class);
+        assertThat(rows.get(0).get("grant_id")).isInstanceOf(String.class);
+        assertThat(rows.get(0).get("parent_tenant_id")).isInstanceOf(String.class);
     }
 }

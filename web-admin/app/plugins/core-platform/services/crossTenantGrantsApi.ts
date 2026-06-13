@@ -18,15 +18,16 @@ import { get, post, del } from '~/shared/services/http-client';
 import type { Result } from '~/shared/services/http-client';
 
 export interface CrossTenantGrantRecord {
-  id: number;
-  parent_tenant_id: number;
-  child_tenant_id: number;
+  // Snowflake ids are carried as strings (a JS number loses precision beyond 2^53).
+  id: string;
+  parent_tenant_id: string;
+  child_tenant_id: string;
   grant_type: string;
-  granted_by: number;
+  granted_by: string;
   granted_at: string;
   expires_at: string | null;
   revoked_at: string | null;
-  revoked_by: number | null;
+  revoked_by: string | null;
   note: string | null;
 }
 
@@ -38,10 +39,11 @@ export interface CrossTenantGrantPage {
 }
 
 export interface CrossTenantSpawnAuditRecord {
-  id: number;
-  grant_id: number | null;
-  parent_tenant_id: number;
-  child_tenant_id: number;
+  // Snowflake ids carried as strings (precision-safe).
+  id: string;
+  grant_id: string | null;
+  parent_tenant_id: string;
+  child_tenant_id: string;
   parent_run_pid: string;
   child_run_pid: string | null;
   decision: string;
@@ -80,16 +82,16 @@ export function listGrants(
 
 export function createGrant(
   body: CreateGrantRequest,
-): Promise<Result<{ id: number }>> {
-  return post<{ id: number }>('/api/admin/cross-tenant-grants', body);
+): Promise<Result<{ id: string }>> {
+  return post<{ id: string }>('/api/admin/cross-tenant-grants', body);
 }
 
-export function revokeGrant(id: number): Promise<Result<{ id: number }>> {
-  return del<{ id: number }>(`/api/admin/cross-tenant-grants/${id}`);
+export function revokeGrant(id: string): Promise<Result<{ id: string }>> {
+  return del<{ id: string }>(`/api/admin/cross-tenant-grants/${id}`);
 }
 
 export function listAudit(
-  id: number,
+  id: string,
   pageNum: number,
   pageSize: number,
 ): Promise<Result<CrossTenantSpawnAuditPage>> {
