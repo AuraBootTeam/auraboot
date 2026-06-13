@@ -1,0 +1,12 @@
+{
+  "pluginId": "com.test.notif.template",
+  "namespace": "tnt",
+  "version": "1.0.0",
+  "displayName": "Notification Template Fixture",
+  "description": "Fixture: ships a notification template via the notificationTemplates resourceDir to exercise the PluginDirectoryLoader -> manifest -> import path (the seam executeFromManifest tests skip).",
+  "minPlatformVersion": "1.0.0",
+  "pluginType": "config",
+  "resourceDirs": {
+    "notificationTemplates": "config/notification-templates.json"
+  }
+}

@@ -16,6 +16,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.net.URL;
+import java.nio.file.Paths;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +38,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PluginImportNotificationTemplateIntegrationTest extends BaseIntegrationTest {
 
     private static final String CODE = "it_f2_alarm_notify";
+
+    /** Fixture: plugin-test/notif-template/ (plugin.json declares a notificationTemplates resourceDir). */
+    private static final String FIXTURE_DIR = "plugin-test/notif-template";
+    private static final String FIXTURE_CODE = "it_f2_dir_notify";
 
     @Autowired
     private PluginImportService pluginImportService;
@@ -125,5 +131,37 @@ class PluginImportNotificationTemplateIntegrationTest extends BaseIntegrationTes
         assertThat(preview.getChanges().getOrDefault(ResourceType.NOTIFICATION_TEMPLATE.name(), List.of()))
                 .as("preview must report the NOTIFICATION_TEMPLATE change")
                 .anyMatch(c -> CODE.equals(c.getResourceCode()));
+    }
+
+    @Test
+    @DisplayName("parseDirectory loads notificationTemplates from the resourceDir and imports them")
+    void parseDirectory_loadsTemplatesFromResourceDir_andImports() throws Exception {
+        // Exercises the seam the executeFromManifest tests skip: PluginDirectoryLoader reads
+        // config/notification-templates.json (declared via the notificationTemplates resourceDir)
+        // into the manifest, the preview reports it, and execute lands it in the DB.
+        ImportPreviewResult preview = pluginImportService.parseDirectory(dirOf(FIXTURE_DIR));
+        assertThat(preview.isValid())
+                .as("directory parse must be valid, errors: %s", preview.getErrors()).isTrue();
+        assertThat(preview.getChanges().getOrDefault(ResourceType.NOTIFICATION_TEMPLATE.name(), List.of()))
+                .as("loader must surface the resourceDir template into the manifest/preview")
+                .anyMatch(c -> FIXTURE_CODE.equals(c.getResourceCode()));
+
+        ImportExecuteResult result = pluginImportService.execute(preview.getImportId(),
+                ImportRequest.builder()
+                        .importId(preview.getImportId())
+                        .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE)
+                        .build());
+        assertThat(result.isSuccess()).as("directory import failed: %s", result.getErrorMessage()).isTrue();
+
+        NotificationTemplate template = notificationTemplateService.getByCode(FIXTURE_CODE);
+        assertThat(template).as("resourceDir-loaded template resolvable by code after import").isNotNull();
+        assertThat(template.getChannel()).isEqualTo("in_app");
+        assertThat(template.getBodyTemplate()).contains("${alarmEventPid}", "${severity}");
+    }
+
+    private String dirOf(String resourcePath) throws Exception {
+        URL resource = getClass().getClassLoader().getResource(resourcePath);
+        assertThat(resource).as("fixture dir %s must exist in test resources", resourcePath).isNotNull();
+        return Paths.get(resource.toURI()).toString();
     }
 }
