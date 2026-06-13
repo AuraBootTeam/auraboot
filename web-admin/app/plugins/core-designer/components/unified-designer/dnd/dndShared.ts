@@ -191,7 +191,19 @@ export function resolveCanvasBlockAncestorDropAction(
   movingBlockId: string,
   targetBlockPathIds: string[],
   caps: DragEndCapabilities,
+  options: { getBlockType?: (blockId: string) => string | undefined } = {},
 ): DragEndAction {
+  const movingBlockType = options.getBlockType?.(movingBlockId);
+  if (movingBlockType) {
+    for (let index = targetBlockPathIds.length - 1; index >= 0; index -= 1) {
+      const targetBlockId = targetBlockPathIds[index];
+      if (options.getBlockType?.(targetBlockId) !== movingBlockType) continue;
+      if (caps.canMoveBlockBeforeTarget?.(movingBlockId, targetBlockId)) {
+        return { type: 'move-before', movingBlockId, targetBlockId };
+      }
+    }
+  }
+
   for (let index = targetBlockPathIds.length - 1; index >= 0; index -= 1) {
     const targetBlockId = targetBlockPathIds[index];
     const action = resolveDragEndAction(
