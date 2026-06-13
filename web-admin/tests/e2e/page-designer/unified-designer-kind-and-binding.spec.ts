@@ -31,6 +31,7 @@ type TestBlock = {
 type CreatedDesignerPage = { pageKey: string; pid: string };
 type AdvancedContainerBlockType = 'repeater' | 'subform';
 type ListBlockMoveType = 'table' | 'filter-bar' | 'action-bar' | 'widget';
+type LeafBlockMoveType = 'column' | 'filter-field';
 
 async function createFormPage(page: Page): Promise<string> {
   const id = uniqueId('udw_kind');
@@ -758,6 +759,76 @@ async function createCrossContainerListBlockPage(
       extension: {
         e2e: true,
         scenario: `unified-designer-${blockType}-${options.source}-cross-container-move`,
+      },
+    },
+  });
+  expect(resp.ok(), await resp.text()).toBe(true);
+  const body = await resp.json();
+  expect(body.code).toBe('0');
+  expect(body.data?.pid).toBeTruthy();
+  return { pageKey, pid: body.data.pid };
+}
+
+async function createCrossContainerLeafBlockListPage(
+  page: Page,
+  blockType: LeafBlockMoveType,
+  options: { emptyTarget?: boolean } = {},
+): Promise<CreatedDesignerPage> {
+  const id = uniqueId(`udw_${blockType.replace('-', '_')}_leaf_move`);
+  const pageKey = `udw_${blockType.replace('-', '_')}_leaf_move_${id}`;
+  const isColumn = blockType === 'column';
+  const sourceParentId = isColumn ? 'table_source' : 'filter_bar_source';
+  const targetParentId = isColumn ? 'table_target' : 'filter_bar_target';
+  const sourceAnchorId = isColumn ? 'source_col_name' : 'source_filter_keyword';
+  const candidateId = isColumn ? 'column_move_candidate' : 'filter_field_move_candidate';
+  const targetLeafId = isColumn ? 'target_col_title' : 'target_filter_status';
+  const makeLeaf = (leafId: string, field: string, label: string) => ({
+    id: leafId,
+    blockType,
+    field,
+    props: { label },
+  });
+  const sourceParent = {
+    id: sourceParentId,
+    blockType: isColumn ? 'table' : 'filter-bar',
+    title: isColumn ? 'Source table' : 'Source filters',
+    layout: { span: 12 },
+    blocks: [
+      makeLeaf(sourceAnchorId, isColumn ? 'name' : 'page_key', 'Source anchor'),
+      makeLeaf(candidateId, isColumn ? 'status' : 'status', 'Move candidate'),
+    ],
+  };
+  const targetParent = {
+    id: targetParentId,
+    blockType: isColumn ? 'table' : 'filter-bar',
+    title: isColumn ? 'Target table' : 'Target filters',
+    layout: { span: 12 },
+    blocks: options.emptyTarget
+      ? []
+      : [makeLeaf(targetLeafId, isColumn ? 'title' : 'status', 'Target leaf')],
+  };
+
+  const resp = await page.request.post('/api/pages', {
+    data: {
+      name: `UDW ${blockType} leaf move ${id}`,
+      pageKey,
+      title: `UDW ${blockType} leaf move ${id}`,
+      kind: 'list',
+      modelCode: 'page_schema',
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'list_root',
+          blockType: 'list',
+          title: 'List root',
+          dataSource: { model: 'page_schema' },
+          layout: { span: 12 },
+          blocks: [sourceParent, targetParent],
+        },
+      ],
+      extension: {
+        e2e: true,
+        scenario: `unified-designer-${blockType}-leaf-cross-container-move`,
       },
     },
   });
@@ -2588,6 +2659,123 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual(['widget_move_candidate']);
     expectListBlockChildren(savedBlocks, 'widget', 'widget_move_candidate');
   });
+
+  for (const blockType of ['column', 'filter-field'] as const) {
+    test(`undoes and redoes moving a ${blockType} leaf before another ${blockType}`, async ({
+      page,
+    }) => {
+      const isColumn = blockType === 'column';
+      const sourceParentId = isColumn ? 'table_source' : 'filter_bar_source';
+      const targetParentId = isColumn ? 'table_target' : 'filter_bar_target';
+      const sourceAnchorId = isColumn ? 'source_col_name' : 'source_filter_keyword';
+      const candidateId = isColumn ? 'column_move_candidate' : 'filter_field_move_candidate';
+      const targetLeafId = isColumn ? 'target_col_title' : 'target_filter_status';
+      const { pageKey: listKey, pid } = await createCrossContainerLeafBlockListPage(page, blockType);
+      await openDesigner(page, listKey);
+      await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+      await page.getByTestId('designer-mode-layout').click();
+      if (isColumn) {
+        await dragCanvasBlockBefore(page, candidateId, targetLeafId);
+      } else {
+        await dragCanvasBlockBeforeHeader(page, candidateId, targetLeafId);
+      }
+
+      const sourceParent = page.getByTestId(`canvas-block-${sourceParentId}`);
+      const targetParent = page.getByTestId(`canvas-block-${targetParentId}`);
+      await expect(sourceParent.getByTestId(`canvas-block-${candidateId}`)).toHaveCount(0);
+      await expect(targetParent.getByTestId(`canvas-block-${candidateId}`)).toBeVisible();
+      expect(await isBeforeInDom(targetParent, candidateId, targetLeafId)).toBe(true);
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+      await waitForDesignerDragToSettle(page);
+
+      await clickDesignerToolbarButton(page, 'designer-undo');
+
+      await expect(sourceParent.getByTestId(`canvas-block-${candidateId}`)).toBeVisible();
+      await expect(targetParent.getByTestId(`canvas-block-${candidateId}`)).toHaveCount(0);
+      expect(await isBeforeInDom(sourceParent, sourceAnchorId, candidateId)).toBe(true);
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+      await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+      await clickDesignerToolbarButton(page, 'designer-redo');
+
+      await expect(sourceParent.getByTestId(`canvas-block-${candidateId}`)).toHaveCount(0);
+      await expect(targetParent.getByTestId(`canvas-block-${candidateId}`)).toBeVisible();
+      expect(await isBeforeInDom(targetParent, candidateId, targetLeafId)).toBe(true);
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+      await saveDesignerPage(page, pid);
+
+      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      expect(readback.ok(), await readback.text()).toBe(true);
+      const readbackBody = await readback.json();
+      expect(readbackBody.code).toBe('0');
+      const savedBlocks = readbackBody.data.blocks as TestBlock[];
+      const savedSource = findBlock(savedBlocks, sourceParentId);
+      const savedTarget = findBlock(savedBlocks, targetParentId);
+      const movedLeaf = findBlock(savedBlocks, candidateId);
+
+      expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
+      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId, targetLeafId]);
+      expect(movedLeaf?.blockType).toBe(blockType);
+      expect(movedLeaf?.props?.label).toBe('Move candidate');
+    });
+
+    test(`undoes and redoes moving a ${blockType} leaf inside an empty compatible parent`, async ({
+      page,
+    }) => {
+      const isColumn = blockType === 'column';
+      const sourceParentId = isColumn ? 'table_source' : 'filter_bar_source';
+      const targetParentId = isColumn ? 'table_target' : 'filter_bar_target';
+      const sourceAnchorId = isColumn ? 'source_col_name' : 'source_filter_keyword';
+      const candidateId = isColumn ? 'column_move_candidate' : 'filter_field_move_candidate';
+      const { pageKey: listKey, pid } = await createCrossContainerLeafBlockListPage(page, blockType, {
+        emptyTarget: true,
+      });
+      await openDesigner(page, listKey);
+      await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+      await page.getByTestId('designer-mode-layout').click();
+      await dragCanvasBlockInto(page, candidateId, targetParentId);
+
+      const sourceParent = page.getByTestId(`canvas-block-${sourceParentId}`);
+      const targetParent = page.getByTestId(`canvas-block-${targetParentId}`);
+      await expect(sourceParent.getByTestId(`canvas-block-${candidateId}`)).toHaveCount(0);
+      await expect(targetParent.getByTestId(`canvas-block-${candidateId}`)).toBeVisible();
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+      await waitForDesignerDragToSettle(page);
+
+      await clickDesignerToolbarButton(page, 'designer-undo');
+
+      await expect(sourceParent.getByTestId(`canvas-block-${candidateId}`)).toBeVisible();
+      await expect(targetParent.getByTestId(`canvas-block-${candidateId}`)).toHaveCount(0);
+      expect(await isBeforeInDom(sourceParent, sourceAnchorId, candidateId)).toBe(true);
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+      await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+      await clickDesignerToolbarButton(page, 'designer-redo');
+
+      await expect(sourceParent.getByTestId(`canvas-block-${candidateId}`)).toHaveCount(0);
+      await expect(targetParent.getByTestId(`canvas-block-${candidateId}`)).toBeVisible();
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+      await saveDesignerPage(page, pid);
+
+      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      expect(readback.ok(), await readback.text()).toBe(true);
+      const readbackBody = await readback.json();
+      expect(readbackBody.code).toBe('0');
+      const savedBlocks = readbackBody.data.blocks as TestBlock[];
+      const savedSource = findBlock(savedBlocks, sourceParentId);
+      const savedTarget = findBlock(savedBlocks, targetParentId);
+      const movedLeaf = findBlock(savedBlocks, candidateId);
+
+      expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
+      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId]);
+      expect(movedLeaf?.blockType).toBe(blockType);
+      expect(movedLeaf?.props?.label).toBe('Move candidate');
+    });
+  }
 
   test('rejects moving a cross-kind block within a form designer and keeps persisted schema unchanged', async ({ page }) => {
     const { pageKey: formKey } = await createCrossKindGuardFormPage(page);
