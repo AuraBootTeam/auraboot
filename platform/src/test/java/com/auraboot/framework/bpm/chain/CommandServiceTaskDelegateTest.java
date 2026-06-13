@@ -5,6 +5,7 @@ import com.auraboot.smart.framework.engine.model.assembly.BaseElement;
 import com.auraboot.smart.framework.engine.model.assembly.IdBasedElement;
 import com.auraboot.smart.framework.engine.model.instance.ActivityInstance;
 import com.auraboot.smart.framework.engine.model.instance.ExecutionInstance;
+import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.framework.bpm.service.ExecutionLogService;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
@@ -379,6 +380,39 @@ class CommandServiceTaskDelegateTest {
             assertFalse(req.getPayload().containsKey("operationType"));
             assertFalse(req.getPayload().containsKey("targetRecordId"));
             assertTrue((Boolean) processVars.get("_step_auto_clear_success"));
+        }
+
+        @Test
+        @DisplayName("resolves targetRecordId from the persisted business key after a userTask drops request vars (F1)")
+        void resolvesTargetRecordIdFromBusinessKeyAfterUserTask() {
+            // After a userTask wait, the start-time request variables (e.g. alarmEventPid)
+            // are gone — executionContext.getRequest() carries only the task-completion
+            // variables. The serviceTask must still resolve the record it operates on, from
+            // the process's persisted business key (ProcessInstance.getBizUniqueId()), which
+            // the engine reloads on continuation. The BPMN references ${processBusinessKey}.
+            Map<String, Object> processVars = new HashMap<>(); // alarmEventPid is gone
+
+            Map<String, String> props = new HashMap<>();
+            props.put("commandCode", "iot_alarm_event:clear");
+            props.put("operationType", "update");
+            props.put("targetRecordId", "${processBusinessKey}");
+            setupPropertiesContext("auto_clear", props, processVars);
+
+            ProcessInstance processInstance = mock(ProcessInstance.class);
+            when(processInstance.getBizUniqueId()).thenReturn("alarm-77");
+            when(executionContext.getProcessInstance()).thenReturn(processInstance);
+
+            when(commandExecutor.execute(eq("iot_alarm_event:clear"), any(CommandExecuteRequest.class)))
+                    .thenReturn(CommandExecuteResult.builder()
+                            .commandCode("iot_alarm_event:clear").phaseReached("completed")
+                            .data(Map.of()).executionTimeMs(7).build());
+
+            delegate.execute(executionContext);
+
+            ArgumentCaptor<CommandExecuteRequest> captor = ArgumentCaptor.forClass(CommandExecuteRequest.class);
+            verify(commandExecutor).execute(eq("iot_alarm_event:clear"), captor.capture());
+            assertEquals("alarm-77", captor.getValue().getTargetRecordId(),
+                    "targetRecordId must resolve from the persisted business key, not the lost request var");
         }
 
         @Test
