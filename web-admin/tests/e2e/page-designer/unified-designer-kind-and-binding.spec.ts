@@ -1568,6 +1568,59 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expectListBlockChildren(savedBlocks, 'table', 'table_move_candidate');
   });
 
+  test('undoes and redoes a table subtree move-before between tab and list root', async ({
+    page,
+  }) => {
+    const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'table', {
+      source: 'tab',
+    });
+    await openDesigner(page, listKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockBeforeHeader(page, 'table_move_candidate', 'table_target');
+
+    const listRoot = page.getByTestId('canvas-block-list_root');
+    const sourceTab = page.getByTestId('canvas-block-tab_source');
+    await expect(sourceTab.getByTestId('canvas-block-table_move_candidate')).toHaveCount(0);
+    await expect(listRoot.getByTestId('canvas-block-table_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(listRoot, 'table_move_candidate', 'table_target')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+    await waitForDesignerDragToSettle(page);
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+
+    await expect(sourceTab.getByTestId('canvas-block-table_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+
+    await expect(sourceTab.getByTestId('canvas-block-table_move_candidate')).toHaveCount(0);
+    await expect(listRoot.getByTestId('canvas-block-table_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(listRoot, 'table_move_candidate', 'table_target')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'list_root');
+    const savedSourceTab = findBlock(savedBlocks, 'tab_source');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+      'tabs_holder',
+      'action_bar_target',
+      'table_move_candidate',
+      'table_target',
+    ]);
+    expect(savedSourceTab?.blocks?.map((block) => block.id)).toEqual([]);
+    expectListBlockChildren(savedBlocks, 'table', 'table_move_candidate');
+  });
+
   test('moves an existing filter-bar subtree from list root inside an empty tab and preserves filters', async ({
     page,
   }) => {
@@ -1581,6 +1634,53 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     await dragCanvasBlockInto(page, 'filter_bar_move_candidate', 'tab_empty');
 
     const targetTab = page.getByTestId('canvas-block-tab_empty');
+    await expect(targetTab.getByTestId('canvas-block-filter_bar_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'list_root');
+    const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
+      'filter_bar_move_candidate',
+    ]);
+    expectListBlockChildren(savedBlocks, 'filter-bar', 'filter_bar_move_candidate');
+  });
+
+  test('undoes and redoes a filter-bar subtree move-inside from list root into an empty tab', async ({
+    page,
+  }) => {
+    const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'filter-bar', {
+      source: 'list',
+    });
+    await openDesigner(page, listKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockInto(page, 'filter_bar_move_candidate', 'tab_empty');
+
+    const listRoot = page.getByTestId('canvas-block-list_root');
+    const targetTab = page.getByTestId('canvas-block-tab_empty');
+    await expect(targetTab.getByTestId('canvas-block-filter_bar_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+    await waitForDesignerDragToSettle(page);
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+
+    await expect(targetTab.getByTestId('canvas-block-filter_bar_move_candidate')).toHaveCount(0);
+    await expect(listRoot.getByTestId('canvas-block-filter_bar_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+
     await expect(targetTab.getByTestId('canvas-block-filter_bar_move_candidate')).toBeVisible();
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
