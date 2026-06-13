@@ -3,6 +3,8 @@ package com.auraboot.framework.automation.executor.impl;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.bpm.service.BpmIntegrationService;
 import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
+import com.auraboot.smart.framework.engine.storage.StorageMode;
+import com.auraboot.smart.framework.engine.storage.StorageModeHolder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -97,6 +99,27 @@ class StartProcessActionExecutorTest {
         executor.execute(action, context);
 
         verify(bpmIntegrationService).startBusinessProcess(eq("p1"), eq("REC-9"), anyMap(), anyString());
+    }
+
+    @Test
+    void execute_temporarilyUsesDatabaseStorageAndRestoresOuterAutomationCustomMode() {
+        try {
+            StorageModeHolder.set(StorageMode.CUSTOM);
+            when(bpmIntegrationService.startBusinessProcess(anyString(), any(), anyMap(), anyString()))
+                    .thenAnswer(invocation -> {
+                        assertThat(StorageModeHolder.get()).isEqualTo(StorageMode.DATABASE);
+                        return null;
+                    });
+
+            AutomationAction action = new AutomationAction();
+            action.setConfig(new HashMap<>(Map.of("processKey", "p1")));
+
+            executor.execute(action, new HashMap<>());
+
+            assertThat(StorageModeHolder.get()).isEqualTo(StorageMode.CUSTOM);
+        } finally {
+            StorageModeHolder.clear();
+        }
     }
 
     @Test

@@ -116,4 +116,33 @@ public class AutomationFlowConfigDerivationIntegrationTest extends BaseIntegrati
         assertThat(reloaded.getTriggerConfig().getEventTypes())
                 .containsExactlyInAnyOrder("process_started", "task_completed");
     }
+
+    @Test
+    @DisplayName("designer inactivity flow derives modelCode and inactivity trigger config")
+    void designerInactivity_derivesModelCodeAndTriggerConfig() {
+        String modelCode = "derive-inactive-model-" + runId;
+        AutomationCreateRequest req = designerRequest(
+                "DeriveInactivity-" + runId,
+                "trigger-inactivity",
+                Map.of(
+                        "triggerType", "on_inactivity",
+                        "modelCode", modelCode,
+                        "inactivityHours", 24,
+                        "inactivityField", "last_seen_at",
+                        "stateField", "status",
+                        "inactivityStates", List.of("open", "pending")));
+
+        AutomationDTO created = automationService.create(req);
+        assertThat(created.getPid()).isNotNull();
+
+        AutomationDTO reloaded = automationService.findByPid(created.getPid());
+        assertThat(reloaded.getTriggerType()).isEqualTo("on_inactivity");
+        assertThat(reloaded.getModelCode()).isEqualTo(modelCode);
+        assertThat(reloaded.getTriggerConfig()).isNotNull();
+        assertThat(reloaded.getTriggerConfig().getInactivityHours()).isEqualTo(24);
+        assertThat(reloaded.getTriggerConfig().getInactivityField()).isEqualTo("last_seen_at");
+        assertThat(reloaded.getTriggerConfig().getStateField()).isEqualTo("status");
+        assertThat(reloaded.getTriggerConfig().getInactivityStates())
+                .containsExactlyInAnyOrder("open", "pending");
+    }
 }

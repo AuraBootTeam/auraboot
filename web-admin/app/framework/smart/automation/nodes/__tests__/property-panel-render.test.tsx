@@ -12,7 +12,7 @@
  * components (selects, expression editor, …) have their own unit tests.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 
 // Hermetic i18n.
@@ -57,6 +57,7 @@ const EXPECTED_AUTOMATION_FIELD_TYPES = [
   'multiselect',
   'number',
   'process-select',
+  'rule-binding',
   'select',
   'text',
   'textarea',
@@ -107,4 +108,19 @@ describe('Automation property-panel render coverage (Phase 3 Task 3.4)', () => {
       expect(container.firstChild, `PropertyFieldRenderer rendered nothing for type '${type}'`).not.toBeNull();
     },
   );
+
+  it('PropertyFieldRenderer writes static multiselect values as arrays', () => {
+    const setValue = vi.fn();
+    render(
+      <PropertyFieldRenderer
+        schema={schemaFor('multiselect')}
+        adapter={{ ...stubAdapter([]), setValue }}
+      />,
+    );
+
+    fireEvent.click(screen.getByPlaceholderText('Select...'));
+    fireEvent.click(screen.getByRole('button', { name: /A/ }));
+
+    expect(setValue).toHaveBeenCalledWith(['a']);
+  });
 });

@@ -475,6 +475,36 @@
       "resourceType": "function"
     },
     {
+      "code": "decision.rollout.manage",
+      "name": "Decision Runtime rollout manage",
+      "description": "Decision Runtime — create, activate and pause rollout policies",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:rollout",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "decision.rollout.promote",
+      "name": "Decision Runtime rollout promote",
+      "description": "Decision Runtime — promote candidate rollout versions to full serving traffic",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:rollout",
+      "action": "promote",
+      "resourceType": "function"
+    },
+    {
+      "code": "decision.rollout.rollback",
+      "name": "Decision Runtime rollout rollback",
+      "description": "Decision Runtime — roll rollout serving traffic back to the baseline version",
+      "type": "function",
+      "module": "decision",
+      "resource": "decision:rollout",
+      "action": "rollback",
+      "resourceType": "function"
+    },
+    {
       "code": "decision.policy.read",
       "name": "Event Policy definition read",
       "description": "Event Policy — list, view definitions and versions",
@@ -1531,6 +1561,46 @@
       "type": "function",
       "module": "billing",
       "resource": "/api/billing/usage",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "billing.plan.read",
+      "name": "计费方案查看",
+      "description": "查看计费方案",
+      "type": "function",
+      "module": "billing",
+      "resource": "/api/billing/plans",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "billing.subscription.read",
+      "name": "订阅查看",
+      "description": "查看订阅信息",
+      "type": "function",
+      "module": "billing",
+      "resource": "/api/billing/subscriptions",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "billing.invoice.read",
+      "name": "账单查看",
+      "description": "查看账单信息",
+      "type": "function",
+      "module": "billing",
+      "resource": "/api/billing/invoices",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "billing.license.read",
+      "name": "许可证查看",
+      "description": "查看许可证信息",
+      "type": "function",
+      "module": "billing",
+      "resource": "/api/billing/licenses",
       "action": "read",
       "resourceType": "function"
     }

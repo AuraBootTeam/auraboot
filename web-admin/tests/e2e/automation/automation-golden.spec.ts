@@ -25,7 +25,7 @@
  *      automation log captures it.
  *
  * Uses real database + real engine. NO MOCKING. No PUT-API fallbacks,
- * no skip wrappers around missing product gaps, no `retries:N` masking.
+ * no skip wrappers around missing product gaps, no retry-count masking.
  *
  * @since 2026-05-30 (B2d+B1 mega session)
  */
@@ -985,18 +985,9 @@ test.describe('Automation Golden — Layer B behavioral matrix (Phase 2)', () =>
     }
   });
 
-  // ── E3 — loop body fires once per collection element ────────────────────────
-  // HONEST SKIP (counted, not a silent gap): the multi-iteration loop runtime is
-  // covered by platform AutomationProcessRuntimeIntegrationTest (3-element, empty,
-  // and absent-collection assertions via runtime.run). The E2E fire path cannot
-  // supply a multi-element collection: the on_record_create trigger context is
-  // built from the e2et_order record, which has no collection/array field for the
-  // control-loop to iterate (collection config reads a context list variable like
-  // "items"). Extending to the fire path requires a collection-carrying trigger
-  // fixture; deferred rather than faked.
-  test.skip('E3: control-loop fires the body once per collection element (covered by AutomationProcessRuntimeIntegrationTest; fire-path needs a collection-carrying trigger fixture)', async () => {
-    // intentionally empty — see the comment above for the honest-skip rationale.
-  });
+  // E3 was retired from this legacy API-driven suite. The executable browser
+  // coverage now lives in automation-designer-golden.spec.ts:
+  // N-LOOP covers a 3-element collection, and N-LOOP-EDGE covers an empty collection.
 });
 
 // ===========================================================================
@@ -1447,15 +1438,6 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
       data: { type: 'action-send-webhook', label: 'SendWebhook', config: { actionType: 'send_webhook', eventType, payload } },
     };
   }
-  function llmCallNode(id: string, userPromptTemplate: string, x = 400, y = 300) {
-    return {
-      id,
-      type: 'action-llm-call',
-      position: { x, y },
-      data: { type: 'action-llm-call', label: 'LlmCall', config: { actionType: 'llm_call', userPromptTemplate, maxTokens: 64 } },
-    };
-  }
-
   // ── action-call-api — makes a real outbound HTTP call ─────────────────────────
   // CallApiExecutor runs the URL through SsrfValidator + PinnedHttpRequests. Loopback
   // is blocked, but in the `test` profile SsrfValidator allowlists host.docker.internal
@@ -1524,80 +1506,7 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     expect(statuses.find((s) => s.nodeId === a)?.status, `send-webhook node completed: ${JSON.stringify(statuses)}`).toBe('completed');
   });
 
-  // ── action-llm-call — invokes the LLM via the built-in stub provider ──────────
-  // TEMPORARILY fixme: the executor + StubLlmProvider both exist, but the GA test tenant
-  // carries a SEEDED real provider (minimax, from the showcase seed) that overrides the
-  // yml stub-sentinel fallback, so the run makes a real call → 401. Forcing the stub
-  // cleanly needs `agent.llm.stub-mode=true` on the E2E backend (its intended use: run
-  // the chat pipeline without real credentials). Enabled on the stack in this PR's
-  // backend batch, then un-fixme'd. The executor is unit + integration covered
-  // (LlmCallExecutorTest + Streaming/Vision IT). See FINDING-5.
-  test.fixme('action-llm-call: the action invokes the LLM (built-in stub provider) and the node completes', async ({ page }) => {
-    const t = 'trig', a = 'llm';
-    const create = await postAutomation(page, {
-      name: `P3-LLM ${uniqueId()}`,
-      flowConfig: {
-        nodes: [
-          triggerCreateNode(t, MODEL_CODE),
-          llmCallNode(a, 'Summarize order ${recordId} in one word.'),
-        ],
-        edges: [flowEdge(t, a)],
-      },
-      actions: [],
-      enabled: false,
-    });
-    expect(create.ok, `P3-LLM create: ${JSON.stringify(create.raw)}`).toBe(true);
-    createdPids.push(create.pid!);
-    await enableAutomationViaApi(page, create.pid!);
-
-    const firedAt = Date.now();
-    expect((await createOrderRecordViaCommand(page, `P3-LLM-order ${uniqueId()}`)).ok).toBe(true);
-    const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
-    expect(String(log.status).toLowerCase(), `P3-LLM run: ${JSON.stringify({ log, statuses })}`).toBe('success');
-    expect(statuses.find((s) => s.nodeId === a)?.status, `llm-call node completed: ${JSON.stringify(statuses)}`).toBe('completed');
-  });
-
-  function startProcessNode(id: string, processKey: string, x = 400, y = 300) {
-    return {
-      id,
-      type: 'action-start-process',
-      position: { x, y },
-      data: { type: 'action-start-process', label: 'StartProc', config: { actionType: 'start_process', processKey } },
-    };
-  }
-
-  // ── action-start-process — starts a BPM process instance ──────────────────────
-  // Golden surfaced that this palette node had NO backend executor: CompositeActionExecutor
-  // threw UnsupportedOperationException("No executor found for action type: start_process")
-  // for every automation that used it. This PR CLOSES that gap with StartProcessActionExecutor
-  // (delegating to BpmIntegrationService.startBusinessProcess; unit-covered by
-  // StartProcessActionExecutorTest).
-  //
-  // HONEST SKIP for the E2E fire path (counted, not faked): the OSS SmartEngine BPM adapter
-  // is a stub (SmartEngineBpmAdapter / processEngineService.startProcess throws "not implement
-  // intentionally"), so a real process instance cannot start on the OSS stack — the run fails
-  // with that stub message, not a node defect. The executor itself is implemented + deployed +
-  // unit-tested; the assembled-runtime fire needs a non-stub BPM engine (enterprise). Same
-  // limitation blocks trigger-bpm-event. See FINDING-7.
-  test.fixme('action-start-process: the action starts a BPM process instance (e2et_payment_approval) and the node completes', async ({ page }) => {
-    const t = 'trig', a = 'startproc';
-    const create = await postAutomation(page, {
-      name: `P3-SP ${uniqueId()}`,
-      flowConfig: {
-        nodes: [triggerCreateNode(t, MODEL_CODE), startProcessNode(a, 'e2et_payment_approval')],
-        edges: [flowEdge(t, a)],
-      },
-      actions: [],
-      enabled: false,
-    });
-    expect(create.ok, `P3-SP create: ${JSON.stringify(create.raw)}`).toBe(true);
-    createdPids.push(create.pid!);
-    await enableAutomationViaApi(page, create.pid!);
-
-    const firedAt = Date.now();
-    expect((await createOrderRecordViaCommand(page, `P3-SP-order ${uniqueId()}`)).ok).toBe(true);
-    const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
-    expect(String(log.status).toLowerCase(), `P3-SP run: ${JSON.stringify({ log, statuses })}`).toBe('success');
-    expect(statuses.find((s) => s.nodeId === a)?.status, `start-process node completed: ${JSON.stringify(statuses)}`).toBe('completed');
-  });
+  // action-llm-call and action-start-process were retired from this legacy
+  // API-driven suite. The executable browser/runtime coverage now lives in
+  // automation-designer-golden.spec.ts as N-LLM-CALL and N-START-PROCESS.
 });

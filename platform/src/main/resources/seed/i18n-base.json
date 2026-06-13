@@ -2494,6 +2494,31 @@
     "en-US": "Total"
   },
   {
+    "key": "workbench.pipeline.discovery",
+    "zh-CN": "发现",
+    "en-US": "Discovery"
+  },
+  {
+    "key": "workbench.pipeline.qualification",
+    "zh-CN": "资质审查",
+    "en-US": "Qualification"
+  },
+  {
+    "key": "workbench.pipeline.proposal",
+    "zh-CN": "提案",
+    "en-US": "Proposal"
+  },
+  {
+    "key": "workbench.pipeline.negotiation",
+    "zh-CN": "谈判",
+    "en-US": "Negotiation"
+  },
+  {
+    "key": "workbench.pipeline.closed_won",
+    "zh-CN": "赢单",
+    "en-US": "Closed Won"
+  },
+  {
     "key": "workbench.leads.title",
     "zh-CN": "最新线索",
     "en-US": "New Leads"
@@ -2527,6 +2552,36 @@
     "key": "workbench.leads.daysAgo",
     "zh-CN": "{days}天前",
     "en-US": "{days}d ago"
+  },
+  {
+    "key": "workbench.leads.status.new",
+    "zh-CN": "新建",
+    "en-US": "New"
+  },
+  {
+    "key": "workbench.leads.status.following_up",
+    "zh-CN": "跟进中",
+    "en-US": "Following Up"
+  },
+  {
+    "key": "workbench.leads.status.contacted",
+    "zh-CN": "已联系",
+    "en-US": "Contacted"
+  },
+  {
+    "key": "workbench.leads.status.qualified",
+    "zh-CN": "已合格",
+    "en-US": "Qualified"
+  },
+  {
+    "key": "workbench.leads.status.converted",
+    "zh-CN": "已转化",
+    "en-US": "Converted"
+  },
+  {
+    "key": "workbench.leads.status.disqualified",
+    "zh-CN": "不合格",
+    "en-US": "Disqualified"
   },
   {
     "key": "workbench.processStats.title",

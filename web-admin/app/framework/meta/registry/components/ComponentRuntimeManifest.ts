@@ -117,4 +117,76 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   addressfield: runtime('picker', 'AddressField', {
     aliases: ['AddressField', 'address_field', 'address'],
   }),
+  decisionrolloutmonitor: runtime('decision', 'DecisionRolloutMonitorBlock', {
+    aliases: [
+      'DecisionRolloutMonitorBlock',
+      'decision-rollout-monitor',
+      'decision_rollout_monitor',
+      'decisionrolloutmonitor',
+    ],
+  }),
+  decisionfieldimpact: runtime('decision', 'DecisionFieldImpactBlock', {
+    aliases: [
+      'DecisionFieldImpactBlock',
+      'decision-field-impact',
+      'decision_field_impact',
+      'decisionfieldimpact',
+    ],
+  }),
+  decisionintegrationimpact: runtime('decision', 'DecisionIntegrationImpactBlock', {
+    aliases: [
+      'DecisionIntegrationImpactBlock',
+      'decision-integration-impact',
+      'decision_integration_impact',
+      'decisionintegrationimpact',
+    ],
+  }),
+  decisiondefinitionactions: runtime('decision', 'DecisionDefinitionActionsBlock', {
+    aliases: [
+      'DecisionDefinitionActionsBlock',
+      'decision-definition-actions',
+      'decision_definition_actions',
+      'decisiondefinitionactions',
+    ],
+  }),
+  decisioneventpolicyactions: runtime('decision', 'EventPolicyActionsBlock', {
+    aliases: [
+      'EventPolicyActionsBlock',
+      'decision-event-policy-actions',
+      'decision_event_policy_actions',
+      'decisioneventpolicyactions',
+    ],
+  }),
+  decisioneventpolicydesigner: runtime('decision', 'EventPolicyDesignerBlock', {
+    aliases: [
+      'EventPolicyDesignerBlock',
+      'decision-event-policy-designer',
+      'decision_event_policy_designer',
+      'decisioneventpolicydesigner',
+    ],
+  }),
+  decisionexecutionlogtrace: runtime('decision', 'ExecutionLogTraceBlock', {
+    aliases: [
+      'ExecutionLogTraceBlock',
+      'decision-execution-log-trace',
+      'decision_execution_log_trace',
+      'decisionexecutionlogtrace',
+    ],
+  }),
+  decisiontableworkbench: runtime('decision', 'DecisionTableWorkbenchBlock', {
+    aliases: [
+      'DecisionTableWorkbenchBlock',
+      'decision-table-workbench',
+      'decision_table_workbench',
+      'decisiontableworkbench',
+    ],
+  }),
+  decisionrulebinding: runtime('decision', 'DecisionRuleBindingBlock', {
+    aliases: [
+      'DecisionRuleBindingBlock',
+      'decision-rule-binding',
+      'decision_rule_binding',
+      'decisionrulebinding',
+    ],
+  }),
 };

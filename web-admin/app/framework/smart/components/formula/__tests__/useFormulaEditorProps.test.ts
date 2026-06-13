@@ -179,7 +179,7 @@ describe('useFormulaEditorProps', () => {
     );
     const fns = await result.current.fetchFunctions!();
     expect(fns.length).toBeGreaterThan(0);
-    const names = fns.map((f) => f.name);
+    const names = fns.map((f: { name: string }) => f.name);
     expect(names).toContain('concat');
     expect(names).toContain('IF');
     expect(names).toContain('now');
@@ -199,7 +199,7 @@ describe('useFormulaEditorProps', () => {
   it('editorValue is memoized (stable when value unchanged)', () => {
     const onChange = vi.fn();
     const { result, rerender } = renderHook(
-      ({ v }) => useFormulaEditorProps({ value: v, onChange }),
+      ({ v }: { v: string }) => useFormulaEditorProps({ value: v, onChange }),
       { initialProps: { v: '${form.price}' } },
     );
     const first = result.current.editorValue;
@@ -210,7 +210,7 @@ describe('useFormulaEditorProps', () => {
   it('editorValue updates when value prop changes', () => {
     const onChange = vi.fn();
     const { result, rerender } = renderHook(
-      ({ v }) => useFormulaEditorProps({ value: v, onChange }),
+      ({ v }: { v: string }) => useFormulaEditorProps({ value: v, onChange }),
       { initialProps: { v: '${form.price}' } },
     );
     expect(result.current.editorValue).toBe('#price');

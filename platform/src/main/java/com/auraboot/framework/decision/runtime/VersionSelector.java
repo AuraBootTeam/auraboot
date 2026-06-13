@@ -63,6 +63,7 @@ public final class VersionSelector {
                 Instant at = criteria.asOf();
                 yield highest(all, v -> isStatus(v, VersionStatus.PUBLISHED) && effectiveAt(v, at));
             }
+            case ROLLOUT -> null;
         };
     }
 

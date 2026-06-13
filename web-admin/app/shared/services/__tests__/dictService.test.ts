@@ -38,22 +38,22 @@ describe('dictService', () => {
       const dto = { pid: 'p1', code: 'STATUS', name: 'Status' };
       postMock.mockResolvedValue({ ...SUCCESS, data: dto });
 
-      const result = await dictService.create({ code: 'STATUS', name: 'Status', dictType: 'simple' });
+      const result = await dictService.create({ code: 'STATUS', name: 'Status', dictType: 'simple', sourceType: 'STATIC' });
 
-      expect(postMock).toHaveBeenCalledWith('/api/meta/dict', { code: 'STATUS', name: 'Status', dictType: 'simple' }, undefined, undefined);
+      expect(postMock).toHaveBeenCalledWith('/api/meta/dict', { code: 'STATUS', name: 'Status', dictType: 'simple', sourceType: 'STATIC' }, undefined, undefined);
       expect(result).toEqual(dto);
     });
 
     it('throws when success is false', async () => {
       postMock.mockResolvedValue({ success: false, message: 'Server error', data: null });
 
-      await expect(dictService.create({ code: 'X', name: 'X', dictType: 'simple' })).rejects.toThrow('Server error');
+      await expect(dictService.create({ code: 'X', name: 'X', dictType: 'simple', sourceType: 'STATIC' })).rejects.toThrow('Server error');
     });
 
     it('throws default message when result.message is missing', async () => {
       postMock.mockResolvedValue({ success: false, message: '', data: null });
 
-      await expect(dictService.create({ code: 'X', name: 'X', dictType: 'simple' })).rejects.toThrow('Failed to create dictionary');
+      await expect(dictService.create({ code: 'X', name: 'X', dictType: 'simple', sourceType: 'STATIC' })).rejects.toThrow('Failed to create dictionary');
     });
   });
 

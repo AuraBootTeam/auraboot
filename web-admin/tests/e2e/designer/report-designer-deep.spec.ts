@@ -7,7 +7,7 @@
  *   - Report-level operations (save, export, undo/redo)
  *
  * IDs: RPT-DT-01..13, RPT-GT-01..07, RPT-SC-01..06, RPT-RT-01..06,
- *      RPT-CT-01..09, RPT-CH-01..08, RPT-BD-01..08, RPT-OP-01..07,
+ *      RPT-CT-01..09, RPT-CH-01..08, RPT-BD-01..08, RPT-OP-01..13,
  *      RPT-BC-01..07, RPT-WM-01..06
  *
  * @since 6.0.0
@@ -15,7 +15,10 @@
 
 import { test, expect } from '../../fixtures';
 import type { Page } from '@playwright/test';
-import { uniqueId } from '../helpers';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { inflateSync } from 'node:zlib';
+import { executeCommandViaApi, uniqueId } from '../helpers';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -60,8 +63,10 @@ async function openReportAndAddBand(page: Page, bandType: 'Page Header' | 'Page 
     .getByRole('button', { name: new RegExp(bandType, 'i') })
     .first()
     .click();
-  await page.waitForTimeout(300);
   const canvas = page.getByTestId('report-canvas');
+  await expect(canvas.getByText(bandType === 'Page Header' ? 'Header' : 'Footer', { exact: true })).toBeVisible({
+    timeout: 5000,
+  });
   const cursorDivs = canvas.locator('.cursor-pointer');
   if (bandType === 'Page Header') {
     await cursorDivs.first().click({ timeout: 5000 });
@@ -69,6 +74,526 @@ async function openReportAndAddBand(page: Page, bandType: 'Page Header' | 'Page 
     await cursorDivs.last().click({ timeout: 5000 });
   }
   await expect(page.getByTestId('block-property-panel')).toBeVisible({ timeout: 5000 });
+}
+
+async function createReportExportPage(page: Page) {
+  const title = uniqueId('ReportExport');
+  const pageKey = title.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+  const exportRows = [
+    { region: 'North', cases: 12, owner: 'Ops-A' },
+    { region: 'South', cases: 9, owner: 'Ops-B' },
+  ];
+  const reportDsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title,
+    page: {
+      size: 'A4',
+      orientation: 'portrait',
+      margin: { top: 20, right: 20, bottom: 20, left: 20 },
+    },
+    dataSources: {
+      orders: {
+        type: 'static',
+        data: exportRows,
+      },
+    },
+    body: [
+      {
+        id: 'orders_table',
+        blockType: 'table',
+        title: 'Orders Export',
+        dataSource: 'orders',
+        showHeader: true,
+        columns: [
+          { field: 'region', label: 'Region' },
+          { field: 'cases', label: 'Cases' },
+          { field: 'owner', label: 'Owner' },
+        ],
+      },
+    ],
+  };
+
+  const createResp = await page.request.post('/api/pages', {
+    data: {
+      pageKey,
+      name: title,
+      title,
+      kind: 'list',
+      profile: 'report',
+      blocks: [],
+      schemaVersion: 4,
+      semver: '0.1.0',
+      metaInfo: { e2eArtifact: 'report-excel' },
+      extension: { reportDsl },
+    },
+  });
+  expect(createResp.ok(), `Create report page failed: ${createResp.status()}`).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create report page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created report page pid').toBeTruthy();
+
+  return { pid, title, exportRows };
+}
+
+async function createReportPdfVisualFidelityPage(page: Page) {
+  const title = uniqueId('ReportPdfVisual');
+  const pageKey = title.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+  const reportDsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title,
+    page: {
+      size: 'A4',
+      orientation: 'landscape',
+      margin: { top: 15, right: 10, bottom: 12, left: 35 },
+    },
+    dataSources: {
+      layoutRows: {
+        type: 'static',
+        data: [{ region: 'North', cases: 12 }],
+      },
+    },
+    body: [
+      {
+        id: 'layout_table',
+        blockType: 'table',
+        title: 'Layout Table',
+        dataSource: 'layoutRows',
+        showHeader: true,
+        columns: [
+          { field: 'region', label: 'Region' },
+          { field: 'cases', label: 'Cases' },
+        ],
+      },
+    ],
+  };
+
+  const createResp = await page.request.post('/api/pages', {
+    data: {
+      pageKey,
+      name: title,
+      title,
+      kind: 'list',
+      profile: 'report',
+      blocks: [],
+      schemaVersion: 4,
+      semver: '0.1.0',
+      metaInfo: { e2eArtifact: 'report-pdf-visual-fidelity' },
+      extension: { reportDsl },
+    },
+  });
+  expect(createResp.ok(), `Create visual fidelity report page failed: ${createResp.status()}`).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create visual fidelity report page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created visual fidelity report page pid').toBeTruthy();
+
+  return { pid, title };
+}
+
+async function createReportNonTableExportPage(page: Page) {
+  const title = uniqueId('ReportNonTableExport');
+  const pageKey = title.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+  const exportRows = [
+    { region: 'North', status: 'Open', owner: 'Ops-A', cases: 12 },
+    { region: 'North', status: 'Closed', owner: 'Ops-A', cases: 3 },
+    { region: 'South', status: 'Open', owner: 'Ops-B', cases: 9 },
+  ];
+  const reportDsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title,
+    page: {
+      size: 'A4',
+      orientation: 'portrait',
+      margin: { top: 20, right: 20, bottom: 20, left: 20 },
+    },
+    dataSources: {
+      ops: {
+        type: 'static',
+        data: exportRows,
+      },
+    },
+    body: [
+      {
+        id: 'header',
+        blockType: 'page-header',
+        content: 'Operations Header',
+      },
+      {
+        id: 'grouped_cases',
+        blockType: 'grouped-table',
+        title: 'Grouped Cases',
+        dataSource: 'ops',
+        groupByField: 'owner',
+        showHeader: true,
+        columns: [
+          { field: 'region', label: 'Region' },
+          { field: 'status', label: 'Status' },
+          { field: 'cases', label: 'Cases' },
+        ],
+      },
+      {
+        id: 'status_matrix',
+        blockType: 'cross-tab',
+        title: 'Region Status Matrix',
+        dataSource: 'ops',
+        rowField: 'region',
+        columnField: 'status',
+        valueField: 'cases',
+        aggregation: 'sum',
+        showRowTotal: true,
+        showColumnTotal: true,
+      },
+      {
+        id: 'open_total',
+        blockType: 'stat-card',
+        title: 'Open Case Total',
+        dataSource: 'ops',
+        valueField: 'cases',
+        aggregation: 'sum',
+        label: 'Total Cases',
+      },
+      {
+        id: 'summary',
+        blockType: 'rich-text',
+        title: 'Executive Summary',
+        content: 'Operations summary line one\nOperations summary line two',
+      },
+      {
+        id: 'status_chart',
+        blockType: 'chart',
+        title: 'Status Chart',
+        dataSource: 'ops',
+        chartType: 'bar',
+        categoryField: 'status',
+        valueField: 'cases',
+        aggregation: 'sum',
+      },
+      {
+        id: 'barcode',
+        blockType: 'barcode',
+        title: 'Export Barcode',
+        format: 'code128',
+        staticValue: 'OPS-2026-EXPORT',
+      },
+      {
+        id: 'watermark',
+        blockType: 'watermark',
+        text: 'CONFIDENTIAL',
+      },
+      {
+        id: 'footer',
+        blockType: 'page-footer',
+        content: 'Operations Footer',
+      },
+    ],
+  };
+
+  const createResp = await page.request.post('/api/pages', {
+    data: {
+      pageKey,
+      name: title,
+      title,
+      kind: 'list',
+      profile: 'report',
+      blocks: [],
+      schemaVersion: 4,
+      semver: '0.1.0',
+      metaInfo: { e2eArtifact: 'report-non-table-export' },
+      extension: { reportDsl },
+    },
+  });
+  expect(createResp.ok(), `Create non-table report page failed: ${createResp.status()}`).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create non-table report page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created non-table report page pid').toBeTruthy();
+
+  return { pid, title, exportRows };
+}
+
+async function ensureNamedQuery(
+  page: Page,
+  request: {
+    code: string;
+    title: string;
+    description: string;
+    fromSql: string;
+  },
+) {
+  const createResp = await page.request.post('/api/meta/named-queries', { data: request });
+  if (createResp.ok()) {
+    const createBody = await createResp.json();
+    expect(createBody.code).toBe('0');
+    return;
+  }
+
+  const createText = await createResp.text();
+  const lookupResp = await page.request.get(
+    `/api/meta/named-queries/by-code/${encodeURIComponent(request.code)}`,
+  );
+  if (lookupResp.ok()) {
+    const lookupBody = await lookupResp.json();
+    if (lookupBody.code === '0' && lookupBody.data?.code === request.code) return;
+  }
+
+  throw new Error(`Failed to create or reuse named query ${request.code}: ${createText}`);
+}
+
+async function ensureNamedQueryField(
+  page: Page,
+  queryCode: string,
+  field: {
+    fieldCode: string;
+    columnExpr: string;
+    dataType: string;
+    displayName: string;
+    sortable: boolean;
+    searchable: boolean;
+    sortOrder: number;
+  },
+) {
+  const encodedQueryCode = encodeURIComponent(queryCode);
+  const encodedFieldCode = encodeURIComponent(field.fieldCode);
+  const addResp = await page.request.post(`/api/meta/named-queries/${encodedQueryCode}/fields`, {
+    data: field,
+  });
+  if (addResp.ok()) {
+    const addBody = await addResp.json();
+    expect(addBody.code).toBe('0');
+    return;
+  }
+
+  const addText = await addResp.text();
+  throw new Error(`Failed to create named query field ${queryCode}.${encodedFieldCode}: ${addText}`);
+}
+
+async function createReportNonStaticDataSourceExportPage(page: Page) {
+  const uid = uniqueId('ReportDataSourceExport');
+  const title = uid;
+  const pageKey = title.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+  const queryCode = `rpt_export_${uid.toLowerCase().replace(/[^a-z0-9_]+/g, '_')}`;
+  const modelTitle = `${uid} Model`;
+  const namedQueryTitle = `${uid} NamedQuery`;
+  const apiTitle = `${uid} API`;
+
+  for (const [orderTitle, customer] of [
+    [modelTitle, 'Report Model Customer'],
+    [namedQueryTitle, 'Report NamedQuery Customer'],
+    [apiTitle, 'Report API Customer'],
+  ]) {
+    const created = await executeCommandViaApi(
+      page,
+      'e2et:create_order',
+      {
+        e2et_order_title: orderTitle,
+        e2et_order_type: 'normal',
+        e2et_order_customer: customer,
+        e2et_order_urgent: false,
+      },
+      undefined,
+      'create',
+    );
+    expect(created.code).toBe('0');
+    expect(created.recordId).toBeTruthy();
+  }
+
+  await ensureNamedQuery(page, {
+    code: queryCode,
+    title: `Report export ${uid}`,
+    description: 'Auto-generated for Report Designer non-static dataSource export E2E',
+    fromSql:
+      'SELECT o.e2et_order_title, o.e2et_order_customer, o.e2et_order_type ' +
+      'FROM mt_e2et_order o ' +
+      'WHERE o.tenant_id = #{params.tenantId} AND o.e2et_order_title = #{params.reportTitle}',
+  });
+
+  for (const field of [
+    {
+      fieldCode: 'e2et_order_title',
+      columnExpr: 'e2et_order_title',
+      dataType: 'string',
+      displayName: 'Title',
+      sortable: true,
+      searchable: true,
+      sortOrder: 1,
+    },
+    {
+      fieldCode: 'e2et_order_customer',
+      columnExpr: 'e2et_order_customer',
+      dataType: 'string',
+      displayName: 'Customer',
+      sortable: true,
+      searchable: true,
+      sortOrder: 2,
+    },
+    {
+      fieldCode: 'e2et_order_type',
+      columnExpr: 'e2et_order_type',
+      dataType: 'string',
+      displayName: 'Type',
+      sortable: true,
+      searchable: true,
+      sortOrder: 3,
+    },
+  ]) {
+    await ensureNamedQueryField(page, queryCode, field);
+  }
+
+  const tableColumns = [
+    { field: 'e2et_order_title', label: 'Title' },
+    { field: 'e2et_order_customer', label: 'Customer' },
+    { field: 'e2et_order_type', label: 'Type' },
+  ];
+  const reportDsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title,
+    page: {
+      size: 'A4',
+      orientation: 'portrait',
+      margin: { top: 20, right: 20, bottom: 20, left: 20 },
+    },
+    dataSources: {
+      modelOrders: {
+        type: 'model',
+        modelCode: 'e2et_order',
+        maxItems: 5,
+        filters: [{ fieldName: 'e2et_order_title', operator: 'EQ', value: modelTitle }],
+      },
+      namedQueryOrders: {
+        type: 'namedQuery',
+        queryCode,
+        maxItems: 5,
+        params: { reportTitle: namedQueryTitle },
+      },
+      apiOrders: {
+        type: 'api',
+        endpoint: '/api/datasource/list',
+        params: {
+          datasourceId: `nq:${queryCode}`,
+          format: 'records',
+          maxItems: 5,
+          reportTitle: apiTitle,
+        },
+      },
+    },
+    body: [
+      {
+        id: 'model_orders',
+        blockType: 'table',
+        title: 'Model Orders',
+        dataSource: 'modelOrders',
+        showHeader: true,
+        columns: tableColumns,
+      },
+      {
+        id: 'named_query_orders',
+        blockType: 'table',
+        title: 'NamedQuery Orders',
+        dataSource: 'namedQueryOrders',
+        showHeader: true,
+        columns: tableColumns,
+      },
+      {
+        id: 'api_orders',
+        blockType: 'table',
+        title: 'API Orders',
+        dataSource: 'apiOrders',
+        showHeader: true,
+        columns: tableColumns,
+      },
+    ],
+  };
+
+  const createResp = await page.request.post('/api/pages', {
+    data: {
+      pageKey,
+      name: title,
+      title,
+      kind: 'list',
+      profile: 'report',
+      blocks: [],
+      schemaVersion: 4,
+      semver: '0.1.0',
+      metaInfo: { e2eArtifact: 'report-non-static-data-source-export' },
+      extension: { reportDsl },
+    },
+  });
+  expect(createResp.ok(), `Create non-static report page failed: ${createResp.status()}`).toBeTruthy();
+  const createBody = await createResp.json();
+  expect(createBody.code, 'create non-static report page API code').toBe('0');
+  const pid = String(createBody.data?.pid || '');
+  expect(pid, 'created non-static report page pid').toBeTruthy();
+
+  return { pid, title, modelTitle, namedQueryTitle, apiTitle };
+}
+
+function extractPdfContentText(bytes: Buffer): string {
+  const source = bytes.toString('latin1');
+  const chunks: string[] = [];
+  let offset = 0;
+  while (offset < source.length) {
+    const streamIndex = source.indexOf('stream', offset);
+    if (streamIndex < 0) break;
+    const dataStart = source.indexOf('\n', streamIndex);
+    const streamEnd = source.indexOf('endstream', dataStart);
+    if (dataStart < 0 || streamEnd < 0) break;
+
+    let raw = bytes.subarray(dataStart + 1, streamEnd);
+    while (raw.length > 0 && (raw[raw.length - 1] === 10 || raw[raw.length - 1] === 13)) {
+      raw = raw.subarray(0, raw.length - 1);
+    }
+
+    try {
+      chunks.push(inflateSync(raw).toString('latin1'));
+    } catch {
+      chunks.push(raw.toString('latin1'));
+    }
+    offset = streamEnd + 'endstream'.length;
+  }
+  return chunks.join('\n');
+}
+
+function extractPdfMediaBox(bytes: Buffer): { width: number; height: number } {
+  const match = bytes
+    .toString('latin1')
+    .match(/\/MediaBox\s*\[\s*0(?:\.0+)?\s+0(?:\.0+)?\s+([0-9.]+)\s+([0-9.]+)/);
+  expect(match, 'PDF MediaBox must be present').toBeTruthy();
+  return { width: Number(match?.[1]), height: Number(match?.[2]) };
+}
+
+function extractPdfTextObjects(bytes: Buffer): Array<{ text: string; x: number; y: number; fontSize: number }> {
+  const content = extractPdfContentText(bytes);
+  const objects: Array<{ text: string; x: number; y: number; fontSize: number }> = [];
+  const textObjectPattern =
+    /\/[A-Za-z0-9]+\s+(-?\d+(?:\.\d+)?)\s+Tf\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+Td\s+\(([^()]*)\)\s+Tj/g;
+  let match: RegExpExecArray | null;
+  while ((match = textObjectPattern.exec(content)) != null) {
+    objects.push({
+      fontSize: Number(match[1]),
+      x: Number(match[2]),
+      y: Number(match[3]),
+      text: match[4].replace(/\\([()\\])/g, '$1'),
+    });
+  }
+  return objects;
+}
+
+function requirePdfTextObject(
+  objects: Array<{ text: string; x: number; y: number; fontSize: number }>,
+  text: string,
+) {
+  const object = objects.find((entry) => entry.text === text);
+  expect(object, `PDF text object not found: ${text}`).toBeTruthy();
+  return object!;
+}
+
+function pdfMmToPoints(millimeters: number): number {
+  return (millimeters * 72) / 25.4;
 }
 
 // ===================================================================
@@ -731,51 +1256,376 @@ test.describe('Report Operations', () => {
     await expect(excelBtn).toBeVisible({ timeout: 5000 });
   });
 
-  test('RPT-OP-07: Export Excel triggers API call or save prompt', async ({ page }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
-    await waitForDesignerLoad(page);
-    // Add a block first so the report has content
-    const palette = page.getByTestId('block-palette');
-    await expect(palette).toBeVisible({ timeout: 10000 });
-    await palette
-      .getByRole('button', { name: /data table/i })
-      .first()
-      .click();
-    // Save first to get a valid report PID
-    const saveBtn = page.getByRole('button', { name: /save/i });
-    await saveBtn.click();
-    const saveResponse = await page
-      .waitForResponse(
+  test('RPT-OP-07: Export Excel downloads a parsable XLSX artifact', async ({ page }, testInfo) => {
+    const { pid, title, exportRows } = await createReportExportPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const excelBtn = page.getByRole('button', { name: /export excel/i });
+      await expect(excelBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
         (res) =>
-          res.url().includes('/api/pages') &&
-          (res.request().method().toLowerCase() === 'post' ||
-            res.request().method().toLowerCase() === 'put'),
-        { timeout: 10000 },
-      )
-      .catch(() => null);
-    await page.waitForTimeout(500);
-
-    // Click Excel export — if report was saved, it triggers API; otherwise it shows alert
-    const excelBtn = page.getByRole('button', { name: /export excel/i });
-
-    if (saveResponse && saveResponse.ok()) {
-      // Report was saved — expect API call to export endpoint
-      const exportPromise = page.waitForResponse(
-        (res) => res.url().includes('/api/reports/export/excel'),
-        { timeout: 10000 },
+          res.url().includes('/api/reports/export/excel') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
       );
       await excelBtn.click();
-      const exportResponse = await exportPromise.catch(() => null);
-      if (exportResponse) {
-        expect(exportResponse.status()).toBeDefined();
-      }
-    } else {
-      // Report was NOT saved — expect alert prompting to save first
-      const dialogPromise = page.waitForEvent('dialog', { timeout: 5000 });
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `Excel export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(download.suggestedFilename()).toBe(`${title}.xlsx`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const bytes = await readFile(savedPath);
+      expect(bytes.subarray(0, 2).toString()).toBe('PK');
+
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.read(bytes, { type: 'buffer' });
+      expect(workbook.SheetNames).toEqual(['Orders Export']);
+      const sheetRows = XLSX.utils.sheet_to_json(workbook.Sheets['Orders Export'], {
+        header: 1,
+        raw: true,
+      }) as unknown[][];
+      expect(sheetRows.slice(0, 4)).toEqual([
+        ['Orders Export'],
+        ['Region', 'Cases', 'Owner'],
+        [exportRows[0].region, exportRows[0].cases, exportRows[0].owner],
+        [exportRows[1].region, exportRows[1].cases, exportRows[1].owner],
+      ]);
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
+
+  test('RPT-OP-08: Export PDF downloads a non-empty PDF artifact', async ({ page }, testInfo) => {
+    const { pid, title } = await createReportExportPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const pdfBtn = page.getByRole('button', { name: /export pdf/i });
+      await expect(pdfBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/pdf') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
+      await pdfBtn.click();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `PDF export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(download.suggestedFilename()).toBe(`${title}.pdf`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const bytes = await readFile(savedPath);
+      const pdfText = bytes.toString('latin1');
+      expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      expect(bytes.length).toBeGreaterThan(1_000);
+      expect(pdfText).toContain('/Type /Page');
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
+
+  test('RPT-OP-09: Export Excel includes non-table semantic sheets', async ({ page }, testInfo) => {
+    const { pid, title } = await createReportNonTableExportPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const excelBtn = page.getByRole('button', { name: /export excel/i });
+      await expect(excelBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/excel') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
       await excelBtn.click();
-      const dialog = await dialogPromise;
-      expect(dialog.message()).toContain('save the report');
-      await dialog.accept();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `Excel export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(download.suggestedFilename()).toBe(`${title}.xlsx`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const bytes = await readFile(savedPath);
+      expect(bytes.subarray(0, 2).toString()).toBe('PK');
+
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.read(bytes, { type: 'buffer' });
+      expect(workbook.SheetNames).toEqual([
+        'Grouped Cases',
+        'Region Status Matrix',
+        'Open Case Total',
+        'Executive Summary',
+        'Status Chart',
+        'Report Text',
+      ]);
+      const grouped = workbook.Sheets['Grouped Cases'];
+      expect(grouped.A2.v).toBe('Region');
+      expect(grouped.A3.v).toBe('owner: Ops-A (2)');
+      expect(grouped.A4.v).toBe('North');
+      expect(grouped.A6.v).toBe('owner: Ops-B (1)');
+
+      const matrix = workbook.Sheets['Region Status Matrix'];
+      expect(matrix.A2.v).toBe('region \\ status');
+      expect(matrix.B2.v).toBe('Closed');
+      expect(matrix.C2.v).toBe('Open');
+      expect(matrix.B3.v).toBe(3);
+      expect(matrix.C3.v).toBe(12);
+      expect(matrix.A5.v).toBe('Total');
+      expect(matrix.D5.v).toBe(24);
+
+      expect(workbook.Sheets['Open Case Total'].B3.v).toBe(24);
+      expect(workbook.Sheets['Executive Summary'].A2.v).toBe('Operations summary line one');
+      expect(workbook.Sheets['Status Chart'].A3.v).toBe('Closed');
+      expect(workbook.Sheets['Status Chart'].B4.v).toBe(21);
+      expect(workbook.Sheets['Report Text'].A2.v).toBe('Page Header');
+      expect(workbook.Sheets['Report Text'].B3.v).toBe('OPS-2026-EXPORT');
+      expect(workbook.Sheets['Report Text'].B4.v).toBe('CONFIDENTIAL');
+      expect(workbook.Sheets['Report Text'].B5.v).toBe('Operations Footer');
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
+
+  test('RPT-OP-10: Export PDF includes non-table semantic content', async ({ page }, testInfo) => {
+    const { pid, title } = await createReportNonTableExportPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const pdfBtn = page.getByRole('button', { name: /export pdf/i });
+      await expect(pdfBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/pdf') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
+      await pdfBtn.click();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `PDF export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(exportResponse.headers()['content-type']).toContain('application/pdf');
+      expect(download.suggestedFilename()).toBe(`${title}.pdf`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const bytes = await readFile(savedPath);
+      const pdfText = bytes.toString('latin1');
+      const pdfContentText = extractPdfContentText(bytes);
+      expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      expect(bytes.length).toBeGreaterThan(1_000);
+      expect(pdfText).toContain('/Type /Page');
+      expect(pdfContentText).toContain('OPS-2026-EXPORT');
+      expect(pdfContentText).toContain('CONFIDENTIAL');
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
+
+  test('RPT-OP-11: Export Excel includes model, namedQuery, and api dataSource rows', async ({
+    page,
+  }, testInfo) => {
+    const { pid, title, modelTitle, namedQueryTitle, apiTitle } =
+      await createReportNonStaticDataSourceExportPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const excelBtn = page.getByRole('button', { name: /export excel/i });
+      await expect(excelBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/excel') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
+      await excelBtn.click();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `Excel export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(download.suggestedFilename()).toBe(`${title}.xlsx`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const bytes = await readFile(savedPath);
+      expect(bytes.subarray(0, 2).toString()).toBe('PK');
+
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.read(bytes, { type: 'buffer' });
+      expect(workbook.SheetNames).toEqual(['Model Orders', 'NamedQuery Orders', 'API Orders']);
+
+      const modelRows = XLSX.utils.sheet_to_json(workbook.Sheets['Model Orders'], {
+        header: 1,
+        raw: true,
+      }) as unknown[][];
+      expect(modelRows.slice(0, 3)).toEqual([
+        ['Model Orders'],
+        ['Title', 'Customer', 'Type'],
+        [modelTitle, 'Report Model Customer', 'normal'],
+      ]);
+
+      const namedQueryRows = XLSX.utils.sheet_to_json(workbook.Sheets['NamedQuery Orders'], {
+        header: 1,
+        raw: true,
+      }) as unknown[][];
+      expect(namedQueryRows.slice(0, 3)).toEqual([
+        ['NamedQuery Orders'],
+        ['Title', 'Customer', 'Type'],
+        [namedQueryTitle, 'Report NamedQuery Customer', 'normal'],
+      ]);
+
+      const apiRows = XLSX.utils.sheet_to_json(workbook.Sheets['API Orders'], {
+        header: 1,
+        raw: true,
+      }) as unknown[][];
+      expect(apiRows.slice(0, 3)).toEqual([
+        ['API Orders'],
+        ['Title', 'Customer', 'Type'],
+        [apiTitle, 'Report API Customer', 'normal'],
+      ]);
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
+
+  test('RPT-OP-12: Export JSON includes round-trip DSL and resolved dataSource rows', async ({
+    page,
+  }, testInfo) => {
+    const { pid, title, modelTitle, namedQueryTitle, apiTitle } =
+      await createReportNonStaticDataSourceExportPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const jsonBtn = page.getByRole('button', { name: /export json/i });
+      await expect(jsonBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/json') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
+      await jsonBtn.click();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `JSON export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(exportResponse.headers()['content-type']).toContain('application/json');
+      expect(download.suggestedFilename()).toBe(`${title}.report.json`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const payload = JSON.parse((await readFile(savedPath)).toString('utf8')) as {
+        format?: string;
+        reportPid?: string;
+        reportDsl?: {
+          title?: string;
+          dataSources?: Record<string, { type?: string }>;
+          body?: Array<{ blockType?: string; title?: string; dataSource?: string }>;
+        };
+        dataSets?: Record<string, Array<Record<string, unknown>>>;
+      };
+      expect(payload.format).toBe('auraboot.report.export.v1');
+      expect(payload.reportPid).toBe(pid);
+      expect(payload.reportDsl?.title).toBe(title);
+      expect(payload.reportDsl?.dataSources?.modelOrders?.type).toBe('model');
+      expect(payload.reportDsl?.dataSources?.namedQueryOrders?.type).toBe('namedQuery');
+      expect(payload.reportDsl?.dataSources?.apiOrders?.type).toBe('api');
+      expect(payload.reportDsl?.body?.map((block) => block.title)).toEqual([
+        'Model Orders',
+        'NamedQuery Orders',
+        'API Orders',
+      ]);
+      expect(payload.dataSets?.modelOrders?.[0]?.e2et_order_title).toBe(modelTitle);
+      expect(payload.dataSets?.namedQueryOrders?.[0]?.e2et_order_title).toBe(namedQueryTitle);
+      expect(payload.dataSets?.apiOrders?.[0]?.e2et_order_title).toBe(apiTitle);
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+    }
+  });
+
+  test('RPT-OP-13: Export PDF preserves page settings and text hierarchy', async ({
+    page,
+  }, testInfo) => {
+    const { pid, title } = await createReportPdfVisualFidelityPage(page);
+    try {
+      await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+      await waitForDesignerLoad(page);
+      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+
+      const pdfBtn = page.getByRole('button', { name: /export pdf/i });
+      await expect(pdfBtn).toBeVisible({ timeout: 5000 });
+
+      const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+      const exportResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/reports/export/pdf') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 30_000 },
+      );
+      await pdfBtn.click();
+
+      const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+      expect(exportResponse.ok(), `PDF export API failed: ${exportResponse.status()}`).toBeTruthy();
+      expect(exportResponse.headers()['content-type']).toContain('application/pdf');
+      expect(download.suggestedFilename()).toBe(`${title}.pdf`);
+
+      const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+      await download.saveAs(savedPath);
+
+      const bytes = await readFile(savedPath);
+      expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      const mediaBox = extractPdfMediaBox(bytes);
+      expect(mediaBox.width).toBeGreaterThan(mediaBox.height);
+      expect(mediaBox.width).toBeGreaterThan(841);
+      expect(mediaBox.width).toBeLessThan(842);
+      expect(mediaBox.height).toBeGreaterThan(595);
+      expect(mediaBox.height).toBeLessThan(596);
+
+      const textObjects = extractPdfTextObjects(bytes);
+      const titleObject = requirePdfTextObject(textObjects, title);
+      const blockTitleObject = requirePdfTextObject(textObjects, 'Layout Table');
+      const expectedLeft = pdfMmToPoints(35);
+      expect(titleObject.x).toBeGreaterThan(expectedLeft - 1);
+      expect(titleObject.x).toBeLessThan(expectedLeft + 1);
+      expect(titleObject.fontSize).toBe(16);
+      expect(blockTitleObject.x).toBeGreaterThan(expectedLeft - 1);
+      expect(blockTitleObject.x).toBeLessThan(expectedLeft + 1);
+      expect(blockTitleObject.fontSize).toBe(12);
+      expect(titleObject.y).toBeGreaterThan(blockTitleObject.y);
+    } finally {
+      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
     }
   });
 });

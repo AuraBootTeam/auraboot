@@ -4,7 +4,7 @@
  * Creates an implicit SavedView for users who haven't explicitly created one,
  * then auto-saves sort/filter/column changes with a 2-second debounce.
  */
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { ViewConfig, SavedView } from '~/framework/smart/types/savedView';
 
 interface UseAutoSaveViewOptions {
@@ -25,6 +25,19 @@ export function useAutoSaveView({
 }: UseAutoSaveViewOptions): UseAutoSaveViewResult {
   const pendingRef = useRef<Partial<ViewConfig> | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      pendingRef.current = null;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = undefined;
+      }
+    };
+  }, []);
 
   const autoSave = useCallback(
     (config: Partial<ViewConfig>) => {
@@ -36,6 +49,7 @@ export function useAutoSaveView({
 
       // Debounce 2 seconds
       timerRef.current = setTimeout(async () => {
+        if (!mountedRef.current) return;
         const pending = pendingRef.current;
         if (!pending) return;
         pendingRef.current = null;
@@ -43,6 +57,7 @@ export function useAutoSaveView({
         try {
           await updateViewConfig(pending);
         } catch (err) {
+          if (!mountedRef.current) return;
           console.error('[useAutoSaveView] Failed to auto-save:', err);
           // Re-queue the failed changes
           pendingRef.current = { ...(pendingRef.current || {}), ...pending };

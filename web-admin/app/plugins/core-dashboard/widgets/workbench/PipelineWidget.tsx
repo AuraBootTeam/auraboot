@@ -29,12 +29,21 @@ interface PipelineWidgetProps {
 }
 
 const DEFAULT_COLORS: Record<string, string> = {
-  prospecting: '#3B82F6',
+  discovery: '#3B82F6',
   qualification: '#8B5CF6',
   proposal: '#F59E0B',
   negotiation: '#EF4444',
   closed_won: '#10B981',
   closed_lost: '#6B7280',
+};
+
+const STAGE_LABEL_FALLBACKS: Record<string, string> = {
+  discovery: 'Discovery',
+  qualification: 'Qualification',
+  proposal: 'Proposal',
+  negotiation: 'Negotiation',
+  closed_won: 'Closed Won',
+  closed_lost: 'Closed Lost',
 };
 
 function formatAmount(amount: number): string {
@@ -49,6 +58,7 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
   const [data, setData] = useState<PipelineData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   // crmUnavailable: true when backend returned empty stages (CRM module not installed in OSS)
   const [crmUnavailable, setCrmUnavailable] = useState(false);
 
@@ -58,6 +68,9 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError(false);
+      setPermissionDenied(false);
+      setCrmUnavailable(false);
       try {
         const result = await get<PipelineData>('/api/workbench/pipeline');
         if (!cancelled && result.code === '0' && result.data) {
@@ -66,6 +79,8 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
           if (result.data.stages.length === 0) {
             setCrmUnavailable(true);
           }
+        } else if (!cancelled && result.code === '403') {
+          setPermissionDenied(true);
         } else if (!cancelled) {
           setError(true);
         }
@@ -86,7 +101,7 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
     const filters = JSON.stringify([
       { fieldName: 'crm_opp_stage', operator: 'eq', value: stageCode },
     ]);
-    window.location.href = `/crm_opportunity?filters=${encodeURIComponent(filters)}`;
+    window.location.href = `/p/crm_opportunity?filters=${encodeURIComponent(filters)}`;
   };
 
   // --- Loading ---
@@ -107,6 +122,26 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
               />
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Permission denied ---
+  if (permissionDenied) {
+    return (
+      <div className={`flex h-full flex-col ${className}`} data-testid="pipeline-permission-denied">
+        <div className="mb-3 flex items-center justify-between px-1">
+          <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
+          <span className="mb-1 text-2xl">{'\uD83D\uDD12'}</span>
+          <span className="text-sm font-medium text-gray-500">
+            {t('workbench.pipeline.permissionDenied', {}, 'No permission to view pipeline')}
+          </span>
+          <span className="mt-1 text-xs text-gray-400">
+            {t('workbench.pipeline.permissionDeniedHint', {}, 'Ask an administrator for CRM opportunity access')}
+          </span>
         </div>
       </div>
     );
@@ -145,7 +180,7 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
             {t('workbench.pipeline.empty', {}, 'No opportunity data')}
           </span>
           <a
-            href="/crm_opportunity"
+            href="/p/crm_opportunity"
             className="mt-2 text-xs text-blue-500 hover:text-blue-600"
           >
             {t('workbench.pipeline.goToCrm', {}, 'Go to CRM')} &rarr;
@@ -171,6 +206,11 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
         {data.stages.map((stage) => {
           const barWidth = Math.max((stage.count / maxCount) * 100, 8);
           const color = stage.color || DEFAULT_COLORS[stage.code] || '#6B7280';
+          const stageLabel = t(
+            stage.label,
+            {},
+            STAGE_LABEL_FALLBACKS[stage.code] || stage.label || stage.code,
+          );
 
           return (
             <button
@@ -178,10 +218,11 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
               type="button"
               onClick={() => handleStageClick(stage.code)}
               className="group block w-full cursor-pointer text-left"
+              data-testid={`pipeline-stage-${stage.code}`}
             >
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-xs text-gray-600 group-hover:text-gray-900">
-                  {stage.label}
+                  {stageLabel}
                 </span>
                 <span className="text-[11px] text-gray-400">
                   {stage.count} &middot; {formatAmount(stage.amount)}

@@ -1,3 +1,4 @@
+import React from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { usePageDataSources } from '../usePageDataSources';
@@ -26,6 +27,40 @@ function expectFilterParam(
 }
 
 describe('usePageDataSources', () => {
+  it('rerenders consumers after a synchronous static schema data source auto-fetches', async () => {
+    const snapshots: string[] = [];
+    const schema = {
+      id: 'workbench_runtime',
+      modelCode: 'tenant',
+      dataSources: {
+        summary: {
+          type: 'static',
+          adaptor: 'records',
+          data: [{ pendingCount: 2 }],
+        },
+      },
+    } as any;
+
+    renderHook(
+      () => {
+        const state = usePageDataSources({
+          context: createExpressionContext({}),
+          schema,
+        });
+        snapshots.push(String((state.getData('summary') as any)?.[0]?.pendingCount ?? '-'));
+        return state;
+      },
+      {
+        wrapper: ({ children }: { children: React.ReactNode }) =>
+          React.createElement(React.StrictMode, null, children),
+      },
+    );
+
+    await waitFor(() => {
+      expect(snapshots).toContain('2');
+    });
+  });
+
   it('rerenders when an auto-fetched schema data source returns data', async () => {
     fetchResultMock.mockResolvedValue({
       code: '0',

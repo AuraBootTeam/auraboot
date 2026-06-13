@@ -4,6 +4,8 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.entity.SlaConfigEntity;
 import com.auraboot.framework.bpm.mapper.SlaConfigMapper;
 import com.auraboot.framework.common.util.UlidGenerator;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.plugin.dto.imports.SlaConfigDefinitionDTO;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ import java.util.Set;
 public class SlaConfigService {
 
     private final SlaConfigMapper slaConfigMapper;
+    private final DecisionUsageIndexService usageIndexService;
 
     public List<SlaConfigEntity> list() {
         return slaConfigMapper.findAllEnabled(MetaContext.getCurrentTenantId());
@@ -75,6 +78,7 @@ public class SlaConfigService {
                 .deadlineValue(request.deadlineValue())
                 .businessCalendar(request.businessCalendar() != null ? request.businessCalendar() : false)
                 .warningRules(request.warningRules())
+                .ruleBinding(request.ruleBinding())
                 .modelCode(request.modelCode())
                 .deadlineField(request.deadlineField())
                 .priorityField(request.priorityField())
@@ -85,6 +89,7 @@ public class SlaConfigService {
                 .deletedFlag(false)
                 .build();
         slaConfigMapper.insert(entity);
+        usageIndexService.refreshSource("SLA_RULE", entity.getPid());
         log.info("Created SLA config: pid={}, name={}", entity.getPid(), entity.getName());
         return entity;
     }
@@ -103,6 +108,7 @@ public class SlaConfigService {
         if (request.deadlineValue() != null) entity.setDeadlineValue(request.deadlineValue());
         if (request.businessCalendar() != null) entity.setBusinessCalendar(request.businessCalendar());
         if (request.warningRules() != null) entity.setWarningRules(request.warningRules());
+        if (request.ruleBinding() != null) entity.setRuleBinding(request.ruleBinding());
         if (request.modelCode() != null) entity.setModelCode(request.modelCode());
         if (request.deadlineField() != null) entity.setDeadlineField(request.deadlineField());
         if (request.priorityField() != null) entity.setPriorityField(request.priorityField());
@@ -110,6 +116,7 @@ public class SlaConfigService {
         if (request.enabled() != null) entity.setEnabled(request.enabled());
         entity.setUpdatedAt(Instant.now());
         slaConfigMapper.updateById(entity);
+        usageIndexService.refreshSource("SLA_RULE", entity.getPid());
         log.info("Updated SLA config: pid={}", pid);
         return entity;
     }
@@ -121,6 +128,7 @@ public class SlaConfigService {
             throw new IllegalArgumentException("SLA config not found: " + pid);
         }
         slaConfigMapper.deleteById(entity.getId());
+        usageIndexService.deleteSource("SLA_RULE", entity.getPid());
         log.info("Deleted SLA config: pid={}", pid);
     }
 
@@ -128,6 +136,7 @@ public class SlaConfigService {
             String name, String targetType, String targetKey, String domainCode,
             String deadlineMode, String deadlineValue, Boolean businessCalendar,
             List<Map<String, Object>> warningRules,
+            RuleConsumerBinding ruleBinding,
             String modelCode, String deadlineField, String priorityField,
             String suspendPolicy) {}
 
@@ -156,6 +165,7 @@ public class SlaConfigService {
                     .deadlineValue(dto.getDeadlineValue())
                     .businessCalendar(dto.getBusinessCalendar() != null ? dto.getBusinessCalendar() : Boolean.FALSE)
                     .warningRules(dto.getWarningRules())
+                    .ruleBinding(dto.getRuleBinding())
                     .modelCode(dto.getModelCode())
                     .deadlineField(dto.getDeadlineField())
                     .priorityField(dto.getPriorityField())
@@ -166,6 +176,7 @@ public class SlaConfigService {
                     .deletedFlag(false)
                     .build();
             slaConfigMapper.insert(entity);
+            usageIndexService.refreshSource("SLA_RULE", entity.getPid());
             log.info("Imported SLA config (created): name={}, pid={}", entity.getName(), entity.getPid());
             return entity;
         }
@@ -177,6 +188,7 @@ public class SlaConfigService {
         existing.setDeadlineValue(dto.getDeadlineValue());
         if (dto.getBusinessCalendar() != null) existing.setBusinessCalendar(dto.getBusinessCalendar());
         existing.setWarningRules(dto.getWarningRules());
+        existing.setRuleBinding(dto.getRuleBinding());
         existing.setModelCode(dto.getModelCode());
         existing.setDeadlineField(dto.getDeadlineField());
         existing.setPriorityField(dto.getPriorityField());
@@ -184,6 +196,7 @@ public class SlaConfigService {
         if (dto.getEnabled() != null) existing.setEnabled(dto.getEnabled());
         existing.setUpdatedAt(now);
         slaConfigMapper.updateById(existing);
+        usageIndexService.refreshSource("SLA_RULE", existing.getPid());
         log.info("Imported SLA config (updated): name={}, pid={}", existing.getName(), existing.getPid());
         return existing;
     }
@@ -192,6 +205,7 @@ public class SlaConfigService {
             String name, String targetType, String targetKey, String domainCode,
             String deadlineMode, String deadlineValue, Boolean businessCalendar,
             List<Map<String, Object>> warningRules,
+            RuleConsumerBinding ruleBinding,
             String modelCode, String deadlineField, String priorityField,
             String suspendPolicy, Boolean enabled) {}
 }

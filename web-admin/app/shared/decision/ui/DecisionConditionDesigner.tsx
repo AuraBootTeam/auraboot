@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ConditionBuilder, type FieldOption } from './ConditionBuilder';
 import { ConditionTestRunPanel, type TestSample } from './ConditionTestRunPanel';
 import { group, serialize, type GroupNode, type PathOperand } from '../ast/conditionAst';
-import type { DecisionApi, ValidateResult } from '../api/decisionApi';
+import type { DecisionApi, EventPolicySummary, ValidateResult } from '../api/decisionApi';
 
 /**
  * DecisionOps condition designer (mockup 策略设计器 / F3, docs/1.md §14, §17): composes the
@@ -16,9 +16,17 @@ export interface DecisionConditionDesignerProps {
   samples?: TestSample[];
   initial?: GroupNode;
   labelOf?: (o: PathOperand) => string;
+  selectedPolicy?: EventPolicySummary | null;
 }
 
-export function DecisionConditionDesigner({ api, fields, samples = [], initial, labelOf }: DecisionConditionDesignerProps) {
+export function DecisionConditionDesigner({
+  api,
+  fields,
+  samples = [],
+  initial,
+  labelOf,
+  selectedPolicy,
+}: DecisionConditionDesignerProps) {
   const [condition, setCondition] = useState<GroupNode>(initial ?? group('AND', []));
   const [validation, setValidation] = useState<ValidateResult | null>(null);
   const [validating, setValidating] = useState(false);
@@ -35,6 +43,17 @@ export function DecisionConditionDesigner({ api, fields, samples = [], initial, 
 
   return (
     <div data-testid="condition-designer">
+      {selectedPolicy && (
+        <div className="dcd-policy-context" data-testid="dcd-policy-context">
+          <strong>{selectedPolicy.policyName ?? selectedPolicy.policyCode}</strong>
+          <span className="mono">{selectedPolicy.policyCode}</span>
+          <span>{selectedPolicy.eventType ?? '-'}</span>
+          <span>{selectedPolicy.targetType ?? '-'}:{selectedPolicy.targetKey ?? '-'}</span>
+          {selectedPolicy.version != null && <span>v{selectedPolicy.version}</span>}
+          {selectedPolicy.status && <span>{selectedPolicy.status}</span>}
+        </div>
+      )}
+
       <ConditionBuilder value={condition} fields={fields} onChange={setCondition} />
 
       <div className="dcd-actions">

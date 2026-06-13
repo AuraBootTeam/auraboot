@@ -35,6 +35,14 @@ public final class BpmExtensionKeys {
     public static final String NODE_HOOKS = "aura.hooks";
 
     /**
+     * Node-level: serialized {@code RuleConsumerBinding} JSON for rule-center
+     * integration. User tasks use it for decision-driven assignment; gateway
+     * nodes use it to evaluate and expose rule outputs before sequence-flow
+     * expressions run.
+     */
+    public static final String RULE_BINDING = "aura.ruleBinding";
+
+    /**
      * Node-level (callActivity): serialized JSON object carrying parent↔child
      * variable mapping configuration.
      *

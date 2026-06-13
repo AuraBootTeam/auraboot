@@ -290,6 +290,8 @@ export function BPMNDesigner() {
       aura: processAura,
       name: processName,
       key: processKey,
+      description: processDescription,
+      category: processCategory,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: 'application/json',

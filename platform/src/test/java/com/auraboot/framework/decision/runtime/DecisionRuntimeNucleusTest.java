@@ -95,6 +95,33 @@ class DecisionRuntimeNucleusTest {
     }
 
     @Test
+    void validateCollectsWhitelistedFunctionRefs() {
+        String fnAst = """
+            { "type": "compare",
+              "left": { "type": "path", "scope": "record", "path": "data.submittedOn", "dataType": "date" },
+              "operator": "GTE",
+              "right": {
+                "type": "functionCall",
+                "name": "date",
+                "returnType": "date",
+                "args": [
+                  { "type": "literal", "value": 2026, "dataType": "integer" },
+                  { "type": "literal", "value": 6, "dataType": "integer" },
+                  { "type": "literal", "value": 10, "dataType": "integer" }
+                ]
+              } }
+            """;
+        JsonNode node;
+        try { node = mapper.readTree(fnAst); } catch (Exception e) { throw new RuntimeException(e); }
+        DecisionValidateResult v = runtime.validate(
+                ResolvedDecision.simpleCondition("fn_date", 1, VersionStatus.VALIDATED, node));
+
+        assertThat(v.valid()).isTrue();
+        assertThat(v.fieldRefs()).contains("record.data.submittedOn");
+        assertThat(v.functionRefs()).contains("date");
+    }
+
+    @Test
     void validateRejectsBadAst() {
         JsonNode bad = mapper.createObjectNode().put("type", "compare"); // missing operator/left
         ResolvedDecision d = ResolvedDecision.simpleCondition("bad", null, VersionStatus.DRAFT, bad);
@@ -113,6 +140,10 @@ class DecisionRuntimeNucleusTest {
         JsonNode node;
         try { node = mapper.readTree(fnAst); } catch (Exception e) { throw new RuntimeException(e); }
         ResolvedDecision d = ResolvedDecision.simpleCondition("fn", 1, VersionStatus.PUBLISHED, node);
+        DecisionValidateResult v = runtime.validate(d);
+        assertThat(v.valid()).isFalse();
+        assertThat(v.errors()).extracting(DecisionValidateResult.Issue::code).contains("AST_FUNCTION");
+
         DecisionResult r = runtime.evaluate(d, ctx(1), DecisionEvaluateOptions.defaults());
         assertThat(r.status()).isEqualTo(DecisionStatus.ERROR);
         assertThat(r.errors()).isNotEmpty();

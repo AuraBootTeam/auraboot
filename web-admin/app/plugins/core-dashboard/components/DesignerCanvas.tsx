@@ -14,6 +14,7 @@ import { renderWidget } from './WidgetRenderer';
 import type { Widget, WidgetType } from '../types';
 import type { Layout } from '~/framework/smart/types/dashboard';
 import type { DrillDownConfig, FilterConfig } from '~/framework/smart/types/chart';
+import { createWidgetDraft } from '../utils/createWidgetDraft';
 
 /**
  * Linkage filters state - grouped by linkage group ID
@@ -131,27 +132,10 @@ export const DesignerCanvas: React.FC<DesignerCanvasProps> = ({ className = '' }
       const x = Math.floor((e.clientX - rect.left) / columnWidth);
       const y = Math.floor((e.clientY - rect.top) / layoutConfig.rowHeight);
 
-      // Create new widget
-      const newWidget: Omit<Widget, 'id'> = {
-        type: widgetType,
-        componentType: widgetType,
+      const newWidget = createWidgetDraft(widgetDef, {
         x: Math.max(0, Math.min(x, layoutConfig.columns - widgetDef.defaultSize.w)),
         y: Math.max(0, y),
-        w: widgetDef.defaultSize.w,
-        h: widgetDef.defaultSize.h,
-        minW: widgetDef.defaultSize.minW,
-        minH: widgetDef.defaultSize.minH,
-        maxW: widgetDef.defaultSize.maxW,
-        maxH: widgetDef.defaultSize.maxH,
-        props: {},
-        config: {
-          title: widgetDef.defaultConfig.title || widgetDef.label,
-          dataSource: widgetDef.defaultConfig.dataSource || {
-            type: 'aggregate',
-            metrics: [{ field: 'id', aggregation: 'count' }],
-          },
-        },
-      };
+      });
 
       addWidget(newWidget);
     },

@@ -135,9 +135,15 @@ export function usePageDataSources(options: UsePageDataSourcesOptions): UsePageD
     }
 
     const dataSourcesString = JSON.stringify(mergedDataSources);
+    const managerMatchesDataSources = Object.entries(mergedDataSources).every(([id, config]) => {
+      const current = manager.getConfig(id);
+      if (!current) return false;
+      const expectedAutoFetch = config.pagination ? false : config.autoFetch ?? true;
+      return current.autoFetch === expectedAutoFetch;
+    });
 
     // 如果数据源内容没有变化，直接返回
-    if (dataSourcesString === dataSourcesStringRef.current) {
+    if (dataSourcesString === dataSourcesStringRef.current && managerMatchesDataSources) {
       return;
     }
 
@@ -158,6 +164,7 @@ export function usePageDataSources(options: UsePageDataSourcesOptions): UsePageD
         }),
       );
     });
+    forceUpdate({});
   }, [mergedDataSources, manager]);
 
   useEffect(() => {
@@ -191,6 +198,8 @@ export function usePageDataSources(options: UsePageDataSourcesOptions): UsePageD
     return () => {
       dataSourceUnsubscribersRef.current.forEach((unsubscribe) => unsubscribe());
       dataSourceUnsubscribersRef.current = [];
+      dataSourcesStringRef.current = '';
+      contextSignatureRef.current = null;
       manager.clear();
     };
   }, []);

@@ -8,7 +8,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import type { ReportDsl } from '../types';
 import { reportDesignerService } from '../services/reportDesignerService';
 import { fetchReportData } from '../services/fetchReportData';
-import { reportToHtml } from '../services/reportToHtml';
 import { ReportTableBlockRenderer } from './ReportTableBlockRenderer';
 import { ReportBandRenderer } from './ReportBandRenderer';
 import { ReportPageSkeleton } from './ReportPageSkeleton';
@@ -25,6 +24,7 @@ interface ReportPageContentProps {
 
 export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey }) => {
   const [report, setReport] = useState<ReportDsl | null>(null);
+  const [reportPid, setReportPid] = useState<string | null>(null);
   const [dataSets, setDataSets] = useState<Record<string, Record<string, unknown>[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +46,7 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
         const result = await reportDesignerService.loadByPageKey(pageKey);
         if (!mounted) return;
         setReport(result.dsl);
+        setReportPid(result.pid);
 
         // Initialize default param values
         const defaults: Record<string, string> = {};
@@ -80,16 +81,10 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
   }, [report, paramValues, loadData]);
 
   const handleExportPdf = useCallback(async () => {
-    if (!report) return;
+    if (!report || !reportPid) return;
     setExporting(true);
     try {
-      const html = reportToHtml(report, dataSets);
-      const blob = await reportDesignerService.exportPdf(
-        html,
-        report.page.size,
-        report.page.orientation,
-        `${report.title || 'report'}.pdf`,
-      );
+      const blob = await reportDesignerService.exportPdf(reportPid);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -104,7 +99,7 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
     } finally {
       setExporting(false);
     }
-  }, [report, dataSets]);
+  }, [report, reportPid]);
 
   const handlePrint = useCallback(() => {
     window.print();

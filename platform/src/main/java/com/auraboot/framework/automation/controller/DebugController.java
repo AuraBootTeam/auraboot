@@ -42,9 +42,11 @@ public class DebugController {
     @RequirePermission(MetaPermission.AUTOMATION_MANAGE)
     public ApiResponse<DebugSessionDTO> createSession(
             @Parameter(description = "Automation PID") @PathVariable @NotBlank String automationId,
-            @Valid @RequestBody DebugSessionCreateRequest request) {
+            @Valid @RequestBody(required = false) DebugSessionCreateRequest request) {
         log.info("Creating debug session for automation: {}", automationId);
-        DebugSessionDTO session = debugSessionService.createSession(automationId, request);
+        DebugSessionDTO session = debugSessionService.createSession(
+                automationId,
+                request != null ? request : new DebugSessionCreateRequest());
         return ApiResponse.success("Debug session created", session);
     }
 

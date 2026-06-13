@@ -30,6 +30,7 @@ const HEALTH_OPTIONS: (ConnectorHealth | 'ALL')[] = ['ALL', 'HEALTHY', 'DEGRADED
 export function ConnectorListView({ connectors, initialHealth = 'ALL' }: ConnectorListViewProps) {
   const [health, setHealth] = useState<ConnectorHealth | 'ALL'>(initialHealth);
   const [query, setQuery] = useState('');
+  const [selectedConnector, setSelectedConnector] = useState<Connector | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -57,7 +58,7 @@ export function ConnectorListView({ connectors, initialHealth = 'ALL' }: Connect
       ) : (
         <table className="cl-table">
           <thead>
-            <tr><th>编码</th><th>名称</th><th>类型</th><th>端点</th><th>认证</th><th>健康</th><th>启用</th></tr>
+            <tr><th>编码</th><th>名称</th><th>类型</th><th>端点</th><th>认证</th><th>健康</th><th>启用</th><th>详情</th></tr>
           </thead>
           <tbody>
             {filtered.map((c) => (
@@ -69,10 +70,36 @@ export function ConnectorListView({ connectors, initialHealth = 'ALL' }: Connect
                 <td>{c.authMode ?? '—'}</td>
                 <td><span className={`cl-health cl-${c.health}`}>{c.health}</span></td>
                 <td>{c.enabled ? '启用' : '停用'}</td>
+                <td>
+                  <button
+                    type="button"
+                    data-testid={`cl-open-${c.code}`}
+                    onClick={() => setSelectedConnector(c)}
+                  >详情</button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {selectedConnector && (
+        <aside className="cl-log-drawer" role="dialog" aria-label="连接器详情" data-testid="cl-log-drawer">
+          <div className="drawer-head">
+            <h4>连接器详情</h4>
+            <button type="button" data-testid="cl-log-close" onClick={() => setSelectedConnector(null)}>关闭</button>
+          </div>
+          <dl>
+            <dt>编码</dt><dd className="mono">{selectedConnector.code}</dd>
+            <dt>名称</dt><dd>{selectedConnector.name}</dd>
+            <dt>类型</dt><dd>{selectedConnector.type}</dd>
+            <dt>端点</dt><dd className="mono">{selectedConnector.endpoint ?? '—'}</dd>
+            <dt>认证</dt><dd>{selectedConnector.authMode ?? '—'}</dd>
+            <dt>健康</dt><dd>{selectedConnector.health}</dd>
+            <dt>启用</dt><dd>{selectedConnector.enabled ? '启用' : '停用'}</dd>
+          </dl>
+          <div className="cl-log-empty">暂无运行日志</div>
+        </aside>
       )}
     </div>
   );

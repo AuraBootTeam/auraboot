@@ -135,6 +135,21 @@ class PageSchemaConverterMobileUxTest {
                 .containsEntry("dataSources", dataSources);
     }
 
+    @Test
+    void updateRequestCanPersistEmptyBlocksArray() {
+        PageSchemaConverter converter = buildConverter();
+
+        PageSchema existing = new PageSchema();
+        existing.setBlocks("[{\"id\":\"stale\",\"blockType\":\"text\"}]");
+
+        PageSchemaUpdateRequest updateRequest = new PageSchemaUpdateRequest();
+        updateRequest.setBlocks(List.of());
+
+        converter.updateEntity(existing, updateRequest);
+
+        assertThat(existing.getBlocks()).isEqualTo("[]");
+    }
+
     private PageSchemaConverter buildConverter() {
         PageSchemaConverter converter = Mappers.getMapper(PageSchemaConverter.class);
         ReflectionTestUtils.setField(converter, "objectMapper", new ObjectMapper());

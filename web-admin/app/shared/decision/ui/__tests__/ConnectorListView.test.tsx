@@ -37,4 +37,13 @@ describe('ConnectorListView', () => {
     fireEvent.change(screen.getByLabelText('connector-search'), { target: { value: 'nope' } });
     expect(screen.getByTestId('cl-empty')).toBeInTheDocument();
   });
+
+  it('opens a connector log drawer from a connector row', () => {
+    render(<ConnectorListView connectors={connectors} />);
+    fireEvent.click(screen.getByTestId('cl-open-sms_gw'));
+    expect(screen.getByTestId('cl-log-drawer')).toHaveTextContent('sms_gw');
+    expect(screen.getByTestId('cl-log-drawer')).toHaveTextContent('DEGRADED');
+    expect(screen.getByTestId('cl-log-drawer')).toHaveTextContent('https://sms/api');
+    expect(screen.getByTestId('cl-log-drawer')).toHaveTextContent('暂无运行日志');
+  });
 });

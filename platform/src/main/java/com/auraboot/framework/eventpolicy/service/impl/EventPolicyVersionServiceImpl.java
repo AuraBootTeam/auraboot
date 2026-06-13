@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.decision.model.VersionStatus;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
 import com.auraboot.framework.eventpolicy.model.ConflictStrategy;
@@ -35,8 +36,8 @@ import java.util.List;
  * EventPolicy version lifecycle service implementation.
  *
  * <p>State machine enforced by {@link VersionStatus#canTransitionTo}.
- * Validation deserializes rules_json into List&lt;PolicyRule&gt; and verifies each
- * rule's ConditionNode parses (ConditionNode is Jackson-polymorphic).
+ * Validation deserializes rules_json into List&lt;PolicyRule&gt; and verifies each rule has either
+ * a parseable ConditionNode or a decision binding.
  *
  * @author AuraBoot Team
  * @since 2.3.0
@@ -48,6 +49,7 @@ public class EventPolicyVersionServiceImpl implements EventPolicyVersionService 
 
     private final DrtPolicyVersionMapper versionMapper;
     private final ObjectMapper objectMapper;
+    private final DecisionUsageIndexService usageIndexService;
 
     // ─── tenant guard ────────────────────────────────────────────────────────
 
@@ -138,11 +140,17 @@ public class EventPolicyVersionServiceImpl implements EventPolicyVersionService 
                 throw new ValidationException(ResponseCode.CommonValidationFailed,
                         "Event policy version must have at least one rule");
             }
-            // Verify each rule has a parseable condition (non-null)
+            // Verify each rule has either a parseable condition or a decision binding.
             for (PolicyRule rule : rules) {
-                if (rule.condition() == null) {
+                if (rule.condition() == null && rule.decisionBinding() == null) {
                     throw new ValidationException(ResponseCode.CommonValidationFailed,
-                            "Rule '" + rule.ruleCode() + "' has no condition");
+                            "Rule '" + rule.ruleCode() + "' has no condition or decisionBinding");
+                }
+                if (rule.decisionBinding() != null
+                        && (rule.decisionBinding().decisionCode() == null
+                        || rule.decisionBinding().decisionCode().isBlank())) {
+                    throw new ValidationException(ResponseCode.CommonValidationFailed,
+                            "Rule '" + rule.ruleCode() + "' decisionBinding.decisionCode is required");
                 }
             }
         } catch (ValidationException ve) {
@@ -154,6 +162,7 @@ public class EventPolicyVersionServiceImpl implements EventPolicyVersionService 
 
         entity.setStatus(VersionStatus.VALIDATED.name());
         versionMapper.updateById(entity);
+        usageIndexService.refreshSource("EVENT_POLICY", entity.getPid());
 
         log.info("EventPolicy version validated: pid={}", pid);
         return entity;
@@ -183,6 +192,7 @@ public class EventPolicyVersionServiceImpl implements EventPolicyVersionService 
         }
 
         versionMapper.updateById(entity);
+        usageIndexService.refreshSource("EVENT_POLICY", entity.getPid());
 
         log.info("EventPolicy version published: pid={}, code={}, version={}",
                 pid, entity.getPolicyCode(), entity.getVersion());

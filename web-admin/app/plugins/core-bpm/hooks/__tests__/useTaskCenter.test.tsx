@@ -55,6 +55,7 @@ import * as workbenchService from '~/plugins/core-bpm/services/bpmWorkbenchServi
 import * as slaService from '~/plugins/core-bpm/services/slaService';
 import * as notifyService from '~/plugins/core-bpm/services/bpmNotifyService';
 import { useToastContext } from '~/contexts/ToastContext';
+import type { TaskInstance } from '~/plugins/core-bpm/services/bpmWorkbenchService';
 
 const mockGetWorkbench = vi.mocked(workbenchService.getWorkbench);
 const mockGetDashboard = vi.mocked(slaService.getDashboard);
@@ -75,12 +76,12 @@ const mockSendUrge = vi.mocked(notifyService.sendUrge);
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-const makeTask = (overrides: Partial<ReturnType<typeof baseTask>> = {}) => ({
+const makeTask = (overrides: Partial<TaskInstance> = {}): TaskInstance => ({
   ...baseTask(),
   ...overrides,
 });
 
-function baseTask() {
+function baseTask(): TaskInstance {
   return {
     instanceId: 'inst-1',
     taskId: 'task-1',

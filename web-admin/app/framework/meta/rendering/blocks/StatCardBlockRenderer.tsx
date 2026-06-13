@@ -19,7 +19,7 @@
  * is used so the block still renders.
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -34,13 +34,24 @@ export const StatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ bl
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
 
-  const cfg = (block as any).statCard || {};
+  const cfg = { ...((block as any).props || {}), ...((block as any).statCard || {}) };
   const title = block.title ? getLocalizedText(block.title, locale, t) : '';
+  const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
+  const refreshInterval = Number((block as any).refreshInterval ?? cfg.refreshInterval ?? 0);
+
+  useEffect(() => {
+    if (!dataSourceId || !Number.isFinite(refreshInterval) || refreshInterval <= 0) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      void runtime.getDataSourceManager().reload(dataSourceId);
+    }, refreshInterval);
+    return () => window.clearInterval(timer);
+  }, [dataSourceId, refreshInterval, runtime]);
 
   // Try to pull value from data source (first row, valueField column). Fallback
   // to the inline value declared in `statCard.value`.
-  const value = useMemo(() => {
-    const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
+  const value = (() => {
     if (dataSourceId) {
       try {
         const data: any = runtime.getDataSourceManager().getData(dataSourceId);
@@ -55,10 +66,10 @@ export const StatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ bl
       }
     }
     return cfg.value ?? cfg.number ?? '—';
-  }, [block.dataSource, cfg.valueField, cfg.value, cfg.number, runtime]);
+  })();
 
   const unit = cfg.unit || cfg.suffix || '';
-  const trend: string | undefined = cfg.trend;
+  const trend: string | undefined = cfg.trend ?? cfg.change ?? cfg.changeField;
   const trendDirection: 'up' | 'down' | 'flat' = cfg.trendDirection || 'flat';
   const trendClass =
     trendDirection === 'up'

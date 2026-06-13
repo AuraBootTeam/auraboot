@@ -98,6 +98,7 @@ export const filterDetailSchemas: ExtendedPropertySchema<string>[] = [
 /** Toolbar preset toggles (gated by capabilities at render time). */
 export const toolbarPresetSchemas: ExtendedPropertySchema<string>[] = [
   { key: 'presetCreate', label: '新增', type: 'boolean', group: '预设按钮' },
+  { key: 'presetRefresh', label: '刷新', type: 'boolean', group: '预设按钮' },
   { key: 'presetExport', label: '导出', type: 'boolean', group: '预设按钮' },
   { key: 'presetBulkDelete', label: '批量删除', type: 'boolean', group: '预设按钮' },
 ];
@@ -120,13 +121,44 @@ export const customButtonSchemas: ExtendedPropertySchema<string>[] = [
     description: '图标只做辅助识别，不要替代按钮文案。',
   },
   {
+    key: 'code',
+    label: '按钮编码',
+    type: 'text',
+    group: '基础',
+    placeholder: 'refresh_orders',
+    description: '用于运行态 testid 和行为识别。刷新类自定义按钮请使用稳定、唯一的编码。',
+  },
+  {
+    key: 'actionKind',
+    label: '动作类型',
+    type: 'select',
+    group: '绑定',
+    defaultValue: 'command',
+    description: '普通业务动作绑定 Command;数据刷新动作绑定指定 dataSource。',
+    options: [
+      { label: '执行 Command', value: 'command' },
+      { label: '刷新数据源', value: 'refresh' },
+    ],
+  },
+  {
     key: 'command',
     label: 'Command',
     type: 'text',
     required: true,
     placeholder: 'plugin:action',
     group: '绑定',
+    dependsOn: { field: 'actionKind', anyOf: [undefined, 'command'] },
     description: '绑定清晰的 command，避免一个按钮承担多个隐式行为。',
+  },
+  {
+    key: 'targetDataSource',
+    label: '目标数据源',
+    type: 'text',
+    required: true,
+    placeholder: 'ds_list',
+    group: '绑定',
+    dependsOn: { field: 'actionKind', value: 'refresh' },
+    description: '运行态点击按钮时刷新这个 page dataSource。',
   },
   {
     key: 'requiresSelection',

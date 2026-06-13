@@ -47,6 +47,22 @@ class DecisionTableIntegrationTest extends BaseIntegrationTest {
           "defaultOutput":{"route":"manager"} }
         """;
 
+    private static final String COLLECT_SUM_TABLE = """
+        { "hitPolicy":"COLLECT",
+          "aggregation":"SUM",
+          "inputs":[
+            {"id":"amount","label":"Amount","expr":{"type":"path","scope":"record","path":"data.amount","dataType":"decimal"}}],
+          "outputs":[{"id":"score","label":"Score","dataType":"decimal"}],
+          "rules":[
+            {"ruleId":"base","priority":10,
+             "when":{"amount":{"feel":"> 1000"}},
+             "then":{"score":10}},
+            {"ruleId":"large","priority":20,
+             "when":{"amount":{"feel":"> 5000"}},
+             "then":{"score":15}}],
+          "defaultOutput":{"score":0} }
+        """;
+
     private DrtEvaluateRequest evalReq(String code, Object amount, Object priority) {
         DrtEvaluateRequest req = new DrtEvaluateRequest();
         req.setDecisionCode(code);
@@ -90,5 +106,34 @@ class DecisionTableIntegrationTest extends BaseIntegrationTest {
         DecisionResult fallback = evaluationService.evaluate(evalReq(code, 500, "NORMAL"));
         assertThat(fallback.status()).isEqualTo(DecisionStatus.MATCHED);
         assertThat(fallback.outputs()).containsEntry("route", "manager");
+    }
+
+    @Test
+    void decisionTable_collectSumAndFeelCellsRoundTripOverRealStack() throws Exception {
+        String code = "it_table_collect_" + System.nanoTime();
+        DrtDefinitionCreateRequest def = new DrtDefinitionCreateRequest();
+        def.setDecisionCode(code);
+        def.setDecisionName("IT Collect Table");
+        def.setScopeType("BPM");
+        def.setOwnerModule("decision");
+        definitionService.create(def);
+
+        DrtVersionCreateRequest ver = new DrtVersionCreateRequest();
+        ver.setKind("DECISION_TABLE");
+        ver.setRuntimeAdapter("PLATFORM_DECISION_TABLE");
+        ver.setContentJson(mapper.readTree(COLLECT_SUM_TABLE));
+        DrtVersionDTO draft = versionService.createDraft(code, ver);
+
+        DecisionValidateResult validation = versionService.validate(draft.getPid());
+        assertThat(validation.valid()).isTrue();
+        assertThat(validation.fieldRefs()).contains("record.data.amount");
+
+        versionService.publish(draft.getPid());
+
+        DecisionResult result = evaluationService.evaluate(evalReq(code, 20000, "HIGH"));
+        assertThat(result.status()).isEqualTo(DecisionStatus.MATCHED);
+        assertThat(result.outputs()).containsEntry("score", 25);
+        assertThat(result.matchedRules()).extracting(DecisionResult.MatchedRule::ruleId)
+                .containsExactly("base", "large");
     }
 }

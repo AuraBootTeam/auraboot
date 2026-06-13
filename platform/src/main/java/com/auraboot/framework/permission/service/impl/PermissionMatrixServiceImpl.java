@@ -10,6 +10,7 @@ import com.auraboot.framework.permission.service.RolePermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.postgresql.util.PGobject;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -288,11 +289,34 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
         if (policySchema instanceof String str) {
             return str.isBlank() ? null : str;
         }
+        if (policySchema instanceof PGobject pgObject) {
+            String value = pgObject.getValue();
+            return value == null || value.isBlank() ? null : value;
+        }
+        if (policySchema instanceof Map<?, ?> map) {
+            String wrappedJson = unwrapPgJsonWrapper(map);
+            if (wrappedJson != null) {
+                return wrappedJson;
+            }
+        }
         // CATCH: non-transactional, safe to handle — JSON serialization for DTO
         try {
             return objectMapper.writeValueAsString(policySchema);
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private String unwrapPgJsonWrapper(Map<?, ?> map) {
+        Object type = map.get("type");
+        Object value = map.get("value");
+        if (!(value instanceof String str) || str.isBlank()) {
+            return null;
+        }
+        if (type instanceof String typeStr
+                && ("jsonb".equalsIgnoreCase(typeStr) || "json".equalsIgnoreCase(typeStr))) {
+            return str;
+        }
+        return null;
     }
 }

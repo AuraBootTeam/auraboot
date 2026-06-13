@@ -257,6 +257,50 @@ class AutomationFlowCompilerTest {
         assertThat(bpmn).doesNotContain("multiInstanceLoopCharacteristics");
     }
 
+    private Automation delayAutomation() {
+        Automation a = new Automation();
+        a.setPid("AUTODELAY");
+        a.setName("Delay automation");
+        a.setFlowConfig(Map.of(
+                "nodes", List.of(
+                        Map.of("id", "t1", "type", "trigger-webhook",
+                                "data", Map.of("label", "Webhook", "config", Map.of())),
+                        Map.of("id", "delay", "type", "control-delay",
+                                "data", Map.of("label", "Delay",
+                                        "config", Map.of("duration", 1, "unit", "seconds"))),
+                        Map.of("id", "body", "type", "action-send-notification",
+                                "data", Map.of("label", "Notify",
+                                        "config", Map.of("actionType", "send_notification",
+                                                "title", "After delay")))),
+                "edges", List.of(
+                        Map.of("id", "e1", "source", "t1", "target", "delay"),
+                        Map.of("id", "e2", "source", "delay", "target", "body"))));
+        return a;
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void compile_delayNode_mapsToServiceTaskActionSpec() {
+        AutomationFlowCompiler.CompiledFlow out = compiler.compile(delayAutomation());
+
+        Map<String, String> typeById = new java.util.HashMap<>();
+        out.designerJson().get("nodes").forEach(n ->
+                typeById.put(n.get("id").asText(), n.get("type").asText()));
+        assertThat(typeById).containsEntry("delay", "serviceTask");
+        assertThat(typeById).containsEntry("body", "serviceTask");
+
+        Map<String, Object> spec = (Map<String, Object>) out.actionsByNodeId().get("delay");
+        assertThat(spec).isNotNull();
+        assertThat(spec.get("type")).isEqualTo("delay");
+        Map<String, Object> config = (Map<String, Object>) spec.get("config");
+        assertThat(config).containsEntry("duration", 1);
+        assertThat(config).containsEntry("unit", "seconds");
+
+        String bpmn = new JsonToBpmnConverter(new ObjectMapper(), null)
+                .convertFromJsonNode(out.designerJson());
+        assertThat(bpmn).contains(AutomationActionServiceTaskDelegate.BEAN_NAME);
+    }
+
     @Test
     void compiledDesignerJson_convertsToValidSmartEngineBpmn() {
         AutomationFlowCompiler.CompiledFlow out = compiler.compile(linearNotificationAutomation());

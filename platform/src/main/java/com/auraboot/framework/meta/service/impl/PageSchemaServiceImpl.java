@@ -80,7 +80,9 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         PageSchema pageSchema = pageSchemaConverter.toEntity(request);
         pageSchema.setPid(UniqueIdGenerator.generate());
         pageSchema.setStatus(Status.DRAFT.getCode());
-        pageSchema.setExtension(new com.auraboot.framework.meta.entity.payload.ExtensionBean());
+        if (pageSchema.getExtension() == null) {
+            pageSchema.setExtension(new com.auraboot.framework.meta.entity.payload.ExtensionBean());
+        }
         recordBoundModelVersion(pageSchema);
         pageSchema.setVersion(1);
         pageSchema.setIsCurrent(true);

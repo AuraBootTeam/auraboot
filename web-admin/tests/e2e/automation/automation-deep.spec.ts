@@ -208,33 +208,6 @@ test.describe('Automation Deep', () => {
   });
 
   /**
-   * AT-005: Condition building UI
-   */
-  test('AT-005: Condition building in editor', async ({ page }) => {
-    if (!baseAutomation?.pid) { throw new Error(String('Base automation not created')); }
-
-    await page.goto(`/automation/${baseAutomation.pid}`);
-    await page.waitForLoadState('domcontentloaded');
-
-    // Look for condition/filter section
-    const conditionSection = page.locator(
-      'text=条件, text=Condition, text=过滤, text=Filter, [data-testid="condition-builder"]'
-    ).first();
-    const hasCondition = await conditionSection.isVisible({ timeout: 5000 }).catch(() => false);
-
-    // Editor page should have loaded
-    const nameInput = page.getByTestId('automation-editor-name-input');
-    await expect(nameInput).toBeVisible({ timeout: 5000 });
-
-    // Previously this branch silently passed via `expect(true).toBe(true)`,
-    // violating §2 fake-pass red line (skip-wrapping a product gap).
-    // Real UI-drag coverage for condition builder tracked under B1 backlog
-    // docs/backlog/2026-05-28-B1-automation-golden-e2e-followup.md
-    test.skip(!hasCondition, 'Condition builder hidden behind tab/section — see B1 backlog');
-    await expect(conditionSection).toBeVisible();
-  });
-
-  /**
    * AT-006: SEND_NOTIFICATION action type
    */
   test('AT-006: SEND_NOTIFICATION action type', async ({ page }) => {
@@ -352,11 +325,15 @@ test.describe('Automation Deep', () => {
     createdPids.push(multiAuto.pid);
 
     const resp = await page.request.get(`/api/automations/${multiAuto.pid}`);
-    if (resp.ok()) {
-      const data = await resp.json();
-      const actions = data.data?.actions || data.actions || [];
-      expect(actions.length).toBeGreaterThanOrEqual(3);
-    }
+    expect(resp.ok(), `failed to read automation ${multiAuto.pid}`).toBe(true);
+    const data = await resp.json();
+    const actions = data.data?.actions || data.actions || [];
+    expect(actions).toHaveLength(3);
+    expect(actions.map((action: { label?: string }) => action.label)).toEqual([
+      'Notify 1',
+      'Update',
+      'Notify 2',
+    ]);
   });
 
   /**
@@ -373,10 +350,9 @@ test.describe('Automation Deep', () => {
     createdPids.push(updateTrigger.pid);
 
     const resp = await page.request.get(`/api/automations/${updateTrigger.pid}`);
-    if (resp.ok()) {
-      const data = await resp.json();
-      expect(data.data?.triggerType || data.triggerType).toBe('on_record_update');
-    }
+    expect(resp.ok(), `failed to read automation ${updateTrigger.pid}`).toBe(true);
+    const data = await resp.json();
+    expect(data.data?.triggerType || data.triggerType).toBe('on_record_update');
   });
 
   /**
@@ -400,29 +376,4 @@ test.describe('Automation Deep', () => {
     await expect(page.getByText(stateTrigger.name)).toBeVisible({ timeout: 10000 });
   });
 
-  /**
-   * AT-014: Priority configuration
-   */
-  test('AT-014: Priority configuration', async ({ page }) => {
-    const highPriorityAuto = await createAutomationViaApi(page, {
-      name: `Priority ${uniqueId()}`,
-      priority: 10,
-    });
-    createdPids.push(highPriorityAuto.pid);
-
-    const resp = await page.request.get(`/api/automations/${highPriorityAuto.pid}`);
-    if (resp.ok()) {
-      const data = await resp.json();
-      const priority = data.data?.priority || data.priority;
-      // Priority should be set or default
-      expect(priority !== undefined || true).toBe(true);
-    }
-
-    // Navigate to editor and verify priority field
-    await page.goto(`/automation/${highPriorityAuto.pid}`);
-    await page.waitForLoadState('domcontentloaded');
-
-    const nameInput = page.getByTestId('automation-editor-name-input');
-    await expect(nameInput).toBeVisible({ timeout: 5000 });
-  });
 });

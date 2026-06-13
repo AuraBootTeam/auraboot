@@ -13,5 +13,7 @@ public enum VersionBinding {
     /** Selected by effective time (policy / SLA effective date). */
     EFFECTIVE_TIME,
     /** Selected by the originating event time (event replay / audit). */
-    AS_OF_EVENT_TIME
+    AS_OF_EVENT_TIME,
+    /** Selected by the active progressive rollout policy for the decision. */
+    ROLLOUT
 }

@@ -71,7 +71,7 @@ export interface FetchOptions {
    * // Result: /api/user/123?role=admin (GET)
    * // Result: /api/user/123 with body {role: 'admin'} (POST)
    */
-  params?: Record<string, any>;
+  params?: Record<string, any> | any[];
 
   /**
    * Explicit authentication token
@@ -92,6 +92,15 @@ export interface FetchOptions {
    * @default 30000 (30 seconds)
    */
   timeout?: number;
+
+  /**
+   * Optional caller-owned abort signal.
+   *
+   * Used by React hooks to cancel in-flight client requests when a page
+   * unmounts or a route changes. Timeout handling may combine this signal
+   * with AbortSignal.timeout when both are provided.
+   */
+  signal?: AbortSignal;
 
   /**
    * API configuration overrides

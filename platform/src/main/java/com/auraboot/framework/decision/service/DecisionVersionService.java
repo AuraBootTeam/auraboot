@@ -40,6 +40,11 @@ public interface DecisionVersionService {
     DrtVersionDTO publish(String pid);
 
     /**
+     * Publish with explicit blast-radius acknowledgement when downstream consumers exist.
+     */
+    DrtVersionDTO publish(String pid, boolean impactAcknowledged);
+
+    /**
      * M7 governance — submit a VALIDATED version for 4-eyes approval (VALIDATED → PENDING_APPROVAL).
      * The author submits; a different user with {@code decision.approve} then approves/rejects.
      */
@@ -51,8 +56,25 @@ public interface DecisionVersionService {
      */
     DrtVersionDTO approve(String pid, String note);
 
+    /**
+     * Approve + publish with explicit blast-radius acknowledgement when downstream consumers exist.
+     */
+    DrtVersionDTO approve(String pid, String note, boolean impactAcknowledged);
+
     /** Reject a PENDING_APPROVAL version (PENDING_APPROVAL → REJECTED), recording the reason. */
     DrtVersionDTO reject(String pid, String note);
+
+    /** Deprecate a PUBLISHED version (PUBLISHED → DEPRECATED). */
+    DrtVersionDTO deprecate(String pid, String note, boolean impactAcknowledged);
+
+    /** Retire a DEPRECATED version (DEPRECATED → RETIRED). */
+    DrtVersionDTO retire(String pid, String note, boolean impactAcknowledged);
+
+    /**
+     * Delete a mutable draft-like version and clear its usage-index refs.
+     * Published/deprecated/retired versions are never hard-deleted; callers must deprecate/retire instead.
+     */
+    DrtVersionDTO delete(String pid);
 
     /** Find a version by its own PID (tenant-scoped). Returns null when not found. */
     DrtVersionDTO findByPid(String pid);

@@ -23,7 +23,7 @@ vi.mock('~/shared/services/dynamicService', () => ({
 import { useDynamicApi } from '../useDynamicApi';
 import { dynamicService } from '~/shared/services/dynamicService';
 
-const ds = dynamicService as Record<string, ReturnType<typeof vi.fn>>;
+const ds = dynamicService as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 describe('useDynamicApi', () => {
   beforeEach(() => {

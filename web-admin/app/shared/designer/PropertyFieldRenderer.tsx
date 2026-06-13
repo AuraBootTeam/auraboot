@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import {
   BaseInput,
   BaseSelect,
@@ -30,6 +31,10 @@ import { DependentMultiSelect } from './DependentMultiSelect';
 import { LocalizedTextInput, type LocalizedTextValue } from './LocalizedTextInput';
 import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/IconPicker';
 import { ArrayItemEditor } from './ArrayItemEditor';
+import {
+  DecisionRuleBindingBlock,
+  type RuleConsumerBindingDraft,
+} from '~/ui/smart/decision/DecisionRuleBindingBlock';
 import { dictService } from '~/shared/services/dictService';
 import { toast } from 'sonner';
 import type { FieldAdapter } from '~/ui/field-adapter';
@@ -160,9 +165,8 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
     case 'multiselect':
       if (schema.options && schema.options.length > 0) {
         return (
-          <BaseSelect
-            adapter={adapter as any}
-            name={schema.key}
+          <StaticMultiSelect
+            adapter={adapter}
             label={label}
             placeholder={placeholder}
             helpText={helpText}
@@ -311,6 +315,22 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         />
       );
 
+    case 'rule-binding':
+      return (
+        <RuleBindingField
+          adapter={adapter}
+          label={label}
+          helpText={helpText}
+          mode={schema.ruleBindingMode ?? 'decision'}
+          consumerType={schema.ruleBindingConsumerType}
+          consumerCode={schema.ruleBindingConsumerCode}
+          consumerNodeId={schema.ruleBindingConsumerNodeId}
+          showImpactPreview={Boolean(schema.ruleBindingShowImpactPreview)}
+          showTestRunner={Boolean(schema.ruleBindingShowTestRunner)}
+          initialDecisionCode={schema.ruleBindingInitialDecisionCode}
+        />
+      );
+
     case 'semantic-model-select':
       return (
         <ResourceSelectField
@@ -409,6 +429,148 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+function StaticMultiSelect({
+  adapter,
+  label,
+  placeholder,
+  helpText,
+  options,
+}: {
+  adapter: FieldAdapter<unknown>;
+  label?: string;
+  placeholder?: string;
+  helpText?: string;
+  options: { label: string; value: string; description?: string }[];
+}) {
+  const [search, setSearch] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const selectedValues = Array.isArray(adapter.value) ? (adapter.value as string[]) : [];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredOptions = search
+    ? options.filter(
+        (option) =>
+          option.label.toLowerCase().includes(search.toLowerCase()) ||
+          option.value.toLowerCase().includes(search.toLowerCase()),
+      )
+    : options;
+
+  const toggleOption = (value: string) => {
+    const next = selectedValues.includes(value)
+      ? selectedValues.filter((v) => v !== value)
+      : [...selectedValues, value];
+    adapter.setValue(next);
+  };
+
+  return (
+    <div>
+      {label && (
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {label}
+          {adapter.required && <span className="ml-1 text-red-500">*</span>}
+        </label>
+      )}
+      <div ref={containerRef} className="relative" onClick={() => setIsOpen(true)}>
+        <div
+          className={`flex min-h-[38px] cursor-text flex-wrap items-center gap-1 rounded-md border px-2 py-1 text-sm ${
+            isOpen ? 'border-blue-500 ring-2 ring-blue-500' : 'border-gray-300'
+          } ${adapter.error ? 'border-red-400' : ''} ${adapter.disabled ? 'bg-gray-50 text-gray-400' : ''}`}
+        >
+          {selectedValues.map((value) => {
+            const option = options.find((o) => o.value === value);
+            const display = option?.label || value;
+            return (
+              <span
+                key={value}
+                className="inline-flex items-center gap-1 rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700"
+              >
+                {display}
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    adapter.setValue(selectedValues.filter((v) => v !== value));
+                  }}
+                  className="ml-0.5 text-blue-400 hover:text-blue-700 focus:outline-none"
+                  aria-label={`Remove ${display}`}
+                  disabled={adapter.disabled}
+                >
+                  x
+                </button>
+              </span>
+            );
+          })}
+          <input
+            type="text"
+            value={search}
+            disabled={adapter.disabled}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setIsOpen(true);
+            }}
+            onFocus={() => setIsOpen(true)}
+            placeholder={selectedValues.length === 0 ? (placeholder || 'Select...') : ''}
+            className="min-w-[80px] flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400 disabled:cursor-not-allowed"
+          />
+        </div>
+
+        {isOpen && !adapter.disabled && (
+          <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-400">No results</div>
+            ) : (
+              filteredOptions.map((option) => {
+                const checked = selectedValues.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleOption(option.value);
+                      setSearch('');
+                    }}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 ${
+                      checked ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                    }`}
+                  >
+                    <span
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                        checked
+                          ? 'border-blue-500 bg-blue-500 text-white'
+                          : 'border-gray-300 bg-white'
+                      }`}
+                    >
+                      {checked && <Check className="h-3 w-3" aria-hidden="true" />}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+      {adapter.error ? (
+        <p className="mt-1 text-xs text-red-500">{adapter.error}</p>
+      ) : (
+        helpText && <p className="mt-1 text-xs text-gray-500">{helpText}</p>
+      )}
+    </div>
+  );
+}
+
 /** Wraps BaseResourceSelect with a label / helpText / field-error chrome. */
 function ResourceSelectField({
   adapter,
@@ -450,6 +612,53 @@ function ResourceSelectField({
       ) : (
         helpText && <p className="mt-1 text-xs text-gray-500">{helpText}</p>
       )}
+    </div>
+  );
+}
+
+function RuleBindingField({
+  adapter,
+  label,
+  helpText,
+  mode,
+  consumerType,
+  consumerCode,
+  consumerNodeId,
+  showImpactPreview,
+  showTestRunner,
+  initialDecisionCode,
+}: {
+  adapter: FieldAdapter<unknown>;
+  label?: string;
+  helpText?: string;
+  mode: 'condition' | 'decision' | 'combined';
+  consumerType?: string;
+  consumerCode?: string;
+  consumerNodeId?: string;
+  showImpactPreview?: boolean;
+  showTestRunner?: boolean;
+  initialDecisionCode?: string;
+}) {
+  return (
+    <div data-testid="rule-binding-property-field">
+      {label && <div className="mb-1 text-sm font-medium text-gray-700">{label}</div>}
+      {helpText && <p className="mb-2 text-xs text-gray-500">{helpText}</p>}
+      <DecisionRuleBindingBlock
+        value={adapter.value as RuleConsumerBindingDraft | string | undefined}
+        onChange={(next) => adapter.setValue(next)}
+        block={{
+          props: {
+            mode,
+            consumerType,
+            consumerCode,
+            consumerNodeId,
+            initialDecisionCode,
+            showImpactPreview,
+            showTestRunner,
+          },
+        }}
+      />
+      {adapter.error ? <p className="mt-1 text-xs text-red-600">{adapter.error}</p> : null}
     </div>
   );
 }

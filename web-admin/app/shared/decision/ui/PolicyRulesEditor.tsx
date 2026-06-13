@@ -16,6 +16,7 @@ export interface PolicyRuleDraft {
   priority: number;
   enabled: boolean;
   condition: GroupNode;
+  actions?: unknown[];
 }
 
 export interface PolicyRulesValue {
@@ -43,7 +44,7 @@ export function PolicyRulesEditor({ value, fields, onChange }: PolicyRulesEditor
   const addRule = () => {
     const n = value.rules.length + 1;
     setRules([...value.rules, {
-      ruleCode: `R-${n}`, ruleName: `规则 ${n}`, priority: n * 100, enabled: true, condition: group('AND', []),
+      ruleCode: `R-${n}`, ruleName: `规则 ${n}`, priority: n * 100, enabled: true, condition: group('AND', []), actions: [],
     }]);
   };
 

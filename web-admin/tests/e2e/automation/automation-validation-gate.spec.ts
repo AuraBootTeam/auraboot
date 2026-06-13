@@ -45,7 +45,13 @@ async function makeDirtyAndEnableSave(page: import('@playwright/test').Page) {
     await nameInput(page).pressSequentially(' edited');
     if (await save.isEnabled({ timeout: 1500 }).catch(() => false)) return;
     // initialData effect reset isDirty after our edit — settle then retry.
-    await page.waitForTimeout(400);
+    await expect
+      .poll(async () => await save.isEnabled().catch(() => false), {
+        timeout: 400,
+        intervals: [100, 100, 200],
+      })
+      .toBe(true)
+      .catch(() => undefined);
   }
   await expect(save).toBeEnabled({ timeout: 3000 });
 }

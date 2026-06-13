@@ -192,6 +192,25 @@ export const actionRegistry = new ActionRegistry();
 // 注册内置动作处理器
 // ============================================
 
+function resolveDataSourceTargets(args?: Record<string, any>): string | string[] | undefined {
+  const targets =
+    args?.targets ??
+    args?.target ??
+    args?.dataSourceIds ??
+    args?.dataSourceId ??
+    args?.ids ??
+    args?.id;
+
+  if (Array.isArray(targets)) {
+    const validTargets = targets.filter(
+      (target): target is string => typeof target === 'string' && target.length > 0,
+    );
+    return validTargets.length > 0 ? validTargets : undefined;
+  }
+
+  return typeof targets === 'string' && targets.length > 0 ? targets : undefined;
+}
+
 /**
  * 导航动作 - 跳转到指定路径
  */
@@ -358,12 +377,19 @@ actionRegistry.register('reset', ({ setFilters, loadData, setPagination }) => {
 /**
  * 刷新数据 - 使用当前条件重新加载数据
  */
-actionRegistry.register('refresh', ({ loadData, filters }) => {
-  if (!loadData) {
-    console.error('[ActionRegistry] refresh: missing loadData');
+actionRegistry.register('refresh', async ({ loadData, filters, dataSourceManager, args }) => {
+  const targets = resolveDataSourceTargets(args);
+  if (dataSourceManager && targets) {
+    await dataSourceManager.reload(targets);
     return;
   }
-  loadData({ filters });
+
+  if (loadData) {
+    await loadData({ filters });
+    return;
+  }
+
+  console.error('[ActionRegistry] refresh: missing loadData or dataSource target');
 });
 
 /**
@@ -533,13 +559,12 @@ actionRegistry.register('dataSource.reload', async ({ dataSourceManager, args })
     console.error('[ActionRegistry] dataSource.reload: missing dataSourceManager');
     return;
   }
-  const targets = args?.targets || args?.target;
+  const targets = resolveDataSourceTargets(args);
   if (!targets) {
     console.error('[ActionRegistry] dataSource.reload: missing targets');
     return;
   }
-  const targetArray = Array.isArray(targets) ? targets : [targets];
-  await dataSourceManager.reload(targetArray);
+  await dataSourceManager.reload(targets);
 });
 
 /**

@@ -16,6 +16,7 @@ import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.exception.ValidationException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -49,6 +50,7 @@ public class AutomationServiceImpl implements AutomationService {
     private final AutomationTriggerService automationTriggerService;
     private final com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
     private final AutomationFlowTriggerDeriver flowTriggerDeriver;
+    private final DecisionUsageIndexService usageIndexService;
 
     // ==================== Tenant isolation guards ====================
     // ab_automation is excluded from the global TenantLineInnerInterceptor so the
@@ -124,6 +126,7 @@ public class AutomationServiceImpl implements AutomationService {
         automation.setUpdatedBy(currentUserPid);
 
         automationMapper.insertAutomation(automation);
+        usageIndexService.refreshSource("AUTOMATION", automation.getPid());
 
         log.info("Automation created: pid={}", automation.getPid());
         return toDTO(automation);
@@ -194,6 +197,7 @@ public class AutomationServiceImpl implements AutomationService {
         automation.setUpdatedBy(currentUserPid);
 
         automationMapper.updateAutomation(automation);
+        usageIndexService.refreshSource("AUTOMATION", automation.getPid());
 
         log.info("Automation updated: pid={}", pid);
         return toDTO(automation);
@@ -207,6 +211,7 @@ public class AutomationServiceImpl implements AutomationService {
         Automation automation = loadOwnedAutomation(pid);
 
         automationMapper.deleteById(automation.getId());
+        usageIndexService.deleteSource("AUTOMATION", automation.getPid());
 
         log.info("Automation deleted: pid={}", pid);
     }
@@ -298,13 +303,11 @@ public class AutomationServiceImpl implements AutomationService {
         automationMapper.updateEnabled(pid, true, currentUserPid);
 
         automation.setEnabled(true);
+        usageIndexService.refreshSource("AUTOMATION", automation.getPid());
 
-        // T2: compile + deploy the visual flow to SmartEngine on enable so the
-        // trigger path can start it. Flat actions-only automations have no flow to deploy.
-        java.util.Map<String, Object> fc = automation.getFlowConfig();
-        if (fc != null && fc.get("nodes") instanceof java.util.List<?> ns && !ns.isEmpty()) {
-            automationProcessRuntime.deploy(automation);
-        }
+        // Trigger execution always goes through SmartEngine. The compiler supports both
+        // visual flowConfig and flat actions[], so both shapes must be deployed on enable.
+        automationProcessRuntime.deploy(automation);
 
         log.info("Automation enabled: pid={}", pid);
         return toDTO(automation);
@@ -321,6 +324,7 @@ public class AutomationServiceImpl implements AutomationService {
         automationMapper.updateEnabled(pid, false, currentUserPid);
 
         automation.setEnabled(false);
+        usageIndexService.refreshSource("AUTOMATION", automation.getPid());
         log.info("Automation disabled: pid={}", pid);
         return toDTO(automation);
     }
@@ -416,6 +420,7 @@ public class AutomationServiceImpl implements AutomationService {
         copy.setUpdatedBy(currentUserPid);
 
         automationMapper.insertAutomation(copy);
+        usageIndexService.refreshSource("AUTOMATION", copy.getPid());
         log.info("Automation duplicated: source={}, newPid={}", pid, copy.getPid());
         return toDTO(copy);
     }

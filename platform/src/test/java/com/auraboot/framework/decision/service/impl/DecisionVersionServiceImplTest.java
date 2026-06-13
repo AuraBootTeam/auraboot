@@ -11,6 +11,11 @@ import com.auraboot.framework.decision.model.RuntimeAdapter;
 import com.auraboot.framework.decision.model.VersionStatus;
 import com.auraboot.framework.decision.runtime.DecisionRuntime;
 import com.auraboot.framework.decision.runtime.ResolvedDecision;
+import com.auraboot.framework.decision.dto.DecisionImpactDTO;
+import com.auraboot.framework.decision.dto.DecisionImpactRiskDTO;
+import com.auraboot.framework.decision.service.DecisionImpactAckService;
+import com.auraboot.framework.decision.service.DecisionImpactService;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.exception.ValidationException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -55,6 +60,9 @@ class DecisionVersionServiceImplTest {
 
     @Mock private DrtVersionMapper versionMapper;
     @Mock private DecisionRuntime decisionRuntime;
+    @Mock private DecisionImpactService impactService;
+    @Mock private DecisionUsageIndexService usageIndexService;
+    @Mock private DecisionImpactAckService impactAckService;
 
     // ObjectMapper is a real instance — not worth mocking
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -71,7 +79,8 @@ class DecisionVersionServiceImplTest {
         MetaContext.setSystemTenantContext(TENANT_ID);
         // Inject real ObjectMapper into the @InjectMocks instance
         // (Mockito does not inject non-@Mock fields automatically)
-        service = new DecisionVersionServiceImpl(versionMapper, decisionRuntime, objectMapper);
+        service = new DecisionVersionServiceImpl(
+                versionMapper, decisionRuntime, objectMapper, impactService, usageIndexService, impactAckService);
     }
 
     @AfterEach
@@ -159,6 +168,7 @@ class DecisionVersionServiceImplTest {
             ArgumentCaptor<DrtVersionEntity> captor = ArgumentCaptor.forClass(DrtVersionEntity.class);
             verify(versionMapper).updateById(captor.capture());
             assertThat(captor.getValue().getStatus()).isEqualTo(VersionStatus.VALIDATED.name());
+            verify(usageIndexService).refreshDecisionVersion(VERSION_PID);
         }
 
         @Test
@@ -202,6 +212,7 @@ class DecisionVersionServiceImplTest {
             entity.setStatus(VersionStatus.VALIDATED.name());
             when(versionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
             when(versionMapper.updateById(isA(DrtVersionEntity.class))).thenReturn(1);
+            when(impactService.getDecisionImpact(DECISION_CODE)).thenReturn(nonBlockingImpact());
 
             DrtVersionDTO result = service.publish(VERSION_PID);
 
@@ -242,6 +253,7 @@ class DecisionVersionServiceImplTest {
             entity.setStatus(VersionStatus.VALIDATED.name());
             when(versionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
             when(versionMapper.updateById(isA(DrtVersionEntity.class))).thenReturn(1);
+            when(impactService.getDecisionImpact(DECISION_CODE)).thenReturn(nonBlockingImpact());
 
             service.publish(VERSION_PID);
 
@@ -250,6 +262,155 @@ class DecisionVersionServiceImplTest {
             // MetaContext.getCurrentUserPid() may be null in system context —
             // the important thing is that publishedAt is set.
             assertThat(captor.getValue().getPublishedAt()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("publish with downstream consumers requires explicit impact acknowledgement")
+        void rejectsBlockingImpactWithoutAcknowledgement() {
+            DrtVersionEntity entity = draftEntity();
+            entity.setStatus(VersionStatus.VALIDATED.name());
+            when(versionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
+            when(impactService.getDecisionImpact(DECISION_CODE)).thenReturn(blockingImpact("Used by 1 automation"));
+
+            assertThatThrownBy(() -> service.publish(VERSION_PID))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining("Impact acknowledgement required")
+                    .hasMessageContaining("Used by 1 automation");
+
+            verify(versionMapper, never()).updateById(isA(DrtVersionEntity.class));
+        }
+
+        @Test
+        @DisplayName("acknowledged publish proceeds when downstream consumers exist")
+        void acknowledgedPublishAllowsBlockingImpact() {
+            DrtVersionEntity entity = draftEntity();
+            entity.setStatus(VersionStatus.VALIDATED.name());
+            when(versionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
+            when(impactService.getDecisionImpact(DECISION_CODE)).thenReturn(blockingImpact("Used by 1 automation"));
+            when(versionMapper.updateById(isA(DrtVersionEntity.class))).thenReturn(1);
+
+            DrtVersionDTO result = service.publish(VERSION_PID, true);
+
+            assertThat(result.getStatus()).isEqualTo(VersionStatus.PUBLISHED.name());
+            verify(versionMapper).updateById(isA(DrtVersionEntity.class));
+            verify(usageIndexService).refreshDecisionVersion(VERSION_PID);
+            verify(impactAckService).recordAcknowledgement(
+                    eq("PUBLISH"), eq("DECISION_VERSION"), eq(DECISION_CODE), eq(VERSION_PID),
+                    isNull(), eq("Used by 1 automation"), any(DecisionImpactDTO.class), isNull());
+            verify(impactService, never()).rebuildUsageIndex();
+        }
+    }
+
+    // ─── deprecate / retire ─────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("deprecate / retire")
+    class LifecycleTransitions {
+
+        @Test
+        @DisplayName("acknowledged deprecate moves PUBLISHED→DEPRECATED and refreshes usage refs")
+        void acknowledgedDeprecateAllowsBlockingImpact() {
+            DrtVersionEntity entity = draftEntity();
+            entity.setStatus(VersionStatus.PUBLISHED.name());
+            when(versionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
+            when(impactService.getDecisionImpact(DECISION_CODE)).thenReturn(blockingImpact("Used by 1 SLA rule"));
+            when(versionMapper.updateById(isA(DrtVersionEntity.class))).thenReturn(1);
+
+            DrtVersionDTO result = service.deprecate(VERSION_PID, "planned retirement", true);
+
+            assertThat(result.getStatus()).isEqualTo(VersionStatus.DEPRECATED.name());
+            ArgumentCaptor<DrtVersionEntity> captor = ArgumentCaptor.forClass(DrtVersionEntity.class);
+            verify(versionMapper).updateById(captor.capture());
+            assertThat(captor.getValue().getStatus()).isEqualTo(VersionStatus.DEPRECATED.name());
+            assertThat(captor.getValue().getApprovalNote()).isEqualTo("planned retirement");
+            verify(usageIndexService).refreshDecisionVersion(VERSION_PID);
+            verify(impactAckService).recordAcknowledgement(
+                    eq("DEPRECATE"), eq("DECISION_VERSION"), eq(DECISION_CODE), eq(VERSION_PID),
+                    isNull(), eq("Used by 1 SLA rule"), any(DecisionImpactDTO.class), eq("planned retirement"));
+        }
+
+        @Test
+        @DisplayName("deprecate with downstream consumers requires explicit impact acknowledgement")
+        void rejectsDeprecateWithoutAcknowledgement() {
+            DrtVersionEntity entity = draftEntity();
+            entity.setStatus(VersionStatus.PUBLISHED.name());
+            when(versionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
+            when(impactService.getDecisionImpact(DECISION_CODE)).thenReturn(blockingImpact("Used by 1 SLA rule"));
+
+            assertThatThrownBy(() -> service.deprecate(VERSION_PID, "planned retirement", false))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining("Impact acknowledgement required")
+                    .hasMessageContaining("Used by 1 SLA rule");
+
+            verify(versionMapper, never()).updateById(isA(DrtVersionEntity.class));
+        }
+
+        @Test
+        @DisplayName("acknowledged retire moves DEPRECATED→RETIRED and refreshes usage refs")
+        void acknowledgedRetireAllowsBlockingImpact() {
+            DrtVersionEntity entity = draftEntity();
+            entity.setStatus(VersionStatus.DEPRECATED.name());
+            when(versionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
+            when(impactService.getDecisionImpact(DECISION_CODE)).thenReturn(blockingImpact("Used by 1 automation"));
+            when(versionMapper.updateById(isA(DrtVersionEntity.class))).thenReturn(1);
+
+            DrtVersionDTO result = service.retire(VERSION_PID, "replaced by v2", true);
+
+            assertThat(result.getStatus()).isEqualTo(VersionStatus.RETIRED.name());
+            ArgumentCaptor<DrtVersionEntity> captor = ArgumentCaptor.forClass(DrtVersionEntity.class);
+            verify(versionMapper).updateById(captor.capture());
+            assertThat(captor.getValue().getStatus()).isEqualTo(VersionStatus.RETIRED.name());
+            assertThat(captor.getValue().getApprovalNote()).isEqualTo("replaced by v2");
+            verify(usageIndexService).refreshDecisionVersion(VERSION_PID);
+            verify(impactAckService).recordAcknowledgement(
+                    eq("RETIRE"), eq("DECISION_VERSION"), eq(DECISION_CODE), eq(VERSION_PID),
+                    isNull(), eq("Used by 1 automation"), any(DecisionImpactDTO.class), eq("replaced by v2"));
+        }
+
+        @Test
+        @DisplayName("retire from PUBLISHED is rejected — must deprecate first")
+        void rejectsRetireFromPublished() {
+            DrtVersionEntity entity = draftEntity();
+            entity.setStatus(VersionStatus.PUBLISHED.name());
+            when(versionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
+
+            assertThatThrownBy(() -> service.retire(VERSION_PID, "skip deprecate", true))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining("DEPRECATED");
+
+            verify(versionMapper, never()).updateById(isA(DrtVersionEntity.class));
+        }
+
+        @Test
+        @DisplayName("delete removes a draft-like version and clears usage-index refs")
+        void deletesMutableVersionAndClearsUsageRefs() {
+            DrtVersionEntity entity = draftEntity();
+            entity.setStatus(VersionStatus.VALIDATED.name());
+            when(versionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
+            when(versionMapper.deleteById(entity.getId())).thenReturn(1);
+
+            DrtVersionDTO result = service.delete(VERSION_PID);
+
+            assertThat(result.getPid()).isEqualTo(VERSION_PID);
+            assertThat(result.getStatus()).isEqualTo(VersionStatus.VALIDATED.name());
+            verify(usageIndexService).deleteSource("DECISION_VERSION", VERSION_PID);
+            verify(versionMapper).deleteById(entity.getId());
+        }
+
+        @Test
+        @DisplayName("delete rejects published/deprecated/retired versions")
+        void rejectsDeleteForImmutableVersions() {
+            DrtVersionEntity entity = draftEntity();
+            entity.setStatus(VersionStatus.PUBLISHED.name());
+            when(versionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
+
+            assertThatThrownBy(() -> service.delete(VERSION_PID))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining("Cannot delete")
+                    .hasMessageContaining("deprecate/retire");
+
+            verify(usageIndexService, never()).deleteSource(any(), any());
+            verify(versionMapper, never()).deleteById(any(Long.class));
         }
     }
 
@@ -299,5 +460,23 @@ class DecisionVersionServiceImplTest {
         e.setContentJson(content);
         e.setCreatedAt(Instant.now());
         return e;
+    }
+
+    private DecisionImpactDTO nonBlockingImpact() {
+        return impact(false, "No downstream consumers");
+    }
+
+    private DecisionImpactDTO blockingImpact(String summary) {
+        return impact(true, summary);
+    }
+
+    private DecisionImpactDTO impact(boolean blocking, String summary) {
+        DecisionImpactRiskDTO risk = new DecisionImpactRiskDTO();
+        risk.setBlocking(blocking);
+        risk.setSummary(summary);
+        DecisionImpactDTO impact = new DecisionImpactDTO();
+        impact.setDecisionCode(DECISION_CODE);
+        impact.setRisk(risk);
+        return impact;
     }
 }

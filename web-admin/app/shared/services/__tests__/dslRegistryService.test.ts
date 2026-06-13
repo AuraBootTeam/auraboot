@@ -11,5 +11,9 @@ describe('dslRegistryService fallback registry', () => {
     expect(blockTypes).toContain('workbench-action-bar');
     expect(blockTypes).toContain('evidence-panel');
     expect(blockTypes).toContain('artifact-timeline');
+    expect(blockTypes).toContain('detail-section');
+    expect(blockTypes).toContain('text');
+    expect(blockTypes).toContain('chart-card');
+    expect(blockTypes).toContain('selection-info');
   });
 });

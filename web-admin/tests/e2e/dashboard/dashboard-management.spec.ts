@@ -34,13 +34,19 @@ import { clickRowActionByLocator, ensureFilterFormOpen } from '../helpers';
  */
 async function checkActionInDropdown(page: Page, row: Locator, actionCode: string) {
   // Hover the row to reveal action buttons (opacity-0 → opacity-100 via group-hover)
+  await row.scrollIntoViewIfNeeded().catch(() => null);
   await row.hover();
   // Wait for the More button to become visible after hover (opacity transition)
-  const moreBtn = row.locator('[data-testid="row-action-more"]');
+  const moreBtn = row.locator('[data-testid="row-action-more"]').first();
   await moreBtn.waitFor({ state: 'visible', timeout: 8000 });
-  // Open the dropdown — use evaluate to bypass any overlay issues
-  await moreBtn.evaluate((el: HTMLElement) => el.click());
-  const dropdown = page.locator('[data-testid="row-action-dropdown"]');
+  const dropdown = page.locator('[data-testid="row-action-dropdown"]').first();
+  await moreBtn.click({ force: true });
+  if (!(await dropdown.isVisible({ timeout: 1000 }).catch(() => false))) {
+    await moreBtn.press('Enter').catch(() => null);
+  }
+  if (!(await dropdown.isVisible({ timeout: 1000 }).catch(() => false))) {
+    await moreBtn.dispatchEvent('click').catch(() => null);
+  }
   await dropdown.waitFor({ state: 'visible', timeout: 8000 });
   await expect(dropdown.locator(`[data-testid="row-action-${actionCode}"]`)).toBeVisible({ timeout: 5000 });
   // Close by pressing Escape (more reliable than clicking outside)
@@ -50,6 +56,19 @@ async function checkActionInDropdown(page: Page, row: Locator, actionCode: strin
 
 import { BASE_URL } from '../../helpers/environments';
 const MGMT_PATH = '/p/dashboard_management';
+
+function minimalDashboardWidget() {
+  return {
+    id: `w-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    type: 'stat-card',
+    title: 'Test Widget',
+    x: 0,
+    y: 0,
+    w: 4,
+    h: 2,
+    config: { label: 'Total', value: '0', color: 'blue', namedQuery: 'nq_test' },
+  };
+}
 
 /**
  * Helper: get JWT token from page cookies for direct API calls
@@ -77,6 +96,7 @@ async function createDashboardViaApi(
     data: {
       title: overrides.title || `E2E Dashboard ${Date.now()}`,
       scope: overrides.scope || 'global',
+      widgets: overrides.widgets ?? [minimalDashboardWidget()],
       ...overrides,
     },
   });
@@ -99,48 +119,14 @@ async function deleteDashboardViaApi(
 }
 
 /**
- * Helper: add a minimal widget to a dashboard via API (required before publishing)
- */
-async function addWidgetToDashboardViaApi(
-  page: import('@playwright/test').Page,
-  pid: string,
-): Promise<void> {
-  const token = await getToken(page);
-  // Fetch current dashboard to get existing widgets
-  const getResp = await page.request.get(`${BASE_URL}/api/dashboards/${pid}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!getResp.ok()) return;
-  const body = await getResp.json();
-  const existing = body.data?.widgets || [];
-  if (existing.length > 0) return; // already has widgets
-
-  // Add a minimal stat-card widget with required config fields
-  const minimalWidget = {
-    id: `w-${Date.now()}`,
-    type: 'stat-card',
-    title: 'Test Widget',
-    x: 0,
-    y: 0,
-    w: 4,
-    h: 2,
-    config: { label: 'Total', value: '0', color: 'blue', namedQuery: 'nq_test' },
-  };
-  await page.request.put(`${BASE_URL}/api/dashboards/${pid}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    data: { widgets: [...existing, minimalWidget] },
-  });
-}
-
-/**
  * Helper: publish a dashboard via API
- * Automatically adds a widget if dashboard has none (backend requires ≥1 widget to publish)
+ * Test dashboards are created with a minimal widget because the backend
+ * requires at least one widget before publishing.
  */
 async function publishDashboardViaApi(
   page: import('@playwright/test').Page,
   pid: string,
 ): Promise<void> {
-  await addWidgetToDashboardViaApi(page, pid);
   const token = await getToken(page);
   const resp = await page.request.post(`${BASE_URL}/api/dashboards/${pid}/publish`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -270,45 +256,6 @@ async function gotoManagementWithFilter(
 
 test.describe('Dashboard Management', () => {
   /**
-   * Ensure the DSL schema for dashboard_management_list has onRowClick + detailUrl.
-   * Plugin import may not always update an existing page, so we patch it via API.
-   */
-  test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
-    const page = await ctx.newPage();
-    try {
-      const token = await getToken(page);
-
-      // Fetch current schema
-      const resp = await page.request.get(`${BASE_URL}/api/pages/key/dashboard_management_list`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!resp.ok()) return;
-      const body = await resp.json();
-      const pageData = body.data;
-
-      // V2 format: flat blocks array (no dslSchema wrapper)
-      const blocks = pageData?.blocks;
-      if (!Array.isArray(blocks)) return;
-
-      const tableBlock = blocks.find((b: any) => b.blockType === 'table');
-      if (!tableBlock || tableBlock.onRowClick === 'navigate') return;
-
-      // Patch: add onRowClick and detailUrl
-      tableBlock.onRowClick = 'navigate';
-      tableBlock.detailUrl = '/dashboard-designer/{pid}';
-
-      await page.request.put(`${BASE_URL}/api/pages/${pageData.pid}`, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        data: { blocks },
-      });
-    } finally {
-      await page.close();
-      await ctx.close();
-    }
-  });
-
-  /**
    * DM-E01: List page loads with filter area, toolbar, and data table
    */
   test('DM-E01: list page loads @smoke', async ({ page }) => {
@@ -382,10 +329,6 @@ test.describe('Dashboard Management', () => {
    * - "编辑" always visible
    */
   test('DM-E03: row action buttons match status', async ({ page }) => {
-    // FIXME: Filter form search on custom API-datasource page does not reliably
-    // filter results — the filter input selector may not match the SmartInput component.
-    // Row action visibility is covered by DM-E04 and DM-E11 which pass consistently.
-    test.fixme(true, 'Filter search unreliable on custom API-datasource page — covered by DM-E04/E11');
     test.setTimeout(60_000);
     const ts = Date.now();
     // Create a draft dashboard
@@ -436,7 +379,6 @@ test.describe('Dashboard Management', () => {
    * Verifies: draft row shows "发布" → after publish via API + reload → shows "取消发布"
    */
   test('DM-E04: publish changes row buttons', async ({ page }) => {
-    test.fixme(true, 'Dashboard rows not found in list — API-created dashboards may not appear immediately');
     const uniqueTitle = `PubChg ${Date.now()}`;
     const { pid } = await createDashboardViaApi(page, {
       title: uniqueTitle,
@@ -522,7 +464,6 @@ test.describe('Dashboard Management', () => {
    * so row click should navigate to /dashboard-designer/{pid}, not open RecordPreviewDrawer.
    */
   test('DM-E07: row click navigates to designer @smoke', async ({ page }) => {
-    test.fixme(true, 'Dashboard rows not found in list after API creation');
     const uniqueTitle = `RowNav ${Date.now()}`;
     const { pid } = await createDashboardViaApi(page, {
       title: uniqueTitle,
@@ -561,7 +502,6 @@ test.describe('Dashboard Management', () => {
    * Clicking it should navigate to the designer, same as row click.
    */
   test('DM-E08: edit action navigates to designer', async ({ page }) => {
-    test.fixme(true, 'Dashboard rows not found in list after API creation');
     const uniqueTitle = `EditNav ${Date.now()}`;
     const { pid } = await createDashboardViaApi(page, {
       title: uniqueTitle,
@@ -612,7 +552,6 @@ test.describe('Dashboard Management', () => {
    * DSL defines list-tabs with "all", "personal" (scope=personal), "global" (scope=global).
    */
   test('DM-E10: list tabs filter by scope', async ({ page }) => {
-    test.fixme(true, 'Dashboard rows not found in list after API creation');
     // Use a common unique prefix so both dashboards appear in the same search filter
     const ts = Date.now();
     const commonPrefix = `TabScope ${ts}`;
@@ -643,8 +582,7 @@ test.describe('Dashboard Management', () => {
       const personalTab = page
         .locator('button, [role="tab"]', { hasText: /个人|Personal/ })
         .first();
-      const personalTabVisible = await personalTab.isVisible({ timeout: 3000 }).catch(() => false);
-      test.skip(!personalTabVisible, 'List tabs (Personal/Global) not available on this page');
+      await expect(personalTab).toBeVisible({ timeout: 3000 });
 
       const personalResp = page.waitForResponse(
         (r) => r.url().includes('/api/dashboards') && r.status() === 200,
@@ -710,129 +648,133 @@ test.describe('Dashboard Management', () => {
    * Covers the complete status flow with UI state assertions at each step.
    */
   test('DM-E11: full lifecycle create → publish → unpublish → delete', async ({ page }) => {
-    test.fixme(true, 'Dashboard rows not found in list after API creation');
+    test.setTimeout(90_000);
     const uniqueTitle = `Lifecycle ${Date.now()}`;
     const { pid } = await createDashboardViaApi(page, {
       title: uniqueTitle,
       scope: 'personal',
     });
 
-    // Add a widget via API so backend publish validation passes
-    await addWidgetToDashboardViaApi(page, pid);
+    try {
+      // Step 1: Verify draft state — use full uniqueTitle to avoid matching old test data
+      await gotoManagementWithFilter(page, uniqueTitle);
+      const row = () => page.locator('tr', { hasText: uniqueTitle }).first();
+      await expect(row()).toBeVisible({ timeout: 10000 });
 
-    // Step 1: Verify draft state — use full uniqueTitle to avoid matching old test data
-    await gotoManagementWithFilter(page, uniqueTitle);
-    const row = () => page.locator('tr', { hasText: uniqueTitle }).first();
-    await expect(row()).toBeVisible({ timeout: 10000 });
+      // Draft status tag — find by looking for "Draft" or "草稿" text anywhere in the row
+      await expect(row()).toContainText(/Draft|草稿/i);
 
-    // Draft status tag — find by looking for "Draft" or "草稿" text anywhere in the row
-    await expect(row()).toContainText(/Draft|草稿/i);
+      // Draft row: edit is primary (direct), publish/delete in More dropdown, unpublish not rendered
+      await row().hover(); // reveal row actions (opacity-0 → opacity-100 via group-hover)
+      await expect(row().locator('[data-testid="row-action-edit"]')).toBeVisible();
+      await checkActionInDropdown(page, row(), 'publish');
+      await checkActionInDropdown(page, row(), 'delete');
+      await expect(row().locator('[data-testid="row-action-unpublish"]')).toHaveCount(0);
 
-    // Draft row: edit is primary (direct), publish/delete in More dropdown, unpublish not rendered
-    await row().hover(); // reveal row actions (opacity-0 → opacity-100 via group-hover)
-    await expect(row().locator('[data-testid="row-action-edit"]')).toBeVisible();
-    await checkActionInDropdown(page, row(), 'publish');
-    await checkActionInDropdown(page, row(), 'delete');
-    await expect(row().locator('[data-testid="row-action-unpublish"]')).toHaveCount(0);
-
-    // Step 2: Publish via UI button (publish is in More dropdown)
-    const publishResp = page.waitForResponse(
-      (r) => r.url().includes('/publish') && r.request().method() === 'POST',
-      { timeout: 8000 },
-    );
-    await clickRowActionByLocator(page, row(), 'publish');
-    const pubResponse = await publishResp;
-    expect(pubResponse.status()).toBe(200);
-    await waitForDashboardStatus(page, pid, 'published');
-
-    // Re-navigate with filter to verify published state
-    await gotoManagementWithFilter(page, uniqueTitle);
-    const pubRow = () => page.locator('tr', { hasText: uniqueTitle }).first();
-    await expect(pubRow()).toBeVisible({ timeout: 10000 });
-    await expect(pubRow()).toContainText(/Published|已发布/i);
-
-    // Published row: edit is primary (direct), unpublish/delete in More dropdown, publish not rendered
-    await checkActionInDropdown(page, pubRow(), 'unpublish');
-    await expect(pubRow().locator('[data-testid="row-action-publish"]')).toHaveCount(0);
-
-    // Step 3: Unpublish via UI button (unpublish is in More dropdown)
-    const unpubResp = page.waitForResponse(
-      (r) => r.url().includes('/unpublish') && r.request().method() === 'POST',
-      { timeout: 8000 },
-    );
-    await clickRowActionByLocator(page, pubRow(), 'unpublish');
-    const unpubResponse = await unpubResp;
-    expect(unpubResponse.status()).toBe(200);
-    await waitForDashboardStatus(page, pid, 'draft');
-
-    // Re-navigate with filter to verify draft state restored
-    await gotoManagementWithFilter(page, uniqueTitle);
-    const draftRow = () => page.locator('tr', { hasText: uniqueTitle }).first();
-    await expect(draftRow()).toBeVisible({ timeout: 10000 });
-    await checkActionInDropdown(page, draftRow(), 'publish');
-    await expect(draftRow().locator('[data-testid="row-action-unpublish"]')).toHaveCount(0);
-
-    // Step 4: Delete via UI button with confirm dialog (handles primary slot + "more actions" dropdown)
-    await clickRowActionByLocator(page, draftRow(), 'delete');
-
-    // Accept confirm dialog
-    const confirmDialog = page.locator('[data-testid="confirm-dialog"]');
-    await confirmDialog.waitFor({ state: 'visible', timeout: 5000 });
-    // Verify confirm dialog shows deletion-related content
-    await expect(confirmDialog).toContainText(/确认|删除|delete|Confirm/i);
-
-    // Set up API listener BEFORE clicking OK
-    const deleteResp = page
-      .waitForResponse(
-        (r) => r.url().includes('/dashboards/') && r.request().method() === 'DELETE',
+      // Step 2: Publish via UI button (publish is in More dropdown)
+      const publishResp = page.waitForResponse(
+        (r) => r.url().includes('/publish') && r.request().method() === 'POST',
         { timeout: 8000 },
-      )
-      .catch(() => null);
-    await page.locator('[data-testid="confirm-ok"]').click();
-    await deleteResp;
+      );
+      await clickRowActionByLocator(page, row(), 'publish');
+      const pubResponse = await publishResp;
+      expect(pubResponse.status()).toBe(200);
+      await waitForDashboardStatus(page, pid, 'published');
 
-    // Verify row is gone after list refresh (filter still set to uniqueTitle)
-    await page
-      .waitForResponse(
-        (r) =>
-          r.url().includes('/dashboards') && !r.url().includes('/publish') && r.status() === 200,
+      // Re-navigate with filter to verify published state
+      await gotoManagementWithFilter(page, uniqueTitle);
+      const pubRow = () => page.locator('tr', { hasText: uniqueTitle }).first();
+      await expect(pubRow()).toBeVisible({ timeout: 10000 });
+      await expect(pubRow()).toContainText(/Published|已发布/i);
+
+      // Published row: edit is primary (direct), unpublish/delete in More dropdown, publish not rendered
+      await checkActionInDropdown(page, pubRow(), 'unpublish');
+      await expect(pubRow().locator('[data-testid="row-action-publish"]')).toHaveCount(0);
+
+      // Step 3: Unpublish via UI button (unpublish is in More dropdown)
+      const unpubResp = page.waitForResponse(
+        (r) => r.url().includes('/unpublish') && r.request().method() === 'POST',
         { timeout: 8000 },
-      )
-      .catch(() => page.reload());
-    await expect(page.locator('tr', { hasText: uniqueTitle })).toHaveCount(0, { timeout: 8000 });
+      );
+      await clickRowActionByLocator(page, pubRow(), 'unpublish');
+      const unpubResponse = await unpubResp;
+      expect(unpubResponse.status()).toBe(200);
+      await waitForDashboardStatus(page, pid, 'draft');
+
+      // Re-navigate with filter to verify draft state restored
+      await gotoManagementWithFilter(page, uniqueTitle);
+      const draftRow = () => page.locator('tr', { hasText: uniqueTitle }).first();
+      await expect(draftRow()).toBeVisible({ timeout: 10000 });
+      await checkActionInDropdown(page, draftRow(), 'publish');
+      await expect(draftRow().locator('[data-testid="row-action-unpublish"]')).toHaveCount(0);
+
+      // Step 4: Delete via UI button with confirm dialog (handles primary slot + "more actions" dropdown)
+      await clickRowActionByLocator(page, draftRow(), 'delete');
+
+      // Accept confirm dialog
+      const confirmDialog = page.locator('[data-testid="confirm-dialog"]');
+      await confirmDialog.waitFor({ state: 'visible', timeout: 5000 });
+      // Verify confirm dialog shows deletion-related content
+      await expect(confirmDialog).toContainText(/确认|删除|delete|Confirm/i);
+
+      // Set up API listener BEFORE clicking OK
+      const deleteResp = page
+        .waitForResponse(
+          (r) => r.url().includes('/dashboards/') && r.request().method() === 'DELETE',
+          { timeout: 8000 },
+        )
+        .catch(() => null);
+      await page.locator('[data-testid="confirm-ok"]').click();
+      await deleteResp;
+
+      // Verify row is gone after list refresh (filter still set to uniqueTitle)
+      await page
+        .waitForResponse(
+          (r) =>
+            r.url().includes('/dashboards') && !r.url().includes('/publish') && r.status() === 200,
+          { timeout: 8000 },
+        )
+        .catch(() => page.reload());
+      await expect(page.locator('tr', { hasText: uniqueTitle })).toHaveCount(0, { timeout: 8000 });
+    } finally {
+      await unpublishDashboardViaApi(page, pid).catch(() => {});
+      await deleteDashboardViaApi(page, pid).catch(() => {});
+    }
   });
 
   /**
    * DM-E12: Publish via row action button with API response verification
    */
-  test.fixme('DM-E12: publish via row action with response check', async ({ page }) => {
+  test('DM-E12: publish via row action with response check', async ({ page }) => {
     const uniqueTitle = `PubAction ${Date.now()}`;
     const { pid } = await createDashboardViaApi(page, {
       title: uniqueTitle,
       scope: 'global',
     });
 
-    // Add widget via API so backend publish validation passes
-    await addWidgetToDashboardViaApi(page, pid);
+    try {
+      await gotoManagementWithFilter(page, uniqueTitle);
 
-    await gotoManagementWithFilter(page, 'PubAction');
+      const row = page.locator('tr', { hasText: uniqueTitle }).first();
+      await expect(row).toBeVisible({ timeout: 10000 });
 
-    const row = page.locator('tr', { hasText: 'PubAction' }).first();
-    await expect(row).toBeVisible({ timeout: 10000 });
+      // Set up response listener BEFORE clicking
+      const publishResp = page.waitForResponse(
+        (r) => r.url().includes('/publish') && r.request().method() === 'POST',
+        { timeout: 8000 },
+      );
 
-    // Set up response listener BEFORE clicking
-    const publishResp = page.waitForResponse(
-      (r) => r.url().includes('/publish') && r.request().method() === 'POST',
-      { timeout: 8000 },
-    );
+      await clickRowActionByLocator(page, row, 'publish'); // publish is in More dropdown
 
-    await clickRowActionByLocator(page, row, 'publish'); // publish is in More dropdown
-
-    // Verify API response is successful with correct format
-    const response = await publishResp;
-    expect(response.status()).toBe(200);
-    const body = await response.json();
-    expect(body.code).toBe('0'); // Standard AuraBoot success code
+      // Verify API response is successful with correct format
+      const response = await publishResp;
+      expect(response.status()).toBe(200);
+      const body = await response.json();
+      expect(body.code).toBe('0'); // Standard AuraBoot success code
+    } finally {
+      await unpublishDashboardViaApi(page, pid).catch(() => {});
+      await deleteDashboardViaApi(page, pid).catch(() => {});
+    }
   });
 
   /**

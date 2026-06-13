@@ -24,6 +24,13 @@ import { templateService } from '../templateService';
 /** Build a success result as templateService expects: { code, desc, data } where ResultHelper.isSuccess checks code==='0' */
 const ok = <T>(data: T) => ({ code: '0', desc: 'OK', data });
 const fail = (desc: string) => ({ code: '500', desc, data: null });
+const crudConfig = {
+  generateList: true,
+  generateForm: true,
+  generateDetail: true,
+  enableExport: true,
+  enableImport: true,
+};
 
 describe('templateService', () => {
   beforeEach(() => {
@@ -38,12 +45,11 @@ describe('templateService', () => {
       const expected = { taskId: 'task-1', status: 'pending' };
       postMock.mockResolvedValue(ok(expected));
 
-      const config = { includeList: true, includeForm: true, includeDetail: true };
-      const result = await templateService.generateCrudTemplate('order', config);
+      const result = await templateService.generateCrudTemplate('order', crudConfig);
 
       expect(postMock).toHaveBeenCalledWith(
         '/api/templates/crud/generate',
-        { modelCode: 'order', config },
+        { modelCode: 'order', config: crudConfig },
         undefined,
         undefined,
       );
@@ -53,13 +59,13 @@ describe('templateService', () => {
     it('throws when response indicates failure', async () => {
       postMock.mockResolvedValue(fail('Service unavailable'));
 
-      await expect(templateService.generateCrudTemplate('order', {})).rejects.toThrow('Service unavailable');
+      await expect(templateService.generateCrudTemplate('order', crudConfig)).rejects.toThrow('Service unavailable');
     });
 
     it('throws default message when desc is empty', async () => {
       postMock.mockResolvedValue({ code: '500', desc: '', data: null });
 
-      await expect(templateService.generateCrudTemplate('order', {})).rejects.toThrow('Failed to generate CRUD template');
+      await expect(templateService.generateCrudTemplate('order', crudConfig)).rejects.toThrow('Failed to generate CRUD template');
     });
   });
 

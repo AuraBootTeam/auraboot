@@ -113,8 +113,37 @@ export function resolveDetailFieldComponent(meta?: {
   }
 }
 
-export function buildDetailRecordEndpoint(tableName: string, recordId: string): string {
+function applyRecordEndpointTemplate(template: string, recordId: string): string {
+  const encoded = encodeURIComponent(recordId);
+  return template
+    .replace(/\{pid\}/g, encoded)
+    .replace(/\{recordId\}/g, encoded)
+    .replace(/\{id\}/g, encoded);
+}
+
+export function buildDetailRecordEndpoint(
+  tableName: string,
+  recordId: string,
+  schema?: { dataSource?: Record<string, any> } | null,
+): string {
+  const dataSource = schema?.dataSource;
+  if (dataSource?.type === 'api') {
+    const template = dataSource.detailEndpoint || dataSource.recordEndpoint;
+    if (typeof template === 'string' && template.trim()) {
+      return applyRecordEndpointTemplate(template.trim(), recordId);
+    }
+    if (typeof dataSource.endpoint === 'string' && dataSource.endpoint.trim()) {
+      return `${dataSource.endpoint.replace(/\/+$/, '')}/${encodeURIComponent(recordId)}`;
+    }
+  }
   return buildApiEndpoint(tableName, recordId);
+}
+
+export function shouldSkipDetailModelFieldMeta(
+  schema: { extension?: Record<string, any> } | null | undefined,
+): boolean {
+  const extension = schema?.extension ?? {};
+  return extension.skipFieldMeta === true || extension.skipDynamicFieldMeta === true;
 }
 
 /**
@@ -352,7 +381,7 @@ export function DetailPageContent(props: PageContentProps) {
       // Use /api/dynamic/{pageKey}/field-meta which requires model-level read permission
       // instead of /api/meta/models/{pid}/fields which requires management permission
       const pageKey = schema?.modelCode || tableName;
-      if (!pageKey) return;
+      if (!pageKey || shouldSkipDetailModelFieldMeta(schema)) return;
       const fieldsRes = await fetchResult<any[]>(`/api/dynamic/${pageKey}/field-meta`, {
         method: 'get',
         token: token || undefined,
@@ -553,9 +582,14 @@ export function DetailPageContent(props: PageContentProps) {
     [allBlocks],
   );
 
-  // For simple detail pages without tabs, find form-section blocks directly
+  // For simple detail pages without tabs, find field-display blocks directly.
+  // Page Designer exposes both form-section and detail-section; both render
+  // as read-only field groups on detail pages.
   const directFormBlocks = useMemo(
-    () => allBlocks.filter((b: BlockConfig) => b.blockType === 'form-section'),
+    () =>
+      allBlocks.filter(
+        (b: BlockConfig) => b.blockType === 'form-section' || b.blockType === 'detail-section',
+      ),
     [allBlocks],
   );
   const effectiveDirectFormBlocks = directFormBlocks;
@@ -1214,7 +1248,7 @@ function DetailBlockRenderer({
     return null;
   }
 
-  if (block.blockType === 'form-section') {
+  if (block.blockType === 'form-section' || block.blockType === 'detail-section') {
     // dataPath binds this section to a nested object of the raw payload (e.g. a license's
     // latestHeartbeat); without it the section uses the unwrapped master record.
     const sectionDataPath = (block as any).dataPath as string | undefined;

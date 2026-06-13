@@ -1,5 +1,6 @@
 package com.auraboot.framework.eventpolicy.service;
 
+import com.auraboot.framework.eventpolicy.dto.EventPolicyDefinitionSummary;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyDefinitionEntity;
 
 import java.util.List;
@@ -24,6 +25,22 @@ public interface EventPolicyDefinitionService {
      * Returns null if not found.
      */
     DrtPolicyDefinitionEntity findByCode(String policyCode);
+
+    /**
+     * Enable or disable a policy definition.
+     */
+    DrtPolicyDefinitionEntity setEnabled(String policyCode, boolean enabled);
+
+    /**
+     * Copy a policy definition. If the source has a latest version, copy it as DRAFT v1.
+     */
+    DrtPolicyDefinitionEntity copy(String sourcePolicyCode, String newPolicyCode, String newPolicyName);
+
+    /**
+     * List policy definitions for the current tenant with optional console filters.
+     */
+    List<EventPolicyDefinitionSummary> listDefinitions(
+            String keyword, String eventType, String targetType, String targetKey, String status);
 
     /**
      * Find all enabled definitions matching the given event_type + target_type + target_key

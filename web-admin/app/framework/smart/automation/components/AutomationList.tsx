@@ -33,6 +33,7 @@ export function AutomationList({
   const revalidator = useRevalidator();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [hydrated, setHydrated] = useState(false);
+  const [automations, setAutomations] = useState(initialAutomations);
   const [logDialogAutomation, setLogDialogAutomation] = useState<Automation | null>(null);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -45,6 +46,10 @@ export function AutomationList({
     setHydrated(true);
   }, []);
 
+  useEffect(() => {
+    setAutomations(initialAutomations);
+  }, [initialAutomations]);
+
   const handleToggleEnabled = async (automation: Automation) => {
     try {
       const response = await fetch(`/api/automations/${automation.pid}/toggle`, {
@@ -54,6 +59,17 @@ export function AutomationList({
       if (!response.ok) {
         throw new Error('Failed to toggle automation');
       }
+      const result = await response.json().catch(() => null);
+      const updated = result?.data as Automation | undefined;
+      setAutomations((current) =>
+        current.map((item) =>
+          item.pid === automation.pid
+            ? updated?.pid === automation.pid
+              ? { ...item, ...updated }
+              : { ...item, enabled: !item.enabled }
+            : item,
+        ),
+      );
       revalidator.revalidate();
     } catch (err) {
       showErrorToast(err instanceof Error ? err.message : 'Failed to toggle');
@@ -221,13 +237,13 @@ export function AutomationList({
       </div>
 
       {/* List */}
-      {initialAutomations.length === 0 ? (
+      {automations.length === 0 ? (
         <div className="px-6 py-12 text-center text-gray-500" data-testid="automation-empty">
           {st('$i18n:automation.list.empty') || 'No automations yet. Create your first one!'}
         </div>
       ) : (
         <div className="divide-y divide-gray-200">
-          {initialAutomations.map((automation) => (
+          {automations.map((automation) => (
             <div
               key={automation.pid}
               className="px-6 py-4 transition-colors hover:bg-gray-50"

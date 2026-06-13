@@ -55,6 +55,15 @@ function setCachedSchema(pageKey: string, schema: UnifiedSchema): void {
   schemaCache.set(pageKey, { schema, timestamp: Date.now() });
 }
 
+function isTransientFetchError(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  return (
+    error.name === 'AbortError' ||
+    error.name === 'TimeoutError' ||
+    message.includes('network error: failed to fetch')
+  );
+}
+
 export interface UseSchemaLoaderOptions {
   /**
    * 页面唯一标识
@@ -98,7 +107,10 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
     throw new Error('Either pageKey or (tableName + type) must be provided');
   };
 
-  const loadSchema = async () => {
+  const loadSchema = async (
+    isStale: () => boolean = () => false,
+    signal?: AbortSignal,
+  ) => {
     try {
       setError(null);
 
@@ -129,7 +141,11 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
       let result = await fetchResult<PageSchemaDTO>(endpoint, {
         method: 'get',
         token: options.token,
+        signal,
       });
+      if (isStale()) {
+        return;
+      }
 
       if (!ResultHelper.isSuccess(result)) {
         throw new Error(result.message || 'Failed to load schema');
@@ -161,16 +177,30 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
       setCachedSchema(pageKey, merged);
       setSchema(merged);
     } catch (err) {
+      if (isStale()) {
+        return;
+      }
       const error = err instanceof Error ? err : new Error('Unknown error');
       setError(error);
-      console.error('Failed to load schema:', error);
+      if (!isTransientFetchError(error)) {
+        console.error('Failed to load schema:', error);
+      }
     } finally {
+      if (isStale()) {
+        return;
+      }
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadSchema();
+    let cancelled = false;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    loadSchema(() => cancelled, controller?.signal);
+    return () => {
+      cancelled = true;
+      controller?.abort();
+    };
   }, [options.pageKey, options.tableName, options.type]);
 
   return {

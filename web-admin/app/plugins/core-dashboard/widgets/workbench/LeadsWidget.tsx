@@ -1,7 +1,7 @@
 /**
  * LeadsWidget — List of recent CRM leads.
  *
- * Data source: GET /crm_lead/list (dynamic controller)
+ * Data source: GET /api/dynamic/crm_lead/list (dynamic controller)
  * Sorted by created_at desc, top N items.
  */
 
@@ -10,7 +10,9 @@ import { get } from '~/shared/services/http-client';
 import { useI18n } from '~/contexts/I18nContext';
 
 interface LeadRecord {
-  id: string;
+  id?: string;
+  pid?: string;
+  recordId?: string;
   crm_lead_company?: string;
   crm_lead_contact_name?: string;
   crm_lead_contact_email?: string;
@@ -48,12 +50,17 @@ function formatRelativeTime(dateStr: string, t: (key: string, params?: Record<st
   return date.toLocaleDateString();
 }
 
+function getLeadRecordId(lead: LeadRecord): string {
+  return lead.pid || lead.id || lead.recordId || '';
+}
+
 export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidgetProps) {
   const { t } = useI18n();
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   // crmUnavailable: true when the CRM module is not installed (API error, e.g. table does not exist)
   const [crmUnavailable, setCrmUnavailable] = useState(false);
 
@@ -63,13 +70,18 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError(false);
+      setPermissionDenied(false);
+      setCrmUnavailable(false);
       try {
         const result = await get<LeadListResponse>(
-          `/crm_lead/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
+          `/api/dynamic/crm_lead/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
         );
         if (!cancelled && result.code === '0' && result.data) {
           setLeads(result.data.records || []);
           setTotal(result.data.total || 0);
+        } else if (!cancelled && result.code === '403') {
+          setPermissionDenied(true);
         } else if (!cancelled) {
           setError(true);
         }
@@ -87,7 +99,10 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
   }, [maxItems]);
 
   const handleRowClick = (lead: LeadRecord) => {
-    window.location.href = `/crm_lead/${lead.id}`;
+    const recordId = getLeadRecordId(lead);
+    if (recordId) {
+      window.location.href = `/p/crm_lead/view/${encodeURIComponent(recordId)}`;
+    }
   };
 
   // --- Loading ---
@@ -109,6 +124,26 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
               <div className="h-5 w-14 animate-pulse rounded-full bg-gray-100" />
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Permission denied ---
+  if (permissionDenied) {
+    return (
+      <div className={`flex h-full flex-col ${className}`} data-testid="leads-permission-denied">
+        <div className="mb-3 flex items-center justify-between px-1">
+          <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
+          <span className="mb-1 text-2xl">{'\uD83D\uDD12'}</span>
+          <span className="text-sm font-medium text-gray-500">
+            {t('workbench.leads.permissionDenied', {}, 'No permission to view leads')}
+          </span>
+          <span className="mt-1 text-xs text-gray-400">
+            {t('workbench.leads.permissionDeniedHint', {}, 'Ask an administrator for CRM lead access')}
+          </span>
         </div>
       </div>
     );
@@ -159,7 +194,7 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
         <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
         {total > maxItems && (
           <a
-            href="/crm_lead"
+            href="/p/crm_lead"
             className="text-[11px] text-blue-500 hover:text-blue-600"
           >
             {t('workbench.leads.viewAll', {}, 'View All')} &rarr;
@@ -169,7 +204,8 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
 
       {/* Lead rows */}
       <div className="flex-1 space-y-2 overflow-y-auto">
-        {leads.map((lead) => {
+        {leads.map((lead, index) => {
+          const recordId = getLeadRecordId(lead);
           const status = lead.crm_lead_status || 'new';
           const statusStyle = STATUS_STYLES[status] || STATUS_STYLES.new;
           const timeStr = lead.created_at
@@ -178,9 +214,11 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
 
           return (
             <button
-              key={lead.id}
+              key={recordId || `${lead.crm_lead_company ?? 'lead'}-${index}`}
+              data-testid={recordId ? `lead-row-${recordId}` : undefined}
               type="button"
               onClick={() => handleRowClick(lead)}
+              disabled={!recordId}
               className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-gray-100 bg-white p-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/30"
             >
               {/* Icon */}
@@ -203,6 +241,7 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
 
               {/* Status badge */}
               <span
+                data-testid={`lead-status-${status}`}
                 className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusStyle.bg} ${statusStyle.text}`}
               >
                 {t(`workbench.leads.status.${status}`, {}, status)}

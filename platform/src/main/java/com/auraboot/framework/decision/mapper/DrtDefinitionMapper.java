@@ -22,4 +22,7 @@ public interface DrtDefinitionMapper extends BaseMapper<DrtDefinitionEntity> {
     DrtDefinitionEntity findByTenantAndCode(
             @Param("tenantId") Long tenantId,
             @Param("decisionCode") String decisionCode);
+
+    @Select("SELECT COUNT(*) FROM ab_drt_definition WHERE tenant_id = #{tenantId}")
+    long countByTenant(@Param("tenantId") Long tenantId);
 }

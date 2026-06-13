@@ -25,6 +25,8 @@
 
 import { test, expect } from '../../fixtures';
 import type { Page } from '../../fixtures';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 // ============================================================
 //  Flow Designer (F4-b)
@@ -186,8 +188,7 @@ test.describe('Flow Designer (F4-b)', () => {
         .catch(() => false),
     ]);
 
-    const categoriesFound = [hasTrigger, hasAction, hasControl].filter(Boolean).length;
-    expect(categoriesFound).toBeGreaterThanOrEqual(1);
+    expect([hasTrigger, hasAction, hasControl]).toContain(true);
   });
 
   /**
@@ -211,8 +212,7 @@ test.describe('Flow Designer (F4-b)', () => {
     ]).catch(() => 'timeout' as const);
 
     if (result !== 'content') {
-      test.skip(true, 'Flow designer save button not available — automation page may not be loaded');
-      return;
+      throw new Error(`Flow designer save button not available: ${result}`);
     }
 
     await expect(saveLocator.first()).toBeVisible();
@@ -339,11 +339,7 @@ test.describe('BPMN Designer (F4-c)', () => {
       });
       await page.mouse.up();
 
-      const nodes = page.locator('.react-flow__node');
-      const nodeCount = await nodes.count();
-
-      // In some environments HTML5 DnD is limited in headless mode; ensure canvas remains operable.
-      expect(nodeCount).toBeGreaterThanOrEqual(0);
+      // In some environments HTML5 DnD is limited in headless mode; canvas operability is asserted below.
     }
 
     await expect(canvas).toBeVisible();
@@ -484,13 +480,18 @@ test.describe('BPMN Designer (F4-c)', () => {
     expect(isDisabled).toBe(true);
   });
 
-  test('F4-E20: Import/Export JSON serialization', async ({ page }) => {
+  test('F4-E20: Import/Export JSON serialization', async ({ page }, testInfo) => {
     const loaded = await openBPMNDesigner(page);
 
     if (!loaded) {
       throw new Error('BPMN designer route not available');
       return;
     }
+    await page.waitForFunction(
+      () => Boolean((window as unknown as { __bpmnDesignerStore?: unknown }).__bpmnDesignerStore),
+      undefined,
+      { timeout: 10000 },
+    );
 
     const importBtn = page.locator('[data-testid="bpmn-btn-import"]');
     await expect(importBtn).toBeVisible();
@@ -498,28 +499,63 @@ test.describe('BPMN Designer (F4-c)', () => {
     const fileInput = page.locator('input[type="file"][accept=".json"]');
     await expect(fileInput).toBeAttached();
 
+    const processKey = `artifact_export_${Date.now()}`;
+    const importedProcess = {
+      name: 'Artifact Export Process',
+      key: processKey,
+      description: 'Imported then exported by E2E',
+      nodes: [
+        {
+          id: 'start_1',
+          type: 'startEvent',
+          position: { x: 100, y: 200 },
+          data: { type: 'startEvent', label: '开始', config: {} },
+        },
+        {
+          id: 'end_1',
+          type: 'endEvent',
+          position: { x: 400, y: 200 },
+          data: { type: 'endEvent', label: '结束', config: {} },
+        },
+      ],
+      edges: [{ id: 'e_start_end', source: 'start_1', target: 'end_1', type: 'smoothstep' }],
+    };
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await fileInput.setInputFiles({
+        name: `${processKey}.json`,
+        mimeType: 'application/json',
+        buffer: Buffer.from(JSON.stringify(importedProcess)),
+      });
+      const applied = await page
+        .locator('[data-testid="bpmn-field-key"]')
+        .inputValue({ timeout: 3000 })
+        .then((value) => value === processKey)
+        .catch(() => false);
+      if (applied) break;
+    }
+    await expect(page.locator('[data-testid="bpmn-field-name"]')).toHaveValue(
+      importedProcess.name,
+    );
+    await expect(page.locator('[data-testid="bpmn-field-key"]')).toHaveValue(importedProcess.key);
+
     const exportBtn = page.locator('[data-testid="bpmn-btn-export"]');
     await expect(exportBtn).toBeVisible();
 
-    const downloadPromise = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
-
+    const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
     await exportBtn.click();
-
     const download = await downloadPromise;
-    if (download) {
-      const filename = download.suggestedFilename();
-      expect(filename).toContain('.json');
+    expect(download.suggestedFilename()).toBe(`${processKey}.json`);
 
-      const downloadPath = await download.path();
-      if (downloadPath) {
-        const fs = await import('fs');
-        const content = fs.readFileSync(downloadPath, 'utf-8');
-        const parsed = JSON.parse(content);
+    const savedPath = path.join(testInfo.outputDir, download.suggestedFilename());
+    await download.saveAs(savedPath);
+    const parsed = JSON.parse(await readFile(savedPath, 'utf-8'));
 
-        expect(parsed).toHaveProperty('nodes');
-        expect(parsed).toHaveProperty('edges');
-      }
-    }
+    expect(parsed.key).toBe(importedProcess.key);
+    expect(parsed.name).toBe(importedProcess.name);
+    expect(parsed.description).toBe(importedProcess.description);
+    expect(parsed.nodes).toEqual(importedProcess.nodes);
+    expect(parsed.edges).toEqual([{ ...importedProcess.edges[0], data: {} }]);
   });
 
   test('F4-E20b: Version history panel toggle', async ({ page }) => {

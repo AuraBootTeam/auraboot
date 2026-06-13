@@ -5,7 +5,7 @@
  * Provides different property editors for each block type.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { DslBlock } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { LocalizedTextInput, type LocalizedTextValue } from '~/shared/designer';
 import { useI18n } from '~/contexts/I18nContext';
@@ -105,6 +105,8 @@ function getAvailableGroups(blockType: string): PropertyGroup[] {
       return ['basic', 'data', 'appearance'];
     case 'chart-card':
       return ['basic', 'data', 'appearance'];
+    case 'custom':
+      return ['basic', 'data', 'behavior'];
     case 'text':
       return ['basic', 'appearance'];
     case 'toolbar':
@@ -124,6 +126,37 @@ interface PropertyEditorProps {
   readonly?: boolean;
 }
 
+interface DataSourceReferenceFieldProps extends PropertyEditorProps {
+  fieldTestId: string;
+  inputTestId: string;
+  placeholder: string;
+}
+
+const DataSourceReferenceField: React.FC<DataSourceReferenceFieldProps> = ({
+  block,
+  onChange,
+  readonly,
+  fieldTestId,
+  inputTestId,
+  placeholder,
+}) => {
+  const value = typeof block.dataSource === 'string' ? block.dataSource : '';
+
+  return (
+    <PropertyField label="数据源" testId={fieldTestId}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange({ dataSource: e.target.value || undefined })}
+        disabled={readonly}
+        className="property-input font-mono text-xs"
+        placeholder={placeholder}
+        data-testid={inputTestId}
+      />
+    </PropertyField>
+  );
+};
+
 /**
  * Basic properties (title, id, visibility)
  */
@@ -134,7 +167,8 @@ const BasicProperties: React.FC<PropertyEditorProps> = ({ block, onChange, reado
     block.blockType === 'form-section' ||
     block.blockType === 'detail-section' ||
     block.blockType === 'stat-card' ||
-    block.blockType === 'chart-card';
+    block.blockType === 'chart-card' ||
+    block.blockType === 'custom';
 
   return (
     <div className="space-y-4">
@@ -147,6 +181,20 @@ const BasicProperties: React.FC<PropertyEditorProps> = ({ block, onChange, reado
             disabled={readonly}
             placeholder={l('输入标题', 'Enter title')}
             testId="block-title-input"
+          />
+        </PropertyField>
+      )}
+
+      {block.blockType === 'custom' && (
+        <PropertyField label="组件" hint="Runtime component alias" testId="custom-component">
+          <input
+            type="text"
+            value={block.component || ''}
+            onChange={(e) => onChange({ component: e.target.value || undefined })}
+            disabled={readonly}
+            className="property-input font-mono text-xs"
+            placeholder="decision-field-impact"
+            data-testid="custom-component-input"
           />
         </PropertyField>
       )}
@@ -269,28 +317,80 @@ const LayoutProperties: React.FC<PropertyEditorProps> = ({ block, onChange, read
   );
 };
 
+interface CustomPropsJsonEditorProps extends PropertyEditorProps {
+  props: Record<string, any>;
+}
+
+const formatJson = (value: Record<string, any>) => JSON.stringify(value || {}, null, 2);
+
+const CustomPropsJsonEditor: React.FC<CustomPropsJsonEditorProps> = ({
+  block,
+  onChange,
+  readonly,
+  props,
+}) => {
+  const [draft, setDraft] = useState(() => formatJson(props));
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(formatJson(props));
+    setError(null);
+  }, [block.id, props]);
+
+  return (
+    <PropertyField label="Props JSON" hint="Must be a JSON object" testId="custom-props-json">
+      <textarea
+        value={draft}
+        onChange={(event) => {
+          const next = event.target.value;
+          setDraft(next);
+          try {
+            const parsed = next.trim() ? JSON.parse(next) : {};
+            if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+              throw new Error('Props JSON must be an object');
+            }
+            setError(null);
+            onChange({ props: parsed });
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Invalid JSON');
+          }
+        }}
+        disabled={readonly}
+        className="property-input min-h-[120px] resize-y font-mono text-xs"
+        placeholder={'{\n  "initialCurrentDataType": "string"\n}'}
+        data-testid="custom-props-json-input"
+      />
+      {error && (
+        <div className="mt-1 text-xs text-red-600" data-testid="custom-props-json-error">
+          {error}
+        </div>
+      )}
+    </PropertyField>
+  );
+};
+
 /**
  * Data properties (data source, bindings)
  */
 const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readonly }) => {
   const props = (block.props || {}) as Record<string, any>;
+  const blockRefreshInterval =
+    block.refreshInterval ??
+    (typeof props.refreshInterval === 'number' ? props.refreshInterval : undefined);
 
   return (
     <div className="space-y-4">
       {/* Data source (for table) */}
       {block.blockType === 'table' && (
         <>
-          <PropertyField label="数据源" testId="data-source">
-            <input
-              type="text"
-              value={block.dataSource || ''}
-              onChange={(e) => onChange({ dataSource: e.target.value || undefined })}
-              disabled={readonly}
-              className="property-input font-mono text-xs"
-              placeholder="tableData"
-              data-testid="data-source-input"
-            />
-          </PropertyField>
+          <DataSourceReferenceField
+            block={block}
+            onChange={onChange}
+            readonly={readonly}
+            fieldTestId="data-source"
+            inputTestId="data-source-input"
+            placeholder="tableData"
+          />
 
           <PropertyField label="选择绑定" hint="绑定选中行" testId="selection-bind">
             <input
@@ -325,6 +425,15 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
       {/* Stat card data */}
       {block.blockType === 'stat-card' && (
         <>
+          <DataSourceReferenceField
+            block={block}
+            onChange={onChange}
+            readonly={readonly}
+            fieldTestId="stat-data-source"
+            inputTestId="stat-data-source-input"
+            placeholder="ds_stats"
+          />
+
           <PropertyField label="数值字段" testId="stat-value-field">
             <input
               type="text"
@@ -348,12 +457,40 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
               data-testid="stat-change-field-input"
             />
           </PropertyField>
+
+          <PropertyField label="刷新间隔(ms)" testId="stat-refresh-interval">
+            <input
+              type="number"
+              value={blockRefreshInterval ?? ''}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                onChange({
+                  refreshInterval: Number.isFinite(next) && next > 0 ? next : undefined,
+                });
+              }}
+              disabled={readonly}
+              className="property-input"
+              min={0}
+              step={500}
+              placeholder="0"
+              data-testid="stat-refresh-interval-input"
+            />
+          </PropertyField>
         </>
       )}
 
       {/* Chart data */}
       {block.blockType === 'chart-card' && (
         <>
+          <DataSourceReferenceField
+            block={block}
+            onChange={onChange}
+            readonly={readonly}
+            fieldTestId="chart-data-source"
+            inputTestId="chart-data-source-input"
+            placeholder="ds_chart"
+          />
+
           <PropertyField label="图表类型" testId="chart-type">
             <select
               value={props.chartType || 'bar'}
@@ -392,6 +529,55 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
               data-testid="chart-y-field-input"
             />
           </PropertyField>
+
+          <PropertyField label="刷新间隔(ms)" testId="chart-refresh-interval">
+            <input
+              type="number"
+              value={blockRefreshInterval ?? ''}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                onChange({
+                  refreshInterval: Number.isFinite(next) && next > 0 ? next : undefined,
+                });
+              }}
+              disabled={readonly}
+              className="property-input"
+              min={0}
+              step={500}
+              placeholder="0"
+              data-testid="chart-refresh-interval-input"
+            />
+          </PropertyField>
+        </>
+      )}
+
+      {block.blockType === 'custom' && (
+        <>
+          <PropertyField label="值字段" hint="Optional runtime value field" testId="custom-value-field">
+            <input
+              type="text"
+              value={props.valueField || ''}
+              onChange={(e) =>
+                onChange({
+                  props: {
+                    ...props,
+                    valueField: e.target.value || undefined,
+                  },
+                })
+              }
+              disabled={readonly}
+              className="property-input font-mono text-xs"
+              placeholder="pid"
+              data-testid="custom-value-field-input"
+            />
+          </PropertyField>
+
+          <CustomPropsJsonEditor
+            block={block}
+            onChange={onChange}
+            readonly={readonly}
+            props={props}
+          />
         </>
       )}
     </div>

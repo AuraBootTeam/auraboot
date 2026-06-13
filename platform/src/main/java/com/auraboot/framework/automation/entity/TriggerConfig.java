@@ -1,5 +1,6 @@
 package com.auraboot.framework.automation.entity;
 
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -38,6 +39,13 @@ public class TriggerConfig {
 
     /** Version binding for {@link #decisionRef} (LATEST by default). */
     private String decisionBinding;
+
+    /**
+     * Platform rule-center binding contract. New consumers should prefer this over the legacy
+     * {@link #decisionRef}/{@link #decisionBinding} pair so field/decision refs, fallback and trace
+     * semantics stay consistent across Automation, BPM, SLA, EventPolicy and permissions.
+     */
+    private RuleConsumerBinding ruleBinding;
 
     // ==================== ON_RECORD_UPDATE specific ====================
 

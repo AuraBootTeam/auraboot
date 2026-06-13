@@ -52,10 +52,13 @@ export function buildRequest(
   url: string;
   init: RequestInit;
 } {
-  const { method = 'get', params = {}, timeout, apiConfig } = options;
+  const { method = 'get', params = {}, timeout, apiConfig, signal } = options;
+  const paramsAreArray = Array.isArray(params);
 
   // Step 1: Replace PathVariables and separate params
-  const { processedPath, remainingParams } = replacePathVariables(path, params);
+  const { processedPath, remainingParams } = paramsAreArray
+    ? { processedPath: path, remainingParams: {} }
+    : replacePathVariables(path, params);
 
   // Step 2: Resolve base URL based on environment
   const baseUrl = resolveBaseUrl(context, apiConfig);
@@ -95,8 +98,11 @@ export function buildRequest(
     };
   }
 
-  // Step 6: Add request body for non-GET/DELETE requests; DELETE uses query params
-  if (method === 'delete' && Object.keys(remainingParams).length > 0) {
+  // Step 6: Add request body for non-GET requests. DELETE object params remain
+  // query params for legacy endpoints; array params are JSON bodies for batch APIs.
+  if (method === 'delete' && paramsAreArray) {
+    init.body = JSON.stringify(params);
+  } else if (method === 'delete' && Object.keys(remainingParams).length > 0) {
     const deleteSearchParams = new URLSearchParams();
     for (const [key, val] of Object.entries(remainingParams)) {
       if (val !== undefined && val !== null) {
@@ -114,10 +120,24 @@ export function buildRequest(
     }
   }
 
-  // Step 7: Add timeout signal (if supported)
+  // Step 7: Add cancellation signals (caller abort + timeout when supported)
+  const abortSignals: AbortSignal[] = [];
+  if (signal) {
+    abortSignals.push(signal);
+  }
   if (timeout && typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
     // @ts-ignore - AbortSignal.timeout is not in all TypeScript versions
-    init.signal = AbortSignal.timeout(timeout);
+    abortSignals.push(AbortSignal.timeout(timeout));
+  }
+  if (abortSignals.length === 1) {
+    init.signal = abortSignals[0];
+  } else if (
+    abortSignals.length > 1 &&
+    typeof AbortSignal !== 'undefined' &&
+    'any' in AbortSignal
+  ) {
+    // @ts-ignore - AbortSignal.any is not in all TypeScript versions
+    init.signal = AbortSignal.any(abortSignals);
   }
 
   return { url: fullUrl, init };

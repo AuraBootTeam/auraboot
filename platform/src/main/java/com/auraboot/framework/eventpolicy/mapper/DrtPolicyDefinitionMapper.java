@@ -25,6 +25,44 @@ public interface DrtPolicyDefinitionMapper extends BaseMapper<DrtPolicyDefinitio
             @Param("tenantId") Long tenantId,
             @Param("policyCode") String policyCode);
 
+    @Select("SELECT COUNT(*) FROM ab_drt_policy_definition WHERE tenant_id = #{tenantId}")
+    long countByTenant(@Param("tenantId") Long tenantId);
+
+    /**
+     * List definitions for the governance console with optional filters.
+     */
+    @Select("""
+            <script>
+            SELECT * FROM ab_drt_policy_definition
+            WHERE tenant_id = #{tenantId}
+            <if test="keyword != null and keyword != ''">
+              AND (
+                LOWER(policy_code) LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+                OR LOWER(policy_name) LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+                OR LOWER(event_type) LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+                OR LOWER(target_type) LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+                OR LOWER(target_key) LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+              )
+            </if>
+            <if test="eventType != null and eventType != ''">
+              AND event_type = #{eventType}
+            </if>
+            <if test="targetType != null and targetType != ''">
+              AND target_type = #{targetType}
+            </if>
+            <if test="targetKey != null and targetKey != ''">
+              AND target_key = #{targetKey}
+            </if>
+            ORDER BY updated_at DESC, id DESC
+            </script>
+            """)
+    List<DrtPolicyDefinitionEntity> listDefinitions(
+            @Param("tenantId") Long tenantId,
+            @Param("keyword") String keyword,
+            @Param("eventType") String eventType,
+            @Param("targetType") String targetType,
+            @Param("targetKey") String targetKey);
+
     /**
      * Find all enabled definitions matching a given (tenant, event_type, target_type, target_key).
      * target_type and target_key may be null for wildcard match; this query requires exact match.

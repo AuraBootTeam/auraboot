@@ -729,6 +729,21 @@ public final class MetaPermission {
      */
     public static final String DRT_RUNTIME_EVALUATE = "decision.runtime.evaluate";
 
+    /**
+     * Decision Runtime rollout management permission (create, activate, pause rollout policies).
+     */
+    public static final String DRT_ROLLOUT_MANAGE = "decision.rollout.manage";
+
+    /**
+     * Decision Runtime rollout promote permission (promote candidate to full serving traffic).
+     */
+    public static final String DRT_ROLLOUT_PROMOTE = "decision.rollout.promote";
+
+    /**
+     * Decision Runtime rollout rollback permission (force serving traffic back to baseline).
+     */
+    public static final String DRT_ROLLOUT_ROLLBACK = "decision.rollout.rollback";
+
     // ==================== EVENT POLICY permissions ====================
     // NOTE: These are for the EventPolicy module (ab_drt_policy_* tables, /api/event-policy).
     // They are DISTINCT from the decision.definition.* permissions above which belong to the

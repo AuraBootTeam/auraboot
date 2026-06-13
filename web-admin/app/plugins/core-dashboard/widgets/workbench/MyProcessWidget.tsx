@@ -89,7 +89,7 @@ export function MyProcessWidget({
   const hasMore = filteredProcesses.length > maxItems;
 
   const handleProcessClick = (process: ProcessInstance) => {
-    window.location.href = `/bpm/process/${process.instanceId}`;
+    window.location.href = `/bpm/process-status?processInstanceId=${encodeURIComponent(process.instanceId)}`;
   };
 
   // --- Header ---
@@ -133,7 +133,7 @@ export function MyProcessWidget({
   // --- Skeleton loading ---
   if (loading) {
     return (
-      <div className={`flex h-full flex-col ${className}`}>
+      <div data-testid="my-process-widget" className={`flex h-full flex-col ${className}`}>
         {renderHeader()}
         {renderFilters()}
         <div className="flex-1 space-y-2">
@@ -155,7 +155,7 @@ export function MyProcessWidget({
   // --- Empty state ---
   if (displayedProcesses.length === 0) {
     return (
-      <div className={`flex h-full flex-col ${className}`}>
+      <div data-testid="my-process-widget" className={`flex h-full flex-col ${className}`}>
         {renderHeader()}
         {renderFilters()}
         <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
@@ -170,7 +170,7 @@ export function MyProcessWidget({
 
   // --- Process list ---
   return (
-    <div className={`flex h-full flex-col ${className}`}>
+    <div data-testid="my-process-widget" className={`flex h-full flex-col ${className}`}>
       {renderHeader()}
       {renderFilters()}
       <div className="flex-1 space-y-2 overflow-y-auto">
@@ -181,6 +181,7 @@ export function MyProcessWidget({
           return (
             <button
               key={process.instanceId}
+              data-testid={`my-process-row-${process.instanceId}`}
               type="button"
               onClick={() => handleProcessClick(process)}
               className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-gray-100 bg-white p-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/30"

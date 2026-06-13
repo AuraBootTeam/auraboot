@@ -11,8 +11,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -100,6 +102,81 @@ class UserEngagementServiceImplTest {
 
         service.upsert(1L, 2L, dto);
         verify(engagementMapper, times(2)).deleteById(anyLong());
+    }
+
+    @Test
+    void upsert_recentViewAssignsTimestampsBeforePrune() {
+        when(engagementMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        AtomicReference<UserEngagement> inserted = new AtomicReference<>();
+        doAnswer(invocation -> {
+            UserEngagement entity = invocation.getArgument(0);
+            entity.setId(999L);
+            inserted.set(entity);
+            return 1;
+        }).when(engagementMapper).insert(any(UserEngagement.class));
+
+        OffsetDateTime base = OffsetDateTime.now().minusDays(30);
+        List<UserEngagement> existing = new ArrayList<>();
+        IntStream.range(0, 20).forEach(i -> {
+            UserEngagement old = entity((long) (1000 + i));
+            old.setEngagementType("recent_view");
+            old.setCreatedAt(base.plusDays(i));
+            old.setUpdatedAt(base.plusDays(i));
+            existing.add(old);
+        });
+        when(engagementMapper.selectList(any(LambdaQueryWrapper.class))).thenAnswer(invocation -> {
+            List<UserEngagement> all = new ArrayList<>(existing);
+            all.add(inserted.get());
+            return all;
+        });
+
+        UserEngagementDTO dto = new UserEngagementDTO();
+        dto.setTargetType("page");
+        dto.setTargetId("new-recent");
+        dto.setEngagementType("recent_view");
+
+        service.upsert(1L, 2L, dto);
+
+        assertNotNull(inserted.get().getCreatedAt(), "new recent record must have createdAt before pruning");
+        assertNotNull(inserted.get().getUpdatedAt(), "new recent record must have updatedAt before pruning");
+        verify(engagementMapper, never()).deleteById(999L);
+    }
+
+    @Test
+    void upsert_recentViewPrunesNullTimestampHistoryBeforeNewRecord() {
+        when(engagementMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        AtomicReference<UserEngagement> inserted = new AtomicReference<>();
+        doAnswer(invocation -> {
+            UserEngagement entity = invocation.getArgument(0);
+            entity.setId(999L);
+            inserted.set(entity);
+            return 1;
+        }).when(engagementMapper).insert(any(UserEngagement.class));
+
+        List<UserEngagement> all = new ArrayList<>();
+        IntStream.range(0, 20).forEach(i -> {
+            UserEngagement old = entity((long) (1000 + i));
+            old.setEngagementType("recent_view");
+            old.setCreatedAt(null);
+            old.setUpdatedAt(null);
+            all.add(old);
+        });
+        when(engagementMapper.selectList(any(LambdaQueryWrapper.class))).thenAnswer(invocation -> {
+            List<UserEngagement> rows = new ArrayList<>();
+            rows.add(inserted.get());
+            rows.addAll(all);
+            return rows;
+        });
+
+        UserEngagementDTO dto = new UserEngagementDTO();
+        dto.setTargetType("page");
+        dto.setTargetId("new-recent");
+        dto.setEngagementType("recent_view");
+
+        service.upsert(1L, 2L, dto);
+
+        verify(engagementMapper, never()).deleteById(999L);
+        verify(engagementMapper).deleteById(1000L);
     }
 
     @Test

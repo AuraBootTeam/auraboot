@@ -42,6 +42,10 @@ interface DictItem {
   extension?: Record<string, any>;
 }
 
+const DEFAULT_COLUMN_WIDTH = 160;
+const SELECTION_COLUMN_WIDTH = 40;
+const ACTION_COLUMN_WIDTH = 112;
+
 export interface ListTableProps {
   columns: ColumnConfig[];
   data: Record<string, any>[];
@@ -114,6 +118,47 @@ export const ListTable = React.memo(function ListTable({
   const effectiveRowHeight = rowHeight || DEFAULT_ROW_HEIGHT;
   const rowHeightCfg = ROW_HEIGHT_CONFIG[effectiveRowHeight];
 
+  const getColumnWidth = useCallback(
+    (column: ColumnConfig) => {
+      const configuredWidth = columnWidths[column.field] ?? column.width;
+      const numericWidth =
+        typeof configuredWidth === 'number'
+          ? configuredWidth
+          : Number(configuredWidth);
+      return Number.isFinite(numericWidth) && numericWidth > 0
+        ? numericWidth
+        : DEFAULT_COLUMN_WIDTH;
+    },
+    [columnWidths],
+  );
+
+  const getCellStyle = useCallback(
+    (column: ColumnConfig): React.CSSProperties => {
+      const width = getColumnWidth(column);
+      return {
+        width: `${width}px`,
+        maxWidth: `${width}px`,
+      };
+    },
+    [getColumnWidth],
+  );
+
+  const renderReadOnlyCellContent = useCallback(
+    (record: Record<string, any>, column: ColumnConfig, rowIndex: number) => {
+      const rawValue = record[column.field];
+      const title =
+        typeof rawValue === 'string' || typeof rawValue === 'number'
+          ? String(rawValue)
+          : undefined;
+      return (
+        <div className="min-w-0 max-w-full truncate" title={title}>
+          {renderCellContent(record, column, rowIndex)}
+        </div>
+      );
+    },
+    [renderCellContent],
+  );
+
   // Separate action column from data columns, then order data columns
   const { orderedDataColumns, actionColumn } = useMemo(() => {
     const actionCol = columns.find((c) => c.isActionColumn);
@@ -137,6 +182,19 @@ export const ListTable = React.memo(function ListTable({
     () => orderedDataColumns.map((col) => col.field),
     [orderedDataColumns],
   );
+
+  const actionColumnWidth = actionColumn
+    ? getColumnWidth({ ...actionColumn, width: actionColumn.width ?? ACTION_COLUMN_WIDTH })
+    : 0;
+
+  const tableMinWidth = useMemo(() => {
+    const selectionWidth = enableSelection ? SELECTION_COLUMN_WIDTH : 0;
+    const dataWidth = orderedDataColumns.reduce(
+      (sum, column) => sum + getColumnWidth(column),
+      0,
+    );
+    return selectionWidth + dataWidth + actionColumnWidth;
+  }, [actionColumnWidth, enableSelection, getColumnWidth, orderedDataColumns]);
 
   // DnD sensors — PointerSensor with distance threshold to avoid accidental drags
   const sensors = useSensors(
@@ -201,7 +259,20 @@ export const ListTable = React.memo(function ListTable({
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
-          <table className="min-w-full divide-y divide-gray-200">
+          <table
+            className="min-w-full table-fixed divide-y divide-gray-200"
+            style={{ minWidth: `${tableMinWidth}px` }}
+          >
+            <colgroup>
+              {enableSelection && <col style={{ width: `${SELECTION_COLUMN_WIDTH}px` }} />}
+              {orderedDataColumns.map((column) => (
+                <col
+                  key={column.field}
+                  style={{ width: `${getColumnWidth(column)}px` }}
+                />
+              ))}
+              {actionColumn && <col style={{ width: `${actionColumnWidth}px` }} />}
+            </colgroup>
             <thead className={`bg-gray-50 ${enableVirtualization ? 'sticky top-0 z-20' : ''}`}>
               <tr>
                 {enableSelection && (
@@ -223,7 +294,7 @@ export const ListTable = React.memo(function ListTable({
                 {orderedDataColumns.map((column) => {
                   const sortInfo = activeSorts.find((s) => s.fieldCode === column.field);
                   const isSortable = column.sortable !== false;
-                  const colWidth = columnWidths[column.field] ?? column.width;
+                  const colWidth = getColumnWidth(column);
 
                   return (
                     <DraggableColumnHeader
@@ -374,8 +445,9 @@ export const ListTable = React.memo(function ListTable({
                           const tdFrozenRight = tdFrozenPos === 'right';
                           return (
                             <td
-                              key={column.field}
-                              data-testid={`table-cell-${index}-${column.field}`}
+                      key={column.field}
+                      style={getCellStyle(column)}
+                      data-testid={`table-cell-${index}-${column.field}`}
                               className={`px-6 ${rowHeightCfg.pyClass} text-sm whitespace-nowrap text-gray-700 ${
                                 column.align === 'right'
                                   ? 'text-right'
@@ -406,14 +478,19 @@ export const ListTable = React.memo(function ListTable({
                                   {renderCellContent(record, column, index)}
                                 </InlineEditCell>
                               ) : (
-                                renderCellContent(record, column, index)
+                                renderReadOnlyCellContent(record, column, index)
                               )}
                             </td>
                           );
                         })}
                         {actionColumn && (
                           <td
-                            className={`px-2 ${rowHeightCfg.pyClass} sticky right-0 z-10 w-px border-l border-gray-200 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)] group-hover:bg-gray-50`}
+                            data-testid={`table-cell-${index}-actions`}
+                            className={`px-2 ${rowHeightCfg.pyClass} sticky right-0 z-10 border-l border-gray-200 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)] group-hover:bg-gray-50`}
+                            style={{
+                              width: `${actionColumnWidth}px`,
+                              maxWidth: `${actionColumnWidth}px`,
+                            }}
                           >
                             <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
                               <RowActionButtons
@@ -483,6 +560,7 @@ export const ListTable = React.memo(function ListTable({
                           return (
                             <td
                               key={column.field}
+                              style={getCellStyle(column)}
                               data-testid={`table-cell-${index}-${column.field}`}
                               className={`px-6 ${rowHeightCfg.pyClass} text-sm whitespace-nowrap text-gray-700 ${
                                 column.align === 'right'
@@ -514,7 +592,7 @@ export const ListTable = React.memo(function ListTable({
                                   {renderCellContent(record, column, index)}
                                 </InlineEditCell>
                               ) : (
-                                renderCellContent(record, column, index)
+                                renderReadOnlyCellContent(record, column, index)
                               )}
                             </td>
                           );
@@ -523,7 +601,12 @@ export const ListTable = React.memo(function ListTable({
                         {/* Action column cell */}
                         {actionColumn && (
                           <td
-                            className={`px-2 ${rowHeightCfg.pyClass} sticky right-0 z-10 w-px border-l border-gray-200 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)] group-hover:bg-gray-50`}
+                            data-testid={`table-cell-${index}-actions`}
+                            className={`px-2 ${rowHeightCfg.pyClass} sticky right-0 z-10 border-l border-gray-200 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)] group-hover:bg-gray-50`}
+                            style={{
+                              width: `${actionColumnWidth}px`,
+                              maxWidth: `${actionColumnWidth}px`,
+                            }}
                           >
                             <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
                               <RowActionButtons

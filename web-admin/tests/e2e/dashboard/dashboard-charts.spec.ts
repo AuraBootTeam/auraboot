@@ -193,12 +193,17 @@ test.describe('Dashboard Charts - Adding New Widgets', () => {
       return;
     }
 
+    const beforeCount = await designerPage.getWidgetCount();
+
     // Use addWidget which has retry logic for click-to-add
     await designerPage.addWidget('漏斗图');
 
-    // Verify widget was added to canvas
-    const widgetCount = await designerPage.getWidgetCount();
-    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    await expect
+      .poll(() => designerPage.getWidgetCount(), { timeout: 5000 })
+      .toBe(beforeCount + 1);
+    await expect(designerPage.canvas.locator('[data-widget-type="smart-funnel-chart"]')).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   /**
@@ -503,20 +508,11 @@ test.describe('Dashboard Charts - Widget Categories', () => {
       '数据表格',
     ];
 
-    let foundCount = 0;
     for (const widgetLabel of expectedWidgets) {
       const widget = designerPage.paletteItem(widgetLabel);
-      const isVisible = await widget.isVisible({ timeout: 2000 }).catch(() => false);
-      if (isVisible) foundCount++;
-    }
-
-    // At least the original 5 widgets should be present (number card, bar, line, pie, area)
-    expect(foundCount).toBeGreaterThanOrEqual(5);
-
-    // Ideally all 9 should be present including the 4 new ones
-    // Log the count for debugging
-    if (foundCount < expectedWidgets.length) {
-      console.log(`Found ${foundCount}/${expectedWidgets.length} expected widgets in palette`);
+      await expect(widget, `palette should include ${widgetLabel}`).toBeVisible({
+        timeout: 5000,
+      });
     }
   });
 });

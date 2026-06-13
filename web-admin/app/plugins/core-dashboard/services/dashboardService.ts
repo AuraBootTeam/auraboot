@@ -196,6 +196,7 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
     'icon',
     'label',
     'trend',
+    'shortcuts',
   ] as const) {
     if (rawConfig[key] !== undefined) {
       (passthrough as Record<string, unknown>)[key] = rawConfig[key];

@@ -32,6 +32,96 @@ class JsonToBpmnConverterTest {
         bpmnToJson = new BpmnToJsonConverter(objectMapper);
     }
 
+    @Test
+    @DisplayName("should emit rule-center binding smart property for BPM user task assignment")
+    void shouldEmitRuleBindingForUserTaskAssignment() {
+        String json = """
+            {
+              "key": "rule-assignment",
+              "name": "Rule Assignment",
+              "nodes": [
+                {"id": "start", "type": "startEvent", "data": {"type": "startEvent"}},
+                {"id": "task", "type": "userTask", "data": {
+                  "type": "userTask",
+                  "label": "Assign",
+                  "config": {
+                    "assignmentRuleBinding": {
+                      "consumerType": "BPM",
+                      "consumerCode": "rule-assignment",
+                      "consumerNodeId": "task",
+                      "bindingKind": "DECISION_REF",
+                      "decisionBinding": {
+                        "decisionCode": "task_assignee",
+                        "versionPolicy": "LATEST_PUBLISHED",
+                        "inputMappings": [],
+                        "fallbackPolicy": {"mode": "FAIL_CLOSED"},
+                        "enabled": true
+                      },
+                      "enabled": true
+                    }
+                  }
+                }},
+                {"id": "end", "type": "endEvent", "data": {"type": "endEvent"}}
+              ],
+              "edges": [
+                {"id": "e1", "source": "start", "target": "task", "data": {}},
+                {"id": "e2", "source": "task", "target": "end", "data": {}}
+              ]
+            }
+            """;
+
+        String xml = jsonToBpmn.convert(json);
+
+        assertTrue(xml.contains("name=\"aura.ruleBinding\""), xml);
+        assertTrue(xml.contains("&quot;decisionCode&quot;:&quot;task_assignee&quot;"), xml);
+        assertTrue(xml.contains("&quot;consumerNodeId&quot;:&quot;task&quot;"), xml);
+    }
+
+    @Test
+    @DisplayName("should emit rule-center binding smart property for gateway")
+    void shouldEmitRuleBindingForGateway() {
+        String json = """
+            {
+              "key": "rule-gateway",
+              "name": "Rule Gateway",
+              "nodes": [
+                {"id": "start", "type": "startEvent", "data": {"type": "startEvent"}},
+                {"id": "gw", "type": "exclusiveGateway", "data": {
+                  "type": "exclusiveGateway",
+                  "config": {
+                    "ruleBinding": {
+                      "consumerType": "BPM",
+                      "consumerCode": "rule-gateway",
+                      "consumerNodeId": "gw",
+                      "bindingKind": "DECISION_REF",
+                      "decisionBinding": {
+                        "decisionCode": "approval_routing",
+                        "versionPolicy": "LATEST_PUBLISHED",
+                        "inputMappings": [],
+                        "fallbackPolicy": {"mode": "FAIL_CLOSED"},
+                        "enabled": true
+                      },
+                      "enabled": true
+                    }
+                  }
+                }},
+                {"id": "end", "type": "endEvent", "data": {"type": "endEvent"}}
+              ],
+              "edges": [
+                {"id": "e1", "source": "start", "target": "gw", "data": {}},
+                {"id": "e2", "source": "gw", "target": "end", "data": {"condition": {"type": "expression", "content": "decision.matched == true"}}}
+              ]
+            }
+            """;
+
+        String xml = jsonToBpmn.convert(json);
+
+        assertTrue(xml.contains("<exclusiveGateway id=\"gw\""), xml);
+        assertTrue(xml.contains("name=\"aura.ruleBinding\""), xml);
+        assertTrue(xml.contains("&quot;decisionCode&quot;:&quot;approval_routing&quot;"), xml);
+        assertTrue(xml.contains("decision.matched == true"), xml);
+    }
+
     // ==================== Simple Linear Process ====================
 
     @Nested

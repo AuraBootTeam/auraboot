@@ -5,8 +5,10 @@ import com.auraboot.smart.framework.engine.context.ExecutionContext;
 import com.auraboot.smart.framework.engine.listener.Listener;
 import com.auraboot.smart.framework.engine.pvm.event.EventConstant;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
+import com.auraboot.framework.bpm.extension.BpmExtensionAccessor;
 import com.auraboot.framework.bpm.event.EventBusService;
 import com.auraboot.framework.bpm.service.BpmNodeHookService;
+import com.auraboot.framework.bpm.service.BpmRuleBindingRuntimeService;
 import com.auraboot.framework.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +31,8 @@ public class ProcessEventListener implements Listener {
     private final BpmAuditService bpmAuditService;
     private final EventBusService eventBusService;
     private final BpmNodeHookService hookService;
+    private final BpmExtensionAccessor extensionAccessor;
+    private final BpmRuleBindingRuntimeService ruleBindingRuntimeService;
 
     @Override
     public void execute(EventConstant event, ExecutionContext executionContext) {
@@ -82,6 +86,10 @@ public class ProcessEventListener implements Listener {
                             String processKey = executionContext.getProcessInstance() != null
                                     ? executionContext.getProcessInstance().getProcessDefinitionId() : null;
                             if (processKey != null) {
+                                extensionAccessor.getRuleConsumerBinding(processKey, activityId)
+                                        .ifPresent(binding -> ruleBindingRuntimeService.evaluateAndApply(
+                                                binding, processKey, activityId, processInstanceId,
+                                                request != null ? request : Map.of()));
                                 BpmNodeHookService.HookExecutionResult preCheck =
                                         hookService.executePreChecks(processKey, activityId, request != null ? request : Map.of());
                                 if (!preCheck.passed()) {

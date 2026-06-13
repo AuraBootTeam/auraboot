@@ -103,7 +103,11 @@ function RenderedWidget({
 
   if (!Component) {
     return (
-      <div data-widget-id={widget.id} className="h-full flex items-center justify-center text-sm text-gray-400">
+      <div
+        data-widget-id={widget.id}
+        data-widget-type={widget.type}
+        className="h-full flex items-center justify-center text-sm text-gray-400"
+      >
         Unknown widget: {widget.type}
       </div>
     );
@@ -129,7 +133,7 @@ function RenderedWidget({
   };
 
   return (
-    <div data-widget-id={widget.id} className="h-full">
+    <div data-widget-id={widget.id} data-widget-type={widget.type} className="h-full">
       <Suspense
         fallback={
           <div className="flex h-full items-center justify-center text-sm text-gray-400">

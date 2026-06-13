@@ -29,6 +29,68 @@ class TestFixtureControllerRouteInboxTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Test
+    void approvalFixtureUsesExplicitUserIdWhenProvided() throws Exception {
+        TestFixtureController controller = new TestFixtureController();
+        ApplicationContext applicationContext = mock(ApplicationContext.class);
+        InboxService inboxService = mock(InboxService.class);
+        TenantService tenantService = mock(TenantService.class);
+        UserService userService = mock(UserService.class);
+
+        Tenant tenant = new Tenant();
+        tenant.setId(100L);
+        User fallbackUser = new User();
+        fallbackUser.setId(200L);
+        fallbackUser.setPid("01KUSER00000000000000000001");
+        fallbackUser.setEmail("e2e@test.local");
+
+        AtomicLong inboxIds = new AtomicLong(7100L);
+        when(applicationContext.containsBean("inboxService")).thenReturn(true);
+        when(applicationContext.getBean("inboxService")).thenReturn(inboxService);
+        when(tenantService.findByName("e2e_test")).thenReturn(tenant);
+        when(userService.findByEmail("e2e@test.local")).thenReturn(fallbackUser);
+        when(inboxService.createItem(any(InboxItem.class))).thenAnswer(invocation -> {
+            InboxItem item = invocation.getArgument(0);
+            item.setId(inboxIds.getAndIncrement());
+            return item;
+        });
+
+        ReflectionTestUtils.setField(controller, "applicationContext", applicationContext);
+        ReflectionTestUtils.setField(controller, "tenantService", tenantService);
+        ReflectionTestUtils.setField(controller, "userService", userService);
+
+        FixtureResult result = ReflectionTestUtils.invokeMethod(
+                controller,
+                "createInboxItemsWithType",
+                "approval_run",
+                Map.of(
+                        "count", 1,
+                        "tenantId", 100L,
+                        "userId", 300L
+                ),
+                null,
+                "approval",
+                "high",
+                "E2E Approval Request"
+        );
+
+        assertNotNull(result);
+        assertTrue(result.isSuccess());
+        assertEquals(List.of("7100"), result.getRecordIds());
+        assertEquals("100", result.getMetadata().get("tenantId"));
+        assertEquals("300", result.getMetadata().get("userId"));
+
+        ArgumentCaptor<InboxItem> itemCaptor = ArgumentCaptor.forClass(InboxItem.class);
+        verify(inboxService).createItem(itemCaptor.capture());
+        InboxItem item = itemCaptor.getValue();
+        assertEquals(100L, item.getTenantId());
+        assertEquals(300L, item.getUserId());
+        assertEquals("approval", item.getItemType());
+        assertEquals("high", item.getPriority());
+        assertEquals("pending", item.getStatus());
+        assertEquals("E2E Approval Request [approval_run-1]", item.getTitle());
+    }
+
+    @Test
     void inboxRouteFixtureCreatesDeepLinkedInboxCardWithActions() throws Exception {
         TestFixtureController controller = new TestFixtureController();
         ApplicationContext applicationContext = mock(ApplicationContext.class);

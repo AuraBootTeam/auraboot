@@ -207,9 +207,24 @@ export async function fillNodeConfig(
   await page.locator(`[data-testid="flow-node-${nodeId}"]`).click();
   for (const [key, value] of Object.entries(fields)) {
     const field = page.locator(`[data-testid="prop-field-${key}"]`);
-    await field.waitFor({ state: 'visible' });
+    await ensurePropertyFieldVisible(page, field);
     await fillOneField(page, field, value);
   }
+}
+
+async function ensurePropertyFieldVisible(page: Page, field: Locator): Promise<void> {
+  if (await field.isVisible().catch(() => false)) return;
+  await expandCollapsedPropertyGroups(page);
+  await field.waitFor({ state: 'visible' });
+}
+
+async function expandCollapsedPropertyGroups(page: Page): Promise<void> {
+  const toggles = page.locator('[data-testid^="prop-group-toggle-"][aria-expanded="false"]');
+  for (let guard = 0; guard < 20; guard += 1) {
+    if ((await toggles.count()) === 0) return;
+    await toggles.first().click();
+  }
+  throw new Error('too many collapsed property groups to expand');
 }
 
 /**

@@ -1,6 +1,8 @@
 package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
+import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.rbac.entity.RolePermission;
@@ -17,11 +19,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.postgresql.util.PGobject;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -44,6 +50,12 @@ class PermissionPolicyServiceImplTest {
 
     @Mock
     private UserRoleService userRoleService;
+
+    @Mock
+    private ObjectProvider<DecisionUsageIndexService> usageIndexServiceProvider;
+
+    @Mock
+    private DecisionUsageIndexService usageIndexService;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -154,6 +166,38 @@ class PermissionPolicyServiceImplTest {
     }
 
     @Test
+    void getPolicySchemaReturnsParsedMapFromPgObject() throws SQLException {
+        PGobject policySchema = new PGobject();
+        policySchema.setType("jsonb");
+        policySchema.setValue("{\"dynamicAbac\":{\"type\":\"rule-center\"}}");
+        Permission perm = new Permission();
+        perm.setPolicySchema(policySchema);
+        when(permissionMapper.findByCode("function.case.approve")).thenReturn(perm);
+
+        Map<String, Object> schema = service.getPolicySchema("function.case.approve");
+
+        assertThat(schema).containsKey("dynamicAbac");
+        assertThat(schema.get("dynamicAbac")).isInstanceOf(Map.class);
+        assertThat(((Map<?, ?>) schema.get("dynamicAbac")).get("type")).isEqualTo("rule-center");
+    }
+
+    @Test
+    void getPolicySchemaReturnsParsedMapFromJsonbMapWrapper() {
+        Permission perm = new Permission();
+        perm.setPolicySchema(Map.of(
+                "type", "jsonb",
+                "value", "{\"dynamicAbac\":{\"type\":\"rule-center\"}}",
+                "null", false));
+        when(permissionMapper.findByCode("function.case.approve")).thenReturn(perm);
+
+        Map<String, Object> schema = service.getPolicySchema("function.case.approve");
+
+        assertThat(schema).containsKey("dynamicAbac");
+        assertThat(schema.get("dynamicAbac")).isInstanceOf(Map.class);
+        assertThat(((Map<?, ?>) schema.get("dynamicAbac")).get("type")).isEqualTo("rule-center");
+    }
+
+    @Test
     void setPolicyWritesJsonViaMapper() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
@@ -164,6 +208,43 @@ class PermissionPolicyServiceImplTest {
         ArgumentCaptor<String> jsonCap = ArgumentCaptor.forClass(String.class);
         verify(rolePermissionMapper).updateConditionsById(eq(900L), jsonCap.capture());
         assertThat(jsonCap.getValue()).contains("\"maxAmount\":1000");
+    }
+
+    @Test
+    void setPolicyValidatesRuleCenterAbacAndRefreshesPermissionPolicyUsageIndex() {
+        RolePermission rp = new RolePermission();
+        rp.setId(900L);
+        rp.setPid("rp-abac-900");
+        when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+        when(usageIndexServiceProvider.getIfAvailable()).thenReturn(usageIndexService);
+
+        service.setPolicy(7L, 50L, Map.of("dynamicAbac", Map.of(
+                "decisionBinding", Map.of(
+                        "decisionCode", "permission_amount_guard",
+                        "versionPolicy", "LATEST_PUBLISHED",
+                        "timeoutMs", 50,
+                        "fallbackPolicy", Map.of("mode", "FAIL_CLOSED")),
+                "expectedMatched", true)));
+
+        ArgumentCaptor<String> jsonCap = ArgumentCaptor.forClass(String.class);
+        verify(rolePermissionMapper).updateConditionsById(eq(900L), jsonCap.capture());
+        assertThat(jsonCap.getValue()).contains("\"decisionCode\":\"permission_amount_guard\"");
+        verify(usageIndexService).refreshSource("PERMISSION_POLICY", "rp-abac-900");
+    }
+
+    @Test
+    void setPolicyRejectsInvalidRuleCenterAbacShape() {
+        RolePermission rp = new RolePermission();
+        rp.setId(900L);
+        rp.setPid("rp-abac-900");
+        when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+
+        assertThatThrownBy(() -> service.setPolicy(7L, 50L, Map.of("dynamicAbac", Map.of(
+                "decisionBinding", Map.of("versionPolicy", "LATEST_PUBLISHED")))))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessageContaining("decisionCode is required");
+
+        verify(rolePermissionMapper, never()).updateConditionsById(anyLong(), anyString());
     }
 
     @Test

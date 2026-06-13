@@ -11,7 +11,12 @@ const FIELDS: FieldOption[] = [
 
 function Harness({ initial }: { initial: GroupNode }) {
   const [v, setV] = useState<GroupNode>(initial);
-  return <ConditionBuilder value={v} fields={FIELDS} onChange={setV} />;
+  return (
+    <>
+      <ConditionBuilder value={v} fields={FIELDS} onChange={setV} />
+      <pre data-testid="dump">{JSON.stringify(v)}</pre>
+    </>
+  );
 }
 
 const oneHighPriority = (): GroupNode =>
@@ -72,5 +77,70 @@ describe('ConditionBuilder', () => {
     render(<Harness initial={group('AND', [])} />);
     expect(screen.getByTestId('cb-empty')).toBeInTheDocument();
     expect(screen.getByTestId('cb-preview')).toHaveTextContent('—');
+  });
+
+  it('authors nested OR groups and NOT wrappers', () => {
+    render(<Harness initial={oneHighPriority()} />);
+
+    fireEvent.click(screen.getByTestId('cb-add-group'));
+    expect(screen.getByTestId('cb-group-1')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('op-or-1'));
+    fireEvent.change(screen.getByLabelText('field-1-0'), {
+      target: { value: 'record:data.amount' },
+    });
+    fireEvent.change(screen.getByLabelText('operator-1-0'), {
+      target: { value: 'GT' },
+    });
+    fireEvent.change(screen.getByLabelText('value-1-0'), {
+      target: { value: '5000' },
+    });
+    fireEvent.click(screen.getByTestId('cb-add-1'));
+    fireEvent.change(screen.getByLabelText('field-1-1'), {
+      target: { value: 'record:data.priority' },
+    });
+    fireEvent.change(screen.getByLabelText('value-1-1'), {
+      target: { value: 'HIGH' },
+    });
+
+    fireEvent.click(screen.getByTestId('cb-add-not'));
+    expect(screen.getByTestId('cb-not-2')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('field-2-0'), {
+      target: { value: 'record:data.priority' },
+    });
+    fireEvent.change(screen.getByLabelText('value-2-0'), {
+      target: { value: 'LOW' },
+    });
+
+    expect(screen.getByTestId('cb-preview')).toHaveTextContent('或');
+    expect(screen.getByTestId('cb-preview')).toHaveTextContent('非');
+
+    const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as GroupNode;
+    expect(dump.children[1]).toMatchObject({
+      type: 'group',
+      op: 'OR',
+      children: [
+        {
+          type: 'compare',
+          operator: 'GT',
+          left: { scope: 'record', path: 'data.amount' },
+          right: { value: '5000' },
+        },
+        {
+          type: 'compare',
+          operator: 'EQ',
+          left: { scope: 'record', path: 'data.priority' },
+          right: { value: 'HIGH' },
+        },
+      ],
+    });
+    expect(dump.children[2]).toMatchObject({
+      type: 'not',
+      child: {
+        type: 'compare',
+        operator: 'EQ',
+        left: { scope: 'record', path: 'data.priority' },
+        right: { value: 'LOW' },
+      },
+    });
   });
 });

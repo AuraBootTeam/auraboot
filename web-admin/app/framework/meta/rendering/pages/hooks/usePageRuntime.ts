@@ -100,7 +100,8 @@ export function usePageRuntime(
           showToast,
           locale,
           t,
-          disableAutoFetch: true,
+          disableAutoFetch: false,
+          skipDataSourceRegistration: true,
         },
   );
 

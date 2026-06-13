@@ -89,6 +89,19 @@ describe('ListToolbar i18n', () => {
     expect(input.placeholder).toBe('搜索...');
   });
 
+  it('keeps toolbar controls responsive on narrow list pages', () => {
+    renderToolbar();
+    const toolbar = screen.getByTestId('list-toolbar');
+    const input = screen.getByTestId('list-search-input');
+    const inputWrap = input.parentElement;
+    const quickFilters = screen.getByTestId('quick-filters');
+
+    expect(toolbar).toHaveClass('flex-wrap');
+    expect(inputWrap).toHaveClass('basis-full');
+    expect(input).toHaveClass('w-full');
+    expect(quickFilters).toHaveClass('overflow-x-auto');
+  });
+
   it('renders Add Filter chip-bar button from common.add_filter', () => {
     renderToolbar();
     expect(screen.getByText(/\+ 添加筛选/)).toBeInTheDocument();

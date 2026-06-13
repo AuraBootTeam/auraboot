@@ -72,6 +72,55 @@ interface SelectedFieldInfo {
   fieldRef: DslFieldRef;
 }
 
+function createDefaultBlock(blockType: BlockType, idPrefix = 'block'): DslBlock {
+  const newBlock: DslBlock = {
+    id: `${idPrefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    blockType,
+    span: blockType === 'table' ? 12 : undefined,
+  };
+
+  switch (blockType) {
+    case 'filters':
+      newBlock.fields = [];
+      newBlock.actions = ['search', 'reset'];
+      break;
+    case 'form-section':
+    case 'detail-section':
+      newBlock.title = { 'zh-CN': '区段标题', 'en-US': 'Section Title' };
+      newBlock.fields = [];
+      break;
+    case 'table':
+      newBlock.columns = [];
+      newBlock.dataSource = 'tableData';
+      break;
+    case 'toolbar':
+    case 'form-buttons':
+      newBlock.buttons = [];
+      break;
+    case 'tabs':
+      newBlock.title = { 'zh-CN': '标签页', 'en-US': 'Tabs' };
+      newBlock.tabs = [
+        {
+          key: 'all',
+          label: { 'en-US': 'All', 'zh-CN': '全部' },
+          filter: null,
+        },
+      ];
+      break;
+    case 'custom':
+      newBlock.title = { 'zh-CN': '自定义区块', 'en-US': 'Custom Block' };
+      newBlock.component = 'decision-field-impact';
+      newBlock.props = {};
+      break;
+    case 'text':
+      newBlock.title = { 'en-US': 'Text', 'zh-CN': '文本内容' };
+      newBlock.props = { content: '' };
+      break;
+  }
+
+  return newBlock;
+}
+
 export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
   schema,
   onSchemaChange,
@@ -114,6 +163,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
   const [draggedBlock, setDraggedBlock] = useState<DslBlock | null>(null);
   const [draggedFieldName, setDraggedFieldName] = useState<string | null>(null);
   const latestSchemaRef = useRef<PageSchema>(schema);
+  const lastTabDropRef = useRef<{ signature: string; at: number } | null>(null);
 
   useEffect(() => {
     latestSchemaRef.current = schema;
@@ -146,6 +196,14 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
     [selectedBlockId, blocks],
   );
 
+  const resolvedSelectedFieldInfo = useMemo(() => {
+    if (!selectedFieldInfo) return null;
+    const block = blocks.find((b) => b.id === selectedFieldInfo.blockId);
+    const fieldRef = block?.fields?.[selectedFieldInfo.fieldIndex];
+    if (!fieldRef) return null;
+    return { ...selectedFieldInfo, fieldRef };
+  }, [blocks, selectedFieldInfo]);
+
   // Block IDs for SortableContext
   const blockIds = useMemo(() => blocks.map((b) => b.id), [blocks]);
 
@@ -155,42 +213,49 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
     (blockType: BlockType) => {
       if (readonly) return;
 
-      // ID combines timestamp + random suffix to avoid same-millisecond
-      // collisions (rapid sequential addBlock calls in tests / drag-spam).
-      // Same-id blocks confuse SortableContext + React reconciliation,
-      // resulting in stale render order vs blocks[] state.
-      const newBlock: DslBlock = {
-        id: `block_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        blockType,
-        span: blockType === 'table' ? 12 : undefined,
-      };
-
-      switch (blockType) {
-        case 'filters':
-          newBlock.fields = [];
-          newBlock.actions = ['search', 'reset'];
-          break;
-        case 'form-section':
-        case 'detail-section':
-          newBlock.title = { 'zh-CN': '区段标题', 'en-US': 'Section Title' };
-          newBlock.fields = [];
-          break;
-        case 'table':
-          newBlock.columns = [];
-          newBlock.dataSource = 'tableData';
-          break;
-        case 'toolbar':
-        case 'form-buttons':
-          newBlock.buttons = [];
-          break;
-      }
+      const newBlock = createDefaultBlock(blockType);
 
       const currentSchema = latestSchemaRef.current;
       const currentBlocks = currentSchema.blocks ?? [];
       commitSchema({ ...currentSchema, blocks: [...currentBlocks, newBlock] });
       setSelectedBlockId(newBlock.id);
     },
-    [commitSchema, readonly, l],
+    [commitSchema, readonly],
+  );
+
+  const appendBlockToTab = useCallback(
+    (parentBlockId: string, tabKey: string, blockType: BlockType) => {
+      if (readonly) return;
+
+      const signature = `${parentBlockId}:${tabKey}:${blockType}`;
+      const now = Date.now();
+      const lastDrop = lastTabDropRef.current;
+      if (lastDrop?.signature === signature && now - lastDrop.at < 250) return;
+      lastTabDropRef.current = { signature, at: now };
+
+      const currentSchema = latestSchemaRef.current;
+      const currentBlocks = currentSchema.blocks ?? [];
+      const parentIndex = currentBlocks.findIndex((block) => block.id === parentBlockId);
+      const parentBlock = currentBlocks[parentIndex];
+      if (!parentBlock || parentBlock.blockType !== 'tabs') return;
+
+      const nextChildBlock = createDefaultBlock(blockType, 'tab_child');
+      const nextTabs = (parentBlock.tabs ?? []).map((tab) =>
+        tab.key === tabKey
+          ? {
+              ...tab,
+              blocks: [...(Array.isArray(tab.blocks) ? tab.blocks : []), nextChildBlock],
+            }
+          : tab,
+      );
+      const nextBlocks = [...currentBlocks];
+      nextBlocks[parentIndex] = { ...parentBlock, tabs: nextTabs };
+
+      commitSchema({ ...currentSchema, blocks: nextBlocks });
+      setSelectedBlockId(parentBlockId);
+      setSelectedFieldInfo(null);
+    },
+    [commitSchema, readonly],
   );
 
   const removeBlock = useCallback(
@@ -396,6 +461,14 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
       // ── Drop from block library ──
       if (activeId.startsWith('library:')) {
         const blockType = activeId.replace('library:', '') as BlockType;
+        if (overId.startsWith('tab-child-drop:')) {
+          const [, parentBlockId, ...encodedTabKeyParts] = overId.split(':');
+          const tabKey = decodeURIComponent(encodedTabKeyParts.join(':'));
+          if (parentBlockId && tabKey) {
+            appendBlockToTab(parentBlockId, tabKey, blockType);
+          }
+          return;
+        }
         if (
           overId === 'blocks-canvas' ||
           overId.startsWith('block-drop:') ||
@@ -435,7 +508,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
         }
       }
     },
-    [blocks, addBlock, reorderBlocks, handleFieldDropToBlock, handleFieldReorder],
+    [blocks, addBlock, appendBlockToTab, reorderBlocks, handleFieldDropToBlock, handleFieldReorder],
   );
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -587,7 +660,9 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                         block={block}
                         isSelected={selectedBlockId === block.id}
                         selectedFieldInfo={
-                          selectedFieldInfo?.blockId === block.id ? selectedFieldInfo : null
+                          resolvedSelectedFieldInfo?.blockId === block.id
+                            ? resolvedSelectedFieldInfo
+                            : null
                         }
                         onSelect={() => handleBlockSelect(block.id)}
                         onDelete={() => removeBlock(block.id)}
@@ -622,7 +697,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
             <BlockPropertyPanel
               block={selectedBlock}
               modelCode={modelCode || schema.modelCode}
-              selectedFieldInfo={selectedFieldInfo}
+              selectedFieldInfo={resolvedSelectedFieldInfo}
               onChange={(updates) => {
                 if (selectedBlockId) updateBlock(selectedBlockId, updates);
               }}
@@ -631,6 +706,8 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
               readonly={readonly}
               isCustomApiMode={isCustomApiMode}
               dataSource={apiDataSource}
+              activeLibraryBlockType={draggedBlockType}
+              onDropLibraryBlockToTab={appendBlockToTab}
               onDataSourceChange={(ds) => {
                 commitSchema({ ...latestSchemaRef.current, dataSource: ds } as any);
               }}

@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { Client } from 'pg';
-import { PG_CONN } from '../../helpers/environments';
+import { BACKEND_URL, PG_CONN } from '../../helpers/environments';
 import { gotoAcpUiPage } from './route-helpers';
 import { findRowByContent } from '../helpers';
 
@@ -130,7 +130,7 @@ test.describe('A5: Agent approval close-loop (golden)', () => {
       // Seed into the admin's *login* tenant (the tenant the UI/command run in),
       // resolved from the login JWT — NOT the lowest ab_tenant_member row, which
       // is the system tenant and is not what the approval list/page shows.
-      const loginResp = await fetch(`${process.env.BACKEND_URL}/api/auth/login`, {
+      const loginResp = await fetch(`${BACKEND_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 'admin@auraboot.com', password: 'Test2026x' }),

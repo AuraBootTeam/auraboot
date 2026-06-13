@@ -48,4 +48,13 @@ describe('ExecutionLogViewer', () => {
     render(<ExecutionLogViewer logs={logs} initialStatus="SUCCESS" />);
     expect(screen.getByTestId('elv-count')).toHaveTextContent('2');
   });
+
+  it('opens an execution detail drawer from a log row', () => {
+    render(<ExecutionLogViewer logs={logs} />);
+    fireEvent.click(screen.getByTestId('elv-open-trace-bbb'));
+    expect(screen.getByTestId('elv-detail-drawer')).toHaveTextContent('trace-bbb');
+    expect(screen.getByTestId('elv-detail-drawer')).toHaveTextContent('FAILED_RETRYING');
+    expect(screen.getByTestId('elv-detail-drawer')).toHaveTextContent('CALL_CONNECTOR');
+    expect(screen.getByTestId('elv-detail-drawer')).toHaveTextContent('921ms');
+  });
 });

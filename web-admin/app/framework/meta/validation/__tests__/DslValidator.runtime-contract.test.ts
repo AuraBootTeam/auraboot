@@ -122,4 +122,147 @@ describe('DslValidator runtime contract compatibility', () => {
 
     expect(messages).toEqual([]);
   });
+
+  it('accepts DecisionOps typed custom blocks for DSL-hosted rollout workbench pages', () => {
+    const messages = validateStructure({
+      kind: 'list',
+      version: '1.0.0',
+      id: 'decisionops_rollouts',
+      title: 'Decision Rollouts',
+      layout: {
+        type: 'stack',
+      },
+      blocks: [
+        {
+          id: 'rollout_monitor',
+          blockType: 'custom',
+          component: 'DecisionRolloutMonitorBlock',
+          props: {
+            initialDecisionCode: 'complaint_sla_deadline',
+          },
+        },
+      ],
+    });
+
+    expect(messages).toEqual([]);
+  });
+
+  it('accepts DecisionOps typed custom blocks for DSL-hosted field impact pages', () => {
+    const messages = validateStructure({
+      kind: 'list',
+      version: '1.0.0',
+      id: 'decisionops_model_fields_impact_list',
+      title: 'Field Impact',
+      layout: {
+        type: 'stack',
+      },
+      extension: {
+        customOnly: true,
+        skipFieldMeta: true,
+      },
+      blocks: [
+        {
+          id: 'decision_field_impact',
+          blockType: 'custom',
+          component: 'DecisionFieldImpactBlock',
+          props: {
+            initialFieldRef: 'record.data.priority',
+            initialCurrentDataType: 'string',
+          },
+        },
+      ],
+    });
+
+    expect(messages).toEqual([]);
+  });
+
+  it('accepts DecisionOps rule binding custom block for DSL-hosted rule-center consumers', () => {
+    const messages = validateStructure({
+      kind: 'form',
+      version: '1.0.0',
+      id: 'automation_rule_binding_form',
+      title: 'Rule Binding',
+      layout: {
+        type: 'stack',
+      },
+      extension: {
+        customOnly: true,
+        skipFieldMeta: true,
+      },
+      blocks: [
+        {
+          id: 'rule_binding',
+          blockType: 'custom',
+          component: 'DecisionRuleBindingBlock',
+          props: {
+            mode: 'combined',
+            initialDecisionCode: 'approval_routing',
+          },
+        },
+      ],
+    });
+
+    expect(messages).toEqual([]);
+  });
+
+  it('accepts API-backed detail pages with record endpoint templates', () => {
+    const messages = validateStructure({
+      kind: 'detail',
+      version: '1.0.0',
+      id: 'decisionops_event_policies_detail',
+      title: {
+        'zh-CN': 'Event Policy 详情',
+        'en-US': 'Event Policy Detail',
+      },
+      layout: {
+        type: 'stack',
+      },
+      extension: {
+        dataSource: {
+          type: 'api',
+          endpoint: '/api/event-policy/definitions',
+          detailEndpoint: '/api/event-policy/definitions/{recordId}',
+          method: 'get',
+        },
+        skipFieldMeta: true,
+        showEdit: false,
+      },
+      blocks: [
+        {
+          id: 'event_policy_definition_overview',
+          blockType: 'form-section',
+          title: {
+            'zh-CN': '策略概览',
+            'en-US': 'Policy Overview',
+          },
+          fields: [
+            {
+              field: 'policyName',
+              label: {
+                'zh-CN': '策略',
+                'en-US': 'Policy',
+              },
+            },
+            {
+              field: 'policyCode',
+              label: {
+                'zh-CN': '策略编码',
+                'en-US': 'Policy Code',
+              },
+            },
+            {
+              field: 'enabled',
+              label: {
+                'zh-CN': '启用',
+                'en-US': 'Enabled',
+              },
+              component: 'switch',
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(messages).toEqual([]);
+  });
 });

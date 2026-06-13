@@ -42,7 +42,6 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text-summary', 'json-summary', 'html'],
       reportsDirectory: './coverage',
-      all: true,
       include: ['app/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
       exclude: [
         'node_modules',

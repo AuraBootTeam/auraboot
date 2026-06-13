@@ -142,6 +142,9 @@ public class FileServiceImpl implements FileService {
         if (entity != null) {
             return entity;
         }
+        if (!isNumericId(fileId)) {
+            return null;
+        }
         return fileMapper.selectById(fileId);
     }
 
@@ -153,7 +156,10 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional
     public boolean deleteFile(String fileId, Long userId) {
-        FileEntity fileEntity = fileMapper.selectById(fileId);
+        FileEntity fileEntity = findByPid(fileId);
+        if (fileEntity == null && isNumericId(fileId)) {
+            fileEntity = fileMapper.selectById(fileId);
+        }
         if (fileEntity == null) {
             throw new BusinessException("File not found: " + fileId);
         }
@@ -304,5 +310,9 @@ public class FileServiceImpl implements FileService {
         }
         int lastDotIndex = filename.lastIndexOf('.');
         return lastDotIndex > 0 ? filename.substring(lastDotIndex + 1) : "";
+    }
+
+    private boolean isNumericId(String value) {
+        return StringUtils.hasText(value) && value.chars().allMatch(Character::isDigit);
     }
 }

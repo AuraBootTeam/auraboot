@@ -54,7 +54,11 @@ export const SectionsTab: React.FC<SectionsTabProps> = ({ vm, setVm, fields, rea
   };
 
   const updateSection = (idx: number, patch: Partial<SectionConfig>) => {
-    const next = vm.sections.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+    const normalizedPatch: Partial<SectionConfig> = { ...patch };
+    if (Object.prototype.hasOwnProperty.call(patch, 'columns')) {
+      normalizedPatch.columns = normalizeColumns((patch as Record<string, unknown>).columns);
+    }
+    const next = vm.sections.map((s, i) => (i === idx ? { ...s, ...normalizedPatch } : s));
     setVm({ ...vm, sections: next });
   };
 
@@ -137,6 +141,7 @@ export const SectionsTab: React.FC<SectionsTabProps> = ({ vm, setVm, fields, rea
                     <button
                       className="flex min-w-0 flex-1 items-center gap-4 text-left"
                       onClick={() => setSelectedIdx(selectedIdx === i ? null : i)}
+                      data-testid={`section-select-${i}`}
                     >
                       <span className={cn(
                         'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-sm font-semibold',
@@ -158,6 +163,7 @@ export const SectionsTab: React.FC<SectionsTabProps> = ({ vm, setVm, fields, rea
                         onClick={() => moveSection(i, -1)}
                         disabled={i === 0 || readonly}
                         className="inline-flex items-center gap-1 rounded-2xl border border-slate-200 px-3 py-2 text-xs text-slate-600 disabled:cursor-not-allowed disabled:opacity-30"
+                        data-testid={`section-move-up-${i}`}
                       >
                         <ArrowUpIcon className="h-4 w-4" />
                         上移
@@ -166,6 +172,7 @@ export const SectionsTab: React.FC<SectionsTabProps> = ({ vm, setVm, fields, rea
                         onClick={() => moveSection(i, 1)}
                         disabled={i === vm.sections.length - 1 || readonly}
                         className="inline-flex items-center gap-1 rounded-2xl border border-slate-200 px-3 py-2 text-xs text-slate-600 disabled:cursor-not-allowed disabled:opacity-30"
+                        data-testid={`section-move-down-${i}`}
                       >
                         <ArrowDownIcon className="h-4 w-4" />
                         下移
@@ -174,6 +181,7 @@ export const SectionsTab: React.FC<SectionsTabProps> = ({ vm, setVm, fields, rea
                         onClick={() => removeSection(i)}
                         disabled={readonly}
                         className="inline-flex items-center gap-1 rounded-2xl border border-red-200 px-3 py-2 text-xs text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+                        data-testid={`section-remove-${i}`}
                       >
                         <TrashIcon className="h-4 w-4" />
                         删除
@@ -209,7 +217,7 @@ export const SectionsTab: React.FC<SectionsTabProps> = ({ vm, setVm, fields, rea
               </div>
               <SchemaBlockConfigPanel
                 schemas={sectionDetailSchemas}
-                value={selected as unknown as Record<string, unknown>}
+                value={{ ...selected, columns: String(selected.columns) } as unknown as Record<string, unknown>}
                 onChange={(next) => updateSection(selectedIdx, next as Partial<SectionConfig>)}
                 readonly={readonly}
               />
@@ -223,12 +231,15 @@ export const SectionsTab: React.FC<SectionsTabProps> = ({ vm, setVm, fields, rea
                     <label
                       key={f.code}
                       className="mb-2 flex cursor-pointer items-center gap-3 rounded-2xl border border-transparent bg-white px-3 py-2.5 text-sm last:mb-0 hover:border-slate-200"
+                      data-testid={`section-field-${f.code}`}
+                      data-field-code={f.code}
                     >
                       <input
                         type="checkbox"
                         checked={selected.fields.includes(f.code)}
                         onChange={() => toggleFieldInSection(selectedIdx, f.code)}
                         disabled={readonly}
+                        aria-label={f.code}
                       />
                       <span className="min-w-0">
                         <span className="block font-medium text-slate-900">{f.displayName ?? f.code}</span>
@@ -252,3 +263,9 @@ export const SectionsTab: React.FC<SectionsTabProps> = ({ vm, setVm, fields, rea
     </div>
   );
 };
+
+function normalizeColumns(value: unknown): SectionConfig['columns'] {
+  const n = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
+  if (n === 1 || n === 2 || n === 3 || n === 4) return n;
+  return 2;
+}

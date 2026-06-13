@@ -32,6 +32,7 @@ export type PropertyType =
   | 'process-select'
   | 'automation-select'
   | 'command-select'
+  | 'rule-binding'
   | 'localizedText'
   | 'icon'
   | 'array'
@@ -75,6 +76,17 @@ export interface PropertySchema<TLabel = string | I18nText> {
   optionSource?: 'fields' | 'dict';
   /** type='multiselect' optionSource='dict' only: explicit dict code (else the parent value is used). */
   dictCode?: string;
+
+  /** type='rule-binding' only: host mode for the shared rule-center binding editor. */
+  ruleBindingMode?: 'condition' | 'decision' | 'combined';
+  /** type='rule-binding' only: consumer metadata persisted in RuleConsumerBinding. */
+  ruleBindingConsumerType?: string;
+  ruleBindingConsumerCode?: string;
+  ruleBindingConsumerNodeId?: string;
+  /** type='rule-binding' only: optional rule-center helper panels. */
+  ruleBindingShowImpactPreview?: boolean;
+  ruleBindingShowTestRunner?: boolean;
+  ruleBindingInitialDecisionCode?: string;
 }
 
 // ==================== Validation ====================

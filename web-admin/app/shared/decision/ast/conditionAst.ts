@@ -90,13 +90,147 @@ function resolveOperand(op: Operand | undefined, ctx: ScopedContext): Resolved {
   if (!op) return { present: false, value: undefined };
   if (op.type === 'literal') return { present: true, value: op.value };
   if (op.type === 'path') return resolvePath(ctx, op.scope, op.path);
-  // functionCall is not evaluated client-side (backend authoritative) -> UNKNOWN-yielding
-  return { present: false, value: undefined };
+  return resolveFunctionCall(op, ctx);
+}
+
+function resolveFunctionCall(op: FunctionCallOperand, ctx: ScopedContext): Resolved {
+  const name = normalizeFunctionName(op.name);
+  const args = (op.args ?? []).map((arg) => resolveOperand(arg, ctx));
+  if (args.some((arg) => !arg.present)) return { present: false, value: undefined };
+  try {
+    return { present: true, value: invokeWhitelistedFunction(name, args.map((arg) => arg.value)) };
+  } catch {
+    return { present: false, value: undefined };
+  }
+}
+
+function invokeWhitelistedFunction(name: string, args: unknown[]): unknown {
+  if (name === 'string.length') return args[0] === null || args[0] === undefined ? 0 : String(args[0]).length;
+  if (name === 'string.lower') return args[0] === null || args[0] === undefined ? null : String(args[0]).toLowerCase();
+  if (name === 'string.upper') return args[0] === null || args[0] === undefined ? null : String(args[0]).toUpperCase();
+  if (name === 'collection.size') return Array.isArray(args[0]) ? args[0].length : 0;
+  if (name === 'date') {
+    if (args.length === 1) return formatDateArg(args[0]);
+    if (args.length === 3) return formatDateParts(args);
+  }
+  if (name === 'time') {
+    if (args.length === 1) return formatTimeArg(args[0]);
+    if (args.length === 3) return formatTimeParts(args);
+  }
+  if (name === 'date and time') {
+    if (args.length === 1) return formatDateTimeArg(args[0]);
+    if (args.length === 2) return `${formatDateArg(args[0])}T${formatTimeArg(args[1])}`;
+    if (args.length === 6) return `${formatDateParts(args.slice(0, 3))}T${formatTimeParts(args.slice(3, 6))}`;
+  }
+  if (name === 'duration' && args.length === 1) {
+    const text = String(args[0] ?? '').trim();
+    if (parseIsoDuration(text) !== null) return text;
+  }
+  throw new Error(`Function not whitelisted: ${name}`);
+}
+
+function normalizeFunctionName(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function toIntegerArg(value: unknown): number {
+  const number = typeof value === 'number' ? value : Number(String(value ?? '').trim());
+  if (!Number.isInteger(number)) throw new Error(`function argument is not an integer: ${String(value)}`);
+  return number;
+}
+
+function formatDateArg(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const text = String(value ?? '').trim();
+  const dateOnly = parseDateOnly(text);
+  if (dateOnly !== null) return new Date(dateOnly).toISOString().slice(0, 10);
+  const parsed = Date.parse(text);
+  if (!Number.isNaN(parsed)) return new Date(parsed).toISOString().slice(0, 10);
+  throw new Error(`invalid date literal: ${text}`);
+}
+
+function formatDateParts(args: unknown[]): string {
+  const [year, month, day] = args.map(toIntegerArg);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    throw new Error('invalid date parts');
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function formatTimeArg(value: unknown): string {
+  const text = String(value ?? '').trim();
+  if (parseTimeOnly(text) === null) throw new Error(`invalid time literal: ${text}`);
+  return text;
+}
+
+function formatTimeParts(args: unknown[]): string {
+  const [hour, minute, second] = args.map(toIntegerArg);
+  const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
+  if (parseTimeOnly(time) === null) throw new Error('invalid time parts');
+  return time;
+}
+
+function formatDateTimeArg(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  const text = String(value ?? '').trim();
+  if (!Number.isNaN(Date.parse(text))) return text;
+  throw new Error(`invalid datetime literal: ${text}`);
 }
 
 function toNum(v: unknown): number | null {
   if (typeof v === 'number') return v;
   if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v);
+  return null;
+}
+
+function parseDateOnly(value: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const [, y, m, d] = match;
+  const time = Date.UTC(Number(y), Number(m) - 1, Number(d));
+  return Number.isNaN(time) ? null : time;
+}
+
+function parseTimeOnly(value: string): number | null {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(value.trim());
+  if (!match) return null;
+  const [, hh, mm, ss = '0', ms = '0'] = match;
+  const h = Number(hh);
+  const m = Number(mm);
+  const s = Number(ss);
+  const milli = Number(ms.padEnd(3, '0'));
+  if (h > 23 || m > 59 || s > 59 || milli > 999) return null;
+  return (((h * 60) + m) * 60 + s) * 1000 + milli;
+}
+
+function parseIsoDuration(value: string): number | null {
+  const match = /^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i.exec(value.trim());
+  if (!match) return null;
+  const [, days = '0', hours = '0', minutes = '0', seconds = '0'] = match;
+  if ([days, hours, minutes, seconds].every((part) => part === '0')) return null;
+  const totalSeconds = Number(days) * 86400 + Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
+  return Number.isNaN(totalSeconds) ? null : totalSeconds * 1000;
+}
+
+function toOrderedValue(v: unknown, dt?: DataType): number | null {
+  if (!dt) return null;
+  if (dt === 'date') {
+    if (v instanceof Date) return Date.UTC(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate());
+    if (typeof v !== 'string') return null;
+    return parseDateOnly(v) ?? (Number.isNaN(Date.parse(v)) ? null : Date.parse(v));
+  }
+  if (dt === 'time') {
+    return typeof v === 'string' ? parseTimeOnly(v) : null;
+  }
+  if (dt === 'datetime') {
+    if (v instanceof Date) return v.getTime();
+    if (typeof v !== 'string') return null;
+    return parseDateOnly(v) ?? (Number.isNaN(Date.parse(v)) ? null : Date.parse(v));
+  }
+  if (dt === 'duration') {
+    return typeof v === 'string' ? parseIsoDuration(v) : null;
+  }
   return null;
 }
 
@@ -118,8 +252,17 @@ function valueEquals(left: unknown, right: unknown, dt?: DataType): boolean {
     const a = toNum(left); const b = toNum(right);
     return a !== null && b !== null && a === b;
   }
+  const orderedLeft = toOrderedValue(left, dt);
+  const orderedRight = toOrderedValue(right, dt);
+  if (orderedLeft !== null && orderedRight !== null) return orderedLeft === orderedRight;
   // enum/dict/etc compare by code (string), default case-sensitive string compare
   return String(left) === String(right);
+}
+
+function orderedCompare(left: unknown, right: unknown, dt: DataType | undefined, pred: (c: number) => boolean): Truth {
+  const a = toOrderedValue(left, dt); const b = toOrderedValue(right, dt);
+  if (a !== null && b !== null) return pred(a - b) ? 'TRUE' : 'FALSE';
+  return numericCompare(left, right, pred);
 }
 
 function numericCompare(left: unknown, right: unknown, pred: (c: number) => boolean): Truth {
@@ -153,16 +296,24 @@ function evalCompare(node: CompareNode, ctx: ScopedContext): Truth {
   switch (op) {
     case 'EQ': return bool(valueEquals(left.value, rv, dt));
     case 'NE': return bool(!valueEquals(left.value, rv, dt));
-    case 'GT': return numericCompare(left.value, rv, (c) => c > 0);
-    case 'GTE': return numericCompare(left.value, rv, (c) => c >= 0);
-    case 'LT': return numericCompare(left.value, rv, (c) => c < 0);
-    case 'LTE': return numericCompare(left.value, rv, (c) => c <= 0);
+    case 'GT': return orderedCompare(left.value, rv, dt, (c) => c > 0);
+    case 'GTE': return orderedCompare(left.value, rv, dt, (c) => c >= 0);
+    case 'LT': return orderedCompare(left.value, rv, dt, (c) => c < 0);
+    case 'LTE': return orderedCompare(left.value, rv, dt, (c) => c <= 0);
     case 'IN': return bool(asArray(rv).some((x) => valueEquals(left.value, x, dt)));
     case 'NOT_IN': return bool(!asArray(rv).some((x) => valueEquals(left.value, x, dt)));
     case 'BETWEEN': {
-      const arr = asArray(rv); const v = toNum(left.value);
+      const arr = asArray(rv);
+      if (arr.length !== 2) return 'UNKNOWN';
+      const ordered = toOrderedValue(left.value, dt);
+      const orderedLo = toOrderedValue(arr[0], dt);
+      const orderedHi = toOrderedValue(arr[1], dt);
+      if (ordered !== null && orderedLo !== null && orderedHi !== null) {
+        return bool(ordered >= orderedLo && ordered <= orderedHi);
+      }
+      const v = toNum(left.value);
       const lo = toNum(arr[0]); const hi = toNum(arr[1]);
-      if (v === null || lo === null || hi === null || arr.length !== 2) return 'UNKNOWN';
+      if (v === null || lo === null || hi === null) return 'UNKNOWN';
       return bool(v >= lo && v <= hi);
     }
     case 'CONTAINS_TEXT': return bool(String(left.value).includes(String(rv)));

@@ -128,6 +128,8 @@ public class SimpleConditionAdapter implements DecisionAdapter {
             case ConditionNode.CompareNode c -> {
                 if (c.left() == null) {
                     errors.add(new DecisionValidateResult.Issue("AST_STRUCTURE", "compare missing left operand"));
+                } else {
+                    collectOperandStructural(c.left(), errors);
                 }
                 if (c.operator() == null) {
                     errors.add(new DecisionValidateResult.Issue("AST_STRUCTURE", "compare missing operator"));
@@ -136,6 +138,22 @@ public class SimpleConditionAdapter implements DecisionAdapter {
                     errors.add(new DecisionValidateResult.Issue("AST_STRUCTURE",
                             "operator " + c.operator().code() + " requires a right operand"));
                 }
+                collectOperandStructural(c.right(), errors);
+            }
+        }
+    }
+
+    private void collectOperandStructural(Operand operand, List<DecisionValidateResult.Issue> errors) {
+        if (operand == null) {
+            return;
+        }
+        if (operand instanceof Operand.FunctionCallOperand f) {
+            if (!evaluator.isFunctionRegistered(f.name())) {
+                errors.add(new DecisionValidateResult.Issue("AST_FUNCTION",
+                        "Function not whitelisted: " + f.name()));
+            }
+            if (f.args() != null) {
+                f.args().forEach(arg -> collectOperandStructural(arg, errors));
             }
         }
     }

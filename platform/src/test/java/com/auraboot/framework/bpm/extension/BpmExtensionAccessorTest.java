@@ -3,6 +3,8 @@ package com.auraboot.framework.bpm.extension;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.model.CcPolicy;
 import com.auraboot.framework.bpm.model.WithdrawPolicy;
+import com.auraboot.framework.decision.rule.DecisionVersionPolicy;
+import com.auraboot.framework.decision.rule.RuleBindingKind;
 import com.auraboot.smart.framework.engine.SmartEngine;
 import com.auraboot.smart.framework.engine.constant.ExtensionElementsConstant;
 import com.auraboot.smart.framework.engine.model.assembly.ExtensionElementContainer;
@@ -184,6 +186,65 @@ class BpmExtensionAccessorTest {
                 accessor.getRequiredPermissions("leave_request", "manager_approval"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Malformed aura.requiredPermissions");
+    }
+
+    @Test
+    @DisplayName("getRuleConsumerBinding parses BPM rule binding from activity extension")
+    void getRuleConsumerBindingParsed() {
+        ExtensionElements taskExt = buildExtensionElements(
+                BpmExtensionKeys.RULE_BINDING,
+                """
+                {
+                  "consumerType": "BPM",
+                  "consumerCode": "leave_request",
+                  "consumerNodeId": "manager_approval",
+                  "bindingKind": "DECISION_REF",
+                  "decisionBinding": {
+                    "decisionCode": "task_assignee",
+                    "versionPolicy": "LATEST_PUBLISHED",
+                    "inputMappings": [],
+                    "fallbackPolicy": {"mode": "FAIL_CLOSED"},
+                    "enabled": true
+                  },
+                  "enabled": true
+                }
+                """);
+        when(userTask.getExtensionElements()).thenReturn(taskExt);
+
+        var binding = accessor.getRuleConsumerBinding("leave_request", "manager_approval");
+
+        assertThat(binding).isPresent();
+        assertThat(binding.get().consumerType()).isEqualTo("BPM");
+        assertThat(binding.get().consumerCode()).isEqualTo("leave_request");
+        assertThat(binding.get().consumerNodeId()).isEqualTo("manager_approval");
+        assertThat(binding.get().bindingKind()).isEqualTo(RuleBindingKind.DECISION_REF);
+        assertThat(binding.get().decisionBinding().decisionCode()).isEqualTo("task_assignee");
+        assertThat(binding.get().decisionBinding().versionPolicy())
+                .isEqualTo(DecisionVersionPolicy.LATEST_PUBLISHED);
+    }
+
+    @Test
+    @DisplayName("getRuleConsumerBinding fills BPM consumer metadata defaults")
+    void getRuleConsumerBindingDefaultsMetadata() {
+        ExtensionElements taskExt = buildExtensionElements(
+                BpmExtensionKeys.RULE_BINDING,
+                """
+                {
+                  "bindingKind": "DECISION_REF",
+                  "decisionBinding": {
+                    "decisionCode": "task_assignee",
+                    "versionPolicy": "LATEST_PUBLISHED"
+                  }
+                }
+                """);
+        when(userTask.getExtensionElements()).thenReturn(taskExt);
+
+        var binding = accessor.getRuleConsumerBinding("leave_request", "manager_approval");
+
+        assertThat(binding).isPresent();
+        assertThat(binding.get().consumerType()).isEqualTo("BPM");
+        assertThat(binding.get().consumerCode()).isEqualTo("leave_request");
+        assertThat(binding.get().consumerNodeId()).isEqualTo("manager_approval");
     }
 
     @Test

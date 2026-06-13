@@ -136,6 +136,7 @@ export function CallActivityEditor({
           onChange={(e) => handleChange('description', e.target.value)}
           className="w-full rounded-md border border-gray-300 px-3 py-2"
           rows={2}
+          data-testid="callactivity-description"
         />
       </div>
 
@@ -176,6 +177,7 @@ export function CallActivityEditor({
           type="button"
           onClick={() => setMappingExpanded(!mappingExpanded)}
           className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          data-testid="callactivity-mapping-toggle"
         >
           <span>{t('bpmn.callactivity.variableMapping')}</span>
           <span className="text-gray-400">{mappingExpanded ? '▾' : '▸'}</span>

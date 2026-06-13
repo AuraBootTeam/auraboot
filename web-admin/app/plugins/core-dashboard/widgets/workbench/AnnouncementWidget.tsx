@@ -15,7 +15,7 @@ import { get } from '~/shared/services/http-client';
 import { useI18n } from '~/contexts/I18nContext';
 
 interface AnnouncementItem {
-  id: number;
+  id: string;
   title: string;
   content: string | null;
   priority: string;

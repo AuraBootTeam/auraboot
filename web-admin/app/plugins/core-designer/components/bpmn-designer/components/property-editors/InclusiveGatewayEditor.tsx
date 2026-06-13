@@ -8,6 +8,7 @@
 
 import type { InclusiveGatewayConfig } from '~/plugins/core-designer/components/bpmn-designer/types';
 import { useI18n } from '~/contexts/I18nContext';
+import { RuleCenterBindingSection } from './RuleCenterBindingSection';
 
 // Extended config with completionCondition for join behavior
 interface ExtendedInclusiveGatewayConfig extends InclusiveGatewayConfig {
@@ -18,16 +19,23 @@ interface InclusiveGatewayEditorProps {
   config?: ExtendedInclusiveGatewayConfig;
   onChange: (config: ExtendedInclusiveGatewayConfig) => void;
   outgoingEdges: Array<{ id: string; label?: string; condition?: string }>;
+  processKey?: string;
+  nodeId?: string;
 }
 
 export function InclusiveGatewayEditor({
   config,
   onChange,
   outgoingEdges,
+  processKey,
+  nodeId,
 }: InclusiveGatewayEditorProps) {
   const { t } = useI18n();
 
-  const handleChange = (field: keyof ExtendedInclusiveGatewayConfig, value: string) => {
+  const handleChange = (
+    field: keyof ExtendedInclusiveGatewayConfig,
+    value: ExtendedInclusiveGatewayConfig[keyof ExtendedInclusiveGatewayConfig],
+  ) => {
     onChange({ ...config, name: config?.name || '', [field]: value });
   };
 
@@ -94,6 +102,19 @@ export function InclusiveGatewayEditor({
             'Unsupported: SmartEngine InclusiveGatewayParser does not read <completionCondition>; default BPMN join semantics apply. Needs runtime support (parser + behavior), not just UI enable.'}
         </p>
       </div>
+
+      <RuleCenterBindingSection
+        title="规则中心路由"
+        enabledLabel=""
+        enabled={Boolean(config?.ruleBinding)}
+        value={config?.ruleBinding}
+        mode="combined"
+        consumerCode={processKey}
+        consumerNodeId={nodeId}
+        testId="inclusivegateway-rule-binding"
+        onToggle={(_, initialValue) => handleChange('ruleBinding', initialValue)}
+        onChange={(ruleBinding) => handleChange('ruleBinding', ruleBinding)}
+      />
     </>
   );
 }

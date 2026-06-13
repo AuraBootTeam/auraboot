@@ -8,21 +8,29 @@
 
 import type { ExclusiveGatewayConfig } from '~/plugins/core-designer/components/bpmn-designer/types';
 import { useI18n } from '~/contexts/I18nContext';
+import { RuleCenterBindingSection } from './RuleCenterBindingSection';
 
 interface ExclusiveGatewayEditorProps {
   config?: ExclusiveGatewayConfig;
   onChange: (config: ExclusiveGatewayConfig) => void;
   outgoingEdges: Array<{ id: string; label?: string; condition?: string }>;
+  processKey?: string;
+  nodeId?: string;
 }
 
 export function ExclusiveGatewayEditor({
   config,
   onChange,
   outgoingEdges,
+  processKey,
+  nodeId,
 }: ExclusiveGatewayEditorProps) {
   const { t } = useI18n();
 
-  const handleChange = (field: keyof ExclusiveGatewayConfig, value: string) => {
+  const handleChange = (
+    field: keyof ExclusiveGatewayConfig,
+    value: ExclusiveGatewayConfig[keyof ExclusiveGatewayConfig],
+  ) => {
     onChange({ ...config, name: config?.name || '', [field]: value });
   };
 
@@ -95,6 +103,19 @@ export function ExclusiveGatewayEditor({
           </div>
         </div>
       )}
+
+      <RuleCenterBindingSection
+        title="规则中心路由"
+        enabledLabel=""
+        enabled={Boolean(config?.ruleBinding)}
+        value={config?.ruleBinding}
+        mode="combined"
+        consumerCode={processKey}
+        consumerNodeId={nodeId}
+        testId="exclusivegateway-rule-binding"
+        onToggle={(_, initialValue) => handleChange('ruleBinding', initialValue)}
+        onChange={(ruleBinding) => handleChange('ruleBinding', ruleBinding)}
+      />
     </>
   );
 }

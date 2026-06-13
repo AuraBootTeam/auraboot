@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   and, or, negate, cmp, group, not, lit, path, evaluatePreview, isMatch,
   serialize, parse, toNaturalLanguage, checkComplexity,
-  type ScopedContext, type ConditionNode, type PathOperand,
+  type ScopedContext, type ConditionNode, type PathOperand, type FunctionCallOperand,
 } from '../conditionAst';
 
 const rec = (data: Record<string, unknown>): ScopedContext => ({ record: { data } });
@@ -42,6 +42,35 @@ describe('evaluatePreview — happy', () => {
       rec({ risk: 'Critical' }))).toBe('TRUE');
     expect(evaluatePreview(cmp(path('record', 'data.amount', 'decimal'), 'BETWEEN', lit([1000, 5000], 'decimal')),
       rec({ amount: 3000 }))).toBe('TRUE');
+  });
+
+  it('date and datetime comparisons use ISO ordering', () => {
+    expect(evaluatePreview(cmp(path('record', 'data.submittedOn', 'date'), 'GTE', lit('2026-06-01', 'date')),
+      rec({ submittedOn: '2026-06-15' }))).toBe('TRUE');
+    expect(evaluatePreview(cmp(path('record', 'data.submittedOn', 'date'), 'BETWEEN', lit(['2026-06-01', '2026-06-30'], 'date')),
+      rec({ submittedOn: '2026-06-15' }))).toBe('TRUE');
+    expect(evaluatePreview(cmp(path('record', 'data.submittedAt', 'datetime'), 'LT', lit('2026-06-15T10:30:00Z', 'datetime')),
+      rec({ submittedAt: '2026-06-15T09:00:00Z' }))).toBe('TRUE');
+  });
+
+  it('whitelisted date and duration function calls preview locally', () => {
+    const dateFn: FunctionCallOperand = {
+      type: 'functionCall',
+      name: 'date',
+      returnType: 'date',
+      args: [lit(2026, 'integer'), lit(6, 'integer'), lit(10, 'integer')],
+    };
+    expect(evaluatePreview(cmp(path('record', 'data.submittedOn', 'date'), 'GTE', dateFn),
+      rec({ submittedOn: '2026-06-11' }))).toBe('TRUE');
+
+    const durationFn: FunctionCallOperand = {
+      type: 'functionCall',
+      name: 'duration',
+      returnType: 'duration',
+      args: [lit('P2D', 'string')],
+    };
+    expect(evaluatePreview(cmp(path('record', 'data.sla', 'duration'), 'LTE', durationFn),
+      rec({ sla: 'P1D' }))).toBe('TRUE');
   });
 });
 
