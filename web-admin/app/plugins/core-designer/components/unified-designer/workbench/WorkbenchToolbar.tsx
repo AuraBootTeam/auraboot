@@ -16,10 +16,12 @@ interface WorkbenchToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   returnHref?: string;
+  aiCopilotEnabled?: boolean;
   onModeChange: (mode: WorkbenchMode) => void;
   onUndo: () => void;
   onRedo: () => void;
   onSave: () => void;
+  onOpenAiCopilot?: () => void;
 }
 
 export function WorkbenchToolbar({
@@ -32,10 +34,12 @@ export function WorkbenchToolbar({
   canUndo,
   canRedo,
   returnHref,
+  aiCopilotEnabled,
   onModeChange,
   onUndo,
   onRedo,
   onSave,
+  onOpenAiCopilot,
 }: WorkbenchToolbarProps) {
   const { locale } = useI18n();
   const saveDisabled = !isDirty || saveStatus === 'saving' || saveStatus === 'invalid';
@@ -67,6 +71,16 @@ export function WorkbenchToolbar({
           >
             {resolveDesignerText(DESIGNER_I18N.unified.pages, locale)}
           </a>
+        ) : null}
+        {aiCopilotEnabled ? (
+          <button
+            type="button"
+            data-testid="designer-ai-copilot"
+            onClick={onOpenAiCopilot}
+            className="rounded-md border border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50 px-3 py-1.5 text-sm font-medium text-purple-700 hover:from-purple-100 hover:to-indigo-100"
+          >
+            ✨ AI
+          </button>
         ) : null}
         <button
           type="button"
