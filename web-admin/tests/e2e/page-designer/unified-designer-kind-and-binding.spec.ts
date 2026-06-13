@@ -372,6 +372,55 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     ]);
   });
 
+  test('undoes and redoes a cross-container move-before before saving schema order', async ({ page }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerFormPage(page);
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockBefore(page, 'field_move_candidate', 'field_target_email');
+
+    const sourceSection = page.getByTestId('canvas-block-section_source');
+    const targetSection = page.getByTestId('canvas-block-section_target');
+    await expect(sourceSection.getByTestId('canvas-block-field_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-field_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(targetSection, 'field_move_candidate', 'field_target_email')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+    await waitForDesignerDragToSettle(page);
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+
+    await expect(sourceSection.getByTestId('canvas-block-field_move_candidate')).toBeVisible();
+    await expect(targetSection.getByTestId('canvas-block-field_move_candidate')).toHaveCount(0);
+    expect(await isBeforeInDom(sourceSection, 'field_source_name', 'field_move_candidate')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+
+    await expect(sourceSection.getByTestId('canvas-block-field_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-field_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(targetSection, 'field_move_candidate', 'field_target_email')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedSource = findBlock(savedBlocks, 'section_source');
+    const savedTarget = findBlock(savedBlocks, 'section_target');
+
+    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([
+      'field_move_candidate',
+      'field_target_email',
+      'field_target_status',
+    ]);
+  });
+
   test('moves an existing field block inside an empty form-section container and persists schema order', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerFormPage(page, { emptyTarget: true });
     await openDesigner(page, formKey);
@@ -382,6 +431,49 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     const sourceSection = page.getByTestId('canvas-block-section_source');
     const targetSection = page.getByTestId('canvas-block-section_target');
+    await expect(sourceSection.getByTestId('canvas-block-field_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-field_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedSource = findBlock(savedBlocks, 'section_source');
+    const savedTarget = findBlock(savedBlocks, 'section_target');
+
+    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['field_move_candidate']);
+  });
+
+  test('undoes and redoes a cross-container move-inside into an empty section before saving schema order', async ({ page }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerFormPage(page, { emptyTarget: true });
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockInto(page, 'field_move_candidate', 'section_target');
+
+    const sourceSection = page.getByTestId('canvas-block-section_source');
+    const targetSection = page.getByTestId('canvas-block-section_target');
+    await expect(sourceSection.getByTestId('canvas-block-field_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-field_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+    await waitForDesignerDragToSettle(page);
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+
+    await expect(sourceSection.getByTestId('canvas-block-field_move_candidate')).toBeVisible();
+    await expect(targetSection.getByTestId('canvas-block-field_move_candidate')).toHaveCount(0);
+    expect(await isBeforeInDom(sourceSection, 'field_source_name', 'field_move_candidate')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+
     await expect(sourceSection.getByTestId('canvas-block-field_move_candidate')).toHaveCount(0);
     await expect(targetSection.getByTestId('canvas-block-field_move_candidate')).toBeVisible();
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -518,6 +610,34 @@ async function dragCanvasBlockInto(page: Page, sourceBlockId: string, parentBloc
   await page.mouse.move(dst!.x + dst!.width / 2, dst!.y + dst!.height / 2, { steps: 18 });
   await page.mouse.move(dst!.x + dst!.width / 2 + 4, dst!.y + dst!.height / 2 + 4, { steps: 4 });
   await page.mouse.up();
+}
+
+async function waitForDesignerDragToSettle(page: Page) {
+  await expect(page.getByTestId('drag-overlay-ghost')).toHaveCount(0);
+  await expect
+    .poll(() => page.locator('[data-drop-intent]:not([data-drop-intent="none"])').count())
+    .toBe(0);
+}
+
+async function clickDesignerToolbarButton(page: Page, testId: string) {
+  const button = page.getByTestId(testId);
+  await expect(button).toBeEnabled();
+  await expect
+    .poll(() => receivesPointerAtCenter(button))
+    .toBe(true);
+  await button.hover();
+  await button.click();
+}
+
+async function receivesPointerAtCenter(locator: Locator): Promise<boolean> {
+  return locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const target = document.elementFromPoint(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    );
+    return target === element || element.contains(target);
+  });
 }
 
 async function saveDesignerPage(page: Page, pid: string): Promise<void> {

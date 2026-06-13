@@ -495,6 +495,45 @@ describe('UnifiedDesignerWorkbench', () => {
     );
   });
 
+  it('undoes and redoes layout reorder operations without losing dirty-state accuracy', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+
+    fireEvent.click(screen.getByTestId('outline-item-field_customer_name'));
+    fireEvent.click(screen.getByTestId('designer-mode-layout'));
+
+    expect(screen.getByTestId('designer-undo')).toBeDisabled();
+    expect(screen.getByTestId('designer-redo')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('block-move-down-field_customer_name'));
+
+    expect(isBefore('canvas-block-field_customer_phone', 'canvas-block-field_customer_name')).toBe(
+      true,
+    );
+    expect(screen.getByTestId('designer-undo')).not.toBeDisabled();
+    expect(screen.getByTestId('designer-redo')).toBeDisabled();
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
+
+    fireEvent.click(screen.getByTestId('designer-undo'));
+
+    expect(isBefore('canvas-block-field_customer_name', 'canvas-block-field_customer_phone')).toBe(
+      true,
+    );
+    expect(screen.getByTestId('designer-undo')).toBeDisabled();
+    expect(screen.getByTestId('designer-redo')).not.toBeDisabled();
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存');
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('designer-redo'));
+
+    expect(isBefore('canvas-block-field_customer_phone', 'canvas-block-field_customer_name')).toBe(
+      true,
+    );
+    expect(screen.getByTestId('designer-undo')).not.toBeDisabled();
+    expect(screen.getByTestId('designer-redo')).toBeDisabled();
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
+    expect(screen.getByTestId('designer-save')).not.toBeDisabled();
+  });
+
   it('moves dashboard widgets in layout mode and writes dashboard grid coordinates', () => {
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
 
