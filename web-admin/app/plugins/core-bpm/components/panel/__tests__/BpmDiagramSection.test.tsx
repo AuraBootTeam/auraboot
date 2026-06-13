@@ -231,7 +231,9 @@ describe('BpmDiagramSection', () => {
       expect(screen.getByTestId('bpm-diagram-container')).toBeInTheDocument();
     });
 
-    expect(observedElements).toHaveLength(1);
+    await waitFor(() => {
+      expect(observedElements).toHaveLength(1);
+    });
     fitViewMock.mockClear();
 
     resizeObserverCallback?.(

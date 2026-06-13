@@ -85,6 +85,45 @@ async function createFormPage(page: Page): Promise<string> {
   return pageKey;
 }
 
+async function createPaletteAuthoringFormPage(page: Page): Promise<CreatedDesignerPage> {
+  const id = uniqueId('udw_palette_container');
+  const pageKey = `udw_palette_container_${id}`;
+  const resp = await page.request.post('/api/pages', {
+    data: {
+      name: `UDW palette container ${id}`,
+      pageKey,
+      title: `UDW palette container ${id}`,
+      kind: 'form',
+      modelCode: 'page_schema',
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          title: 'Form root',
+          dataSource: { model: 'page_schema' },
+          layout: { span: 12 },
+          blocks: [
+            {
+              id: 'section_main',
+              blockType: 'form-section',
+              title: 'Main section',
+              layout: { span: 12 },
+              blocks: [],
+            },
+          ],
+        },
+      ],
+      extension: { e2e: true, scenario: 'unified-designer-palette-container-authoring' },
+    },
+  });
+  expect(resp.ok(), await resp.text()).toBe(true);
+  const body = await resp.json();
+  expect(body.code).toBe('0');
+  expect(body.data?.pid).toBeTruthy();
+  return { pageKey, pid: body.data.pid };
+}
+
 async function createCrossContainerFormPage(
   page: Page,
   options: { emptyTarget?: boolean } = {},
@@ -1152,6 +1191,72 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     await expect
       .poll(async () => page.locator('[data-testid^="canvas-block-field_"]').count())
       .toBeGreaterThan(beforeFields);
+  });
+
+  test('adds nested containers from the palette with undo, redo, save, and readback', async ({ page }) => {
+    const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
+
+    await page.getByTestId('outline-item-form_root').click();
+    await openBlocksResourceTab(page);
+
+    await expect(page.getByTestId('palette-add-tabs')).toBeEnabled();
+    await page.getByTestId('palette-add-tabs').click();
+    await expect(page.getByTestId('canvas-block-tabs_new_tabs')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+    await expect(page.getByTestId('canvas-block-tabs_new_tabs')).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+    await expect(page.getByTestId('canvas-block-tabs_new_tabs')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await expect(page.getByTestId('inspector-selected-id')).toHaveText('tabs_new_tabs');
+    await openBlocksResourceTab(page);
+    await expect(page.getByTestId('palette-add-tab')).toBeEnabled();
+    await page.getByTestId('palette-add-tab').click();
+    await expect(page.getByTestId('canvas-block-tab_new_tab')).toBeVisible();
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+    await expect(page.getByTestId('canvas-block-tabs_new_tabs')).toBeVisible();
+    await expect(page.getByTestId('canvas-block-tab_new_tab')).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+    await expect(page.getByTestId('canvas-block-tab_new_tab')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'form_root');
+    const savedTabs = findBlock(savedBlocks, 'tabs_new_tabs');
+    const savedTab = findBlock(savedBlocks, 'tab_new_tab');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+      'section_main',
+      'tabs_new_tabs',
+    ]);
+    expect(savedTabs).toMatchObject({
+      blockType: 'tabs',
+      title: { en: 'New tabs', 'zh-CN': '新标签页' },
+      layout: { span: 12 },
+    });
+    expect(savedTabs?.blocks?.map((block) => block.id)).toEqual(['tab_new_tab']);
+    expect(savedTab).toMatchObject({
+      blockType: 'tab',
+      title: { en: 'New tab', 'zh-CN': '新标签' },
+      layout: { span: 12 },
+      blocks: [],
+    });
   });
 
   test('moves an existing field block between form-section containers and persists schema order', async ({ page }) => {
