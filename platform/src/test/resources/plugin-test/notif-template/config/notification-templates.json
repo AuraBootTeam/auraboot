@@ -1,0 +1,12 @@
+[
+  {
+    "code": "it_f2_dir_notify",
+    "name": "Directory-loaded notify",
+    "channel": "in_app",
+    "category": "system",
+    "subjectTemplate": "Dir alarm (${severity})",
+    "bodyTemplate": "Directory-loaded template: alarm ${alarmEventPid} severity ${severity}.",
+    "variables": "[\"alarmEventPid\",\"severity\"]",
+    "enabled": true
+  }
+]
