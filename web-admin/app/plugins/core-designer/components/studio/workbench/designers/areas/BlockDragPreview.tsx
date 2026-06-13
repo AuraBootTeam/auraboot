@@ -28,6 +28,7 @@ const BLOCK_INFO: Record<BlockType, { name: string; icon: string }> = {
   'candidate-list': { name: 'Candidate List', icon: 'ALT' },
   'workbench-action-bar': { name: 'Workbench Action Bar', icon: 'ACT' },
   'evidence-panel': { name: 'Evidence Panel', icon: 'EV' },
+  'gerber-viewer': { name: 'Gerber Viewer', icon: 'PCB' },
   'artifact-timeline': { name: 'Artifact Timeline', icon: 'TL' },
   'review-drawer': { name: 'Review Drawer', icon: 'REV' },
   'chart-card': { name: 'Chart Card', icon: '📉' },

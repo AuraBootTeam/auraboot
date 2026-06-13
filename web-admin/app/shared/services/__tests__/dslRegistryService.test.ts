@@ -10,6 +10,7 @@ describe('dslRegistryService fallback registry', () => {
     expect(blockTypes).toContain('candidate-list');
     expect(blockTypes).toContain('workbench-action-bar');
     expect(blockTypes).toContain('evidence-panel');
+    expect(blockTypes).toContain('gerber-viewer');
     expect(blockTypes).toContain('artifact-timeline');
   });
 });

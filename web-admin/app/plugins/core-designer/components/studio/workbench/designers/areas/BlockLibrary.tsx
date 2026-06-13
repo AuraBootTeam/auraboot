@@ -187,6 +187,15 @@ const BLOCK_TYPES: BlockTypeInfo[] = [
     keywords: ['evidence', 'json', 'proof', 'audit'],
   },
   {
+    type: 'gerber-viewer',
+    name: 'Gerber视图',
+    icon: 'PCB',
+    description: '展示 Gerber / CPL 校验视图与器件坐标',
+    availableIn: ['list', 'form'],
+    category: 'workbench',
+    keywords: ['gerber', 'pcb', 'cpl', 'viewer', 'dfm'],
+  },
+  {
     type: 'artifact-timeline',
     name: '产物时间线',
     icon: 'TL',
@@ -230,6 +239,7 @@ const BLOCK_TYPE_EN: Record<BlockType, { name: string; description: string }> = 
   'candidate-list': { name: 'Candidate List', description: 'Selectable candidate records' },
   'workbench-action-bar': { name: 'Workbench Action Bar', description: 'Workbench action group' },
   'evidence-panel': { name: 'Evidence Panel', description: 'Selection-bound evidence viewer' },
+  'gerber-viewer': { name: 'Gerber Viewer', description: 'Gerber and CPL inspection viewer' },
   'artifact-timeline': { name: 'Artifact Timeline', description: 'Revision and artifact timeline' },
   'review-drawer': { name: 'Review Drawer', description: 'Row review drawer with candidates and export impact' },
   'chart-card': { name: 'Chart Card', description: 'Chart visualization' },

@@ -151,4 +151,11 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
       'decision_model_field_catalog',
     ],
   }),
+  processfeerulematrix: runtime('quoteops', 'ProcessFeeRuleMatrixBlock', {
+    aliases: [
+      'ProcessFeeRuleMatrixBlock',
+      'processFeeRuleMatrixBlock',
+      'process_fee_rule_matrix',
+    ],
+  }),
 };

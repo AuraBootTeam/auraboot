@@ -12,6 +12,7 @@ describe('DEFAULT_COL_SPAN_BY_TYPE', () => {
     expect(getDefaultColSpan('candidate-list')).toBe(4);
     expect(getDefaultColSpan('workbench-action-bar')).toBe(12);
     expect(getDefaultColSpan('evidence-panel')).toBe(6);
+    expect(getDefaultColSpan('gerber-viewer')).toBe(12);
     expect(getDefaultColSpan('artifact-timeline')).toBe(6);
   });
   it('returns 6 for chart', () => {

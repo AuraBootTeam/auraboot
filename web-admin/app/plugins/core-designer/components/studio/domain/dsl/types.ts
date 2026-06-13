@@ -114,6 +114,7 @@ export type BlockType =
   | 'candidate-list'
   | 'workbench-action-bar'
   | 'evidence-panel'
+  | 'gerber-viewer'
   | 'artifact-timeline'
   | 'review-drawer'
   | 'chart-card'
