@@ -20,6 +20,19 @@ public interface NotificationTemplateMapper extends BaseMapper<NotificationTempl
         """)
     NotificationTemplate findByCode(@Param("tenantId") Long tenantId, @Param("code") String code);
 
+    /**
+     * Find a template by tenant + code regardless of {@code enabled} state.
+     *
+     * <p>{@link #findByCode} filters {@code enabled = TRUE} (the runtime delivery query); plugin
+     * import upsert must see a disabled existing row too, otherwise it would attempt a second
+     * insert and violate the {@code UNIQUE (tenant_id, code)} constraint.
+     */
+    @Select("""
+        SELECT * FROM ab_notification_template
+        WHERE tenant_id = #{tenantId} AND code = #{code}
+        """)
+    NotificationTemplate findByCodeForUpsert(@Param("tenantId") Long tenantId, @Param("code") String code);
+
     @Select("""
         SELECT * FROM ab_notification_template
         WHERE tenant_id = #{tenantId} AND pid = #{pid}
