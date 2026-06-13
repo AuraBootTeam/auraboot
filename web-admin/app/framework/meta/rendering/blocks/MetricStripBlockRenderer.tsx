@@ -57,6 +57,12 @@ function mappedMetricValue(value: any, metric: any, locale: string, t: (key: str
   return String(value);
 }
 
+function renderMetricAuxText(value: any, locale: string, t: (key: string) => string): string {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'object') return getLocalizedText(value, locale, t);
+  return String(value);
+}
+
 export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> = ({
   block,
   runtime,
@@ -122,6 +128,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
     const value = metric.valueField ? readPath(record, metric.valueField) : metric.value;
     const unit = metric.unitField ? readPath(record, metric.unitField) : metric.unit;
     const subText = metric.subTextField ? readPath(record, metric.subTextField) : metric.subText;
+    const displaySubText = renderMetricAuxText(subText, locale, t);
     const tone = metric.tone || 'default';
     const clickable = Boolean(metric.onClick);
     const active = metric.activeWhen ? evaluator.evaluateCondition(metric.activeWhen, context) : false;
@@ -175,7 +182,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
           <span className="text-2xl font-semibold">{displayValue}</span>
           {unit && <span className="text-xs text-gray-500">{String(unit)}</span>}
         </div>
-        {subText && <div className="mt-1 text-xs text-gray-500">{String(subText)}</div>}
+        {displaySubText && <div className="mt-1 text-xs text-gray-500">{displaySubText}</div>}
       </button>
     );
   });

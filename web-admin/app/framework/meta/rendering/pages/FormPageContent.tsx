@@ -57,6 +57,7 @@ const DATA_TYPE_TO_COMPONENT: Record<string, string> = {
   boolean: 'SmartSwitch',
   reference: 'SmartSelect',
   json: 'SmartTextarea',
+  jsonb: 'SmartTextarea',
   file: 'SmartUpload',
   money: 'SmartMoneyInput',
 };
@@ -181,6 +182,78 @@ function isJsonLikeDataType(dataType?: string): boolean {
   return ['json', 'jsonb'].includes(String(dataType || '').toLowerCase());
 }
 
+function tryParseJsonText(text: string): unknown {
+  const trimmed = text.trim();
+  if (!trimmed) return text;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return text;
+  }
+}
+
+function isJsonEnvelope(value: unknown): value is { type?: unknown; value: unknown } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const type = String(record.type || '').toLowerCase();
+  return (
+    (type === 'json' || type === 'jsonb') && Object.prototype.hasOwnProperty.call(record, 'value')
+  );
+}
+
+export function unwrapJsonLikeValue(rawValue: any): any {
+  let current = rawValue;
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (isJsonEnvelope(current)) {
+      const envelopeValue = current.value;
+      current = typeof envelopeValue === 'string' ? tryParseJsonText(envelopeValue) : envelopeValue;
+      continue;
+    }
+
+    if (typeof current === 'string') {
+      const parsed = tryParseJsonText(current);
+      if (parsed !== current && isJsonEnvelope(parsed)) {
+        current = parsed;
+        continue;
+      }
+    }
+
+    break;
+  }
+  return current;
+}
+
+export function normalizeLoadedFormValue(rawValue: any, dataType?: string): any {
+  const normalized = unwrapJsonLikeValue(rawValue);
+  const shouldFormatJson = isJsonLikeDataType(dataType) || normalized !== rawValue;
+  if (!shouldFormatJson || normalized == null || normalized === '') {
+    return normalized;
+  }
+
+  if (typeof normalized === 'string') {
+    const parsed = tryParseJsonText(normalized);
+    return parsed === normalized ? normalized : JSON.stringify(parsed, null, 2);
+  }
+
+  try {
+    return JSON.stringify(normalized, null, 2);
+  } catch {
+    return String(normalized);
+  }
+}
+
+export function normalizeLoadedRecordForForm(
+  loadedRecord: Record<string, any>,
+  fieldDataTypes: Record<string, string> = {},
+): Record<string, any> {
+  return Object.fromEntries(
+    Object.entries(loadedRecord).map(([key, value]) => [
+      key,
+      normalizeLoadedFormValue(value, fieldDataTypes[key]),
+    ]),
+  );
+}
+
 function resolveComponentByFieldMeta(
   dataType?: string,
   extension?: Record<string, any>,
@@ -256,8 +329,12 @@ export function normalizePayloadValue(rawValue: any, dataType?: string) {
   ) {
     return null;
   }
-  if (isJsonLikeDataType(dataType) && typeof rawValue === 'string') {
-    const trimmed = rawValue.trim();
+  if (isJsonLikeDataType(dataType)) {
+    const unwrapped = unwrapJsonLikeValue(rawValue);
+    if (typeof unwrapped !== 'string') {
+      return unwrapped;
+    }
+    const trimmed = unwrapped.trim();
     if (
       (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
       (trimmed.startsWith('{') && trimmed.endsWith('}'))
@@ -268,6 +345,7 @@ export function normalizePayloadValue(rawValue: any, dataType?: string) {
         // Keep original string when not valid JSON text
       }
     }
+    return unwrapped;
   }
   return rawValue;
 }
@@ -633,6 +711,7 @@ export function FormPageContent(props: PageContentProps) {
   }, [locale, t, formData, dataSourceManager, user, permissions, mode]);
 
   const [mainRecordLoaded, setMainRecordLoaded] = useState(!isEditMode);
+  const fieldDataTypesRef = useRef<Record<string, string>>({});
   const loadMainRecord = useCallback(
     async (options?: { preserveDirty?: boolean }) => {
       if (!recordId) return;
@@ -645,12 +724,16 @@ export function FormPageContent(props: PageContentProps) {
           token: token || undefined,
         });
         if (ResultHelper.isSuccess(resp) && resp.data) {
+          const normalizedRecord = normalizeLoadedRecordForForm(
+            resp.data,
+            fieldDataTypesRef.current,
+          );
           setFormData((prev) =>
             preserveDirty
-              ? mergeLoadedRecordWithDirtyFields(resp.data, prev, dirtyFieldsRef.current)
-              : resp.data,
+              ? mergeLoadedRecordWithDirtyFields(normalizedRecord, prev, dirtyFieldsRef.current)
+              : normalizedRecord,
           );
-          setInitialFormData(resp.data);
+          setInitialFormData(normalizedRecord);
         }
       } catch {
         // Keep the form usable when a transient refresh request fails; callers
@@ -731,6 +814,25 @@ export function FormPageContent(props: PageContentProps) {
   // Fetch model field metadata for component resolution (must be before early returns)
   const [modelFields, setModelFields] = useState<Record<string, FieldMetaInfo>>({});
   const [fieldMetaLoaded, setFieldMetaLoaded] = useState(false);
+  useEffect(() => {
+    const types: Record<string, string> = {};
+    const blocks = Array.isArray(schema?.blocks) ? schema.blocks : [];
+    for (const block of blocks) {
+      if (block?.blockType !== 'form-section' || !Array.isArray(block.fields)) continue;
+      for (const rawField of block.fields) {
+        if (rawField?.field && rawField.dataType) {
+          types[String(rawField.field)] = String(rawField.dataType);
+        }
+      }
+    }
+    for (const [fieldCode, meta] of Object.entries(modelFields)) {
+      if (meta?.dataType) {
+        types[fieldCode] = meta.dataType;
+      }
+    }
+    fieldDataTypesRef.current = types;
+  }, [schema?.blocks, modelFields]);
+
   useEffect(() => {
     let cancelled = false;
     setFieldMetaLoaded(false);

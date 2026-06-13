@@ -49,53 +49,68 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
   const align = (block as any).align || 'end';
   const alignClass =
     align === 'start' ? 'justify-start' : align === 'center' ? 'justify-center' : 'justify-end';
+  const title = block.title ? getLocalizedText(block.title, locale, t) : '';
   const surfaceClass =
     surface === 'bare'
       ? 'flex flex-wrap items-center gap-2'
       : 'flex flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-white p-3';
   const buttonSizeClass = density === 'compact' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm';
 
+  const actionButtons = visibleActions.map((actionConfig: any) => {
+    const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
+    const label = getLocalizedText(actionConfig.label || code, locale, t);
+    const variant = actionConfig.variant || 'secondary';
+    const active = actionConfig.activeWhen
+      ? evaluator.evaluateCondition(actionConfig.activeWhen, context)
+      : false;
+    const disabledByCondition = actionConfig.disabledWhen
+      ? evaluator.evaluateCondition(actionConfig.disabledWhen, context)
+      : false;
+    const disabled = Boolean(disabledByCondition || runningAction);
+
+    return (
+      <button
+        key={code}
+        type="button"
+        data-testid={`workbench-action-${code}`}
+        disabled={disabled}
+        onClick={() => {
+          setRunningAction(code);
+          void executeSimpleWorkbenchAction(runtime, actionConfig.onClick)
+            .catch((error) => {
+              console.error('[WorkbenchActionBarBlockRenderer] action failed:', error);
+            })
+            .finally(() => setRunningAction(null));
+        }}
+        className={`rounded-md font-medium ${
+          variantClass[variant] || variantClass.secondary
+        } ${active ? activeVariantClass[variant] || activeVariantClass.secondary : ''} ${
+          buttonSizeClass
+        } disabled:cursor-not-allowed disabled:opacity-50`}
+      >
+        {runningAction === code ? t('common.loading') : label}
+      </button>
+    );
+  });
+
+  if (title) {
+    return (
+      <div
+        className={`${surfaceClass} justify-between`}
+        data-testid="workbench-action-bar"
+      >
+        <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+        <div className={`flex flex-wrap items-center gap-2 ${alignClass}`}>{actionButtons}</div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`${surfaceClass} ${alignClass}`}
       data-testid="workbench-action-bar"
     >
-      {visibleActions.map((actionConfig: any) => {
-        const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
-        const label = getLocalizedText(actionConfig.label || code, locale, t);
-        const variant = actionConfig.variant || 'secondary';
-        const active = actionConfig.activeWhen
-          ? evaluator.evaluateCondition(actionConfig.activeWhen, context)
-          : false;
-        const disabledByCondition = actionConfig.disabledWhen
-          ? evaluator.evaluateCondition(actionConfig.disabledWhen, context)
-          : false;
-        const disabled = Boolean(disabledByCondition || runningAction);
-
-        return (
-          <button
-            key={code}
-            type="button"
-            data-testid={`workbench-action-${code}`}
-            disabled={disabled}
-            onClick={() => {
-              setRunningAction(code);
-              void executeSimpleWorkbenchAction(runtime, actionConfig.onClick)
-                .catch((error) => {
-                  console.error('[WorkbenchActionBarBlockRenderer] action failed:', error);
-                })
-                .finally(() => setRunningAction(null));
-            }}
-            className={`rounded-md font-medium ${
-              variantClass[variant] || variantClass.secondary
-            } ${active ? activeVariantClass[variant] || activeVariantClass.secondary : ''} ${
-              buttonSizeClass
-            } disabled:cursor-not-allowed disabled:opacity-50`}
-          >
-            {runningAction === code ? t('common.loading') : label}
-          </button>
-        );
-      })}
+      {actionButtons}
     </div>
   );
 };
