@@ -415,6 +415,106 @@ describe('Unified designer existing-block move guards', () => {
     ).toBe(false);
   });
 
+  it('rejects kind-allowed children when the target parent cannot contain them', () => {
+    const schemaWithSubTableColumn: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'form_with_column_guard',
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'section_source',
+              blockType: 'form-section',
+              blocks: [
+                {
+                  id: 'sub_table_source',
+                  blockType: 'sub-table',
+                  blocks: [{ id: 'column_move_candidate', blockType: 'column', field: 'name' }],
+                },
+              ],
+            },
+            {
+              id: 'section_target',
+              blockType: 'form-section',
+              blocks: [{ id: 'field_target', blockType: 'field', field: 'name' }],
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(
+      canMoveExistingBlockBeforeTarget({
+        blocks: schemaWithSubTableColumn.blocks,
+        kind: 'form',
+        blockRegistry: registry,
+        movingBlockId: 'column_move_candidate',
+        targetBlockId: 'field_target',
+      }),
+    ).toBe(false);
+    expect(
+      canMoveExistingBlockToParent({
+        blocks: schemaWithSubTableColumn.blocks,
+        kind: 'form',
+        blockRegistry: registry,
+        movingBlockId: 'column_move_candidate',
+        parentBlockId: 'section_target',
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects cross-kind workflow block moves beyond the detail-section regression case', () => {
+    const listSchemaWithWorkflowBlock: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'list',
+      id: 'list_with_invalid_workflow_block',
+      blocks: [
+        {
+          id: 'list_root',
+          blockType: 'list',
+          blocks: [
+            {
+              id: 'tabs_root',
+              blockType: 'tabs',
+              blocks: [
+                {
+                  id: 'tab_main',
+                  blockType: 'tab',
+                  blocks: [
+                    { id: 'table_main', blockType: 'table' },
+                    { id: 'bpm_panel_from_detail', blockType: 'bpm-panel' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(
+      canMoveExistingBlockBeforeTarget({
+        blocks: listSchemaWithWorkflowBlock.blocks,
+        kind: 'list',
+        blockRegistry: registry,
+        movingBlockId: 'bpm_panel_from_detail',
+        targetBlockId: 'table_main',
+      }),
+    ).toBe(false);
+    expect(
+      canMoveExistingBlockToParent({
+        blocks: listSchemaWithWorkflowBlock.blocks,
+        kind: 'list',
+        blockRegistry: registry,
+        movingBlockId: 'bpm_panel_from_detail',
+        parentBlockId: 'tab_main',
+      }),
+    ).toBe(false);
+  });
+
   it('does not resolve a compatible empty container drop as a sibling-before move', () => {
     const schemaWithEmptyTarget: PageSchemaV3 = {
       schemaVersion: 3,
