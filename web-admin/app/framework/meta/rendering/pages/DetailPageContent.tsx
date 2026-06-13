@@ -31,7 +31,6 @@ import { ResultHelper } from '~/utils/type';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useToastContext } from '~/contexts/ToastContext';
-import { ErrorAlert } from '~/ui/ErrorAlert';
 import { ReportGenerateButton } from '~/framework/smart/components/report/ReportGenerateButton';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { InlineApprovalPanel } from '~/framework/smart/components/approval/InlineApprovalPanel';
@@ -188,6 +187,15 @@ export function extractBlockDataRows(rawData: any, dataPath?: string): any[] {
 
 function getMetaExtension(meta?: { extension?: Record<string, any> }): Record<string, any> {
   return meta?.extension && typeof meta.extension === 'object' ? meta.extension : {};
+}
+
+function resolveTextFallback(
+  t: (key: string) => string,
+  key: string,
+  fallback: string,
+): string {
+  const resolved = t(key);
+  return resolved && resolved !== key ? resolved : fallback;
 }
 
 function shouldReplaceGeneratedLabel(label: unknown, fieldCode: string): boolean {
@@ -666,24 +674,12 @@ export function DetailPageContent(props: PageContentProps) {
     [location.hash, location.pathname, location.search, routerNavigate, tabHashKeys],
   );
   const activeDetailTab = resolveActiveDetailTab(tabs, activeTab);
+  const actionFailedTitle = resolveTextFallback(t, 'common.actionFailed', 'Action failed');
+  const closeLabel = resolveTextFallback(t, 'common.close', 'Close');
 
   // Show loading while record is being fetched
   if (recordLoading) {
     return <LoadingSpinner />;
-  }
-
-  // Error handling
-  if (actionError) {
-    return (
-      <ErrorAlert
-        title={t('common.loadError') || 'Load failed'}
-        error={actionError}
-        onRetry={() => {
-          setError(null);
-          window.location.reload();
-        }}
-      />
-    );
   }
 
   return (
@@ -772,6 +768,29 @@ export function DetailPageContent(props: PageContentProps) {
             day: 'numeric',
           })}
         </div>
+
+        {actionError && (
+          <div
+            className="print-hide mx-6 mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            role="alert"
+            data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'action-error')}
+            data-print="hide"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="font-medium">{actionFailedTitle}</div>
+                <div className="mt-1 break-words">{actionError}</div>
+              </div>
+              <button
+                type="button"
+                className="shrink-0 rounded px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                onClick={() => setError(null)}
+              >
+                {closeLabel}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* AI Next Best Action suggestions (hidden in print) */}
         <div className="print-hide">

@@ -89,6 +89,49 @@ describe('DataSourceManager', () => {
     );
   });
 
+  it('evaluates namedQuery params against detail record/form/state context', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: { records: [{ material: 'RC0603FR-0710KL' }], total: 1 },
+    } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { pid: 'quote-1' },
+        record: { pid: 'quote-1' },
+        state: { selectedSource: 'kingdee' },
+      } as any),
+    );
+    manager.register('bomPriceWaterfall', {
+      type: 'namedQuery',
+      queryCode: 'qo_quote_bom_price_waterfall',
+      format: 'records',
+      adaptor: 'table',
+      autoFetch: false,
+      params: {
+        quoteId: '${form.pid}',
+        recordId: '${record.pid}',
+        source: '${state.selectedSource}',
+      },
+    });
+
+    await manager.fetch('bomPriceWaterfall');
+
+    expect(mockedFetchResult).toHaveBeenCalledWith(
+      '/api/datasource/list',
+      expect.objectContaining({
+        method: 'get',
+        params: expect.objectContaining({
+          datasourceId: 'nq:qo_quote_bom_price_waterfall',
+          format: 'records',
+          quoteId: 'quote-1',
+          recordId: 'quote-1',
+          source: 'kingdee',
+        }),
+      }),
+    );
+  });
+
   it('omits format for namedQuery sources by default (option/dropdown format)', async () => {
     mockedFetchResult.mockResolvedValueOnce({ code: '0', data: [] } as any);
 

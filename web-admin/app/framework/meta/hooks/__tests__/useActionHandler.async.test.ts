@@ -116,4 +116,52 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect(result.current.activeTask?.status).toBe('failed');
     expect(result.current.activeTask?.errorMessage).toContain('source_file_id is required');
   });
+
+  it('prefers command context.detail over generic HTTP error text', async () => {
+    fetchResultMock.mockResolvedValueOnce({
+      code: '35000',
+      desc: 'Bad parameter',
+      message: 'Bad parameter',
+      data: null,
+      context: {
+        detail:
+          'Plugin handler execution failed: Quote readiness gate failed: BOM_PRICE_MISSING: E2E-MISSING-PRICE',
+      },
+    });
+
+    const loadData = vi.fn();
+    const showToast = vi.fn();
+    const onError = vi.fn();
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'qo_quote_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        showToast,
+        onError,
+        context: { loadData } as any,
+      }),
+    );
+
+    const button = {
+      code: 'submit_approval',
+      label: 'Submit Approval',
+      action: { type: 'command', command: 'qo_quote_common:submit_approval' },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button, {
+        pid: '01KTYHZX80DQ0HWWDXTY5JTZEB',
+      });
+    });
+
+    expect(loadData).not.toHaveBeenCalled();
+    expect(result.current.error).toContain('BOM_PRICE_MISSING');
+    expect(result.current.error).not.toBe('Bad parameter');
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('BOM_PRICE_MISSING'), 'error');
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect((onError.mock.calls[0][0] as Error).message).toContain('BOM_PRICE_MISSING');
+  });
 });

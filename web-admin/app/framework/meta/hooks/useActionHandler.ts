@@ -68,6 +68,33 @@ import { useAsyncTaskModalSink } from '~/framework/meta/rendering/components/Asy
 import type { NavigateFunction as RouterNavigateFunction } from 'react-router';
 type NavigateFunction = RouterNavigateFunction;
 
+function firstNonBlankString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return undefined;
+}
+
+function resolveCommandErrorMessage(result: unknown, commandCode: string): string {
+  const body = (result || {}) as Record<string, any>;
+  return (
+    firstNonBlankString(
+      body.context?.detail,
+      body.context?.error,
+      body.context?.exception,
+      body.data?.context?.detail,
+      body.data?.context?.error,
+      body.data?.detail,
+      body.data?.error,
+      body.data?.message,
+      body.message,
+      body.desc,
+    ) || `Command ${commandCode} failed`
+  );
+}
+
 export interface UseActionHandlerOptions {
   // SchemaRuntime (可选 - 用于 ActionFlow 支持)
   runtime?: SchemaRuntime | null;
@@ -251,7 +278,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       });
 
       if (!ResultHelper.isSuccess(result)) {
-        throw new Error(result.desc || result.message || `Command ${commandCode} failed`);
+        throw new Error(resolveCommandErrorMessage(result, commandCode));
       }
 
       // Async dispatch: handlerParams.async commands return immediately with a
@@ -635,9 +662,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Action execution failed';
+        const errorObject = err instanceof Error ? err : new Error(errorMessage);
         console.error(`[useActionHandler] Action execution failed (${button.code}):`, err);
         setError(errorMessage);
-        if (onError) onError(err as Error);
+        showToast?.(errorMessage, 'error');
+        if (onError) onError(errorObject);
       } finally {
         setLoading(false);
       }
