@@ -60,13 +60,104 @@ import { ResultHelper } from '~/utils/type';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { normalizeAction, normalizeButtonProps } from '~/framework/meta/utils/normalizeAction';
-import { pickFile, uploadCommandFile, resolvePromptUploadKey } from '~/framework/meta/utils/promptUpload';
+import {
+  pickFile,
+  uploadCommandFile,
+  resolvePromptUploadKey,
+  resolvePromptUploadFilenameKey,
+} from '~/framework/meta/utils/promptUpload';
 import type { AsyncTask } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
 import { useAsyncTaskModalSink } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
 
 // Navigate function type (compatible with react-router v7)
 import type { NavigateFunction as RouterNavigateFunction } from 'react-router';
 type NavigateFunction = RouterNavigateFunction;
+
+function firstNonBlankString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return undefined;
+}
+
+function toNonBlankString(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const text = String(value).trim();
+  return text.length > 0 ? text : undefined;
+}
+
+function readPath(source: unknown, path: string): unknown {
+  if (!source || typeof source !== 'object') return undefined;
+  return path.split('.').reduce<unknown>((current, segment) => {
+    if (!current || typeof current !== 'object') return undefined;
+    return (current as Record<string, unknown>)[segment];
+  }, source);
+}
+
+function resolveRuntimeTemplate(value: unknown, runtimeContext: Record<string, unknown>): unknown {
+  if (typeof value !== 'string') return value;
+  const exact = value.trim().match(/^\$\{(.+)\}$/);
+  if (exact) return readPath(runtimeContext, exact[1]);
+  return value.replace(/\$\{([^}]+)\}/g, (_match, path) =>
+    String(readPath(runtimeContext, path) ?? ''),
+  );
+}
+
+function resolveCommandTargetRecordId(
+  actionDef: Record<string, unknown>,
+  runtimeContext: Record<string, unknown>,
+  record: Record<string, any> | undefined,
+  context: Record<string, any>,
+): string | undefined {
+  const explicitTarget = resolveRuntimeTemplate(
+    actionDef.targetRecordId ?? actionDef.targetRecordPid,
+    runtimeContext,
+  );
+  return (
+    toNonBlankString(explicitTarget) ||
+    toNonBlankString(record?.pid) ||
+    toNonBlankString(record?.id) ||
+    toNonBlankString(context.data?.pid) ||
+    toNonBlankString(context.data?.id)
+  );
+}
+
+function resolveCommandRefreshIds(
+  actionDef: Record<string, unknown>,
+  button: Record<string, unknown>,
+): string[] | undefined {
+  const rawRefresh =
+    actionDef.refresh ??
+    actionDef.reload ??
+    button.refresh ??
+    button.reload;
+  if (Array.isArray(rawRefresh)) {
+    const ids = rawRefresh.map((item) => toNonBlankString(item)).filter(Boolean) as string[];
+    return ids.length > 0 ? ids : undefined;
+  }
+  const singleId = toNonBlankString(rawRefresh);
+  return singleId ? [singleId] : undefined;
+}
+
+function resolveCommandErrorMessage(result: unknown, commandCode: string): string {
+  const body = (result || {}) as Record<string, any>;
+  return (
+    firstNonBlankString(
+      body.context?.detail,
+      body.context?.error,
+      body.context?.exception,
+      body.data?.context?.detail,
+      body.data?.context?.error,
+      body.data?.detail,
+      body.data?.error,
+      body.data?.message,
+      body.message,
+      body.desc,
+    ) || `Command ${commandCode} failed`
+  );
+}
 
 export interface UseActionHandlerOptions {
   // SchemaRuntime (可选 - 用于 ActionFlow 支持)
@@ -251,7 +342,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       });
 
       if (!ResultHelper.isSuccess(result)) {
-        throw new Error(result.desc || result.message || `Command ${commandCode} failed`);
+        throw new Error(resolveCommandErrorMessage(result, commandCode));
       }
 
       // Async dispatch: handlerParams.async commands return immediately with a
@@ -382,7 +473,13 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               const confirmed = await showConfirmDialog(confirmKey);
               if (!confirmed) return;
             }
-            const targetRecordId = record?.pid || (context.data?.pid as string | undefined);
+            const runtimeContext = (runtime?.getContext?.() ?? {}) as Record<string, unknown>;
+            const targetRecordId = resolveCommandTargetRecordId(
+              actionDef as unknown as Record<string, unknown>,
+              runtimeContext,
+              record,
+              context,
+            );
             let payload = record || context.data || {};
             // `promptUpload`: collect a file from the user, upload it, and inject the
             // resulting file id into the payload before the command runs. Strictly
@@ -397,12 +494,18 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               if (!file) return; // user dismissed the picker — nothing to do
               setLoading(true);
               const fileId = await uploadCommandFile(file, token);
-              payload = { ...payload, [resolvePromptUploadKey(promptUpload)]: fileId };
+              payload = {
+                ...payload,
+                [resolvePromptUploadKey(promptUpload)]: fileId,
+                [resolvePromptUploadFilenameKey(promptUpload)]: file.name,
+              };
             }
             const btnLabel = normalizedButton.label;
             const btnCode = normalizedButton.code;
+            const explicitOperationType = toNonBlankString((actionDef as any).operationType);
             const operationType =
-              btnLabel === 'delete' || btnCode === 'delete'
+              explicitOperationType ||
+              (btnLabel === 'delete' || btnCode === 'delete'
                 ? 'delete'
                 : btnLabel === 'create' || btnCode === 'create'
                   ? 'create'
@@ -410,10 +513,16 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                     ? 'update'
                     : targetRecordId
                       ? 'update'
-                      : undefined;
+                      : undefined);
             await executeCommand(actionDef.command, targetRecordId, payload, operationType);
+            const refreshIds = resolveCommandRefreshIds(
+              actionDef as unknown as Record<string, unknown>,
+              normalizedButton as unknown as Record<string, unknown>,
+            );
             if (context.loadData) {
               await context.loadData();
+            } else if (refreshIds && dataSourceManager?.reload) {
+              await dataSourceManager.reload(refreshIds);
             } else {
               navigate(`/p/${tableName}`);
             }
@@ -425,6 +534,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // Absolute backend/external URLs (e.g. a file-download endpoint) are
             // real browser navigations, not client-side routes — open them so the
             // browser handles the Content-Disposition download.
+            if (actionDef.hardReload === true) {
+              window.open(path, '_self');
+              return;
+            }
             if (/^(https?:)?\/\//.test(path) || path.startsWith('/api/')) {
               window.open(path, '_blank', 'noopener');
               return;
@@ -635,9 +748,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Action execution failed';
+        const errorObject = err instanceof Error ? err : new Error(errorMessage);
         console.error(`[useActionHandler] Action execution failed (${button.code}):`, err);
         setError(errorMessage);
-        if (onError) onError(err as Error);
+        showToast?.(errorMessage, 'error');
+        if (onError) onError(errorObject);
       } finally {
         setLoading(false);
       }

@@ -279,7 +279,7 @@ export type ActionDef =
   | { type: 'state_transition'; command: string }
   | { type: 'bulk_command'; command: string }
   | { type: 'bulk_state_transition'; command: string }
-  | { type: 'navigate'; to: string; command?: string }
+  | { type: 'navigate'; to: string; command?: string; hardReload?: boolean }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }
   | { type: 'flow'; handler: string }

@@ -4,9 +4,10 @@
  * A toolbar/command button may declare `promptUpload: true` (or
  * `promptUpload: "<payloadKey>"`) to collect a file from the user *before* the
  * command runs — the file is uploaded via the platform file-upload API and its
- * id is injected into the command payload. Without this, such buttons fire the
- * command with an empty payload and the handler rejects it (e.g.
- * `source_file_id is required`).
+ * id is injected into the command payload. The original browser filename is
+ * injected under a companion key so command handlers can preserve artifact
+ * provenance. Without this, such buttons fire the command with an empty payload
+ * and the handler rejects it (e.g. `source_file_id is required`).
  */
 
 /**
@@ -81,4 +82,26 @@ export function resolvePromptUploadKey(promptUpload: unknown): string {
   return typeof promptUpload === 'string' && promptUpload.trim()
     ? promptUpload.trim()
     : 'source_file_id';
+}
+
+/**
+ * Resolve the companion filename payload key for a promptUpload file id key.
+ *
+ * Examples:
+ * - `corrected_bom_file_id` → `corrected_bom_filename`
+ * - `process_rule_file_id` → `process_rule_filename`
+ * - `source_file_id` → `source_filename`
+ */
+export function resolvePromptUploadFilenameKey(promptUpload: unknown): string {
+  const fileIdKey = resolvePromptUploadKey(promptUpload);
+  if (fileIdKey.endsWith('_file_id')) {
+    return `${fileIdKey.slice(0, -'_file_id'.length)}_filename`;
+  }
+  if (fileIdKey.endsWith('_fileId')) {
+    return `${fileIdKey.slice(0, -'_fileId'.length)}_filename`;
+  }
+  if (fileIdKey.endsWith('FileId')) {
+    return `${fileIdKey.slice(0, -'FileId'.length)}Filename`;
+  }
+  return `${fileIdKey}_filename`;
 }

@@ -59,11 +59,16 @@ export function BPMNToolbar({
   const isVersionPanelOpen = isVersionPanelOpenProp ?? false;
 
   const isReadOnly = !!viewingVersionId;
+  const secondaryButtonClass =
+    'shrink-0 whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50';
 
   // Build a title element with editable name + key inputs + status badge
   const titleElement = (
-    <div className="flex items-center gap-2">
-      <h1 data-testid="bpmn-page-title" className="text-xl font-semibold text-gray-900">
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <h1
+        data-testid="bpmn-page-title"
+        className="shrink-0 whitespace-nowrap text-xl font-semibold text-gray-900"
+      >
         {t('bpmn.designer.title')}
       </h1>
       <input
@@ -94,7 +99,7 @@ export function BPMNToolbar({
     <>
       <button
         onClick={onValidate}
-        className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        className={secondaryButtonClass}
         disabled={isReadOnly}
         data-testid="bpmn-btn-validate"
       >
@@ -102,7 +107,7 @@ export function BPMNToolbar({
       </button>
       <button
         onClick={onImport}
-        className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        className={secondaryButtonClass}
         disabled={isReadOnly}
         data-testid="bpmn-btn-import"
       >
@@ -110,14 +115,14 @@ export function BPMNToolbar({
       </button>
       <button
         onClick={onExport}
-        className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        className={secondaryButtonClass}
         data-testid="bpmn-btn-export"
       >
         {t('bpmn.designer.export')}
       </button>
       <button
         onClick={onToggleVersionHistory}
-        className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+        className={`shrink-0 whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
           isVersionPanelOpen
             ? 'border-blue-300 bg-blue-50 text-blue-700'
             : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
@@ -130,15 +135,15 @@ export function BPMNToolbar({
       <button
         onClick={onDeploy}
         disabled={isDeploying || isDirty || !processDefinition?.id || isReadOnly}
-        className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+        className="shrink-0 whitespace-nowrap rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
         data-testid="bpmn-btn-deploy"
       >
         {isDeploying ? t('bpmn.designer.deploying') : t('bpmn.designer.deploy')}
       </button>
-      <div className="h-6 w-px bg-gray-300" />
+      <div className="h-6 w-px shrink-0 bg-gray-300" />
       <button
         onClick={onMonitorToggle}
-        className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+        className={`shrink-0 whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
           viewMode === 'monitor'
             ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
             : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
