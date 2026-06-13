@@ -599,17 +599,25 @@ export function UnifiedDesignerWorkbench({
     setActiveDrag(null);
     setActiveDropIntent(null);
 
-    let action = resolveDragEndAction(drag, drop, {
+    let action: ReturnType<typeof resolveDragEndAction> = null;
+    if (drag?.kind === 'canvas-block' && drop?.kind === 'block') {
+      const dropPath = findBlockById(document.blocks, drop.blockId)?.path.map((item) => item.id) ?? [];
+      action = resolveCanvasBlockAncestorDropAction(
+        drag.blockId,
+        dropPath,
+        {
+          ...dropCapabilities,
+          canAddBlockToRoot,
+        },
+        {
+          getBlockType: (blockId) => findBlockById(document.blocks, blockId)?.block.blockType,
+        },
+      );
+    }
+    action ??= resolveDragEndAction(drag, drop, {
       ...dropCapabilities,
       canAddBlockToRoot,
     });
-    if (!action && drag?.kind === 'canvas-block' && drop?.kind === 'block') {
-      const dropPath = findBlockById(document.blocks, drop.blockId)?.path.map((item) => item.id) ?? [];
-      action = resolveCanvasBlockAncestorDropAction(drag.blockId, dropPath, {
-        ...dropCapabilities,
-        canAddBlockToRoot,
-      });
-    }
     if (!action) return;
 
     switch (action.type) {
