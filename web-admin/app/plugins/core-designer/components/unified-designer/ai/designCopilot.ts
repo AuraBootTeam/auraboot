@@ -174,7 +174,12 @@ export function parseDesignCopilotResponse(
   };
 
   const assignIds = (block: any): DslBlockV3 => {
-    const next: DslBlockV3 = { ...block, id: nextId() };
+    // MD-2: stamp AI provenance so manual vs generated blocks are distinguishable.
+    const next: DslBlockV3 = {
+      ...block,
+      id: nextId(),
+      extension: { ...(block.extension ?? {}), source: 'ai' },
+    };
     if (Array.isArray(block.blocks)) {
       next.blocks = block.blocks.map(assignIds);
     }
@@ -187,10 +192,36 @@ export function parseDesignCopilotResponse(
 }
 
 /**
+ * MD-2: a block the AI copilot must NOT overwrite when it regenerates. A block is
+ * locked when an author marks it via `props.aiLocked` (same flag D5 uses at field
+ * level, lifted here to block level).
+ */
+export function isBlockLocked(block: DslBlockV3): boolean {
+  return block?.props?.aiLocked === true;
+}
+
+/**
+ * Merge AI blocks into an existing child list.
+ * - append: keep all existing blocks, add the AI blocks after them.
+ * - replace: keep only LOCKED existing blocks (MD-2 — AI re-gen respects manual
+ *   locks), then add the AI blocks after them. Unlocked manual blocks are replaced.
+ */
+function mergeBlocks(
+  existing: DslBlockV3[],
+  aiBlocks: DslBlockV3[],
+  mergeMode: DesignMergeMode,
+): DslBlockV3[] {
+  if (mergeMode === 'append') return [...existing, ...aiBlocks];
+  const locked = existing.filter(isBlockLocked);
+  return [...locked, ...aiBlocks];
+}
+
+/**
  * Apply parsed copilot blocks into a document. For a kind with a single root
  * container, the blocks become that container's children (replace/append per
- * mergeMode); manual content is preserved on append. For composite (no root
- * container) the blocks merge at the page root.
+ * mergeMode); manual content is preserved on append, and locked blocks (MD-2)
+ * are preserved even on replace. For composite (no root container) the blocks
+ * merge at the page root with the same rules.
  *
  * Pure: returns a new document, never mutates the input.
  */
@@ -202,9 +233,7 @@ export function applyDesignBlocks(
   const { blocks, mergeMode } = parsed;
 
   if (!rootBlockType) {
-    const nextRootBlocks =
-      mergeMode === 'append' ? [...document.blocks, ...blocks] : blocks;
-    return { ...document, blocks: nextRootBlocks };
+    return { ...document, blocks: mergeBlocks(document.blocks, blocks, mergeMode) };
   }
 
   const rootIndex = document.blocks.findIndex((b) => b.blockType === rootBlockType);
@@ -215,8 +244,7 @@ export function applyDesignBlocks(
   }
 
   const root = document.blocks[rootIndex];
-  const existingChildren = root.blocks ?? [];
-  const nextChildren = mergeMode === 'append' ? [...existingChildren, ...blocks] : blocks;
+  const nextChildren = mergeBlocks(root.blocks ?? [], blocks, mergeMode);
   const nextRoot: DslBlockV3 = { ...root, blocks: nextChildren };
   const nextBlocks = [...document.blocks];
   nextBlocks[rootIndex] = nextRoot;
