@@ -69,6 +69,10 @@ interface QuoteInspection {
     name?: string;
   };
   board?: Partial<BoardBounds>;
+  boardSvgUrls?: {
+    top?: string;
+    bottom?: string;
+  };
   summary?: Record<string, number>;
   layerManifest?: LayerManifestItem[];
   drillFiles?: DrillFile[];
@@ -317,10 +321,10 @@ function boardBounds(inspection: QuoteInspection | undefined, line: Record<strin
 function matchesSearch(component: ComponentInspection, normalizedQuery: string): boolean {
   if (!normalizedQuery) return true;
   return (
-    component.refdes?.toUpperCase().includes(normalizedQuery) ||
-    component.footprint?.toUpperCase().includes(normalizedQuery) ||
-    component.bomItem?.materialName?.toUpperCase().includes(normalizedQuery) ||
-    component.bomItem?.process?.toUpperCase().includes(normalizedQuery)
+    (component.refdes || '').toUpperCase().includes(normalizedQuery) ||
+    (component.footprint || '').toUpperCase().includes(normalizedQuery) ||
+    (component.bomItem?.materialName || '').toUpperCase().includes(normalizedQuery) ||
+    (component.bomItem?.process || '').toUpperCase().includes(normalizedQuery)
   );
 }
 
@@ -410,6 +414,12 @@ function selectedParseStatus(line: Record<string, any>): string {
   const parse = readPath(line, 'qo_ql_gerber_parse_status') || '-';
   const validation = readPath(line, 'qo_ql_gerber_validation_status') || '-';
   return `${parse} / ${validation}`;
+}
+
+function boardSvgUrl(inspection: QuoteInspection | undefined, side: SideFilter): string | undefined {
+  if (!inspection || side === 'all' || side === 'unknown') return undefined;
+  const value = inspection.boardSvgUrls?.[side];
+  return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
 function Segmented<T extends string>({
@@ -610,6 +620,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
   const projectCode = inspection.project?.code || readPath(lineRecord, 'qo_ql_description') || 'Gerber inspection';
   const projectName = inspection.project?.name || readPath(lineRecord, 'qo_ql_mpn') || '';
   const summary = inspection.summary || {};
+  const activeBoardSvgUrl = boardSvgUrl(inspection, side);
 
   return (
     <section className="space-y-3" data-testid="gerber-viewer">
@@ -655,7 +666,15 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
             className="relative overflow-hidden rounded-lg border border-gray-300 bg-gray-950 shadow-sm"
             style={{ aspectRatio: `${board.widthMm} / ${board.heightMm}` }}
           >
-            <BoardLayerSvg board={board} layers={layers} side={side} />
+            {activeBoardSvgUrl ? (
+              <img
+                src={activeBoardSvgUrl}
+                alt={`${side === 'top' ? 'Top' : 'Bottom'} Gerber board render`}
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <BoardLayerSvg board={board} layers={layers} side={side} />
+            )}
             <div className="absolute inset-0">
               {components.map((component, index) => {
                 const active = component.refdes === selectedRefdes;
