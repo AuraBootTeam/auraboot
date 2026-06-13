@@ -2,6 +2,7 @@
 type: backlog
 status: closed
 created: 2026-06-13
+closed: 2026-06-13
 distilled_to: web-admin/app/framework/meta/utils/__tests__/canonicalizePageDsl.test.ts (regression test "folds commandCode into a command action for a legacy form-persist verb (save)")
 ---
 
@@ -75,3 +76,23 @@ golden on a shipped dynamic form (create → row appears) **and** a synthesized 
 This is a platform-wide form-dispatch change — high blast radius (every form/button) — so it
 must be done deliberately with broad form-type coverage (create/edit, command/CRUD, with/without
 commandCode), not bundled into an unrelated fix.
+
+## Prompt-to-App browser revalidation 2026-06-13
+
+The `origin/main` fix was revalidated on the current Prompt-to-App golden stack. This adds browser
+coverage for both the shipped legacy form and a synthesized generated app, so the closure evidence is
+not only unit-level.
+
+Verification on `Vite:5274 → BFF:3601 → Backend:6543` (`AGENT_LLM_STUB_MODE=true` only replaces the
+external LLM key dependency):
+
+- Unit: `pnpm exec vitest run app/framework/meta/utils/__tests__/canonicalizePageDsl.test.ts` →
+  16 passed.
+- Typecheck: `pnpm typecheck` → passed.
+- Smoke: `tests/e2e/ai/nl-modeling-smoke.spec.ts` on current worktree stack
+  → 25 passed, 2 skipped.
+- Real-browser golden:
+  `tests/e2e/ai/prompt-to-app-dynamic-form-submit-golden.spec.ts` → 21 passed, 1 skipped.
+  It covers both the side-nav → `/p/tasset_category` → shipped legacy form submit path and the
+  Prompt-to-App synthesized side-nav → `/p/<generated_model>` → create submit path, asserting the
+  command POST and row appearance.
