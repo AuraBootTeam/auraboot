@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.nlmodeling;
 
+import com.auraboot.framework.agent.nlmodeling.dto.NlModelingRequest;
 import com.auraboot.framework.agent.nlmodeling.dto.NlModelingResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,6 +29,27 @@ class NlModelingManifestPostProcessingTest {
             m.put((String) kv[i], kv[i + 1]);
         }
         return m;
+    }
+
+    @Test
+    void emptyOptions_deserializeToNull_notFalse_soGenerationStaysOn() throws Exception {
+        // Regression: with primitive boolean + @Builder.Default, Jackson deserialized
+        // `options:{}` to all-false, silently disabling page/command/menu generation
+        // for callers that send empty or partial options. Boxed Boolean leaves omitted
+        // fields null (treated as "generate" downstream); only explicit false disables.
+        NlModelingRequest empty = mapper.readValue(
+                "{\"description\":\"x\",\"options\":{}}", NlModelingRequest.class);
+        assertNull(empty.getOptions().getGeneratePages(), "omitted option must be null, not false");
+        assertNull(empty.getOptions().getGenerateCommands());
+        assertNull(empty.getOptions().getGenerateMenus());
+
+        NlModelingRequest explicit = mapper.readValue(
+                "{\"description\":\"x\",\"options\":{\"generatePages\":false}}", NlModelingRequest.class);
+        assertEquals(Boolean.FALSE, explicit.getOptions().getGeneratePages(),
+                "an explicit false must still be honored");
+
+        // The builder path (used when options is null) still defaults everything on.
+        assertEquals(Boolean.TRUE, NlModelingRequest.Options.builder().build().getGeneratePages());
     }
 
     @Test
