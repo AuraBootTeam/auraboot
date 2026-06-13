@@ -75,33 +75,63 @@ export function moveBlockBefore(
   targetBlockId: string,
 ): DslBlockV3[] {
   if (movingBlockId === targetBlockId) return blocks;
-  return moveWithinParent(blocks, movingBlockId, targetBlockId).blocks;
+  const movingResult = findBlockById(blocks, movingBlockId);
+  const targetResult = findBlockById(blocks, targetBlockId);
+  if (!movingResult || !targetResult) return blocks;
+  if (targetResult.path.some((item) => item.id === movingBlockId)) return blocks;
+
+  const extraction = extractBlockById(blocks, movingBlockId);
+  if (!extraction) return blocks;
+
+  const insertion = insertBlockBeforeId(extraction.blocks, targetBlockId, extraction.block);
+  return insertion.changed ? insertion.blocks : blocks;
 }
 
-function moveWithinParent(
+function extractBlockById(
   blocks: DslBlockV3[],
-  movingBlockId: string,
-  targetBlockId: string,
-): { blocks: DslBlockV3[]; changed: boolean } {
-  const movingIndex = blocks.findIndex((block) => block.id === movingBlockId);
-  const targetIndex = blocks.findIndex((block) => block.id === targetBlockId);
-
-  if (movingIndex !== -1 && targetIndex !== -1) {
+  blockId: string,
+): { blocks: DslBlockV3[]; block: DslBlockV3 } | null {
+  const directIndex = blocks.findIndex((block) => block.id === blockId);
+  if (directIndex !== -1) {
     const next = [...blocks];
-    const [moving] = next.splice(movingIndex, 1);
-    const adjustedTargetIndex = movingIndex < targetIndex ? targetIndex - 1 : targetIndex;
-    next.splice(adjustedTargetIndex, 0, moving);
+    const [block] = next.splice(directIndex, 1);
+    return { blocks: next, block };
+  }
+
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index];
+    if (!block.blocks?.length) continue;
+    const extraction = extractBlockById(block.blocks, blockId);
+    if (!extraction) continue;
+    const next = [...blocks];
+    next[index] = { ...block, blocks: extraction.blocks };
+    return { blocks: next, block: extraction.block };
+  }
+
+  return null;
+}
+
+function insertBlockBeforeId(
+  blocks: DslBlockV3[],
+  targetBlockId: string,
+  movingBlock: DslBlockV3,
+): { blocks: DslBlockV3[]; changed: boolean } {
+  const targetIndex = blocks.findIndex((block) => block.id === targetBlockId);
+  if (targetIndex !== -1) {
+    const next = [...blocks];
+    next.splice(targetIndex, 0, movingBlock);
     return { blocks: next, changed: true };
   }
 
-  let changed = false;
-  const next = blocks.map((block) => {
-    if (!block.blocks?.length) return block;
-    const result = moveWithinParent(block.blocks, movingBlockId, targetBlockId);
-    if (!result.changed) return block;
-    changed = true;
-    return { ...block, blocks: result.blocks };
-  });
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index];
+    if (!block.blocks?.length) continue;
+    const insertion = insertBlockBeforeId(block.blocks, targetBlockId, movingBlock);
+    if (!insertion.changed) continue;
+    const next = [...blocks];
+    next[index] = { ...block, blocks: insertion.blocks };
+    return { blocks: next, changed: true };
+  }
 
-  return { blocks: changed ? next : blocks, changed };
+  return { blocks, changed: false };
 }
