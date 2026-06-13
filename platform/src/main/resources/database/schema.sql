@@ -9974,7 +9974,7 @@ ON CONFLICT (resource_code) DO NOTHING;
 CREATE TABLE IF NOT EXISTS ab_billing_quota_pool (
     id                  BIGINT          PRIMARY KEY,
     pool_code           VARCHAR(128)    NOT NULL,
-    account_id          BIGINT          NOT NULL,
+    account_id          BIGINT          NOT NULL REFERENCES ab_billing_account(id),
     workspace_id        BIGINT,                         -- NULL = account-level
     subscription_id     BIGINT          NOT NULL,
     resource_code       VARCHAR(64)     NOT NULL,
@@ -10017,7 +10017,7 @@ CREATE TABLE IF NOT EXISTS ab_billing_quota_bucket (
     id                  BIGINT          PRIMARY KEY,
     bucket_code         VARCHAR(128)    NOT NULL,
     pool_id             BIGINT          NOT NULL,
-    account_id          BIGINT          NOT NULL,
+    account_id          BIGINT          NOT NULL REFERENCES ab_billing_account(id),
     user_id             BIGINT,                         -- NULL = account-level
     subscription_id     BIGINT          NOT NULL,
     resource_code       VARCHAR(64)     NOT NULL,
@@ -10202,7 +10202,7 @@ CREATE TABLE IF NOT EXISTS ab_billing_usage_event (
     idempotency_key     VARCHAR(256)    NOT NULL,
 
     -- Owning account
-    account_id          BIGINT          NOT NULL,
+    account_id          BIGINT          NOT NULL REFERENCES ab_billing_account(id),
 
     -- Optional workspace scoping
     workspace_id        BIGINT,
