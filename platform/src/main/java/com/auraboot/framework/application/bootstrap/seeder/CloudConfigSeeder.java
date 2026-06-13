@@ -9,6 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Slf4j
@@ -18,6 +21,12 @@ public class CloudConfigSeeder {
     private final JdbcTemplate jdbcTemplate;
     private final FieldEncryptionService fieldEncryptionService;
     private final ObjectMapper objectMapper;
+
+    private static final String INSERT_SQL = """
+            INSERT INTO ab_cloud_config (pid, config_level, service_type, provider_code, config, enabled, priority)
+            VALUES (?, ?, ?, ?, ?::jsonb, ?, ?)
+            ON CONFLICT DO NOTHING
+            """;
 
     /**
      * Sensitive JSON field names that must be encrypted at rest before INSERT.
@@ -34,58 +43,80 @@ public class CloudConfigSeeder {
             "privateKey", "password", "accessKey", "accessToken", "refreshToken"
     );
 
+    /** Default (keyless, disabled) config for an env-provisionable LLM provider. */
+    private record LlmProviderSeed(String providerCode, int priority, String config) {}
+
+    /**
+     * Default config for the OpenAI-compatible / messages-format LLM providers whose
+     * apiKey is supplied via {@code <PROVIDER>_API_KEY} env vars (see
+     * {@link #LLM_PROVIDER_ENV_KEYS}). Single source of truth shared by
+     * {@link #seedDefaults()} (seeds them keyless + disabled on a fresh DB) and
+     * {@link #provisionLlmApiKeysFromEnv()} (recreates a row from this default when
+     * the operator sets the env var but the row is absent — e.g. it was deleted
+     * during a credential cleanup). All entries are keyless: keys only ever come
+     * from the environment, never from source.
+     */
+    private static final Map<String, LlmProviderSeed> LLM_PROVIDER_SEEDS = buildLlmProviderSeeds();
+
+    private static Map<String, LlmProviderSeed> buildLlmProviderSeeds() {
+        Map<String, LlmProviderSeed> m = new LinkedHashMap<>();
+        m.put("seed_llm_anthropic", new LlmProviderSeed("anthropic", 10,
+                "{\"displayName\":\"Anthropic (Claude)\",\"apiFormat\":\"messages\",\"baseUrl\":\"https://api.anthropic.com\",\"defaultModel\":\"claude-sonnet-4-6\",\"maxTokens\":4096,\"models\":[\"claude-opus\",\"claude-sonnet\",\"claude-haiku\"]}"));
+        m.put("seed_llm_openai", new LlmProviderSeed("openai", 20,
+                "{\"displayName\":\"OpenAI\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.openai.com\",\"defaultModel\":\"gpt-4o\",\"maxTokens\":4096,\"models\":[\"gpt-4\",\"gpt-3.5\",\"o1-\",\"o3-\",\"o4-\"]}"));
+        m.put("seed_llm_deepseek", new LlmProviderSeed("deepseek", 30,
+                "{\"displayName\":\"DeepSeek\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.deepseek.com\",\"defaultModel\":\"deepseek-chat\",\"maxTokens\":4096,\"models\":[\"deepseek\"]}"));
+        m.put("seed_llm_qianwen", new LlmProviderSeed("qianwen", 50,
+                "{\"displayName\":\"通义千问 (Qwen)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://dashscope.aliyuncs.com/compatible-mode\",\"defaultModel\":\"qwen-plus\",\"maxTokens\":4096,\"models\":[\"qwen\"]}"));
+        m.put("seed_llm_zhipu", new LlmProviderSeed("zhipu", 60,
+                "{\"displayName\":\"智谱 (Zhipu)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://open.bigmodel.cn/api/paas\",\"defaultModel\":\"glm-4\",\"maxTokens\":4096,\"models\":[\"glm\"]}"));
+        m.put("seed_llm_moonshot", new LlmProviderSeed("moonshot", 70,
+                "{\"displayName\":\"月之暗面 (Moonshot)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.moonshot.cn\",\"defaultModel\":\"moonshot-v1-8k\",\"maxTokens\":4096,\"models\":[\"moonshot\"]}"));
+        return m;
+    }
+
+    /** seed_ pid → environment variable holding that LLM provider's apiKey. */
+    private static final Map<String, String> LLM_PROVIDER_ENV_KEYS = Map.of(
+            "seed_llm_deepseek", "DEEPSEEK_API_KEY",
+            "seed_llm_openai", "OPENAI_API_KEY",
+            "seed_llm_anthropic", "ANTHROPIC_API_KEY",
+            "seed_llm_qianwen", "DASHSCOPE_API_KEY",
+            "seed_llm_zhipu", "ZHIPU_API_KEY",
+            "seed_llm_moonshot", "MOONSHOT_API_KEY",
+            "seed_llm_minimaxi", "MINIMAX_API_KEY");
+
     public void seed() {
         // Check if already seeded by looking for any seed_ prefixed pid
         Integer existing = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM ab_cloud_config WHERE pid LIKE 'seed_%'", Integer.class);
         if (existing != null && existing > 0) {
             log.info("CloudConfigSeeder: seeded 0 cloud configs (skipped {} existing)", existing);
-            return;
+        } else {
+            seedDefaults();
+        }
+        // Always (idempotent): provision/override LLM provider apiKeys from environment
+        // variables (<PROVIDER>_API_KEY). Keeps secrets in the environment — never
+        // hardcoded in source, never pasted into chat — and re-applies on every boot.
+        provisionLlmApiKeysFromEnv();
+    }
+
+    private void seedDefaults() {
+        int count = 0;
+
+        // Env-provisionable LLM providers — keyless + disabled until a key is supplied.
+        for (Map.Entry<String, LlmProviderSeed> e : LLM_PROVIDER_SEEDS.entrySet()) {
+            LlmProviderSeed seed = e.getValue();
+            count += jdbcTemplate.update(INSERT_SQL, e.getKey(), "platform", "llm",
+                    seed.providerCode(), encryptSensitiveFields(seed.config()), false, seed.priority());
         }
 
-        String sql = """
-                INSERT INTO ab_cloud_config (pid, config_level, service_type, provider_code, config, enabled, priority)
-                VALUES (?, ?, ?, ?, ?::jsonb, ?, ?)
-                ON CONFLICT DO NOTHING
-                """;
-
         Object[][] rows = {
-            // LLM Providers
-            {
-                "seed_llm_anthropic", "platform", "llm", "anthropic",
-                "{\"displayName\":\"Anthropic (Claude)\",\"apiFormat\":\"messages\",\"baseUrl\":\"https://api.anthropic.com\",\"defaultModel\":\"claude-sonnet-4-6\",\"maxTokens\":4096,\"models\":[\"claude-opus\",\"claude-sonnet\",\"claude-haiku\"]}",
-                false, 10
-            },
-            {
-                "seed_llm_openai", "platform", "llm", "openai",
-                "{\"displayName\":\"OpenAI\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.openai.com\",\"defaultModel\":\"gpt-4o\",\"maxTokens\":4096,\"models\":[\"gpt-4\",\"gpt-3.5\",\"o1-\",\"o3-\",\"o4-\"]}",
-                false, 20
-            },
-            {
-                "seed_llm_deepseek", "platform", "llm", "deepseek",
-                "{\"displayName\":\"DeepSeek\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.deepseek.com\",\"defaultModel\":\"deepseek-chat\",\"maxTokens\":4096,\"models\":[\"deepseek\"]}",
-                false, 30
-            },
+            // LLM provider with a bundled key (legacy; key supersedable via MINIMAX_API_KEY env)
             {
                 // TODO: Remove API key before open-source release
                 "seed_llm_minimaxi", "platform", "llm", "minimaxi",
                 "{\"apiKey\":\"sk-cp-XNk1pU7mUnMlnRoprZArXq1XhTNVgVgtBXm48BW6XjROAB4vsK2DyEgyCOS7ODpgJWvy9jx9dTQE7tR3q_1mg0ldaiBc-j5H1wwrFzJ3RcqYYLIpL1jW_cI\",\"displayName\":\"MiniMax (海螺AI)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.minimax.chat/v1\",\"defaultModel\":\"MiniMax-M2.5\",\"maxTokens\":4096,\"models\":[\"MiniMax-M2.5\",\"MiniMax-Text-01\",\"abab6.5s-chat\"]}",
                 true, 40
-            },
-            {
-                "seed_llm_qianwen", "platform", "llm", "qianwen",
-                "{\"displayName\":\"通义千问 (Qwen)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://dashscope.aliyuncs.com/compatible-mode\",\"defaultModel\":\"qwen-plus\",\"maxTokens\":4096,\"models\":[\"qwen\"]}",
-                false, 50
-            },
-            {
-                "seed_llm_zhipu", "platform", "llm", "zhipu",
-                "{\"displayName\":\"智谱 (Zhipu)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://open.bigmodel.cn/api/paas\",\"defaultModel\":\"glm-4\",\"maxTokens\":4096,\"models\":[\"glm\"]}",
-                false, 60
-            },
-            {
-                "seed_llm_moonshot", "platform", "llm", "moonshot",
-                "{\"displayName\":\"月之暗面 (Moonshot)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.moonshot.cn\",\"defaultModel\":\"moonshot-v1-8k\",\"maxTokens\":4096,\"models\":[\"moonshot\"]}",
-                false, 70
             },
             // Embedding Providers
             {
@@ -116,13 +147,70 @@ public class CloudConfigSeeder {
             },
         };
 
-        int count = 0;
         for (Object[] row : rows) {
             String configJson = (String) row[4];
             String encryptedConfigJson = encryptSensitiveFields(configJson);
-            count += jdbcTemplate.update(sql, row[0], row[1], row[2], row[3], encryptedConfigJson, row[5], row[6]);
+            count += jdbcTemplate.update(INSERT_SQL, row[0], row[1], row[2], row[3], encryptedConfigJson, row[5], row[6]);
         }
-        log.info("CloudConfigSeeder: seeded {} cloud configs (skipped {} existing)", count, rows.length - count);
+        int total = LLM_PROVIDER_SEEDS.size() + rows.length;
+        log.info("CloudConfigSeeder: seeded {} cloud configs (skipped {} existing)", count, total - count);
+    }
+
+    /**
+     * Provisions LLM provider apiKeys from environment variables — the 12-factor way
+     * to supply secrets in dev/CI/prod without hardcoding them in source or pasting
+     * them into a chat. For each provider whose {@code <PROVIDER>_API_KEY} env var is
+     * set, merges the key into the provider's config (encrypted) and enables it.
+     *
+     * <p>If the row is absent (e.g. it was deleted during a credential cleanup) and
+     * the provider has a known default ({@link #LLM_PROVIDER_SEEDS}), the row is
+     * recreated from that default so setting the env var alone is sufficient to make
+     * the provider work. Idempotent: runs on every boot, only writes when the env var
+     * is set, never clears a key when the env var is absent, and never logs the key.
+     */
+    void provisionLlmApiKeysFromEnv() {
+        for (Map.Entry<String, String> entry : LLM_PROVIDER_ENV_KEYS.entrySet()) {
+            String pid = entry.getKey();
+            String envVar = entry.getValue();
+            String apiKey = readEnv(envVar);
+            if (apiKey == null || apiKey.isBlank()) {
+                continue;
+            }
+            List<String> existing = jdbcTemplate.queryForList(
+                    "SELECT config::text FROM ab_cloud_config WHERE pid = ?", String.class, pid);
+            LlmProviderSeed seed = LLM_PROVIDER_SEEDS.get(pid);
+            if (existing.isEmpty() && seed == null) {
+                // Absent row with no known default (e.g. an inline-only provider) —
+                // skip rather than guess a config shape.
+                continue;
+            }
+            try {
+                String baseConfig = existing.isEmpty() ? seed.config() : existing.get(0);
+                ObjectNode config = (ObjectNode) objectMapper.readTree(baseConfig);
+                config.put("apiKey", apiKey);
+                String encrypted = encryptSensitiveFields(objectMapper.writeValueAsString(config));
+                if (existing.isEmpty()) {
+                    jdbcTemplate.update(INSERT_SQL, pid, "platform", "llm",
+                            seed.providerCode(), encrypted, true, seed.priority());
+                    log.info("CloudConfigSeeder: created + provisioned {} from env {} (enabled)",
+                            pid, envVar);
+                } else {
+                    jdbcTemplate.update(
+                            "UPDATE ab_cloud_config SET config = ?::jsonb, enabled = true WHERE pid = ?",
+                            encrypted, pid);
+                    log.info("CloudConfigSeeder: provisioned {} apiKey from env {} (enabled)",
+                            pid, envVar);
+                }
+            } catch (Exception e) {
+                log.warn("CloudConfigSeeder: failed to provision {} apiKey from env {}: {}",
+                        pid, envVar, e.getMessage());
+            }
+        }
+    }
+
+    /** Seam over {@link System#getenv(String)} so the env source can be overridden in tests. */
+    protected String readEnv(String name) {
+        return System.getenv(name);
     }
 
     /**
