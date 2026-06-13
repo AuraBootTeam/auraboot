@@ -30,7 +30,10 @@ export class InspectorSchemaRegistry {
   }
 
   getFieldsForBlock(block: DslBlockV3): PropertySchema<string>[] {
-    return this.dynamicSchemas.get(block.blockType)?.(block) ?? this.getFields(block.blockType);
+    const base = this.dynamicSchemas.get(block.blockType)?.(block) ?? this.getFields(block.blockType);
+    // MD-2: every block is lockable — append the AI-lock toggle unless the
+    // block's own schema already declares it (e.g. form fields from D5).
+    return base.some((field) => field.key === aiLockField.key) ? base : [...base, aiLockField];
   }
 }
 
@@ -44,6 +47,16 @@ const permissionCodeField: PropertySchema<string> = {
   key: 'props.permissionCode',
   label: 'Permission code',
   type: 'text',
+};
+
+// MD-2 — block-level AI lock. Lifts D5's field-level lock to a universal inspector
+// toggle (appended to every block by getFieldsForBlock) so an author can mark ANY
+// block aiLocked and the in-designer AI copilot won't overwrite it on re-generate
+// (enforced by applyDesignBlocks.isBlockLocked).
+const aiLockField: PropertySchema<string> = {
+  key: 'props.aiLocked',
+  label: 'AI locked',
+  type: 'boolean',
 };
 
 const modelContainerFields: PropertySchema<string>[] = [
@@ -117,7 +130,7 @@ const fieldFields: PropertySchema<string>[] = [
   { key: 'props.dictCode', label: 'Dict code', type: 'text' },
   { key: 'props.required', label: 'Required', type: 'boolean' },
   { key: 'props.readOnly', label: 'Read only', type: 'boolean' },
-  { key: 'props.aiLocked', label: 'AI locked', type: 'boolean' },
+  aiLockField,
   permissionCodeField,
   { key: 'props.placeholder', label: 'Placeholder', type: 'text' },
   { key: 'props.helpText', label: 'Help text', type: 'text' },
