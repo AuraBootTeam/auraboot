@@ -1802,6 +1802,113 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expectFormSectionChildren(savedBlocks, 'form_section_move_candidate');
   });
 
+  test('undoes and redoes moving a form-section subtree from a tab before a form-root sibling', async ({
+    page,
+  }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
+      source: 'tab',
+    });
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockBeforeHeader(page, 'form_section_move_candidate', 'section_target');
+
+    const formRoot = page.getByTestId('canvas-block-form_root');
+    const sourceTab = page.getByTestId('canvas-block-tab_source');
+    await expect(sourceTab.getByTestId('canvas-block-form_section_move_candidate')).toHaveCount(0);
+    await expect(formRoot.getByTestId('canvas-block-form_section_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(formRoot, 'form_section_move_candidate', 'section_target')).toBe(
+      true,
+    );
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+    await waitForDesignerDragToSettle(page);
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+
+    await expect(sourceTab.getByTestId('canvas-block-form_section_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(formRoot, 'tabs_holder', 'section_target')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+
+    await expect(sourceTab.getByTestId('canvas-block-form_section_move_candidate')).toHaveCount(0);
+    await expect(formRoot.getByTestId('canvas-block-form_section_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(formRoot, 'form_section_move_candidate', 'section_target')).toBe(
+      true,
+    );
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'form_root');
+    const savedSourceTab = findBlock(savedBlocks, 'tab_source');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+      'tabs_holder',
+      'form_section_move_candidate',
+      'section_target',
+    ]);
+    expect(savedSourceTab?.blocks?.map((block) => block.id)).toEqual([]);
+    expectFormSectionChildren(savedBlocks, 'form_section_move_candidate');
+  });
+
+  test('undoes and redoes moving a form-section subtree from form root inside an empty tab', async ({
+    page,
+  }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
+      source: 'form',
+    });
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockInto(page, 'form_section_move_candidate', 'tab_empty');
+
+    const formRoot = page.getByTestId('canvas-block-form_root');
+    const targetTab = page.getByTestId('canvas-block-tab_empty');
+    await expect(targetTab.getByTestId('canvas-block-form_section_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(formRoot, 'tabs_holder', 'form_section_move_candidate')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+    await waitForDesignerDragToSettle(page);
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+
+    await expect(targetTab.getByTestId('canvas-block-form_section_move_candidate')).toHaveCount(0);
+    await expect(formRoot.getByTestId('canvas-block-form_section_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(formRoot, 'form_section_move_candidate', 'tabs_holder')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+
+    await expect(targetTab.getByTestId('canvas-block-form_section_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(formRoot, 'tabs_holder', 'form_section_move_candidate')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'form_root');
+    const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
+      'form_section_move_candidate',
+    ]);
+    expectFormSectionChildren(savedBlocks, 'form_section_move_candidate');
+  });
+
   test('moves an existing table subtree from a tab before another list-root table and preserves columns/actions', async ({
     page,
   }) => {
