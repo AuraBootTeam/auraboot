@@ -1,6 +1,6 @@
 ---
 type: backlog
-status: completed
+status: shipped
 created: 2026-06-11
 relates_to:
   - docs/architecture/decision-runtime-and-expression-strategy.md

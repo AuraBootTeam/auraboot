@@ -6,6 +6,8 @@ owner: platform
 topic: RAG review→G1-G10 endgame session — full process reflection, root-cause taxonomy, precipitation decisions
 ---
 
+<!-- no-precipitation: durable lessons were distilled into the enterprise canonical docs outside this OSS checkout, so local doc governance cannot resolve cross-repo targets. -->
+
 # RAG Endgame Session — Deep Retro (2026-06-11)
 
 Covers the whole arc: RAG system review → gap tracker → /aura-endgame G1-G9 remediation

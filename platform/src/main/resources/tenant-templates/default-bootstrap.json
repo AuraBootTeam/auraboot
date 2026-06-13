@@ -1563,6 +1563,46 @@
       "resource": "/api/billing/usage",
       "action": "read",
       "resourceType": "function"
+    },
+    {
+      "code": "billing.plan.read",
+      "name": "计费方案查看",
+      "description": "查看计费方案",
+      "type": "function",
+      "module": "billing",
+      "resource": "/api/billing/plans",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "billing.subscription.read",
+      "name": "订阅查看",
+      "description": "查看订阅信息",
+      "type": "function",
+      "module": "billing",
+      "resource": "/api/billing/subscriptions",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "billing.invoice.read",
+      "name": "账单查看",
+      "description": "查看账单信息",
+      "type": "function",
+      "module": "billing",
+      "resource": "/api/billing/invoices",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "billing.license.read",
+      "name": "许可证查看",
+      "description": "查看许可证信息",
+      "type": "function",
+      "module": "billing",
+      "resource": "/api/billing/licenses",
+      "action": "read",
+      "resourceType": "function"
     }
   ],
   "roles": [

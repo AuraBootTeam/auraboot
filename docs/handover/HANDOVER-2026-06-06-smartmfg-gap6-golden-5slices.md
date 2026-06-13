@@ -22,7 +22,7 @@ Shipped **5 production-ready PRs, all merged to `auraboot-plugins` main** — 3 
 ## Tasks Completed (all MERGED to auraboot-plugins main)
 
 - **PR #30 `fde56cc` — equipment downtime/breakdown + maintenance golden.** Converted `pe:equipment_breakdown`
-  + `pe:end_equipment_downtime` from `custom` → `state_transition + handler`; wired 报故障/结束停机 + 开始/完成维保
+  and `pe:end_equipment_downtime` from `custom` → `state_transition + handler`; wired 报故障/结束停机 + 开始/完成维保
   action points; authored the empty `pe_equipment_maintenance` pages. 8/8 golden. Bugs: stale prebuilt jar
   (pre-#12 EndDowntime) + immutable-`Map.of`→`db.update` crash. Doc: `pcba-manufacturing/EQ-DOWNTIME-MAINTENANCE-GOLDEN.md`.
 - **PR #32 `3eccbd1` — immutable-map cross-plugin cleanup.** Swept the `Map.of(...)`/`List.of(...)` → db-write

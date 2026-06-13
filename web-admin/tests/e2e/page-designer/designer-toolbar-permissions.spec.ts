@@ -23,6 +23,7 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
+import { BASE_URL } from '../../helpers/environments';
 import { uniqueId } from '../helpers';
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ async function openDesigner(page: Page, pid: string): Promise<void> {
 }
 
 function appBaseUrl(baseURL?: string): string {
-  return baseURL ?? process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5174';
+  return baseURL ?? BASE_URL;
 }
 
 async function expectCurrentUserPermission(

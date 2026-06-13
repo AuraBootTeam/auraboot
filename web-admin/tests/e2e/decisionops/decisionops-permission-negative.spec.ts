@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
+import { BACKEND_URL } from '../../helpers/environments';
 
 type ApiEnvelope<T> = {
   code?: number | string;
@@ -28,7 +29,6 @@ type TestUser = {
   password: string;
 };
 
-const BACKEND_URL = process.env.BACKEND_URL ?? 'http://127.0.0.1:6482';
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const ADMIN_PASSWORD = 'Test2026x';
 const TEST_PASSWORD = 'Test2026x';
