@@ -133,6 +133,13 @@ public class PluginManifestExtended extends PluginManifest {
     private List<SavedViewDefinitionDTO> savedViews;
 
     /**
+     * Notification template definitions to import from {@code config/notification-templates.json}
+     * (table {@code ab_notification_template}). Lets a plugin deliver its own BPMN/automation
+     * notifications instead of the platform logging "template not found, skipping".
+     */
+    private List<NotificationTemplateDefinitionDTO> notificationTemplates;
+
+    /**
      * Dashboard definitions to import from {@code config/dashboards/*.json}.
      * This is the first-class contract (Plan #8); no BlockToDashboardConverter step is needed.
      */
@@ -316,6 +323,15 @@ public class PluginManifestExtended extends PluginManifest {
         if (savedViews != null) {
             for (SavedViewDefinitionDTO savedView : savedViews) {
                 if (!savedView.isValid()) {
+                    return false;
+                }
+            }
+        }
+
+        // Validate notification templates
+        if (notificationTemplates != null) {
+            for (NotificationTemplateDefinitionDTO template : notificationTemplates) {
+                if (!template.isValid()) {
                     return false;
                 }
             }
@@ -509,6 +525,8 @@ public class PluginManifestExtended extends PluginManifest {
                 AgentDefinitionDTO::getUnknownFields, AgentDefinitionDTO::getAgentCode);
         collectUnknownFieldWarnings(warnings, "savedViews", savedViews,
                 SavedViewDefinitionDTO::getUnknownFields, SavedViewDefinitionDTO::getUniqueKey);
+        collectUnknownFieldWarnings(warnings, "notificationTemplates", notificationTemplates,
+                NotificationTemplateDefinitionDTO::getUnknownFields, NotificationTemplateDefinitionDTO::getUniqueKey);
 
         return warnings;
     }
@@ -563,6 +581,7 @@ public class PluginManifestExtended extends PluginManifest {
                 || (namedQueries != null && !namedQueries.isEmpty())
                 || (agentDefinitions != null && !agentDefinitions.isEmpty())
                 || (savedViews != null && !savedViews.isEmpty())
+                || (notificationTemplates != null && !notificationTemplates.isEmpty())
                 || (dashboards != null && !dashboards.isEmpty())
                 || (rules != null && !rules.isEmpty())
                 || (slaConfigs != null && !slaConfigs.isEmpty());
@@ -589,6 +608,7 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("namedQueries", namedQueries != null ? namedQueries.size() : 0),
                 Map.entry("agentDefinitions", agentDefinitions != null ? agentDefinitions.size() : 0),
                 Map.entry("savedViews", savedViews != null ? savedViews.size() : 0),
+                Map.entry("notificationTemplates", notificationTemplates != null ? notificationTemplates.size() : 0),
                 Map.entry("dashboards", dashboards != null ? dashboards.size() : 0),
                 Map.entry("rules", rules != null ? rules.size() : 0),
                 Map.entry("slaConfigs", slaConfigs != null ? slaConfigs.size() : 0)
@@ -618,6 +638,8 @@ public class PluginManifestExtended extends PluginManifest {
         namedQueries = sanitized(namedQueries, n -> isCommentObject(n.getCode(), n.getUnknownFields()));
         agentDefinitions = sanitized(agentDefinitions, a -> isCommentObject(a.getAgentCode(), a.getUnknownFields()));
         savedViews = sanitized(savedViews, s -> isCommentObject(s.getUniqueKey(), s.getUnknownFields()));
+        notificationTemplates = sanitized(notificationTemplates,
+                t -> isCommentObject(t.getCode(), t.getUnknownFields()));
         dashboards = sanitized(dashboards, d -> isCommentObject(d.getCode(), d.getUnknownFields()));
         i18nResources = sanitized(i18nResources, i -> i.getKey() == null || i.getKey().isBlank());
     }

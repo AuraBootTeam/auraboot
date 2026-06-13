@@ -30,6 +30,12 @@ public final class BpmServiceTaskConstants {
     /** Designer node type for a serviceTask that updates a single record field. */
     public static final String NODE_TYPE_RECORD_UPDATE_TASK = "record-update-task";
 
+    /** Spring bean name used as {@code smart:class} for the plugin-action delegate (non-command serviceTask actions). */
+    public static final String BEAN_PLUGIN_ACTION_DELEGATE = "pluginActionServiceTaskDelegate";
+
+    /** Designer node type for a serviceTask that invokes a plugin {@code ServiceTaskActionExtension}. */
+    public static final String NODE_TYPE_PLUGIN_ACTION_TASK = "plugin-action-task";
+
     // ==================== smart:* extension attributes ====================
 
     public static final String ATTR_RULE_CODE = "ruleCode";
@@ -53,6 +59,12 @@ public final class BpmServiceTaskConstants {
     public static final String ATTR_RECORD_ID_VAR = "recordIdVar";
     public static final String ATTR_FIELD_NAME = "fieldName";
     public static final String ATTR_FIELD_VALUE = "fieldValue";
+
+    // plugin-action-task attributes
+    /** Action type discriminator resolved against {@code ServiceTaskActionExtension.supports}. */
+    public static final String ATTR_ACTION = "action";
+    /** Optional process-variable name to receive the action's return value. */
+    public static final String ATTR_RESULT_VAR = "resultVar";
 
     private BpmServiceTaskConstants() {
         // no instances

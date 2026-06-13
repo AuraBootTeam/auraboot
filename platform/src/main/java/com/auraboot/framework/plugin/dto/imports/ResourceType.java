@@ -21,6 +21,7 @@ public enum ResourceType {
     AGENT_DEFINITION("ab_agent_definition", "Agent 定义", OwnershipType.SHARED),
     DICT_ITEM("ab_dict_item", "字典项", OwnershipType.USER_CLAIMED),
     SAVED_VIEW("ab_saved_view", "保存视图", OwnershipType.SHARED),
+    NOTIFICATION_TEMPLATE("ab_notification_template", "通知模板", OwnershipType.SHARED),
     I18N("ab_i18n_resource", "国际化资源", OwnershipType.SHARED);
 
     private final String tableName;
@@ -59,6 +60,9 @@ public enum ResourceType {
             case AGENT_DEFINITION -> 76;
             case PAGE -> 80;
             case SAVED_VIEW -> 82;
+            // Templates are looked up by code at process runtime (no FK), but importing them
+            // before PROCESS keeps the delivery channel ready by the time processes deploy.
+            case NOTIFICATION_TEMPLATE -> 85;
             case PROCESS -> 90;
             case I18N -> 95;
         };

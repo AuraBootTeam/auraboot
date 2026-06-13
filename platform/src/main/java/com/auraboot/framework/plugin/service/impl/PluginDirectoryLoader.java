@@ -289,6 +289,17 @@ public class PluginDirectoryLoader {
             }
         }
 
+        // Load notification templates
+        if (resourceDirs.containsKey("notificationTemplates")) {
+            List<NotificationTemplateDefinitionDTO> templates = loadResourceList(
+                    resourcePath(pluginDir, resourceDirs, "notificationTemplates"),
+                    NotificationTemplateDefinitionDTO.class);
+            if (!templates.isEmpty()) {
+                manifest.setNotificationTemplates(
+                        mergeList(manifest.getNotificationTemplates(), templates));
+            }
+        }
+
         // Load dashboards (first-class contract: config/dashboards/*.json).
         // Convention over configuration: scan `config/dashboards/` even if the
         // plugin didn't explicitly declare it in resourceDirs.
@@ -547,6 +558,8 @@ public class PluginDirectoryLoader {
                 manifest::getAgentDefinitions, manifest::setAgentDefinitions);
         loadSourceResource(source, resourceDirs, "savedViews", SavedViewDefinitionDTO.class,
                 manifest::getSavedViews, manifest::setSavedViews);
+        loadSourceResource(source, resourceDirs, "notificationTemplates", NotificationTemplateDefinitionDTO.class,
+                manifest::getNotificationTemplates, manifest::setNotificationTemplates);
         loadSourceResource(source, resourceDirs, "dashboards", DashboardDefinitionDTO.class,
                 manifest::getDashboards, manifest::setDashboards);
 
