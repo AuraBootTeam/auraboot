@@ -152,10 +152,29 @@ describe('GrantFormModal', () => {
       expect(createGrantMock).toHaveBeenCalledTimes(1);
     });
     const args = createGrantMock.mock.calls[0][0];
-    expect(args.parentTenantId).toBe(100);
-    expect(args.childTenantId).toBe(200);
+    // Tenant ids must be passed as full-precision strings, not Number()-coerced
+    // (snowflake ids exceed 2^53 and would lose precision as JS numbers).
+    expect(args.parentTenantId).toBe('100');
+    expect(args.childTenantId).toBe('200');
     expect(args.note).toBe('staging supervisor');
     expect(onCreated).toHaveBeenCalled();
+  });
+
+  it('preservesSnowflakePrecision: large tenant id is not mangled by Number()', async () => {
+    createGrantMock.mockResolvedValueOnce({ success: true, data: { id: 7 } });
+    render(<GrantFormModal onClose={() => {}} onCreated={() => {}} />);
+
+    const bigId = '323059090391699456'; // > 2^53; Number() would yield ...699460
+    fireEvent.change(screen.getByTestId('grant-form-parent-tenant'), { target: { value: bigId } });
+    fireEvent.change(screen.getByTestId('grant-form-child-tenant'), { target: { value: '1' } });
+    fireEvent.submit(screen.getByTestId('grant-form-submit').closest('form')!);
+
+    await waitFor(() => {
+      expect(createGrantMock).toHaveBeenCalledTimes(1);
+    });
+    const args = createGrantMock.mock.calls[0][0];
+    expect(args.parentTenantId).toBe(bigId);
+    expect(String(Number(args.parentTenantId))).not.toBe(bigId); // proves a number would lose precision
   });
 
   it('showsErrorOnFailure: API failure renders form error message', async () => {

@@ -54,3 +54,9 @@ created: 2026-06-13
 - **生成质量**:弱模型(deepseek-chat→v4-flash)只生成 model+fields。生成质量 = prompt/model 调优,独立项。
 - **MD-3 in-designer AI 副驾**:复用本 generate/refine(现 import-ready)→ 限定到设计器当前面片段。
 - ✅ DeepSeek key:本验证用后**已清** `aura_boot_auraqr` CloudConfig(`DELETE ab_cloud_config ... provider_code=deepseek`,验 0 行);chat 暴露的 key 仍须 owner 端轮换。
+
+## 后续 follow-up 结论(2026-06-13 同会话,上方「残留」2/3 已收口)
+> 像素 golden「残留」已被 #630(tenant-selection 雪花精度修)+ #631(form submit 修)解决:真浏览器 list+form 渲染、菜单导航、create→行落库全验过。
+1. **生成质量(prompt 硬化)**:`buildSystemPrompt` 加「每 model **必须**出 CRUD 命令 + list/form 页 + `/p/<model>` 菜单(REQUIRED,禁只 model+fields)」;**同步修 few-shot + Menu Definition 菜单 path `/dynamic/<kebab>`→`/p/<snake_model>`**(旧 few-shot 是 latent bug:capable model 照抄生成 kebab 菜单 404,同 #630 synthesizeMenus 坑)。真 DeepSeek 实测:`deepseek-chat`(→v4-flash)**仍只出 model+fields**——丰富度=**模型能力**绑定非 prompt 缺口;synthesis(#629)兜底保可用。prompt 改对 capable model 有效 + 修 few-shot 路径 bug=净改进。
+2. **admin 流 `Number(tenantId)` 雪花精度**(同 #630 类):修 `entitlements.tsx`(grant+token)+`CrossTenantGrantsPage.tsx`+`crossTenantGrantsApi.ts`(类型 `number`→`string`)。后端 `CreateGrantRequest` 是 `Long`(Jackson coerce string,同 #630 已浏览器验机制)。`CrossTenantGrantsPage` 单测 7/7(加大-id 精度回归)+tsc 净。cross-tenant create 业务 golden 被 PLATFORM_ADMIN role gating 挡(env,非 fix),not-run。
+3. **MD-3 = 已实装**(§16:先盘自家):page designer 工具栏已有 **`AiPageGenerateDialog`**(`core-designer/components/studio/components/AiPageGenerateDialog.tsx`)——scoped 当前页、带 model fields 上下文、replace/append merge、经 `auraBotApi.chatStream` 真 LLM 生成 page DSL 应用画布。memory「MD-3 规划中」stale。剩:LLM-key-gated 设计器 golden。

@@ -484,7 +484,7 @@ public class NlModelingService {
                   "parentCode": null,
                   "name:zh-CN": "<Chinese name>",
                   "name:en": "<English name>",
-                  "path": "/dynamic/<kebab-case-model-code>",
+                  "path": "/p/<snake_case_model_code>",
                   "component": null,
                   "icon": "IconDatabase",
                   "type": 1,
@@ -495,7 +495,8 @@ public class NlModelingService {
                 }
                 ```
                 - type=0 for directory (parent menu), type=1 for page link
-                - path for DSL pages: /dynamic/<model-code-kebab-case>
+                - path for a dynamic model page: /p/<model_code> (snake_case, NOT kebab — the frontend
+                  resolves /p/<model_code> to the model's <model_code>_list page; kebab-casing 404s)
                 - First create a parent menu (type=0, path=null), then child menus with parentCode
 
                 ### i18n Definition
@@ -539,6 +540,14 @@ public class NlModelingService {
                 4. For ENUM fields, use a dictCode like "<model_code>_<field_code>" (the dict will be created separately)
                 5. Generate a parent menu (type=0) to group all child page menus
                 6. The permissions array can be empty — dynamic permissions are auto-created on model publish
+                7. ALWAYS emit the full operable set for EVERY model — these are REQUIRED, never optional:
+                   - commands: a create, an update, and a delete command per model (type "create"/"update"/"delete",
+                     modelCode set, inputFields listing the model's field codes; delete needs no inputFields).
+                     A model with no commands gets no model.<code>.<action> permission, so its CRUD 403s.
+                   - pages: BOTH a list page and a form page per model, in the V2 flat format shown above
+                     (top-level kind/schemaVersion/modelCode/layout/blocks). A model with no pages is an empty shell.
+                   - menus: a navigation menu entry per model pointing at /p/<model_code> so the page is reachable.
+                   Do NOT return only models+fields — that produces an app with no UI and no operations.
 
                 ## Few-Shot Example
                 For a simple "Book Management" module with title, author, ISBN, price, and published date:
@@ -1212,7 +1221,7 @@ public class NlModelingService {
                 ],
                 "menus": [
                   { "code": "nl_book_mgmt", "parentCode": null, "name:zh-CN": "图书管理", "name:en": "Book Management", "path": null, "component": null, "icon": "IconBook", "type": 0, "permissionCode": null, "orderNo": 100, "visible": true, "extension": { "platforms": ["web"] } },
-                  { "code": "nl_book_list", "parentCode": "nl_book_mgmt", "name:zh-CN": "图书列表", "name:en": "Book List", "path": "/dynamic/book", "component": null, "icon": "IconList", "type": 1, "permissionCode": "dynamic.book.read", "orderNo": 10, "visible": true, "extension": { "platforms": ["web"] } }
+                  { "code": "nl_book_list", "parentCode": "nl_book_mgmt", "name:zh-CN": "图书列表", "name:en": "Book List", "path": "/p/book", "component": null, "icon": "IconList", "type": 1, "permissionCode": "dynamic.book.read", "orderNo": 10, "visible": true, "extension": { "platforms": ["web"] } }
                 ],
                 "i18n": [
                   { "key": "model.book._meta.label", "zh-CN": "图书", "en-US": "Book", "source": "import", "refType": "model" },
