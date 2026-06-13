@@ -9,7 +9,6 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { auraBotApi } from '~/plugins/core-aurabot/services/auraBotApi';
 import { get } from '~/shared/services/http-client';
 import {
   buildContextPrompt,
@@ -78,9 +77,6 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const sessionIdRef = useRef(`page-ai-${pageId}`);
-  const messagesRef = useRef<ChatMessage[]>([]);
-  messagesRef.current = messages;
 
   // Auto-load model fields when modelCode is available but modelFields prop is not provided
   const [autoFields, setAutoFields] = useState<Array<{ code: string; name: string; type: string }>>([]);
@@ -116,11 +112,6 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
     }
   }, [open]);
 
-  // Update sessionId when pageId changes
-  useEffect(() => {
-    sessionIdRef.current = `page-ai-${pageId}`;
-  }, [pageId]);
-
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || isStreaming) return;
@@ -149,79 +140,40 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
         modelCode,
       });
 
-      const history: Array<{ role: string; content: string }> = [
-        { role: 'system', content: systemPrompt },
-      ];
-      // Include previous messages for multi-turn context (exclude the new user msg)
-      for (const msg of messagesRef.current) {
-        if (msg.role === 'user' || msg.role === 'assistant') {
-          if (msg.content && !msg.streaming && !msg.error) {
-            history.push({ role: msg.role, content: msg.content });
-          }
-        }
-      }
-
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setInput('');
       setIsStreaming(true);
 
-      try {
-        await auraBotApi.chatStream(
-          {
-            sessionId: sessionIdRef.current,
-            message: text.trim(),
-            history,
-          },
-          {
-            onChunk: (chunk) => {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, content: m.content + chunk }
-                    : m,
-                ),
-              );
-            },
-            onDone: (fullContent) => {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, content: fullContent || m.content, streaming: false }
-                    : m,
-                ),
-              );
-              setIsStreaming(false);
+      // Route page generation through the dedicated tools-off completion endpoint.
+      // The current canvas is already embedded in systemPrompt (buildContextPrompt),
+      // so each instruction is applied against the live page state. Going through the
+      // general AuraBot chat agent instead would inject an agent system prompt +
+      // business tools, making the model reply conversationally rather than emit page DSL.
+      const setAssistant = (patch: Partial<ChatMessage>) =>
+        setMessages((prev) => prev.map((m) => (m.id === assistantMsgId ? { ...m, ...patch } : m)));
 
-              // Try to parse as DSL
-              try {
-                const dsl = parsePageDslResponse(fullContent);
-                onGenerated(dsl);
-              } catch {
-                // Not valid DSL — that's fine, it may be a conversational reply
-              }
-            },
-            onError: (errMsg) => {
-              const errorText = typeof errMsg === 'string' ? errMsg : 'AI 生成失败';
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, content: errorText, streaming: false, error: true }
-                    : m,
-                ),
-              );
-              setIsStreaming(false);
-            },
-          },
-        );
+      try {
+        const resp = await fetch('/api/agent/nl-modeling/generate-page', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ systemPrompt, message: text.trim() }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.content) {
+          setAssistant({ content: data.error || `AI 生成失败 (${resp.status})`, streaming: false, error: true });
+          setIsStreaming(false);
+          return;
+        }
+        setAssistant({ content: data.content, streaming: false });
+        setIsStreaming(false);
+        try {
+          const dsl = parsePageDslResponse(data.content);
+          onGenerated(dsl);
+        } catch {
+          // Not valid DSL — leave it as a conversational reply, no canvas change.
+        }
       } catch (err) {
-        const errorText = err instanceof Error ? err.message : 'AI 生成失败';
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsgId
-              ? { ...m, content: errorText, streaming: false, error: true }
-              : m,
-          ),
-        );
+        setAssistant({ content: err instanceof Error ? err.message : 'AI 生成失败', streaming: false, error: true });
         setIsStreaming(false);
       }
     },

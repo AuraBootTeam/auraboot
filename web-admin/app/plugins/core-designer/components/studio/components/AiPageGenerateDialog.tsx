@@ -1,14 +1,16 @@
 /**
  * AiPageGenerateDialog — Natural language → Page DSL generation
  *
- * Uses AuraBot chat/stream API with a specialized system prompt
- * to generate page layouts from user descriptions.
+ * Uses the dedicated, tools-off page-generation completion endpoint
+ * (POST /api/agent/nl-modeling/generate-page) with a specialized system prompt
+ * to generate page layouts from user descriptions. Routing through the general
+ * AuraBot chat agent instead would inject an agent system prompt + business tools,
+ * making the model reply conversationally rather than emit page DSL.
  *
  * @since 4.1.0
  */
 
-import React, { useState, useRef } from 'react';
-import { auraBotApi } from '~/plugins/core-aurabot/services/auraBotApi';
+import React, { useState } from 'react';
 import { buildPageGenerationPrompt, parsePageDslResponse } from './ai-page-prompt';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
@@ -31,7 +33,6 @@ export const AiPageGenerateDialog: React.FC<AiPageGenerateDialogProps> = ({
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const sessionIdRef = useRef(`ai-page-gen-${Date.now()}`);
 
   if (!open) return null;
 
@@ -48,33 +49,29 @@ export const AiPageGenerateDialog: React.FC<AiPageGenerateDialogProps> = ({
     const systemPrompt = buildPageGenerationPrompt(modelFields);
 
     try {
-      await auraBotApi.chatStream(
-        {
-          sessionId: sessionIdRef.current,
-          message: description.trim(),
-          history: [{ role: 'system', content: systemPrompt }],
-        },
-        {
-          onChunk: (chunk) => {
-            setPreview((prev) => prev + chunk);
-          },
-          onDone: (fullContent) => {
-            try {
-              const dsl = parsePageDslResponse(fullContent);
-              setGenerating(false);
-              onGenerated(dsl);
-              onClose();
-            } catch (parseErr) {
-              setError(`AI 响应解析失败：${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
-              setGenerating(false);
-            }
-          },
-          onError: (errMsg) => {
-            setError(errMsg || 'AI 生成失败');
-            setGenerating(false);
-          },
-        },
-      );
+      const resp = await fetch('/api/agent/nl-modeling/generate-page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ systemPrompt, message: description.trim() }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.content) {
+        setError(data.error || `AI 生成失败 (${resp.status})`);
+        setGenerating(false);
+        return;
+      }
+      setPreview(data.content);
+      let dsl;
+      try {
+        dsl = parsePageDslResponse(data.content);
+      } catch (parseErr) {
+        setError(`AI 响应解析失败：${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
+        setGenerating(false);
+        return;
+      }
+      setGenerating(false);
+      onGenerated(dsl);
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'AI 生成失败');
       setGenerating(false);

@@ -32,6 +32,15 @@ class NlModelingManifestPostProcessingTest {
     }
 
     @Test
+    void generatePageDsl_blankOrNullMessage_returnsNullWithoutCallingLlm() {
+        // The in-designer page-gen endpoint guards empty input before any LLM call.
+        // (The real LLM path is covered by the host-first designer golden, not here.)
+        NlModelingService svc = new NlModelingService(null, null, mapper);
+        assertNull(svc.generatePageDsl("a page-gen system prompt", null));
+        assertNull(svc.generatePageDsl("a page-gen system prompt", "   "));
+    }
+
+    @Test
     void emptyOptions_deserializeToNull_notFalse_soGenerationStaysOn() throws Exception {
         // Regression: with primitive boolean + @Builder.Default, Jackson deserialized
         // `options:{}` to all-false, silently disabling page/command/menu generation

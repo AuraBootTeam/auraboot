@@ -47,6 +47,21 @@ public class NlModelingController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/generate-page")
+    @Operation(summary = "Tools-off completion for the in-designer page-generation copilot")
+    public ResponseEntity<java.util.Map<String, Object>> generatePage(
+            @RequestBody java.util.Map<String, String> request) {
+        String message = request.get("message");
+        log.info("Page-design generate request: message length={}",
+                message != null ? message.length() : 0);
+        String content = nlModelingService.generatePageDsl(request.get("systemPrompt"), message);
+        if (content == null) {
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                    "error", "LLM provider not configured or returned no content"));
+        }
+        return ResponseEntity.ok(java.util.Map.of("content", content));
+    }
+
     @PostMapping("/refine")
     @Operation(summary = "Refine generated DSL via conversational instruction")
     public ResponseEntity<NlModelingResponse> refine(@RequestBody NlRefineRequest request) {
