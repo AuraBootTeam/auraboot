@@ -426,6 +426,106 @@ describe('Recursive PageSchema V3 utilities', () => {
     ]);
   });
 
+  it('moves form-section subtrees between form and tab containers without losing fields', () => {
+    const crossContainerSchema: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'form_with_section_moves',
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'tabs_holder',
+              blockType: 'tabs',
+              blocks: [
+                {
+                  id: 'tab_source',
+                  blockType: 'tab',
+                  blocks: [
+                    {
+                      id: 'form_section_move_candidate',
+                      blockType: 'form-section',
+                      blocks: [
+                        { id: 'candidate_field_name', blockType: 'field', field: 'name' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'section_target',
+              blockType: 'form-section',
+              blocks: [{ id: 'target_field_title', blockType: 'field', field: 'title' }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const beforeTarget = moveBlockBefore(
+      crossContainerSchema.blocks,
+      'form_section_move_candidate',
+      'section_target',
+    );
+    const formAfterBefore = findBlockById(beforeTarget, 'form_root')?.block;
+    const tabAfterBefore = findBlockById(beforeTarget, 'tab_source')?.block;
+    const movedBefore = findBlockById(beforeTarget, 'form_section_move_candidate')?.block;
+
+    expect(formAfterBefore?.blocks?.map((block) => block.id)).toEqual([
+      'tabs_holder',
+      'form_section_move_candidate',
+      'section_target',
+    ]);
+    expect(tabAfterBefore?.blocks?.map((block) => block.id)).toEqual([]);
+    expect(movedBefore?.blocks?.map((block) => block.id)).toEqual(['candidate_field_name']);
+
+    const insideTabSchema: PageSchemaV3 = {
+      ...crossContainerSchema,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'form_section_move_candidate',
+              blockType: 'form-section',
+              blocks: [{ id: 'candidate_field_name', blockType: 'field', field: 'name' }],
+            },
+            {
+              id: 'tabs_holder',
+              blockType: 'tabs',
+              blocks: [{ id: 'tab_empty', blockType: 'tab', blocks: [] }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const insideTab = moveBlockToParent(
+      insideTabSchema.blocks,
+      'form_section_move_candidate',
+      'tab_empty',
+    );
+    const formAfterInside = findBlockById(insideTab, 'form_root')?.block;
+    const tabAfterInside = findBlockById(insideTab, 'tab_empty')?.block;
+    const movedInside = findBlockById(insideTab, 'form_section_move_candidate')?.block;
+
+    expect(formAfterInside?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(tabAfterInside?.blocks?.map((block) => block.id)).toEqual([
+      'form_section_move_candidate',
+    ]);
+    expect(movedInside?.blocks?.map((block) => block.id)).toEqual(['candidate_field_name']);
+
+    const registry = createDefaultBlockRegistryV3();
+    expect(registry.canContain('form', 'form-section')).toBe(true);
+    expect(registry.canContain('tab', 'form-section')).toBe(true);
+    expect(registry.canContain('form-section', 'field')).toBe(true);
+    expect(registry.canContain('action-bar', 'form-section')).toBe(false);
+  });
+
   it('moves list block subtrees between list and tab containers without losing children', () => {
     const crossContainerSchema: PageSchemaV3 = {
       schemaVersion: 3,
