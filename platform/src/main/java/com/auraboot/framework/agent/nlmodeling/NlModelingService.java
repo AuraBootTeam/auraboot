@@ -739,14 +739,18 @@ public class NlModelingService {
         // Map resources to plugin manifest format, with conformance post-processing.
         List<Map<String, Object>> fields = lowercaseStringKey(res.getFields(), "dataType");
         downgradeOrphanEnumFields(fields, res.getDicts());
-        manifest.put("models", res.getModels() != null ? res.getModels() : List.of());
+        conformFieldLabels(fields);
+        manifest.put("models", conformModels(res.getModels()));
         manifest.put("fields", fields);
         manifest.put("modelFieldBindings", synthesizeBindings(res.getModels(), fields, res.getBindings()));
         List<Map<String, Object>> commands =
                 synthesizeCrudCommands(pluginCode, res.getModels(), fields, res.getCommands());
         manifest.put("commands", lowercaseStringKey(commands, "type"));
-        manifest.put("pages", res.getPages() != null ? res.getPages() : List.of());
-        manifest.put("menus", deriveDynamicMenuPageKeys(res.getMenus()));
+        List<Map<String, Object>> pages =
+                synthesizePages(pluginCode, res.getModels(), fields, res.getPages());
+        manifest.put("pages", pages);
+        manifest.put("menus", deriveDynamicMenuPageKeys(
+                synthesizeMenus(res.getModels(), res.getMenus())));
         manifest.put("i18nResources", res.getI18n() != null ? res.getI18n() : List.of());
         manifest.put("permissions", res.getPermissions() != null ? res.getPermissions() : List.of());
         manifest.put("dicts", res.getDicts() != null ? res.getDicts() : List.of());
@@ -934,6 +938,200 @@ public class NlModelingService {
         return c;
     }
 
+    /** Compact ordered-map literal for building synthesized DSL fragments. */
+    private static Map<String, Object> om(Object... kv) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        for (int i = 0; i < kv.length; i += 2) {
+            map.put((String) kv[i], kv[i + 1]);
+        }
+        return map;
+    }
+
+    /**
+     * Synthesizes default list + form pages for a single-model generation that carries
+     * none, so a generated app is navigable/operable in the browser (not just via the
+     * dynamic API). Mirrors the few-shot areas-based PageSchema (toolbar+table list,
+     * form-section form) wired to the model's CRUD commands. Multi-model is left
+     * untouched (page→model assignment is ambiguous) and logged.
+     */
+    /**
+     * Humanizes a snake/kebab code into a business label: {@code "unit_price" -> "Unit Price"}.
+     * Used as a fallback display label so synthesized pages/fields carry business wording
+     * (the import's S-PAGE-LABEL rejects labels that are raw codes — contain {@code _}/{@code .}
+     * or equal the field code).
+     */
+    static String humanize(String code) {
+        if (code == null || code.isEmpty()) {
+            return code;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String part : code.split("[_\\-\\s]+")) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return sb.length() == 0 ? code : sb.toString();
+    }
+
+    /**
+     * Synthesizes a business {@code displayName} ("Unit Price" from "unit_price") on any field
+     * whose labels are all blank or raw codes, so list columns and form fields resolve a label
+     * and pass the import's S-PAGE-LABEL rule. Fields that already carry a business label
+     * (in any locale) are left untouched.
+     */
+    static List<Map<String, Object>> conformFieldLabels(List<Map<String, Object>> fields) {
+        if (fields == null) {
+            return new ArrayList<>();
+        }
+        for (Map<String, Object> f : fields) {
+            if (f == null || !(f.get("code") instanceof String code) || code.isBlank()
+                    || hasBusinessLabel(f, code)) {
+                continue;
+            }
+            String label = humanize(code);
+            f.put("displayName:en", label);
+            f.put("displayName:zh-CN", label);
+        }
+        return fields;
+    }
+
+    private static boolean hasBusinessLabel(Map<String, Object> field, String code) {
+        for (String key : List.of("displayName", "displayName:en", "displayName:zh-CN")) {
+            if (field.get(key) instanceof String s && !s.isBlank()
+                    && !s.equals(code) && !s.contains("_") && !s.contains(".")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Defaults {@code modelType} to {@code "entity"} on any model that omits it.
+     * The strict import rejects a model with a missing modelType
+     * ("Model '&lt;code&gt;' has missing modelType"); weak LLMs sometimes drop it.
+     */
+    static List<Map<String, Object>> conformModels(List<Map<String, Object>> models) {
+        if (models == null) {
+            return new ArrayList<>();
+        }
+        for (Map<String, Object> m : models) {
+            if (m != null && !(m.get("modelType") instanceof String mt && !mt.isBlank())) {
+                m.put("modelType", "entity");
+            }
+        }
+        return models;
+    }
+
+    static List<Map<String, Object>> synthesizePages(String pluginCode, List<Map<String, Object>> models,
+                                                     List<Map<String, Object>> fields,
+                                                     List<Map<String, Object>> pages) {
+        if (pages != null && !pages.isEmpty()) {
+            return pages;
+        }
+        if (models == null || models.size() != 1
+                || !(models.get(0).get("code") instanceof String model)) {
+            if (models != null && models.size() > 1) {
+                log.warn("NL modeling generated {} models but no pages; cannot synthesize pages "
+                        + "for ambiguous page→model assignment", models.size());
+            }
+            return pages != null ? pages : new ArrayList<>();
+        }
+        List<String> fieldCodes = new ArrayList<>();
+        Set<String> requiredCodes = new HashSet<>();
+        if (fields != null) {
+            for (Map<String, Object> f : fields) {
+                if (f != null && f.get("code") instanceof String fc) {
+                    fieldCodes.add(fc);
+                    if (f.get("constraints") instanceof Map<?, ?> c
+                            && Boolean.TRUE.equals(c.get("required"))) {
+                        requiredCodes.add(fc);
+                    }
+                }
+            }
+        }
+        return new ArrayList<>(List.of(
+                listPage(pluginCode, model, fieldCodes),
+                formPage(pluginCode, model, fieldCodes, requiredCodes)));
+    }
+
+    private static Map<String, Object> listPage(String plugin, String model, List<String> fieldCodes) {
+        List<Map<String, Object>> columns = new ArrayList<>();
+        for (String fc : fieldCodes) {
+            columns.add(om("field", fc, "width", 160, "sortable", true));
+        }
+        columns.add(om("field", "actions", "isActionColumn", true, "label", "$i18n:common.actions",
+                "buttons", List.of(
+                        om("code", "edit", "action", "edit", "navigateTo", model + "_form",
+                                "label", "$i18n:common.button.edit"),
+                        om("code", "delete", "action", "delete", "danger", true,
+                                "commandCode", plugin + ":delete_" + model,
+                                "label", "$i18n:common.button.delete"))));
+        Map<String, Object> toolbar = om("id", model + "_toolbar", "blockType", "toolbar",
+                "area", "toolbar", "buttons", List.of(
+                        om("code", "create", "action", "create", "primary", true,
+                                "label", "$i18n:common.button.create")));
+        Map<String, Object> table = om("id", model + "_table", "blockType", "table",
+                "props", om("rowClickAction", "drawer"),
+                "columns", columns,
+                "searchFields", new ArrayList<>(fieldCodes),
+                "area", "main");
+        return om("pageKey", model + "_list",
+                "name:zh-CN", humanize(model) + " List", "name:en", humanize(model) + " List",
+                "kind", "list", "schemaVersion", 4, "modelCode", model,
+                "title", om("zh-CN", humanize(model) + " List", "en", humanize(model) + " List"),
+                "layout", om("type", "stack"),
+                "blocks", List.of(toolbar, table));
+    }
+
+    private static Map<String, Object> formPage(String plugin, String model, List<String> fieldCodes,
+                                                Set<String> requiredCodes) {
+        List<Map<String, Object>> formFields = new ArrayList<>();
+        for (String fc : fieldCodes) {
+            Map<String, Object> ff = om("field", fc, "colSpan", 6);
+            if (requiredCodes != null && requiredCodes.contains(fc)) {
+                ff.put("required", true);
+            }
+            formFields.add(ff);
+        }
+        Map<String, Object> section = om("id", "basic", "blockType", "form-section",
+                "title", om("zh-CN", "Basic Information", "en-US", "Basic Information"),
+                "fields", formFields, "area", "main");
+        Map<String, Object> buttons = om("id", "buttons", "blockType", "form-buttons", "area", "footer",
+                "buttons", List.of(
+                        om("code", "submit", "action", "save", "commandCode", plugin + ":create_" + model,
+                                "primary", true, "label", "$i18n:common.button.submit"),
+                        om("code", "cancel", "action", "cancel", "label", "$i18n:common.button.cancel")));
+        return om("pageKey", model + "_form",
+                "name:zh-CN", humanize(model) + " Form", "name:en", humanize(model) + " Form",
+                "kind", "form", "schemaVersion", 4, "modelCode", model,
+                "title", om("zh-CN", humanize(model) + " Form", "en", humanize(model) + " Form"),
+                "layout", om("type", "stack"),
+                "blocks", List.of(section, buttons));
+    }
+
+    /**
+     * Synthesizes a navigation menu pointing at the model's list page when the LLM
+     * generated none (single-model). The dynamic path lets
+     * {@link #deriveDynamicMenuPageKeys} wire the pageKey.
+     */
+    static List<Map<String, Object>> synthesizeMenus(List<Map<String, Object>> models,
+                                                    List<Map<String, Object>> menus) {
+        if (menus != null && !menus.isEmpty()) {
+            return menus;
+        }
+        if (models == null || models.size() != 1
+                || !(models.get(0).get("code") instanceof String model)) {
+            return menus != null ? menus : new ArrayList<>();
+        }
+        return new ArrayList<>(List.of(om(
+                "code", "menu_" + model, "name:en", humanize(model), "icon", "table",
+                "path", "/dynamic/" + model.replace('_', '-'))));
+    }
+
     // =========================================================================
     // Few-Shot Example
     // =========================================================================
@@ -984,33 +1182,28 @@ public class NlModelingService {
                     "name:zh-CN": "图书列表",
                     "name:en": "Book List",
                     "kind": "list",
+                    "schemaVersion": 4,
                     "modelCode": "book",
-                    "blocks": [{
-                      "kind": "List",
-                      "version": "1.0.0",
-                      "id": "list.book",
-                      "modelCode": "book",
-                      "layout": { "areas": ["toolbar", "content"], "areasConfig": { "toolbar": { "type": "flex", "direction": "row" }, "content": { "type": "flex", "direction": "column" } } },
-                      "areas": {
-                        "toolbar": { "blocks": [{ "id": "toolbar", "blockType": "toolbar", "buttons": [{ "code": "create", "variant": "primary", "label": "create", "action": { "type": "navigate", "to": "book_form", "command": "book_mgmt:create_book" } }] }] },
-                        "content": { "blocks": [{ "id": "table", "blockType": "table", "columns": [ { "field": "title", "width": 200, "sortable": true }, { "field": "author", "width": 150 }, { "field": "isbn", "width": 150 }, { "field": "price", "width": 100 }, { "field": "published_date", "width": 120 } ], "rowActions": [ { "code": "edit", "label": "edit", "action": { "type": "navigate", "to": "book_form", "command": "book_mgmt:update_book" } }, { "code": "delete", "label": "delete", "variant": "danger", "action": { "type": "command", "command": "book_mgmt:delete_book" } } ] }] }
-                      }
-                    }]
+                    "title": { "zh-CN": "图书列表", "en": "Book List" },
+                    "layout": { "type": "stack" },
+                    "blocks": [
+                      { "id": "book_toolbar", "blockType": "toolbar", "area": "toolbar", "buttons": [{ "code": "create", "action": "create", "primary": true, "label": "$i18n:common.button.create" }] },
+                      { "id": "book_table", "blockType": "table", "area": "main", "props": { "rowClickAction": "drawer" }, "columns": [ { "field": "title", "width": 200, "sortable": true }, { "field": "author", "width": 150 }, { "field": "isbn", "width": 150 }, { "field": "price", "width": 100 }, { "field": "published_date", "width": 120 }, { "field": "actions", "isActionColumn": true, "label": "$i18n:common.actions", "buttons": [ { "code": "edit", "action": "edit", "navigateTo": "book_form", "label": "$i18n:common.button.edit" }, { "code": "delete", "action": "delete", "danger": true, "commandCode": "book_mgmt:delete_book", "label": "$i18n:common.button.delete" } ] } ], "searchFields": ["title", "author", "isbn"] }
+                    ]
                   },
                   {
                     "pageKey": "book_form",
                     "name:zh-CN": "图书表单",
                     "name:en": "Book Form",
                     "kind": "form",
+                    "schemaVersion": 4,
                     "modelCode": "book",
-                    "blocks": [{
-                      "kind": "Form",
-                      "version": "1.0.0",
-                      "id": "form.book",
-                      "modelCode": "book",
-                      "layout": { "areas": ["content"], "areasConfig": { "content": { "type": "flex", "direction": "column" } } },
-                      "areas": { "content": { "blocks": [{ "id": "basic_info", "blockType": "form-section", "title": "basic_info", "columns": 2, "fields": [ { "field": "title" }, { "field": "author" }, { "field": "isbn" }, { "field": "price" }, { "field": "published_date" } ] }] } }
-                    }]
+                    "title": { "zh-CN": "图书表单", "en": "Book Form" },
+                    "layout": { "type": "stack" },
+                    "blocks": [
+                      { "id": "basic", "blockType": "form-section", "area": "main", "title": { "zh-CN": "基本信息", "en-US": "Basic Information" }, "fields": [ { "field": "title", "colSpan": 6, "required": true }, { "field": "author", "colSpan": 6 }, { "field": "isbn", "colSpan": 6 }, { "field": "price", "colSpan": 6 }, { "field": "published_date", "colSpan": 6 } ] },
+                      { "id": "buttons", "blockType": "form-buttons", "area": "footer", "buttons": [ { "code": "submit", "action": "save", "commandCode": "book_mgmt:create_book", "primary": true, "label": "$i18n:common.button.submit" }, { "code": "cancel", "action": "cancel", "label": "$i18n:common.button.cancel" } ] }
+                    ]
                   }
                 ],
                 "menus": [
