@@ -184,7 +184,7 @@ export class DataSourceManager {
     // 智能提取参数: 如果 config 中没有 params,从 ID 中提取
     // 例如: ds_storeTypes → { datasourceId: 'ds_storeTypes' }
     let defaultParams: Record<string, any> = {};
-    if (!config.params && !config.body) {
+    if (config.type !== 'namedQuery' && !config.params && !config.body) {
       defaultParams = { datasourceId: id };
     }
 
@@ -405,18 +405,7 @@ export class DataSourceManager {
       throw new Error('API endpoint is required');
     }
 
-    // 求值 params
-    let params = config.params;
-    if (typeof params === 'string') {
-      const bindResult = bind(params, this.getContext());
-      // 如果是绑定结果（包含 path 属性），使用 value；否则使用整个结果
-      params =
-        bindResult && typeof bindResult === 'object' && 'path' in bindResult
-          ? bindResult.value
-          : bindResult;
-    } else if (params && typeof params === 'object' && !Array.isArray(params)) {
-      params = expressionEvaluator.evaluateObject(params, this.getContext());
-    }
+    const params = this.evaluateConfiguredParams(config.params);
 
     // 合并额外参数
     const mergedParams = {
@@ -452,7 +441,9 @@ export class DataSourceManager {
       throw new Error('queryCode is required for namedQuery data source');
     }
 
+    const configuredParams = this.evaluateConfiguredParams(config.params);
     const params: Record<string, any> = {
+      ...(configuredParams && typeof configuredParams === 'object' ? configuredParams : {}),
       datasourceId: `nq:${config.queryCode}`,
       valueField: config.valueField || 'id',
       labelField: config.labelField || 'name',
@@ -475,6 +466,20 @@ export class DataSourceManager {
     }
 
     return this.adaptData(result.data, config);
+  }
+
+  private evaluateConfiguredParams(paramsConfig: DataSourceConfig['params']): any {
+    if (typeof paramsConfig === 'string') {
+      const bindResult = bind(paramsConfig, this.getContext());
+      // 如果是绑定结果（包含 path 属性），使用 value；否则使用整个结果
+      return bindResult && typeof bindResult === 'object' && 'path' in bindResult
+        ? bindResult.value
+        : bindResult;
+    }
+    if (paramsConfig && typeof paramsConfig === 'object' && !Array.isArray(paramsConfig)) {
+      return expressionEvaluator.evaluateObject(paramsConfig, this.getContext());
+    }
+    return paramsConfig;
   }
 
   /**

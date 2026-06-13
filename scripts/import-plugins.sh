@@ -47,6 +47,7 @@ Environment:
   ADMIN_EMAIL        default: admin@auraboot.com
   ADMIN_PASSWORD     default: Test2026x
   IMPORT_ATTEMPTS    default: 2
+  SKIP_BOM_DEFAULT_SEED set to 1 to skip bom:seed_defaults after BOM plugin import
   EXTRA_PLUGIN_ROOTS colon-separated additional plugin roots
 USAGE
 }
@@ -455,14 +456,88 @@ else:
     return 1
 }
 
+bom_standardization_imported() {
+    local plugin_id
+
+    for plugin_id in "${successful_plugin_ids[@]}"; do
+        if [ "$plugin_id" = "com.auraboot.bom-standardization" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+seed_bom_defaults_if_imported() {
+    local resp summary
+
+    if [ "${SKIP_BOM_DEFAULT_SEED:-0}" = "1" ] || [ "${SKIP_SEED:-0}" = "1" ]; then
+        echo "BOM default seed: skipped (SKIP_BOM_DEFAULT_SEED/SKIP_SEED=1)"
+        return 0
+    fi
+
+    if ! bom_standardization_imported; then
+        return 0
+    fi
+
+    echo "BOM default seed: running bom:seed_defaults"
+    resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/meta/commands/execute/bom:seed_defaults" \
+        -H "Authorization: Bearer $jwt" \
+        -H "Content-Type: application/json" \
+        -d '{"payload":{}}')"
+    summary="$(printf '%s' "$resp" | python3 -c "
+import sys,json
+try:
+    d=json.load(sys.stdin)
+except Exception:
+    print('parse-error')
+    sys.exit(0)
+
+ok = d.get('success') is True or d.get('code') in (0, '0')
+if not ok:
+    print(d.get('errorMessage') or d.get('message') or str(d)[:300])
+    sys.exit(0)
+
+data = d.get('data') or {}
+if isinstance(data, dict):
+    for key in ('inserted', 'insertedCounts', 'counts'):
+        value = data.get(key)
+        if isinstance(value, dict):
+            parts = [f'{k}={v}' for k, v in value.items()]
+            if parts:
+                print('ok\\t' + ', '.join(parts))
+                sys.exit(0)
+    parts = [f'{k}={v}' for k, v in data.items() if isinstance(v, (str, int, float, bool))]
+    if parts:
+        print('ok\\t' + ', '.join(parts))
+        sys.exit(0)
+
+print('ok')
+" 2>/dev/null || echo "$resp")"
+
+    if [ "$summary" = "ok" ]; then
+        echo "BOM default seed: OK"
+        return 0
+    fi
+    if [[ "$summary" == ok$'\t'* ]]; then
+        echo "BOM default seed: OK (${summary#*$'\t'})"
+        return 0
+    fi
+
+    echo "ERROR: bom:seed_defaults failed: $summary" >&2
+    echo "Response: $resp" >&2
+    return 1
+}
+
 if [ "${#failures[@]}" -gt 0 ]; then
     echo "ERROR: ${#failures[@]} plugin import(s) failed:" >&2
     printf '  - %s\n' "${failures[@]}" >&2
     exit 1
 fi
 
-verify_latest_import_statuses
-
 verify_reference_integrity
+
+seed_bom_defaults_if_imported
+
+verify_latest_import_statuses
 
 echo "Plugin import complete."

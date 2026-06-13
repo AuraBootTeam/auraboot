@@ -163,6 +163,39 @@ describe('MetricStripBlockRenderer', () => {
     });
   });
 
+  it('renders localized metric subText without leaking object text', () => {
+    const runtime = makeRuntime({
+      data: {
+        summary: {
+          confirmedCount: 3,
+        },
+      },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'metrics',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      metrics: [
+        {
+          key: 'confirmed',
+          label: 'Confirmed',
+          valueField: 'confirmedCount',
+          subText: {
+            'zh-CN': '含 MOQ/SPQ/币种/有效期',
+            'en-US': 'Includes MOQ/SPQ/currency/validity',
+          },
+        },
+      ],
+    };
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip-item-confirmed')).toHaveTextContent(
+      'Includes MOQ/SPQ/currency/validity',
+    );
+    expect(screen.queryByText('[object Object]')).toBeNull();
+  });
+
   it('rerenders when its data source publishes data after initial render', () => {
     const data: Record<string, any> = {
       summary: null,
@@ -367,6 +400,28 @@ describe('WorkbenchActionBarBlockRenderer', () => {
     const bar = screen.getByTestId('workbench-action-bar');
     expect(bar).not.toHaveClass('border');
     expect(screen.getByTestId('workbench-action-download')).toHaveClass('text-xs');
+  });
+
+  it('renders an optional section title beside the action group', () => {
+    const runtime = makeRuntime() as any;
+    const block: BlockConfig = {
+      id: 'actions',
+      blockType: 'workbench-action-bar',
+      title: 'Price Waterfall',
+      surface: 'bare',
+      actions: [
+        {
+          code: 'run_sourcing',
+          label: 'Run Sourcing',
+          variant: 'primary',
+        },
+      ],
+    };
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByRole('heading', { name: 'Price Waterfall' })).toBeInTheDocument();
+    expect(screen.getByTestId('workbench-action-run_sourcing')).toHaveTextContent('Run Sourcing');
   });
 });
 

@@ -56,12 +56,12 @@ export function DesignerToolbar({
     <div
       data-testid={testId}
       className={cn(
-        'flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3',
+        'flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3',
         className,
       )}
     >
       {/* Left: Title + Subtitle + Status + Dirty indicator */}
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         {titleElement || <h1 className="text-xl font-semibold text-gray-900">{title}</h1>}
         {subtitle && <span className="text-sm text-gray-600">{subtitle}</span>}
         {status && <StatusBadge status={status} />}
@@ -79,7 +79,7 @@ export function DesignerToolbar({
       </div>
 
       {/* Right: Undo/Redo + Custom children + Save */}
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {showUndoRedo && (
           <>
             {onUndo && (
@@ -118,7 +118,7 @@ export function DesignerToolbar({
             onClick={onSave}
             disabled={isSaving || !isDirty}
             data-testid={saveButtonTestId ?? (testId ? `${testId}-btn-save` : 'toolbar-btn-save')}
-            className="flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex shrink-0 items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saveLabel || (isSaving ? 'Saving...' : 'Save')}

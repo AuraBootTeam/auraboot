@@ -195,6 +195,27 @@ test('plugin import validates latest import state instead of whole history', () 
   assert.doesNotMatch(script, /where status <> 'success'/i);
 });
 
+test('plugin import seeds BOM defaults when bom-standardization is imported', () => {
+  const script = read('scripts/import-plugins.sh');
+
+  assert.match(script, /seed_bom_defaults_if_imported\(\)/);
+  assert.match(script, /com\.auraboot\.bom-standardization/);
+  assert.match(script, /bom:seed_defaults/);
+  assert.match(script, /api\/meta\/commands\/execute\/bom:seed_defaults/);
+  assert.match(script, /\{"payload":\{\}\}/);
+  assert.match(script, /SKIP_BOM_DEFAULT_SEED/);
+
+  const tail = script.slice(script.indexOf('if [ "${#failures[@]}" -gt 0 ]'));
+  assert.ok(
+    tail.indexOf('verify_reference_integrity') < tail.indexOf('seed_bom_defaults_if_imported'),
+    'BOM defaults must be seeded after cross-plugin references are verified',
+  );
+  assert.ok(
+    tail.indexOf('seed_bom_defaults_if_imported') < tail.indexOf('verify_latest_import_statuses'),
+    'BOM defaults must not be blocked by the post-import history audit',
+  );
+});
+
 test('showcase CRM opportunity seeds send date-only values to DATE fields', () => {
   for (const file of [
     'web-admin/tests/api/setup/seed-showcase-data.spec.ts',

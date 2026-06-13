@@ -316,11 +316,11 @@ function boardBounds(inspection: QuoteInspection | undefined, line: Record<strin
 
 function matchesSearch(component: ComponentInspection, normalizedQuery: string): boolean {
   if (!normalizedQuery) return true;
-  return (
+  return Boolean(
     component.refdes?.toUpperCase().includes(normalizedQuery) ||
-    component.footprint?.toUpperCase().includes(normalizedQuery) ||
-    component.bomItem?.materialName?.toUpperCase().includes(normalizedQuery) ||
-    component.bomItem?.process?.toUpperCase().includes(normalizedQuery)
+      component.footprint?.toUpperCase().includes(normalizedQuery) ||
+      component.bomItem?.materialName?.toUpperCase().includes(normalizedQuery) ||
+      component.bomItem?.process?.toUpperCase().includes(normalizedQuery),
   );
 }
 
