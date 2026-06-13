@@ -30,6 +30,7 @@ describe('kindPolicy', () => {
     // master-detail forms: sub-table (+ its columns) are valid form children
     expect(isBlockTypeAllowedForKind('form', 'sub-table')).toBe(true);
     expect(isBlockTypeAllowedForKind('form', 'column')).toBe(true);
+    expect(isBlockTypeAllowedForKind('form', 'columns')).toBe(true);
     expect(isBlockTypeAllowedForKind('form', 'list')).toBe(false);
     expect(isBlockTypeAllowedForKind('form', 'detail')).toBe(false);
     expect(isBlockTypeAllowedForKind('form', 'dashboard')).toBe(false);
@@ -66,6 +67,7 @@ describe('UnifiedDesignerWorkbench kind collapse', () => {
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
 
     expect(screen.getByTestId('palette-add-form-section')).toBeInTheDocument();
+    expect(screen.getByTestId('palette-add-columns')).toBeInTheDocument();
     expect(screen.queryByTestId('palette-add-list')).not.toBeInTheDocument();
     expect(screen.queryByTestId('palette-add-detail')).not.toBeInTheDocument();
     expect(screen.queryByTestId('palette-add-dashboard')).not.toBeInTheDocument();

@@ -380,6 +380,9 @@ function BlockContent(props: BlockContentProps) {
   if (block.blockType === 'form' || block.blockType === 'form-section') {
     return <FormBlockContent {...props} />;
   }
+  if (block.blockType === 'columns') {
+    return <ColumnsBlockContent {...props} />;
+  }
   if (block.blockType === 'list' || block.blockType === 'table' || block.blockType === 'filter-bar') {
     return <ListBlockContent {...props} />;
   }
@@ -407,6 +410,26 @@ function FormBlockContent(props: BlockContentProps) {
   const children = props.block.blocks ?? [];
   return (
     <div className="grid grid-cols-12 gap-3 p-3">
+      {children.map((child) => (
+        <BlockFrame key={child.id} {...props} block={child} siblingBlocks={children} />
+      ))}
+    </div>
+  );
+}
+
+function ColumnsBlockContent(props: BlockContentProps) {
+  const children = props.block.blocks ?? [];
+  const columnCount = clampColumnCount(props.block.layout?.columns);
+  const gap = clampGap(props.block.layout?.gap);
+
+  return (
+    <div
+      className="grid p-3"
+      style={{
+        gap,
+        gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+      }}
+    >
       {children.map((child) => (
         <BlockFrame key={child.id} {...props} block={child} siblingBlocks={children} />
       ))}
@@ -453,6 +476,16 @@ function LeafBlock({ block, locale }: { block: DslBlockV3; locale: string }) {
       </div>
     </div>
   );
+}
+
+function clampColumnCount(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 2;
+  return Math.max(1, Math.min(4, Math.round(value)));
+}
+
+function clampGap(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 16;
+  return Math.max(0, Math.min(48, Math.round(value)));
 }
 
 function BlockOrderControls({

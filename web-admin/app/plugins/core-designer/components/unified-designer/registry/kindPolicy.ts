@@ -38,7 +38,7 @@ const SHARED_DETAIL_BLOCKS = [
   'ai-fill-banner',
 ] as const;
 
-const SHARED_LAYOUT_BLOCKS = ['tabs', 'tab'] as const;
+const SHARED_LAYOUT_BLOCKS = ['tabs', 'tab', 'columns'] as const;
 const SHARED_ACTION_BLOCKS = ['action-bar', 'action'] as const;
 const SHARED_WORKFLOW_BLOCKS = ['bpm-panel', 'activity-timeline', 'field-history'] as const;
 

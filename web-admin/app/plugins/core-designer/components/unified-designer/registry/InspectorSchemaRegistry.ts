@@ -61,6 +61,13 @@ const formSectionFields: PropertySchema<string>[] = [
   { key: 'layout.span', label: 'Span', type: 'number' },
 ];
 
+const columnsContainerFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'layout.columns', label: 'Columns', type: 'number' },
+  { key: 'layout.gap', label: 'Gap', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
 const listFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'dataSource.model', label: 'Model', type: 'model' },
@@ -475,6 +482,7 @@ export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry 
     'detail-section': formSectionFields,
     list: listFields,
     dashboard: dashboardFields,
+    columns: columnsContainerFields,
     field: fieldFields,
     'filter-field': filterFieldFields,
     table: tableFields,

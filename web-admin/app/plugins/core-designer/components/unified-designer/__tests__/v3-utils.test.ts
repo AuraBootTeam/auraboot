@@ -14,7 +14,7 @@ import {
 import { migrateDashboardResourceToV3, migratePageSchemaV2ToV3 } from '../migration/migrateToV3';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
 import { createDefaultInspectorSchemaRegistry } from '../registry/InspectorSchemaRegistry';
-import { createModelFieldBlock } from '../registry/createBlockTemplate';
+import { createBlockTemplate, createModelFieldBlock } from '../registry/createBlockTemplate';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
 
 describe('Recursive PageSchema V3 utilities', () => {
@@ -1691,9 +1691,33 @@ describe('Inspector schema registry', () => {
     expect(subformSchema.find((field) => field.key === 'props.rows')?.type).toBe('json');
   });
 
+  it('exposes columns container authoring settings and template defaults', () => {
+    const inspectorRegistry = createDefaultInspectorSchemaRegistry();
+    const columnsSchema = inspectorRegistry.getFields('columns');
+    const columnsBlock = createBlockTemplate('columns', new Set());
+
+    expect(columnsSchema.map((field) => field.key)).toEqual(
+      expect.arrayContaining(['title', 'layout.columns', 'layout.gap', 'layout.span']),
+    );
+    expect(columnsSchema.find((field) => field.key === 'layout.columns')?.type).toBe('number');
+    expect(columnsBlock).toMatchObject({
+      id: 'columns_new_columns',
+      blockType: 'columns',
+      title: { en: 'New columns', 'zh-CN': '新分栏' },
+      layout: { span: 12, columns: 2, gap: 16 },
+      blocks: [],
+    });
+  });
+
   it('attaches inspector schemas and containment rules to default block definitions', () => {
     const registry = createDefaultBlockRegistryV3();
 
+    expect(registry.canContain('form', 'columns')).toBe(true);
+    expect(registry.canContain('detail', 'columns')).toBe(true);
+    expect(registry.canContain('tab', 'columns')).toBe(true);
+    expect(registry.canContain('columns', 'form-section')).toBe(true);
+    expect(registry.canContain('columns', 'detail-section')).toBe(true);
+    expect(registry.canContain('columns', 'field')).toBe(true);
     expect(registry.canContain('form-section', 'field')).toBe(true);
     expect(registry.canContain('form-section', 'form-section')).toBe(true);
     expect(registry.canContain('form-section', 'sub-table')).toBe(true);
