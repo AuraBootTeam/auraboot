@@ -1,5 +1,6 @@
 package com.auraboot.framework.billing.quota;
 
+import com.auraboot.framework.billing.BillingAccountSeedHelper;
 import com.auraboot.framework.billing.quota.mapper.*;
 import com.auraboot.framework.billing.quota.model.*;
 import com.auraboot.framework.billing.quota.spi.*;
@@ -43,6 +44,7 @@ import static org.assertj.core.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class QuotaPriorityIntegrationTest extends BaseIntegrationTest {
 
+    @Autowired private BillingAccountSeedHelper   billingAccountSeedHelper;
     @Autowired private QuotaService              quotaService;
     @Autowired private QuotaPoolMapper            quotaPoolMapper;
     @Autowired private QuotaBucketMapper          quotaBucketMapper;
@@ -76,6 +78,10 @@ class QuotaPriorityIntegrationTest extends BaseIntegrationTest {
         accountId      = ACCOUNT_BASE + offset;
         subscriptionId = ACCOUNT_BASE + offset + 10_000L;
 
+        // Seed parent ab_billing_account row so FK on quota_pool/bucket is satisfied.
+        // Task 2 FK-ized account_id → ab_billing_account(id); each test gets a unique accountId.
+        billingAccountSeedHelper.ensureAccountExists(accountId, "ACC-PRIO-" + accountId);
+
         QuotaPool pool = QuotaPool.builder()
                 .poolCode("prio-pool-" + UUID.randomUUID())
                 .accountId(accountId)
@@ -104,6 +110,8 @@ class QuotaPriorityIntegrationTest extends BaseIntegrationTest {
             quotaBucketMapper.deleteById(bid);
         }
         quotaPoolMapper.deleteById(poolId);
+        // Remove the seeded billing account (parent of pool/bucket FK).
+        billingAccountSeedHelper.removeAccount(accountId);
     }
 
     /** Short-hand for creating a LambdaQueryWrapper. */

@@ -1,5 +1,6 @@
 package com.auraboot.framework.billing.quota;
 
+import com.auraboot.framework.billing.BillingAccountSeedHelper;
 import com.auraboot.framework.billing.quota.mapper.*;
 import com.auraboot.framework.billing.quota.model.*;
 import com.auraboot.framework.billing.quota.spi.*;
@@ -28,6 +29,9 @@ import static org.assertj.core.api.Assertions.*;
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class QuotaProvisionIntegrationTest extends BaseIntegrationTest {
+
+    @Autowired
+    private BillingAccountSeedHelper billingAccountSeedHelper;
 
     @Autowired
     private QuotaService quotaService;
@@ -59,6 +63,13 @@ class QuotaProvisionIntegrationTest extends BaseIntegrationTest {
     private static final Instant PERIOD_END =
             PERIOD_START.plus(30, ChronoUnit.DAYS);
 
+    @BeforeEach
+    void seedParentAccount() {
+        // Seed parent ab_billing_account row so FK on quota_pool/bucket is satisfied.
+        // Task 2 FK-ized account_id → ab_billing_account(id); bare IDs now require a parent row.
+        billingAccountSeedHelper.ensureAccountExists(TEST_ACCOUNT_ID, "ACC-IT-" + TEST_ACCOUNT_ID);
+    }
+
     @AfterEach
     void cleanup() {
         // Delete in FK order: ledger → lines → reservations → buckets → pools
@@ -73,6 +84,8 @@ class QuotaProvisionIntegrationTest extends BaseIntegrationTest {
                 .eq(QuotaBucket::getAccountId, TEST_ACCOUNT_ID));
         quotaPoolMapper.delete(new LambdaQueryWrapper<QuotaPool>()
                 .eq(QuotaPool::getAccountId, TEST_ACCOUNT_ID));
+        // Remove the seeded billing account (parent of pool/bucket FK).
+        billingAccountSeedHelper.removeAccount(TEST_ACCOUNT_ID);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

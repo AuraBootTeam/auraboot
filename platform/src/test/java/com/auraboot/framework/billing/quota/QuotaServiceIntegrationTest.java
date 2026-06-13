@@ -1,5 +1,6 @@
 package com.auraboot.framework.billing.quota;
 
+import com.auraboot.framework.billing.BillingAccountSeedHelper;
 import com.auraboot.framework.billing.quota.mapper.*;
 import com.auraboot.framework.billing.quota.model.*;
 import com.auraboot.framework.billing.quota.spi.*;
@@ -35,6 +36,9 @@ import static org.assertj.core.api.Assertions.*;
 class QuotaServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
+    private BillingAccountSeedHelper billingAccountSeedHelper;
+
+    @Autowired
     private QuotaService quotaService;
 
     @Autowired
@@ -66,6 +70,10 @@ class QuotaServiceIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void createTestFixtures() {
+        // Seed parent ab_billing_account row so FK on quota_pool/bucket is satisfied.
+        // Task 2 FK-ized account_id → ab_billing_account(id); bare IDs now require a parent row.
+        billingAccountSeedHelper.ensureAccountExists(TEST_ACCOUNT_ID, "ACC-IT-" + TEST_ACCOUNT_ID);
+
         // Create a pool
         QuotaPool pool = QuotaPool.builder()
                 .poolCode("test-pool-" + UUID.randomUUID())
@@ -116,6 +124,8 @@ class QuotaServiceIntegrationTest extends BaseIntegrationTest {
                         .eq(QuotaReservation::getAccountId, TEST_ACCOUNT_ID));
         quotaBucketMapper.deleteById(currentBucketId);
         quotaPoolMapper.deleteById(currentPoolId);
+        // Remove the seeded billing account (parent of pool/bucket FK).
+        billingAccountSeedHelper.removeAccount(TEST_ACCOUNT_ID);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
