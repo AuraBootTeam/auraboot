@@ -458,6 +458,142 @@ async function createCrossKindGuardFormPage(page: Page): Promise<CreatedDesigner
   return { pageKey, pid: body.data.pid };
 }
 
+async function createIncompatibleContainerGuardFormPage(page: Page): Promise<CreatedDesignerPage> {
+  const id = uniqueId('udw_incompatible_guard');
+  const pageKey = `udw_incompatible_guard_${id}`;
+  const resp = await page.request.post('/api/pages', {
+    data: {
+      name: `UDW incompatible guard ${id}`,
+      pageKey,
+      title: `UDW incompatible guard ${id}`,
+      kind: 'form',
+      modelCode: 'page_schema',
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          title: 'Form root',
+          dataSource: { model: 'page_schema' },
+          layout: { span: 12 },
+          blocks: [
+            {
+              id: 'section_source',
+              blockType: 'form-section',
+              title: 'Source section',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'sub_table_source',
+                  blockType: 'sub-table',
+                  title: 'Source sub-table',
+                  layout: { span: 12 },
+                  blocks: [
+                    {
+                      id: 'column_move_candidate',
+                      blockType: 'column',
+                      field: 'name',
+                      props: { label: 'Candidate column' },
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'section_target',
+              blockType: 'form-section',
+              title: 'Target section',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'field_target_name',
+                  blockType: 'field',
+                  field: 'name',
+                  layout: { span: 6 },
+                  props: { label: 'Target name', component: 'input' },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      extension: { e2e: true, scenario: 'unified-designer-incompatible-container-guard' },
+    },
+  });
+  expect(resp.ok(), await resp.text()).toBe(true);
+  const body = await resp.json();
+  expect(body.code).toBe('0');
+  expect(body.data?.pid).toBeTruthy();
+  return { pageKey, pid: body.data.pid };
+}
+
+async function createCrossKindWorkflowGuardListPage(page: Page): Promise<CreatedDesignerPage> {
+  const id = uniqueId('udw_workflow_guard');
+  const pageKey = `udw_workflow_guard_${id}`;
+  const resp = await page.request.post('/api/pages', {
+    data: {
+      name: `UDW workflow guard ${id}`,
+      pageKey,
+      title: `UDW workflow guard ${id}`,
+      kind: 'list',
+      modelCode: 'page_schema',
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'list_root',
+          blockType: 'list',
+          title: 'List root',
+          dataSource: { model: 'page_schema' },
+          layout: { span: 12 },
+          blocks: [
+            {
+              id: 'tabs_root',
+              blockType: 'tabs',
+              title: 'Tabs root',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'tab_main',
+                  blockType: 'tab',
+                  title: 'Main tab',
+                  blocks: [
+                    {
+                      id: 'table_main',
+                      blockType: 'table',
+                      title: 'Main table',
+                      layout: { span: 12 },
+                      blocks: [
+                        {
+                          id: 'column_table_name',
+                          blockType: 'column',
+                          field: 'name',
+                          props: { label: 'Name' },
+                        },
+                      ],
+                    },
+                    {
+                      id: 'bpm_panel_from_detail',
+                      blockType: 'bpm-panel',
+                      title: 'Workflow panel from stale schema',
+                      layout: { span: 12 },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      extension: { e2e: true, scenario: 'unified-designer-cross-kind-workflow-guard' },
+    },
+  });
+  expect(resp.ok(), await resp.text()).toBe(true);
+  const body = await resp.json();
+  expect(body.code).toBe('0');
+  expect(body.data?.pid).toBeTruthy();
+  return { pageKey, pid: body.data.pid };
+}
+
 /**
  * Open the unified designer for a page key. On a cold dev Vite the very first
  * navigation can race optimizeDeps and render a transient "Application Error";
@@ -895,6 +1031,72 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(tabMain?.blocks?.map((block) => block.id)).toEqual([
       'section_main',
       'detail_section_from_detail',
+    ]);
+  });
+
+  test('rejects moving a kind-allowed child into an incompatible container and keeps persisted schema unchanged', async ({
+    page,
+  }) => {
+    const { pageKey: formKey } = await createIncompatibleContainerGuardFormPage(page);
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    const sourceSubTable = page.getByTestId('canvas-block-sub_table_source');
+    const targetSection = page.getByTestId('canvas-block-section_target');
+    await expect(sourceSubTable.getByTestId('canvas-block-column_move_candidate')).toBeVisible();
+    await expect(targetSection.getByTestId('canvas-block-field_target_name')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+
+    await dragCanvasBlockBefore(page, 'column_move_candidate', 'field_target_name');
+    await waitForDesignerDragToSettle(page);
+
+    await expect(sourceSubTable.getByTestId('canvas-block-column_move_candidate')).toBeVisible();
+    await expect(targetSection.getByTestId('canvas-block-column_move_candidate')).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedSubTable = findBlock(savedBlocks, 'sub_table_source');
+    const savedTarget = findBlock(savedBlocks, 'section_target');
+    expect(savedSubTable?.blocks?.map((block) => block.id)).toEqual(['column_move_candidate']);
+    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['field_target_name']);
+  });
+
+  test('rejects moving a workflow block in a list designer even when the local tab can contain it', async ({
+    page,
+  }) => {
+    const { pageKey: listKey } = await createCrossKindWorkflowGuardListPage(page);
+    await openDesigner(page, listKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    const tabMain = page.getByTestId('canvas-block-tab_main');
+    await expect(tabMain.getByTestId('canvas-block-table_main')).toBeVisible();
+    await expect(tabMain.getByTestId('canvas-block-bpm_panel_from_detail')).toBeVisible();
+    expect(await isBeforeInDom(tabMain, 'table_main', 'bpm_panel_from_detail')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+
+    await dragCanvasBlockBefore(page, 'bpm_panel_from_detail', 'table_main');
+    await waitForDesignerDragToSettle(page);
+
+    await expect(tabMain.getByTestId('canvas-block-table_main')).toBeVisible();
+    await expect(tabMain.getByTestId('canvas-block-bpm_panel_from_detail')).toBeVisible();
+    expect(await isBeforeInDom(tabMain, 'table_main', 'bpm_panel_from_detail')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+
+    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedTab = findBlock(savedBlocks, 'tab_main');
+    expect(savedTab?.blocks?.map((block) => block.id)).toEqual([
+      'table_main',
+      'bpm_panel_from_detail',
     ]);
   });
 
