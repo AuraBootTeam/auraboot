@@ -7,6 +7,10 @@ import {
   moveBlockToParent,
 } from '../utils/recursiveBlockWalker';
 import { setByPath } from '../utils/dotPath';
+import {
+  canMoveExistingBlockBeforeTarget,
+  canMoveExistingBlockToParent,
+} from '../dnd/moveBlockGuards';
 import { migrateDashboardResourceToV3, migratePageSchemaV2ToV3 } from '../migration/migrateToV3';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
 import { createDefaultInspectorSchemaRegistry } from '../registry/InspectorSchemaRegistry';
@@ -162,6 +166,93 @@ describe('Recursive PageSchema V3 utilities', () => {
 
     expect(next).toEqual({ props: { label: 'Name', required: true }, layout: { span: 6 } });
     expect(source).toEqual({ props: { label: 'Name' }, layout: { span: 6 } });
+  });
+});
+
+describe('Unified designer existing-block move guards', () => {
+  const registry = createDefaultBlockRegistryV3();
+  const formSchemaWithCrossKindBlocks: PageSchemaV3 = {
+    schemaVersion: 3,
+    kind: 'form',
+    id: 'form_with_invalid_detail_section',
+    blocks: [
+      {
+        id: 'form_root',
+        blockType: 'form',
+        blocks: [
+          {
+            id: 'tabs_root',
+            blockType: 'tabs',
+            blocks: [
+              {
+                id: 'tab_main',
+                blockType: 'tab',
+                blocks: [
+                  { id: 'section_main', blockType: 'form-section' },
+                  { id: 'detail_section_from_detail', blockType: 'detail-section' },
+                ],
+              },
+            ],
+          },
+          {
+            id: 'section_target',
+            blockType: 'form-section',
+            blocks: [{ id: 'field_target', blockType: 'field', field: 'name' }],
+          },
+        ],
+      },
+    ],
+  };
+
+  it('rejects cross-kind block moves even when the candidate parent type can contain the block', () => {
+    expect(
+      canMoveExistingBlockBeforeTarget({
+        blocks: formSchemaWithCrossKindBlocks.blocks,
+        kind: 'form',
+        blockRegistry: registry,
+        movingBlockId: 'detail_section_from_detail',
+        targetBlockId: 'section_main',
+      }),
+    ).toBe(false);
+    expect(
+      canMoveExistingBlockToParent({
+        blocks: formSchemaWithCrossKindBlocks.blocks,
+        kind: 'form',
+        blockRegistry: registry,
+        movingBlockId: 'detail_section_from_detail',
+        parentBlockId: 'tab_main',
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects leaf-parent, self, and descendant moves without mutating the tree', () => {
+    expect(
+      canMoveExistingBlockToParent({
+        blocks: formSchemaWithCrossKindBlocks.blocks,
+        kind: 'form',
+        blockRegistry: registry,
+        movingBlockId: 'section_main',
+        parentBlockId: 'field_target',
+      }),
+    ).toBe(false);
+    expect(
+      canMoveExistingBlockBeforeTarget({
+        blocks: formSchemaWithCrossKindBlocks.blocks,
+        kind: 'form',
+        blockRegistry: registry,
+        movingBlockId: 'section_target',
+        targetBlockId: 'field_target',
+      }),
+    ).toBe(false);
+    expect(
+      canMoveExistingBlockToParent({
+        blocks: formSchemaWithCrossKindBlocks.blocks,
+        kind: 'form',
+        blockRegistry: registry,
+        movingBlockId: 'section_target',
+        parentBlockId: 'section_target',
+      }),
+    ).toBe(false);
   });
 });
 

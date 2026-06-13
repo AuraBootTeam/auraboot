@@ -52,6 +52,10 @@ import {
   resolveDragEndAction,
   type DragData,
 } from '../dnd/dndShared';
+import {
+  canMoveExistingBlockBeforeTarget,
+  canMoveExistingBlockToParent,
+} from '../dnd/moveBlockGuards';
 import { WorkbenchToolbar, type DesignerSaveStatus } from './WorkbenchToolbar';
 import { ResourcePanel } from './ResourcePanel';
 import { CanvasHost, type ActiveDropIntent } from '../canvas/CanvasHost';
@@ -249,34 +253,23 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canMoveBlockBeforeTarget = (movingBlockId: string, targetBlockId: string) => {
-    if (movingBlockId === targetBlockId) return false;
-    const movingResult = findBlockById(document.blocks, movingBlockId);
-    const targetResult = findBlockById(document.blocks, targetBlockId);
-    if (!movingResult || !targetResult) return false;
-    if (targetResult.path.some((item) => item.id === movingBlockId)) return false;
-
-    const movingBlockType = movingResult.block.blockType;
-
-    if (targetResult.path.length === 1) {
-      if (!isBlockTypeAllowedForKind(document.kind, movingBlockType)) return false;
-      const definition = blockRegistry.get(movingBlockType);
-      if (definition?.category !== 'page') return false;
-      const policy = getKindPolicy(document.kind);
-      return !policy.rootBlockType || policy.rootBlockType === movingBlockType;
-    }
-
-    const parentBlock = targetResult.path[targetResult.path.length - 2].block;
-    return blockRegistry.canContain(parentBlock.blockType, movingBlockType);
+    return canMoveExistingBlockBeforeTarget({
+      blocks: document.blocks,
+      kind: document.kind,
+      blockRegistry,
+      movingBlockId,
+      targetBlockId,
+    });
   };
 
   const canMoveBlockToParent = (movingBlockId: string, parentBlockId: string) => {
-    if (movingBlockId === parentBlockId) return false;
-    const movingResult = findBlockById(document.blocks, movingBlockId);
-    const parentResult = findBlockById(document.blocks, parentBlockId);
-    if (!movingResult || !parentResult) return false;
-    if (parentResult.path.some((item) => item.id === movingBlockId)) return false;
-
-    return blockRegistry.canContain(parentResult.block.blockType, movingResult.block.blockType);
+    return canMoveExistingBlockToParent({
+      blocks: document.blocks,
+      kind: document.kind,
+      blockRegistry,
+      movingBlockId,
+      parentBlockId,
+    });
   };
 
   const canAddBlockToRoot = (blockType: string) => {
