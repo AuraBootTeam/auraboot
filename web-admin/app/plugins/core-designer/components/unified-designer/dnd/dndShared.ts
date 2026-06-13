@@ -186,3 +186,20 @@ export function resolveDragEndAction(
   }
   return null;
 }
+
+export function resolveCanvasBlockAncestorDropAction(
+  movingBlockId: string,
+  targetBlockPathIds: string[],
+  caps: DragEndCapabilities,
+): DragEndAction {
+  for (let index = targetBlockPathIds.length - 1; index >= 0; index -= 1) {
+    const targetBlockId = targetBlockPathIds[index];
+    const action = resolveDragEndAction(
+      { kind: 'canvas-block', blockId: movingBlockId },
+      { kind: 'block', blockId: targetBlockId },
+      caps,
+    );
+    if (action) return action;
+  }
+  return null;
+}

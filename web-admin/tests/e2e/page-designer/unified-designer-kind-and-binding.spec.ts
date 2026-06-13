@@ -158,6 +158,101 @@ async function createCrossContainerFormPage(
   return { pageKey, pid: body.data.pid };
 }
 
+async function createCrossContainerSubTableFormPage(
+  page: Page,
+  options: { emptyTarget?: boolean } = {},
+): Promise<CreatedDesignerPage> {
+  const id = uniqueId('udw_sub_table_move');
+  const pageKey = `udw_sub_table_move_${id}`;
+  const targetBlocks = options.emptyTarget
+    ? []
+    : [
+        {
+          id: 'sub_table_target',
+          blockType: 'sub-table',
+          title: 'Target items',
+          layout: { span: 12 },
+          blocks: [
+            {
+              id: 'target_col_status',
+              blockType: 'column',
+              field: 'status',
+              props: { label: 'Target status' },
+            },
+          ],
+        },
+      ];
+  const resp = await page.request.post('/api/pages', {
+    data: {
+      name: `UDW sub table move ${id}`,
+      pageKey,
+      title: `UDW sub table move ${id}`,
+      kind: 'form',
+      modelCode: 'page_schema',
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          title: 'Form root',
+          dataSource: { model: 'page_schema' },
+          layout: { span: 12 },
+          blocks: [
+            {
+              id: 'section_source',
+              blockType: 'form-section',
+              title: 'Source section',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'field_source_name',
+                  blockType: 'field',
+                  field: 'name',
+                  layout: { span: 6 },
+                  props: { label: 'Source name', component: 'input' },
+                },
+                {
+                  id: 'sub_table_move_candidate',
+                  blockType: 'sub-table',
+                  title: 'Move candidate items',
+                  layout: { span: 12 },
+                  blocks: [
+                    {
+                      id: 'candidate_col_title',
+                      blockType: 'column',
+                      field: 'name',
+                      props: { label: 'Candidate title' },
+                    },
+                    {
+                      id: 'candidate_action_add',
+                      blockType: 'action',
+                      actionType: 'create',
+                      props: { label: 'Add item' },
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'section_target',
+              blockType: 'form-section',
+              title: 'Target section',
+              layout: { span: 12 },
+              blocks: targetBlocks,
+            },
+          ],
+        },
+      ],
+      extension: { e2e: true, scenario: 'unified-designer-sub-table-cross-container-move' },
+    },
+  });
+  expect(resp.ok(), await resp.text()).toBe(true);
+  const body = await resp.json();
+  expect(body.code).toBe('0');
+  expect(body.data?.pid).toBeTruthy();
+  return { pageKey, pid: body.data.pid };
+}
+
 async function createCrossKindGuardFormPage(page: Page): Promise<CreatedDesignerPage> {
   const id = uniqueId('udw_cross_kind_guard');
   const pageKey = `udw_cross_kind_guard_${id}`;
@@ -492,6 +587,77 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['field_move_candidate']);
   });
 
+  test('moves an existing sub-table subtree before another sub-table in a different section', async ({ page }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page);
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockBeforeHeader(page, 'sub_table_move_candidate', 'sub_table_target');
+
+    const sourceSection = page.getByTestId('canvas-block-section_source');
+    const targetSection = page.getByTestId('canvas-block-section_target');
+    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    await expect(targetSection.getByTestId('canvas-block-sub_table_target')).toBeVisible();
+    expect(await isBeforeInDom(targetSection, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedSource = findBlock(savedBlocks, 'section_source');
+    const savedTarget = findBlock(savedBlocks, 'section_target');
+    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
+
+    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([
+      'sub_table_move_candidate',
+      'sub_table_target',
+    ]);
+    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
+      'candidate_col_title',
+      'candidate_action_add',
+    ]);
+  });
+
+  test('moves an existing sub-table subtree inside an empty section and preserves children', async ({ page }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page, { emptyTarget: true });
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockInto(page, 'sub_table_move_candidate', 'section_target');
+
+    const sourceSection = page.getByTestId('canvas-block-section_source');
+    const targetSection = page.getByTestId('canvas-block-section_target');
+    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedSource = findBlock(savedBlocks, 'section_source');
+    const savedTarget = findBlock(savedBlocks, 'section_target');
+    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
+
+    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['sub_table_move_candidate']);
+    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
+      'candidate_col_title',
+      'candidate_action_add',
+    ]);
+  });
+
   test('rejects moving a cross-kind block within a form designer and keeps persisted schema unchanged', async ({ page }) => {
     const { pageKey: formKey } = await createCrossKindGuardFormPage(page);
     await openDesigner(page, formKey);
@@ -592,6 +758,25 @@ async function dragCanvasBlockBefore(page: Page, sourceBlockId: string, targetBl
   await page.mouse.move(src!.x + src!.width / 2 + 12, src!.y + src!.height / 2 + 12, { steps: 6 });
   await page.mouse.move(dst!.x + dst!.width / 2, dst!.y + dst!.height / 2, { steps: 18 });
   await page.mouse.move(dst!.x + dst!.width / 2 + 3, dst!.y + dst!.height / 2 + 3, { steps: 4 });
+  await page.mouse.up();
+}
+
+async function dragCanvasBlockBeforeHeader(page: Page, sourceBlockId: string, targetBlockId: string) {
+  const sourceHandle = page.getByTestId(`block-drag-handle-${sourceBlockId}`);
+  const targetBlock = page.getByTestId(`canvas-block-${targetBlockId}`);
+  await expect(sourceHandle).toBeVisible();
+  await expect(targetBlock).toBeVisible();
+
+  const src = await sourceHandle.boundingBox();
+  const dst = await targetBlock.boundingBox();
+  expect(src && dst).toBeTruthy();
+  const targetX = dst!.x + dst!.width / 2;
+  const targetY = dst!.y + Math.min(20, Math.max(12, dst!.height * 0.18));
+  await page.mouse.move(src!.x + src!.width / 2, src!.y + src!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(src!.x + src!.width / 2 + 12, src!.y + src!.height / 2 + 12, { steps: 6 });
+  await page.mouse.move(targetX, targetY, { steps: 18 });
+  await page.mouse.move(targetX + 3, targetY + 3, { steps: 4 });
   await page.mouse.up();
 }
 

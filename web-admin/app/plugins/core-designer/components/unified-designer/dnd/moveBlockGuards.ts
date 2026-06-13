@@ -35,6 +35,16 @@ export function canMoveExistingBlockBeforeTarget({
   const movingBlockType = movingResult.block.blockType;
   if (!isBlockTypeAllowedForKind(kind, movingBlockType)) return false;
 
+  if (
+    isEmptyCompatibleContainerDrop({
+      targetBlock: targetResult.block,
+      movingBlockType,
+      blockRegistry,
+    })
+  ) {
+    return false;
+  }
+
   if (targetResult.path.length === 1) {
     const definition = blockRegistry.get(movingBlockType);
     if (definition?.category !== 'page') return false;
@@ -64,4 +74,17 @@ export function canMoveExistingBlockToParent({
   if (!isBlockTypeAllowedForKind(kind, movingBlockType)) return false;
 
   return blockRegistry.canContain(parentResult.block.blockType, movingBlockType);
+}
+
+function isEmptyCompatibleContainerDrop({
+  targetBlock,
+  movingBlockType,
+  blockRegistry,
+}: {
+  targetBlock: DslBlockV3;
+  movingBlockType: string;
+  blockRegistry: Pick<BlockRegistryV3, 'canContain'>;
+}): boolean {
+  if ((targetBlock.blocks?.length ?? 0) > 0) return false;
+  return blockRegistry.canContain(targetBlock.blockType, movingBlockType);
 }

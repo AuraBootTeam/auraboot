@@ -160,6 +160,82 @@ describe('Recursive PageSchema V3 utilities', () => {
     ]);
   });
 
+  it('moves a non-field block subtree between compatible containers without losing children', () => {
+    const crossContainerSchema: PageSchemaV3 = {
+      ...schema,
+      blocks: [
+        {
+          id: 'form_1',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'section_basic',
+              blockType: 'form-section',
+              blocks: [
+                {
+                  id: 'sub_table_orders',
+                  blockType: 'sub-table',
+                  blocks: [
+                    { id: 'column_item', blockType: 'column', field: 'item' },
+                    { id: 'action_add', blockType: 'action', actionType: 'create' },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'section_secondary',
+              blockType: 'form-section',
+              blocks: [
+                {
+                  id: 'sub_table_history',
+                  blockType: 'sub-table',
+                  blocks: [{ id: 'column_status', blockType: 'column', field: 'status' }],
+                },
+              ],
+            },
+            {
+              id: 'section_empty',
+              blockType: 'form-section',
+              blocks: [],
+            },
+          ],
+        },
+      ],
+    };
+
+    const beforeTarget = moveBlockBefore(
+      crossContainerSchema.blocks,
+      'sub_table_orders',
+      'sub_table_history',
+    );
+    const sourceAfterBefore = findBlockById(beforeTarget, 'section_basic')?.block;
+    const targetAfterBefore = findBlockById(beforeTarget, 'section_secondary')?.block;
+    const movedBefore = findBlockById(beforeTarget, 'sub_table_orders')?.block;
+
+    expect(sourceAfterBefore?.blocks?.map((block) => block.id)).toEqual([]);
+    expect(targetAfterBefore?.blocks?.map((block) => block.id)).toEqual([
+      'sub_table_orders',
+      'sub_table_history',
+    ]);
+    expect(movedBefore?.blocks?.map((block) => block.id)).toEqual(['column_item', 'action_add']);
+
+    const insideEmpty = moveBlockToParent(
+      crossContainerSchema.blocks,
+      'sub_table_orders',
+      'section_empty',
+    );
+    const targetAfterInside = findBlockById(insideEmpty, 'section_empty')?.block;
+    const movedInside = findBlockById(insideEmpty, 'sub_table_orders')?.block;
+
+    expect(targetAfterInside?.blocks?.map((block) => block.id)).toEqual(['sub_table_orders']);
+    expect(movedInside?.blocks?.map((block) => block.id)).toEqual(['column_item', 'action_add']);
+    expect(
+      findBlockById(crossContainerSchema.blocks, 'section_basic')?.block.blocks?.map(
+        (block) => block.id,
+      ),
+    ).toEqual(['sub_table_orders']);
+  });
+
   it('sets nested dot-path values without mutating the source object', () => {
     const source = { props: { label: 'Name' }, layout: { span: 6 } };
     const next = setByPath(source, 'props.required', true);
@@ -253,6 +329,51 @@ describe('Unified designer existing-block move guards', () => {
         parentBlockId: 'section_target',
       }),
     ).toBe(false);
+  });
+
+  it('does not resolve a compatible empty container drop as a sibling-before move', () => {
+    const schemaWithEmptyTarget: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'form_with_sub_table_move',
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'section_source',
+              blockType: 'form-section',
+              blocks: [{ id: 'sub_table_orders', blockType: 'sub-table' }],
+            },
+            {
+              id: 'section_empty',
+              blockType: 'form-section',
+              blocks: [],
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(
+      canMoveExistingBlockBeforeTarget({
+        blocks: schemaWithEmptyTarget.blocks,
+        kind: 'form',
+        blockRegistry: registry,
+        movingBlockId: 'sub_table_orders',
+        targetBlockId: 'section_empty',
+      }),
+    ).toBe(false);
+    expect(
+      canMoveExistingBlockToParent({
+        blocks: schemaWithEmptyTarget.blocks,
+        kind: 'form',
+        blockRegistry: registry,
+        movingBlockId: 'sub_table_orders',
+        parentBlockId: 'section_empty',
+      }),
+    ).toBe(true);
   });
 });
 
