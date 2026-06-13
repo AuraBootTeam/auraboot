@@ -147,7 +147,17 @@ function normalizeButton(button: ButtonConfig): ButtonConfig {
     result.confirm = result.confirmMessageKey;
   }
 
-  if (!result.action) {
+  // Fold legacy commandCode/navigateTo into the canonical action object when the
+  // button has no action OR carries a legacy form-persist string verb. The persist
+  // verbs (save/submit/create/update) have no ActionRegistry handler, so without
+  // folding they would lose their commandCode (deleted below) and fall through to an
+  // unregistered builtin action — breaking every dynamic-model form submit. Other
+  // string verbs (edit/view/delete/cancel/back) are registered registry actions and
+  // are left untouched.
+  const legacyVerb = typeof result.action === 'string' ? result.action.toLowerCase() : null;
+  const isFormPersistVerb =
+    legacyVerb !== null && ['save', 'submit', 'create', 'update'].includes(legacyVerb);
+  if (!result.action || isFormPersistVerb) {
     if (result.commandCode && result.navigateTo) {
       result.action = {
         type: 'navigate',

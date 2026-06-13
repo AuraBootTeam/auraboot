@@ -1,8 +1,15 @@
 ---
 type: backlog
-status: active
+status: closed
 created: 2026-06-13
+distilled_to: web-admin/app/framework/meta/utils/__tests__/canonicalizePageDsl.test.ts (regression test "folds commandCode into a command action for a legacy form-persist verb (save)")
 ---
+
+> **RESOLVED 2026-06-13** (same session, PR follows). Root cause + fix below; verified by a real-browser golden on both a synthesized app (`sales_lead`) and a shipped plugin (`tasset_category`) — both now create records, rows persist to `mt_*`.
+>
+> **Root cause**: `canonicalizePageDsl.ts` `normalizeButton` only folded `commandCode` into the canonical `action` object when the button had **no** `action` (`if (!result.action)`), but then deleted `commandCode` **unconditionally**. A form-buttons submit button carries the legacy `{ action: "save", commandCode }` shape (every built-in plugin form does) — `action:"save"` is truthy, so the fold was skipped and `commandCode` was deleted, leaving `{action:"save"}` with no command. `"save"` has no `ActionRegistry` handler, so dispatch fell through to an unregistered builtin → `[executeRegistryAction] Action not registered: save`. List verbs (edit/view/delete) survived only because they ARE registered registry actions.
+>
+> **Fix**: fold `commandCode`/`navigateTo` into the action object **also** when `action` is a legacy form-persist string verb (`save`/`submit`/`create`/`update`); leave other verbs (edit/view/delete/cancel/back) to the registry. Guarded by a new unit test.
 
 # Pre-existing bug: dynamic-model form submit throws "Action not registered: save"
 
