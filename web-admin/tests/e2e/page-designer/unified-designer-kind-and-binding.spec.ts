@@ -17,8 +17,11 @@
  */
 
 import { test, expect } from '../../fixtures';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
+
+type TestBlock = { id: string; blocks?: TestBlock[] };
+type CreatedDesignerPage = { pageKey: string; pid: string };
 
 async function createFormPage(page: Page): Promise<string> {
   const id = uniqueId('udw_kind');
@@ -71,6 +74,82 @@ async function createFormPage(page: Page): Promise<string> {
   const body = await resp.json();
   expect(body.code).toBe('0');
   return pageKey;
+}
+
+async function createCrossContainerFormPage(page: Page): Promise<CreatedDesignerPage> {
+  const id = uniqueId('udw_cross_container');
+  const pageKey = `udw_cross_container_${id}`;
+  const resp = await page.request.post('/api/pages', {
+    data: {
+      name: `UDW cross container ${id}`,
+      pageKey,
+      title: `UDW cross container ${id}`,
+      kind: 'form',
+      modelCode: 'page_schema',
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          title: 'Form root',
+          dataSource: { model: 'page_schema' },
+          layout: { span: 12 },
+          blocks: [
+            {
+              id: 'section_source',
+              blockType: 'form-section',
+              title: 'Source section',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'field_source_name',
+                  blockType: 'field',
+                  field: 'name',
+                  layout: { span: 6 },
+                  props: { label: 'Source name', component: 'input' },
+                },
+                {
+                  id: 'field_move_candidate',
+                  blockType: 'field',
+                  field: 'page_key',
+                  layout: { span: 6 },
+                  props: { label: 'Move candidate', component: 'input' },
+                },
+              ],
+            },
+            {
+              id: 'section_target',
+              blockType: 'form-section',
+              title: 'Target section',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'field_target_email',
+                  blockType: 'field',
+                  field: 'description',
+                  layout: { span: 6 },
+                  props: { label: 'Target email', component: 'textarea' },
+                },
+                {
+                  id: 'field_target_status',
+                  blockType: 'field',
+                  field: 'status',
+                  layout: { span: 6 },
+                  props: { label: 'Target status', component: 'select' },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      extension: { e2e: true, scenario: 'unified-designer-cross-container-move' },
+    },
+  });
+  expect(resp.ok(), await resp.text()).toBe(true);
+  const body = await resp.json();
+  expect(body.code).toBe('0');
+  expect(body.data?.pid).toBeTruthy();
+  return { pageKey, pid: body.data.pid };
 }
 
 /**
@@ -176,6 +255,40 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       .toBeGreaterThan(beforeFields);
   });
 
+  test('moves an existing field block between form-section containers and persists schema order', async ({ page }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerFormPage(page);
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockBefore(page, 'field_move_candidate', 'field_target_email');
+
+    const sourceSection = page.getByTestId('canvas-block-section_source');
+    const targetSection = page.getByTestId('canvas-block-section_target');
+    await expect(sourceSection.getByTestId('canvas-block-field_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-field_move_candidate')).toBeVisible();
+    await expect(targetSection.getByTestId('canvas-block-field_target_email')).toBeVisible();
+    expect(await isBeforeInDom(targetSection, 'field_move_candidate', 'field_target_email')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as Array<{ id: string; blocks?: Array<{ id: string }> }>;
+    const savedSource = findBlock(savedBlocks, 'section_source');
+    const savedTarget = findBlock(savedBlocks, 'section_target');
+
+    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([
+      'field_move_candidate',
+      'field_target_email',
+      'field_target_status',
+    ]);
+  });
+
   // Guards Playwright `.dragTo()` compatibility with @dnd-kit. The wider designer
   // E2E suite (unified-designer-workbench UDW-*) drives drags via `.dragTo()`,
   // whose single jump-move pointerWithin can miss — the workbench's
@@ -230,3 +343,72 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
   });
 });
+
+async function dragCanvasBlockBefore(page: Page, sourceBlockId: string, targetBlockId: string) {
+  const sourceHandle = page.getByTestId(`block-drag-handle-${sourceBlockId}`);
+  const targetBlock = page.getByTestId(`canvas-block-${targetBlockId}`);
+  await expect(sourceHandle).toBeVisible();
+  await expect(targetBlock).toBeVisible();
+
+  const src = await sourceHandle.boundingBox();
+  const dst = await targetBlock.boundingBox();
+  expect(src && dst).toBeTruthy();
+  await page.mouse.move(src!.x + src!.width / 2, src!.y + src!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(src!.x + src!.width / 2 + 12, src!.y + src!.height / 2 + 12, { steps: 6 });
+  await page.mouse.move(dst!.x + dst!.width / 2, dst!.y + dst!.height / 2, { steps: 18 });
+  await page.mouse.move(dst!.x + dst!.width / 2 + 3, dst!.y + dst!.height / 2 + 3, { steps: 4 });
+  await page.mouse.up();
+}
+
+async function saveDesignerPage(page: Page, pid: string): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const saveButton = page.getByTestId('designer-save');
+      await expect(saveButton).toBeEnabled();
+      const saveResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/pages/${pid}`) && response.request().method() === 'PUT',
+        { timeout: 5000 },
+      );
+      await saveButton.click();
+      const saveResponse = await saveResponsePromise;
+      expect(saveResponse.ok(), await saveResponse.text()).toBe(true);
+      const saveBody = await saveResponse.json();
+      expect(saveBody.code).toBe('0');
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Designer save did not complete.');
+}
+
+async function isBeforeInDom(
+  container: Locator,
+  beforeBlockId: string,
+  afterBlockId: string,
+) {
+  return container
+    .getByTestId(`canvas-block-${beforeBlockId}`)
+    .evaluate((beforeNode, afterTestId) => {
+      const afterNode = beforeNode
+        .closest('[data-testid^="canvas-block-section_"]')
+        ?.querySelector(`[data-testid="${afterTestId}"]`);
+      return Boolean(
+        afterNode &&
+          (beforeNode.compareDocumentPosition(afterNode) & Node.DOCUMENT_POSITION_FOLLOWING),
+      );
+    }, `canvas-block-${afterBlockId}`);
+}
+
+function findBlock(blocks: TestBlock[], blockId: string): TestBlock | null {
+  for (const block of blocks) {
+    if (block.id === blockId) return block;
+    const child = block.blocks ? findBlock(block.blocks, blockId) : null;
+    if (child) return child;
+  }
+  return null;
+}

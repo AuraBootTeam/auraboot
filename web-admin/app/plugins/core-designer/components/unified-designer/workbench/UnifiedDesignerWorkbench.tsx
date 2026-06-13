@@ -235,6 +235,27 @@ export function UnifiedDesignerWorkbench({
     return Boolean(resolveBlockDropBeforeTarget(targetBlockId, blockType));
   };
 
+  const canMoveBlockBeforeTarget = (movingBlockId: string, targetBlockId: string) => {
+    if (movingBlockId === targetBlockId) return false;
+    const movingResult = findBlockById(document.blocks, movingBlockId);
+    const targetResult = findBlockById(document.blocks, targetBlockId);
+    if (!movingResult || !targetResult) return false;
+    if (targetResult.path.some((item) => item.id === movingBlockId)) return false;
+
+    const movingBlockType = movingResult.block.blockType;
+
+    if (targetResult.path.length === 1) {
+      if (!isBlockTypeAllowedForKind(document.kind, movingBlockType)) return false;
+      const definition = blockRegistry.get(movingBlockType);
+      if (definition?.category !== 'page') return false;
+      const policy = getKindPolicy(document.kind);
+      return !policy.rootBlockType || policy.rootBlockType === movingBlockType;
+    }
+
+    const parentBlock = targetResult.path[targetResult.path.length - 2].block;
+    return blockRegistry.canContain(parentBlock.blockType, movingBlockType);
+  };
+
   const canAddBlockToRoot = (blockType: string) => {
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
     const policy = getKindPolicy(document.kind);
@@ -472,6 +493,7 @@ export function UnifiedDesignerWorkbench({
     canAddBlockToParent,
     canAddModelFieldBeforeTarget,
     canAddModelFieldToParent,
+    canMoveBlockBeforeTarget,
   };
   const rootAccepts = activeDrag?.kind === 'palette-block' && canAddBlockToRoot(activeDrag.blockType);
 

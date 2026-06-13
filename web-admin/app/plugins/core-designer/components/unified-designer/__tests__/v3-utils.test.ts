@@ -61,6 +61,51 @@ describe('Recursive PageSchema V3 utilities', () => {
     expect(section?.blocks?.map((block) => block.id)).toEqual(['field_phone', 'field_name']);
   });
 
+  it('moves a block before a target in another compatible container', () => {
+    const crossContainerSchema: PageSchemaV3 = {
+      ...schema,
+      blocks: [
+        {
+          id: 'form_1',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'section_basic',
+              blockType: 'form-section',
+              blocks: [
+                { id: 'field_name', blockType: 'field', field: 'name' },
+                { id: 'field_phone', blockType: 'field', field: 'phone' },
+              ],
+            },
+            {
+              id: 'section_secondary',
+              blockType: 'form-section',
+              blocks: [
+                { id: 'field_email', blockType: 'field', field: 'email' },
+                { id: 'field_status', blockType: 'field', field: 'status' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const next = moveBlockBefore(crossContainerSchema.blocks, 'field_phone', 'field_email');
+    const sourceSection = findBlockById(next, 'section_basic')?.block;
+    const targetSection = findBlockById(next, 'section_secondary')?.block;
+
+    expect(sourceSection?.blocks?.map((block) => block.id)).toEqual(['field_name']);
+    expect(targetSection?.blocks?.map((block) => block.id)).toEqual([
+      'field_phone',
+      'field_email',
+      'field_status',
+    ]);
+    expect(findBlockById(crossContainerSchema.blocks, 'section_basic')?.block.blocks?.map((block) => block.id)).toEqual([
+      'field_name',
+      'field_phone',
+    ]);
+  });
+
   it('sets nested dot-path values without mutating the source object', () => {
     const source = { props: { label: 'Name' }, layout: { span: 6 } };
     const next = setByPath(source, 'props.required', true);
