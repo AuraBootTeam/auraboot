@@ -343,6 +343,8 @@ export const DESIGNER_I18N = {
     pages: { 'zh-CN': '页面', 'en-US': 'Pages' } as L,
     preview: { 'zh-CN': '预览', 'en-US': 'Preview' } as L,
     history: { 'zh-CN': '历史', 'en-US': 'History' } as L,
+    undo: { 'zh-CN': '撤销', 'en-US': 'Undo' } as L,
+    redo: { 'zh-CN': '重做', 'en-US': 'Redo' } as L,
     edit: { 'zh-CN': '编辑', 'en-US': 'Edit' } as L,
     layout: { 'zh-CN': '布局', 'en-US': 'Layout' } as L,
     save: { 'zh-CN': '保存', 'en-US': 'Save' } as L,

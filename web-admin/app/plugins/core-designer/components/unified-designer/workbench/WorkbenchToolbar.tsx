@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Redo2, Undo2 } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import type { PageSchemaV3, WorkbenchMode } from '../types';
@@ -12,8 +13,12 @@ interface WorkbenchToolbarProps {
   saveStatus: DesignerSaveStatus;
   saveError?: string | null;
   validationErrorCount: number;
+  canUndo: boolean;
+  canRedo: boolean;
   returnHref?: string;
   onModeChange: (mode: WorkbenchMode) => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onSave: () => void;
 }
 
@@ -24,8 +29,12 @@ export function WorkbenchToolbar({
   saveStatus,
   saveError,
   validationErrorCount,
+  canUndo,
+  canRedo,
   returnHref,
   onModeChange,
+  onUndo,
+  onRedo,
   onSave,
 }: WorkbenchToolbarProps) {
   const { locale } = useI18n();
@@ -71,9 +80,38 @@ export function WorkbenchToolbar({
         >
           {resolveDesignerText(DESIGNER_I18N.unified.preview, locale)}
         </button>
-        <button className="rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-600">
-          {resolveDesignerText(DESIGNER_I18N.unified.history, locale)}
-        </button>
+        <div className="grid grid-cols-2 rounded-md border border-slate-200 bg-white">
+          <button
+            type="button"
+            data-testid="designer-undo"
+            aria-label={resolveDesignerText(DESIGNER_I18N.unified.undo, locale)}
+            title={resolveDesignerText(DESIGNER_I18N.unified.undo, locale)}
+            disabled={!canUndo}
+            onClick={onUndo}
+            className={`inline-flex h-8 w-8 items-center justify-center border-r border-slate-200 ${
+              canUndo
+                ? 'text-slate-600 hover:bg-slate-50'
+                : 'cursor-not-allowed text-slate-300'
+            }`}
+          >
+            <Undo2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            data-testid="designer-redo"
+            aria-label={resolveDesignerText(DESIGNER_I18N.unified.redo, locale)}
+            title={resolveDesignerText(DESIGNER_I18N.unified.redo, locale)}
+            disabled={!canRedo}
+            onClick={onRedo}
+            className={`inline-flex h-8 w-8 items-center justify-center ${
+              canRedo
+                ? 'text-slate-600 hover:bg-slate-50'
+                : 'cursor-not-allowed text-slate-300'
+            }`}
+          >
+            <Redo2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
         <div className="ml-2 grid grid-cols-2 rounded-md border border-slate-200 bg-slate-100 p-0.5">
           <button
             type="button"
