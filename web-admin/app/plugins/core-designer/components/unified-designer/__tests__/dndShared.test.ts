@@ -16,6 +16,7 @@ function caps(overrides: Partial<DragEndCapabilities> = {}): DragEndCapabilities
     canAddModelFieldBeforeTarget: () => false,
     canAddModelFieldToParent: () => false,
     canAddBlockToRoot: () => false,
+    canMoveBlockBeforeTarget: () => false,
     ...overrides,
   };
 }
@@ -44,9 +45,14 @@ describe('resolveBlockDropIntent', () => {
   });
 
   it('reorders a canvas block before any other block but not itself', () => {
-    expect(resolveBlockDropIntent({ kind: 'canvas-block', blockId: 'a' }, 'b', caps())).toBe(
-      'before',
-    );
+    expect(
+      resolveBlockDropIntent(
+        { kind: 'canvas-block', blockId: 'a' },
+        'b',
+        caps({ canMoveBlockBeforeTarget: () => true }),
+      ),
+    ).toBe('before');
+    expect(resolveBlockDropIntent({ kind: 'canvas-block', blockId: 'a' }, 'b', caps())).toBeNull();
     expect(resolveBlockDropIntent({ kind: 'canvas-block', blockId: 'a' }, 'a', caps())).toBeNull();
   });
 });
@@ -88,8 +94,15 @@ describe('resolveDragEndAction', () => {
 
   it('moves a canvas block before another block', () => {
     expect(
-      resolveDragEndAction({ kind: 'canvas-block', blockId: 'a' }, { kind: 'block', blockId: 'b' }, caps()),
+      resolveDragEndAction(
+        { kind: 'canvas-block', blockId: 'a' },
+        { kind: 'block', blockId: 'b' },
+        caps({ canMoveBlockBeforeTarget: () => true }),
+      ),
     ).toEqual({ type: 'move-before', movingBlockId: 'a', targetBlockId: 'b' });
+    expect(
+      resolveDragEndAction({ kind: 'canvas-block', blockId: 'a' }, { kind: 'block', blockId: 'b' }, caps()),
+    ).toBeNull();
     expect(
       resolveDragEndAction({ kind: 'canvas-block', blockId: 'a' }, { kind: 'block', blockId: 'a' }, caps()),
     ).toBeNull();

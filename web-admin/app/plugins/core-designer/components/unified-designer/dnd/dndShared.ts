@@ -62,6 +62,7 @@ export interface DropCapabilities {
   canAddBlockToParent(parentBlockId: string, blockType: string): boolean;
   canAddModelFieldBeforeTarget(targetBlockId: string, field: ModelFieldDefinition): boolean;
   canAddModelFieldToParent(parentBlockId: string, field: ModelFieldDefinition): boolean;
+  canMoveBlockBeforeTarget(movingBlockId: string, targetBlockId: string): boolean;
 }
 
 /** Resolve the drop intent for a drag over an existing block, or null if not droppable. */
@@ -80,8 +81,8 @@ export function resolveBlockDropIntent(
     if (caps.canAddBlockToParent(targetBlockId, drag.blockType)) return 'inside';
     return null;
   }
-  // canvas-block reorder: drop before any other block
-  return drag.blockId !== targetBlockId ? 'before' : null;
+  if (drag.blockId === targetBlockId) return null;
+  return caps.canMoveBlockBeforeTarget(drag.blockId, targetBlockId) ? 'before' : null;
 }
 
 export type DragEndAction =
@@ -131,7 +132,7 @@ export function resolveDragEndAction(
     }
     return null;
   }
-  if (drag.blockId !== targetBlockId) {
+  if (drag.blockId !== targetBlockId && caps.canMoveBlockBeforeTarget(drag.blockId, targetBlockId)) {
     return { type: 'move-before', movingBlockId: drag.blockId, targetBlockId };
   }
   return null;
