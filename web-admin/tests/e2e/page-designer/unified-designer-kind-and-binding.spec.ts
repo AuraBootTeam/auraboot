@@ -1587,6 +1587,107 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     ]);
   });
 
+  test('undoes and redoes moving a sub-table subtree before another sub-table', async ({ page }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page);
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockBeforeHeader(page, 'sub_table_move_candidate', 'sub_table_target');
+
+    const sourceSection = page.getByTestId('canvas-block-section_source');
+    const targetSection = page.getByTestId('canvas-block-section_target');
+    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(targetSection, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+    await waitForDesignerDragToSettle(page);
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+
+    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
+    expect(await isBeforeInDom(sourceSection, 'field_source_name', 'sub_table_move_candidate')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+
+    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(targetSection, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedSource = findBlock(savedBlocks, 'section_source');
+    const savedTarget = findBlock(savedBlocks, 'section_target');
+    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
+
+    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([
+      'sub_table_move_candidate',
+      'sub_table_target',
+    ]);
+    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
+      'candidate_col_title',
+      'candidate_action_add',
+    ]);
+  });
+
+  test('undoes and redoes moving a sub-table subtree inside an empty section', async ({ page }) => {
+    const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page, { emptyTarget: true });
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockInto(page, 'sub_table_move_candidate', 'section_target');
+
+    const sourceSection = page.getByTestId('canvas-block-section_source');
+    const targetSection = page.getByTestId('canvas-block-section_target');
+    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+    await waitForDesignerDragToSettle(page);
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+
+    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
+    expect(await isBeforeInDom(sourceSection, 'field_source_name', 'sub_table_move_candidate')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+
+    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
+    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedSource = findBlock(savedBlocks, 'section_source');
+    const savedTarget = findBlock(savedBlocks, 'section_target');
+    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
+
+    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['sub_table_move_candidate']);
+    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
+      'candidate_col_title',
+      'candidate_action_add',
+    ]);
+  });
+
   for (const blockType of ['repeater', 'subform'] as const) {
     test(`moves an existing ${blockType} subtree before another ${blockType} in a different section`, async ({
       page,
@@ -1638,6 +1739,105 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       const sourceSection = page.getByTestId('canvas-block-section_source');
       const targetSection = page.getByTestId('canvas-block-section_target');
+      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
+      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+      await saveDesignerPage(page, pid);
+
+      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      expect(readback.ok(), await readback.text()).toBe(true);
+      const readbackBody = await readback.json();
+      expect(readbackBody.code).toBe('0');
+      const savedBlocks = readbackBody.data.blocks as TestBlock[];
+      const savedSource = findBlock(savedBlocks, 'section_source');
+      const savedTarget = findBlock(savedBlocks, 'section_target');
+
+      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId]);
+      expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
+    });
+
+    test(`undoes and redoes moving a ${blockType} subtree before another ${blockType}`, async ({
+      page,
+    }) => {
+      const movedBlockId = `${blockType}_move_candidate`;
+      const targetBlockId = `${blockType}_target`;
+      const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType);
+      await openDesigner(page, formKey);
+      await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+      await page.getByTestId('designer-mode-layout').click();
+      await dragCanvasBlockBeforeHeader(page, movedBlockId, targetBlockId);
+
+      const sourceSection = page.getByTestId('canvas-block-section_source');
+      const targetSection = page.getByTestId('canvas-block-section_target');
+      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
+      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      expect(await isBeforeInDom(targetSection, movedBlockId, targetBlockId)).toBe(true);
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+      await waitForDesignerDragToSettle(page);
+
+      await clickDesignerToolbarButton(page, 'designer-undo');
+
+      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
+      expect(await isBeforeInDom(sourceSection, 'field_source_name', movedBlockId)).toBe(true);
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+      await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+      await clickDesignerToolbarButton(page, 'designer-redo');
+
+      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
+      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      expect(await isBeforeInDom(targetSection, movedBlockId, targetBlockId)).toBe(true);
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+      await saveDesignerPage(page, pid);
+
+      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      expect(readback.ok(), await readback.text()).toBe(true);
+      const readbackBody = await readback.json();
+      expect(readbackBody.code).toBe('0');
+      const savedBlocks = readbackBody.data.blocks as TestBlock[];
+      const savedSource = findBlock(savedBlocks, 'section_source');
+      const savedTarget = findBlock(savedBlocks, 'section_target');
+
+      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId, targetBlockId]);
+      expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
+    });
+
+    test(`undoes and redoes moving a ${blockType} subtree inside an empty section`, async ({
+      page,
+    }) => {
+      const movedBlockId = `${blockType}_move_candidate`;
+      const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType, {
+        emptyTarget: true,
+      });
+      await openDesigner(page, formKey);
+      await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+      await page.getByTestId('designer-mode-layout').click();
+      await dragCanvasBlockInto(page, movedBlockId, 'section_target');
+
+      const sourceSection = page.getByTestId('canvas-block-section_source');
+      const targetSection = page.getByTestId('canvas-block-section_target');
+      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
+      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+      await waitForDesignerDragToSettle(page);
+
+      await clickDesignerToolbarButton(page, 'designer-undo');
+
+      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
+      expect(await isBeforeInDom(sourceSection, 'field_source_name', movedBlockId)).toBe(true);
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+      await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+      await clickDesignerToolbarButton(page, 'designer-redo');
+
       await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
       await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
