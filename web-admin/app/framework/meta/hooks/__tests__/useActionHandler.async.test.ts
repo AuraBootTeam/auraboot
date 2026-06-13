@@ -14,11 +14,19 @@ vi.mock('~/shared/services/http-client', () => ({
 }));
 
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import * as promptUpload from '~/framework/meta/utils/promptUpload';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 
-function makeRuntime(): SchemaRuntime {
-  const context: Record<string, unknown> = { locale: 'zh-CN', t: (k: string) => k, form: {}, global: {}, state: {} };
+function makeRuntime(overrides: Record<string, unknown> = {}): SchemaRuntime {
+  const context: Record<string, unknown> = {
+    locale: 'zh-CN',
+    t: (k: string) => k,
+    form: {},
+    global: {},
+    state: {},
+    ...overrides,
+  };
   return {
     executeHandler: vi.fn(),
     getContext: () => context,
@@ -163,5 +171,182 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining('BOM_PRICE_MISSING'), 'error');
     expect(onError).toHaveBeenCalledTimes(1);
     expect((onError.mock.calls[0][0] as Error).message).toContain('BOM_PRICE_MISSING');
+  });
+
+  it('uses an explicit command targetRecordId template from runtime context for nested toolbar actions', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { updated: 1 } });
+
+    const loadData = vi.fn().mockResolvedValue(undefined);
+    const runtime = makeRuntime({ form: { pid: 'QUOTE-123' } });
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime,
+        navigate: vi.fn() as any,
+        tableName: 'qo_quote_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: { loadData } as any,
+      }),
+    );
+
+    const button = {
+      code: 'compute_process_fee',
+      label: 'Compute Process Fee',
+      action: {
+        type: 'command',
+        command: 'qo_quote_common:compute_process_fee',
+        targetRecordId: '${form.pid}',
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button);
+    });
+
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/qo_quote_common:compute_process_fee',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          targetRecordId: 'QUOTE-123',
+          operationType: 'UPDATE',
+        }),
+      }),
+    );
+    expect(loadData).toHaveBeenCalled();
+  });
+
+  it('reloads explicit data sources for nested toolbar commands instead of navigating away', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { updated: 1 } });
+
+    const navigate = vi.fn();
+    const reload = vi.fn().mockResolvedValue(undefined);
+    const runtime = makeRuntime({ form: { pid: 'QUOTE-123' } });
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime,
+        navigate: navigate as any,
+        tableName: 'qo_quote_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        dataSourceManager: { reload } as any,
+        context: {} as any,
+      }),
+    );
+
+    const button = {
+      code: 'compute_process_fee',
+      label: 'Compute Process Fee',
+      action: {
+        type: 'command',
+        command: 'qo_quote_common:compute_process_fee',
+        targetRecordId: '${form.pid}',
+        refresh: ['processCostItems', 'lines', 'quoteSummary'],
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button);
+    });
+
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/qo_quote_common:compute_process_fee',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          targetRecordId: 'QUOTE-123',
+          operationType: 'UPDATE',
+        }),
+      }),
+    );
+    expect(reload).toHaveBeenCalledWith(['processCostItems', 'lines', 'quoteSummary']);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('uses a hard browser navigation when navigate actions opt into hardReload', async () => {
+    const navigate = vi.fn();
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: navigate as any,
+        tableName: 'qo_quote_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: {} as any,
+      }),
+    );
+
+    const button = {
+      code: 'open_bom_workbench',
+      label: 'Open BOM Workbench',
+      action: {
+        type: 'navigate',
+        to: '/p/bom_conversion_task_pcba_workbench/view/{pid}',
+        hardReload: true,
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button, { pid: 'TASK-123' });
+    });
+
+    expect(openSpy).toHaveBeenCalledWith('/p/bom_conversion_task_pcba_workbench/view/TASK-123', '_self');
+    expect(navigate).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it('injects the original filename alongside promptUpload file ids', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { importId: 'BOM-IMPORT-1' } });
+    vi.spyOn(promptUpload, 'pickFile').mockResolvedValueOnce(
+      new File(['mpn,qty\nRC0603FR-0710KL,2'], 'corrected-bom-ui-upload.xlsx'),
+    );
+    vi.spyOn(promptUpload, 'uploadCommandFile').mockResolvedValueOnce('FILE-123');
+
+    const reload = vi.fn().mockResolvedValue(undefined);
+    const runtime = makeRuntime({ form: { pid: 'QUOTE-123' } });
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime,
+        navigate: vi.fn() as any,
+        tableName: 'qo_quote_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        dataSourceManager: { reload } as any,
+        context: {} as any,
+      }),
+    );
+
+    const button = {
+      code: 'import_corrected_bom',
+      label: 'Upload Corrected BOM',
+      promptUpload: 'corrected_bom_file_id',
+      action: {
+        type: 'command',
+        command: 'qo_quote_common:import_corrected_bom',
+        targetRecordId: '${form.pid}',
+        refresh: ['lines', 'quoteSummary'],
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button);
+    });
+
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/qo_quote_common:import_corrected_bom',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          targetRecordId: 'QUOTE-123',
+          operationType: 'UPDATE',
+          payload: expect.objectContaining({
+            corrected_bom_file_id: 'FILE-123',
+            corrected_bom_filename: 'corrected-bom-ui-upload.xlsx',
+          }),
+        }),
+      }),
+    );
+    expect(reload).toHaveBeenCalledWith(['lines', 'quoteSummary']);
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolvePromptUploadKey, uploadCommandFile } from '../promptUpload';
+import { resolvePromptUploadFilenameKey, resolvePromptUploadKey, uploadCommandFile } from '../promptUpload';
 
 describe('resolvePromptUploadKey', () => {
   it('defaults to source_file_id when promptUpload is boolean true', () => {
@@ -14,6 +14,21 @@ describe('resolvePromptUploadKey', () => {
     expect(resolvePromptUploadKey('   ')).toBe('source_file_id');
     expect(resolvePromptUploadKey(undefined)).toBe('source_file_id');
     expect(resolvePromptUploadKey(null)).toBe('source_file_id');
+  });
+});
+
+describe('resolvePromptUploadFilenameKey', () => {
+  it('derives a filename key from the default promptUpload file id key', () => {
+    expect(resolvePromptUploadFilenameKey(true)).toBe('source_filename');
+  });
+
+  it('derives a filename key from explicit snake_case file id keys', () => {
+    expect(resolvePromptUploadFilenameKey('corrected_bom_file_id')).toBe('corrected_bom_filename');
+    expect(resolvePromptUploadFilenameKey('process_rule_file_id')).toBe('process_rule_filename');
+  });
+
+  it('falls back to appending _filename for non-standard keys', () => {
+    expect(resolvePromptUploadFilenameKey('attachment')).toBe('attachment_filename');
   });
 });
 

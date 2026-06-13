@@ -1,0 +1,775 @@
+[
+  {
+    "name": "automation-new-real",
+    "url": "http://127.0.0.1:5243/automation/new",
+    "screenshot": "/Users/ghj/work/auraboot/auraboot/test-results/rule-center-consumer-audit/automation-new-real.png",
+    "buttons": [
+      {
+        "disabled": false,
+        "href": "",
+        "i": 0,
+        "testid": "cmd-k-trigger",
+        "text": "搜索... ⌘K"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 1,
+        "testid": "ai-panel-toggle",
+        "text": "AuraBot (⌘J)"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 2,
+        "testid": "inbox-badge",
+        "text": "99+"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 3,
+        "testid": "",
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 4,
+        "testid": "",
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 5,
+        "testid": "",
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 6,
+        "testid": "",
+        "text": "Collapse sidebar"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 7,
+        "testid": "",
+        "text": "字段展示"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 8,
+        "testid": "",
+        "text": "E2E测试"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 9,
+        "testid": "",
+        "text": "元数据管理"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 10,
+        "testid": "",
+        "text": "流程管理"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 11,
+        "testid": "",
+        "text": "决 决策中心"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 12,
+        "testid": "",
+        "text": "CRM 演示"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 13,
+        "testid": "",
+        "text": "请假 demo"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 14,
+        "testid": "",
+        "text": "AI 中心"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 15,
+        "testid": "",
+        "text": "设置"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 16,
+        "testid": "",
+        "text": "资产管理"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 17,
+        "testid": "",
+        "text": "组织管理"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 18,
+        "testid": "",
+        "text": "公 公告管理"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 19,
+        "testid": "",
+        "text": "系统管理"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 20,
+        "testid": "btn-export-automation",
+        "text": "Export"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 21,
+        "testid": "automation-editor-toolbar-btn-save",
+        "text": "Save"
+      },
+      {
+        "disabled": true,
+        "href": "",
+        "i": 22,
+        "testid": "toolbar-btn-undo",
+        "text": "Undo (Ctrl+Z)"
+      },
+      {
+        "disabled": true,
+        "href": "",
+        "i": 23,
+        "testid": "toolbar-btn-redo",
+        "text": "Redo (Ctrl+Y)"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 24,
+        "testid": "",
+        "text": "导入"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 25,
+        "testid": "",
+        "text": "导出"
+      },
+      {
+        "disabled": true,
+        "href": "",
+        "i": 26,
+        "testid": "designer-save",
+        "text": "保存"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 27,
+        "testid": "",
+        "text": "触发器"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 28,
+        "testid": "",
+        "text": "操作"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 29,
+        "testid": "",
+        "text": "控制"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 30,
+        "testid": "",
+        "text": "Zoom In"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 31,
+        "testid": "",
+        "text": "Zoom Out"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 32,
+        "testid": "",
+        "text": "Fit View"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 33,
+        "testid": "",
+        "text": "Toggle Interactivity"
+      }
+    ],
+    "controls": [
+      {
+        "aria": "",
+        "i": 0,
+        "name": "",
+        "placeholder": "自动化名称",
+        "tag": "input",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "aria": "",
+        "i": 1,
+        "name": "",
+        "placeholder": "描述（可选）",
+        "tag": "input",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "errors": [],
+    "flags": {
+      "loginLike": false,
+      "noContent": false,
+      "rawJsonLeak": false
+    },
+    "headings": [
+      {
+        "i": 0,
+        "text": "创建自动化"
+      },
+      {
+        "i": 1,
+        "text": "组件库"
+      }
+    ],
+    "href": "http://127.0.0.1:5243/automation/new",
+    "lines": [
+      "Unsaved",
+      "Export",
+      "Save",
+      "创建自动化",
+      "导入",
+      "导出",
+      "保存",
+      "组件库",
+      "触发器",
+      "记录创建",
+      "当新记录被创建时触发",
+      "记录更新",
+      "当记录被更新时触发",
+      "字段变更",
+      "当指定字段的值发生变化时触发",
+      "状态变更",
+      "当记录从一个状态转换到另一个状态时触发",
+      "定时触发",
+      "按 Cron 表达式定时触发",
+      "Webhook 触发",
+      "当收到外部 Webhook 请求时触发",
+      "流程事件触发",
+      "当 BPM 流程事件发生时触发（流程启动、任务完成等）",
+      "记录闲置时",
+      "当记录在指定时长内没有活动（未更新）时触发，由定时巡检驱动",
+      "操作",
+      "更新记录",
+      "更新指定记录的字段值",
+      "创建记录",
+      "创建一条新记录",
+      "发送通知",
+      "向用户发送通知消息",
+      "执行命令",
+      "执行一个已定义的命令",
+      "调用 API",
+      "调用外部 API 接口",
+      "发送 Webhook",
+      "向外部系统发送 Webhook 请求",
+      "启动流程",
+      "启动一个 BPM 工作流程",
+      "Action Llm Call",
+      "控制",
+      "🔀",
+      "条件分支",
+      "根据表达式结果走不同分支",
+      "⏳",
+      "延迟",
+      "等待指定时间后继续执行",
+      "🔁",
+      "循环",
+      "遍历集合中的每个元素执行操作",
+      "React Flow",
+      "选择一个节点进行配置"
+    ],
+    "title": ""
+  },
+  {
+    "name": "bpmn-designer-real",
+    "url": "http://127.0.0.1:5243/bpmn-designer",
+    "screenshot": "/Users/ghj/work/auraboot/auraboot/test-results/rule-center-consumer-audit/bpmn-designer-real.png",
+    "buttons": [
+      {
+        "disabled": false,
+        "href": "",
+        "i": 0,
+        "testid": "cmd-k-trigger",
+        "text": "搜索... ⌘K"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 1,
+        "testid": "ai-panel-toggle",
+        "text": "AuraBot (⌘J)"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 2,
+        "testid": "inbox-badge",
+        "text": "99+"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 3,
+        "testid": "",
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 4,
+        "testid": "",
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 5,
+        "testid": "",
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 6,
+        "testid": "",
+        "text": "Collapse sidebar"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 7,
+        "testid": "",
+        "text": "字段展示"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 8,
+        "testid": "",
+        "text": "E2E测试"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 9,
+        "testid": "",
+        "text": "元数据管理"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 10,
+        "testid": "",
+        "text": "流程管理"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 11,
+        "testid": "",
+        "text": "决 决策中心"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 12,
+        "testid": "",
+        "text": "CRM 演示"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 13,
+        "testid": "",
+        "text": "请假 demo"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 14,
+        "testid": "",
+        "text": "AI 中心"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 15,
+        "testid": "",
+        "text": "设置"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 16,
+        "testid": "",
+        "text": "资产管理"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 17,
+        "testid": "",
+        "text": "组织管理"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 18,
+        "testid": "",
+        "text": "公 公告管理"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 19,
+        "testid": "",
+        "text": "系统管理"
+      },
+      {
+        "disabled": true,
+        "href": "",
+        "i": 20,
+        "testid": "bpmn-toolbar-btn-undo",
+        "text": "Undo (Ctrl+Z)"
+      },
+      {
+        "disabled": true,
+        "href": "",
+        "i": 21,
+        "testid": "bpmn-toolbar-btn-redo",
+        "text": "Redo (Ctrl+Y)"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 22,
+        "testid": "bpmn-btn-validate",
+        "text": "验证"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 23,
+        "testid": "bpmn-btn-import",
+        "text": "导入"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 24,
+        "testid": "bpmn-btn-export",
+        "text": "导出"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 25,
+        "testid": "bpmn-btn-version-history",
+        "text": "版本历史"
+      },
+      {
+        "disabled": true,
+        "href": "",
+        "i": 26,
+        "testid": "bpmn-btn-deploy",
+        "text": "发布"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 27,
+        "testid": "",
+        "text": "监控"
+      },
+      {
+        "disabled": true,
+        "href": "",
+        "i": 28,
+        "testid": "bpmn-toolbar-btn-save",
+        "text": "保存"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 29,
+        "testid": "",
+        "text": "事件"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 30,
+        "testid": "",
+        "text": "任务"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 31,
+        "testid": "",
+        "text": "网关"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 32,
+        "testid": "",
+        "text": "Zoom In"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 33,
+        "testid": "",
+        "text": "Zoom Out"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 34,
+        "testid": "",
+        "text": "Fit View"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 35,
+        "testid": "",
+        "text": "Toggle Interactivity"
+      },
+      {
+        "disabled": false,
+        "href": "",
+        "i": 36,
+        "testid": "",
+        "text": "Close version panel"
+      }
+    ],
+    "controls": [
+      {
+        "aria": "",
+        "i": 0,
+        "name": "",
+        "placeholder": "流程名称",
+        "tag": "input",
+        "type": "text",
+        "value": "新建流程"
+      },
+      {
+        "aria": "",
+        "i": 1,
+        "name": "",
+        "placeholder": "流程标识",
+        "tag": "input",
+        "type": "text",
+        "value": "process_1781326811175"
+      },
+      {
+        "aria": "",
+        "i": 2,
+        "name": "",
+        "placeholder": "流程名称",
+        "tag": "input",
+        "type": "text",
+        "value": "新建流程"
+      },
+      {
+        "aria": "",
+        "i": 3,
+        "name": "",
+        "placeholder": "",
+        "tag": "input",
+        "type": "text",
+        "value": "process_1781326811175"
+      },
+      {
+        "aria": "",
+        "i": 4,
+        "name": "",
+        "placeholder": "流程描述",
+        "tag": "textarea",
+        "type": "",
+        "value": ""
+      },
+      {
+        "aria": "",
+        "i": 5,
+        "name": "",
+        "placeholder": "选择或输入分类",
+        "tag": "input",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "aria": "",
+        "i": 6,
+        "name": "",
+        "placeholder": "",
+        "tag": "select",
+        "type": "",
+        "value": ""
+      },
+      {
+        "aria": "",
+        "i": 7,
+        "name": "",
+        "placeholder": "",
+        "tag": "select",
+        "type": "",
+        "value": ""
+      }
+    ],
+    "errors": [],
+    "flags": {
+      "loginLike": false,
+      "noContent": false,
+      "rawJsonLeak": false
+    },
+    "headings": [
+      {
+        "i": 0,
+        "text": "BPMN 流程设计器"
+      },
+      {
+        "i": 1,
+        "text": "BPMN组件"
+      },
+      {
+        "i": 2,
+        "text": "流程属性"
+      },
+      {
+        "i": 3,
+        "text": "流程策略 (AuraBoot)"
+      },
+      {
+        "i": 4,
+        "text": "Version History"
+      }
+    ],
+    "href": "http://127.0.0.1:5243/bpmn-designer",
+    "lines": [
+      "BPMN 流程设计器",
+      "草稿",
+      "验证",
+      "导入",
+      "导出",
+      "版本历史",
+      "发布",
+      "监控",
+      "保存",
+      "BPMN组件",
+      "事件",
+      "▶",
+      "Start Event",
+      "Start node of the process",
+      "⬛",
+      "End Event",
+      "End node of the process",
+      "任务",
+      "👤",
+      "User Task",
+      "Task that requires human action",
+      "⚙",
+      "Service Task",
+      "Automated service task",
+      "📨",
+      "Receive Task",
+      "Task that waits for an incoming message",
+      "⧉",
+      "Call Activity",
+      "Invoke another process definition",
+      "网关",
+      "◆",
+      "Exclusive Gateway",
+      "Conditional branch — only one path is taken",
+      "＋",
+      "Parallel Gateway",
+      "Parallel branch — all paths run concurrently",
+      "○",
+      "Inclusive Gateway",
+      "Conditional branch — every matching path runs",
+      "React Flow",
+      "流程属性",
+      "流程名称",
+      "流程标识",
+      "描述",
+      "分类",
+      "流程策略 (AuraBoot)",
+      "撤回策略",
+      "使用默认值",
+      "严格 (仅首个任务前)",
+      "宽松 (任何未结束节点)",
+      "禁止撤回",
+      "控制发起人撤回流程实例的时机",
+      "抄送策略",
+      "使用默认值",
+      "仅发起人",
+      "仅处理人",
+      "发起人和处理人",
+      "决定哪些成员会收到抄送通知",
+      "Version History",
+      "No versions yet",
+      "Save to create the first version",
+      "0 versions available"
+    ],
+    "title": ""
+  }
+]
