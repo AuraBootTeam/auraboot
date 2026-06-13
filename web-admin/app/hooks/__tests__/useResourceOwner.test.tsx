@@ -124,7 +124,7 @@ describe('useBatchResourceOwners', () => {
 
     const resources = [{ type: 'MODEL', code: 'order' }];
     const { result, rerender } = renderHook(
-      ({ res }) => useBatchResourceOwners(res),
+      ({ res }: { res: Array<{ type: string; code: string }> }) => useBatchResourceOwners(res),
       { initialProps: { res: resources } },
     );
 

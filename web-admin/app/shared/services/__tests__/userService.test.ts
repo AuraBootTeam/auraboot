@@ -7,7 +7,7 @@
  * fetchUserInfo / getUserInfo use native fetch + session + process.env; we mock
  * both getTokenFromRequest and global fetch to exercise the network paths.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { getTokenMock } = vi.hoisted(() => ({
   getTokenMock: vi.fn(),
@@ -30,6 +30,10 @@ import type { UserPermissions } from '~/utils/type';
 
 const FAKE_REQUEST = new Request('http://localhost/');
 const TOKEN = 'test-jwt';
+type PermissionFixture = NonNullable<UserPermissions['permissions']>[number];
+type RoleFixture = UserPermissions['roles'][number];
+const permission = (code: string, name: string): PermissionFixture => ({ id: 1, code, name, type: 'model' });
+const role = (code: string, name: string): RoleFixture => ({ id: 1, code, name, type: 'system' });
 
 // ── hasPermission ─────────────────────────────────────────────────────────────
 
@@ -50,7 +54,7 @@ describe('hasPermission', () => {
   it('returns true when permissions array has matching code', () => {
     const perms: UserPermissions = {
       roles: [],
-      permissions: [{ code: 'order.delete', name: 'Delete Order' }],
+      permissions: [permission('order.delete', 'Delete Order')],
     };
     expect(hasPermission(perms, 'order.delete')).toBe(true);
   });
@@ -58,7 +62,7 @@ describe('hasPermission', () => {
   it('returns false when code is not in either list', () => {
     const perms: UserPermissions = {
       roles: [],
-      permissions: [{ code: 'order.view', name: 'View Order' }],
+      permissions: [permission('order.view', 'View Order')],
       permissionCodes: ['order.view'],
     };
     expect(hasPermission(perms, 'order.admin')).toBe(false);
@@ -79,7 +83,7 @@ describe('hasRole', () => {
 
   it('returns true when roles contains matching code', () => {
     const perms: UserPermissions = {
-      roles: [{ code: 'admin', name: 'Admin' }],
+      roles: [role('admin', 'Admin')],
       permissions: [],
     };
     expect(hasRole(perms, 'admin')).toBe(true);
@@ -87,7 +91,7 @@ describe('hasRole', () => {
 
   it('returns false when role code does not match', () => {
     const perms: UserPermissions = {
-      roles: [{ code: 'viewer', name: 'Viewer' }],
+      roles: [role('viewer', 'Viewer')],
       permissions: [],
     };
     expect(hasRole(perms, 'admin')).toBe(false);
@@ -99,7 +103,7 @@ describe('hasRole', () => {
 describe('hasAnyPermission', () => {
   const perms: UserPermissions = {
     roles: [],
-    permissions: [{ code: 'order.view', name: 'View Order' }],
+    permissions: [permission('order.view', 'View Order')],
     permissionCodes: ['report.export'],
   };
 
@@ -121,7 +125,7 @@ describe('hasAnyPermission', () => {
 describe('hasAllPermissions', () => {
   const perms: UserPermissions = {
     roles: [],
-    permissions: [{ code: 'order.view', name: 'View' }],
+    permissions: [permission('order.view', 'View')],
     permissionCodes: ['order.edit'],
   };
 

@@ -320,7 +320,7 @@ describe('usePluginSync', () => {
     );
 
     // Flush auto-sync microtasks
-    await vi.runAllTicksAsync?.() ?? await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
 

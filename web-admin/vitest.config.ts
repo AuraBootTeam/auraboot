@@ -42,7 +42,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text-summary', 'json-summary', 'html'],
       reportsDirectory: './coverage',
-      all: true,
+      // Include all source files in coverage accounting.
       include: ['app/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
       exclude: [
         'node_modules',

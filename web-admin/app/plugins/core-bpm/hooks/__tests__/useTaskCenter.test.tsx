@@ -75,7 +75,9 @@ const mockSendUrge = vi.mocked(notifyService.sendUrge);
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-const makeTask = (overrides: Partial<ReturnType<typeof baseTask>> = {}) => ({
+type TaskFixture = ReturnType<typeof baseTask> & { dueDate?: string };
+
+const makeTask = (overrides: Partial<TaskFixture> = {}) => ({
   ...baseTask(),
   ...overrides,
 });

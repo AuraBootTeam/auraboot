@@ -207,8 +207,8 @@ describe('useSavedViews', () => {
       await result.current.setDefaultView('v2');
     });
 
-    const newDefault = result.current.views.find((v) => v.pid === 'v2');
-    const oldDefault = result.current.views.find((v) => v.pid === 'v1');
+    const newDefault = result.current.views.find((v: { pid: string; isDefault?: boolean }) => v.pid === 'v2');
+    const oldDefault = result.current.views.find((v: { pid: string; isDefault?: boolean }) => v.pid === 'v1');
     expect(newDefault?.isDefault).toBe(true);
     expect(oldDefault?.isDefault).toBe(false);
   });

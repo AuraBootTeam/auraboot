@@ -151,7 +151,7 @@ describe('useNotificationList', () => {
       await result.current.markAsRead(1);
     });
 
-    expect(result.current.notifications.find((n) => n.id === 1)?.isRead).toBe(true);
+    expect(result.current.notifications.find((n: { id: number; isRead: boolean }) => n.id === 1)?.isRead).toBe(true);
     expect(result.current.unreadCount).toBe(1);
     expect(showSuccessToast).toHaveBeenCalledWith('Notification marked as read');
   });
@@ -172,7 +172,7 @@ describe('useNotificationList', () => {
       await result.current.markAllAsRead();
     });
 
-    expect(result.current.notifications.every((n) => n.isRead)).toBe(true);
+    expect(result.current.notifications.every((n: { isRead: boolean }) => n.isRead)).toBe(true);
     expect(result.current.unreadCount).toBe(0);
   });
 

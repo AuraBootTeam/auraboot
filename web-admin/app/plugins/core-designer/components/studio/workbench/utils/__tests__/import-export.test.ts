@@ -15,6 +15,13 @@ const validSchema = (): CanvasSchema => ({
   description: 'A test schema',
   version: '1.0.0',
   components: [],
+  layout: { type: 'vertical', columns: 1, spacing: 8, padding: 0 },
+  metadata: {
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+    createdBy: 'test',
+    tags: [],
+  },
 });
 
 // ─── exportSchema ────────────────────────────────────────────────────────────

@@ -79,7 +79,7 @@ describe('dynamicService', () => {
     it('normalises missing backend fields to defaults', async () => {
       getMock.mockResolvedValue(ok({}));
 
-      const result = await dynamicService.findByPage('order', {});
+      const result = await dynamicService.findByPage('order', { page: 0, size: 20 });
 
       expect(result.records).toEqual([]);
       expect(result.total).toBe(0);
@@ -89,7 +89,7 @@ describe('dynamicService', () => {
     it('throws on failure', async () => {
       getMock.mockResolvedValue(fail('DB error'));
 
-      await expect(dynamicService.findByPage('order', {})).rejects.toThrow('DB error');
+      await expect(dynamicService.findByPage('order', { page: 0, size: 20 })).rejects.toThrow('DB error');
     });
   });
 
