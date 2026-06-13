@@ -3,7 +3,7 @@ type: backlog
 status: closed
 created: 2026-06-13
 closed: 2026-06-13
-distilled_to: web-admin/app/framework/meta/utils/__tests__/canonicalizePageDsl.test.ts (regression test "folds commandCode into a command action for a legacy form-persist verb (save)")
+distilled_to: web-admin/app/framework/meta/utils/__tests__/canonicalizePageDsl.test.ts
 ---
 
 > **RESOLVED 2026-06-13** (same session, PR follows). Root cause + fix below; verified by a real-browser golden on both a synthesized app (`sales_lead`) and a shipped plugin (`tasset_category`) — both now create records, rows persist to `mt_*`.
