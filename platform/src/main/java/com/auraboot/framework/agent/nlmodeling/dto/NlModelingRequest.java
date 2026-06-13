@@ -25,15 +25,22 @@ public class NlModelingRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Options {
+        // Boxed Boolean (not primitive boolean): with @Builder.Default the field
+        // initializer is stripped from the no-args constructor Jackson uses, so a
+        // primitive would deserialize to false for any OMITTED option — silently
+        // disabling page/command/menu generation when a caller sends `options: {}`
+        // or partial options. With Boolean, an omitted field stays null and is
+        // treated as "generate" (true) at the read site; only an explicit `false`
+        // disables. The builder still defaults to true.
         @Builder.Default
-        private boolean generatePages = true;
+        private Boolean generatePages = true;
         @Builder.Default
-        private boolean generateCommands = true;
+        private Boolean generateCommands = true;
         @Builder.Default
-        private boolean generateMenus = true;
+        private Boolean generateMenus = true;
         @Builder.Default
-        private boolean generateI18n = true;
+        private Boolean generateI18n = true;
         @Builder.Default
-        private boolean generateBindings = true;
+        private Boolean generateBindings = true;
     }
 }
