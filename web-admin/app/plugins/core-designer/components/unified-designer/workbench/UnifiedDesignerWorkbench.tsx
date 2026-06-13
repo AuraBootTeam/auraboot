@@ -63,6 +63,8 @@ import { CanvasHost, type ActiveDropIntent } from '../canvas/CanvasHost';
 import { InspectorHost } from './InspectorHost';
 import { RecursiveBlockRenderer } from '../runtime/RecursiveBlockRenderer';
 import { defaultRuntimeExecutionServices } from '../runtime/runtimeExecution';
+import { AiDesignDialog } from '../ai/AiDesignDialog';
+import { buildDesignCopilotPrompt, applyDesignBlocks, type ParsedDesign } from '../ai/designCopilot';
 
 // Pointer-based collision for real users, with a closestCenter fallback when the
 // pointer isn't inside any droppable.
@@ -79,6 +81,12 @@ export interface UnifiedDesignerWorkbenchProps {
   modelFieldsByModel?: ModelFieldsByModel;
   returnHref?: string;
   onSave?: (document: PageSchemaV3) => Promise<void> | void;
+  /**
+   * Enable the in-designer AI copilot (tools-off /generate-page). Pass `true` for
+   * defaults, or an object with `domainGuidance` to flavor the system prompt for a
+   * specific surface (e.g. a QR scan-landing page).
+   */
+  aiCopilot?: boolean | { domainGuidance?: string };
 }
 
 const MAX_DOCUMENT_HISTORY = 50;
@@ -88,6 +96,7 @@ export function UnifiedDesignerWorkbench({
   modelFieldsByModel = {},
   returnHref,
   onSave,
+  aiCopilot,
 }: UnifiedDesignerWorkbenchProps) {
   const initialSnapshot = serializeDocument(initialDocument);
   const [documentHistory, setDocumentHistory] = useState(() => ({
@@ -103,6 +112,7 @@ export function UnifiedDesignerWorkbench({
   const [mode, setMode] = useState<WorkbenchMode>('edit');
   const [previewDeviceId, setPreviewDeviceId] = useState<string>(DEFAULT_DEVICE_PREVIEW_ID);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
   const [activeDropIntent, setActiveDropIntent] = useState<ActiveDropIntent>(null);
   const document = documentHistory.document;
@@ -669,6 +679,51 @@ export function UnifiedDesignerWorkbench({
     }
   };
 
+  const aiCopilotEnabled = !!aiCopilot;
+  const aiDomainGuidance =
+    typeof aiCopilot === 'object' && aiCopilot ? aiCopilot.domainGuidance : undefined;
+  const aiKindPolicy = getKindPolicy(document.kind);
+  const aiRootBlockType = aiKindPolicy.rootBlockType;
+  const aiSystemPrompt = useMemo(() => {
+    if (!aiCopilotEnabled) return '';
+    const allowed = aiKindPolicy.allowedBlockTypes
+      ? [...aiKindPolicy.allowedBlockTypes].filter((type) => type !== aiRootBlockType)
+      : blockDefinitions.map((definition) => definition.blockType);
+    const rootChildren = aiRootBlockType
+      ? (document.blocks.find((block) => block.blockType === aiRootBlockType)?.blocks ?? [])
+      : document.blocks;
+    const fields = (document.modelCode ? (modelFieldsByModel[document.modelCode] ?? []) : []).map(
+      (field) => ({
+        code: field.code,
+        name: typeof field.label === 'string' ? field.label : field.code,
+        type: field.type ?? 'string',
+      }),
+    );
+    return buildDesignCopilotPrompt({
+      kind: document.kind,
+      allowedBlockTypes: allowed,
+      rootBlockType: aiRootBlockType,
+      modelFields: fields,
+      currentBlocks: rootChildren,
+      domainGuidance: aiDomainGuidance,
+    });
+  }, [
+    aiCopilotEnabled,
+    aiKindPolicy,
+    aiRootBlockType,
+    blockDefinitions,
+    document,
+    modelFieldsByModel,
+    aiDomainGuidance,
+  ]);
+
+  const handleApplyAiDesign = (parsed: ParsedDesign) => {
+    updateDocument((current) =>
+      applyDesignBlocks(current, parsed, getKindPolicy(current.kind).rootBlockType),
+    );
+    setSelectedBlockId(null);
+  };
+
   return (
     <div
       className="flex h-[calc(100vh-64px)] min-h-[656px] flex-col overflow-hidden bg-slate-100 text-slate-900"
@@ -685,11 +740,22 @@ export function UnifiedDesignerWorkbench({
         canUndo={canUndo}
         canRedo={canRedo}
         returnHref={returnHref}
+        aiCopilotEnabled={aiCopilotEnabled}
         onModeChange={setMode}
         onUndo={handleUndo}
         onRedo={handleRedo}
         onSave={handleSave}
+        onOpenAiCopilot={() => setAiDialogOpen(true)}
       />
+      {aiCopilotEnabled ? (
+        <AiDesignDialog
+          open={aiDialogOpen}
+          onClose={() => setAiDialogOpen(false)}
+          systemPrompt={aiSystemPrompt}
+          existingIds={collectBlockIds(document.blocks)}
+          onApply={handleApplyAiDesign}
+        />
+      ) : null}
       {mode === 'preview' ? (
         <div
           className="min-h-0 flex-1 overflow-auto bg-slate-100 p-4 lg:p-6"
