@@ -193,10 +193,38 @@ Navigate to [http://localhost:5173](http://localhost:5173) and log in with:
 
 ### AI / LLM
 
+LLM provider API keys are supplied through environment variables — **never hardcoded
+in source or pasted into a chat**. On every startup the platform seeder reads these
+variables and, for each one that is set, provisions the matching provider's cloud
+config: it injects the key (encrypted when `FIELD_ENCRYPTION_KEY` is set), enables the
+provider, and recreates the provider row from defaults if it was previously deleted.
+Leave a variable unset and that provider is left untouched. Set it once (shell export
+or a gitignored `.env`) and you never need to re-enter the key.
+
 | Variable | Default | Description |
 |---|---|---|
+| `DEEPSEEK_API_KEY` | *(empty)* | DeepSeek API key (`deepseek-chat`) |
+| `OPENAI_API_KEY` | *(empty)* | OpenAI API key (`gpt-4o`, o-series) |
 | `ANTHROPIC_API_KEY` | *(empty)* | Anthropic API key for Claude models |
+| `DASHSCOPE_API_KEY` | *(empty)* | Alibaba 通义千问 (Qwen) API key |
+| `ZHIPU_API_KEY` | *(empty)* | 智谱 (Zhipu / GLM) API key |
+| `MOONSHOT_API_KEY` | *(empty)* | 月之暗面 (Moonshot) API key |
+| `MINIMAX_API_KEY` | *(empty)* | MiniMax (海螺AI) API key — overrides the bundled key |
 | `GATEWAY_SECRET` | *(empty)* | AI gateway authentication secret |
+
+> The seeder reads the OS environment variable, so set it wherever your backend
+> process gets its environment — for example a shell export (persist it in
+> `~/.zshrc` / `~/.bashrc` to set it once), your container/process-manager env, or,
+> when launching through `./dev.sh run <name>`, the gitignored
+> `.workspace/env/<name>.env` runtime file (sourced automatically):
+>
+> ```bash
+> export DEEPSEEK_API_KEY=sk-your-key-here   # then (re)start the backend
+> ```
+>
+> The seeder enables and keys the DeepSeek provider on the next boot. To rotate,
+> update the value and restart; to disable, clear the provider in Admin → Cloud
+> Config (an unset variable does not clear an already-stored key).
 
 ### Redis (Optional)
 
