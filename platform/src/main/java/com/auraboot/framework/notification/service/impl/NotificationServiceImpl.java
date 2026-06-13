@@ -12,6 +12,9 @@ import com.auraboot.framework.notification.mapper.NotificationSendLogMapper;
 import com.auraboot.framework.notification.service.NotificationService;
 import com.auraboot.framework.notification.service.NotificationTemplateService;
 import com.auraboot.framework.notification.service.EmailSender;
+import com.auraboot.framework.organization.dto.TeamMemberResponse;
+import com.auraboot.framework.organization.service.TeamMemberService;
+import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -35,15 +39,21 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationSendLogMapper sendLogMapper;
     private final EmailSender emailSender;
     private final Map<String, NotificationChannel> channelMap;
+    private final UserRoleMapper userRoleMapper;
+    private final TeamMemberService teamMemberService;
 
     public NotificationServiceImpl(
             NotificationTemplateService templateService,
             NotificationSendLogMapper sendLogMapper,
             EmailSender emailSender,
-            List<NotificationChannel> channels) {
+            List<NotificationChannel> channels,
+            UserRoleMapper userRoleMapper,
+            TeamMemberService teamMemberService) {
         this.templateService = templateService;
         this.sendLogMapper = sendLogMapper;
         this.emailSender = emailSender;
+        this.userRoleMapper = userRoleMapper;
+        this.teamMemberService = teamMemberService;
         this.channelMap = channels.stream()
                 .collect(Collectors.toMap(NotificationChannel::getChannelCode, c -> c));
         log.info("NotificationService initialized with {} channels: {}",
@@ -86,13 +96,9 @@ public class NotificationServiceImpl implements NotificationService {
             return;
         }
 
-        // recipientId may be a numeric userId (for IN_APP) or an email (for EMAIL)
-        List<Long> recipientUserIds;
-        try {
-            recipientUserIds = List.of(Long.parseLong(request.getRecipientId()));
-        } catch (NumberFormatException e) {
-            recipientUserIds = List.of();
-        }
+        // Resolve recipient(s) per recipientType: user (default), role, or group/team.
+        // recipientId is a numeric userId (user), a role code (role) or a team pid (group).
+        List<Long> recipientUserIds = resolveRecipientUserIds(request, tenantId);
 
         NotificationMessage message = NotificationMessage.builder()
                 .tenantId(tenantId)
@@ -112,6 +118,42 @@ public class NotificationServiceImpl implements NotificationService {
                 request.getRecipientId(), renderedSubject, renderedBody,
                 result.isSuccess() ? "sent" : "failed",
                 result.getErrorMessage());
+    }
+
+    /**
+     * Resolve the recipient user ids for a notification, fanning out for role/group targets.
+     * <ul>
+     *   <li>{@code role} — every active member assigned the role code in this tenant</li>
+     *   <li>{@code group}/{@code team} — every member of the team (by pid)</li>
+     *   <li>{@code user} (default) — the single user id (recipientId parsed as a long)</li>
+     * </ul>
+     */
+    private List<Long> resolveRecipientUserIds(NotificationSendRequest request, Long tenantId) {
+        String recipient = request.getRecipientId();
+        if (recipient == null || recipient.isBlank()) {
+            return List.of();
+        }
+        String type = request.getRecipientType();
+        String normalized = (type == null || type.isBlank()) ? "user" : type.trim().toLowerCase();
+        switch (normalized) {
+            case "role" -> {
+                return userRoleMapper.findUserIdsByRoleCode(recipient, tenantId);
+            }
+            case "group", "team" -> {
+                return teamMemberService.listMembers(recipient).stream()
+                        .map(TeamMemberResponse::getUserId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList();
+            }
+            default -> {
+                try {
+                    return List.of(Long.parseLong(recipient));
+                } catch (NumberFormatException e) {
+                    return List.of();
+                }
+            }
+        }
     }
 
     @Override
