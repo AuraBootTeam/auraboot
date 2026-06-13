@@ -564,13 +564,20 @@ public class NlModelingService {
         sb.append("Please generate a complete AuraBoot DSL plugin configuration for the following requirement:\n\n");
         sb.append(description).append("\n\n");
         sb.append("Generation options:\n");
-        sb.append("- Pages: ").append(opts.isGeneratePages() ? "yes" : "no").append("\n");
-        sb.append("- Commands: ").append(opts.isGenerateCommands() ? "yes" : "no").append("\n");
-        sb.append("- Menus: ").append(opts.isGenerateMenus() ? "yes" : "no").append("\n");
-        sb.append("- i18n: ").append(opts.isGenerateI18n() ? "yes" : "no").append("\n");
-        sb.append("- Bindings: ").append(opts.isGenerateBindings() ? "yes" : "no").append("\n");
+        // Default to generate (true) unless the caller explicitly passed false — an
+        // omitted option deserializes to null, which must NOT mean "no".
+        sb.append("- Pages: ").append(optEnabled(opts.getGeneratePages()) ? "yes" : "no").append("\n");
+        sb.append("- Commands: ").append(optEnabled(opts.getGenerateCommands()) ? "yes" : "no").append("\n");
+        sb.append("- Menus: ").append(optEnabled(opts.getGenerateMenus()) ? "yes" : "no").append("\n");
+        sb.append("- i18n: ").append(optEnabled(opts.getGenerateI18n()) ? "yes" : "no").append("\n");
+        sb.append("- Bindings: ").append(optEnabled(opts.getGenerateBindings()) ? "yes" : "no").append("\n");
         sb.append("\nOutput the complete JSON object. No markdown, no explanation outside the JSON.");
         return sb.toString();
+    }
+
+    /** A generation option is enabled unless the caller explicitly set it to false (null = default-on). */
+    private static boolean optEnabled(Boolean value) {
+        return !Boolean.FALSE.equals(value);
     }
 
     // =========================================================================
