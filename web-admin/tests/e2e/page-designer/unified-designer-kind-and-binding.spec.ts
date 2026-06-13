@@ -23,7 +23,7 @@ import { uniqueId } from '../helpers';
 type TestBlock = { id: string; blocks?: TestBlock[] };
 type CreatedDesignerPage = { pageKey: string; pid: string };
 type AdvancedContainerBlockType = 'repeater' | 'subform';
-type ListBlockMoveType = 'table' | 'filter-bar';
+type ListBlockMoveType = 'table' | 'filter-bar' | 'action-bar';
 
 async function createFormPage(page: Page): Promise<string> {
   const id = uniqueId('udw_kind');
@@ -616,53 +616,61 @@ async function createCrossContainerListBlockPage(
   const id = uniqueId(`udw_${blockType.replace('-', '_')}_${options.source}_move`);
   const pageKey = `udw_${blockType.replace('-', '_')}_${options.source}_move_${id}`;
   const candidateBlock = createListMoveCandidateBlock(blockType);
+  const sourceTabsBlock = {
+    id: 'tabs_holder',
+    blockType: 'tabs',
+    title: 'Tabs holder',
+    layout: { span: 12 },
+    blocks: [
+      {
+        id: 'tab_source',
+        blockType: 'tab',
+        title: 'Source tab',
+        blocks: [candidateBlock],
+      },
+    ],
+  };
+  const targetActionBarBlock = {
+    id: 'action_bar_target',
+    blockType: 'action-bar',
+    title: 'Target actions',
+    region: 'toolbar',
+    layout: { span: 12 },
+    blocks: [
+      {
+        id: 'target_action_create',
+        blockType: 'action',
+        actionType: 'create',
+        props: { label: 'Create target' },
+      },
+    ],
+  };
+  const targetTableBlock = {
+    id: 'table_target',
+    blockType: 'table',
+    title: 'Target table',
+    layout: { span: 12 },
+    blocks: [
+      {
+        id: 'target_col_title',
+        blockType: 'column',
+        field: 'title',
+        props: { label: 'Target title' },
+      },
+    ],
+  };
+  const actionBarAnchorTableBlock = {
+    id: 'action_bar_anchor_table',
+    blockType: 'table',
+    title: 'Action bar anchor table',
+    layout: { span: 12 },
+    blocks: [],
+  };
   const rootBlocks =
     options.source === 'tab'
-      ? [
-          {
-            id: 'tabs_holder',
-            blockType: 'tabs',
-            title: 'Tabs holder',
-            layout: { span: 12 },
-            blocks: [
-              {
-                id: 'tab_source',
-                blockType: 'tab',
-                title: 'Source tab',
-                blocks: [candidateBlock],
-              },
-            ],
-          },
-          {
-            id: 'action_bar_target',
-            blockType: 'action-bar',
-            title: 'Target actions',
-            region: 'toolbar',
-            layout: { span: 12 },
-            blocks: [
-              {
-                id: 'target_action_create',
-                blockType: 'action',
-                actionType: 'create',
-                props: { label: 'Create target' },
-              },
-            ],
-          },
-          {
-            id: 'table_target',
-            blockType: 'table',
-            title: 'Target table',
-            layout: { span: 12 },
-            blocks: [
-              {
-                id: 'target_col_title',
-                blockType: 'column',
-                field: 'title',
-                props: { label: 'Target title' },
-              },
-            ],
-          },
-        ]
+      ? blockType === 'action-bar'
+        ? [actionBarAnchorTableBlock, sourceTabsBlock]
+        : [sourceTabsBlock, targetActionBarBlock, targetTableBlock]
       : [
           candidateBlock,
           {
@@ -729,6 +737,17 @@ function createListMoveCandidateBlock(blockType: ListBlockMoveType) {
     };
   }
 
+  if (blockType === 'action-bar') {
+    return {
+      id: 'action_bar_move_candidate',
+      blockType: 'action-bar',
+      title: 'Move candidate actions',
+      region: 'toolbar',
+      layout: { span: 12 },
+      blocks: createActionBarChildren('candidate'),
+    };
+  }
+
   return {
     id: 'filter_bar_move_candidate',
     blockType: 'filter-bar',
@@ -755,6 +774,14 @@ function expectListBlockChildren(
     expect(movedBlock?.blocks?.map((block) => block.id)).toEqual([
       'candidate_col_name',
       'candidate_action_view',
+    ]);
+    return;
+  }
+
+  if (blockType === 'action-bar') {
+    expect(movedBlock?.blocks?.map((block) => block.id)).toEqual([
+      'candidate_action_submit',
+      'candidate_action_refresh',
     ]);
     return;
   }
@@ -1699,6 +1726,109 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       'filter_bar_move_candidate',
     ]);
     expectListBlockChildren(savedBlocks, 'filter-bar', 'filter_bar_move_candidate');
+  });
+
+  test('undoes and redoes a list action-bar subtree move-before between tab and list root', async ({
+    page,
+  }) => {
+    const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'action-bar', {
+      source: 'tab',
+    });
+    await openDesigner(page, listKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockBeforeHeader(page, 'action_bar_move_candidate', 'action_bar_anchor_table');
+
+    const listRoot = page.getByTestId('canvas-block-list_root');
+    const sourceTab = page.getByTestId('canvas-block-tab_source');
+    await expect(sourceTab.getByTestId('canvas-block-action_bar_move_candidate')).toHaveCount(0);
+    await expect(listRoot.getByTestId('canvas-block-action_bar_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(listRoot, 'action_bar_move_candidate', 'action_bar_anchor_table')).toBe(
+      true,
+    );
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+    await waitForDesignerDragToSettle(page);
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+
+    await expect(sourceTab.getByTestId('canvas-block-action_bar_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+
+    await expect(sourceTab.getByTestId('canvas-block-action_bar_move_candidate')).toHaveCount(0);
+    await expect(listRoot.getByTestId('canvas-block-action_bar_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(listRoot, 'action_bar_move_candidate', 'action_bar_anchor_table')).toBe(
+      true,
+    );
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'list_root');
+    const savedSourceTab = findBlock(savedBlocks, 'tab_source');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+      'action_bar_move_candidate',
+      'action_bar_anchor_table',
+      'tabs_holder',
+    ]);
+    expect(savedSourceTab?.blocks?.map((block) => block.id)).toEqual([]);
+    expectListBlockChildren(savedBlocks, 'action-bar', 'action_bar_move_candidate');
+  });
+
+  test('undoes and redoes a list action-bar subtree move-inside from list root into an empty tab', async ({
+    page,
+  }) => {
+    const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'action-bar', {
+      source: 'list',
+    });
+    await openDesigner(page, listKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await dragCanvasBlockInto(page, 'action_bar_move_candidate', 'tab_empty');
+
+    const listRoot = page.getByTestId('canvas-block-list_root');
+    const targetTab = page.getByTestId('canvas-block-tab_empty');
+    await expect(targetTab.getByTestId('canvas-block-action_bar_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+    await waitForDesignerDragToSettle(page);
+
+    await clickDesignerToolbarButton(page, 'designer-undo');
+
+    await expect(targetTab.getByTestId('canvas-block-action_bar_move_candidate')).toHaveCount(0);
+    await expect(listRoot.getByTestId('canvas-block-action_bar_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+    await expect(page.getByTestId('designer-redo')).toBeEnabled();
+
+    await clickDesignerToolbarButton(page, 'designer-redo');
+
+    await expect(targetTab.getByTestId('canvas-block-action_bar_move_candidate')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+    await saveDesignerPage(page, pid);
+
+    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const savedRoot = findBlock(savedBlocks, 'list_root');
+    const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
+
+    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
+      'action_bar_move_candidate',
+    ]);
+    expectListBlockChildren(savedBlocks, 'action-bar', 'action_bar_move_candidate');
   });
 
   test('rejects moving a cross-kind block within a form designer and keeps persisted schema unchanged', async ({ page }) => {
