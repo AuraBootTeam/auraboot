@@ -158,6 +158,83 @@ async function createCrossContainerFormPage(
   return { pageKey, pid: body.data.pid };
 }
 
+async function createCrossKindGuardFormPage(page: Page): Promise<CreatedDesignerPage> {
+  const id = uniqueId('udw_cross_kind_guard');
+  const pageKey = `udw_cross_kind_guard_${id}`;
+  const resp = await page.request.post('/api/pages', {
+    data: {
+      name: `UDW cross kind guard ${id}`,
+      pageKey,
+      title: `UDW cross kind guard ${id}`,
+      kind: 'form',
+      modelCode: 'page_schema',
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          title: 'Form root',
+          dataSource: { model: 'page_schema' },
+          layout: { span: 12 },
+          blocks: [
+            {
+              id: 'tabs_root',
+              blockType: 'tabs',
+              title: 'Tabs root',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'tab_main',
+                  blockType: 'tab',
+                  title: 'Main tab',
+                  blocks: [
+                    {
+                      id: 'section_main',
+                      blockType: 'form-section',
+                      title: 'Main section',
+                      layout: { span: 12 },
+                      blocks: [
+                        {
+                          id: 'field_inside_section',
+                          blockType: 'field',
+                          field: 'name',
+                          layout: { span: 6 },
+                          props: { label: 'Section field', component: 'input' },
+                        },
+                      ],
+                    },
+                    {
+                      id: 'detail_section_from_detail',
+                      blockType: 'detail-section',
+                      title: 'Detail section from stale schema',
+                      layout: { span: 12 },
+                      blocks: [
+                        {
+                          id: 'field_inside_detail_section',
+                          blockType: 'field',
+                          field: 'description',
+                          layout: { span: 12 },
+                          props: { label: 'Invalid detail field', component: 'textarea' },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      extension: { e2e: true, scenario: 'unified-designer-cross-kind-guard' },
+    },
+  });
+  expect(resp.ok(), await resp.text()).toBe(true);
+  const body = await resp.json();
+  expect(body.code).toBe('0');
+  expect(body.data?.pid).toBeTruthy();
+  return { pageKey, pid: body.data.pid };
+}
+
 /**
  * Open the unified designer for a page key. On a cold dev Vite the very first
  * navigation can race optimizeDeps and render a transient "Application Error";
@@ -323,6 +400,37 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['field_move_candidate']);
   });
 
+  test('rejects moving a cross-kind block within a form designer and keeps persisted schema unchanged', async ({ page }) => {
+    const { pageKey: formKey } = await createCrossKindGuardFormPage(page);
+    await openDesigner(page, formKey);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+    await page.getByTestId('designer-mode-layout').click();
+    const tabsRoot = page.getByTestId('canvas-block-tabs_root');
+    await expect(tabsRoot.getByTestId('canvas-block-section_main')).toBeVisible();
+    await expect(tabsRoot.getByTestId('canvas-block-detail_section_from_detail')).toBeVisible();
+    expect(await isBeforeInDom(tabsRoot, 'section_main', 'detail_section_from_detail')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+
+    await dragCanvasBlockBefore(page, 'detail_section_from_detail', 'section_main');
+
+    await expect(tabsRoot.getByTestId('canvas-block-section_main')).toBeVisible();
+    await expect(tabsRoot.getByTestId('canvas-block-detail_section_from_detail')).toBeVisible();
+    expect(await isBeforeInDom(tabsRoot, 'section_main', 'detail_section_from_detail')).toBe(true);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
+
+    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    expect(readback.ok(), await readback.text()).toBe(true);
+    const readbackBody = await readback.json();
+    expect(readbackBody.code).toBe('0');
+    const savedBlocks = readbackBody.data.blocks as TestBlock[];
+    const tabMain = findBlock(savedBlocks, 'tab_main');
+    expect(tabMain?.blocks?.map((block) => block.id)).toEqual([
+      'section_main',
+      'detail_section_from_detail',
+    ]);
+  });
+
   // Guards Playwright `.dragTo()` compatibility with @dnd-kit. The wider designer
   // E2E suite (unified-designer-workbench UDW-*) drives drags via `.dragTo()`,
   // whose single jump-move pointerWithin can miss — the workbench's
@@ -443,16 +551,18 @@ async function isBeforeInDom(
   afterBlockId: string,
 ) {
   return container
-    .getByTestId(`canvas-block-${beforeBlockId}`)
-    .evaluate((beforeNode, afterTestId) => {
-      const afterNode = beforeNode
-        .closest('[data-testid^="canvas-block-section_"]')
-        ?.querySelector(`[data-testid="${afterTestId}"]`);
+    .evaluate((containerNode, args) => {
+      const beforeNode = containerNode.querySelector(`[data-testid="${args.beforeTestId}"]`);
+      const afterNode = containerNode.querySelector(`[data-testid="${args.afterTestId}"]`);
       return Boolean(
+        beforeNode &&
         afterNode &&
           (beforeNode.compareDocumentPosition(afterNode) & Node.DOCUMENT_POSITION_FOLLOWING),
       );
-    }, `canvas-block-${afterBlockId}`);
+    }, {
+      beforeTestId: `canvas-block-${beforeBlockId}`,
+      afterTestId: `canvas-block-${afterBlockId}`,
+    });
 }
 
 function findBlock(blocks: TestBlock[], blockId: string): TestBlock | null {
