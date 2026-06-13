@@ -12,6 +12,8 @@ import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
+import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
+import com.auraboot.framework.permission.service.FieldPermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -39,6 +41,7 @@ public class CommandFieldMapExecutor {
 
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
+    private final FieldPermissionService fieldPermissionService;
 
     public Map<String, Object> executeFieldMapPhase(List<BindingRule> fieldMapRules,
                                               Map<String, Object> payload,
@@ -58,6 +61,7 @@ public class CommandFieldMapExecutor {
             // Build data map from payload field mappings
             Map<String, Object> data = new HashMap<>();
             data.put("tenant_id", tenantId);
+            Set<String> userMappedFields = new LinkedHashSet<>();
 
             // Load model definition to check virtual field types and get table name
             ModelDefinition modelDef = null;
@@ -82,10 +86,12 @@ public class CommandFieldMapExecutor {
                     Object value = payload.get(sourceField);
                     if (value != null) {
                         data.put(targetField, value);
+                        userMappedFields.add(targetField);
                     }
                 }
             }
 
+            enforceEditableFields(targetModel, modelDef, userMappedFields);
             applyReferencePidCompanions(modelDef, data);
             convertModelFieldTypes(modelDef, data);
 
@@ -217,6 +223,7 @@ public class CommandFieldMapExecutor {
         // Build data map from inputFields (1:1 mapping: payload field -> db column)
         Map<String, Object> data = new HashMap<>();
         data.put("tenant_id", tenantId);
+        Set<String> userMappedFields = new LinkedHashSet<>();
         for (String fieldCode : (inputFields != null ? inputFields : List.<String>of())) {
             Object value = payload.get(fieldCode);
             if (value != null) {
@@ -225,6 +232,7 @@ public class CommandFieldMapExecutor {
                     continue;
                 }
                 data.put(fieldCode, value);
+                userMappedFields.add(fieldCode);
             }
         }
 
@@ -239,6 +247,7 @@ public class CommandFieldMapExecutor {
             }
         }
 
+        enforceEditableFields(modelCode, modelDef, userMappedFields);
         applyReferencePidCompanions(modelDef, data);
 
         // Convert data types based on model field definitions (DATE, INTEGER, DECIMAL, etc.)
@@ -337,6 +346,55 @@ public class CommandFieldMapExecutor {
         }
         Object type = execConfig != null ? execConfig.get("type") : null;
         return type instanceof String ? (String) type : null;
+    }
+
+    private void enforceEditableFields(String modelCode, ModelDefinition modelDef, Set<String> userMappedFields) {
+        if (modelDef == null || modelDef.getFields() == null || modelDef.getFields().isEmpty()
+                || userMappedFields == null || userMappedFields.isEmpty() || !MetaContext.exists()) {
+            return;
+        }
+        Long memberId = MetaContext.getCurrentMemberId();
+        if (memberId == null) {
+            return;
+        }
+
+        FieldPermissionSet permissionSet = fieldPermissionService.getFieldPermissions(memberId, modelCode);
+        if (permissionSet == null || permissionSet.editableFields() == null) {
+            return;
+        }
+
+        Set<String> blockedFields = userMappedFields.stream()
+                .filter(StringUtils::hasText)
+                .filter(fieldKey -> !isSystemField(fieldKey))
+                .map(fieldKey -> resolveFieldCode(modelDef, fieldKey))
+                .filter(Objects::nonNull)
+                .filter(fieldCode -> !permissionSet.editableFields().contains(fieldCode))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (!blockedFields.isEmpty()) {
+            throw new BusinessException(ResponseCode.FORBIDDEN,
+                    "Field edit permission denied for model " + modelCode + ": " + String.join(", ", blockedFields));
+        }
+    }
+
+    private boolean isSystemField(String fieldKey) {
+        return "tenant_id".equals(fieldKey)
+                || "pid".equals(fieldKey)
+                || "created_at".equals(fieldKey)
+                || "created_by".equals(fieldKey)
+                || "updated_at".equals(fieldKey)
+                || "updated_by".equals(fieldKey);
+    }
+
+    private String resolveFieldCode(ModelDefinition modelDef, String fieldKey) {
+        if (modelDef == null || modelDef.getFields() == null || !StringUtils.hasText(fieldKey)) {
+            return fieldKey;
+        }
+        for (FieldDefinition field : modelDef.getFields()) {
+            if (fieldKey.equals(field.getCode()) || fieldKey.equals(field.getColumnName())) {
+                return field.getCode();
+            }
+        }
+        return fieldKey;
     }
 
     /**

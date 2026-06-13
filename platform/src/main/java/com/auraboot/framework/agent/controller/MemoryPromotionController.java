@@ -20,6 +20,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 
 /**
  * Memory Promotion REST API for Mission Control (plan §6.6, PR-67).
@@ -238,6 +240,7 @@ public class MemoryPromotionController {
      * "reject_reason": "..." }}
      */
     @PostMapping("/{pid}/review")
+    @RequirePermission(MetaPermission.ACP_MEMORY_ADMIN)
     public ApiResponse<Map<String, Object>> review(@PathVariable String pid,
                                                    @RequestBody Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -289,6 +292,7 @@ public class MemoryPromotionController {
      * Reason is free-form (not the reject_reason enum).
      */
     @PostMapping("/{pid}/retract")
+    @RequirePermission(MetaPermission.ACP_MEMORY_ADMIN)
     public ApiResponse<Map<String, Object>> retract(@PathVariable String pid,
                                                     @RequestBody Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -327,6 +331,7 @@ public class MemoryPromotionController {
      * {@code failures}. Max {@value #MAX_BATCH} pids per request.
      */
     @PostMapping("/batch-approve")
+    @RequirePermission(MetaPermission.ACP_MEMORY_ADMIN)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> batchApprove(@RequestBody Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();

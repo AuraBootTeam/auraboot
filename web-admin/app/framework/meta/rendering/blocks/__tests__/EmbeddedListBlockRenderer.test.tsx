@@ -20,7 +20,7 @@ import { EmbeddedListBlockRenderer } from '../EmbeddedListBlockRenderer';
 const block = {
   id: 'task_items',
   blockType: 'embedded-list',
-  modelCode: 'bom_standard_item',
+  modelCode: 'bom_standard_line_pcba',
   parentField: 'bom_std_task_id',
   title: { 'zh-CN': '标准 BOM 行', en: 'Standard BOM Rows' },
   columns: [{ field: 'bom_std_material_code', label: 'Code' }],
@@ -33,7 +33,7 @@ describe('EmbeddedListBlockRenderer', () => {
 
     expect(screen.getByTestId('record-list-view')).toBeInTheDocument();
     const props = recordListProps.mock.calls.at(-1)![0];
-    expect(props.modelCode).toBe('bom_standard_item');
+    expect(props.modelCode).toBe('bom_standard_line_pcba');
     expect(props.fixedFilters).toEqual({ bom_std_task_id: 'TASK-1' });
     expect(props.columns).toHaveLength(1);
   });

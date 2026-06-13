@@ -151,6 +151,65 @@ class AutomationTriggerServiceImplTest {
     }
 
     // =========================================================
+    // executeAutomation — tenant context scoping (webhook / system path)
+    // =========================================================
+
+    @Test
+    void executeAutomation_noCallerContext_establishesAndClearsTenantContext() {
+        // A webhook-triggered automation reaches executeAutomation on a JWT-exempt thread with
+        // no MetaContext. The whole method (insertLog, run, updateStatus) must be tenant-scoped
+        // from automation.tenantId, else AutomationLogMapper fails with "MetaContext not
+        // initialized". Regression for the webhook-automation 500.
+        com.auraboot.framework.application.tenant.MetaContext.clear();
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
+
+        Automation automation = new Automation();
+        automation.setPid("AUTO-WH-1");
+        automation.setTenantId(424242L);
+        automation.setTriggerType("webhook");
+
+        // Assert the tenant context is live at run() time (i.e. during insert + the command pipeline).
+        final boolean[] contextDuringRun = {false};
+        final Long[] tenantDuringRun = {null};
+        doAnswer(inv -> {
+            contextDuringRun[0] = com.auraboot.framework.application.tenant.MetaContext.exists();
+            tenantDuringRun[0] = com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId();
+            return null;
+        }).when(automationProcessRuntime).run(any(), any(), any(), any());
+
+        AutomationLog result = service.executeAutomation(automation, null, Map.of("event", "webhook"));
+
+        assertThat(contextDuringRun[0]).isTrue();
+        assertThat(tenantDuringRun[0]).isEqualTo(424242L);
+        assertThat(result.getStatus()).isEqualTo("success");
+        verify(automationLogMapper).insertLog(any());
+        verify(automationLogMapper).updateStatus(any());
+        // We set the context, so we must have cleared it on the way out.
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
+    }
+
+    @Test
+    void executeAutomation_existingCallerContext_isLeftIntact() {
+        // The record-trigger path already carries a MetaContext (the firing user). executeAutomation
+        // must not clear a context it did not create.
+        com.auraboot.framework.application.tenant.MetaContext.setContext(7L, 99L, "user-pid", "alice");
+        try {
+            Automation automation = new Automation();
+            automation.setPid("AUTO-REC-1");
+            automation.setTenantId(7L);
+            automation.setTriggerType("on_record_create");
+
+            service.executeAutomation(automation, "rec-1", Map.of("event", "create"));
+
+            // Caller's context survives.
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isTrue();
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId()).isEqualTo(7L);
+        } finally {
+            com.auraboot.framework.application.tenant.MetaContext.clear();
+        }
+    }
+
+    // =========================================================
     // onRecordUpdate — watch fields filtering
     // =========================================================
 

@@ -56,4 +56,9 @@ public class ChatBIResponse {
      * Total row count in the result.
      */
     private int total;
+
+    /**
+     * Which parser produced the query plan: "llm" or "keyword".
+     */
+    private String parseMode;
 }

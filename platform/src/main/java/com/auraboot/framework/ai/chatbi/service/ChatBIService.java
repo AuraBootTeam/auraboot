@@ -2,6 +2,7 @@ package com.auraboot.framework.ai.chatbi.service;
 
 import com.auraboot.framework.ai.chatbi.dto.ChatBIRequest;
 import com.auraboot.framework.ai.chatbi.dto.ChatBIResponse;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
@@ -19,17 +20,24 @@ import java.util.stream.Collectors;
 /**
  * ChatBI Service — natural language question → structured query → chart results.
  *
- * <p>Current implementation uses keyword-based parsing (mock/fallback mode).
- * LLM integration is left as a TODO for when providers are configured in ACP.</p>
+ * <p>Parsing strategy: when an LLM provider is configured for the tenant, the
+ * question is parsed by {@link ChatBiLlmParser} into a structured query plan
+ * (model choice, aggregation, group-by, filters). On any LLM failure — or when
+ * no provider is configured — the original keyword-based parser is used as the
+ * functional fallback, so behavior without a provider is unchanged. The response
+ * reports which path produced the answer via {@code parseMode}.</p>
  *
  * <p>Pipeline:
  * <ol>
  *   <li>Load model metadata from {@link MetaModelService}</li>
- *   <li>Parse question keywords to infer model, aggregation, filters, sorting</li>
+ *   <li>Parse the question (LLM first, keyword fallback) into a query intent</li>
  *   <li>Build a {@link QueryBuilderDTO} and execute via {@link DynamicDataMapper}</li>
  *   <li>Suggest chart type based on result shape</li>
  * </ol>
  * </p>
+ *
+ * <p>Not to be confused with {@code chatbi/v2} — that is the conversation-scoped
+ * semantic-layer pipeline; this service answers stateless model-direct queries.</p>
  *
  * @author AuraBoot Team
  * @since 2.0.0
@@ -39,8 +47,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChatBIService {
 
+    static final String PARSE_MODE_LLM = "llm";
+    static final String PARSE_MODE_KEYWORD = "keyword";
+
     private final MetaModelService metaModelService;
     private final DynamicDataMapper dynamicDataMapper;
+    private final ChatBiLlmParser chatBiLlmParser;
 
     // --- Keyword sets for intent detection ---
 
@@ -85,25 +97,32 @@ public class ChatBIService {
 
         log.info("ChatBI analyzeQuestion: question='{}', modelCode='{}'", request.getQuestion(), modelCode);
 
-        // TODO: Integrate with ACP LLM provider when configured.
-        // The LLM would parse the question into a structured QueryBuilderDTO.
-        // For now we use keyword-based parsing as a functional fallback.
+        // Step 1+2: Parse the question into (model, intent) — LLM first, keyword fallback.
+        ModelDefinition model;
+        ParsedIntent intent;
+        String parseMode;
 
-        // Step 1: Resolve model
-        ModelDefinition model = resolveModel(question, modelCode);
-        if (model == null) {
-            return buildErrorResponse(request.getQuestion(), "Could not determine which data model to query. Please specify a modelCode or mention a model name in your question.");
+        LlmParseResult llmResult = tryLlmParse(request, modelCode);
+        if (llmResult != null) {
+            model = llmResult.model;
+            intent = llmResult.intent;
+            parseMode = PARSE_MODE_LLM;
+        } else {
+            model = resolveModel(question, modelCode);
+            if (model == null) {
+                return buildErrorResponse(request.getQuestion(), "Could not determine which data model to query. Please specify a modelCode or mention a model name in your question.");
+            }
+            intent = parseIntent(question, model);
+            parseMode = PARSE_MODE_KEYWORD;
         }
 
-        // Step 2: Build QueryBuilderDTO from parsed question
-        ParsedIntent intent = parseIntent(question, model);
         QueryBuilderDTO dto = buildQueryDTO(intent, model);
 
         // Step 3: Execute query
         String tableName = resolveTableName(model);
         Map<String, String> fieldToColumn = buildFieldColumnMap(model);
-        String sql = buildSql(dto, tableName, fieldToColumn);
-        Map<String, Object> params = buildParams(dto);
+        String sql = buildSql(dto, intent, tableName, fieldToColumn);
+        Map<String, Object> params = buildParams(intent);
 
         log.debug("ChatBI SQL: {}", sql);
 
@@ -138,7 +157,120 @@ public class ChatBIService {
                 .chartConfig(chartConfig)
                 .sql(sql)
                 .total(rows.size())
+                .parseMode(parseMode)
                 .build();
+    }
+
+    // ==================== LLM Parsing ====================
+
+    /** Resolved model + intent produced by the LLM parse path. */
+    private static class LlmParseResult {
+        final ModelDefinition model;
+        final ParsedIntent intent;
+
+        LlmParseResult(ModelDefinition model, ParsedIntent intent) {
+            this.model = model;
+            this.intent = intent;
+        }
+    }
+
+    /**
+     * Attempt the LLM parse path. Returns null on any failure so the caller
+     * falls back to keyword parsing.
+     */
+    private LlmParseResult tryLlmParse(ChatBIRequest request, String modelCode) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+
+        ModelDefinition explicitModel = null;
+        List<ModelDefinition> catalog = Collections.emptyList();
+        if (modelCode != null && !modelCode.isBlank()) {
+            explicitModel = metaModelService.getModelDefinition(modelCode).orElse(null);
+            if (explicitModel == null) return null;
+        } else {
+            catalog = loadCatalogModels();
+            if (catalog.isEmpty()) return null;
+        }
+
+        ChatBiLlmParser.ParsedQuery parsed =
+                chatBiLlmParser.tryParse(tenantId, request.getQuestion(), explicitModel, catalog);
+        if (parsed == null) return null;
+
+        ModelDefinition model = explicitModel != null
+                ? explicitModel
+                : metaModelService.getModelDefinition(parsed.getModelCode()).orElse(null);
+        if (model == null) {
+            log.warn("ChatBI LLM chose unknown modelCode '{}'; falling back to keyword parsing", parsed.getModelCode());
+            return null;
+        }
+
+        return new LlmParseResult(model, toIntent(parsed, model));
+    }
+
+    /**
+     * Convert the LLM parse into a {@link ParsedIntent}, validating every field
+     * code against the model definition — hallucinated fields are dropped, not
+     * sent to SQL.
+     */
+    private ParsedIntent toIntent(ChatBiLlmParser.ParsedQuery parsed, ModelDefinition model) {
+        Set<String> validFields = model.getFields() == null
+                ? Collections.emptySet()
+                : model.getFields().stream().map(FieldDefinition::getCode).collect(Collectors.toSet());
+
+        ParsedIntent intent = new ParsedIntent();
+        intent.aggregationFunction = parsed.getAggregationFunction();
+        if (intent.aggregationFunction != null && !"count".equals(intent.aggregationFunction)) {
+            String aggField = parsed.getAggregationField();
+            intent.aggregationField = (aggField != null && validFields.contains(aggField))
+                    ? aggField
+                    : findNumericField(model);
+            if (intent.aggregationField == null) {
+                // No usable numeric field — degrade to a plain select rather than broken SQL
+                intent.aggregationFunction = null;
+            }
+        } else if ("count".equals(intent.aggregationFunction)) {
+            intent.aggregationField = "*";
+        }
+
+        String groupBy = parsed.getGroupByField();
+        if (groupBy != null && validFields.contains(groupBy)) {
+            intent.groupByField = groupBy;
+        } else if (groupBy != null) {
+            log.warn("ChatBI LLM groupByField '{}' not in model {}; dropping", groupBy, model.getCode());
+        }
+
+        intent.sortOrder = parsed.getSortOrder() != null ? parsed.getSortOrder() : "desc";
+        if (parsed.getLimit() != null) {
+            intent.limit = parsed.getLimit();
+            intent.isTopN = parsed.getLimit() <= TOP_N_LIMIT;
+        }
+        intent.isTrend = parsed.isTrend();
+        intent.llmInterpretation = parsed.getInterpretation();
+
+        if (parsed.getFilters() != null) {
+            for (ChatBiLlmParser.ParsedFilter f : parsed.getFilters()) {
+                if (validFields.contains(f.getFieldCode())) {
+                    intent.filters.add(f);
+                } else {
+                    log.warn("ChatBI LLM filter field '{}' not in model {}; dropping", f.getFieldCode(), model.getCode());
+                }
+            }
+        }
+        return intent;
+    }
+
+    private List<ModelDefinition> loadCatalogModels() {
+        try {
+            var modelsPage = metaModelService.searchModels(1, 100, null, null, null, null, null, null, null, null, true);
+            if (modelsPage == null || modelsPage.getRecords() == null) return Collections.emptyList();
+            List<ModelDefinition> catalog = new ArrayList<>();
+            for (var m : modelsPage.getRecords()) {
+                metaModelService.getModelDefinition(m.getCode()).ifPresent(catalog::add);
+            }
+            return catalog;
+        } catch (Exception e) {
+            log.warn("ChatBI: failed to load model catalog for LLM prompt: {}", e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     // ==================== Model Resolution ====================
@@ -183,9 +315,10 @@ public class ChatBIService {
         int limit = DEFAULT_LIMIT;
         boolean isTopN = false;
         boolean isTrend = false;
-        String filterField = null;
-        Object filterValue = null;
-        String filterOperator = "EQ";
+        /** Validated filter conditions (LLM path only; keyword parsing produces none). */
+        List<ChatBiLlmParser.ParsedFilter> filters = new ArrayList<>();
+        /** Interpretation text supplied by the LLM, preferred over the generated one. */
+        String llmInterpretation = null;
     }
 
     private ParsedIntent parseIntent(String question, ModelDefinition model) {
@@ -374,7 +507,7 @@ public class ChatBIService {
         return map;
     }
 
-    private String buildSql(QueryBuilderDTO dto, String tableName, Map<String, String> fieldToColumn) {
+    private String buildSql(QueryBuilderDTO dto, ParsedIntent intent, String tableName, Map<String, String> fieldToColumn) {
         StringBuilder sql = new StringBuilder("SELECT ");
 
         // SELECT clause
@@ -402,10 +535,15 @@ public class ChatBIService {
 
         sql.append(" FROM ").append(tableName);
 
-        // WHERE clause
+        // WHERE clause — filter values are always parameter-bound, never inlined
         List<String> whereClauses = new ArrayList<>();
         if (!tableName.startsWith("mt_")) {
             whereClauses.add("deleted_flag = FALSE");
+        }
+        for (int i = 0; i < intent.filters.size(); i++) {
+            ChatBiLlmParser.ParsedFilter f = intent.filters.get(i);
+            String col = resolveColumn(f.getFieldCode(), fieldToColumn);
+            whereClauses.add(col + " " + sqlOperator(f.getOperator()) + " #{params.f" + i + "}");
         }
         if (!whereClauses.isEmpty()) {
             sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
@@ -439,8 +577,28 @@ public class ChatBIService {
         return col != null ? col : fieldCode;
     }
 
-    private Map<String, Object> buildParams(QueryBuilderDTO dto) {
-        return new HashMap<>(); // No parameterised filters in current implementation
+    private Map<String, Object> buildParams(ParsedIntent intent) {
+        Map<String, Object> params = new HashMap<>();
+        for (int i = 0; i < intent.filters.size(); i++) {
+            ChatBiLlmParser.ParsedFilter f = intent.filters.get(i);
+            Object value = "LIKE".equals(f.getOperator()) ? "%" + f.getValue() + "%" : f.getValue();
+            params.put("f" + i, value);
+        }
+        return params;
+    }
+
+    /** Map a validated filter operator to its SQL form. Operators are whitelisted upstream. */
+    private String sqlOperator(String operator) {
+        return switch (operator) {
+            case "EQ" -> "=";
+            case "NE" -> "<>";
+            case "GT" -> ">";
+            case "GTE" -> ">=";
+            case "LT" -> "<";
+            case "LTE" -> "<=";
+            case "LIKE" -> "LIKE";
+            default -> throw new IllegalArgumentException("Unsupported filter operator: " + operator);
+        };
     }
 
     // ==================== Chart Type Suggestion ====================
@@ -510,6 +668,9 @@ public class ChatBIService {
     }
 
     private String buildInterpretation(ParsedIntent intent, ModelDefinition model) {
+        if (intent.llmInterpretation != null && !intent.llmInterpretation.isBlank()) {
+            return intent.llmInterpretation;
+        }
         StringBuilder sb = new StringBuilder("Querying ");
         String modelName = model.getDisplayName() != null ? model.getDisplayName() : model.getCode();
         sb.append(modelName);

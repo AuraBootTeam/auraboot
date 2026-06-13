@@ -10,6 +10,7 @@ import com.auraboot.framework.rag.entity.KnowledgeBase;
 import com.auraboot.framework.rag.mapper.KbChunkMapper;
 import com.auraboot.framework.rag.mapper.KbDocumentMapper;
 import com.auraboot.framework.rag.mapper.KnowledgeBaseMapper;
+import com.auraboot.framework.rag.util.CjkBigramSegmenter;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * CRUD service for knowledge bases, documents, and chunks.
@@ -196,6 +198,27 @@ public class KnowledgeBaseService {
                 + "chunk_count = (SELECT COUNT(*) FROM ab_kb_chunk WHERE kb_id = ?) "
                 + "WHERE pid = ?",
                 kbPid, kbPid, kbPid);
+    }
+
+    /**
+     * Recompute every chunk's tsv with the current index-time segmentation
+     * (G2: CJK bigrams). Needed once after upgrading rows ingested before the
+     * segmenter existed; new ingests are segmented inline by the pipeline.
+     *
+     * @return number of chunks re-indexed, or -1 when the KB is unknown for this tenant
+     */
+    public int reindexChunkTsv(Long tenantId, String kbPid) {
+        KnowledgeBase kb = findKb(tenantId, kbPid);
+        if (kb == null) return -1;
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT pid, content FROM ab_kb_chunk WHERE kb_id = ? AND tenant_id = ?",
+                kbPid, tenantId);
+        for (Map<String, Object> row : rows) {
+            jdbcTemplate.update(
+                    "UPDATE ab_kb_chunk SET tsv = to_tsvector('simple', ?), updated_at = NOW() WHERE pid = ?",
+                    CjkBigramSegmenter.segment((String) row.get("content")), row.get("pid"));
+        }
+        return rows.size();
     }
 
     // =========================================================================

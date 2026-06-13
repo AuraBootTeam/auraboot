@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 
 @RestController
 @RequestMapping("/api/agent")
@@ -138,6 +140,7 @@ public class CoreAgentController {
      * </ul>
      */
     @PostMapping("/mcp-servers")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ResponseEntity<ApiResponse<Map<String, String>>> registerMcpServer(
             @RequestBody Map<String, Object> body) {
@@ -167,6 +170,7 @@ public class CoreAgentController {
      * Deactivate (soft-remove) an external MCP server for the current tenant.
      */
     @DeleteMapping("/mcp-servers/{pid}")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ResponseEntity<ApiResponse<Void>> deactivateMcpServer(@PathVariable String pid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         mcpServerConfigService.deactivateServer(tenantId, pid);
@@ -191,6 +195,7 @@ public class CoreAgentController {
      * </ul>
      */
     @PostMapping("/events/test-trigger")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ResponseEntity<ApiResponse<Map<String, Object>>> testEventTrigger(
             @RequestBody Map<String, Object> body) {
@@ -240,6 +245,7 @@ public class CoreAgentController {
      * </ul>
      */
     @PostMapping("/definitions/{agentPid}/enroll-employee")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ResponseEntity<ApiResponse<Map<String, Object>>> enrollAsEmployee(
             @PathVariable String agentPid,
@@ -266,6 +272,7 @@ public class CoreAgentController {
      * Remove an agent from the org chart, deactivating its employee record.
      */
     @DeleteMapping("/definitions/{agentPid}/enroll-employee")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     public ResponseEntity<ApiResponse<Void>> removeFromOrg(@PathVariable String agentPid) {
         AgentDefinition agent = agentDefinitionService.findByPid(agentPid);
         if (agent == null) {

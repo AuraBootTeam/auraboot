@@ -276,7 +276,7 @@ test.describe('Sales — Quotation Lifecycle', () => {
 
     // Layer 3: verify a SO was created — query sales orders for one linked to our quotation
     // The convert handler creates a SO linked from the quotation
-    const soResp = await page.request.get('/api/dynamic/sl_sales_order/list?pageNum=1&pageSize=50');
+    const soResp = await page.request.get('/api/dynamic/sl_sales_order_common/list?pageNum=1&pageSize=50');
     expect(soResp.ok()).toBe(true);
     const soBody = await soResp.json();
     const soRecords: any[] = soBody?.data?.records ?? soBody?.records ?? [];

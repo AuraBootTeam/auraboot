@@ -1,7 +1,10 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.dto.AiActionRiskLevel;
+import com.auraboot.framework.agent.util.JsonbColumns;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,7 @@ import java.util.Set;
 public class AiActionRiskAssessor {
 
     private final DynamicDataMapper dynamicDataMapper;
+    private final ObjectMapper objectMapper;
 
     /** Action types that are always LOW risk (no data modification). */
     private static final Set<String> LOW_RISK_ACTIONS = Set.of("copy", "navigate");
@@ -97,6 +101,7 @@ public class AiActionRiskAssessor {
     /**
      * Resolve execution type from ab_command_definition.
      */
+    @SuppressWarnings("unchecked")
     private String resolveExecutionType(String commandCode, Long tenantId) {
         try {
             String sql = "SELECT execution_config FROM ab_command_definition " +
@@ -107,20 +112,25 @@ public class AiActionRiskAssessor {
 
             if (!rows.isEmpty()) {
                 Object execConfig = rows.get(0).get("execution_config");
-                if (execConfig instanceof Map<?, ?> configMap) {
+                Map<String, Object> configMap;
+                if (execConfig instanceof Map<?, ?> m) {
+                    configMap = (Map<String, Object>) m;
+                } else {
+                    // execution_config is JSONB; read via the generic selectByQuery it
+                    // comes back as a driver PGobject (neither Map nor String). The old
+                    // instanceof checks fell through and defaulted to "update", which
+                    // silently DOWNGRADED the risk gating for delete / state_transition
+                    // commands (a BLOCKED delete would assess as MEDIUM). Route through
+                    // JsonbColumns so the type is read on every driver shape.
+                    String json = JsonbColumns.toJsonText(execConfig, objectMapper);
+                    configMap = json == null
+                            ? null
+                            : objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+                }
+                if (configMap != null) {
                     Object type = configMap.get("type");
                     if (type != null) {
                         return type.toString().toLowerCase();
-                    }
-                } else if (execConfig instanceof String configStr) {
-                    // Parse JSON string
-                    if (configStr.contains("\"type\"")) {
-                        int idx = configStr.indexOf("\"type\"");
-                        int valueStart = configStr.indexOf("\"", idx + 7);
-                        int valueEnd = configStr.indexOf("\"", valueStart + 1);
-                        if (valueStart >= 0 && valueEnd > valueStart) {
-                            return configStr.substring(valueStart + 1, valueEnd).toLowerCase();
-                        }
                     }
                 }
             }

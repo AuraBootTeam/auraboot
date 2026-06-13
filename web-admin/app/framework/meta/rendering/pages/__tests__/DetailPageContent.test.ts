@@ -3,10 +3,14 @@ import {
   buildDetailRecordEndpoint,
   collectDetailDictCodes,
   enrichDetailField,
+  extractBlockDataRows,
+  getByDataPath,
   resolveActiveDetailTab,
   resolveDetailFieldComponent,
+  resolveDetailRecordEndpoint,
   resolveSubTableDataSourceConfig,
   shouldRenderDefaultDetailEditAction,
+  unwrapDetailRecord,
 } from '../DetailPageContent';
 
 describe('buildDetailRecordEndpoint', () => {
@@ -218,5 +222,88 @@ describe('resolveActiveDetailTab', () => {
 
   it('returns null when no tabs are configured', () => {
     expect(resolveActiveDetailTab([], 0)).toBeNull();
+  });
+});
+
+describe('getByDataPath', () => {
+  it('reads nested values by dot-path', () => {
+    expect(getByDataPath({ a: { b: { c: 7 } } }, 'a.b.c')).toBe(7);
+    expect(getByDataPath({ version: { versionNo: 2 } }, 'version')).toEqual({ versionNo: 2 });
+  });
+  it('returns the object itself when path is empty, undefined for missing segments', () => {
+    const obj = { x: 1 };
+    expect(getByDataPath(obj, '')).toBe(obj);
+    expect(getByDataPath(obj, undefined)).toBe(obj);
+    expect(getByDataPath(obj, 'y.z')).toBeUndefined();
+    expect(getByDataPath(null, 'a')).toBeNull();
+  });
+});
+
+describe('resolveDetailRecordEndpoint', () => {
+  it('falls back to the dynamic-model convention endpoint when no extension.dataSource', () => {
+    expect(resolveDetailRecordEndpoint({}, 'showcase_all_fields', '900202')).toEqual({
+      endpoint: '/api/dynamic/showcase_all_fields/900202',
+      method: 'get',
+    });
+  });
+  it('prefers schema.modelCode over tableName for the fallback endpoint', () => {
+    expect(
+      resolveDetailRecordEndpoint({ modelCode: 'crm_activity' }, 'crm-my-tasks', '5'),
+    ).toEqual({ endpoint: '/api/dynamic/crm_activity/5', method: 'get' });
+  });
+  it('uses a custom api dataSource endpoint, replacing the {id} placeholder', () => {
+    expect(
+      resolveDetailRecordEndpoint(
+        { extension: { dataSource: { type: 'api', method: 'get', endpoint: '/api/billing/plans/{id}' } } },
+        'billing_plan_catalog_detail',
+        '900202',
+      ),
+    ).toEqual({ endpoint: '/api/billing/plans/900202', method: 'get' });
+  });
+  it('appends /{recordId} when the api endpoint has no placeholder, and honors post', () => {
+    expect(
+      resolveDetailRecordEndpoint(
+        { extension: { dataSource: { type: 'api', method: 'POST', endpoint: '/api/billing/plans/' } } },
+        't',
+        '900202',
+      ),
+    ).toEqual({ endpoint: '/api/billing/plans/900202', method: 'post' });
+  });
+  it('url-encodes the record id', () => {
+    expect(
+      resolveDetailRecordEndpoint(
+        { extension: { dataSource: { type: 'api', endpoint: '/api/x/{id}' } } },
+        't',
+        'a b',
+      ).endpoint,
+    ).toBe('/api/x/a%20b');
+  });
+});
+
+describe('unwrapDetailRecord', () => {
+  it('returns the recordPath-selected object as the master record', () => {
+    expect(unwrapDetailRecord({ version: { versionNo: 2 }, priceComponents: [] }, 'version')).toEqual({
+      versionNo: 2,
+    });
+  });
+  it('returns the raw payload when no recordPath', () => {
+    expect(unwrapDetailRecord({ a: 1 })).toEqual({ a: 1 });
+  });
+  it('returns {} for null payload or non-object recordPath target', () => {
+    expect(unwrapDetailRecord(null, 'version')).toEqual({});
+    expect(unwrapDetailRecord({ version: 'oops' }, 'version')).toEqual({});
+  });
+});
+
+describe('extractBlockDataRows', () => {
+  it('extracts a nested array for a block dataPath', () => {
+    const raw = { version: {}, priceComponents: [{ id: 1 }, { id: 2 }] };
+    expect(extractBlockDataRows(raw, 'priceComponents')).toEqual([{ id: 1 }, { id: 2 }]);
+  });
+  it('returns [] when the path is missing, not an array, or dataPath absent', () => {
+    expect(extractBlockDataRows({ a: 1 }, 'priceComponents')).toEqual([]);
+    expect(extractBlockDataRows({ priceComponents: 'x' }, 'priceComponents')).toEqual([]);
+    expect(extractBlockDataRows({ a: [] }, undefined)).toEqual([]);
+    expect(extractBlockDataRows(null, 'a')).toEqual([]);
   });
 });

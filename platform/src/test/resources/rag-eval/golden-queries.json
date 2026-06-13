@@ -1,6 +1,6 @@
 {
-  "version": "0.1.0-seed",
-  "description": "Spike-1 phase 1 seed queries. 15 entries covering 3 languages × 3 length classes × 4 expected_paths. Phase 2 expands to 50-100.",
+  "version": "0.2.0",
+  "description": "G3 expanded golden set: 52 entries (15 seed + 37 expansion) covering 3 languages × 3 length classes × 4 expected_paths, with zh-heavy weighting (zh retrieval is the remediation focus), ≥5 no-answer capability-gap queries, and ≥3 multi-hop queries spanning multiple pages/docs.",
   "queries": [
     {
       "id": "zh-short-001",
@@ -172,6 +172,422 @@
       "expected_d7_pages": [],
       "tags": ["off-topic"],
       "notes": "off-topic mixed,NoAnswer 第三例"
+    },
+    {
+      "id": "zh-short-003",
+      "language": "zh",
+      "length_class": "short",
+      "expected_path": "B",
+      "query": "按钮不可用",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.troubleshooting.command-execution-denied"],
+      "tags": ["命令", "权限", "troubleshooting"],
+      "notes": "Pure-zh 5-char query. Ground truth: page title is literally 'Command 执行被拒绝或按钮不可用排查' — button-disabled triage is the dedicated troubleshooting page; no other page covers it."
+    },
+    {
+      "id": "zh-short-004",
+      "language": "zh",
+      "length_class": "short",
+      "expected_path": "B",
+      "query": "容量规划",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.playbook.operations-readiness"],
+      "tags": ["operations", "playbook"],
+      "notes": "Pure-zh 4-char query. Ground truth: compiled.playbook.operations-readiness summary explicitly covers 容量规划 (capacity planning) alongside deployment, backup, RTO/RPO. No other D7 page mentions capacity."
+    },
+    {
+      "id": "zh-short-005",
+      "language": "zh",
+      "length_class": "short",
+      "expected_path": "A",
+      "query": "数据字典",
+      "expected_kb_pages": ["docs/system-reference/core/03-字段与数据字典.md"],
+      "expected_d7_pages": [],
+      "tags": ["字段", "字典", "kb"],
+      "notes": "Pure-zh 4-char KB-only query. Ground truth: docs/system-reference/core/03-字段与数据字典.md is the canonical field/data-dictionary reference; none of the 15 compiled D7 pages covers the dictionary system."
+    },
+    {
+      "id": "zh-short-006",
+      "language": "zh",
+      "length_class": "short",
+      "expected_path": "A",
+      "query": "组件库",
+      "expected_kb_pages": ["docs/system-reference/core/05-组件库参考.md"],
+      "expected_d7_pages": [],
+      "tags": ["组件", "前端", "kb"],
+      "notes": "Pure-zh 3-char KB-only query. Ground truth: docs/system-reference/core/05-组件库参考.md is the component library reference; no compiled D7 page covers the UI component catalog."
+    },
+    {
+      "id": "zh-short-007",
+      "language": "zh",
+      "length_class": "short",
+      "expected_path": "neither",
+      "query": "区块链存证",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [],
+      "tags": ["no-answer", "capability-gap"],
+      "notes": "Capability-gap NoAnswer: blockchain notarization. Verified absent — grep -rli '区块链\\|blockchain' over docs/system-reference and compiled-knowledge/pages returns zero hits. Plausible enterprise ask, platform has no such capability."
+    },
+    {
+      "id": "zh-medium-003",
+      "language": "zh",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "命令执行返回403怎么排查",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.troubleshooting.command-execution-denied"],
+      "tags": ["命令", "权限", "troubleshooting"],
+      "notes": "zh medium. Ground truth: compiled.troubleshooting.command-execution-denied summary opens with 'Command 执行 403' and lays out the layer-by-layer triage (publish, permission binding, role, data scope, policy, SOD)."
+    },
+    {
+      "id": "zh-medium-004",
+      "language": "zh",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "为什么要新增编译知识层而不是继续用RAG",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.decision.d7-knowledge-layer"],
+      "tags": ["d7", "knowledge", "decision"],
+      "notes": "zh medium. Ground truth: compiled.decision.d7-knowledge-layer is the decision record stating AuraBoot should not keep treating RAG as the full knowledge system and introduces the D7 Compiled Knowledge layer."
+    },
+    {
+      "id": "zh-medium-005",
+      "language": "zh",
+      "length_class": "medium",
+      "expected_path": "A",
+      "query": "用户注册和登录流程是怎样的",
+      "expected_kb_pages": ["docs/system-reference/core/16-用户注册登录与租户流程.md"],
+      "expected_d7_pages": [],
+      "tags": ["auth", "tenant", "kb"],
+      "notes": "zh medium KB-only. Ground truth: docs/system-reference/core/16-用户注册登录与租户流程.md covers registration/login/tenant flow (scope: Auth, Tenant, RBAC). No compiled D7 page covers auth flow — permission-boundary is about authorization layering, not login."
+    },
+    {
+      "id": "zh-medium-006",
+      "language": "zh",
+      "length_class": "medium",
+      "expected_path": "A",
+      "query": "页面上的动作在运行时如何派发执行",
+      "expected_kb_pages": ["docs/system-reference/core/08-运行时与Action.md"],
+      "expected_d7_pages": [],
+      "tags": ["runtime", "action", "kb"],
+      "notes": "zh medium KB-only. Ground truth: docs/system-reference/core/08-运行时与Action.md documents the runtime and Action dispatch system. The D7 command pages cover the backend command contract, not frontend runtime action dispatch."
+    },
+    {
+      "id": "zh-medium-007",
+      "language": "zh",
+      "length_class": "medium",
+      "expected_path": "neither",
+      "query": "如何配置人脸识别登录",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [],
+      "tags": ["no-answer", "capability-gap", "auth"],
+      "notes": "Capability-gap NoAnswer: face-recognition login. Verified absent — grep -rli '人脸识别' over docs/system-reference returns zero hits; core/16 login flow doc has no biometric auth. Plausible auth-adjacent ask designed to tempt false positives on 登录."
+    },
+    {
+      "id": "zh-medium-008",
+      "language": "zh",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "源注册表如何防止文档过期",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.model.source-registry"],
+      "tags": ["d7", "source-registry", "model"],
+      "notes": "zh medium using translated term 源注册表 (no literal 'source registry' string). Ground truth: compiled.model.source-registry summary describes the deterministic source inventory and source-registry.mjs --check staleness validation."
+    },
+    {
+      "id": "zh-long-002",
+      "language": "zh",
+      "length_class": "long",
+      "expected_path": "B",
+      "query": "命令执行被拒绝提示没有权限,排查时应该如何区分功能权限和数据权限边界",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [
+        "compiled.troubleshooting.command-execution-denied",
+        "compiled.decision.permission-boundary"
+      ],
+      "tags": ["命令", "权限", "multi-hop"],
+      "notes": "Multi-hop zh long: triage steps live in compiled.troubleshooting.command-execution-denied, while the functional-vs-data permission layering (菜单/功能权限 vs 数据权限/字段安全) is defined in compiled.decision.permission-boundary. Answering fully requires both pages."
+    },
+    {
+      "id": "zh-long-003",
+      "language": "zh",
+      "length_class": "long",
+      "expected_path": "B",
+      "query": "新增一个业务操作要配置哪些东西,从模型字段到命令权限菜单的完整交付流程是什么",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.playbook.command-delivery-workflow"],
+      "tags": ["命令", "playbook", "交付"],
+      "notes": "zh long. Ground truth: compiled.playbook.command-delivery-workflow summary describes exactly this end-to-end flow — model/field contract → command/permission/role/menu/page config → import/publish/execute/audit loop."
+    },
+    {
+      "id": "zh-long-004",
+      "language": "zh",
+      "length_class": "long",
+      "expected_path": "B",
+      "query": "动态表的租户隔离字段是拦截器自动处理还是要在业务查询里手动过滤",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.decision.permission-boundary"],
+      "tags": ["租户", "权限", "decision"],
+      "notes": "zh long paraphrase without the literal token tenant_id. Ground truth: compiled.decision.permission-boundary summary states dynamic-table tenant_id is handled by the interceptor and must not be hand-concatenated in business SQL."
+    },
+    {
+      "id": "zh-long-005",
+      "language": "zh",
+      "length_class": "long",
+      "expected_path": "A",
+      "query": "新用户注册之后是如何创建租户并完成初始登录授权的,整个流程涉及哪些步骤",
+      "expected_kb_pages": ["docs/system-reference/core/16-用户注册登录与租户流程.md"],
+      "expected_d7_pages": [],
+      "tags": ["auth", "tenant", "kb"],
+      "notes": "zh long KB-only. Ground truth: docs/system-reference/core/16-用户注册登录与租户流程.md is the canonical registration→tenant-creation→login flow doc (scope: Auth, Tenant, RBAC, reset scripts). No D7 compiled page covers onboarding flow."
+    },
+    {
+      "id": "zh-long-006",
+      "language": "zh",
+      "length_class": "long",
+      "expected_path": "neither",
+      "query": "平台能不能直接对接微信小程序的直播带货功能,并按照成交订单自动结算主播佣金",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [],
+      "tags": ["no-answer", "capability-gap"],
+      "notes": "Capability-gap NoAnswer: WeChat livestream commerce + streamer commission settlement. Verified absent — grep -rli '直播' over docs/system-reference returns zero hits, and no compiled D7 page touches livestreaming or commission settlement."
+    },
+    {
+      "id": "en-short-003",
+      "language": "en",
+      "length_class": "short",
+      "expected_path": "B",
+      "query": "SoD conflict check",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.decision.sod-command-gate"],
+      "tags": ["sod", "command", "decision"],
+      "notes": "en short. Ground truth: compiled.decision.sod-command-gate is the only page about Segregation-of-Duties — rule config and conflict checks must run as a pre-execution gate in the command pipeline."
+    },
+    {
+      "id": "en-short-004",
+      "language": "en",
+      "length_class": "short",
+      "expected_path": "B",
+      "query": "source registry",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.model.source-registry"],
+      "tags": ["d7", "source-registry", "model"],
+      "notes": "en short, exact-title match case. Ground truth: compiled.model.source-registry is titled 'Source Registry 模型'; mirrors zh-medium-008 to compare zh paraphrase vs en exact-term retrieval."
+    },
+    {
+      "id": "en-short-005",
+      "language": "en",
+      "length_class": "short",
+      "expected_path": "neither",
+      "query": "video live streaming",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [],
+      "tags": ["no-answer", "capability-gap"],
+      "notes": "Capability-gap NoAnswer: video live streaming. Verified absent — no hit for 'live stream' / 直播 in docs/system-reference or compiled-knowledge pages. English mirror of zh-long-006 topic."
+    },
+    {
+      "id": "en-medium-003",
+      "language": "en",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "why add a compiled knowledge layer",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.decision.d7-knowledge-layer"],
+      "tags": ["d7", "knowledge", "decision"],
+      "notes": "en medium, mirrors zh-medium-004. Ground truth: compiled.decision.d7-knowledge-layer is the decision record introducing the D7 Compiled Knowledge layer between raw sources and retrieval/consumer context."
+    },
+    {
+      "id": "en-medium-004",
+      "language": "en",
+      "length_class": "medium",
+      "expected_path": "A",
+      "query": "user registration and tenant creation flow",
+      "expected_kb_pages": ["docs/system-reference/core/16-用户注册登录与租户流程.md"],
+      "expected_d7_pages": [],
+      "tags": ["auth", "tenant", "kb"],
+      "notes": "en medium KB-only, mirrors zh-medium-005/zh-long-005. Ground truth: docs/system-reference/core/16-用户注册登录与租户流程.md; tests cross-language retrieval since the KB doc is written in Chinese."
+    },
+    {
+      "id": "en-medium-005",
+      "language": "en",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "BPM process task form binding",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.subsystem.bpm-form-integration"],
+      "tags": ["bpm", "form", "subsystem"],
+      "notes": "en medium, mirrors mix-short-001. Ground truth: compiled.subsystem.bpm-form-integration summary covers process engine, BPM abstraction layer, and Page Designer form binding."
+    },
+    {
+      "id": "en-long-002",
+      "language": "en",
+      "length_class": "long",
+      "expected_path": "B",
+      "query": "D7 runtime trace produced no output even though the golden query file exists, could the source registry be stale",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [
+        "compiled.troubleshooting.d7-runtime-trace-no-output",
+        "compiled.model.source-registry"
+      ],
+      "tags": ["d7", "trace", "multi-hop"],
+      "notes": "Multi-hop en long: trace-no-output triage (D7 switch, trace switch, output path, golden query path/exact match) is in compiled.troubleshooting.d7-runtime-trace-no-output; staleness checking via source-registry.mjs --check is in compiled.model.source-registry. Full answer needs both."
+    },
+    {
+      "id": "en-long-003",
+      "language": "en",
+      "length_class": "long",
+      "expected_path": "B",
+      "query": "What is the contract for command execution, and when should I use ExecutionConfig DSL versus a BindingRule or custom handler",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.command.command-execution-contract"],
+      "tags": ["command", "contract"],
+      "notes": "en long. Ground truth: compiled.command.command-execution-contract summary states standard CRUD/state-transitions use ExecutionConfig DSL while complex logic, external APIs, webhooks use BindingRule or Handler."
+    },
+    {
+      "id": "en-long-004",
+      "language": "en",
+      "length_class": "long",
+      "expected_path": "neither",
+      "query": "Can AuraBoot use built-in OCR to translate uploaded contract PDFs into French and German automatically",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [],
+      "tags": ["no-answer", "capability-gap", "i18n"],
+      "notes": "Capability-gap NoAnswer: OCR + machine translation of documents. Verified absent — grep -rlwi 'OCR' over docs/system-reference and compiled-knowledge returns zero hits; platform i18n covers UI text localization, not document translation. Tempts false positives on i18n/translation terms."
+    },
+    {
+      "id": "mix-short-003",
+      "language": "mixed",
+      "length_class": "short",
+      "expected_path": "B",
+      "query": "D7 trace 排查",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.troubleshooting.d7-runtime-trace-no-output"],
+      "tags": ["d7", "trace", "troubleshooting"],
+      "notes": "Mixed short. Ground truth: compiled.troubleshooting.d7-runtime-trace-no-output is the only troubleshooting page about D7 runtime trace output."
+    },
+    {
+      "id": "mix-short-004",
+      "language": "mixed",
+      "length_class": "short",
+      "expected_path": "B",
+      "query": "SoD 门禁",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.decision.sod-command-gate"],
+      "tags": ["sod", "command", "decision"],
+      "notes": "Mixed short, mirrors en-short-003. Ground truth: compiled.decision.sod-command-gate — SOD as an independent gate in the command execution pipeline."
+    },
+    {
+      "id": "mix-short-005",
+      "language": "mixed",
+      "length_class": "short",
+      "expected_path": "A",
+      "query": "Profile 注册制",
+      "expected_kb_pages": ["docs/system-reference/core/12-Profile注册制架构.md"],
+      "expected_d7_pages": [],
+      "tags": ["profile", "dsl", "kb"],
+      "notes": "Mixed short KB-only. Ground truth: docs/system-reference/core/12-Profile注册制架构.md documents the Profile registration architecture (one DSL schema, multiple render styles). No compiled D7 page covers profiles."
+    },
+    {
+      "id": "mix-short-006",
+      "language": "mixed",
+      "length_class": "short",
+      "expected_path": "neither",
+      "query": "GraphQL 接口",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [],
+      "tags": ["no-answer", "capability-gap", "api"],
+      "notes": "Capability-gap NoAnswer: GraphQL API. The platform is REST-only; the only mention of GraphQL in docs/system-reference (core/15 §validation table) is as an explicitly unsupported dataSource.type enum value. No D7 page mentions GraphQL."
+    },
+    {
+      "id": "mix-medium-003",
+      "language": "mixed",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "AuraBot 如何用 D7 检索",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.subsystem.aurabot-d7-retrieval"],
+      "tags": ["aurabot", "d7", "retrieval"],
+      "notes": "Mixed medium. Ground truth: compiled.subsystem.aurabot-d7-retrieval describes AuraBot retrieval — compiled pages first, then raw chunk drill-down for citation, with runtime trace output."
+    },
+    {
+      "id": "mix-medium-004",
+      "language": "mixed",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "bindingRules 必须独立文件吗",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.playbook.plugin-config-only-import"],
+      "tags": ["plugin", "import", "bindingrules"],
+      "notes": "Mixed medium. Ground truth: compiled.playbook.plugin-config-only-import summary states BindingRules must be imported as a standalone file and must not be inlined in commands.json."
+    },
+    {
+      "id": "mix-medium-005",
+      "language": "mixed",
+      "length_class": "medium",
+      "expected_path": "A",
+      "query": "DSL validator 校验哪些错误类型",
+      "expected_kb_pages": ["docs/system-reference/core/11-DSL验证系统.md"],
+      "expected_d7_pages": [],
+      "tags": ["dsl", "validation", "kb"],
+      "notes": "Mixed medium KB-only. Ground truth: docs/system-reference/core/11-DSL验证系统.md documents the three-layer validation pipeline (structural → semantic → lint). compiled.playbook.dsl-registry-workflow only says to run validation; the rule catalog itself lives only in the KB doc."
+    },
+    {
+      "id": "mix-medium-006",
+      "language": "mixed",
+      "length_class": "medium",
+      "expected_path": "A",
+      "query": "控制平面 control plane 架构是怎样的",
+      "expected_kb_pages": ["docs/system-reference/core/14-平台身份与控制平面架构.md"],
+      "expected_d7_pages": [],
+      "tags": ["architecture", "control-plane", "kb"],
+      "notes": "Mixed medium KB-only. Ground truth: docs/system-reference/core/14-平台身份与控制平面架构.md covers platform identity and control plane (Bootstrap, Login, RBAC, Marketplace, License). No compiled D7 page covers control-plane architecture."
+    },
+    {
+      "id": "mix-medium-007",
+      "language": "mixed",
+      "length_class": "medium",
+      "expected_path": "neither",
+      "query": "支持 Salesforce 双向同步吗",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [],
+      "tags": ["no-answer", "capability-gap", "integration"],
+      "notes": "Capability-gap NoAnswer: Salesforce bidirectional sync. Salesforce appears in docs/system-reference only as a competitor comparison row (core/13 §architecture table, core/14 §admin model table), never as an integration capability. No connector exists."
+    },
+    {
+      "id": "mix-long-002",
+      "language": "mixed",
+      "length_class": "long",
+      "expected_path": "both",
+      "query": "修改 DSL 页面前要先查 DSL Registry,合法的 blockType 和 dataType 白名单完整列表在哪里",
+      "expected_kb_pages": ["docs/system-reference/core/09-DSL能力边界完整参考.md"],
+      "expected_d7_pages": ["compiled.playbook.dsl-registry-workflow"],
+      "tags": ["dsl", "registry", "multi-hop"],
+      "notes": "Multi-hop fusion (path=both): the check-registry-first SOP is compiled.playbook.dsl-registry-workflow (Path B), while the complete blockType/dataType whitelist lives only in docs/system-reference/core/09-DSL能力边界完整参考.md appendix A (Path A). Full answer requires fusing both paths."
+    },
+    {
+      "id": "mix-long-003",
+      "language": "mixed",
+      "length_class": "long",
+      "expected_path": "B",
+      "query": "新增 Command 交付上线后用户点按钮报 403,是 delivery 流程漏配了权限还是被 SOD 拦截",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [
+        "compiled.playbook.command-delivery-workflow",
+        "compiled.troubleshooting.command-execution-denied"
+      ],
+      "tags": ["command", "权限", "multi-hop"],
+      "notes": "Multi-hop mixed long: the permission/role/menu config steps that may have been skipped are in compiled.playbook.command-delivery-workflow; the 403 triage layers (permission binding, role, SOD, operationType) are in compiled.troubleshooting.command-execution-denied. Both pages are needed."
+    },
+    {
+      "id": "mix-long-004",
+      "language": "mixed",
+      "length_class": "long",
+      "expected_path": "B",
+      "query": "config-only 插件导入后命令没生效,resourceDirs 和 bindingRules 注册应该怎么检查",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.playbook.plugin-config-only-import"],
+      "tags": ["plugin", "import", "bindingrules"],
+      "notes": "Mixed long. Ground truth: compiled.playbook.plugin-config-only-import covers plugin.json/resourceDirs resource registration and standalone bindingRules import — exactly the checklist for commands not taking effect after a config-only import."
     }
   ]
 }

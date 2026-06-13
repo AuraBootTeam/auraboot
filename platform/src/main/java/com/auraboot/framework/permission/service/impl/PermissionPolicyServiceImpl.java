@@ -49,6 +49,32 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     @Override
+    public List<ConditionGuard> getConditionGuards(Long memberId, String permissionCode) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
+        if (roleIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Permission permission = permissionMapper.findByCode(permissionCode);
+        if (permission == null) {
+            return Collections.emptyList();
+        }
+
+        List<RolePermissionMapper.RolePermissionConditionAstRow> rows =
+                rolePermissionMapper.findConditionAstGrants(roleIds, permission.getId());
+        if (rows == null || rows.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<ConditionGuard> guards = new ArrayList<>(rows.size());
+        for (var row : rows) {
+            guards.add(new ConditionGuard(row.getId(), row.getConditionAstJson()));
+        }
+        return guards;
+    }
+
+    @Override
     public Map<String, Object> getEffectivePolicy(Long memberId, String permissionCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);

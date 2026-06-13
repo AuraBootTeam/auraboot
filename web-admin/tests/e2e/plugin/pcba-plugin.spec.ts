@@ -61,7 +61,7 @@ test.describe('Product Catalog — Core Master Data', () => {
 test.describe('Sales — Orders & Quotations', () => {
   test.setTimeout(30000);
 
-  test('SALES-01: sl_sales_order list loads @smoke', async ({ page }) => {
+  test('SALES-01: sl_sales_order_common list loads @smoke', async ({ page }) => {
     await assertListPageLoads(page, 'sl-sales-order');
   });
 

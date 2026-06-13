@@ -144,8 +144,9 @@ test.describe('Showcase V2 seed invariants', () => {
   test.setTimeout(180_000);
 
   test('automotive BMS records are queryable through Dynamic API', async ({ request }) => {
-    await expectDynamicContains(request, 'crm_account', 'PCBA-DEMO-CUSTOMER-BMS-001');
-    await expectDynamicContains(request, 'pe_rfq', 'PCBA-DEMO-RFQ-BMS-001');
+    await expectDynamicContains(request, 'crm_account_common', 'PCBA-DEMO-CUSTOMER-BMS-001');
+    // A2-S2: the BMS RFQ seed lives on the PCBA sidecar of crm_customer_request_common now
+    await expectDynamicContains(request, 'crm_customer_request_pcba_rfq', 'PCBA-DEMO-RFQ-BMS-001');
     await expectDynamicContains(request, 'qc_fqc_order', 'PCBA-DEMO-FQC-BMS-001');
     await expectDynamicContains(request, 'qc_batch_trace', 'PCBA-DEMO-BATCH-BMS-001');
   });

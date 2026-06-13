@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
+import com.auraboot.framework.agent.util.JsonbColumns;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -187,7 +188,10 @@ public class AgentSkillService {
         result.put("level", level);
         result.put("steps", steps);
         result.put("promptTemplate", skill.get("prompt_template"));
-        result.put("inputSchema", skill.get("skill_input_schema"));
+        // skill_input_schema is JSONB; loaded via the generic selectByQuery it is a
+        // driver PGobject — returning it raw serializes the wrapper {type,value} to the
+        // caller. parseJsonObject (via JsonbColumns) returns the actual schema map.
+        result.put("inputSchema", parseJsonObject(skill.get("skill_input_schema")));
         return result;
     }
 
@@ -277,12 +281,16 @@ public class AgentSkillService {
     // ==================== Helpers ====================
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> parseJsonObject(Object raw) {
+    Map<String, Object> parseJsonObject(Object raw) {
         if (raw == null) return null;
         if (raw instanceof Map) return (Map<String, Object>) raw;
-        if (raw instanceof String s && !s.isBlank()) {
+        // skill_input_schema is JSONB; via the generic selectByQuery it comes back as
+        // a driver PGobject (not String/Map). JsonbColumns yields the JSON text on
+        // every driver shape so the schema parses instead of silently returning null.
+        String json = JsonbColumns.toJsonText(raw, objectMapper);
+        if (json != null) {
             try {
-                return objectMapper.readValue(s, new TypeReference<>() {});
+                return objectMapper.readValue(json, new TypeReference<>() {});
             } catch (Exception e) {
                 log.debug("Failed to parse JSON object: {}", e.getMessage());
             }
@@ -291,12 +299,17 @@ public class AgentSkillService {
     }
 
     @SuppressWarnings("unchecked")
-    private List<String> parseToolCodes(Object skillTools) {
+    List<String> parseToolCodes(Object skillTools) {
         if (skillTools == null) return List.of();
         if (skillTools instanceof List) return (List<String>) skillTools;
-        if (skillTools instanceof String s && !s.isBlank()) {
+        // skill_tools is JSONB; via the generic selectByQuery it comes back as a driver
+        // PGobject (not String/List) — the old code fell through and returned an EMPTY
+        // list, silently dropping every legacy ATOMIC/WORKFLOW/SOLUTION skill's tools.
+        // JsonbColumns yields the JSON text on every driver shape.
+        String json = JsonbColumns.toJsonText(skillTools, objectMapper);
+        if (json != null) {
             try {
-                return objectMapper.readValue(s, new TypeReference<>() {});
+                return objectMapper.readValue(json, new TypeReference<>() {});
             } catch (Exception e) {
                 log.warn("Failed to parse skill_tools: {}", e.getMessage());
             }

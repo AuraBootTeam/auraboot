@@ -13,6 +13,8 @@ import com.auraboot.framework.rag.service.DocGenerationService;
 import com.auraboot.framework.rag.service.InternalDocImportService;
 import com.auraboot.framework.rag.service.KnowledgeBaseService;
 import com.auraboot.framework.rag.service.RagRetrievalService;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -43,12 +45,14 @@ public class KnowledgeBaseController {
     // =========================================================================
 
     @GetMapping
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_READ)
     public ApiResponse<List<KnowledgeBaseDTO>> list() {
         Long tenantId = MetaContext.getCurrentTenantId();
         return ApiResponse.success(kbService.listKnowledgeBases(tenantId));
     }
 
     @GetMapping("/{kbPid}")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_READ)
     public ApiResponse<KnowledgeBaseDTO> get(@PathVariable String kbPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         KnowledgeBaseDTO kb = kbService.getKnowledgeBase(tenantId, kbPid);
@@ -57,6 +61,7 @@ public class KnowledgeBaseController {
     }
 
     @PostMapping
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<KnowledgeBaseDTO> create(@RequestBody CreateKnowledgeBaseRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -64,6 +69,7 @@ public class KnowledgeBaseController {
     }
 
     @PutMapping("/{kbPid}")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<KnowledgeBaseDTO> update(@PathVariable String kbPid,
                                                   @RequestBody CreateKnowledgeBaseRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -74,12 +80,14 @@ public class KnowledgeBaseController {
     }
 
     @DeleteMapping("/{kbPid}")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<Boolean> delete(@PathVariable String kbPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         return ApiResponse.success(kbService.deleteKnowledgeBase(tenantId, kbPid));
     }
 
     @PostMapping("/{kbPid}/toggle-status")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<Boolean> toggleStatus(@PathVariable String kbPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         return ApiResponse.success(kbService.toggleStatus(tenantId, kbPid));
@@ -89,12 +97,27 @@ public class KnowledgeBaseController {
     // Document management
     // =========================================================================
 
+    /**
+     * Re-segment every chunk's tsv with the current CJK bigram segmentation (G2).
+     * One-shot maintenance action for KBs ingested before the segmenter existed.
+     */
+    @PostMapping("/{kbPid}/reindex")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
+    public ApiResponse<Map<String, Object>> reindex(@PathVariable String kbPid) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        int count = kbService.reindexChunkTsv(tenantId, kbPid);
+        if (count < 0) return ApiResponse.error("Knowledge base not found");
+        return ApiResponse.success(Map.of("reindexedChunks", count));
+    }
+
     @GetMapping("/{kbPid}/documents")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_READ)
     public ApiResponse<List<KbDocumentDTO>> listDocuments(@PathVariable String kbPid) {
         return ApiResponse.success(kbService.listDocuments(kbPid));
     }
 
     @PostMapping("/{kbPid}/documents/upload")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<KbDocumentDTO> uploadDocument(@PathVariable String kbPid,
                                                        @RequestParam("file") MultipartFile file) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -131,6 +154,7 @@ public class KnowledgeBaseController {
     }
 
     @DeleteMapping("/{kbPid}/documents/{docPid}")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<Boolean> deleteDocument(@PathVariable String kbPid,
                                                  @PathVariable String docPid) {
         return ApiResponse.success(kbService.deleteDocument(kbPid, docPid));
@@ -141,6 +165,7 @@ public class KnowledgeBaseController {
     // =========================================================================
 
     @GetMapping("/{kbPid}/documents/{docPid}/chunks")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_READ)
     public ApiResponse<List<KbChunk>> listChunks(@PathVariable String kbPid,
                                                    @PathVariable String docPid,
                                                    @RequestParam(defaultValue = "50") int limit) {
@@ -152,7 +177,8 @@ public class KnowledgeBaseController {
     // =========================================================================
 
     @PostMapping("/retrieve")
-    public ApiResponse<List<RetrievalResult>> retrieve(@RequestBody Map<String, Object> request) {
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_RETRIEVE)
+    public ApiResponse<com.auraboot.framework.rag.dto.RetrievalOutcome> retrieve(@RequestBody Map<String, Object> request) {
         Long tenantId = MetaContext.getCurrentTenantId();
         String query = (String) request.get("query");
         @SuppressWarnings("unchecked")
@@ -160,13 +186,14 @@ public class KnowledgeBaseController {
         Integer topK = request.get("topK") != null ? ((Number) request.get("topK")).intValue() : null;
         Double threshold = request.get("threshold") != null ? ((Number) request.get("threshold")).doubleValue() : null;
 
-        List<RetrievalResult> results = ragRetrievalService.retrieve(tenantId, query, kbPids, topK, threshold);
-        return ApiResponse.success(results);
+        return ApiResponse.success(
+                ragRetrievalService.retrieveWithDiagnostics(tenantId, query, kbPids, topK, threshold));
     }
 
 
     // Internal docs import
     @PostMapping("/import-internal-docs")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<InternalDocImportService.ImportResult> importInternalDocs(
             @RequestBody Map<String, String> request) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -181,6 +208,7 @@ public class KnowledgeBaseController {
     // =========================================================================
 
     @PostMapping("/generate-docs")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<DocGenerationService.GenerationResult> generateDocs(
             @RequestBody Map<String, String> request) throws Exception {
         String outputDir = request.getOrDefault("outputDir", "docs/auto-generated");

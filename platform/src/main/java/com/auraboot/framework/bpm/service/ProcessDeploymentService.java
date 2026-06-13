@@ -6,6 +6,7 @@ import com.auraboot.framework.bpm.audit.BpmAuditService;
 import com.auraboot.framework.bpm.converter.JsonToBpmnConverter;
 import com.auraboot.framework.bpm.entity.BpmNodeHook;
 import com.auraboot.framework.bpm.mapper.BpmNodeHookMapper;
+import com.auraboot.framework.bpm.util.BpmnProcessVersionUtil;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.exception.BusinessException;
@@ -450,14 +451,13 @@ public class ProcessDeploymentService {
         }
 
         try {
-            // Ensure BPMN process element has a version attribute (SmartEngine requires it)
-            String bpmnContent = definition.getBpmnContent();
+            // Ensure BPMN process element has a version attribute (SmartEngine requires it).
+            // Insert it as the first <process> attribute so a raw '>' in a later attribute
+            // value (e.g. an unescaped name) cannot corrupt the injection — see
+            // BpmnProcessVersionUtil.
             String versionStr = String.valueOf(definition.getVersion());
-            if (!bpmnContent.contains("version=\"")) {
-                bpmnContent = bpmnContent.replaceFirst(
-                        "(<process\\s+[^>]*)(>)",
-                        "$1 version=\"" + versionStr + ".0.0\"$2");
-            }
+            String bpmnContent = BpmnProcessVersionUtil.ensureProcessVersion(
+                    definition.getBpmnContent(), versionStr + ".0.0");
 
             // Deploy to SmartEngine - second arg is tenantId, NOT filename
             String tenantId = MetaContext.getCurrentTenantIdAsString();

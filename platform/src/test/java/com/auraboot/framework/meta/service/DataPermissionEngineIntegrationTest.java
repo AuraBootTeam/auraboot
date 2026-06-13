@@ -3,6 +3,11 @@ package com.auraboot.framework.meta.service;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.decision.ast.ConditionNode;
+import com.auraboot.framework.decision.ast.DataType;
+import com.auraboot.framework.decision.ast.Operand;
+import com.auraboot.framework.decision.ast.Operator;
+import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.meta.dto.DataPermissionPolicyCreateRequest;
 import com.auraboot.framework.meta.dto.FieldMaskRule;
 import com.auraboot.framework.meta.entity.DataPermissionPolicy;
@@ -20,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +55,13 @@ class DataPermissionEngineIntegrationTest {
 
     @Autowired
     private DataPermissionEngine dataPermissionEngine;
-    
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
     @Autowired
     private UserService userService;
     
@@ -462,6 +474,139 @@ class DataPermissionEngineIntegrationTest {
 
         List<Map<String, Object>> masked = dataPermissionEngine.applyFieldMasking(records, rules);
         assertEquals("visible", masked.get(0).get("name"));
+    }
+
+    // ==================== B2: CUSTOM condition_ast → SQL ====================
+
+    @Test
+    @DisplayName("B2: CUSTOM condition_ast compiles to SQL that filters real rows")
+    void engine_customAst_buildsSqlThatFiltersRealRows() {
+        String model = "ast_region_model";
+        ConditionNode ast = eq(recordPath("region"), literal("EAST"));
+        createBoundCustomAstPolicy("ast-region", model, ast);
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        String filter = dataPermissionEngine.buildRowFilter(tenantId, model, userId);
+
+        assertNotNull(filter);
+        assertTrue(filter.contains("region = 'EAST'"), "filter was: " + filter);
+
+        String table = "b2_region" + testSuffix;
+        try {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS " + table + " (id BIGINT, region TEXT)");
+            jdbcTemplate.update("DELETE FROM " + table);
+            jdbcTemplate.update("INSERT INTO " + table + " (id, region) VALUES (1, 'EAST'), (2, 'WEST'), (3, 'EAST')");
+
+            Integer total = jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Integer.class);
+            Integer matched = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM " + table + " WHERE 1=1 " + filter, Integer.class);
+
+            assertEquals(3, total);
+            assertEquals(2, matched, "generated SQL should match only EAST rows");
+        } finally {
+            jdbcTemplate.execute("DROP TABLE IF EXISTS " + table);
+        }
+    }
+
+    @Test
+    @DisplayName("B2: CUSTOM condition_ast resolves actor.id to the current user in SQL")
+    void engine_customAst_resolvesActorIdToCurrentUser() {
+        String model = "ast_owner_model";
+        ConditionNode ast = eq(recordPath("owner_id"),
+                new Operand.PathOperand(Scope.ACTOR, "id", DataType.USER));
+        createBoundCustomAstPolicy("ast-owner", model, ast);
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        String filter = dataPermissionEngine.buildRowFilter(tenantId, model, userId);
+
+        assertNotNull(filter);
+        assertTrue(filter.contains("owner_id = " + userId), "filter was: " + filter);
+
+        String table = "b2_owner" + testSuffix;
+        try {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS " + table + " (id BIGINT, owner_id BIGINT)");
+            jdbcTemplate.update("DELETE FROM " + table);
+            jdbcTemplate.update("INSERT INTO " + table + " (id, owner_id) VALUES (1, ?), (2, ?)",
+                    userId, userId + 1);
+
+            Integer matched = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM " + table + " WHERE 1=1 " + filter, Integer.class);
+            assertEquals(1, matched, "only the row owned by the current user should match");
+        } finally {
+            jdbcTemplate.execute("DROP TABLE IF EXISTS " + table);
+        }
+    }
+
+    @Test
+    @DisplayName("B2: CUSTOM condition_ast is evaluated in-memory by canAccessRecord")
+    void engine_customAst_inMemoryCanAccessRecordEvaluatesAst() {
+        String model = "ast_access_model";
+        ConditionNode ast = eq(recordPath("region"), literal("EAST"));
+        createBoundCustomAstPolicy("ast-access", model, ast);
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+
+        assertTrue(dataPermissionEngine.canAccessRecord(tenantId, model, userId, Map.of("region", "EAST")));
+        assertFalse(dataPermissionEngine.canAccessRecord(tenantId, model, userId, Map.of("region", "WEST")));
+        // missing field → UNKNOWN → deny
+        assertFalse(dataPermissionEngine.canAccessRecord(tenantId, model, userId, Map.of("other", "x")));
+    }
+
+    @Test
+    @DisplayName("B2: untranslatable CUSTOM condition_ast fails closed to 1=0")
+    void engine_customAst_rejectedConditionFailsClosed() {
+        String model = "ast_reject_model";
+        // A function operand on the value side is not translatable to a row-filter SQL fragment.
+        ConditionNode ast = ConditionNode.CompareNode.of(
+                recordPath("created_at"), Operator.LT,
+                new Operand.FunctionCallOperand("now", List.of(), DataType.DATETIME));
+        createBoundCustomAstPolicy("ast-reject", model, ast);
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        String filter = dataPermissionEngine.buildRowFilter(tenantId, model, userId);
+
+        assertNotNull(filter);
+        assertTrue(filter.contains("1=0"), "rejected AST should fail closed; filter was: " + filter);
+    }
+
+    private DataPermissionPolicy createBoundCustomAstPolicy(String name, String modelCode, ConditionNode ast) {
+        DataPermissionPolicyCreateRequest req = new DataPermissionPolicyCreateRequest();
+        req.setName(name);
+        req.setModelCode(modelCode);
+        req.setPolicyType("row");
+        req.setScopeType("custom");
+        req.setConditionAst(toWire(ast));
+        req.setPriority(10);
+        DataPermissionPolicy policy = policyService.create(req);
+        policyService.bindToRole(policy.getPid(), localRole.getPid());
+        return policy;
+    }
+
+    /** Serialize the AST through its polymorphic base type (emits {@code type} discriminators), then
+     * read it back to a plain Object — exactly the JSON wire form the controller/UI would send. */
+    private Object toWire(ConditionNode ast) {
+        try {
+            String json = objectMapper.writerFor(ConditionNode.class).writeValueAsString(ast);
+            return objectMapper.readValue(json, Object.class);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static Operand recordPath(String field) {
+        return new Operand.PathOperand(Scope.RECORD, "data." + field, DataType.STRING);
+    }
+
+    private static Operand literal(Object value) {
+        return new Operand.LiteralOperand(value, null);
+    }
+
+    private static ConditionNode eq(Operand left, Operand right) {
+        return ConditionNode.CompareNode.of(left, Operator.EQ, right);
     }
 
     // ==================== Helpers ====================

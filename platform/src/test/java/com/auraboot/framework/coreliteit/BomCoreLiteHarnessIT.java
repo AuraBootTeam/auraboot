@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BomCoreLiteHarnessIT extends AbstractCoreLiteIT {
 
     private static final String BOM_LIST_PAGEKEY =
-            System.getenv().getOrDefault("CORE_LITE_BOM_PAGEKEY", "bom_convert_task_workbench_list");
+            System.getenv().getOrDefault("CORE_LITE_BOM_PAGEKEY", "bom_conversion_task_pcba_workbench_list");
     private static final String BOM_CONTAINER_PATH =
             System.getenv().getOrDefault("CORE_LITE_BOM_CONTAINER_PATH", "/tmp/bom-standardization");
 

@@ -2,6 +2,14 @@
 /**
  * Split PCBA ERP monolithic plugin into 8 sub-plugins.
  * Usage: node scripts/split-pcba-plugin.mjs
+ *
+ * ⚠️ STALE / HISTORICAL: this was a one-shot migration script. Its source
+ * directory (plugins/pcba-erp) no longer exists in this repo, so the script can
+ * no longer run. The model inventory below is kept aligned with the current
+ * plugin layout for reference only — A2-S2 decommissioned the legacy RFQ model
+ * (pe_rfq) and its price tiers; the RFQ truth is now crm_customer_request (crm
+ * plugin) with the 1:1 PCBA sidecar crm_customer_request_pcba_rfq and
+ * crm_customer_request_pcba_price_tier in pcba-crm.
  */
 
 import fs from 'fs';
@@ -21,7 +29,10 @@ const PLUGIN_MODELS = {
     'pe_employee','pe_production_version','pe_contract',
   ],
   'pcba-crm': [
-    'pe_lead','pe_opportunity','pe_rfq','pe_customer_contact',
+    // A2-S2: pe_rfq decommissioned → crm_customer_request_pcba_rfq sidecar
+    // (+ crm_customer_request_pcba_price_tier; the common request lives in crm)
+    'pe_lead','pe_opportunity','crm_customer_request_pcba_rfq',
+    'crm_customer_request_pcba_price_tier','pe_customer_contact',
     'pe_customer_followup','pe_customer_complaint',
   ],
   'pcba-srm': [
@@ -406,7 +417,8 @@ const COMMON_DICTS = [
 
 // Dict prefix -> plugin mapping
 const DICT_PREFIXES = {
-  'pe_lead_': 'pcba-crm', 'pe_opp_': 'pcba-crm', 'pe_rfq_': 'pcba-crm',
+  'pe_lead_': 'pcba-crm', 'pe_opp_': 'pcba-crm',
+  'crm_crq_': 'pcba-crm', 'crm_cpt_': 'pcba-crm',
   'pe_complaint_': 'pcba-crm', 'pe_followup_': 'pcba-crm',
   'pe_se_': 'pcba-srm', 'pe_sq_': 'pcba-srm', 'pe_asn_': 'pcba-srm',
   'pe_oc_': 'pcba-srm', 'pe_supplier_level': 'pcba-srm',

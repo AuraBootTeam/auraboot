@@ -1,6 +1,6 @@
 import React from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { ArrowDown, ArrowUp, GripVertical, Maximize2, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, Lock, Maximize2, Trash2 } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import type { DesignerMode, DslBlockV3, PageSchemaV3 } from '../types';
@@ -286,8 +286,20 @@ function BlockFrame(props: BlockFrameProps) {
               </button>
             ) : null}
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-900">
-                {getBlockLabel(block, locale)}
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-sm font-semibold text-slate-900">
+                  {getBlockLabel(block, locale)}
+                </span>
+                {(block.props as { aiLocked?: unknown } | undefined)?.aiLocked === true ? (
+                  <span
+                    data-testid={`ai-lock-badge-${block.id}`}
+                    className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700"
+                    title={resolveDesignerText(DESIGNER_I18N.unified.aiLockBadge, locale)}
+                  >
+                    <Lock className="h-2.5 w-2.5" aria-hidden="true" />
+                    {resolveDesignerText(DESIGNER_I18N.unified.aiLockBadge, locale)}
+                  </span>
+                ) : null}
               </div>
               <div className="truncate font-mono text-[11px] text-slate-400">{block.blockType}</div>
             </div>

@@ -12,14 +12,19 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.StateGraphService;
 import com.auraboot.framework.meta.service.StateTransitionEngine;
+import com.auraboot.framework.meta.util.JsonbFieldHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import com.auraboot.framework.common.constant.StatusConstants;
 
 /**
@@ -162,6 +167,14 @@ public class CommandStateCheckExecutor {
             CommandExecutorUtils.validateSqlIdentifier(stateField, "stateField");
             String tableName = metaModelService.getTableName(modelCode);
             CommandExecutorUtils.validateSqlIdentifier(tableName, "state check tableName");
+            FieldDefinition stateDefinition = findFieldDefinition(modelCode, stateField).orElse(null);
+            String selectExpression = stateField;
+            if (stateDefinition != null && stateDefinition.isJsonbVirtual()) {
+                CommandExecutorUtils.validateSqlIdentifier(stateDefinition.getJsonbColumn(), "state jsonb column");
+                CommandExecutorUtils.validateSqlIdentifier(stateDefinition.getJsonbPath(), "state jsonb path");
+                selectExpression = stateDefinition.getJsonbColumn()
+                        + "->>'" + stateDefinition.getJsonbPath() + "' AS " + stateField;
+            }
             var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordId);
             // The `pid` column is a globally-unique ULID, so a pid lookup identifies exactly
             // one row across all tenants and needs no tenant predicate. This is essential on
@@ -172,7 +185,7 @@ public class CommandStateCheckExecutor {
             // Either way we use selectByQueryWithoutTenant to bypass the TenantLineInnerInterceptor
             // (which would append an empty-tenant predicate off the async thread).
             boolean byPid = "pid".equals(idEntry.getKey());
-            String sql = "SELECT " + stateField + " FROM " + tableName
+            String sql = "SELECT " + selectExpression + " FROM " + tableName
                     + " WHERE " + idEntry.getKey() + " = #{params.recordId}"
                     + (byPid ? "" : " AND tenant_id = #{params.tenantId}");
             Map<String, Object> params = byPid
@@ -195,14 +208,91 @@ public class CommandStateCheckExecutor {
                                        String stateField, String newState) {
         try {
             String tableName = metaModelService.getTableName(modelCode);
+            Optional<ModelDefinition> modelOpt = metaModelService.getModelDefinition(modelCode);
+            FieldDefinition stateDefinition = modelOpt
+                    .flatMap(model -> findFieldDefinition(model, stateField))
+                    .orElse(null);
             var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordId);
-            Map<String, Object> data = Map.of(stateField, newState);
             Map<String, Object> conditions = Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue());
-            dynamicDataMapper.update(tableName, data, conditions);
+            int updated;
+            if (modelOpt.isPresent() && stateDefinition != null && stateDefinition.isJsonbVirtual()) {
+                CommandExecutorUtils.validateSqlIdentifier(stateDefinition.getJsonbColumn(), "state jsonb column");
+                CommandExecutorUtils.validateSqlIdentifier(stateDefinition.getJsonbPath(), "state jsonb path");
+                Map<String, Object> existingVirtualValues = readJsonbVirtualValues(
+                        tenantId, tableName, recordId, modelOpt.get(), stateDefinition.getJsonbColumn());
+                Map<String, Object> merged = JsonbFieldHelper.mergeJsonbFieldsForUpdate(
+                        modelOpt.get(), Map.of(stateField, newState), existingVirtualValues);
+                Map<String, Object> data = new LinkedHashMap<>();
+                for (Map.Entry<String, Object> entry : merged.entrySet()) {
+                    Object value = entry.getValue();
+                    data.put(entry.getKey(), JsonbFieldHelper.shouldSerializeJsonValue(value)
+                            ? JsonbFieldHelper.toJsonString(value)
+                            : value);
+                }
+                data.put("updated_at", Instant.now());
+                updated = dynamicDataMapper.updateWithJsonb(
+                        tableName, data, conditions, Set.of(stateDefinition.getJsonbColumn()));
+            } else {
+                Map<String, Object> data = Map.of(stateField, newState);
+                updated = dynamicDataMapper.update(tableName, data, conditions);
+            }
+            if (updated == 0) {
+                throw new BusinessException(ResponseCode.BadParam,
+                        "state transition affected 0 rows for " + modelCode + " id=" + recordId);
+            }
         } catch (Exception e) {
             log.error("Failed to write state transition for model={}, record={}, state={}: {}",
                     modelCode, recordId, newState, e.getMessage());
             throw new BusinessException(ResponseCode.BadParam, "Failed to update state: " + e.getMessage());
+        }
+    }
+
+    private Optional<FieldDefinition> findFieldDefinition(String modelCode, String fieldCode) {
+        return metaModelService.getModelDefinition(modelCode)
+                .flatMap(model -> findFieldDefinition(model, fieldCode));
+    }
+
+    private Optional<FieldDefinition> findFieldDefinition(ModelDefinition model, String fieldCode) {
+        if (model == null || model.getFields() == null || !StringUtils.hasText(fieldCode)) {
+            return Optional.empty();
+        }
+        return model.getFields().stream()
+                .filter(field -> fieldCode.equals(field.getCode()) || fieldCode.equals(field.getColumnName()))
+                .findFirst();
+    }
+
+    private Map<String, Object> readJsonbVirtualValues(Long tenantId, String tableName, String recordId,
+                                                       ModelDefinition model, String jsonbColumn) {
+        try {
+            CommandExecutorUtils.validateSqlIdentifier(tableName, "state jsonb tableName");
+            CommandExecutorUtils.validateSqlIdentifier(jsonbColumn, "state jsonb column");
+            List<String> expressions = new ArrayList<>();
+            for (FieldDefinition field : model.getFields()) {
+                if (!field.isJsonbVirtual() || !jsonbColumn.equals(field.getJsonbColumn())) {
+                    continue;
+                }
+                CommandExecutorUtils.validateSqlIdentifier(field.getCode(), "state jsonb virtual field");
+                CommandExecutorUtils.validateSqlIdentifier(field.getJsonbPath(), "state jsonb path");
+                expressions.add(jsonbColumn + "->>'" + field.getJsonbPath() + "' AS " + field.getCode());
+            }
+            if (expressions.isEmpty()) {
+                return Map.of();
+            }
+            var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordId);
+            String sql = "SELECT " + String.join(", ", expressions)
+                    + " FROM " + tableName
+                    + " WHERE " + idEntry.getKey() + " = #{params.recordId}"
+                    + " AND tenant_id = #{params.tenantId}";
+            Map<String, Object> params = Map.of("tenantId", tenantId, "recordId", idEntry.getValue());
+            List<Map<String, Object>> result = dynamicDataMapper.selectByQueryWithoutTenant(sql, params);
+            if (result == null || result.isEmpty()) {
+                return Map.of();
+            }
+            return result.get(0);
+        } catch (Exception e) {
+            log.warn("Failed to read JSONB virtual state values for model={}, recordId={}, column={}: {}",
+                    model.getCode(), recordId, jsonbColumn, e.getMessage());
+            return Map.of();
         }
     }
 }

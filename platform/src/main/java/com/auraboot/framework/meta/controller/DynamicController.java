@@ -597,10 +597,7 @@ public class DynamicController {
             // Parse format
             Object formatObj = exportParams.get("format");
             if (formatObj != null) {
-                String formatStr = formatObj.toString().toUpperCase();
-                if ("csv".equals(formatStr)) {
-                    format = DataExportRequest.ExportFormat.CSV;
-                }
+                format = parseExportFormat(formatObj);
             }
 
             // Parse conditions from frontend filters
@@ -658,6 +655,16 @@ public class DynamicController {
         return ApiResponse.success(legacyResult);
     }
 
+    private static DataExportRequest.ExportFormat parseExportFormat(Object formatObj) {
+        String formatStr = formatObj.toString().trim().toLowerCase(java.util.Locale.ROOT);
+        return switch (formatStr) {
+            case "csv" -> DataExportRequest.ExportFormat.CSV;
+            case "json" -> DataExportRequest.ExportFormat.JSON;
+            case "xlsx", "excel" -> DataExportRequest.ExportFormat.EXCEL;
+            default -> DataExportRequest.ExportFormat.EXCEL;
+        };
+    }
+
     /**
      * 下载导出文件
      */
@@ -683,12 +690,13 @@ public class DynamicController {
             return;
         }
 
-        String fileName = pageKey + "_export.xlsx";
+        String extension = exportExtension(filePath);
+        String fileName = pageKey + "_export." + extension;
         String encodedFileName = java.net.URLEncoder.encode(fileName, java.nio.charset.StandardCharsets.UTF_8)
                 .replace("+", "%20");
 
         long fileSize = java.nio.file.Files.size(filePath);
-        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setContentType(exportContentType(extension));
         response.setContentLengthLong(fileSize);
         response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"; filename*=UTF-8''" + encodedFileName);
         response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -709,6 +717,23 @@ public class DynamicController {
         } catch (Exception e) {
             log.warn("Failed to delete temp export file: {}", logSafe(file));
         }
+    }
+
+    private static String exportExtension(java.nio.file.Path filePath) {
+        String fileName = filePath.getFileName() != null ? filePath.getFileName().toString().toLowerCase() : "";
+        if (fileName.endsWith(".csv")) return "csv";
+        if (fileName.endsWith(".json")) return "json";
+        if (fileName.endsWith(".xml")) return "xml";
+        return "xlsx";
+    }
+
+    private static String exportContentType(String extension) {
+        return switch (extension) {
+            case "csv" -> "text/csv;charset=UTF-8";
+            case "json" -> "application/json";
+            case "xml" -> "application/xml";
+            default -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        };
     }
 
     /**

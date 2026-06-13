@@ -290,38 +290,56 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
         Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : automation.getTenantId();
 
-        // Create log entry
-        AutomationLog logEntry = new AutomationLog();
-        logEntry.setPid(UniqueIdGenerator.generate());
-        logEntry.setTenantId(tenantId);
-        logEntry.setAutomationId(automation.getPid());
-        logEntry.setTriggerType(automation.getTriggerType());
-        logEntry.setTriggerRecordId(recordId);
-        logEntry.setTriggerPayload(triggerPayload);
-        logEntry.setStatus(StatusConstants.RUNNING);
-        logEntry.setStartedAt(Instant.now());
-        logEntry.setCreatedAt(Instant.now());
-
-        automationLogMapper.insertLog(logEntry);
-
-        // T2: every automation runs on SmartEngine. The compiler synthesizes a linear flow
-        // from triggerType + actions[] when there is no visual flowConfig, so the flat
-        // sequential executor has been removed.
-        try {
-            // Pass the log id through so AutomationActionServiceTaskDelegate can persist
-            // per-node execution rows linked to this run (G5 runtime overlay).
-            automationProcessRuntime.run(automation, recordId, triggerPayload, logEntry.getId());
-            logEntry.setStatus("success");
-        } catch (Exception e) {
-            log.error("Automation run failed: pid={}, error={}",
-                    automation.getPid(), e.getMessage(), e);
-            logEntry.setStatus(StatusConstants.FAILED);
-            logEntry.setErrorMessage(e.getMessage());
+        // Establish tenant context for the whole run when the caller has none. Triggers that
+        // ride a JWT-exempt path (the webhook receiver) or an @Async worker thread arrive with
+        // no MetaContext, so the AutomationLogMapper insert/updateStatus and the tenant-scoped
+        // command pipeline would fail with "MetaContext not initialized". The previous code
+        // relied on AutomationProcessRuntime.run() setting then clearing MetaContext internally,
+        // which left updateStatus() below it uncovered. Scope the whole method here; clear in
+        // finally only when we are the one who set it.
+        boolean tenantContextSet = false;
+        if (!MetaContext.exists() && tenantId != null) {
+            MetaContext.setContext(tenantId, null, automation.getCreatedBy(), null);
+            tenantContextSet = true;
         }
-        logEntry.setCompletedAt(Instant.now());
-        automationLogMapper.updateStatus(logEntry);
-        automationMapper.updateTriggerStats(automation.getPid());
-        return logEntry;
+        try {
+            // Create log entry
+            AutomationLog logEntry = new AutomationLog();
+            logEntry.setPid(UniqueIdGenerator.generate());
+            logEntry.setTenantId(tenantId);
+            logEntry.setAutomationId(automation.getPid());
+            logEntry.setTriggerType(automation.getTriggerType());
+            logEntry.setTriggerRecordId(recordId);
+            logEntry.setTriggerPayload(triggerPayload);
+            logEntry.setStatus(StatusConstants.RUNNING);
+            logEntry.setStartedAt(Instant.now());
+            logEntry.setCreatedAt(Instant.now());
+
+            automationLogMapper.insertLog(logEntry);
+
+            // T2: every automation runs on SmartEngine. The compiler synthesizes a linear flow
+            // from triggerType + actions[] when there is no visual flowConfig, so the flat
+            // sequential executor has been removed.
+            try {
+                // Pass the log id through so AutomationActionServiceTaskDelegate can persist
+                // per-node execution rows linked to this run (G5 runtime overlay).
+                automationProcessRuntime.run(automation, recordId, triggerPayload, logEntry.getId());
+                logEntry.setStatus("success");
+            } catch (Exception e) {
+                log.error("Automation run failed: pid={}, error={}",
+                        automation.getPid(), e.getMessage(), e);
+                logEntry.setStatus(StatusConstants.FAILED);
+                logEntry.setErrorMessage(e.getMessage());
+            }
+            logEntry.setCompletedAt(Instant.now());
+            automationLogMapper.updateStatus(logEntry);
+            automationMapper.updateTriggerStats(automation.getPid());
+            return logEntry;
+        } finally {
+            if (tenantContextSet) {
+                MetaContext.clear();
+            }
+        }
     }
 
     @Override

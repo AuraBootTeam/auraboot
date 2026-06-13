@@ -1,5 +1,6 @@
 package com.auraboot.framework.rag.service;
 
+import com.auraboot.framework.rag.config.RagRetrievalProperties;
 import com.auraboot.framework.rag.dto.RetrievalResult;
 import com.auraboot.framework.rag.entity.KnowledgeBase;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -31,10 +33,14 @@ class RagRetrievalServiceBranchTest {
     @Mock private JdbcTemplate jdbcTemplate;
 
     private RagRetrievalService service;
+    private RagRetrievalProperties props;
 
     @BeforeEach
     void setUp() {
-        service = new RagRetrievalService(embeddingService, kbService, queryRewriteService, jdbcTemplate);
+        props = new RagRetrievalProperties();
+        service = new RagRetrievalService(embeddingService, kbService, queryRewriteService, jdbcTemplate,
+                new RagRetrievalMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()),
+                props);
     }
 
     @Test
@@ -142,32 +148,111 @@ class RagRetrievalServiceBranchTest {
         assertThrows(RuntimeException.class, () -> service.hasActiveKnowledgeBases(1L));
     }
 
-    @Test
-    @DisplayName("buildRagContext returns empty for null input")
-    void buildRagContextNull() {
-        assertEquals("", service.buildRagContext(null));
-    }
 
-    @Test
-    @DisplayName("buildRagContext returns empty for empty list")
-    void buildRagContextEmpty() {
-        assertEquals("", service.buildRagContext(List.of()));
-    }
 
-    @Test
-    @DisplayName("buildRagContext formats results into reference section")
-    void buildRagContextFormats() {
-        RetrievalResult r = RetrievalResult.builder()
-                .chunkPid("c1")
-                .docName("doc-A")
-                .chunkIndex(7)
-                .content("body content")
+
+    // ─────────────────────── G10 relevance-rejection floor ───────────────────────
+
+    private static RetrievalResult chunk(String content, double distance) {
+        return RetrievalResult.builder()
+                .chunkPid("c-" + Integer.toHexString(content.hashCode()))
+                .content(content)
+                .distance(distance)
+                .similarity(1.0 - distance)
                 .build();
-        String out = service.buildRagContext(List.of(r));
-        assertTrue(out.contains("## Reference Knowledge"));
-        assertTrue(out.contains("Source: doc-A"));
-        assertTrue(out.contains("Chunk 7"));
-        assertTrue(out.contains("body content"));
+    }
+
+    private void stubKeywordMode(String query) {
+        when(queryRewriteService.rewrite(anyString()))
+                .thenReturn(new QueryRewriteService.QueryRewriteResult(query, query, false));
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.setEmbeddingProvider("openai");
+        when(kbService.findKbByPid("kb1")).thenReturn(kb);
+        when(embeddingService.embed(eq(1L), eq(query), eq("openai"))).thenReturn(null); // keyword-fallback
+        lenient().when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+    }
+
+    @Test
+    @DisplayName("rejection floor (keyword mode): drops the whole set when no chunk clears coverage")
+    void rejectionFloorKeywordModeDropsWholeSetWhenNoneClears() {
+        String query = "数据字典";
+        stubKeywordMode(query);
+        // Both chunks are off-topic for the query → coverage 0 → no chunk clears → empty.
+        RetrievalResult off1 = chunk("command execution pipeline and audit log", 1.0);
+        RetrievalResult off2 = chunk("plugin lifecycle and permission binding", 1.0);
+        when(queryRewriteService.rerank(any(), eq(query), anyInt())).thenReturn(List.of(off1, off2));
+
+        assertTrue(service.retrieve(1L, query, List.of("kb1"), null, null).isEmpty());
+    }
+
+    @Test
+    @DisplayName("rejection floor (keyword mode): keeps the whole top-k (incl. low-coverage chunk) when the best clears")
+    void rejectionFloorKeywordModeKeepsSetWhenBestClears() {
+        String query = "数据字典";
+        stubKeywordMode(query);
+        // The relevant chunk clears the floor; a lower-coverage neighbor is kept too
+        // (best-match gate, not per-chunk filtering — the relevant chunk must never be cut).
+        RetrievalResult relevant = chunk("数据字典 字段 元数据 配置说明", 1.0);   // coverage 1.0
+        RetrievalResult weakNeighbor = chunk("配置 与 字段 校验", 1.0);          // partial coverage
+        when(queryRewriteService.rerank(any(), eq(query), anyInt())).thenReturn(List.of(relevant, weakNeighbor));
+
+        List<RetrievalResult> result = service.retrieve(1L, query, List.of("kb1"), null, null);
+
+        assertEquals(2, result.size());
+        assertSame(relevant, result.get(0));
+    }
+
+    @Test
+    @DisplayName("rejection floor (hybrid mode): drops the set when every chunk is below the similarity floor")
+    void rejectionFloorHybridModeDropsWholeSetWhenAllLowSimilarity() {
+        String query = "q";
+        when(queryRewriteService.rewrite(anyString()))
+                .thenReturn(new QueryRewriteService.QueryRewriteResult(query, query, false));
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.setEmbeddingProvider("openai");
+        when(kbService.findKbByPid("kb1")).thenReturn(kb);
+        when(embeddingService.embed(eq(1L), eq(query), eq("openai"))).thenReturn(new float[]{0.1f, 0.2f});
+        lenient().when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+        // hybrid mode → real cosine distance present, so the vector-similarity leg gates.
+        RetrievalResult far1 = chunk("irrelevant lexical content", 0.95);  // similarity 0.05 < 0.20
+        RetrievalResult far2 = chunk("another off-topic chunk", 0.90);     // similarity 0.10 < 0.20
+        when(queryRewriteService.rerank(any(), eq(query), anyInt())).thenReturn(List.of(far1, far2));
+
+        assertTrue(service.retrieve(1L, query, List.of("kb1"), null, null).isEmpty());
+    }
+
+    @Test
+    @DisplayName("rejection floor (hybrid mode): keeps the set when a chunk clears the similarity floor")
+    void rejectionFloorHybridModeKeepsSetWhenSimilarChunkPresent() {
+        String query = "q";
+        when(queryRewriteService.rewrite(anyString()))
+                .thenReturn(new QueryRewriteService.QueryRewriteResult(query, query, false));
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.setEmbeddingProvider("openai");
+        when(kbService.findKbByPid("kb1")).thenReturn(kb);
+        when(embeddingService.embed(eq(1L), eq(query), eq("openai"))).thenReturn(new float[]{0.1f, 0.2f});
+        lenient().when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+        RetrievalResult near = chunk("the relevant chunk", 0.40);   // similarity 0.60 ≥ 0.20
+        RetrievalResult far = chunk("a weak neighbor", 0.95);       // similarity 0.05 < 0.20
+        when(queryRewriteService.rerank(any(), eq(query), anyInt())).thenReturn(List.of(near, far));
+
+        List<RetrievalResult> result = service.retrieve(1L, query, List.of("kb1"), null, null);
+
+        assertEquals(2, result.size());
+        assertSame(near, result.get(0));
+    }
+
+    @Test
+    @DisplayName("rejection floor disabled: keeps even an entirely off-topic set")
+    void rejectionFloorDisabledKeepsEverything() {
+        props.setRejectionFloorEnabled(false);
+        String query = "数据字典";
+        stubKeywordMode(query);
+        RetrievalResult off1 = chunk("command execution pipeline", 1.0);
+        RetrievalResult off2 = chunk("plugin lifecycle", 1.0);
+        when(queryRewriteService.rerank(any(), eq(query), anyInt())).thenReturn(List.of(off1, off2));
+
+        assertEquals(2, service.retrieve(1L, query, List.of("kb1"), null, null).size());
     }
 
     @Test
@@ -184,17 +269,17 @@ class RagRetrievalServiceBranchTest {
     }
 
     @Test
-    @DisplayName("buildTsQuery splits each CJK character into a separate term")
+    @DisplayName("buildTsQuery expands CJK runs into overlapping bigrams (G2)")
     void buildTsQueryCjk() {
-        String out = RagRetrievalService.buildTsQuery("你好");
-        assertEquals("你 | 好", out);
+        String out = RagRetrievalService.buildTsQuery("命令执行");
+        assertEquals("命令 | 令执 | 执行", out);
     }
 
     @Test
-    @DisplayName("buildTsQuery flushes Latin buffer before CJK char")
+    @DisplayName("buildTsQuery flushes Latin buffer before CJK run")
     void buildTsQueryMixed() {
-        String out = RagRetrievalService.buildTsQuery("foo你bar");
-        assertEquals("foo | 你 | bar", out);
+        String out = RagRetrievalService.buildTsQuery("foo权限bar");
+        assertEquals("foo | 权限 | bar", out);
     }
 
     @Test

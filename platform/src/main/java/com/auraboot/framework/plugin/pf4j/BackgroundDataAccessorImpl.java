@@ -109,16 +109,22 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
         Long priorUser = hadPriorContext ? MetaContext.getCurrentUserId() : null;
         String priorUserPid = hadPriorContext ? MetaContext.getCurrentUserPid() : null;
         String priorUsername = hadPriorContext ? MetaContext.getCurrentUsername() : null;
+        Long priorMember = MetaContext.getCurrentMemberId();
+        Long priorEnv = MetaContext.getCurrentEnvironmentId();
         java.util.Set<Long> priorRoles = hadPriorContext
                 ? MetaContext.getCurrentRoleIds() : java.util.Set.of();
         // Bind full context (tenant + synthetic system user) so DynamicDataServiceImpl's
         // populateSystemFields finds a non-null userId for changed_by / created_by.
         MetaContext.setContext(tenantId, SYSTEM_USER_ID, null, "system");
+        MetaContext.setMemberId(null);
+        MetaContext.setEnvironmentId(priorEnv);
         try {
-            return work.get();
+            return MetaContext.runWithoutDataPermission(work);
         } finally {
             if (hadPriorContext) {
                 MetaContext.setContext(priorTenant, priorUser, priorUserPid, priorUsername, priorRoles);
+                MetaContext.setMemberId(priorMember);
+                MetaContext.setEnvironmentId(priorEnv);
             } else {
                 MetaContext.clear();
             }

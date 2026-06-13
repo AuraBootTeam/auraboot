@@ -8,6 +8,7 @@
 import React, { useCallback, useState } from 'react';
 import { cn } from '~/utils/cn';
 import { confirmDialog } from '~/utils/confirmDialog';
+import type { ButtonConfig } from '~/framework/meta/schemas/types';
 
 export interface BulkActionToolbarProps {
   /** Number of selected items */
@@ -22,6 +23,12 @@ export interface BulkActionToolbarProps {
   onBulkDelete?: (ids: string[]) => Promise<void>;
   /** Callback for bulk export action */
   onBulkExport?: (ids: string[]) => void;
+  /** DSL-configured business bulk actions */
+  bulkActions?: ButtonConfig[];
+  /** Callback for DSL-configured business bulk actions */
+  onBulkAction?: (button: ButtonConfig, ids: string[]) => void | Promise<void>;
+  /** Label resolver for DSL-configured business bulk actions */
+  resolveActionLabel?: (button: ButtonConfig) => string;
   /** Callback to clear selection */
   onClearSelection?: () => void;
   /** Custom CSS class */
@@ -37,10 +44,14 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
   onBulkEdit,
   onBulkDelete,
   onBulkExport,
+  bulkActions = [],
+  onBulkAction,
+  resolveActionLabel,
   onClearSelection,
   className,
 }) => {
   const [deleting, setDeleting] = useState(false);
+  const [runningActionCode, setRunningActionCode] = useState<string | null>(null);
 
   const handleBulkDelete = useCallback(async () => {
     if (!onBulkDelete || selectedIds.length === 0) return;
@@ -58,6 +69,19 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
       setDeleting(false);
     }
   }, [onBulkDelete, selectedIds]);
+
+  const handleCustomBulkAction = useCallback(
+    async (button: ButtonConfig) => {
+      if (!onBulkAction || selectedIds.length === 0) return;
+      setRunningActionCode(button.code);
+      try {
+        await onBulkAction(button, selectedIds);
+      } finally {
+        setRunningActionCode(null);
+      }
+    },
+    [onBulkAction, selectedIds],
+  );
 
   if (selectedCount === 0) return null;
 
@@ -84,6 +108,31 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
       {/* Actions */}
       <div className="flex items-center gap-2">
+        {/* DSL-configured business bulk actions */}
+        {bulkActions.map((button) => {
+          const label = resolveActionLabel ? resolveActionLabel(button) : String(button.label ?? button.code);
+          const isRunning = runningActionCode === button.code;
+          const isDanger = button.danger || button.variant === 'danger';
+          return (
+            <button
+              key={button.code}
+              type="button"
+              onClick={() => handleCustomBulkAction(button)}
+              disabled={isRunning}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
+                isDanger ? 'text-red-400 hover:bg-red-900/50' : 'hover:bg-gray-700',
+                'disabled:cursor-not-allowed disabled:opacity-50',
+              )}
+            >
+              {isRunning && (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              )}
+              {label}
+            </button>
+          );
+        })}
+
         {/* Bulk Edit */}
         {onBulkEdit && (
           <button

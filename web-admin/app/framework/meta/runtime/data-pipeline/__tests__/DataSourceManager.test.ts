@@ -30,7 +30,7 @@ describe('DataSourceManager', () => {
     );
     manager.register('canonicalLines', {
       type: 'api',
-      endpoint: '/api/dynamic/bom_canonical_line/list',
+      endpoint: '/api/dynamic/req_requirement_line_pcba_bom/list',
       method: 'get',
       adaptor: 'table',
       autoFetch: false,
@@ -45,7 +45,7 @@ describe('DataSourceManager', () => {
     await manager.fetch('canonicalLines');
 
     expect(mockedFetchResult).toHaveBeenCalledWith(
-      '/api/dynamic/bom_canonical_line/list',
+      '/api/dynamic/req_requirement_line_pcba_bom/list',
       expect.objectContaining({
         method: 'get',
         params: expect.objectContaining({
@@ -59,6 +59,51 @@ describe('DataSourceManager', () => {
     expect(JSON.parse(params.filters)).toEqual([
       { fieldName: 'bom_cl_task_id', operator: 'EQ', value: 'task-1' },
     ]);
+  });
+
+  it('passes format=records for namedQuery sources so metric-strip gets raw aggregate rows', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: { list: [{ total_devices: 5, online_devices: 2 }], total: 1 },
+    } as any);
+
+    const manager = new DataSourceManager(createExpressionContext({} as any));
+    manager.register('fleetKpi', {
+      type: 'namedQuery',
+      queryCode: 'iot_dashboard_kpi',
+      format: 'records',
+      autoFetch: false,
+    });
+
+    await manager.fetch('fleetKpi');
+
+    expect(mockedFetchResult).toHaveBeenCalledWith(
+      '/api/datasource/list',
+      expect.objectContaining({
+        method: 'get',
+        params: expect.objectContaining({
+          datasourceId: 'nq:iot_dashboard_kpi',
+          format: 'records',
+        }),
+      }),
+    );
+  });
+
+  it('omits format for namedQuery sources by default (option/dropdown format)', async () => {
+    mockedFetchResult.mockResolvedValueOnce({ code: '0', data: [] } as any);
+
+    const manager = new DataSourceManager(createExpressionContext({} as any));
+    manager.register('statusOptions', {
+      type: 'namedQuery',
+      queryCode: 'iot_dashboard_device_status',
+      autoFetch: false,
+    });
+
+    await manager.fetch('statusOptions');
+
+    const params = mockedFetchResult.mock.calls[0][1]?.params as Record<string, any>;
+    expect(params.datasourceId).toBe('nq:iot_dashboard_device_status');
+    expect(params.format).toBeUndefined();
   });
 
   it('keeps updated page context available after binding a schema state manager', async () => {
@@ -90,7 +135,7 @@ describe('DataSourceManager', () => {
     );
     manager.register('taskSummary', {
       type: 'api',
-      endpoint: '/api/dynamic/bom_convert_task/list',
+      endpoint: '/api/dynamic/bom_conversion_task_pcba/list',
       method: 'get',
       adaptor: 'table',
       autoFetch: false,
@@ -102,7 +147,7 @@ describe('DataSourceManager', () => {
 
     await manager.fetch('taskSummary');
 
-    expect(mockedFetchResult).toHaveBeenCalledWith('/api/dynamic/bom_convert_task/list', {
+    expect(mockedFetchResult).toHaveBeenCalledWith('/api/dynamic/bom_conversion_task_pcba/list', {
       method: 'get',
       params: {
         pidFromForm: 'task-2',
@@ -274,7 +319,7 @@ describe('DataSourceManager', () => {
     );
     manager.register('standardLines', {
       type: 'api',
-      endpoint: '/api/dynamic/bom_standard_item/list',
+      endpoint: '/api/dynamic/bom_standard_line_pcba/list',
       method: 'get',
       adaptor: 'table',
       autoFetch: false,
@@ -318,7 +363,7 @@ describe('DataSourceManager', () => {
     );
     manager.register('standardLines', {
       type: 'api',
-      endpoint: '/api/dynamic/bom_standard_item/list',
+      endpoint: '/api/dynamic/bom_standard_line_pcba/list',
       method: 'get',
       adaptor: 'table',
       autoFetch: false,

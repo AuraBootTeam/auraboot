@@ -29,6 +29,13 @@ import {
 import { setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
+import {
+  DEVICE_PREVIEW_PRESETS,
+  DEFAULT_DEVICE_PREVIEW_ID,
+  getDeviceFrameStyle,
+  getDevicePreviewPreset,
+} from '../preview/devicePreviewPresets';
+import { getPageTemplate, getPageTemplates } from '../templates/pageTemplateRegistry';
 import { getKindPolicy, isBlockTypeAllowedForKind } from '../registry/kindPolicy';
 import {
   createBlockTemplate,
@@ -76,6 +83,7 @@ export function UnifiedDesignerWorkbench({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [validationErrorCount, setValidationErrorCount] = useState(0);
   const [mode, setMode] = useState<WorkbenchMode>('edit');
+  const [previewDeviceId, setPreviewDeviceId] = useState<string>(DEFAULT_DEVICE_PREVIEW_ID);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
   const [activeDropIntent, setActiveDropIntent] = useState<ActiveDropIntent>(null);
@@ -111,6 +119,19 @@ export function UnifiedDesignerWorkbench({
     setSaveStatus('dirty');
     setSaveError(null);
     setValidationErrorCount(0);
+  };
+
+  // D6 — apply a scenario template: replace the page's blocks (and title) with a
+  // fresh tree built by the registered template, then clear the selection.
+  const applyTemplate = (templateId: string) => {
+    const template = getPageTemplate(templateId);
+    if (!template) return;
+    updateDocument((current) => ({
+      ...current,
+      title: template.title ?? current.title,
+      blocks: template.build(),
+    }));
+    setSelectedBlockId(null);
   };
 
   const updateSelectedBlock = (path: string, value: unknown) => {
@@ -550,7 +571,31 @@ export function UnifiedDesignerWorkbench({
           className="min-h-0 flex-1 overflow-auto bg-slate-100 p-4 lg:p-6"
           data-testid="unified-runtime-preview"
         >
-          <div className="mx-auto max-w-7xl">
+          <div className="mx-auto mb-3 flex max-w-7xl items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">预览设备</span>
+            <select
+              data-testid="preview-device-select"
+              value={previewDeviceId}
+              onChange={(event) => setPreviewDeviceId(event.target.value)}
+              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
+            >
+              {DEVICE_PREVIEW_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div
+            className={
+              getDevicePreviewPreset(previewDeviceId).width == null
+                ? 'mx-auto max-w-7xl'
+                : 'mx-auto overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200'
+            }
+            data-testid="preview-device-frame"
+            data-device={previewDeviceId}
+            style={getDeviceFrameStyle(getDevicePreviewPreset(previewDeviceId))}
+          >
             <RecursiveBlockRenderer
               schema={document}
               runtimeServices={defaultRuntimeExecutionServices}
@@ -569,6 +614,29 @@ export function UnifiedDesignerWorkbench({
             setActiveDropIntent(null);
           }}
         >
+          {getPageTemplates().length > 0 ? (
+            <div
+              className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2"
+              data-testid="designer-template-bar"
+            >
+              <span className="text-xs font-medium text-slate-500">场景模板</span>
+              <select
+                data-testid="designer-template-select"
+                value=""
+                onChange={(event) => {
+                  if (event.target.value) applyTemplate(event.target.value);
+                }}
+                className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
+              >
+                <option value="">应用模板…</option>
+                {getPageTemplates().map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div
             className="flex min-h-0 flex-1 flex-col overflow-auto xl:flex-row xl:overflow-hidden"
             data-testid="unified-workbench-body"

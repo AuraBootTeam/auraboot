@@ -203,7 +203,7 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
             );
         }
 
-        tenantMemberService.addMember(user.getId(),createdTenant.getId(), StatusConstants.ACTIVE);
+        var newMember = tenantMemberService.addMember(user.getId(),createdTenant.getId(), StatusConstants.ACTIVE);
 
         // 使用新的TenantBootstrapService初始化默认RBAC数据
         try {
@@ -223,12 +223,18 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
             user.getId()
         );
 
-        // 生成新的JWT令牌（包含租户信息 + security version）
+        // 生成新的JWT令牌（包含租户信息 + memberId + security version）。
+        // memberId is required: PermissionInterceptor/UserPermissionServiceImpl resolves
+        // a user's permissions through their tenant membership, so a JWT carrying only
+        // tenantId (no memberId) yields "MemberId not available in MetaContext" and 403s
+        // every permission-gated endpoint. A freshly self-registered founder must land in
+        // a fully usable workspace, so mint the member-scoped token here (mirrors login).
         int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
         String newJwt = jwtUtil.generateTokenWithTenantId(
                 userDetailsService.loadUserByUsername(user.getEmail()),
                 user.getPid(),
                 createdTenant.getId(),
+                newMember != null ? newMember.getId() : null,
                 securityVersion
         );
         // Register this JWT in server-side session store (NOT_SUPPORTED propagation, won't affect this transaction)

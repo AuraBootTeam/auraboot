@@ -173,7 +173,18 @@ export class SchemaRuntime {
         return;
       }
 
-      const finalConfig = disableAutoFetch ? { ...config, autoFetch: false } : config;
+      // `disableAutoFetch` exists to stop a data source from firing before the
+      // state it depends on is ready. But it was applied to *every* source,
+      // including ones with nothing to wait for — so dependency-less KPI named
+      // queries (feeding a metric-strip) and filter-bound lists whose filter
+      // state is simply empty never loaded and rendered as "-" / "暂无数据".
+      // Defer only the sources whose dependency parents are genuinely unresolved
+      // at mount (e.g. a detail bound to an as-yet-unselected row); those fetch
+      // later via dependency tracking. State binding has already run by here, so
+      // `dependenciesReady` reflects the real initial context.
+      const deferUntilDependencyReady =
+        disableAutoFetch && !this.dataSourceManager.dependenciesReady(config);
+      const finalConfig = deferUntilDependencyReady ? { ...config, autoFetch: false } : config;
       this.dataSourceManager.register(id, finalConfig);
       this.registeredDataSources.add(id);
     });

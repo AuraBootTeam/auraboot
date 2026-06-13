@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 
 /**
  * Learning Loop REST API for Mission Control HITL workflow.
@@ -166,6 +168,7 @@ public class LearningLoopController {
      *   reject:  any → REVIEWED_REJECTED
      */
     @PostMapping("/drafts/{pid}/review")
+    @RequirePermission(MetaPermission.ACP_LEARNING_REVIEW)
     public ApiResponse<Map<String, Object>> review(@PathVariable String pid,
                                                     @RequestBody Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -229,6 +232,7 @@ public class LearningLoopController {
      * and the proposal passed validation) or not.
      */
     @PostMapping("/drafts/{pid}/auto-rename")
+    @RequirePermission(MetaPermission.ACP_LEARNING_REVIEW)
     public ApiResponse<Map<String, Object>> autoRename(@PathVariable String pid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         boolean renamed = namer.renameDraft(tenantId, pid);
@@ -288,6 +292,7 @@ public class LearningLoopController {
      * plus the decision so Mission Control can show them inline.
      */
     @PostMapping("/drafts/{pid}/evaluate-promotion")
+    @RequirePermission(MetaPermission.ACP_LEARNING_REVIEW)
     public ApiResponse<Map<String, Object>> evaluatePromotion(@PathVariable String pid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Map<String, Object>> owns = jdbcTemplate.queryForList(

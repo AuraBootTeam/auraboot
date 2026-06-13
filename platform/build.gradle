@@ -208,6 +208,8 @@ ext {
     // Drools Rule Engine
     droolsVersion = '8.44.2.Final'
     xxlJobVersion = '3.4.0'
+    springKafkaVersion = '3.2.0'
+    kafkaClientsVersion = '3.7.0'
     testWorkerNum = project.findProperty('workerNum') ?: '1'
 }
 
@@ -247,6 +249,12 @@ configurations {
 dependencies {
     // Plugin API module
     implementation project(':platform-plugin-api')
+
+    // Kafka runtime classes must come from one host classloader. PF4J plugins
+    // use the Spring Boot RestartClassLoader as parent; bundling Spring Kafka
+    // or kafka-clients inside a plugin causes split-package classloader errors.
+    implementation "org.springframework.kafka:spring-kafka:${springKafkaVersion}"
+    implementation "org.apache.kafka:kafka-clients:${kafkaClientsVersion}"
 
     // ULID
     implementation 'de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0'
@@ -476,6 +484,16 @@ test {
     testTmpDir.mkdirs()
     systemProperty 'java.io.tmpdir', testTmpDir.absolutePath
 
+    // Bound Spring's TestContext cache. The full suite has dozens of distinct
+    // @SpringBootTest context configurations; Spring caches each one with its
+    // own HikariCP pool kept alive, and the accumulated pools exhaust the
+    // shared PostgreSQL max_connections (observed: a full run pinned all 400
+    // connections and broke concurrent sessions). Evicting the LRU context on
+    // overflow closes its pool and releases connections. Override with
+    // -PspringTestContextCacheMaxSize=N.
+    systemProperty 'spring.test.context.cache.maxSize',
+        (project.findProperty('springTestContextCacheMaxSize') ?: '8')
+
     // Allow callers to override the Testcontainers hub mirror per-task.
     // Used by IoT TSDB IT to bypass the daocloud mirror (403 today) and
     // pull tdengine directly from Docker Hub. Set via:
@@ -641,9 +659,12 @@ def jacocoExcludes = [
     '**/chatbi/**',
     // Inbox/mobile — tested via E2E
     '**/inbox/**',
-    // meta.service.impl — complex orchestration (command pipeline, metadata management,
-    // state machines, etc.) tested indirectly via integration + E2E command flows
-    '**/meta/service/impl/**',
+    // NOTE (2026-06-11): meta/service/impl (command pipeline, metadata orchestration,
+    // state machines) was previously excluded as "tested indirectly". Measurement showed
+    // it is actually ~47% line-covered by 47 existing test files — excluding it
+    // artificially inflated the bundle (80.1% on a narrow denominator) and HID the
+    // orchestration core. It is now MEASURED so the gate reflects real business logic.
+    // Including it moves the bundle to ~70.2% line. Controllers stay excluded (E2E-covered).
 ]
 
 jacocoTestReport {
@@ -685,13 +706,51 @@ jacocoTestCoverageVerification {
         }))
     }
     violationRules {
+        // No-regression ratchet over the HONEST denominator. 2026-06-10 the curated
+        // bundle read 80.1% (33671/42043) — but that excluded meta/service/impl (the
+        // command pipeline). 2026-06-11 that exclude was removed (it was already ~47%
+        // covered), so the bundle now measures the real orchestration core and read
+        // ~70.2% (42826/61002), floor 0.68. A wave of real-stack IT for the
+        // meta/service/impl command-pipeline core (2026-06-11) then lifted the package
+        // 47.0%->56.1%: DictService 26.7->79%, DictCascade 1.8->77%, DictVersion
+        // 36.7->74%, DynamicData 34->39%, ReconciliationService 0.2->79%, NamedQuery
+        // 47->85% (~+1437 covered lines). The gate-denominator bundle now reads
+        // ~73.2% (45356/61940), so the floor is raised 0.68->0.69->0.71 (preserving the
+        // original ~2pt flaky margin — full-suite IT has run-to-run flake). Keep raising
+        // it as more of meta/service/impl lands. The number went DOWN from the old
+        // narrow 80% but the SCOPE went UP — this is more rigorous, not less.
+        // 2026-06-11 wave 2: real-stack IT for six more near-zero meta/service/impl
+        // classes — EdiService 0.3->96%, QueryAuditServiceImpl 8.5->82%,
+        // SecureQueryExecutorImpl 16->74%, SchemaAccessProjectorImpl 0.4->57%,
+        // FieldForkServiceImpl 1->87%, FieldImpactAnalysisServiceImpl 1->100%
+        // (+249 tests, ~+1600 covered lines). meta/service/impl 56.1->65.4%; the
+        // gate-denominator bundle now reads ~0.75, so the floor is raised 0.71->0.73
+        // (same ~2pt flaky margin). Two of the six surfaced live jsonb-persistence
+        // bugs (fixed in-band); behavioral findings are in
+        // docs/backlog/2026-06-11-meta-impl-coverage-product-findings.md.
         rule {
             enabled = true
             element = 'BUNDLE'
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.50
+                minimum = 0.73
+            }
+        }
+        // Lock the already-strong security/identity domains so they cannot rot.
+        rule {
+            enabled = true
+            element = 'PACKAGE'
+            includes = [
+                'com.auraboot.framework.permission.service.impl',
+                'com.auraboot.framework.auth.service.impl',
+                'com.auraboot.framework.tenant.service.impl',
+                'com.auraboot.framework.rbac.service.impl',
+            ]
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.84
             }
         }
     }

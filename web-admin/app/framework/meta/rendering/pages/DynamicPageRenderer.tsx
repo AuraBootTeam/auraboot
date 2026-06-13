@@ -19,6 +19,8 @@ import { profileRegistry } from '~/framework/meta/profiles/ProfileRegistry';
 import { ProfileProvider } from '~/framework/meta/profiles/ProfileContext';
 import { ErrorAlert } from '~/ui/ErrorAlert';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
+import { isUnconfiguredStubPage } from './isUnconfiguredStubPage';
+import { StubPageError } from './StubPageError';
 
 // Ensure profiles are registered
 import '~/framework/meta/profiles/admin';
@@ -97,6 +99,16 @@ export function DynamicPageRenderer({
   // 5. No schema
   if (!schema) {
     return <ErrorAlert error={`No schema found for ${tableName} (${pageType})`} />;
+  }
+
+  // 5.5 Fail fast on an unconfigured auto_created stub page (Item-3). The
+  // platform auto-creates a placeholder on model publish that renders a
+  // misleading empty shell (raw-code title + zero-column table + "no data")
+  // with no error. Surface an explicit, diagnosable state instead — this entry
+  // is shared by all kinds, so it covers list/form/detail/workbench and the
+  // rename-missed-derived-pageKey case.
+  if (isUnconfiguredStubPage(schema)) {
+    return <StubPageError pageKey={pageKey} tableName={tableName} kind={pageType} />;
   }
 
   // 6. Resolve page renderer from profile

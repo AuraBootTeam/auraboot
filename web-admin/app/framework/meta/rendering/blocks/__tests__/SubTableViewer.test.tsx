@@ -1,9 +1,14 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { SubTableConfig } from '~/framework/meta/schemas/types';
 
 const fetchResultMock = vi.fn();
+const navigateMock = vi.hoisted(() => vi.fn());
+
+vi.mock('react-router', () => ({
+  useNavigate: () => navigateMock,
+}));
 
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: (...args: unknown[]) => fetchResultMock(...args),
@@ -63,6 +68,7 @@ function buildConfig(overrides?: Partial<SubTableConfig>): SubTableConfig {
 describe('SubTableViewer', () => {
   beforeEach(() => {
     fetchResultMock.mockReset();
+    navigateMock.mockReset();
   });
 
   afterEach(() => {
@@ -257,5 +263,186 @@ describe('SubTableViewer', () => {
 
     await expect(screen.findByTestId('sortable-row-row-1')).resolves.toBeInTheDocument();
     expect(screen.getByTestId('subtable-add-row').textContent).toContain('添加联系人');
+  });
+
+  it('merges configured default values into create payloads with parent record templates', async () => {
+    fetchResultMock
+      .mockResolvedValueOnce({ code: '0', data: { records: [] } })
+      .mockResolvedValueOnce({ code: '0', data: {} })
+      .mockResolvedValueOnce({ code: '0', data: { records: [] } });
+
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          parentField: 'crm_act_related_id',
+          readOnly: false,
+          commands: { create: 'crm:create_activity' },
+          defaultValues: {
+            crm_act_type: 'task',
+            crm_act_status: 'open',
+            crm_act_related_model: 'crm_customer_request',
+            crm_act_owner: '${record.crm_cr_owner}',
+          },
+          columns: [
+            { field: 'crm_act_subject', label: 'Subject', required: true },
+            { field: 'crm_act_assignee', label: 'Assignee' },
+          ],
+          emptyState: {
+            actionLabel: 'Add Task',
+          },
+        }}
+        parentRecordId="request-1"
+        parentRecordData={{ crm_cr_owner: 'sales-owner' }}
+        isEditable
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId('subtable-empty-action'));
+    fireEvent.change(screen.getByTestId('subtable-add-crm_act_subject'), {
+      target: { value: 'Review customer BOM' },
+    });
+    fireEvent.change(screen.getByTestId('subtable-add-crm_act_assignee'), {
+      target: { value: 'FAE Team' },
+    });
+    fireEvent.click(screen.getByTestId('subtable-save-btn'));
+
+    await waitFor(() => {
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/meta/commands/execute/crm:create_activity',
+        expect.objectContaining({
+          method: 'post',
+          params: expect.objectContaining({
+            operationType: 'create',
+            payload: expect.objectContaining({
+              crm_act_type: 'task',
+              crm_act_status: 'open',
+              crm_act_related_model: 'crm_customer_request',
+              crm_act_related_id: 'request-1',
+              crm_act_owner: 'sales-owner',
+              crm_act_subject: 'Review customer BOM',
+              crm_act_assignee: 'FAE Team',
+            }),
+          }),
+        }),
+      );
+    });
+  });
+
+  it('executes configured row state actions against the selected child record pid', async () => {
+    fetchResultMock
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          records: [
+            {
+              pid: 'task-1',
+              crm_act_subject: 'Review BOM risk',
+              crm_act_status: 'open',
+            },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({ code: '0', data: {} })
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          records: [
+            {
+              pid: 'task-1',
+              crm_act_subject: 'Review BOM risk',
+              crm_act_status: 'in_progress',
+            },
+          ],
+        },
+      });
+
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          parentField: 'crm_act_related_id',
+          readOnly: false,
+          actions: [
+            {
+              code: 'start_task',
+              label: { 'zh-CN': '开始', 'en-US': 'Start' },
+              action: { type: 'state_transition', command: 'crm:start_task' },
+              visibleWhen: "row.crm_act_status === 'open'",
+            },
+          ],
+          columns: [
+            { field: 'crm_act_subject', label: 'Subject' },
+            { field: 'crm_act_status', label: 'Status' },
+          ],
+        }}
+        parentRecordId="request-1"
+        isEditable
+      />,
+    );
+
+    await expect(screen.findByTestId('sortable-row-task-1')).resolves.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('subtable-row-action-start_task-0'));
+
+    await waitFor(() => {
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/meta/commands/execute/crm:start_task',
+        expect.objectContaining({
+          method: 'post',
+          params: expect.objectContaining({
+            targetRecordId: 'task-1',
+            operationType: 'UPDATE',
+            payload: expect.objectContaining({
+              pid: 'task-1',
+              crm_act_status: 'open',
+            }),
+          }),
+        }),
+      );
+    });
+  });
+
+  it('navigates row actions with row field path templates', async () => {
+    fetchResultMock.mockResolvedValue({
+      code: '0',
+      data: {
+        records: [
+          {
+            pid: 'summary-1',
+            crm_qs_code: 'QS-001',
+            crm_qs_source_quote_id: 'quote-1',
+          },
+        ],
+      },
+    });
+
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          parentField: 'crm_qs_customer_request_id',
+          readOnly: false,
+          actions: [
+            {
+              code: 'open_quoteops',
+              label: { 'zh-CN': '打开报价', 'en-US': 'Open Quote' },
+              action: { type: 'navigate', to: '/p/qo_quote/view/{crm_qs_source_quote_id}' },
+              visibleWhen: "row.crm_qs_source_quote_id !== null && row.crm_qs_source_quote_id !== ''",
+            },
+          ],
+          columns: [
+            { field: 'crm_qs_code', label: 'Code' },
+            { field: 'crm_qs_source_quote_id', label: 'Quote ID' },
+          ],
+        }}
+        parentRecordId="request-1"
+        isEditable
+      />,
+    );
+
+    await expect(screen.findByTestId('sortable-row-summary-1')).resolves.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('subtable-row-action-open_quoteops-0'));
+
+    expect(navigateMock).toHaveBeenCalledWith('/p/qo_quote/view/quote-1');
   });
 });

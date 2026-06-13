@@ -1,7 +1,11 @@
 package com.auraboot.framework.rag.service;
 
+import com.auraboot.framework.rag.config.RagRetrievalProperties;
+import com.auraboot.framework.rag.dto.RetrievalOutcome;
 import com.auraboot.framework.rag.dto.RetrievalResult;
 import com.auraboot.framework.rag.entity.KnowledgeBase;
+import com.auraboot.framework.rag.util.CjkBigramSegmenter;
+import com.auraboot.framework.rag.util.KeywordCoverage;
 import com.auraboot.framework.rag.util.VectorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +29,8 @@ public class RagRetrievalService {
     private final KnowledgeBaseService kbService;
     private final QueryRewriteService queryRewriteService;
     private final JdbcTemplate jdbcTemplate;
+    private final RagRetrievalMetrics metrics;
+    private final RagRetrievalProperties retrievalProperties;
 
     private static final int DEFAULT_TOP_K = 5;
     private static final double DEFAULT_THRESHOLD = 0.8;
@@ -43,7 +49,18 @@ public class RagRetrievalService {
      */
     public List<RetrievalResult> retrieve(Long tenantId, String query,
                                             List<String> kbPids, Integer topK, Double threshold) {
-        if (query == null || query.isBlank()) return List.of();
+        return retrieveWithDiagnostics(tenantId, query, kbPids, topK, threshold).getResults();
+    }
+
+    /**
+     * Same as {@link #retrieve} but also returns user-visible warnings about
+     * silently-degraded recall (G8), and records retrieval metrics (G6).
+     */
+    public RetrievalOutcome retrieveWithDiagnostics(Long tenantId, String query,
+                                            List<String> kbPids, Integer topK, Double threshold) {
+        List<String> warnings = new ArrayList<>();
+        long startedAt = System.currentTimeMillis();
+        if (query == null || query.isBlank()) return new RetrievalOutcome(List.of(), warnings);
 
         // Query expansion for short/domain-specific queries
         QueryRewriteService.QueryRewriteResult rewrite = queryRewriteService.rewrite(query);
@@ -56,7 +73,7 @@ public class RagRetrievalService {
         List<String> targetKbs = resolveTargetKbs(tenantId, kbPids);
         if (targetKbs.isEmpty()) {
             log.debug("No active knowledge bases found for tenant {}", tenantId);
-            return List.of();
+            return new RetrievalOutcome(List.of(), warnings);
         }
 
         // Get embedding provider from the first KB.
@@ -69,7 +86,7 @@ public class RagRetrievalService {
         // behavior was zero results or confusing SQL error. Per deep-review
         // P3-1: drop incompatible KBs + log.
         KnowledgeBase firstKb = kbService.findKbByPid(targetKbs.get(0));
-        if (firstKb == null) return List.of();
+        if (firstKb == null) return new RetrievalOutcome(List.of(), warnings);
         if (targetKbs.size() > 1) {
             String firstProvider = firstKb.getEmbeddingProvider();
             List<String> compatibleKbs = new ArrayList<>();
@@ -87,8 +104,12 @@ public class RagRetrievalService {
                 log.warn("retrieve: dropping {} KB(s) with embedding provider != {} to avoid pgvector "
                                 + "dimension mismatch: kept={} dropped={}",
                         incompatibleKbs.size(), firstProvider, compatibleKbs, incompatibleKbs);
+                metrics.recordKbDropped(incompatibleKbs.size());
+                warnings.add("Skipped " + incompatibleKbs.size() + " knowledge base(s) whose embedding "
+                        + "provider differs from '" + firstProvider + "' (vector dimension mismatch): "
+                        + incompatibleKbs + ". Search them separately or re-embed with one provider.");
                 targetKbs = compatibleKbs;
-                if (targetKbs.isEmpty()) return List.of();
+                if (targetKbs.isEmpty()) return new RetrievalOutcome(List.of(), warnings);
             }
         }
 
@@ -98,13 +119,22 @@ public class RagRetrievalService {
             queryEmbedding = embeddingService.embed(tenantId, query, firstKb.getEmbeddingProvider());
         } catch (Exception e) {
             log.warn("Embedding failed, falling back to keyword search: {}", e.getMessage());
+            metrics.recordDegraded("embedding_failed");
         }
 
+        List<RetrievalResult> results;
+        String path;
         if (queryEmbedding != null) {
-            return rerankedResults(hybridSearch(queryEmbedding, searchQuery, targetKbs, k, dist), query, k);
+            path = "hybrid";
+            results = rerankedResults(hybridSearch(queryEmbedding, searchQuery, targetKbs, k, dist), query, k);
         } else {
-            return rerankedResults(keywordSearch(searchQuery, targetKbs, k), query, k);
+            path = "keyword";
+            results = rerankedResults(keywordSearch(searchQuery, targetKbs, k), query, k);
         }
+        // G10: drop results below the relevance floor so off-topic queries return empty.
+        results = applyRejectionFloor(results, query);
+        metrics.recordRetrieval(path, System.currentTimeMillis() - startedAt, results.size());
+        return new RetrievalOutcome(results, warnings);
     }
 
     /**
@@ -155,6 +185,7 @@ public class RagRetrievalService {
             return rows.stream().map(this::mapRow).toList();
         } catch (Exception e) {
             log.error("Hybrid search failed, falling back to vector-only: {}", e.getMessage());
+            metrics.recordDegraded("hybrid_sql_failed");
             return vectorOnlySearch(queryEmbedding, targetKbs, topK, threshold);
         }
     }
@@ -202,6 +233,7 @@ public class RagRetrievalService {
             return rows.stream().map(this::mapRow).toList();
         } catch (Exception e) {
             log.error("Keyword search failed: {}", e.getMessage());
+            metrics.recordDegraded("keyword_sql_failed");
             return List.of();
         }
     }
@@ -263,45 +295,62 @@ public class RagRetrievalService {
 
     /**
      * Build a tsquery string from user input. Splits into terms joined with '|' (OR).
-     * Handles CJK characters by treating each character as a separate term.
+     * CJK runs are expanded into overlapping bigrams matching the index-time
+     * segmentation in {@code KbChunkIngestPipeline} (G2) — see
+     * {@link com.auraboot.framework.rag.util.CjkBigramSegmenter}.
      */
     static String buildTsQuery(String query) {
-        if (query == null || query.isBlank()) return "";
-        List<String> terms = new ArrayList<>();
-        StringBuilder currentTerm = new StringBuilder();
-
-        for (int i = 0; i < query.length(); i++) {
-            char ch = query.charAt(i);
-            if (Character.isWhitespace(ch)) {
-                if (currentTerm.length() > 0) {
-                    terms.add(currentTerm.toString());
-                    currentTerm.setLength(0);
-                }
-            } else if (Character.UnicodeScript.of(ch) == Character.UnicodeScript.HAN
-                    || Character.UnicodeScript.of(ch) == Character.UnicodeScript.HIRAGANA
-                    || Character.UnicodeScript.of(ch) == Character.UnicodeScript.KATAKANA
-                    || Character.UnicodeScript.of(ch) == Character.UnicodeScript.HANGUL) {
-                // CJK: flush any Latin buffer, then add single char as term
-                if (currentTerm.length() > 0) {
-                    terms.add(currentTerm.toString());
-                    currentTerm.setLength(0);
-                }
-                terms.add(String.valueOf(ch));
-            } else if (Character.isLetterOrDigit(ch) || ch == '_') {
-                currentTerm.append(ch);
-            }
-            // Skip punctuation
-        }
-        if (currentTerm.length() > 0) {
-            terms.add(currentTerm.toString());
-        }
-
+        List<String> terms = CjkBigramSegmenter.tsQueryTerms(query);
         if (terms.isEmpty()) return "";
         return String.join(" | ", terms);
     }
 
     private List<RetrievalResult> rerankedResults(List<RetrievalResult> results, String query, int maxK) {
         return queryRewriteService.rerank(results, query, maxK);
+    }
+
+    /**
+     * G10 relevance-rejection floor — a query-level no-answer gate: if <em>no</em>
+     * returned chunk clears the relevance bar the whole result set is dropped, so
+     * an off-topic query degrades to an empty result (a trustworthy "no relevant
+     * knowledge" signal) instead of returning chunks that merely share an
+     * incidental term. If the best chunk passes, the top-k is returned unchanged.
+     *
+     * <p>The gate is best-match, not per-chunk, on purpose: filtering individual
+     * chunks would discard a relevant-but-low-coverage chunk whenever some other
+     * chunk scored higher, returning the wrong chunk and dropping the right one
+     * (measured: per-chunk filtering regressed Path-A recall 0.600→0.300 on the
+     * golden set while a best-match gate held it at 0.600). The floor's job is "is
+     * any match good enough", not reranking.
+     *
+     * <p>Per chunk the mode-appropriate signal decides: when a real embedding
+     * distance is present (hybrid mode, {@code distance < 1.0}) vector similarity
+     * gates — a chunk that only matched the keyword OR-branch still carries its
+     * true (low) cosine similarity, so vocabulary-overlap off-topic queries are
+     * rejected while vector-found paraphrases survive. Otherwise (keyword-fallback,
+     * {@code distance == 1.0}, no vector signal) keyword coverage gates. Coverage
+     * uses the original user {@code query}, never the synonym-expanded one, so
+     * expansion can't dilute the denominator.
+     *
+     * @see RagRetrievalProperties
+     */
+    private List<RetrievalResult> applyRejectionFloor(List<RetrievalResult> results, String query) {
+        if (!retrievalProperties.isRejectionFloorEnabled() || results.isEmpty()) {
+            return results;
+        }
+        double minSim = retrievalProperties.getMinVectorSimilarity();
+        double minCov = retrievalProperties.getMinKeywordCoverage();
+        boolean anyRelevant = results.stream().anyMatch(r -> {
+            boolean hasVector = r.getDistance() < 1.0;
+            return hasVector
+                    ? r.getSimilarity() >= minSim
+                    : KeywordCoverage.coverage(query, r.getContent()) >= minCov;
+        });
+        if (anyRelevant) {
+            return results;
+        }
+        metrics.recordRejectionFloor(results.size());
+        return List.of();
     }
 
     private RetrievalResult mapRow(Map<String, Object> row) {
@@ -324,23 +373,6 @@ public class RagRetrievalService {
                 .build();
     }
 
-    /**
-     * Build a formatted RAG context section for injection into the LLM system prompt.
-     */
-    public String buildRagContext(List<RetrievalResult> results) {
-        if (results == null || results.isEmpty()) return "";
-
-        StringBuilder sb = new StringBuilder("\n\n## Reference Knowledge\n");
-        sb.append("Use the following information to answer the user's question. ");
-        sb.append("Cite sources using [Source: docName, Chunk N] format.\n\n");
-
-        for (RetrievalResult r : results) {
-            sb.append("### [Source: ").append(r.getDocName())
-              .append(", Chunk ").append(r.getChunkIndex()).append("]\n");
-            sb.append(r.getContent()).append("\n\n---\n\n");
-        }
-        return sb.toString();
-    }
 
     /**
      * Check if a tenant has any active knowledge bases with embedded chunks.

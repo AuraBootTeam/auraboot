@@ -1,8 +1,10 @@
 package com.auraboot.framework.meta.entity;
 
+import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.apache.ibatis.type.JdbcType;
 
 import java.time.Instant;
 
@@ -74,9 +76,10 @@ public class QueryAuditLog {
     private String queryType;
 
     /**
-     * Query conditions (JSONB, structured conditions)
+     * Query conditions (JSONB, structured conditions).
+     * The DB column is {@code jsonb NOT NULL}; the TypeHandler converts String ↔ jsonb.
      */
-    @TableField("conditions")
+    @TableField(value = "conditions", typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)
     private String conditions;
 
     /**

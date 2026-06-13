@@ -14,7 +14,7 @@
  *     --project=chromium-m1 --config=tests/e2e/crm/m4.playwright.config.ts
  *
  * COVERAGE MATRIX:
- *   D1  accepted quotation -> convert -> draft order appears in sl_sales_order list (UI)
+ *   D1  accepted quotation -> convert -> draft order appears in sl_sales_order_common list (UI)
  *   D2  order detail shows the source-quote back-link / draft status (UI)
  *   D3  draft (non-accepted) quotation convert is rejected (precondition, API-asserted)
  */
@@ -133,7 +133,7 @@ test.describe('CRM M4 quote-to-order (L4 UI golden)', () => {
     expect(conv?.code, 'convert succeeds for accepted quotation').toBe('0');
 
     // resolve the created order's code for the UI assertion
-    const list = await fetch(`${BE}/api/dynamic/sl_sales_order/list?pageNum=1&pageSize=200&sortField=created_at&sortOrder=desc`, {
+    const list = await fetch(`${BE}/api/dynamic/sl_sales_order_common/list?pageNum=1&pageSize=200&sortField=created_at&sortOrder=desc`, {
       headers: { Authorization: `Bearer ${jwt}` },
     }).then((x) => x.json());
     const rows: any[] = list?.data?.records || [];
@@ -149,7 +149,7 @@ test.describe('CRM M4 quote-to-order (L4 UI golden)', () => {
 
   // ---- D1: converted order visible in the sales-order list UI ----
   test('D1 converted order appears in the sales order list', async ({ page }) => {
-    await gotoPage(page, '/p/sl_sales_order');
+    await gotoPage(page, '/p/sl_sales_order_common');
     await expect(page.getByText(orderCode).first()).toBeVisible({ timeout: 12000 });
     await assertNoRawCodeLeak(page, 'sales_order_list');
     await page.screenshot({ path: `${SHOT}/d1_order_list.png`, fullPage: true });
@@ -157,7 +157,7 @@ test.describe('CRM M4 quote-to-order (L4 UI golden)', () => {
 
   // ---- D2: order detail shows draft status + source-quote back-link ----
   test('D2 order detail shows draft status (UI)', async ({ page }) => {
-    await gotoPage(page, '/p/sl_sales_order');
+    await gotoPage(page, '/p/sl_sales_order_common');
     await expect(page.getByText(orderCode).first()).toBeVisible({ timeout: 12000 });
     await page.getByText(orderCode).first().click();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});

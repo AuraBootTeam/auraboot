@@ -126,8 +126,8 @@ class DslRegistryTest {
     }
 
     @Test
-    void blockType_has29Values() {
-        assertEquals(29, DslRegistry.BlockType.values().length);
+    void blockType_has30Values() {
+        assertEquals(30, DslRegistry.BlockType.values().length);
         Set<String> codes = DslRegistry.BlockType.codes();
         assertTrue(codes.containsAll(Set.of(
                 "form", "form-section", "form-buttons", "form-wizard",
@@ -144,6 +144,11 @@ class DslRegistryTest {
                 "metric-strip", "record-inspector", "candidate-list",
                 "workbench-action-bar", "evidence-panel", "artifact-timeline",
                 "review-drawer", "status-banner")));
+        // 1.4 — digital-thread lineage visualization block (trace-graph DSL block,
+        // rendered by TraceGraphBlockRenderer). Frontend block (#450) shipped without
+        // the backend enum entry, so any page mounting it was rejected at import
+        // (S-PAGE-BLOCK-TYPE) — this closes that frontend/backend drift.
+        assertTrue(codes.contains("trace-graph"));
     }
 
     @Test

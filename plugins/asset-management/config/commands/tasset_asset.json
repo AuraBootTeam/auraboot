@@ -108,6 +108,12 @@
       "in_use"
     ],
     "toState": "available",
+    "autoSetFields": {
+      "tasset_as_assigned_to": {
+        "strategy": "fixed_value",
+        "value": ""
+      }
+    },
     "permissions": [
       "tasset.asset.manage"
     ],
@@ -164,6 +170,48 @@
     "side_effect_description": null,
     "output_description": "Returns asset with status AVAILABLE.",
     "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "tasset:report_repair",
+    "displayName:zh-CN": "报修",
+    "displayName:en": "Report Repair",
+    "type": "state_transition",
+    "modelCode": "tasset_asset",
+    "stateField": "tasset_as_status",
+    "fromStates": [
+      "available",
+      "in_use"
+    ],
+    "toState": "repair",
+    "inputFields": [
+      "tasset_as_notes"
+    ],
+    "sideEffects": [
+      {
+        "action": "create_record",
+        "targetModel": "tasset_maintenance",
+        "fieldMapping": {
+          "tasset_mn_code": "${tasset_as_code}",
+          "tasset_mn_asset_id": "${recordId}",
+          "tasset_mn_type": "repair",
+          "tasset_mn_status": "scheduled",
+          "tasset_mn_notes": "${tasset_as_notes}"
+        }
+      }
+    ],
+    "permissions": [
+      "tasset.asset.manage"
+    ],
+    "agent_hint": "Report a fault and put the asset into REPAIR. Capture a fault description in notes. Auto-creates a repair maintenance work-order linked to the asset.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Asset must be AVAILABLE or IN_USE.",
+    "side_effect_description": "Creates a tasset_maintenance work-order (type=repair, status=scheduled) linked to this asset via tasset_mn_asset_id, carrying the fault note.",
+    "output_description": "Returns asset with status REPAIR and the fault note recorded.",
+    "example_input": {
+      "tasset_as_notes": "Screen flickering, needs repair"
+    },
     "idempotent": false,
     "reversible": false
   },

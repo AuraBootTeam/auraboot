@@ -3,8 +3,10 @@
  *
  * Tests PCE-001 ~ PCE-018: CRUD lifecycle, status transitions, and field
  * variations for 2 CRM-extended models:
- * - pe_rfq (Request for Quotation) — full status lifecycle with supply modes & quality classes
- * - crm_contact (Contact) — simple CRUD with primary contact flag
+ * - crm_customer_request_common + crm_customer_request_pcba_rfq sidecar (A2-S2 RFQ truth) —
+ *   request lifecycle (draft/submitted/routed) plus the sidecar DFM gate
+ *   (pending/in_review/passed/conditional/failed) with supply modes & quality classes
+ * - crm_contact_common (Contact) — simple CRUD with primary contact flag
  *
  * Each model tests: list rendering, create via API + verify in list,
  * create via UI form, edit via UI, delete via UI, state transitions,
@@ -33,19 +35,21 @@ import {
 // ---------------------------------------------------------------------------
 
 const PAGE_KEYS = {
-  rfq: 'pe-rfq',
+  rfq: 'crm_customer_request_pcba_rfq',
+  customerRequest: 'crm_customer_request_common',
   customerContact: 'crm-contact',
 };
 
 type CrmExtBucket = {
   rfqs: string[];
+  requests: string[];
   contacts: string[];
   accounts: string[];
   opportunities: string[];
 };
 
 function emptyBucket(): CrmExtBucket {
-  return { rfqs: [], contacts: [], accounts: [], opportunities: [] };
+  return { rfqs: [], requests: [], contacts: [], accounts: [], opportunities: [] };
 }
 
 async function fetchRecord(
@@ -70,6 +74,9 @@ async function deleteRecord(
 async function cleanup(page: import('@playwright/test').Page, b: CrmExtBucket): Promise<void> {
   for (const pid of [...b.rfqs].reverse()) {
     await deleteRecord(page, PAGE_KEYS.rfq, pid).catch(() => {});
+  }
+  for (const pid of [...b.requests].reverse()) {
+    await deleteRecord(page, PAGE_KEYS.customerRequest, pid).catch(() => {});
   }
   for (const pid of [...b.contacts].reverse()) {
     await deleteRecord(page, PAGE_KEYS.customerContact, pid).catch(() => {});
@@ -296,11 +303,58 @@ test.describe('PCBA CRM Extended', () => {
   test.describe.configure({ timeout: 60000 });
 
   // =========================================================================
-  // pe_rfq — Request for Quotation (PCE-001 ~ PCE-011)
+  // crm_customer_request_common + crm_customer_request_pcba_rfq sidecar (PCE-001 ~ PCE-011)
   // =========================================================================
 
-  test.describe('RFQ (pe_rfq)', () => {
+  test.describe('RFQ (crm_customer_request_pcba_rfq)', () => {
     const bucket = emptyBucket();
+
+    /**
+     * Create a customer request (RFQ truth) plus its 1:1 PCBA sidecar directly via
+     * the sidecar create command. The DFM gate starts at 'pending'.
+     */
+    async function createRequestWithSidecar(
+      page: import('@playwright/test').Page,
+      productModel: string,
+      sidecarExtras: Record<string, unknown> = {},
+    ): Promise<{ requestId: string; sidecarId: string }> {
+      const cr = await executeCommandViaApi(
+        page,
+        'crm:create_customer_request',
+        {
+          crm_cr_title: productModel,
+          crm_cr_type: 'rfq',
+          crm_cr_summary: 'E2E PCBA RFQ sidecar seed',
+        },
+        undefined,
+        'create',
+        { allowHttpError: true },
+      );
+      if (!cr.recordId || cr.code !== ErrorCodes.SUCCESS) {
+        throw new Error('Customer request creation failed — crm plugin may not be imported');
+      }
+      bucket.requests.push(cr.recordId);
+
+      const sidecar = await executeCommandViaApi(
+        page,
+        'pe:create_customer_request_pcba_rfq',
+        {
+          crm_customer_request_id: cr.recordId,
+          crm_crq_product_model: productModel,
+          crm_crq_dfm_status: 'pending',
+          crm_crq_bom_status: 'not_uploaded',
+          ...sidecarExtras,
+        },
+        undefined,
+        'create',
+        { allowHttpError: true },
+      );
+      if (!sidecar.recordId || sidecar.code !== ErrorCodes.SUCCESS) {
+        throw new Error('PCBA RFQ sidecar creation failed — pcba-crm plugin may not be imported');
+      }
+      bucket.rfqs.push(sidecar.recordId);
+      return { requestId: cr.recordId, sidecarId: sidecar.recordId };
+    }
 
     test.afterAll(async ({ browser }) => {
       const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
@@ -322,59 +376,55 @@ test.describe('PCBA CRM Extended', () => {
     test('PCE-002: Create RFQ via API, verify in list @critical', async ({ page }) => {
       const productModel = `E2E RFQ ${uniqueId()}`;
 
-      const result = await executeCommandViaApi(
-        page,
-        'pe:create_rfq',
-        {
-          pe_rfq_product_model: productModel,
-          pe_rfq_quantity: 1000,
-          pe_rfq_delivery_window: '30 days',
-          pe_rfq_quality_class: 'class_2',
-          pe_rfq_trace_level: 'l1_batch',
-          pe_rfq_supply_mode: 'turnkey',
-          pe_rfq_revision: 'A',
-          pe_rfq_notes: 'E2E test RFQ',
-        },
-        undefined,
-        'create',
-        { allowHttpError: true },
-      );
+      const { sidecarId } = await createRequestWithSidecar(page, productModel, {
+        crm_crq_quantity: 1000,
+        crm_crq_delivery_window: '30 days',
+        crm_crq_quality_class: 'class_2',
+        crm_crq_trace_level: 'l1_batch',
+        crm_crq_supply_mode: 'turnkey',
+        crm_crq_revision: 'A',
+      });
 
-      if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error('RFQ creation failed — plugin may not be imported');
-        return;
-      }
-      bucket.rfqs.push(result.recordId);
-
-      // Verify auto-set initial status
-      const record = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(record.pe_rfq_status).toBe('draft');
+      // Verify auto-set code and initial DFM gate state
+      const record = await fetchRecord(page, PAGE_KEYS.rfq, sidecarId);
+      expect(String(record.crm_crq_code ?? '')).toBeTruthy();
+      expect(record.crm_crq_dfm_status).toBe('pending');
 
       // Verify in list via API filter
       const records = await queryFilteredList(
         page,
         PAGE_KEYS.rfq,
-        'pe_rfq_product_model',
+        'crm_crq_product_model',
         productModel,
       );
       expect(records.length).toBeGreaterThan(0);
     });
 
     test('PCE-003: Create RFQ via UI form', async ({ page }) => {
-      test.fixme(true, 'Field pe_rfq_product_model not found on form — field may have been renamed');
+      // The sidecar form requires the customer-request reference, so seed one first.
+      const productModel = `E2E RFQ UI ${uniqueId()}`;
+      const cr = await executeCommandViaApi(
+        page,
+        'crm:create_customer_request',
+        { crm_cr_title: productModel, crm_cr_type: 'rfq' },
+        undefined,
+        'create',
+        { allowHttpError: true },
+      );
+      expect(cr.code, 'customer request for UI form should be created').toBe(ErrorCodes.SUCCESS);
+      bucket.requests.push(cr.recordId);
+
       await navigateToDynamicPage(page, PAGE_KEYS.rfq);
       await clickCreateButton(page);
       await waitForFormReady(page);
 
-      const productModel = `E2E RFQ UI ${uniqueId()}`;
-
-      await fillFormField(page, 'pe_rfq_product_model', productModel);
-      await fillFormField(page, 'pe_rfq_revision', 'B');
-      await fillFormField(page, 'pe_rfq_notes', 'Created via UI form');
+      await selectReferenceField(page, 'crm_customer_request_id', productModel, cr.recordId);
+      await fillFormField(page, 'crm_crq_product_model', productModel);
+      await fillFormField(page, 'crm_crq_revision', 'B');
 
       // Try to fill numeric fields
       const qtyInput = page
-        .locator('[data-testid="form-field-pe_rfq_quantity"] input, input[name="pe_rfq_quantity"]')
+        .locator('[data-testid="form-field-crm_crq_quantity"] input, input[name="crm_crq_quantity"]')
         .first();
       if (await qtyInput.isVisible({ timeout: 2000 }).catch(() => false)) {
         await qtyInput.fill('500');
@@ -390,62 +440,48 @@ test.describe('PCBA CRM Extended', () => {
       const records = await queryFilteredList(
         page,
         PAGE_KEYS.rfq,
-        'pe_rfq_product_model',
+        'crm_crq_product_model',
         productModel,
       );
       expect(records.length).toBeGreaterThan(0);
     });
 
-    test('PCE-004: Edit RFQ notes and revision @critical', async ({ page }) => {
+    test('PCE-004: Edit RFQ revision and test requirements @critical', async ({ page }) => {
       const productModel = `E2E RFQ Edit ${uniqueId()}`;
-      const updatedNotes = `Updated notes ${uniqueId('upd')}`;
+      const updatedRequirements = `Updated requirements ${uniqueId('upd')}`;
 
-      const result = await executeCommandViaApi(
-        page,
-        'pe:create_rfq',
-        {
-          pe_rfq_product_model: productModel,
-          pe_rfq_quantity: 200,
-          pe_rfq_delivery_window: '14 days',
-          pe_rfq_quality_class: 'class_1',
-          pe_rfq_trace_level: 'l2_serial',
-          pe_rfq_supply_mode: 'consigned',
-          pe_rfq_revision: 'A',
-          pe_rfq_notes: 'Original notes',
-        },
-        undefined,
-        'create',
-        { allowHttpError: true },
-      );
-
-      if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error('RFQ creation failed');
-        return;
-      }
-      bucket.rfqs.push(result.recordId);
+      const { sidecarId } = await createRequestWithSidecar(page, productModel, {
+        crm_crq_quantity: 200,
+        crm_crq_delivery_window: '14 days',
+        crm_crq_quality_class: 'class_1',
+        crm_crq_trace_level: 'l2_serial',
+        crm_crq_supply_mode: 'consigned',
+        crm_crq_revision: 'A',
+        crm_crq_test_requirements: 'Original requirements',
+      });
 
       // Edit via API (avoids pagination issues with 30+ records)
       const updateResult = await executeCommandViaApi(
         page,
-        'pe:update_rfq',
-        { pe_rfq_notes: updatedNotes, pe_rfq_revision: 'C' },
-        result.recordId,
+        'pe:update_customer_request_pcba_rfq',
+        { crm_crq_test_requirements: updatedRequirements, crm_crq_revision: 'C' },
+        sidecarId,
         'update',
         { allowHttpError: true },
       );
-      expect(updateResult.code, 'Update RFQ should succeed').toBe(ErrorCodes.SUCCESS);
+      expect(updateResult.code, 'Update RFQ sidecar should succeed').toBe(ErrorCodes.SUCCESS);
 
       // Verify the update via API
-      const updated = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(updated.pe_rfq_product_model).toBe(productModel);
-      expect(updated.pe_rfq_notes).toBe(updatedNotes);
-      expect(updated.pe_rfq_revision).toBe('C');
+      const updated = await fetchRecord(page, PAGE_KEYS.rfq, sidecarId);
+      expect(updated.crm_crq_product_model).toBe(productModel);
+      expect(updated.crm_crq_test_requirements).toBe(updatedRequirements);
+      expect(updated.crm_crq_revision).toBe('C');
 
       // Verify via filtered list query
       const records = await queryFilteredList(
         page,
         PAGE_KEYS.rfq,
-        'pe_rfq_product_model',
+        'crm_crq_product_model',
         productModel,
       );
       expect(records.length).toBeGreaterThan(0);
@@ -455,43 +491,37 @@ test.describe('PCBA CRM Extended', () => {
       await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
     });
 
-    test('PCE-005: Delete RFQ', async ({ page }) => {
-      const productModel = `E2E RFQ Del ${uniqueId()}`;
+    test('PCE-005: Delete customer request', async ({ page }) => {
+      // The sidecar has no delete command; deletion happens on the customer request.
+      const title = `E2E RFQ Del ${uniqueId()}`;
 
       const result = await executeCommandViaApi(
         page,
-        'pe:create_rfq',
-        {
-          pe_rfq_product_model: productModel,
-          pe_rfq_quantity: 100,
-          pe_rfq_supply_mode: 'partial',
-          pe_rfq_quality_class: 'class_3',
-          pe_rfq_trace_level: 'l3_key_param',
-        },
+        'crm:create_customer_request',
+        { crm_cr_title: title, crm_cr_type: 'rfq' },
         undefined,
         'create',
         { allowHttpError: true },
       );
 
       if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error('RFQ creation failed');
-        return;
+        throw new Error('Customer request creation failed');
       }
       // Do not push to bucket — we are deleting here
 
       // Verify record exists before delete
       const preRecords = await queryFilteredList(
         page,
-        PAGE_KEYS.rfq,
-        'pe_rfq_product_model',
-        productModel,
+        PAGE_KEYS.customerRequest,
+        'crm_cr_title',
+        title,
       );
-      expect(preRecords.length, 'RFQ should exist before delete').toBeGreaterThan(0);
+      expect(preRecords.length, 'customer request should exist before delete').toBeGreaterThan(0);
 
       // Delete via API (avoids pagination issues with 30+ records)
       const delResult = await executeCommandViaApi(
         page,
-        'pe:delete_rfq',
+        'crm:delete_customer_request',
         {},
         result.recordId,
         'delete',
@@ -499,18 +529,18 @@ test.describe('PCBA CRM Extended', () => {
       );
 
       if (delResult.code !== ErrorCodes.SUCCESS) {
-        bucket.rfqs.push(result.recordId);
+        bucket.requests.push(result.recordId);
       }
 
       // Verify deletion via API filter
       const postRecords = await queryFilteredList(
         page,
-        PAGE_KEYS.rfq,
-        'pe_rfq_product_model',
-        productModel,
+        PAGE_KEYS.customerRequest,
+        'crm_cr_title',
+        title,
       );
       if (postRecords.length > 0) {
-        bucket.rfqs.push(result.recordId);
+        bucket.requests.push(result.recordId);
       }
       expect(postRecords.length).toBe(0);
 
@@ -519,59 +549,43 @@ test.describe('PCBA CRM Extended', () => {
       await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
     });
 
-    test('PCE-006: Submit RFQ (draft -> submitted) @critical', async ({ page }) => {
-      const productModel = `E2E RFQ Submit ${uniqueId()}`;
+    test('PCE-006: Request DFM (pending -> in_review) @critical', async ({ page }) => {
+      const productModel = `E2E RFQ DFM Request ${uniqueId()}`;
 
-      const result = await executeCommandViaApi(
+      const { sidecarId } = await createRequestWithSidecar(page, productModel, {
+        crm_crq_quantity: 500,
+        crm_crq_delivery_window: '21 days',
+        crm_crq_quality_class: 'class_2',
+        crm_crq_trace_level: 'l1_batch',
+        crm_crq_supply_mode: 'turnkey',
+      });
+
+      // Verify initial DFM gate state
+      let record = await fetchRecord(page, PAGE_KEYS.rfq, sidecarId);
+      expect(record.crm_crq_dfm_status).toBe('pending');
+
+      // Request DFM via API (avoids pagination issues with 30+ records)
+      const requestResult = await executeCommandViaApi(
         page,
-        'pe:create_rfq',
-        {
-          pe_rfq_product_model: productModel,
-          pe_rfq_quantity: 500,
-          pe_rfq_delivery_window: '21 days',
-          pe_rfq_quality_class: 'class_2',
-          pe_rfq_trace_level: 'l1_batch',
-          pe_rfq_supply_mode: 'turnkey',
-          pe_rfq_notes: 'RFQ for submit test',
-        },
-        undefined,
-        'create',
-        { allowHttpError: true },
-      );
-
-      if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error('RFQ creation failed');
-        return;
-      }
-      bucket.rfqs.push(result.recordId);
-
-      // Verify initial status
-      let record = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(record.pe_rfq_status).toBe('draft');
-
-      // Submit via API (avoids pagination issues with 30+ records)
-      const submitResult = await executeCommandViaApi(
-        page,
-        'pe:submit_rfq',
+        'pe:request_dfm_pcba_rfq',
         {},
-        result.recordId,
+        sidecarId,
         'update',
         { allowHttpError: true },
       );
-      if (submitResult.code !== ErrorCodes.SUCCESS) {
-        throw new Error('Submit RFQ command not available');
-        return;
+      if (requestResult.code !== ErrorCodes.SUCCESS) {
+        throw new Error('Request DFM command not available');
       }
 
       // Verify status transition
-      record = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(record.pe_rfq_status).toBe('submitted');
+      record = await fetchRecord(page, PAGE_KEYS.rfq, sidecarId);
+      expect(record.crm_crq_dfm_status).toBe('in_review');
 
       // Verify via filtered list query
       const records = await queryFilteredList(
         page,
         PAGE_KEYS.rfq,
-        'pe_rfq_product_model',
+        'crm_crq_product_model',
         productModel,
       );
       expect(records.length).toBeGreaterThan(0);
@@ -581,221 +595,210 @@ test.describe('PCBA CRM Extended', () => {
       await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
     });
 
-    test('PCE-007: Clarify RFQ (submitted -> CLARIFICATION)', async ({ page }) => {
-      const productModel = `E2E RFQ Clarify ${uniqueId()}`;
+    test('PCE-007: Conditional DFM (in_review -> conditional)', async ({ page }) => {
+      const productModel = `E2E RFQ DFM Conditional ${uniqueId()}`;
 
-      const result = await executeCommandViaApi(
+      const { sidecarId } = await createRequestWithSidecar(page, productModel, {
+        crm_crq_quantity: 250,
+        crm_crq_supply_mode: 'consigned',
+        crm_crq_quality_class: 'class_1',
+        crm_crq_trace_level: 'l2_serial',
+      });
+
+      // Open the gate first: pending -> in_review
+      const requestResult = await executeCommandViaApi(
         page,
-        'pe:create_rfq',
-        {
-          pe_rfq_product_model: productModel,
-          pe_rfq_quantity: 250,
-          pe_rfq_supply_mode: 'consigned',
-          pe_rfq_quality_class: 'class_1',
-          pe_rfq_trace_level: 'l2_serial',
-        },
-        undefined,
-        'create',
-        { allowHttpError: true },
-      );
-
-      if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error('RFQ creation failed');
-        return;
-      }
-      bucket.rfqs.push(result.recordId);
-
-      // Submit first: draft -> submitted
-      const submitResult = await executeCommandViaApi(
-        page,
-        'pe:submit_rfq',
+        'pe:request_dfm_pcba_rfq',
         {},
-        result.recordId,
+        sidecarId,
         'update',
         { allowHttpError: true },
       );
-      if (submitResult.code !== ErrorCodes.SUCCESS) {
-        throw new Error('Submit RFQ command not available — skipping clarify test');
-        return;
+      if (requestResult.code !== ErrorCodes.SUCCESS) {
+        throw new Error('Request DFM command not available — skipping conditional test');
       }
 
-      let record = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(record.pe_rfq_status).toBe('submitted');
+      let record = await fetchRecord(page, PAGE_KEYS.rfq, sidecarId);
+      expect(record.crm_crq_dfm_status).toBe('in_review');
 
-      // Clarify via API: submitted -> CLARIFICATION (avoids pagination issues)
-      const clarifyResult = await executeCommandViaApi(
+      // Conclude conditional via API: in_review -> conditional
+      const conditionalResult = await executeCommandViaApi(
         page,
-        'pe:clarify_rfq',
+        'pe:flag_dfm_conditional_pcba_rfq',
         {},
-        result.recordId,
+        sidecarId,
         'update',
         { allowHttpError: true },
       );
-      if (clarifyResult.code !== ErrorCodes.SUCCESS) {
-        throw new Error('Clarify RFQ command not available');
-        return;
+      if (conditionalResult.code !== ErrorCodes.SUCCESS) {
+        throw new Error('Conditional DFM command not available');
       }
 
       // Verify status transition
-      record = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(record.pe_rfq_status).toBe('clarification');
+      record = await fetchRecord(page, PAGE_KEYS.rfq, sidecarId);
+      expect(record.crm_crq_dfm_status).toBe('conditional');
 
       // Navigate to list page to maintain E2E character
       await navigateToDynamicPage(page, PAGE_KEYS.rfq);
       await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
     });
 
-    test('PCE-008: Finalize RFQ (submitted -> FINALIZED)', async ({ page }) => {
-      const productModel = `E2E RFQ Finalize ${uniqueId()}`;
+    test('PCE-008: Pass DFM (in_review -> passed)', async ({ page }) => {
+      const productModel = `E2E RFQ DFM Pass ${uniqueId()}`;
 
-      const result = await executeCommandViaApi(
+      const { sidecarId } = await createRequestWithSidecar(page, productModel, {
+        crm_crq_quantity: 750,
+        crm_crq_supply_mode: 'turnkey',
+        crm_crq_quality_class: 'class_2',
+        crm_crq_trace_level: 'l1_batch',
+      });
+
+      // Open the gate first: pending -> in_review
+      const requestResult = await executeCommandViaApi(
         page,
-        'pe:create_rfq',
-        {
-          pe_rfq_product_model: productModel,
-          pe_rfq_quantity: 750,
-          pe_rfq_supply_mode: 'turnkey',
-          pe_rfq_quality_class: 'class_2',
-          pe_rfq_trace_level: 'l1_batch',
-          pe_rfq_notes: 'RFQ for finalize test',
-        },
-        undefined,
-        'create',
-        { allowHttpError: true },
-      );
-
-      if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error('RFQ creation failed');
-        return;
-      }
-      bucket.rfqs.push(result.recordId);
-
-      // Submit first: draft -> submitted
-      const submitResult = await executeCommandViaApi(
-        page,
-        'pe:submit_rfq',
+        'pe:request_dfm_pcba_rfq',
         {},
-        result.recordId,
+        sidecarId,
         'update',
         { allowHttpError: true },
       );
-      if (submitResult.code !== ErrorCodes.SUCCESS) {
-        throw new Error('Submit RFQ command not available — skipping finalize test');
-        return;
+      if (requestResult.code !== ErrorCodes.SUCCESS) {
+        throw new Error('Request DFM command not available — skipping pass test');
       }
 
-      let record = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(record.pe_rfq_status).toBe('submitted');
+      let record = await fetchRecord(page, PAGE_KEYS.rfq, sidecarId);
+      expect(record.crm_crq_dfm_status).toBe('in_review');
 
-      // Finalize via API: submitted -> FINALIZED (avoids pagination issues)
-      const finalizeResult = await executeCommandViaApi(
+      // Conclude passed via API: in_review -> passed
+      const passResult = await executeCommandViaApi(
         page,
-        'pe:finalize_rfq',
+        'pe:pass_dfm_pcba_rfq',
         {},
-        result.recordId,
+        sidecarId,
         'update',
         { allowHttpError: true },
       );
-      if (finalizeResult.code !== ErrorCodes.SUCCESS) {
-        throw new Error('Finalize RFQ command failed');
-        return;
+      if (passResult.code !== ErrorCodes.SUCCESS) {
+        throw new Error('Pass DFM command failed');
       }
 
       // Verify status transition
-      record = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(record.pe_rfq_status).toBe('finalized');
+      record = await fetchRecord(page, PAGE_KEYS.rfq, sidecarId);
+      expect(record.crm_crq_dfm_status).toBe('passed');
 
       // Navigate to list page to maintain E2E character
       await navigateToDynamicPage(page, PAGE_KEYS.rfq);
       await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
     });
 
-    test('PCE-009: Full lifecycle — draft -> submitted -> CLARIFICATION -> FINALIZED', async ({
+    test('PCE-009: Full lifecycle — request draft -> submitted -> routed; DFM in_review -> failed', async ({
       page,
     }) => {
       const productModel = `E2E RFQ Full ${uniqueId()}`;
 
-      const result = await executeCommandViaApi(
+      // The route handler refuses requests without an account, so seed one first.
+      const account = await executeCommandViaApi(
         page,
-        'pe:create_rfq',
+        'crm:create_account',
+        { crm_acc_name: `E2E RFQ Full Account ${uniqueId()}` },
+        undefined,
+        'create',
+        { allowHttpError: true },
+      );
+      expect(account.code, 'account for full lifecycle should be created').toBe(ErrorCodes.SUCCESS);
+      bucket.accounts.push(account.recordId);
+
+      const cr = await executeCommandViaApi(
+        page,
+        'crm:create_customer_request',
         {
-          pe_rfq_product_model: productModel,
-          pe_rfq_quantity: 1500,
-          pe_rfq_delivery_window: '45 days',
-          pe_rfq_quality_class: 'class_3',
-          pe_rfq_trace_level: 'l1_batch',
-          pe_rfq_supply_mode: 'partial',
-          pe_rfq_revision: 'A',
-          pe_rfq_notes: 'Full lifecycle test',
+          crm_cr_title: productModel,
+          crm_cr_account_id: account.recordId,
+          crm_cr_type: 'rfq',
+          crm_cr_summary: 'Full lifecycle test',
         },
         undefined,
         'create',
         { allowHttpError: true },
       );
-
-      if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error('RFQ creation failed');
-        return;
+      if (!cr.recordId || cr.code !== ErrorCodes.SUCCESS) {
+        throw new Error('Customer request creation failed');
       }
-      bucket.rfqs.push(result.recordId);
+      bucket.requests.push(cr.recordId);
 
       // Step 1: Verify draft
-      let record = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(record.pe_rfq_status).toBe('draft');
+      let request = await fetchRecord(page, PAGE_KEYS.customerRequest, cr.recordId);
+      expect(request.crm_cr_status).toBe('draft');
 
       // Step 2: draft -> submitted
       const submitResult = await executeCommandViaApi(
         page,
-        'pe:submit_rfq',
+        'crm:submit_customer_request',
         {},
-        result.recordId,
+        cr.recordId,
         'update',
         { allowHttpError: true },
       );
       if (submitResult.code !== ErrorCodes.SUCCESS) {
-        throw new Error('Submit RFQ not available — skipping full lifecycle');
-        return;
+        throw new Error('Submit customer request not available — skipping full lifecycle');
       }
-      record = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(record.pe_rfq_status).toBe('submitted');
+      request = await fetchRecord(page, PAGE_KEYS.customerRequest, cr.recordId);
+      expect(request.crm_cr_status).toBe('submitted');
 
-      // Step 3: submitted -> CLARIFICATION
-      const clarifyResult = await executeCommandViaApi(
+      // Step 3: submitted -> routed (the handler auto-creates the PCBA sidecar)
+      const routeResult = await executeCommandViaApi(
         page,
-        'pe:clarify_rfq',
+        'pe:route_customer_request_to_rfq',
         {},
-        result.recordId,
+        cr.recordId,
         'update',
         { allowHttpError: true },
       );
-      if (clarifyResult.code !== ErrorCodes.SUCCESS) {
-        throw new Error('Clarify RFQ not available — partial lifecycle verified');
-        return;
+      if (routeResult.code !== ErrorCodes.SUCCESS) {
+        throw new Error('Route customer request failed');
       }
-      record = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(record.pe_rfq_status).toBe('clarification');
+      request = await fetchRecord(page, PAGE_KEYS.customerRequest, cr.recordId);
+      expect(request.crm_cr_status).toBe('routed');
+      expect(request.crm_cr_routed_object_type).toBe('crm_customer_request_pcba_rfq');
+      const sidecarId = String(request.crm_cr_routed_object_id ?? '');
+      expect(sidecarId, 'route should create the PCBA sidecar').toBeTruthy();
+      bucket.rfqs.push(sidecarId);
 
-      // Step 4: CLARIFICATION -> FINALIZED
-      const finalizeResult = await executeCommandViaApi(
+      let sidecar = await fetchRecord(page, PAGE_KEYS.rfq, sidecarId);
+      expect(sidecar.crm_crq_product_model).toBe(productModel);
+      expect(sidecar.crm_crq_dfm_status).toBe('pending');
+
+      // Step 4: DFM pending -> in_review -> failed (the refusing branch of the gate)
+      const requestDfm = await executeCommandViaApi(
         page,
-        'pe:finalize_rfq',
+        'pe:request_dfm_pcba_rfq',
         {},
-        result.recordId,
+        sidecarId,
         'update',
         { allowHttpError: true },
       );
-      if (finalizeResult.code !== ErrorCodes.SUCCESS) {
-        throw new Error('Finalize RFQ failed from CLARIFICATION state');
-        return;
+      if (requestDfm.code !== ErrorCodes.SUCCESS) {
+        throw new Error('Request DFM not available — partial lifecycle verified');
       }
-      record = await fetchRecord(page, PAGE_KEYS.rfq, result.recordId);
-      expect(record.pe_rfq_status).toBe('finalized');
+      const failDfm = await executeCommandViaApi(
+        page,
+        'pe:fail_dfm_pcba_rfq',
+        {},
+        sidecarId,
+        'update',
+        { allowHttpError: true },
+      );
+      if (failDfm.code !== ErrorCodes.SUCCESS) {
+        throw new Error('Fail DFM failed from in_review state');
+      }
+      sidecar = await fetchRecord(page, PAGE_KEYS.rfq, sidecarId);
+      expect(sidecar.crm_crq_dfm_status).toBe('failed');
 
       // Verify final state in list via API filter
       const finalRecords = await queryFilteredList(
         page,
         PAGE_KEYS.rfq,
-        'pe_rfq_product_model',
+        'crm_crq_product_model',
         productModel,
       );
       expect(finalRecords.length).toBeGreaterThan(0);
@@ -804,56 +807,31 @@ test.describe('PCBA CRM Extended', () => {
     test('PCE-010: RFQ boundary values — quantity and delivery_window', async ({ page }) => {
       // Test minimum quantity boundary
       const productModelMin = `E2E RFQ MinQty ${uniqueId()}`;
-      const resultMin = await executeCommandViaApi(
-        page,
-        'pe:create_rfq',
-        {
-          pe_rfq_product_model: productModelMin,
-          pe_rfq_quantity: 1,
-          pe_rfq_delivery_window: '1 day',
-          pe_rfq_supply_mode: 'turnkey',
-          pe_rfq_quality_class: 'class_1',
-          pe_rfq_trace_level: 'l3_key_param',
-        },
-        undefined,
-        'create',
-        { allowHttpError: true },
-      );
+      const { sidecarId: minId } = await createRequestWithSidecar(page, productModelMin, {
+        crm_crq_quantity: 1,
+        crm_crq_delivery_window: '1 day',
+        crm_crq_supply_mode: 'turnkey',
+        crm_crq_quality_class: 'class_1',
+        crm_crq_trace_level: 'l3_key_param',
+      });
 
-      if (!resultMin.recordId || resultMin.code !== ErrorCodes.SUCCESS) {
-        throw new Error('RFQ creation failed — plugin may not be imported');
-        return;
-      }
-      bucket.rfqs.push(resultMin.recordId);
-
-      const recordMin = await fetchRecord(page, PAGE_KEYS.rfq, resultMin.recordId);
-      expect(Number(recordMin.pe_rfq_quantity)).toBe(1);
-      expect(String(recordMin.pe_rfq_delivery_window)).toContain('1');
+      const recordMin = await fetchRecord(page, PAGE_KEYS.rfq, minId);
+      expect(Number(recordMin.crm_crq_quantity)).toBe(1);
+      expect(String(recordMin.crm_crq_delivery_window)).toContain('1');
 
       // Test larger quantity
       const productModelLarge = `E2E RFQ LargeQty ${uniqueId()}`;
-      const resultLarge = await executeCommandViaApi(
-        page,
-        'pe:create_rfq',
-        {
-          pe_rfq_product_model: productModelLarge,
-          pe_rfq_quantity: 100000,
-          pe_rfq_delivery_window: '365 days',
-          pe_rfq_supply_mode: 'consigned',
-          pe_rfq_quality_class: 'class_3',
-          pe_rfq_trace_level: 'l2_serial',
-        },
-        undefined,
-        'create',
-        { allowHttpError: true },
-      );
+      const { sidecarId: largeId } = await createRequestWithSidecar(page, productModelLarge, {
+        crm_crq_quantity: 100000,
+        crm_crq_delivery_window: '365 days',
+        crm_crq_supply_mode: 'consigned',
+        crm_crq_quality_class: 'class_3',
+        crm_crq_trace_level: 'l2_serial',
+      });
 
-      if (resultLarge.recordId && resultLarge.code === ErrorCodes.SUCCESS) {
-        bucket.rfqs.push(resultLarge.recordId);
-        const recordLarge = await fetchRecord(page, PAGE_KEYS.rfq, resultLarge.recordId);
-        expect(Number(recordLarge.pe_rfq_quantity)).toBe(100000);
-        expect(String(recordLarge.pe_rfq_delivery_window)).toContain('365');
-      }
+      const recordLarge = await fetchRecord(page, PAGE_KEYS.rfq, largeId);
+      expect(Number(recordLarge.crm_crq_quantity)).toBe(100000);
+      expect(String(recordLarge.crm_crq_delivery_window)).toContain('365');
 
       // UI verification: confirm list page loads
       await navigateToDynamicPage(page, PAGE_KEYS.rfq);
@@ -866,7 +844,7 @@ test.describe('PCBA CRM Extended', () => {
       const table = page.locator('table, [role="table"]');
       await expect(table.first()).toBeVisible({ timeout: 15000 });
 
-      // Column headers should NOT contain raw i18n key patterns like "model.pe_..."
+      // Column headers should NOT contain raw i18n key patterns like "model.crm_..."
       const headers = page.locator('thead th, [role="columnheader"]');
       const headerCount = await headers.count();
 
@@ -876,7 +854,7 @@ test.describe('PCBA CRM Extended', () => {
           .nth(i)
           .innerText()
           .catch(() => '');
-        if (text.match(/^model\.\w+\.\w+\.label$/)) {
+        if (text.match(/^model\.\w+\.\w+\.label$/) || text.match(/^crm_crq_\w+$/)) {
           rawKeyFound = true;
           break;
         }
@@ -897,10 +875,10 @@ test.describe('PCBA CRM Extended', () => {
   });
 
   // =========================================================================
-  // crm_contact — Contact (PCE-012 ~ PCE-018)
+  // crm_contact_common — Contact (PCE-012 ~ PCE-018)
   // =========================================================================
 
-  test.describe('Contact (crm_contact)', () => {
+  test.describe('Contact (crm_contact_common)', () => {
     const bucket = emptyBucket();
     /** A shared customer id created in beforeAll, reused across contact tests. */
     let sharedCustomerId: string | null = null;
@@ -932,7 +910,7 @@ test.describe('PCBA CRM Extended', () => {
 
       // Fallback: query existing account if creation failed
       if (!sharedCustomerId) {
-        const resp = await p.request.get('/api/dynamic/crm_account/list?pageSize=1');
+        const resp = await p.request.get('/api/dynamic/crm_account_common/list?pageSize=1');
         if (resp.ok()) {
           const body = await resp.json();
           const rec = body?.data?.records?.[0];
@@ -1008,7 +986,7 @@ test.describe('PCBA CRM Extended', () => {
     });
 
     test('PCE-014: Create Contact via UI form', async ({ page }) => {
-      await ensureAuthenticated(page, '/p/crm_contact');
+      await ensureAuthenticated(page, '/p/crm_contact_common');
       await navigateToDynamicPage(page, PAGE_KEYS.customerContact);
       await clickCreateButton(page);
       await waitForFormReady(page);

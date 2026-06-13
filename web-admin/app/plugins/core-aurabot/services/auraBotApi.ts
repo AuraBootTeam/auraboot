@@ -16,7 +16,6 @@ import type {
   UndoResponse,
   AuraBotContext,
   IntentResult,
-  OperationStep,
 } from '../types';
 import type { ResultContract } from '../types/ResultContract';
 
@@ -53,38 +52,20 @@ async function readErrorMessage(response: Response): Promise<string> {
 // ============================================================================
 
 /**
- * SSE event types from the server
+ * SSE event names actually emitted by the backend stream
+ * (source of truth: OSS SseResponseSink — keep in sync, see
+ * docs/backlog/2026-06-10-agent-system-review-and-remediation.md C2).
  */
-export type SSEEventType =
+export type AuraBotSseEventName =
+  | 'chunk'
   | 'thinking'
-  | 'intent'
-  | 'preview'
-  | 'result'
-  | 'confirm_required'
+  | 'tool_start'
+  | 'tool_result'
+  | 'result_contract'
   | 'warning'
-  | 'error'
-  | 'done';
-
-/**
- * SSE event data
- */
-export interface SSEEvent {
-  type: SSEEventType;
-  data: unknown;
-}
-
-/**
- * Chat stream callbacks
- */
-export interface ChatStreamCallbacks {
-  onThinking?: (message: string) => void;
-  onIntent?: (intent: IntentResult) => void;
-  onPreview?: (steps: OperationStep[]) => void;
-  onResult?: (result: unknown) => void;
-  onConfirmRequired?: (data: { message: string; actions: string[] }) => void;
-  onError?: (error: { code?: string; message: string }) => void;
-  onDone?: () => void;
-}
+  | 'confirm_required'
+  | 'done'
+  | 'error';
 
 /**
  * Simple chat stream callbacks for the copilot panel.
@@ -206,75 +187,6 @@ export const auraBotApi = {
   // persists both inbound + outbound rows from /chat/stream itself (via
   // AuraBotTurnPersistence). Pass conversationId + clientMsgId on ChatRequest
   // so server can write the inbound row keyed by clientMsgId for dedup.
-
-  /**
-   * Send a chat message and receive streaming response
-   */
-  async chat(
-    request: ChatRequest,
-    callbacks: ChatStreamCallbacks,
-    signal?: AbortSignal,
-  ): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/chat`, {
-      method: 'post',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-      },
-      credentials: 'include',
-      body: JSON.stringify(request),
-      signal,
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Request failed' }));
-      callbacks.onError?.({ message: error.message || `HTTP ${response.status}` });
-      return;
-    }
-
-    // Handle SSE stream
-    const reader = response.body?.getReader();
-    if (!reader) {
-      callbacks.onError?.({ message: 'No response body' });
-      return;
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('event:')) {
-            // Event type line, will be followed by data
-            continue;
-          }
-          if (line.startsWith('data:')) {
-            const dataStr = line.slice(5).trim();
-            if (!dataStr) continue;
-
-            try {
-              const event = JSON.parse(dataStr) as SSEEvent;
-              handleSSEEvent(event, callbacks);
-            } catch (parseError) {
-              console.error('Failed to parse SSE data:', parseError);
-            }
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-
-    callbacks.onDone?.();
-  },
 
   /**
    * Send a chat message (non-streaming)
@@ -735,32 +647,6 @@ async function processSSEStream(
   }
 
   callbacks.onDone(fullContent, traceId);
-}
-
-function handleSSEEvent(event: SSEEvent, callbacks: ChatStreamCallbacks): void {
-  switch (event.type) {
-    case 'thinking':
-      callbacks.onThinking?.(event.data as string);
-      break;
-    case 'intent':
-      callbacks.onIntent?.(event.data as IntentResult);
-      break;
-    case 'preview':
-      callbacks.onPreview?.(event.data as OperationStep[]);
-      break;
-    case 'result':
-      callbacks.onResult?.(event.data);
-      break;
-    case 'confirm_required':
-      callbacks.onConfirmRequired?.(event.data as { message: string; actions: string[] });
-      break;
-    case 'error':
-      callbacks.onError?.(event.data as { code?: string; message: string });
-      break;
-    case 'done':
-      callbacks.onDone?.();
-      break;
-  }
 }
 
 export default auraBotApi;

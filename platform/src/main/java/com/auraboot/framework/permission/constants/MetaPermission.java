@@ -639,6 +639,36 @@ public final class MetaPermission {
      */
     public static final String ACP_AGENT_APPROVAL = "acp.agent.approval";
 
+    /**
+     * ACP runtime operations: dispatch tasks to agents, scaffolding, schedule
+     * reload/trigger, tool contract derivation, dry-run/sandbox execution,
+     * collaboration (delegate/broadcast/pipeline), BPM bridging, skill sync.
+     */
+    public static final String ACP_RUNTIME_MANAGE = "acp.runtime.manage";
+
+    /**
+     * Admin views over agent runs and shadow runs ({@code /api/admin/agent-runs},
+     * {@code /api/admin/shadow-runs}).
+     */
+    public static final String ACP_AGENT_RUN_ADMIN = "acp.agent_run.admin";
+
+    /**
+     * Agent memory governance: promotion review/retract/batch-approve and
+     * tier admin (promote-now).
+     */
+    public static final String ACP_MEMORY_ADMIN = "acp.memory.admin";
+
+    /**
+     * User-soul-profile administration (cross-user views, forget).
+     * User self-service profile edits are NOT gated by this code.
+     */
+    public static final String ACP_PROFILE_ADMIN = "acp.profile.admin";
+
+    /**
+     * Learning-loop draft governance (review / auto-rename / evaluate-promotion).
+     */
+    public static final String ACP_LEARNING_REVIEW = "acp.learning.review";
+
     // ==================== IoT permissions ====================
 
     /**
@@ -738,6 +768,68 @@ public final class MetaPermission {
      * Event Policy run permission (call /run endpoint to evaluate a published policy).
      */
     public static final String POLICY_RUNTIME_RUN = "decision.policy.run";
+
+    // ==================== BILLING permissions ====================
+
+    /**
+     * Billing resource catalog read permission (list all active catalog entries).
+     * Used by {@code ResourceCatalogController} GET /api/billing/resource-catalog.
+     */
+    public static final String BILLING_CATALOG_READ = "billing.catalog.read";
+
+    /**
+     * Quota bucket balance read permission.
+     * Used by {@code QuotaBucketController} GET /api/billing/quota/buckets.
+     */
+    public static final String BILLING_QUOTA_READ = "billing.quota.read";
+
+    /**
+     * Usage event read permission.
+     * Used by {@code UsageEventController} GET /api/billing/usage/events.
+     */
+    public static final String BILLING_USAGE_READ = "billing.usage.read";
+
+    /**
+     * Billing plan catalog read permission (list plans, plan versions, price components, quota templates).
+     * Used by {@code BillingPlanConsoleController} GET /api/billing/plans.
+     */
+    public static final String BILLING_PLAN_READ = "billing.plan.read";
+
+    /**
+     * Subscription read permission (list and view subscriptions and subscription items).
+     * Used by {@code BillingSubscriptionConsoleController} GET /api/billing/subscriptions.
+     */
+    public static final String BILLING_SUBSCRIPTION_READ = "billing.subscription.read";
+
+    /**
+     * Invoice read permission (list and view invoices and invoice line items).
+     * Used by {@code BillingInvoiceConsoleController} GET /api/billing/invoices.
+     */
+    public static final String BILLING_INVOICE_READ = "billing.invoice.read";
+
+    /**
+     * License key read permission (list and view license keys and heartbeats).
+     * Used by {@code BillingLicenseConsoleController} GET /api/billing/licenses.
+     */
+    public static final String BILLING_LICENSE_READ = "billing.license.read";
+
+    // ==================== AI / RAG Knowledge Base permissions ====================
+
+    /**
+     * Knowledge base read permission (list KBs, view documents and chunks).
+     */
+    public static final String AI_KNOWLEDGE_READ = "ai.knowledge.read";
+
+    /**
+     * Knowledge base management permission (create/update/delete KBs, upload and
+     * delete documents, reindex, import internal docs, generate docs).
+     */
+    public static final String AI_KNOWLEDGE_MANAGE = "ai.knowledge.manage";
+
+    /**
+     * Knowledge retrieval permission (run retrieval queries / playground).
+     */
+    public static final String AI_KNOWLEDGE_RETRIEVE = "ai.knowledge.retrieve";
 
     // ==================== Private Constructor ====================
 

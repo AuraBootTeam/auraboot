@@ -47,6 +47,9 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
     private RagContextProviderImpl ragContextProvider;
 
     @Autowired
+    private com.auraboot.framework.rag.d7.D7ContextAssembler d7ContextAssembler;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     // Mock external dependencies per AGENTS.md: LLM/AI providers and file storage
@@ -238,43 +241,28 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
     }
 
     // =========================================================================
-    // RagRetrievalService — buildRagContext
-    // =========================================================================
+    // D7ContextAssembler — fused context renderer
+    // -------------------------------------------------------------------------
 
     @Test
-    @Order(20)
-    @DisplayName("CTX-01: buildRagContext formats retrieval results")
-    void buildRagContext() {
-        List<RetrievalResult> results = List.of(
-                RetrievalResult.builder()
-                        .docName("architecture.md")
-                        .chunkIndex(3)
-                        .content("AuraBoot uses a plugin-based architecture.")
-                        .similarity(0.92)
-                        .build(),
-                RetrievalResult.builder()
-                        .docName("commands.md")
-                        .chunkIndex(7)
-                        .content("Commands follow a 20-stage pipeline.")
-                        .similarity(0.85)
-                        .build()
-        );
-
-        String context = retrievalService.buildRagContext(results);
-
-        assertThat(context).contains("## Reference Knowledge");
-        assertThat(context).contains("[Source: architecture.md, Chunk 3]");
-        assertThat(context).contains("plugin-based architecture");
-        assertThat(context).contains("[Source: commands.md, Chunk 7]");
-        assertThat(context).contains("20-stage pipeline");
+    @DisplayName("CTX-01: fused context formats retrieval results with source citations")
+    void buildFusedContext() {
+        var results = java.util.List.of(
+                com.auraboot.framework.rag.dto.RetrievalResult.builder()
+                        .chunkPid("c1").docName("guide.md").chunkIndex(0)
+                        .content("Plugin system overview").build());
+        String context = d7ContextAssembler.buildFusedContext(
+                com.auraboot.framework.rag.d7.D7RagFusion.fuse(java.util.List.of(), results, 60, 1.5), 0);
+        assertThat(context).contains("Retrieved Knowledge");
+        assertThat(context).contains("[Source: guide.md, Chunk 0]");
+        assertThat(context).contains("Plugin system overview");
     }
 
     @Test
-    @Order(21)
-    @DisplayName("CTX-02: buildRagContext with empty list returns empty string")
-    void buildRagContext_empty() {
-        assertThat(retrievalService.buildRagContext(null)).isEmpty();
-        assertThat(retrievalService.buildRagContext(List.of())).isEmpty();
+    @DisplayName("CTX-02: fused context with no items returns empty string")
+    void buildFusedContext_empty() {
+        assertThat(d7ContextAssembler.buildFusedContext(java.util.List.of(), 0)).isEmpty();
+        assertThat(d7ContextAssembler.buildFusedContext(null, 0)).isEmpty();
     }
 
     // =========================================================================
@@ -324,7 +312,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
         String context = ragContextProvider.retrieveContext(
                 getTestTenant().getId(), "plugin architecture", List.of(kb.getPid()));
 
-        assertThat(context).contains("Reference Knowledge");
+        assertThat(context).contains("Retrieved Knowledge");
         assertThat(context).contains("Plugin system overview content");
     }
 

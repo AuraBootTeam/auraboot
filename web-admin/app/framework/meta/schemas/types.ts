@@ -97,6 +97,10 @@ export interface DataSourceConfig {
   queryCode?: string; // Named query code
   searchField?: string; // Field for keyword search
   maxItems?: number; // Max items to return (default: 200)
+  // 'records' returns raw query rows (multi-column aggregate rows) instead of the default
+  // option format ({key,value,label} for dropdowns). Use for metric-strip / KPI sources that
+  // read raw columns via valueField (e.g. SELECT COUNT(*) AS total_devices ...).
+  format?: 'records' | 'options'; // Default: options
 }
 
 // Handler 配置
@@ -147,6 +151,12 @@ export interface FieldConfig {
   validation?: ValidationRule[];
   dataSource?: string | DataSourceConfig; // 支持直接引用 dataSource ID
   dependOn?: string[];
+  /**
+   * Mirror this field's value to a page state key (e.g. `statusFilter`) so data
+   * sources that read `${state.<bindState>}` (filter/search inputs feeding a
+   * list query) receive it. Without this the value only lives in form scope.
+   */
+  bindState?: string;
   optionsWhen?: string;
   visibleWhen?: string;
   enableWhen?: string;
@@ -267,6 +277,8 @@ export interface ColumnConfig {
 export type ActionDef =
   | { type: 'command'; command: string }
   | { type: 'state_transition'; command: string }
+  | { type: 'bulk_command'; command: string }
+  | { type: 'bulk_state_transition'; command: string }
   | { type: 'navigate'; to: string; command?: string }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }
@@ -403,6 +415,11 @@ export interface SubTableConfig {
   actions?: ButtonConfig[];
   summary?: SummaryConfig;
   resolveVia?: ResolveViaConfig;
+  /**
+   * Values merged into create payloads before editable row input.
+   * String values support the same `${recordId}` / `${record.field}` templates as sub-table data sources.
+   */
+  defaultValues?: Record<string, unknown>;
   addCommandCode?: string;
   /** Custom add button configuration */
   addButton?: ButtonConfig | boolean;

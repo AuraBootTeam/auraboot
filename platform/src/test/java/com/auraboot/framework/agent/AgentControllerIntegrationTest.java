@@ -3,6 +3,13 @@ package com.auraboot.framework.agent;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.rbac.entity.RolePermission;
+import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import java.time.Instant;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
 import lombok.extern.slf4j.Slf4j;
@@ -49,8 +56,24 @@ public class AgentControllerIntegrationTest extends BaseIntegrationTest {
 
     private MockMvc mockMvc;
 
+    @Autowired
+    private PermissionMapper permissionMapper;
+
+    @Autowired
+    private RolePermissionMapper rolePermissionMapper;
+
+    @Autowired
+    private com.auraboot.framework.permission.service.UserPermissionService userPermissionService;
+
     @BeforeEach
     void setupMockMvc() {
+        // ACP runtime operations are permission-gated (acp.runtime.manage);
+        // grant it to the test role so the endpoint behavior under test is
+        // reachable. The deny path is covered by the security IT suite.
+        grantPermissionToTestRole("acp.runtime.manage", "acp", "runtime", "manage", "ACP Runtime Manage");
+        // The shared test user's permission set may already be cached by an
+        // earlier test class in the same context — evict so the grant is seen.
+        userPermissionService.evictUserPermissions(getTestUser().getId());
         Filter metaContextFilter = (request, response, chain) -> {
             try {
                 MetaContext.setContext(
@@ -59,9 +82,24 @@ public class AgentControllerIntegrationTest extends BaseIntegrationTest {
                         getTestUser().getPid(),
                         getTestUser().getUserName()
                 );
+                // PermissionInterceptor resolves the user from the Spring
+                // SecurityContext (CustomUserDetails), not MetaContext — the
+                // gated ACP endpoints need an authenticated principal.
+                com.auraboot.framework.auth.dto.CustomUserDetails userDetails =
+                        new com.auraboot.framework.auth.dto.CustomUserDetails(
+                                getTestUser().getUserName(),
+                                "test-password",
+                                getTestUser().getId(),
+                                getTestUser().getPid(),
+                                org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("role_admin"),
+                                true, true, true, true);
+                org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                        new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities()));
                 chain.doFilter(request, response);
             } finally {
                 MetaContext.clear();
+                org.springframework.security.core.context.SecurityContextHolder.clearContext();
             }
         };
 
@@ -221,5 +259,47 @@ public class AgentControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 // Either "taskPid and agentCode required" error OR "Agent runtime is disabled" — both are error responses
                 .andExpect(jsonPath("$.code").value("1"));
+    }
+
+    private void grantPermissionToTestRole(String code, String resourceType,
+                                           String resourceCode, String action, String name) {
+        Permission permission = permissionMapper.findByCode(code);
+        if (permission == null) {
+            permission = new Permission();
+            permission.setPid(UniqueIdGenerator.generate());
+            permission.setCode(code);
+            permission.setName(name);
+            permission.setResourceType(resourceType);
+            permission.setResourceCode(resourceCode);
+            permission.setAction(action);
+            permission.setSource("manual");
+            permission.setStatus("active");
+            permission.setDeletedFlag(false);
+            permission.setTenantId(getTestTenant().getId());
+            permission.setCreatedAt(Instant.now());
+            permission.setUpdatedAt(Instant.now());
+            permissionMapper.insert(permission);
+        }
+
+        boolean notAssigned = rolePermissionMapper.selectList(
+                new LambdaQueryWrapper<RolePermission>()
+                        .eq(RolePermission::getRoleId, getTestRole().getId())
+                        .eq(RolePermission::getPermissionId, permission.getId())
+                        .eq(RolePermission::getDeletedFlag, false)
+        ).isEmpty();
+
+        if (notAssigned) {
+            RolePermission rp = new RolePermission();
+            rp.setPid(UniqueIdGenerator.generate());
+            rp.setRoleId(getTestRole().getId());
+            rp.setPermissionId(permission.getId());
+            rp.setGrantType("grant");
+            rp.setStatus("active");
+            rp.setDeletedFlag(false);
+            rp.setTenantId(getTestTenant().getId());
+            rp.setCreatedAt(Instant.now());
+            rp.setUpdatedAt(Instant.now());
+            rolePermissionMapper.insert(rp);
+        }
     }
 }

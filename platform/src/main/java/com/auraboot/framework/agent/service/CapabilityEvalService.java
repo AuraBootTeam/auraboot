@@ -7,6 +7,7 @@ import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.entity.AbCapabilityEvalRun;
+import com.auraboot.framework.agent.eval.CapabilityEvalRegressionGate;
 import com.auraboot.framework.agent.mapper.AbCapabilityEvalRunMapper;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -46,6 +47,7 @@ public class CapabilityEvalService {
     private final DynamicDataMapper dynamicDataMapper;
     private final ObjectMapper objectMapper;
     private final AbCapabilityEvalRunMapper evalRunMapper;
+    private final LlmToolSelectionService llmToolSelectionService;
 
     /**
      * Auto-generate evaluation cases from published capabilities.
@@ -106,6 +108,14 @@ public class CapabilityEvalService {
      */
     public Map<String, Object> evaluateToolSelection(Long tenantId, String evalMode,
                                                       List<CapabilityEvalCase> cases) {
+        // An eval run must never be labeled "llm" when no model was actually
+        // consulted — degrade explicitly and persist the truthful mode.
+        if ("llm".equals(evalMode) && !llmToolSelectionService.isAvailable(tenantId)) {
+            log.warn("LLM eval mode requested but no provider configured for tenant {}; "
+                    + "degrading run to keyword mode", tenantId);
+            evalMode = "keyword";
+        }
+
         int totalCases = cases.size();
 
         int correctSelections = 0;
@@ -117,15 +127,34 @@ public class CapabilityEvalService {
 
         List<Map<String, Object>> caseResults = new ArrayList<>();
 
+        // LLM mode: discover the candidate catalog once for the whole run.
+        List<ToolDefinition> llmCatalog = "llm".equals(evalMode) ? discoverTools(tenantId) : List.of();
+
         for (CapabilityEvalCase evalCase : cases) {
             List<String> selectedTools;
+            List<String> hallucinatedTools = List.of();
+            String llmError = null;
             if ("llm".equals(evalMode)) {
-                selectedTools = evaluateWithLlm(tenantId, evalCase);
+                try {
+                    LlmToolSelectionService.Selection selection = llmToolSelectionService
+                            .selectTools(tenantId, evalCase.getTaskDescription(), llmCatalog, 5);
+                    selectedTools = selection.selected();
+                    hallucinatedTools = selection.hallucinated();
+                } catch (Exception e) {
+                    // A failed LLM call scores as an empty (incorrect) selection —
+                    // never silently swapped for keyword results mid-run.
+                    log.warn("LLM tool selection failed for case {}: {}", evalCase.getCaseId(), e.getMessage());
+                    selectedTools = List.of();
+                    llmError = e.getMessage();
+                }
             } else {
                 selectedTools = selectToolsByRelevance(tenantId, evalCase.getTaskDescription());
             }
 
             Map<String, Object> caseResult = new LinkedHashMap<>();
+            if (llmError != null) {
+                caseResult.put("llmError", llmError);
+            }
             caseResult.put("caseId", evalCase.getCaseId());
             caseResult.put("category", evalCase.getCategory());
             caseResult.put("taskDescription", evalCase.getTaskDescription());
@@ -168,9 +197,13 @@ public class CapabilityEvalService {
             caseResult.put("composabilityCorrect", composabilityOk);
 
             // Dimension 5: Hallucination Rate (10%)
-            // For keyword mode, tools are always selected from the known set — no hallucinations.
-            // LLM mode may hallucinate tool names; detected by finding names not in the active tool set.
-            // Currently both modes select from existing tools, so hallucinationCount stays 0.
+            // Keyword mode always selects from the known set — no hallucinations.
+            // LLM mode: tool codes in the reply that are not in the catalog count
+            // the case as hallucinated (partitioned by LlmToolSelectionService).
+            if (!hallucinatedTools.isEmpty()) {
+                hallucinationCount++;
+                caseResult.put("hallucinatedTools", hallucinatedTools);
+            }
 
             caseResults.add(caseResult);
         }
@@ -294,15 +327,13 @@ public class CapabilityEvalService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * LLM-based tool selection. Falls back to keyword mode until a full LLM
-     * integration is wired in.
-     */
-    private List<String> evaluateWithLlm(Long tenantId, CapabilityEvalCase evalCase) {
-        // TODO: Full LLM implementation — for now, fall back to keyword mode
-        log.info("LLM eval mode requested but falling back to keyword selection for case: {}",
-                evalCase.getCaseId());
-        return selectToolsByRelevance(tenantId, evalCase.getTaskDescription());
+    /** Discover the candidate tool catalog for an eval run. */
+    private List<ToolDefinition> discoverTools(Long tenantId) {
+        ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
+                .tenantId(tenantId)
+                .maxResults(200)
+                .build();
+        return toolProviderRegistry.discoverAll(ctx);
     }
 
     /**
@@ -354,26 +385,31 @@ public class CapabilityEvalService {
      */
     private void checkRegression(Long tenantId, AbCapabilityEvalRun current, Map<String, Object> report) {
         try {
-            List<AbCapabilityEvalRun> previous = evalRunMapper.selectList(
+            // Unified onto the shared CapabilityEvalRegressionGate (also used by
+            // ScheduledCapabilityEvalJob). This inline check keeps its "relative
+            // regression only" character — it filters to dimensions that *regressed*
+            // against the rolling baseline and ignores absolute-floor findings (the
+            // scheduled job's gate concern) — but now covers all 5 dimensions over a
+            // rolling-median baseline instead of only tool-accuracy vs the single
+            // previous run.
+            List<AbCapabilityEvalRun> window = evalRunMapper.selectList(
                     new LambdaQueryWrapper<AbCapabilityEvalRun>()
                             .eq(AbCapabilityEvalRun::getTenantId, tenantId)
                             .ne(AbCapabilityEvalRun::getPid, current.getPid())
                             .orderByDesc(AbCapabilityEvalRun::getRunAt)
-                            .last("LIMIT 1")
+                            .last("LIMIT 5")
             );
-
-            if (!previous.isEmpty()) {
-                AbCapabilityEvalRun prev = previous.get(0);
-                if (prev.getToolSelectionAccuracy() != null && current.getToolSelectionAccuracy() != null) {
-                    double delta = current.getToolSelectionAccuracy() - prev.getToolSelectionAccuracy();
-                    if (delta < -0.05) {
-                        log.warn("REGRESSION: Tool selection accuracy dropped by {:.1f}% (from {:.1f}% to {:.1f}%)",
-                                Math.abs(delta) * 100, prev.getToolSelectionAccuracy() * 100,
-                                current.getToolSelectionAccuracy() * 100);
-                        report.put("regression_warning", String.format(
-                                "Tool selection accuracy degraded by %.1f%%", Math.abs(delta) * 100));
-                    }
-                }
+            CapabilityEvalRegressionGate.Verdict verdict = CapabilityEvalRegressionGate.evaluate(
+                    current, window, CapabilityEvalRegressionGate.Thresholds.defaults());
+            List<CapabilityEvalRegressionGate.Finding> regressions = verdict.findings().stream()
+                    .filter(CapabilityEvalRegressionGate.Finding::regressed)
+                    .toList();
+            if (!regressions.isEmpty()) {
+                String summary = regressions.stream()
+                        .map(CapabilityEvalRegressionGate.Finding::detail)
+                        .collect(java.util.stream.Collectors.joining("; "));
+                log.warn("Capability-eval regression tenant={}: {}", tenantId, summary);
+                report.put("regression_warning", summary);
             }
         } catch (Exception e) {
             log.warn("Regression check failed: {}", e.getMessage());

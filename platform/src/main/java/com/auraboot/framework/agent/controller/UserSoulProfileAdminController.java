@@ -20,6 +20,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 
 /**
  * Admin-facing User Soul Profile endpoints (plan §5.6 / PR-78).
@@ -161,6 +163,7 @@ public class UserSoulProfileAdminController {
      * still succeed (Editor inserts a fresh tombstone version).
      */
     @PostMapping("/forget")
+    @RequirePermission(MetaPermission.ACP_PROFILE_ADMIN)
     public ApiResponse<Map<String, Object>> forget(@RequestBody Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
 

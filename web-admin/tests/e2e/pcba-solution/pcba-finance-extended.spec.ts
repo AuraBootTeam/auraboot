@@ -270,7 +270,7 @@ async function clickRowActionAndGetBody(
 // Prerequisite data PIDs (existing records in the database)
 // ---------------------------------------------------------------------------
 
-/** crm_account record PID — used as customer reference for AR transactions */
+/** crm_account_common record PID — used as customer reference for AR transactions */
 const SAMPLE_CUSTOMER_PID = '01KKGJ6ME6TPGADND91P4TGA7J';
 
 /** pe_supplier record PID — used as supplier reference for AP transactions */

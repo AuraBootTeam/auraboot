@@ -31,6 +31,42 @@ export default defineConfig({
     outputFile: {
       json: './test-results/results.json',
     },
+    // ── Coverage (v8) ──
+    // Baseline 2026-06-10: lines 19.08% / statements 18.79% / functions 16.43% /
+    // branches 16.44% across app + packages (285 spec files, 2099 tests).
+    // Thresholds act as a no-regression ratchet — raise them in lockstep as the
+    // coverage initiative adds tests toward the 80% target. UI presentation code
+    // stays covered by Playwright E2E; vitest targets hooks / utils / renderers /
+    // registries / pure decision logic.
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'json-summary', 'html'],
+      reportsDirectory: './coverage',
+      include: ['app/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
+      exclude: [
+        'node_modules',
+        'build',
+        'tests',
+        '**/__tests__/**',
+        '**/*.test.{ts,tsx}',
+        '**/*.d.ts',
+        '**/*.config.{ts,js,mts}',
+        '**/types/**',
+      ],
+      thresholds: {
+        // Ratchet — raised 2026-06-11 (round 2) after coverage PRs #540/#541/#542/#543
+        // (designer runtime engines + studio/plugin hooks + useTaskCenter/useDslForm).
+        // Measured: lines 25.61 / stmts 25.13 / funcs 22.35 / branches 19.9. Floors sit
+        // just under measured for flaky margin. NOTE: vitest covers logic (services /
+        // hooks / engines / utils); React presentation components are covered by
+        // Playwright E2E, so the vitest line ceiling is ~30% — reaching 80% line needs
+        // E2E coverage merge, not more component unit tests (see tracker §7).
+        lines: 25,
+        statements: 24,
+        functions: 22,
+        branches: 19,
+      },
+    },
     // 禁用 watch 模式的交互提示
     watch: false, // 禁用 watch 模式
     // 或者如果需要 watch 模式但不要提示，可以使用：

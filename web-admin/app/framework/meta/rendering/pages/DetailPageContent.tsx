@@ -146,6 +146,75 @@ export function shouldSkipDetailModelFieldMeta(
   return extension.skipFieldMeta === true || extension.skipDynamicFieldMeta === true;
 }
 
+/**
+ * Read a nested value from an object by dot-path (e.g. "version", "a.b.c").
+ * Returns the object itself when path is empty; undefined when any segment is missing.
+ */
+export function getByDataPath(obj: any, path?: string): any {
+  if (obj == null || !path) return obj;
+  return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
+}
+
+/**
+ * Resolve the master-record endpoint + method for a detail page.
+ *
+ * When the page declares a page-level `extension.dataSource` of `type: "api"`, the master
+ * record is fetched from that custom endpoint (e.g. an external REST controller like
+ * `/api/billing/plans/{id}`) instead of the dynamic-model convention `/api/dynamic/{model}/{id}`.
+ * This lets non-dynamic-model detail pages (billing, finance, any custom REST aggregate) render.
+ *
+ * Endpoint templating: `{id}`, `{recordId}`, or `${recordId}` placeholders are replaced with the
+ * recordId; if none is present, `/{recordId}` is appended. Mirrors the list page's API datasource
+ * handling in ListPageContent.
+ */
+export function resolveDetailRecordEndpoint(
+  schema: { extension?: Record<string, any>; modelCode?: string } | null | undefined,
+  tableName: string,
+  recordId: string,
+): { endpoint: string; method: 'get' | 'post' } {
+  const ds = schema?.extension?.dataSource as
+    | { type?: string; endpoint?: string; method?: string }
+    | undefined;
+  if (ds && ds.type === 'api' && typeof ds.endpoint === 'string' && ds.endpoint.length > 0) {
+    const method = String(ds.method || 'get').toLowerCase() === 'post' ? 'post' : 'get';
+    let endpoint = ds.endpoint;
+    if (/\{id\}|\{recordId\}|\$\{recordId\}/.test(endpoint)) {
+      endpoint = endpoint.replace(
+        /\{id\}|\{recordId\}|\$\{recordId\}/g,
+        encodeURIComponent(recordId),
+      );
+    } else {
+      endpoint = `${endpoint.replace(/\/+$/, '')}/${encodeURIComponent(recordId)}`;
+    }
+    return { endpoint, method };
+  }
+  const model = schema?.modelCode || tableName;
+  return { endpoint: buildDetailRecordEndpoint(model, recordId), method: 'get' };
+}
+
+/**
+ * Unwrap the master-record object from a raw detail API payload using
+ * `extension.dataSource.recordPath` (e.g. the `version` key of a PlanVersionDetailDto).
+ * Returns the raw payload when no recordPath is configured.
+ */
+export function unwrapDetailRecord(rawData: any, recordPath?: string): Record<string, any> {
+  if (rawData == null) return {};
+  if (!recordPath) return typeof rawData === 'object' ? rawData : {};
+  const val = getByDataPath(rawData, recordPath);
+  return val && typeof val === 'object' ? val : {};
+}
+
+/**
+ * Extract a nested array for a block's `dataPath` from the raw detail API payload
+ * (e.g. `priceComponents` / `quotaTemplates` siblings of the master record in the DTO).
+ * Returns [] when the path is missing or not an array.
+ */
+export function extractBlockDataRows(rawData: any, dataPath?: string): any[] {
+  if (rawData == null || !dataPath) return [];
+  const val = getByDataPath(rawData, dataPath);
+  return Array.isArray(val) ? val : [];
+}
+
 function getMetaExtension(meta?: { extension?: Record<string, any> }): Record<string, any> {
   return meta?.extension && typeof meta.extension === 'object' ? meta.extension : {};
 }
@@ -294,6 +363,10 @@ export function DetailPageContent(props: PageContentProps) {
 
   // Client-side record + model field loading (parallelized)
   const [recordData, setRecordData] = useState<RecordData>({});
+  // Full raw API payload (before recordPath unwrap). For pages backed by a custom
+  // extension.dataSource that returns an aggregate DTO (master + nested arrays),
+  // dataPath blocks read their rows from here; recordData is the unwrapped master.
+  const [rawData, setRawData] = useState<any>(null);
   const [recordLoading, setRecordLoading] = useState(true);
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
 
@@ -323,14 +396,16 @@ export function DetailPageContent(props: PageContentProps) {
     }
 
     async function loadRecord(): Promise<void> {
-      const endpoint = buildDetailRecordEndpoint(recordModelCode, recordId!, schema);
+      const { endpoint, method } = resolveDetailRecordEndpoint(schema, recordModelCode, recordId!);
       const result = await fetchResult<RecordData>(endpoint, {
-        method: 'get',
+        method,
         token: token || undefined,
       });
       if (cancelled) return;
       if (ResultHelper.isSuccess(result) && result.data) {
-        setRecordData(result.data);
+        const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
+        setRawData(result.data);
+        setRecordData(unwrapDetailRecord(result.data, recordPath));
       }
     }
 
@@ -346,18 +421,22 @@ export function DetailPageContent(props: PageContentProps) {
     return () => {
       cancelled = true;
     };
-  }, [recordId, tableName, recordModelCode, schema, token]);
+  }, [recordId, tableName, recordModelCode, schema, schema?.modelCode, token]);
 
   // Stable callback to reload the parent record (used after sub-table command execution)
   const reloadRecord = useCallback(() => {
     if (!recordId || !tableName) return;
-    const endpoint = buildDetailRecordEndpoint(recordModelCode, recordId, schema);
-    fetchResult<RecordData>(endpoint, { method: 'get', token: token || undefined })
+    const { endpoint, method } = resolveDetailRecordEndpoint(schema, recordModelCode, recordId);
+    fetchResult<RecordData>(endpoint, { method, token: token || undefined })
       .then((result) => {
-        if (ResultHelper.isSuccess(result) && result.data) setRecordData(result.data);
+        if (ResultHelper.isSuccess(result) && result.data) {
+          const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
+          setRawData(result.data);
+          setRecordData(unwrapDetailRecord(result.data, recordPath));
+        }
       })
       .catch(() => {});
-  }, [recordId, tableName, recordModelCode, schema, token]);
+  }, [recordId, tableName, recordModelCode, token, schema]);
 
   // Enrich a page-schema field with model field metadata (dictCode, component, dataType)
   const enrichField = useCallback(
@@ -794,6 +873,7 @@ export function DetailPageContent(props: PageContentProps) {
                     <DetailBlockRenderer
                       block={block}
                       recordData={recordData}
+                      rawData={rawData}
                       recordId={recordId!}
                       token={token || undefined}
                       locale={locale}
@@ -836,6 +916,7 @@ export function DetailPageContent(props: PageContentProps) {
                 key={block.id || `block-${blockIndex}`}
                 block={block}
                 recordData={recordData}
+                rawData={rawData}
                 recordId={recordId!}
                 token={token || undefined}
                 locale={locale}
@@ -855,6 +936,7 @@ export function DetailPageContent(props: PageContentProps) {
                 key={block.id || `sub-${blockIndex}`}
                 block={block}
                 recordData={recordData}
+                rawData={rawData}
                 recordId={recordId!}
                 token={token || undefined}
                 locale={locale}
@@ -874,6 +956,7 @@ export function DetailPageContent(props: PageContentProps) {
                 key={block.id || `monthly-${blockIndex}`}
                 block={block}
                 recordData={recordData}
+                rawData={rawData}
                 recordId={recordId!}
                 token={token || undefined}
                 locale={locale}
@@ -893,6 +976,7 @@ export function DetailPageContent(props: PageContentProps) {
                 key={block.id || `embedded-${blockIndex}`}
                 block={block}
                 recordData={recordData}
+                rawData={rawData}
                 recordId={recordId!}
                 token={token || undefined}
                 locale={locale}
@@ -1004,11 +1088,113 @@ function resolveChartBlockRecordParams(
 }
 
 /**
+ * DataPathTable - read-only table rendering a nested array (block.dataPath) of a detail
+ * page's raw payload. Honors localized column labels, dict-tag rendering (renderType:"tag"
+ * + dictCode) and datetime formatting — mirroring the list table's column conventions — so
+ * detail sub-tables never leak raw field codes.
+ */
+function DataPathTable({
+  title,
+  columns,
+  rows,
+  locale,
+  t,
+  getDictItems,
+}: {
+  title?: any;
+  columns: Array<{
+    field: string;
+    label?: any;
+    width?: number;
+    renderType?: string;
+    dictCode?: string;
+  }>;
+  rows: any[];
+  locale: string;
+  t: (key: string) => string;
+  getDictItems?: (
+    code: string,
+  ) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
+}) {
+  const renderCell = (
+    col: { field: string; renderType?: string; dictCode?: string },
+    row: any,
+  ) => {
+    const raw = row?.[col.field];
+    if (raw == null || raw === '') return <span className="text-gray-400">—</span>;
+    if (col.renderType === 'tag' && col.dictCode && getDictItems) {
+      const items = getDictItems(col.dictCode) || [];
+      const match = items.find((i) => String(i.value) === String(raw));
+      return (
+        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+          {match?.label ?? String(raw)}
+        </span>
+      );
+    }
+    if (col.renderType === 'datetime') {
+      const d = new Date(String(raw));
+      return <span>{isNaN(d.getTime()) ? String(raw) : d.toLocaleString(locale)}</span>;
+    }
+    return <span>{String(raw)}</span>;
+  };
+
+  return (
+    <div className="sub-table-section">
+      {title && (
+        <h3 className="mb-5 text-sm font-semibold tracking-wider text-gray-500 uppercase">
+          {getLocalizedText(title, locale, t)}
+        </h3>
+      )}
+      <div className="overflow-x-auto rounded border border-gray-200">
+        <table
+          className="min-w-full divide-y divide-gray-200 text-sm"
+          data-testid="detail-datapath-table"
+        >
+          <thead className="bg-gray-50">
+            <tr>
+              {columns.map((col) => (
+                <th
+                  key={col.field}
+                  className="px-3 py-2 text-left font-medium text-gray-500"
+                  style={col.width ? { minWidth: col.width } : undefined}
+                >
+                  {getLocalizedText(col.label, locale, t) || col.field}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 bg-white">
+            {rows.length === 0 ? (
+              <tr>
+                <td className="px-3 py-4 text-center text-gray-400" colSpan={columns.length || 1}>
+                  {t('common.noData') || '暂无数据'}
+                </td>
+              </tr>
+            ) : (
+              rows.map((row, idx) => (
+                <tr key={row?.id ?? idx} data-testid="detail-datapath-row">
+                  {columns.map((col) => (
+                    <td key={col.field} className="px-3 py-2 text-gray-700">
+                      {renderCell(col, row)}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/**
  * DetailBlockRenderer - renders a single block within the detail page
  */
 function DetailBlockRenderer({
   block,
   recordData,
+  rawData,
   recordId,
   token,
   locale,
@@ -1024,6 +1210,7 @@ function DetailBlockRenderer({
 }: {
   block: BlockConfig;
   recordData: RecordData;
+  rawData?: any;
   recordId: string;
   token?: string;
   locale: string;
@@ -1062,6 +1249,12 @@ function DetailBlockRenderer({
   }
 
   if (block.blockType === 'form-section' || block.blockType === 'detail-section') {
+    // dataPath binds this section to a nested object of the raw payload (e.g. a license's
+    // latestHeartbeat); without it the section uses the unwrapped master record.
+    const sectionDataPath = (block as any).dataPath as string | undefined;
+    const sectionRecord = sectionDataPath
+      ? getByDataPath(rawData, sectionDataPath) || {}
+      : recordData;
     return (
       <div className="form-section">
         {block.title && (
@@ -1087,7 +1280,7 @@ function DetailBlockRenderer({
                 >
                   <DynamicField
                     field={enrichedField}
-                    value={recordData ? recordData[field.field] : undefined}
+                    value={sectionRecord ? sectionRecord[field.field] : undefined}
                     onChange={() => {}}
                     readOnly={true}
                     locale={locale}
@@ -1099,6 +1292,24 @@ function DetailBlockRenderer({
           </div>
         )}
       </div>
+    );
+  }
+
+  if (block.blockType === 'sub-table' && (block as any).dataPath) {
+    // dataPath sub-table: render rows directly from a nested array of the raw payload
+    // (e.g. a plan version's priceComponents / quotaTemplates returned by the aggregate
+    // detail endpoint). No separate fetch; read-only.
+    const rows = extractBlockDataRows(rawData, (block as any).dataPath);
+    const columns = ((block as any).columns || []) as any[];
+    return (
+      <DataPathTable
+        title={block.title}
+        columns={columns}
+        rows={rows}
+        locale={locale}
+        t={t}
+        getDictItems={getDictItems}
+      />
     );
   }
 

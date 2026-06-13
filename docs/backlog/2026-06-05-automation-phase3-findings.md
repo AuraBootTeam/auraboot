@@ -1,3 +1,10 @@
+---
+type: backlog
+status: closed
+created: 2026-06-05
+---
+<!-- no-precipitation: session findings backlog; all findings fixed+merged into PRs #437/#438, FINDING-4b diagnosis embedded inline as §15-marked unverified note; no independent canonical lesson to distill -->
+
 # Automation Golden E2E — Phase 3 findings (2026-06-05)
 
 Phase 3 (18-node-type back coverage) extended the Layer B behavioral matrix in

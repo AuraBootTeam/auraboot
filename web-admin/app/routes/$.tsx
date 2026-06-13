@@ -23,11 +23,13 @@ import { getTokenFromRequest } from '~/shared/services/session';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPageRenderer';
+import { resolveLocalMenuRedirect } from '~/routes/_shared/dynamic-route-utils';
 
 interface MenuInfo {
   pid: string;
   name: string;
   path: string;
+  redirect?: string | null;
   pageKey?: string;
   pagePid?: string;
 }
@@ -99,6 +101,18 @@ export default function CatchAllRoute() {
 
         const menu = menuResult.data;
         setMenuInfo(menu);
+
+        const redirect = resolveLocalMenuRedirect(menu.redirect, location);
+        if (redirect.error) {
+          setError(`Menu "${menu.name}" has invalid redirect configuration: ${redirect.error}`);
+          setLoading(false);
+          return;
+        }
+        if (redirect.shouldRedirect) {
+          setRedirecting(true);
+          navigate(redirect.target, { replace: true });
+          return;
+        }
 
         // Step 2: Get page configuration via pageKey or pagePid
         const pageKey = menu.pageKey;

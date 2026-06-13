@@ -7,10 +7,12 @@ import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.security.SqlInjectionProtector;
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.meta.exception.MetaServiceException;
+import com.auraboot.framework.application.tenant.MetaContext;
 import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -44,6 +46,9 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
     private final QueryAuditService queryAuditService;
     private final com.auraboot.framework.meta.mapper.DynamicDataMapper dynamicDataMapper;
     private final DataPermissionEngine dataPermissionEngine;
+    private final CacheManager cacheManager;
+
+    private static final String QUERY_CACHE = "secureQuery";
 
     // ==================== 核心查询执行方法 ====================
 
@@ -759,23 +764,45 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
 
     // ==================== 缓存管理方法 ====================
 
+    /**
+     * Read a cached query result. Accesses the {@code secureQuery} cache directly via the
+     * {@link CacheManager} rather than {@code @Cacheable}: the previous {@code @Cacheable}
+     * annotation never took effect because {@code getQueryCache} is invoked from within the
+     * same bean ({@link #executeSecureQuery}), which bypasses the Spring proxy — so the cache
+     * was effectively disabled, and an external (proxied) call threw {@code IllegalArgumentException}
+     * (the {@code secureQuery} cache is configured {@code allowNullValues=false} and the body
+     * returned {@code null}). Direct access returns {@code null} cleanly on a miss.
+     */
     @Override
-    @Cacheable(value = "secureQuery", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #request.queryId")
+    @SuppressWarnings("unchecked")
     public <T> T getQueryCache(SecureQueryRequest request) {
-        // Spring Cache会自动处理缓存逻辑
-        return null;
+        Cache cache = cacheManager.getCache(QUERY_CACHE);
+        if (cache == null) {
+            return null;
+        }
+        Cache.ValueWrapper wrapper = cache.get(generateCacheKey(request));
+        return wrapper == null ? null : (T) wrapper.get();
     }
 
     @Override
     public <T> void setQueryCache(SecureQueryRequest request, T result) {
-        // Spring Cache会自动处理缓存设置
-        log.debug("设置查询缓存: queryId={}", logSafe(request.getQueryId()));
+        if (result == null) {
+            return;
+        }
+        Cache cache = cacheManager.getCache(QUERY_CACHE);
+        if (cache != null) {
+            cache.put(generateCacheKey(request), result);
+            log.debug("设置查询缓存: key={}", logSafe(generateCacheKey(request)));
+        }
     }
 
     @Override
     public void clearQueryCache(SecureQueryRequest request) {
-        log.debug("清除查询缓存: queryId={}", logSafe(request.getQueryId()));
-        // TODO: 实现缓存清除逻辑
+        Cache cache = cacheManager.getCache(QUERY_CACHE);
+        if (cache != null) {
+            cache.evict(generateCacheKey(request));
+            log.debug("清除查询缓存: key={}", logSafe(generateCacheKey(request)));
+        }
     }
 
     @Override
@@ -895,7 +922,13 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
             return supplier.get();
         }
 
-        CompletableFuture<T> future = CompletableFuture.supplyAsync(supplier);
+        // The supplier runs the data query, which reads MetaContext (tenant/user/roles) for
+        // tenant isolation. CompletableFuture.supplyAsync runs on the common ForkJoinPool, whose
+        // worker thread does NOT inherit the caller's MetaContext ThreadLocal — without this the
+        // query threw "MetaContext not initialized" (or, worse, could run unscoped). Capture the
+        // caller-thread context and re-establish it inside the worker, clearing it afterwards.
+        final Supplier<T> contextual = withMetaContext(supplier);
+        CompletableFuture<T> future = CompletableFuture.supplyAsync(contextual);
         try {
             return future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
@@ -910,6 +943,42 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
             throw new MetaServiceException(
                 "Query execution failed during " + operation + ": " + e.getCause().getMessage(), e.getCause());
         }
+    }
+
+    /**
+     * Wrap a supplier so it runs with the caller thread's {@link MetaContext} (tenant / user /
+     * roles / member / environment) re-established on whatever thread actually executes it, then
+     * cleared. Required when handing work to a pool thread (see {@link #executeWithTimeout}) so
+     * tenant isolation and data-permission filtering still apply.
+     */
+    private <T> Supplier<T> withMetaContext(Supplier<T> supplier) {
+        if (!MetaContext.exists()) {
+            return supplier;
+        }
+        final MetaContext ctx = MetaContext.get();
+        final Set<Long> roleIds = MetaContext.getCurrentRoleIds();
+        final Long memberId = MetaContext.getCurrentMemberId();
+        final Long envId = MetaContext.getCurrentEnvironmentId();
+        return () -> {
+            boolean owns = !MetaContext.exists();
+            if (owns) {
+                MetaContext.setContext(ctx.getTenantId(), ctx.getUserId(), ctx.getUserPid(),
+                        ctx.getUsername(), roleIds);
+                if (memberId != null) {
+                    MetaContext.setMemberId(memberId);
+                }
+                if (envId != null) {
+                    MetaContext.setEnvironmentId(envId);
+                }
+            }
+            try {
+                return supplier.get();
+            } finally {
+                if (owns) {
+                    MetaContext.clear();
+                }
+            }
+        };
     }
 
     /**
