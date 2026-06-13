@@ -22,6 +22,7 @@ import { uniqueId } from '../helpers';
 
 type TestBlock = { id: string; blocks?: TestBlock[] };
 type CreatedDesignerPage = { pageKey: string; pid: string };
+type AdvancedContainerBlockType = 'repeater' | 'subform';
 
 async function createFormPage(page: Page): Promise<string> {
   const id = uniqueId('udw_kind');
@@ -253,6 +254,133 @@ async function createCrossContainerSubTableFormPage(
   return { pageKey, pid: body.data.pid };
 }
 
+async function createCrossContainerAdvancedContainerFormPage(
+  page: Page,
+  blockType: AdvancedContainerBlockType,
+  options: { emptyTarget?: boolean } = {},
+): Promise<CreatedDesignerPage> {
+  const id = uniqueId(`udw_${blockType}_move`);
+  const pageKey = `udw_${blockType}_move_${id}`;
+  const candidateId = `${blockType}_move_candidate`;
+  const targetId = `${blockType}_target`;
+  const targetBlocks = options.emptyTarget
+    ? []
+    : [
+        {
+          id: targetId,
+          blockType,
+          title: `Target ${blockType}`,
+          layout: { span: 12 },
+          blocks: createAdvancedContainerChildren(blockType, 'target'),
+        },
+      ];
+
+  const resp = await page.request.post('/api/pages', {
+    data: {
+      name: `UDW ${blockType} move ${id}`,
+      pageKey,
+      title: `UDW ${blockType} move ${id}`,
+      kind: 'form',
+      modelCode: 'page_schema',
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          title: 'Form root',
+          dataSource: { model: 'page_schema' },
+          layout: { span: 12 },
+          blocks: [
+            {
+              id: 'section_source',
+              blockType: 'form-section',
+              title: 'Source section',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'field_source_name',
+                  blockType: 'field',
+                  field: 'name',
+                  layout: { span: 6 },
+                  props: { label: 'Source name', component: 'input' },
+                },
+                {
+                  id: candidateId,
+                  blockType,
+                  title: `Move candidate ${blockType}`,
+                  layout: { span: 12 },
+                  blocks: createAdvancedContainerChildren(blockType, 'candidate'),
+                },
+              ],
+            },
+            {
+              id: 'section_target',
+              blockType: 'form-section',
+              title: 'Target section',
+              layout: { span: 12 },
+              blocks: targetBlocks,
+            },
+          ],
+        },
+      ],
+      extension: { e2e: true, scenario: `unified-designer-${blockType}-cross-container-move` },
+    },
+  });
+  expect(resp.ok(), await resp.text()).toBe(true);
+  const body = await resp.json();
+  expect(body.code).toBe('0');
+  expect(body.data?.pid).toBeTruthy();
+  return { pageKey, pid: body.data.pid };
+}
+
+function createAdvancedContainerChildren(blockType: AdvancedContainerBlockType, prefix: 'candidate' | 'target') {
+  if (blockType === 'repeater') {
+    return [
+      {
+        id: `${prefix}_field_name`,
+        blockType: 'field',
+        field: 'name',
+        layout: { span: 6 },
+        props: { label: `${prefix} name`, component: 'input' },
+      },
+    ];
+  }
+
+  return [
+    {
+      id: `${prefix}_section_details`,
+      blockType: 'form-section',
+      title: `${prefix} details`,
+      layout: { span: 12 },
+      blocks: [
+        {
+          id: `${prefix}_field_name`,
+          blockType: 'field',
+          field: 'name',
+          layout: { span: 6 },
+          props: { label: `${prefix} name`, component: 'input' },
+        },
+      ],
+    },
+  ];
+}
+
+function expectAdvancedContainerChildren(
+  savedBlocks: TestBlock[],
+  blockType: AdvancedContainerBlockType,
+  movedBlockId: string,
+) {
+  const movedBlock = findBlock(savedBlocks, movedBlockId);
+  if (blockType === 'repeater') {
+    expect(movedBlock?.blocks?.map((block) => block.id)).toEqual(['candidate_field_name']);
+    return;
+  }
+
+  expect(movedBlock?.blocks?.map((block) => block.id)).toEqual(['candidate_section_details']);
+  const movedSection = findBlock(savedBlocks, 'candidate_section_details');
+  expect(movedSection?.blocks?.map((block) => block.id)).toEqual(['candidate_field_name']);
+}
+
 async function createCrossKindGuardFormPage(page: Page): Promise<CreatedDesignerPage> {
   const id = uniqueId('udw_cross_kind_guard');
   const pageKey = `udw_cross_kind_guard_${id}`;
@@ -355,6 +483,16 @@ async function openDesigner(page: Page, pageKey: string) {
   }
 }
 
+async function openBlocksResourceTab(page: Page) {
+  const blocksTab = page.getByTestId('resource-tab-blocks');
+  const firstPaletteItem = page.getByTestId('palette-add-form-section');
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await blocksTab.click();
+    if (await firstPaletteItem.isVisible().catch(() => false)) return;
+  }
+  await expect(firstPaletteItem).toBeVisible({ timeout: 10000 });
+}
+
 test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   // The designer route pulls a heavy dep graph (@dnd-kit, lucide, react-router
   // framework). On a cold dev Vite the first load triggers optimizeDeps and can
@@ -375,7 +513,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     await expect(page.getByTestId('resource-tab-blocks')).toHaveText('区块');
 
     // Palette collapses to the form kind; other page kinds + placeholder leaves absent.
-    await page.getByTestId('resource-tab-blocks').click();
+    await openBlocksResourceTab(page);
     await expect(page.getByTestId('palette-add-form-section')).toBeVisible();
     await expect(page.getByTestId('palette-add-list')).toHaveCount(0);
     await expect(page.getByTestId('palette-add-detail')).toHaveCount(0);
@@ -657,6 +795,77 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       'candidate_action_add',
     ]);
   });
+
+  for (const blockType of ['repeater', 'subform'] as const) {
+    test(`moves an existing ${blockType} subtree before another ${blockType} in a different section`, async ({
+      page,
+    }) => {
+      const movedBlockId = `${blockType}_move_candidate`;
+      const targetBlockId = `${blockType}_target`;
+      const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType);
+      await openDesigner(page, formKey);
+      await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+      await page.getByTestId('designer-mode-layout').click();
+      await dragCanvasBlockBeforeHeader(page, movedBlockId, targetBlockId);
+
+      const sourceSection = page.getByTestId('canvas-block-section_source');
+      const targetSection = page.getByTestId('canvas-block-section_target');
+      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
+      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      await expect(targetSection.getByTestId(`canvas-block-${targetBlockId}`)).toBeVisible();
+      expect(await isBeforeInDom(targetSection, movedBlockId, targetBlockId)).toBe(true);
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+      await saveDesignerPage(page, pid);
+
+      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      expect(readback.ok(), await readback.text()).toBe(true);
+      const readbackBody = await readback.json();
+      expect(readbackBody.code).toBe('0');
+      const savedBlocks = readbackBody.data.blocks as TestBlock[];
+      const savedSource = findBlock(savedBlocks, 'section_source');
+      const savedTarget = findBlock(savedBlocks, 'section_target');
+
+      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId, targetBlockId]);
+      expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
+    });
+
+    test(`moves an existing ${blockType} subtree inside an empty section and preserves children`, async ({
+      page,
+    }) => {
+      const movedBlockId = `${blockType}_move_candidate`;
+      const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType, {
+        emptyTarget: true,
+      });
+      await openDesigner(page, formKey);
+      await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
+
+      await page.getByTestId('designer-mode-layout').click();
+      await dragCanvasBlockInto(page, movedBlockId, 'section_target');
+
+      const sourceSection = page.getByTestId('canvas-block-section_source');
+      const targetSection = page.getByTestId('canvas-block-section_target');
+      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
+      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+
+      await saveDesignerPage(page, pid);
+
+      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      expect(readback.ok(), await readback.text()).toBe(true);
+      const readbackBody = await readback.json();
+      expect(readbackBody.code).toBe('0');
+      const savedBlocks = readbackBody.data.blocks as TestBlock[];
+      const savedSource = findBlock(savedBlocks, 'section_source');
+      const savedTarget = findBlock(savedBlocks, 'section_target');
+
+      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
+      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId]);
+      expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
+    });
+  }
 
   test('rejects moving a cross-kind block within a form designer and keeps persisted schema unchanged', async ({ page }) => {
     const { pageKey: formKey } = await createCrossKindGuardFormPage(page);

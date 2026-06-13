@@ -145,6 +145,37 @@ describe('resolveDragEndAction', () => {
       targetBlockId: 'sub_table_target',
     });
   });
+
+  it('prefers a same-type ancestor over a descendant that can also accept the moving block', () => {
+    const blockTypes = new Map([
+      ['subform_move_candidate', 'subform'],
+      ['subform_target', 'subform'],
+      ['target_section_details', 'form-section'],
+      ['target_field_name', 'field'],
+    ]);
+
+    expect(
+      resolveCanvasBlockAncestorDropAction(
+        'subform_move_candidate',
+        [
+          'form_root',
+          'section_target',
+          'subform_target',
+          'target_section_details',
+          'target_field_name',
+        ],
+        caps({
+          canMoveBlockBeforeTarget: (_movingBlockId, targetBlockId) =>
+            targetBlockId === 'target_field_name' || targetBlockId === 'subform_target',
+        }),
+        { getBlockType: (blockId) => blockTypes.get(blockId) },
+      ),
+    ).toEqual({
+      type: 'move-before',
+      movingBlockId: 'subform_move_candidate',
+      targetBlockId: 'subform_target',
+    });
+  });
 });
 
 describe('prioritizeNestedDropCollisions', () => {

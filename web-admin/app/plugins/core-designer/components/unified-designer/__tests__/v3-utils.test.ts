@@ -236,6 +236,90 @@ describe('Recursive PageSchema V3 utilities', () => {
     ).toEqual(['sub_table_orders']);
   });
 
+  it('moves repeater and subform subtrees between compatible containers without losing children', () => {
+    const crossContainerSchema: PageSchemaV3 = {
+      ...schema,
+      blocks: [
+        {
+          id: 'form_1',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'section_basic',
+              blockType: 'form-section',
+              blocks: [
+                {
+                  id: 'repeater_contacts',
+                  blockType: 'repeater',
+                  blocks: [{ id: 'field_contact_name', blockType: 'field', field: 'contact_name' }],
+                },
+                {
+                  id: 'subform_team',
+                  blockType: 'subform',
+                  blocks: [
+                    {
+                      id: 'subform_section_team',
+                      blockType: 'form-section',
+                      blocks: [{ id: 'field_member_name', blockType: 'field', field: 'member_name' }],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'section_secondary',
+              blockType: 'form-section',
+              blocks: [
+                {
+                  id: 'repeater_history',
+                  blockType: 'repeater',
+                  blocks: [{ id: 'field_history_note', blockType: 'field', field: 'history_note' }],
+                },
+              ],
+            },
+            {
+              id: 'section_empty',
+              blockType: 'form-section',
+              blocks: [],
+            },
+          ],
+        },
+      ],
+    };
+
+    const repeaterBeforeTarget = moveBlockBefore(
+      crossContainerSchema.blocks,
+      'repeater_contacts',
+      'repeater_history',
+    );
+    const targetAfterRepeaterMove = findBlockById(repeaterBeforeTarget, 'section_secondary')?.block;
+    const movedRepeater = findBlockById(repeaterBeforeTarget, 'repeater_contacts')?.block;
+
+    expect(targetAfterRepeaterMove?.blocks?.map((block) => block.id)).toEqual([
+      'repeater_contacts',
+      'repeater_history',
+    ]);
+    expect(movedRepeater?.blocks?.map((block) => block.id)).toEqual(['field_contact_name']);
+
+    const subformInsideEmpty = moveBlockToParent(
+      crossContainerSchema.blocks,
+      'subform_team',
+      'section_empty',
+    );
+    const targetAfterSubformMove = findBlockById(subformInsideEmpty, 'section_empty')?.block;
+    const movedSubform = findBlockById(subformInsideEmpty, 'subform_team')?.block;
+    const movedSubformSection = findBlockById(subformInsideEmpty, 'subform_section_team')?.block;
+
+    expect(targetAfterSubformMove?.blocks?.map((block) => block.id)).toEqual(['subform_team']);
+    expect(movedSubform?.blocks?.map((block) => block.id)).toEqual(['subform_section_team']);
+    expect(movedSubformSection?.blocks?.map((block) => block.id)).toEqual(['field_member_name']);
+    expect(
+      findBlockById(crossContainerSchema.blocks, 'section_empty')?.block.blocks?.map(
+        (block) => block.id,
+      ),
+    ).toEqual([]);
+  });
+
   it('sets nested dot-path values without mutating the source object', () => {
     const source = { props: { label: 'Name' }, layout: { span: 6 } };
     const next = setByPath(source, 'props.required', true);
