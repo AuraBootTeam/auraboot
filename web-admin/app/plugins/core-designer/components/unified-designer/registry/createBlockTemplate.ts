@@ -186,6 +186,16 @@ const BLOCK_TEMPLATES: Record<string, { label: string; create: BlockTemplateFact
       blocks: [],
     }),
   },
+  columns: {
+    label: 'New columns',
+    create: (id) => ({
+      id,
+      blockType: 'columns',
+      title: { en: 'New columns', 'zh-CN': '新分栏' },
+      layout: { span: 12, columns: 2, gap: 16 },
+      blocks: [],
+    }),
+  },
   tab: {
     label: 'New tab',
     create: (id) => ({
