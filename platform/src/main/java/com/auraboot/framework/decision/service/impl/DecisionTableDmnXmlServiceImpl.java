@@ -29,6 +29,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
 import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
 import java.math.BigDecimal;
@@ -318,9 +319,13 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
         secure(factory, "http://xml.org/sax/features/external-parameter-entities", false);
         secure(factory, "http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
         factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
         factory.setXIncludeAware(false);
         factory.setExpandEntityReferences(false);
-        return factory.newDocumentBuilder().parse(new InputSource(new StringReader(dmnXml)));
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        builder.setEntityResolver((publicId, systemId) -> new InputSource(new StringReader("")));
+        return builder.parse(new InputSource(new StringReader(dmnXml)));
     }
 
     private void secure(DocumentBuilderFactory factory, String feature, boolean value) throws Exception {

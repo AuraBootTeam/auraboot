@@ -1,8 +1,12 @@
 package com.auraboot.framework.decision.service.impl;
 
+import com.auraboot.framework.decision.dto.DecisionTableDmnXmlDTO;
 import com.auraboot.framework.decision.dto.DecisionTableDmnXmlRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -66,5 +70,37 @@ class DecisionTableDmnXmlServiceImplTest {
         assertThat(result.getModel().path("inputs").get(0).path("allowedValues").get(0).asText()).isEqualTo("GOLD");
         assertThat(result.getModel().path("rules").get(0).path("when").path("tier").path("feel").asText())
                 .isEqualTo("\"GOLD\"");
+    }
+
+    @Test
+    void importRejectsDmnXmlWithExternalEntity() throws Exception {
+        Path secret = Files.createTempFile("auraboot-dmn-xxe-", ".txt");
+        Files.writeString(secret, "XXE_SECRET_DO_NOT_READ");
+        String dmnXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE definitions [
+              <!ENTITY xxe SYSTEM "%s">
+            ]>
+            <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+                         id="definitions" name="definitions" namespace="https://auraboot/test">
+              <decision id="route" name="route">
+                <decisionTable hitPolicy="FIRST">
+                  <input id="amount"><inputExpression><text>&xxe;</text></inputExpression></input>
+                  <output id="route" name="route" typeRef="string"/>
+                  <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"manager"</text></outputEntry></rule>
+                </decisionTable>
+              </decision>
+            </definitions>
+            """.formatted(secret.toUri());
+        DecisionTableDmnXmlRequest request = new DecisionTableDmnXmlRequest();
+        request.setDmnXml(dmnXml);
+
+        var result = service.importDmn(request);
+
+        assertThat(result.getValid()).isFalse();
+        assertThat(result.getModel()).isNull();
+        assertThat(result.getErrors()).isNotEmpty();
+        assertThat(result.getErrors().stream().map(DecisionTableDmnXmlDTO.Issue::getMessage).toList())
+                .noneMatch(message -> message != null && message.contains("XXE_SECRET_DO_NOT_READ"));
     }
 }
