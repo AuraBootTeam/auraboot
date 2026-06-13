@@ -5,7 +5,7 @@
     "name": "决策中心",
     "name:zh-CN": "决策中心",
     "name:en": "DecisionOps",
-    "path": "/decision-ops",
+    "path": "/p/decisionops_rollouts",
     "component": null,
     "icon": "partition",
     "type": 1,
@@ -13,9 +13,168 @@
     "orderNo": 25,
     "visible": true,
     "extension": {
-      "platforms": [
-        "web"
-      ]
+      "platforms": ["web"],
+      "implementation": "dsl",
+      "legacyRedirectFrom": "/decision-ops"
+    }
+  },
+  {
+    "code": "decisionops_definitions",
+    "parentCode": "decisionops_console",
+    "name": "决策定义",
+    "name:zh-CN": "决策定义",
+    "name:en": "Decision Definitions",
+    "path": "/p/decisionops_definitions",
+    "component": null,
+    "icon": "git-branch",
+    "type": 1,
+    "permissionCode": "decision.definition.read",
+    "orderNo": 24,
+    "visible": true,
+    "pageKey": "decisionops_definitions_list",
+    "extension": {
+      "platforms": ["web"],
+      "implementation": "dsl",
+      "customBlocks": ["DecisionDefinitionCatalogBlock"]
+    }
+  },
+  {
+    "code": "decisionops_tables",
+    "parentCode": "decisionops_console",
+    "name": "决策表",
+    "name:zh-CN": "决策表",
+    "name:en": "Decision Tables",
+    "path": "/p/decisionops_tables",
+    "component": null,
+    "icon": "table",
+    "type": 1,
+    "permissionCode": "decision.definition.manage",
+    "orderNo": 25,
+    "visible": true,
+    "pageKey": "decisionops_tables_list",
+    "extension": {
+      "platforms": ["web"],
+      "implementation": "dsl",
+      "customBlocks": ["DecisionTableWorkbenchBlock"]
+    }
+  },
+  {
+    "code": "decisionops_event_policies",
+    "parentCode": "decisionops_console",
+    "name": "Event Policy",
+    "name:zh-CN": "Event Policy",
+    "name:en": "Event Policy",
+    "path": "/p/decisionops_event_policies",
+    "component": null,
+    "icon": "bolt",
+    "type": 1,
+    "permissionCode": "decision.policy.read",
+    "orderNo": 26,
+    "visible": true,
+    "pageKey": "decisionops_event_policies_list",
+    "extension": {
+      "platforms": ["web"],
+      "implementation": "dsl",
+      "customBlocks": ["DecisionModelFieldCatalogBlock"]
+    }
+  },
+  {
+    "code": "decisionops_rollouts",
+    "parentCode": "decisionops_console",
+    "name": "发布治理",
+    "name:zh-CN": "发布治理",
+    "name:en": "Rollout Governance",
+    "path": "/p/decisionops_rollouts",
+    "component": null,
+    "icon": "split",
+    "type": 1,
+    "permissionCode": "decision.definition.read",
+    "orderNo": 27,
+    "visible": true,
+    "pageKey": "decisionops_rollouts_list",
+    "extension": {
+      "platforms": ["web"],
+      "implementation": "dsl",
+      "customBlocks": ["DecisionRolloutMonitorBlock"]
+    }
+  },
+  {
+    "code": "decisionops_execution_logs",
+    "parentCode": "decisionops_console",
+    "name": "执行日志",
+    "name:zh-CN": "执行日志",
+    "name:en": "Execution Logs",
+    "path": "/p/decisionops_execution_logs",
+    "component": null,
+    "icon": "activity",
+    "type": 1,
+    "permissionCode": "decision.definition.read",
+    "orderNo": 28,
+    "visible": true,
+    "pageKey": "decisionops_execution_logs_list",
+    "extension": {
+      "platforms": ["web"],
+      "implementation": "dsl",
+      "customBlocks": ["ExecutionLogTraceBlock"]
+    }
+  },
+  {
+    "code": "decisionops_model_fields",
+    "parentCode": "decisionops_console",
+    "name": "数据模型",
+    "name:zh-CN": "数据模型",
+    "name:en": "Model Fields",
+    "path": "/p/decisionops_model_fields",
+    "component": null,
+    "icon": "database",
+    "type": 1,
+    "permissionCode": "decision.definition.read",
+    "orderNo": 29,
+    "visible": true,
+    "pageKey": "decisionops_model_fields_list",
+    "extension": {
+      "platforms": ["web"],
+      "implementation": "dsl"
+    }
+  },
+  {
+    "code": "decisionops_connectors",
+    "parentCode": "decisionops_console",
+    "name": "集成连接器",
+    "name:zh-CN": "集成连接器",
+    "name:en": "Connectors",
+    "path": "/p/decisionops_connectors",
+    "component": null,
+    "icon": "plug",
+    "type": 1,
+    "permissionCode": "sys.connector.update",
+    "orderNo": 30,
+    "visible": true,
+    "pageKey": "decisionops_connectors_list",
+    "extension": {
+      "platforms": ["web"],
+      "implementation": "dsl",
+      "manageUrl": "/p/api_connector"
+    }
+  },
+  {
+    "code": "decisionops_webhooks",
+    "parentCode": "decisionops_console",
+    "name": "Webhook 治理",
+    "name:zh-CN": "Webhook 治理",
+    "name:en": "Webhook Governance",
+    "path": "/p/decisionops_webhooks",
+    "component": null,
+    "icon": "webhook",
+    "type": 1,
+    "permissionCode": "admin_webhook",
+    "orderNo": 31,
+    "visible": true,
+    "pageKey": "decisionops_webhooks_list",
+    "extension": {
+      "platforms": ["web"],
+      "implementation": "dsl",
+      "manageUrl": "/p/webhook"
     }
   }
 ]

@@ -146,6 +146,8 @@ public class DrtDefinitionServiceImpl implements DrtDefinitionService {
     @Override
     public PageResult<DrtDefinitionDTO> list(String keyword, int page, int size) {
         Long tid = requireTenant();
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 200);
         LambdaQueryWrapper<DrtDefinitionEntity> w = new LambdaQueryWrapper<>();
         w.eq(DrtDefinitionEntity::getTenantId, tid);
         if (StringUtils.hasText(keyword)) {
@@ -154,7 +156,7 @@ public class DrtDefinitionServiceImpl implements DrtDefinitionService {
         }
         w.orderByDesc(DrtDefinitionEntity::getCreatedAt);
 
-        Page<DrtDefinitionEntity> pageResult = definitionMapper.selectPage(new Page<>(page, size), w);
+        Page<DrtDefinitionEntity> pageResult = definitionMapper.selectPage(new Page<>(safePage, safeSize), w);
 
         List<DrtDefinitionDTO> dtos = pageResult.getRecords().stream()
                 .map(this::toDTO)
@@ -163,11 +165,11 @@ public class DrtDefinitionServiceImpl implements DrtDefinitionService {
         PageResult<DrtDefinitionDTO> result = new PageResult<>();
         result.setRecords(dtos);
         result.setTotal(pageResult.getTotal());
-        result.setCurrent((long) page);
-        result.setSize((long) size);
+        result.setCurrent((long) safePage);
+        result.setSize((long) safeSize);
         result.setPages(pageResult.getPages());
-        result.setHasPrevious(page > 1);
-        result.setHasNext(page < pageResult.getPages());
+        result.setHasPrevious(safePage > 1);
+        result.setHasNext(safePage < pageResult.getPages());
         return result;
     }
 

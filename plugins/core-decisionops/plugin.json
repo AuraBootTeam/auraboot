@@ -4,15 +4,16 @@
   "version": "1.0.0",
   "dslVersion": 1,
   "pluginType": "config",
-  "displayName": "Core DecisionOps Navigation",
-  "displayName:zh-CN": "决策中心导航",
-  "displayName:en": "Core DecisionOps Navigation",
-  "description": "Navigation menu for the DecisionOps console (decision definitions, condition designer, execution logs, governance). Backend lives in framework.decision/eventpolicy; frontend route in web-admin core-decisionops.",
+  "displayName": "Core DecisionOps",
+  "displayName:zh-CN": "规则中心",
+  "displayName:en": "Core DecisionOps",
+  "description": "DSL resources for the DecisionOps workspace: decision definitions, DMN tables, event policies, rollouts, execution traces, model fields, and platform integration shortcuts.",
   "author": "AuraBoot Team",
   "minPlatformVersion": "1.0.0",
   "dependencies": [],
   "resourceDirs": {
-    "menus": "config/menus.json"
+    "menus": "config/menus.json",
+    "pages": "config/pages.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",

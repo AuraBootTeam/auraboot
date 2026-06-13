@@ -1,0 +1,541 @@
+[
+  {
+    "pageKey": "decisionops_definitions_list",
+    "name:zh-CN": "决策定义",
+    "name:en": "Decision Definitions",
+    "modelCode": "decision_definition",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": { "type": "stack", "gap": 12 },
+    "extension": {
+      "skipFieldMeta": true,
+      "hideSavedViews": true,
+      "hideQuickFilters": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideFilterChips": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true,
+      "miscBlocksPosition": "beforeTable",
+      "hideDataSourceErrorBanner": true,
+      "options": {
+        "detailUrl": "/p/decisionops_definitions/view/{decisionCode}",
+        "detailNavigation": "detail"
+      },
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/decision/definitions",
+        "pagination": true
+      }
+    },
+    "blocks": [
+      {
+        "id": "decision_definition_catalog",
+        "blockType": "custom",
+        "component": "DecisionDefinitionCatalogBlock",
+        "props": { "mode": "catalog" }
+      },
+      {
+        "id": "decision_definition_table",
+        "blockType": "table",
+        "table": {
+          "columns": [
+            { "field": "decisionCode", "label": { "zh-CN": "决策编码", "en-US": "Decision Code" }, "width": 240 },
+            { "field": "decisionName", "label": { "zh-CN": "名称", "en-US": "Name" }, "width": 240 },
+            {
+              "field": "scopeType",
+              "label": { "zh-CN": "范围", "en-US": "Scope" },
+              "width": 140,
+              "valueType": "tag",
+              "tagMap": {
+                "GOVERNANCE": { "label": { "zh-CN": "治理", "en-US": "Governance" }, "color": "blue" },
+                "AUTOMATION": { "label": { "zh-CN": "自动化", "en-US": "Automation" }, "color": "cyan" },
+                "BPM": { "label": { "zh-CN": "流程", "en-US": "BPM" }, "color": "purple" },
+                "SLA": { "label": { "zh-CN": "SLA", "en-US": "SLA" }, "color": "orange" },
+                "PERMISSION": { "label": { "zh-CN": "权限", "en-US": "Permission" }, "color": "indigo" }
+              }
+            },
+            { "field": "ownerModule", "label": { "zh-CN": "所属模块", "en-US": "Owner Module" }, "width": 150 },
+            {
+              "field": "enabled",
+              "label": { "zh-CN": "启用", "en-US": "Enabled" },
+              "width": 100,
+              "valueType": "tag",
+              "tagMap": {
+                "true": { "label": { "zh-CN": "启用", "en-US": "Enabled" }, "color": "green" },
+                "false": { "label": { "zh-CN": "停用", "en-US": "Disabled" }, "color": "gray" }
+              }
+            },
+            { "field": "updatedAt", "label": { "zh-CN": "更新时间", "en-US": "Updated At" }, "width": 180, "format": "YYYY-MM-DD HH:mm" }
+          ],
+          "rowActions": [
+            { "code": "detail", "label": { "zh-CN": "详情", "en-US": "Detail" }, "action": { "type": "navigate", "to": "/p/decisionops_definitions/view/{decisionCode}" } },
+            { "code": "rollout", "label": { "zh-CN": "灰度", "en-US": "Rollout" }, "action": { "type": "navigate", "to": "/p/decisionops_rollouts?decisionCode={decisionCode}" } }
+          ],
+          "defaultSort": { "field": "createdAt", "order": "desc" }
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "decisionops_tables_list",
+    "name:zh-CN": "决策表",
+    "name:en": "Decision Tables",
+    "modelCode": "decision_definition",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": { "type": "stack", "gap": 12 },
+    "extension": {
+      "skipFieldMeta": true,
+      "customOnly": true,
+      "hideSavedViews": true,
+      "hideQuickFilters": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideFilterChips": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true
+    },
+    "blocks": [
+      {
+        "id": "decision_table_workbench",
+        "blockType": "custom",
+        "component": "DecisionTableWorkbenchBlock",
+        "props": { "mode": "workbench" }
+      }
+    ]
+  },
+  {
+    "pageKey": "decisionops_event_policies_list",
+    "name:zh-CN": "Event Policy",
+    "name:en": "Event Policy",
+    "modelCode": "event_policy_definition",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": { "type": "stack", "gap": 12 },
+    "extension": {
+      "skipFieldMeta": true,
+      "hideSavedViews": true,
+      "hideQuickFilters": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideFilterChips": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true,
+      "miscBlocksPosition": "beforeTable",
+      "options": {
+        "detailUrl": "/p/decisionops_event_policies/view/{policyCode}",
+        "detailNavigation": "detail"
+      },
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/event-policy/definitions?eventType=FORM_SUBMITTED&targetType=FORM&targetKey=complaint",
+        "pagination": true
+      }
+    },
+    "blocks": [
+      {
+        "id": "event_policy_actions",
+        "blockType": "custom",
+        "component": "EventPolicyActionsBlock",
+        "props": {
+          "mode": "list",
+          "detailUrl": "/p/decisionops_event_policies/view/{policyCode}",
+          "designerUrl": "/p/decisionops_event_policy_designer?policyCode={policyCode}",
+          "logsUrl": "/p/decisionops_execution_logs?policyCode={policyCode}"
+        }
+      },
+      {
+        "id": "event_policy_table",
+        "blockType": "table",
+        "table": {
+          "columns": [
+            { "field": "policyName", "label": { "zh-CN": "策略", "en-US": "Policy" }, "width": 220 },
+            { "field": "policyCode", "label": { "zh-CN": "策略编码", "en-US": "Policy Code" }, "width": 220 },
+            {
+              "field": "eventType",
+              "label": { "zh-CN": "事件", "en-US": "Event" },
+              "width": 180,
+              "valueType": "tag",
+              "tagMap": {
+                "FORM_SUBMITTED": { "label": { "zh-CN": "表单提交", "en-US": "Form submitted" }, "color": "blue" },
+                "TASK_COMPLETED": { "label": { "zh-CN": "任务完成", "en-US": "Task completed" }, "color": "green" },
+                "RECORD_CHANGED": { "label": { "zh-CN": "记录变更", "en-US": "Record changed" }, "color": "cyan" }
+              }
+            },
+            {
+              "field": "targetType",
+              "label": { "zh-CN": "目标类型", "en-US": "Target Type" },
+              "width": 140,
+              "valueType": "tag",
+              "tagMap": {
+                "FORM": { "label": { "zh-CN": "表单", "en-US": "Form" }, "color": "blue" },
+                "MODEL": { "label": { "zh-CN": "模型", "en-US": "Model" }, "color": "indigo" },
+                "PROCESS": { "label": { "zh-CN": "流程", "en-US": "Process" }, "color": "purple" }
+              }
+            },
+            { "field": "targetKey", "label": { "zh-CN": "目标", "en-US": "Target" }, "width": 180 },
+            {
+              "field": "phase",
+              "label": { "zh-CN": "阶段", "en-US": "Phase" },
+              "width": 150,
+              "valueType": "tag",
+              "tagMap": {
+                "BEFORE_COMMIT": { "label": { "zh-CN": "提交前", "en-US": "Before commit" }, "color": "orange" },
+                "AFTER_COMMIT": { "label": { "zh-CN": "提交后", "en-US": "After commit" }, "color": "green" },
+                "ASYNC_WORKER": { "label": { "zh-CN": "异步执行", "en-US": "Async worker" }, "color": "cyan" }
+              }
+            },
+            {
+              "field": "matchMode",
+              "label": { "zh-CN": "匹配模式", "en-US": "Match Mode" },
+              "width": 150,
+              "valueType": "tag",
+              "tagMap": {
+                "FIRST": { "label": { "zh-CN": "首个命中", "en-US": "First" }, "color": "blue" },
+                "COLLECT_ALL": { "label": { "zh-CN": "收集全部", "en-US": "Collect all" }, "color": "indigo" },
+                "PRIORITY_FIRST": { "label": { "zh-CN": "优先级首个", "en-US": "Priority first" }, "color": "purple" }
+              }
+            },
+            { "field": "version", "label": { "zh-CN": "版本", "en-US": "Version" }, "width": 100 },
+            {
+              "field": "status",
+              "label": { "zh-CN": "状态", "en-US": "Status" },
+              "width": 130,
+              "valueType": "tag",
+              "tagMap": {
+                "DRAFT": { "label": { "zh-CN": "草稿", "en-US": "Draft" }, "color": "gray" },
+                "PUBLISHED": { "label": { "zh-CN": "已发布", "en-US": "Published" }, "color": "green" },
+                "DISABLED": { "label": { "zh-CN": "已停用", "en-US": "Disabled" }, "color": "gray" }
+              }
+            },
+            {
+              "field": "enabled",
+              "label": { "zh-CN": "启用", "en-US": "Enabled" },
+              "width": 100,
+              "valueType": "tag",
+              "tagMap": {
+                "true": { "label": { "zh-CN": "启用", "en-US": "Enabled" }, "color": "green" },
+                "false": { "label": { "zh-CN": "停用", "en-US": "Disabled" }, "color": "gray" }
+              }
+            },
+            { "field": "owner", "label": { "zh-CN": "负责人", "en-US": "Owner" }, "width": 180 }
+          ],
+          "rowActions": [
+            { "code": "detail", "label": { "zh-CN": "详情", "en-US": "Detail" }, "action": { "type": "navigate", "to": "/p/decisionops_event_policies/view/{policyCode}" } },
+            { "code": "design", "label": { "zh-CN": "设计", "en-US": "Design" }, "action": { "type": "navigate", "to": "/p/decisionops_event_policy_designer?policyCode={policyCode}" } },
+            { "code": "logs", "label": { "zh-CN": "日志", "en-US": "Logs" }, "action": { "type": "navigate", "to": "/p/decisionops_execution_logs?policyCode={policyCode}" } }
+          ],
+          "defaultSort": { "field": "updatedAt", "order": "desc" }
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "decisionops_rollouts_list",
+    "name:zh-CN": "发布治理",
+    "name:en": "Rollout Governance",
+    "modelCode": "decision_rollout_policy",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": { "type": "stack", "gap": 12 },
+    "extension": {
+      "skipFieldMeta": true,
+      "hideSavedViews": true,
+      "hideQuickFilters": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideFilterChips": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true,
+      "miscBlocksPosition": "beforeTable",
+      "hideDataSourceErrorBanner": true,
+      "options": { "detailNavigation": "detail" },
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/decision/rollouts",
+        "pagination": true,
+        "detailEndpoint": "/api/decision/rollouts/{pid}"
+      }
+    },
+    "blocks": [
+      {
+        "id": "rollout_monitor",
+        "blockType": "custom",
+        "component": "DecisionRolloutMonitorBlock",
+        "props": { "initialDecisionCode": "complaint_sla_deadline" }
+      },
+      {
+        "id": "rollout_policy_table",
+        "blockType": "table",
+        "table": {
+          "columns": [
+            { "field": "decisionCode", "label": { "zh-CN": "决策编码", "en-US": "Decision Code" }, "width": 220, "sortable": true },
+            { "field": "baselineVersion", "label": { "zh-CN": "基线版本", "en-US": "Baseline" }, "width": 110, "sortable": true },
+            { "field": "candidateVersion", "label": { "zh-CN": "候选版本", "en-US": "Candidate" }, "width": 110, "sortable": true },
+            {
+              "field": "status",
+              "label": { "zh-CN": "状态", "en-US": "Status" },
+              "width": 120,
+              "sortable": true,
+              "valueType": "tag",
+              "tagMap": {
+                "ACTIVE": { "label": { "zh-CN": "生效中", "en-US": "Active" }, "color": "green" },
+                "CANDIDATE_READY": { "label": { "zh-CN": "候选就绪", "en-US": "Candidate ready" }, "color": "blue" },
+                "NO_BASELINE": { "label": { "zh-CN": "缺少基线", "en-US": "No baseline" }, "color": "orange" },
+                "NO_VERSION": { "label": { "zh-CN": "无版本", "en-US": "No version" }, "color": "red" },
+                "PUBLISHED_ONLY": { "label": { "zh-CN": "仅已发布", "en-US": "Published only" }, "color": "green" }
+              }
+            },
+            { "field": "percentage", "label": { "zh-CN": "灰度比例", "en-US": "Traffic %" }, "width": 110, "sortable": true },
+            { "field": "routingKeyExpr", "label": { "zh-CN": "分流键", "en-US": "Routing Key" }, "width": 160 },
+            { "field": "startedAt", "label": { "zh-CN": "开始时间", "en-US": "Started At" }, "width": 180, "format": "YYYY-MM-DD HH:mm", "sortable": true },
+            { "field": "updatedAt", "label": { "zh-CN": "更新时间", "en-US": "Updated At" }, "width": 180, "format": "YYYY-MM-DD HH:mm", "sortable": true }
+          ],
+          "rowActions": [
+            { "code": "view", "label": { "zh-CN": "详情", "en-US": "Details" }, "action": { "type": "navigate", "to": "/p/decisionops_rollouts/view/{pid}" } }
+          ],
+          "defaultSort": { "field": "createdAt", "order": "desc" }
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "decisionops_execution_logs_list",
+    "name:zh-CN": "执行日志",
+    "name:en": "Execution Logs",
+    "modelCode": "decision_execution_log",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": { "type": "stack", "gap": 12 },
+    "extension": {
+      "skipFieldMeta": true,
+      "customOnly": true,
+      "hideSavedViews": true,
+      "hideQuickFilters": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideFilterChips": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true
+    },
+    "blocks": [
+      {
+        "id": "decision_execution_log_trace_explorer",
+        "blockType": "custom",
+        "component": "ExecutionLogTraceBlock",
+        "props": { "mode": "list", "pageSize": 50 }
+      }
+    ]
+  },
+  {
+    "pageKey": "decisionops_model_fields_list",
+    "name:zh-CN": "数据模型",
+    "name:en": "Model Fields",
+    "modelCode": "decision_model_field",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": { "type": "stack", "gap": 12 },
+    "extension": {
+      "skipFieldMeta": true,
+      "hideSavedViews": true,
+      "hideQuickFilters": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideFilterChips": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true,
+      "miscBlocksPosition": "beforeTable",
+      "hideDataSourceErrorBanner": true,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/decision/model/fields",
+        "pagination": true
+      }
+    },
+    "blocks": [
+      {
+        "id": "decision_model_field_catalog",
+        "blockType": "custom",
+        "component": "DecisionModelFieldCatalogBlock",
+        "props": { "mode": "catalog" }
+      },
+      {
+        "id": "decision_model_field_table",
+        "blockType": "table",
+        "table": {
+          "columns": [
+            { "field": "entityCode", "label": { "zh-CN": "实体", "en-US": "Entity" }, "width": 150 },
+            { "field": "path", "label": { "zh-CN": "字段路径", "en-US": "Field Path" }, "width": 260 },
+            { "field": "label", "label": { "zh-CN": "字段名", "en-US": "Field Label" }, "width": 180 },
+            {
+              "field": "dataType",
+              "label": { "zh-CN": "类型", "en-US": "Type" },
+              "width": 130,
+              "valueType": "tag",
+              "tagMap": {
+                "unknown": { "label": { "zh-CN": "未知", "en-US": "Unknown" }, "color": "gray" },
+                "string": { "label": { "zh-CN": "文本", "en-US": "String" }, "color": "blue" },
+                "number": { "label": { "zh-CN": "数字", "en-US": "Number" }, "color": "green" },
+                "boolean": { "label": { "zh-CN": "布尔", "en-US": "Boolean" }, "color": "purple" },
+                "date": { "label": { "zh-CN": "日期", "en-US": "Date" }, "color": "cyan" },
+                "datetime": { "label": { "zh-CN": "日期时间", "en-US": "Datetime" }, "color": "cyan" }
+              }
+            },
+            { "field": "refs", "label": { "zh-CN": "引用次数", "en-US": "References" }, "width": 120 },
+            {
+              "field": "masked",
+              "label": { "zh-CN": "脱敏", "en-US": "Masked" },
+              "width": 100,
+              "valueType": "tag",
+              "tagMap": {
+                "true": { "label": { "zh-CN": "脱敏", "en-US": "Masked" }, "color": "orange" },
+                "false": { "label": { "zh-CN": "普通", "en-US": "Plain" }, "color": "gray" }
+              }
+            },
+            { "field": "permission", "label": { "zh-CN": "权限", "en-US": "Permission" }, "width": 180 },
+            { "field": "decisionCodes", "label": { "zh-CN": "关联决策", "en-US": "Decision Codes" }, "width": 280 }
+          ],
+          "rowActions": [
+            { "code": "impact", "label": { "zh-CN": "影响", "en-US": "Impact" }, "action": { "type": "navigate", "to": "/p/decisionops_model_fields_impact?fieldRef={entityCode}.{path}&currentDataType={dataType}" } }
+          ],
+          "defaultSort": { "field": "entityCode", "order": "asc" }
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "decisionops_connectors_list",
+    "name:zh-CN": "集成连接器",
+    "name:en": "Connectors",
+    "modelCode": "decision_connector",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": { "type": "stack", "gap": 12 },
+    "extension": {
+      "skipFieldMeta": true,
+      "hideSavedViews": true,
+      "hideQuickFilters": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideFilterChips": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true,
+      "options": {
+        "detailUrl": "/p/decisionops_connectors/view/{pid}",
+        "detailNavigation": "detail"
+      },
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/connectors",
+        "pagination": true
+      }
+    },
+    "blocks": [
+      {
+        "id": "decision_connector_table",
+        "blockType": "table",
+        "table": {
+          "columns": [
+            { "field": "name", "label": { "zh-CN": "连接器", "en-US": "Connector" }, "width": 220 },
+            { "field": "baseUrl", "label": { "zh-CN": "基础地址", "en-US": "Base URL" }, "width": 320 },
+            {
+              "field": "authType",
+              "label": { "zh-CN": "认证方式", "en-US": "Auth Type" },
+              "width": 140,
+              "valueType": "tag",
+              "tagMap": {
+                "NONE": { "label": { "zh-CN": "无认证", "en-US": "None" }, "color": "gray" },
+                "BASIC": { "label": { "zh-CN": "Basic", "en-US": "Basic" }, "color": "blue" },
+                "BEARER": { "label": { "zh-CN": "Bearer", "en-US": "Bearer" }, "color": "indigo" },
+                "API_KEY": { "label": { "zh-CN": "API Key", "en-US": "API Key" }, "color": "purple" }
+              }
+            },
+            {
+              "field": "enabled",
+              "label": { "zh-CN": "启用", "en-US": "Enabled" },
+              "width": 100,
+              "valueType": "tag",
+              "tagMap": {
+                "true": { "label": { "zh-CN": "启用", "en-US": "Enabled" }, "color": "green" },
+                "false": { "label": { "zh-CN": "停用", "en-US": "Disabled" }, "color": "gray" }
+              }
+            },
+            { "field": "timeoutMs", "label": { "zh-CN": "超时(ms)", "en-US": "Timeout (ms)" }, "width": 120 },
+            { "field": "updatedAt", "label": { "zh-CN": "更新时间", "en-US": "Updated At" }, "width": 180, "format": "YYYY-MM-DD HH:mm" }
+          ],
+          "rowActions": [
+            { "code": "detail", "label": { "zh-CN": "详情", "en-US": "Detail" }, "action": { "type": "navigate", "to": "/p/decisionops_connectors/view/{pid}" } },
+            { "code": "manage", "label": { "zh-CN": "管理", "en-US": "Manage" }, "action": { "type": "navigate", "to": "/p/api_connector" } }
+          ],
+          "defaultSort": { "field": "updatedAt", "order": "desc" }
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "decisionops_webhooks_list",
+    "name:zh-CN": "Webhook 治理",
+    "name:en": "Webhook Governance",
+    "modelCode": "webhook",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": { "type": "stack", "gap": 12 },
+    "extension": {
+      "hideSavedViews": true,
+      "hideQuickFilters": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideFilterChips": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true,
+      "options": {
+        "detailUrl": "/p/decisionops_webhooks/view/{pid}",
+        "detailNavigation": "detail"
+      }
+    },
+    "blocks": [
+      {
+        "id": "decision_webhook_table",
+        "blockType": "table",
+        "table": {
+          "columns": [
+            { "field": "name", "label": { "zh-CN": "Webhook", "en-US": "Webhook" }, "width": 220 },
+            { "field": "event_type", "label": { "zh-CN": "事件类型", "en-US": "Event Type" }, "width": 160, "dictCode": "webhook_event_type", "renderType": "tag" },
+            { "field": "target_url", "label": { "zh-CN": "目标 URL", "en-US": "Target URL" }, "width": 320 },
+            { "field": "model_code", "label": { "zh-CN": "关联模型", "en-US": "Model" }, "width": 140 },
+            {
+              "field": "enabled",
+              "label": { "zh-CN": "启用", "en-US": "Enabled" },
+              "width": 100,
+              "valueType": "tag",
+              "tagMap": {
+                "true": { "label": { "zh-CN": "启用", "en-US": "Enabled" }, "color": "green" },
+                "false": { "label": { "zh-CN": "停用", "en-US": "Disabled" }, "color": "gray" }
+              }
+            },
+            { "field": "created_at", "label": { "zh-CN": "创建时间", "en-US": "Created At" }, "width": 180, "format": "YYYY-MM-DD HH:mm" }
+          ],
+          "rowActions": [
+            { "code": "detail", "label": { "zh-CN": "详情", "en-US": "Detail" }, "action": { "type": "navigate", "to": "/p/decisionops_webhooks/view/{pid}" } },
+            { "code": "manage", "label": { "zh-CN": "平台管理", "en-US": "Manage" }, "action": { "type": "navigate", "to": "/p/webhook" } }
+          ],
+          "defaultSort": { "field": "created_at", "order": "desc" }
+        }
+      }
+    ]
+  }
+]

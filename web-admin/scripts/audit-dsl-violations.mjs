@@ -9,10 +9,9 @@
  *         node web-admin/scripts/audit-dsl-violations.mjs (from repo root)
  */
 import Ajv from 'ajv';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { globSync } from 'glob';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Support running from web-admin/ or repo root
@@ -35,7 +34,7 @@ const schemaForValidation = {
 const ajv = new Ajv({ allErrors: true, strict: false });
 const validate = ajv.compile(schemaForValidation);
 
-const pagesFiles = globSync('plugins/*/config/pages.json', { cwd: ROOT });
+const pagesFiles = findPluginPages(ROOT);
 
 let totalPages = 0;
 let totalViolations = 0;
@@ -127,4 +126,16 @@ function inferType(path) {
   if (/\.filterExpression\[\d+\]$/.test(path)) return 'TabFilterExpression';
   if (/\.flow\[\d+\]$/.test(path)) return 'FlowStep';
   return path;
+}
+
+function findPluginPages(root) {
+  const pluginsDir = resolve(root, 'plugins');
+  if (!existsSync(pluginsDir)) return [];
+  return readdirSync(pluginsDir)
+    .filter((name) => {
+      const pluginPath = resolve(pluginsDir, name);
+      return statSync(pluginPath).isDirectory();
+    })
+    .map((name) => `plugins/${name}/config/pages.json`)
+    .filter((relPath) => existsSync(resolve(root, relPath)));
 }

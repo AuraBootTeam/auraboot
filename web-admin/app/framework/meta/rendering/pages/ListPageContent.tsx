@@ -96,7 +96,10 @@ export function buildListReferenceDisplayCacheKey(config: ListReferenceDisplayCo
   return `${config.field}|${config.modelCode}|${config.valueField}|${config.displayField}`;
 }
 
-function readRefTargetConfig(column: ColumnConfig, meta?: Record<string, any>): Record<string, any> {
+function readRefTargetConfig(
+  column: ColumnConfig,
+  meta?: Record<string, any>,
+): Record<string, any> {
   return {
     ...(meta?.extension?.refTarget || {}),
     ...(meta?.refTarget || {}),
@@ -138,7 +141,11 @@ export function collectListReferenceDisplayConfigs(
     const meta = modelFieldMap.get(column.field);
     const refTarget = readRefTargetConfig(column, meta);
     const dataType = String(
-      (column as any).dataType || column.valueType || meta?.dataType || meta?.extension?.dataType || '',
+      (column as any).dataType ||
+        column.valueType ||
+        meta?.dataType ||
+        meta?.extension?.dataType ||
+        '',
     ).toLowerCase();
     const hasReferenceShape =
       dataType === 'reference' ||
@@ -185,6 +192,21 @@ interface PaginationResult<T> {
   page: number;
   pageSize: number;
   totalPages: number;
+}
+
+function readPaginatedRecords<T>(
+  responseData: PaginationResult<T> | T[] | Record<string, any>,
+): { records: T[]; total: number; current: number } {
+  if (Array.isArray(responseData)) {
+    return { records: responseData, total: responseData.length, current: 1 };
+  }
+
+  const payload = responseData as Record<string, any>;
+  const recordsCandidate = payload.records ?? payload.items ?? payload.content ?? payload.data;
+  const records = Array.isArray(recordsCandidate) ? (recordsCandidate as T[]) : [];
+  const total = Number(payload.total ?? payload.totalElements ?? records.length) || 0;
+  const current = Number(payload.page ?? payload.current ?? payload.pageNum ?? 1) || 1;
+  return { records, total, current };
 }
 
 const SYSTEM_FIELD_I18N_KEYS: Record<string, string> = {
@@ -539,6 +561,9 @@ function ListPageContentInner(props: PageContentProps) {
   const pageKey = tableName;
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
   const schemaExtension = (schema as any)?.extension ?? {};
+  const isCustomOnlyPage = Boolean(schemaExtension.customOnly);
+  const renderMiscBlocksBeforeTable = schemaExtension.miscBlocksPosition === 'beforeTable';
+  const hideDataSourceErrorBanner = Boolean(schemaExtension.hideDataSourceErrorBanner);
   const hideSavedViews = listExtensions?.hideSavedViews ?? Boolean(schemaExtension.hideSavedViews);
   const {
     views: savedViews,
@@ -865,6 +890,21 @@ function ListPageContentInner(props: PageContentProps) {
       if (!schema) return;
 
       try {
+        if (isCustomOnlyPage) {
+          setLoading(false);
+          setError(null);
+          setData([]);
+          setPageState((prev) => ({
+            ...prev,
+            pagination: {
+              ...prev.pagination,
+              current: 1,
+              total: 0,
+            },
+          }));
+          return;
+        }
+
         setLoading(true);
         setError(null);
 
@@ -974,9 +1014,10 @@ function ListPageContentInner(props: PageContentProps) {
               },
             }));
           } else {
-            const records = responseData.records ?? [];
-            const currentPage = Number(responseData.page ?? requestedPageNum) || requestedPageNum;
-            const total = Number(responseData.total ?? 0);
+            const pagePayload = readPaginatedRecords<DynamicEntity>(responseData);
+            const records = pagePayload.records;
+            const currentPage = pagePayload.current || requestedPageNum;
+            const total = pagePayload.total;
             setData(records);
             setPageState((prev) => ({
               ...prev,
@@ -1010,6 +1051,7 @@ function ListPageContentInner(props: PageContentProps) {
       tableBlock,
       activeSorts,
       chipFilters,
+      isCustomOnlyPage,
     ],
   );
 
@@ -1184,9 +1226,10 @@ function ListPageContentInner(props: PageContentProps) {
                 },
               }));
             } else {
-              const records = responseData.records ?? [];
-              const currentPage = Number(responseData.page ?? 1) || 1;
-              const total = Number(responseData.total ?? 0);
+              const pagePayload = readPaginatedRecords<DynamicEntity>(responseData);
+              const records = pagePayload.records;
+              const currentPage = pagePayload.current || 1;
+              const total = pagePayload.total;
               setData(records);
               setPageState((prev) => ({
                 ...prev,
@@ -1659,7 +1702,8 @@ function ListPageContentInner(props: PageContentProps) {
         : undefined;
       const referenceDisplayValue =
         referenceConfig && value !== null && value !== undefined
-          ? record[referenceConfig.displayKey] || referenceDisplayCache[cacheKey || '']?.[String(value)]
+          ? record[referenceConfig.displayKey] ||
+            referenceDisplayCache[cacheKey || '']?.[String(value)]
           : undefined;
       const recordForRenderer = referenceDisplayValue
         ? { ...record, [referenceConfig!.displayKey]: referenceDisplayValue }
@@ -2081,7 +2125,7 @@ function ListPageContentInner(props: PageContentProps) {
             if (cancelled || !ResultHelper.isSuccess(result) || !result.data) return;
 
             const responseData = result.data;
-            const rows = Array.isArray(responseData) ? responseData : responseData.records || [];
+            const rows = readPaginatedRecords<DynamicEntity>(responseData).records;
             for (const row of rows) {
               const value = row[config.valueField];
               const label = row[config.displayField];
@@ -2681,7 +2725,7 @@ function ListPageContentInner(props: PageContentProps) {
   }, [allBlocks]);
 
   // Error handling — local errors only (schema loading errors handled by DynamicPageRenderer)
-  if (error) {
+  if (error && miscListBlocks.length === 0 && !hideDataSourceErrorBanner) {
     return (
       <ErrorAlert
         error={error}
@@ -2785,6 +2829,18 @@ function ListPageContentInner(props: PageContentProps) {
               (schema as any)?.extension?.hideToolbarMore
             }
           />
+
+          {error && miscListBlocks.length > 0 && !hideDataSourceErrorBanner && (
+            <div className="p-4">
+              <ErrorAlert
+                error={error}
+                onRetry={() => {
+                  setError(null);
+                  loadData({ page: pagination.current - 1, size: pagination.pageSize, filters });
+                }}
+              />
+            </div>
+          )}
 
           {isTenantMemberPage && memberImportDialogOpen && (
             <div
@@ -3256,163 +3312,196 @@ function ListPageContentInner(props: PageContentProps) {
             )}
 
           {activeViewType === 'table' ? (
-            <>
-              <ListToolbar
-                keyword={keyword}
-                onKeywordChange={setKeyword}
-                onSearch={() => {
-                  // Flush debounced URL sync + cancel pending auto-search, then search immediately
-                  syncKeywordToUrl.flush();
-                  debouncedSearch.cancel();
-                  loadData({ page: 0, size: pagination.pageSize });
-                }}
-                filterFormVisible={filterFormVisible}
-                onFilterFormToggle={() => setFilterFormVisible((prev) => !prev)}
-                hasFilterBlock={
-                  !!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)
-                }
-                activeQuickFilter={activeQuickFilter}
-                onQuickFilter={handleQuickFilter}
-                activeSorts={activeSorts}
-                onSortsChange={setActiveSorts}
-                sortableColumns={tableColumns
-                  .filter((c: ColumnConfig) => !c.isActionColumn && c.field && c.sortable !== false)
-                  .map((c: ColumnConfig) => ({
-                    field: c.field,
-                    label: resolveColumnLabel(c),
-                    valueType: c.valueType || c.sorter,
-                  }))}
-                rowHeight={currentView?.viewConfig?.rowHeight}
-                onRowHeightChange={handleRowHeightChange}
-                onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
-                chipFilters={chipFilters}
-                onChipFiltersChange={setChipFilters}
-                fieldMetadata={tableColumns
-                  .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
-                  .map((c: ColumnConfig) => ({
-                    fieldCode: c.field,
-                    label: resolveColumnLabel(c),
-                    fieldType: c.valueType || c.sorter || 'text',
-                    dictCode: c.dictCode,
-                  }))}
-                resolveChipValueLabel={(filter) => {
-                  const col = tableColumns.find((c: ColumnConfig) => c.field === filter.fieldCode);
-                  const dc = (col as any)?.dictCode as string | undefined;
-                  if (!dc) return undefined;
-                  const item = dictDataCache.current
-                    .get(dc)
-                    ?.find((i) => String(i.value) === String(filter.value));
-                  return item?.label;
-                }}
-                onAddFilter={(e?: React.MouseEvent) => {
-                  const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
-                  setFieldPickerAnchor(
-                    rect ? { x: rect.left, y: rect.bottom + 4 } : { x: 300, y: 200 },
-                  );
-                  setFieldPickerOpen(true);
-                }}
-                onChipClick={(idx, e) => {
-                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  setValuePopoverAnchor({ x: rect.left, y: rect.bottom + 4 });
-                  setEditingChipIdx(idx);
-                }}
-                onClearAll={() => {
-                  setChipFilters([]);
-                  setActiveSorts([]);
-                }}
-                hideQuickFilters={
-                  listExtensions?.hideQuickFilters ?? Boolean(schemaExtension.hideQuickFilters)
-                }
-                hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
-                hideColumnSettings={
-                  listExtensions?.hideColumnSettings ?? Boolean(schemaExtension.hideColumnSettings)
-                }
-                hideRowHeight={
-                  listExtensions?.hideRowHeight ?? Boolean(schemaExtension.hideRowHeight)
-                }
-                hideFilterChips={
-                  listExtensions?.hideFilterChips ?? Boolean(schemaExtension.hideFilterChips)
-                }
-              />
+            isCustomOnlyPage ? (
+              <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
+                {runtime
+                  ? miscListBlocks.map((block: any, idx: number) => (
+                      <BlockRenderer
+                        key={block.id || `misc-list-${idx}`}
+                        block={block}
+                        runtime={runtime}
+                        areaId="list-misc"
+                      />
+                    ))
+                  : null}
+              </div>
+            ) : (
+              <>
+                {renderMiscBlocksBeforeTable && miscListBlocks.length > 0 && runtime && (
+                  <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
+                    {miscListBlocks.map((block: any, idx: number) => (
+                      <BlockRenderer
+                        key={block.id || `misc-list-${idx}`}
+                        block={block}
+                        runtime={runtime}
+                        areaId="list-misc"
+                      />
+                    ))}
+                  </div>
+                )}
 
-              {/* Table area — extracted to ListTable with DnD column reorder */}
-              <ListTable
-                columns={tableColumns}
-                data={displayData}
-                loading={loading}
-                activeSorts={activeSorts}
-                selectedIds={selectedIds}
-                rowHeight={effectiveRowHeight}
-                modelCode={modelCode}
-                columnOrder={columnOrder}
-                onColumnReorder={handleColumnReorder}
-                onColumnResize={handleColumnResize}
-                onToggleSort={toggleSort}
-                onSelectRow={(id, _checked) => toggleRowSelection(id)}
-                onSelectAll={() => toggleSelectAll()}
-                onRowClick={handleRowClick}
-                onContextMenu={(e, column) => {
-                  setContextMenu({ x: e.clientX, y: e.clientY, column });
-                }}
-                renderCellContent={(record, column, rowIndex) =>
-                  renderCellContent(column, record, rowIndex)
-                }
-                evaluateVisibleWhen={evaluateVisibleWhen}
-                canUseButton={canUseButton}
-                resolveButtonLabel={resolveButtonLabel}
-                handleAction={handleAction}
-                resolveColumnLabel={resolveColumnLabel}
-                columnWidths={columnWidths}
-                groupedData={groupedData}
-                groupByField={groupByField ?? undefined}
-                collapsedGroups={collapsedGroups}
-                onToggleGroupCollapse={toggleGroupCollapse}
-                getRowStyle={getRowStyle}
-                previewRecordId={previewRecordId}
-                t={t}
-                onInlineSave={handleInlineSave}
-                dictDataCache={dictDataCache.current}
-                enableSelection={
-                  !!((tableBlock as any)?.table?.selection || (tableBlock as any)?.selection) &&
-                  !listExtensions?.disableRowSelection
-                }
-              />
+                <ListToolbar
+                  keyword={keyword}
+                  onKeywordChange={setKeyword}
+                  onSearch={() => {
+                    // Flush debounced URL sync + cancel pending auto-search, then search immediately
+                    syncKeywordToUrl.flush();
+                    debouncedSearch.cancel();
+                    loadData({ page: 0, size: pagination.pageSize });
+                  }}
+                  filterFormVisible={filterFormVisible}
+                  onFilterFormToggle={() => setFilterFormVisible((prev) => !prev)}
+                  hasFilterBlock={
+                    !!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)
+                  }
+                  activeQuickFilter={activeQuickFilter}
+                  onQuickFilter={handleQuickFilter}
+                  activeSorts={activeSorts}
+                  onSortsChange={setActiveSorts}
+                  sortableColumns={tableColumns
+                    .filter(
+                      (c: ColumnConfig) => !c.isActionColumn && c.field && c.sortable !== false,
+                    )
+                    .map((c: ColumnConfig) => ({
+                      field: c.field,
+                      label: resolveColumnLabel(c),
+                      valueType: c.valueType || c.sorter,
+                    }))}
+                  rowHeight={currentView?.viewConfig?.rowHeight}
+                  onRowHeightChange={handleRowHeightChange}
+                  onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
+                  chipFilters={chipFilters}
+                  onChipFiltersChange={setChipFilters}
+                  fieldMetadata={tableColumns
+                    .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
+                    .map((c: ColumnConfig) => ({
+                      fieldCode: c.field,
+                      label: resolveColumnLabel(c),
+                      fieldType: c.valueType || c.sorter || 'text',
+                      dictCode: c.dictCode,
+                    }))}
+                  resolveChipValueLabel={(filter) => {
+                    const col = tableColumns.find(
+                      (c: ColumnConfig) => c.field === filter.fieldCode,
+                    );
+                    const dc = (col as any)?.dictCode as string | undefined;
+                    if (!dc) return undefined;
+                    const item = dictDataCache.current
+                      .get(dc)
+                      ?.find((i) => String(i.value) === String(filter.value));
+                    return item?.label;
+                  }}
+                  onAddFilter={(e?: React.MouseEvent) => {
+                    const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
+                    setFieldPickerAnchor(
+                      rect ? { x: rect.left, y: rect.bottom + 4 } : { x: 300, y: 200 },
+                    );
+                    setFieldPickerOpen(true);
+                  }}
+                  onChipClick={(idx, e) => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setValuePopoverAnchor({ x: rect.left, y: rect.bottom + 4 });
+                    setEditingChipIdx(idx);
+                  }}
+                  onClearAll={() => {
+                    setChipFilters([]);
+                    setActiveSorts([]);
+                  }}
+                  hideQuickFilters={
+                    listExtensions?.hideQuickFilters ?? Boolean(schemaExtension.hideQuickFilters)
+                  }
+                  hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
+                  hideColumnSettings={
+                    listExtensions?.hideColumnSettings ??
+                    Boolean(schemaExtension.hideColumnSettings)
+                  }
+                  hideRowHeight={
+                    listExtensions?.hideRowHeight ?? Boolean(schemaExtension.hideRowHeight)
+                  }
+                  hideFilterChips={
+                    listExtensions?.hideFilterChips ?? Boolean(schemaExtension.hideFilterChips)
+                  }
+                />
 
-              {/* G7 — misc blocks (chart / description / rich-text / divider /
+                {/* Table area — extracted to ListTable with DnD column reorder */}
+                <ListTable
+                  columns={tableColumns}
+                  data={displayData}
+                  loading={loading}
+                  activeSorts={activeSorts}
+                  selectedIds={selectedIds}
+                  rowHeight={effectiveRowHeight}
+                  modelCode={modelCode}
+                  columnOrder={columnOrder}
+                  onColumnReorder={handleColumnReorder}
+                  onColumnResize={handleColumnResize}
+                  onToggleSort={toggleSort}
+                  onSelectRow={(id, _checked) => toggleRowSelection(id)}
+                  onSelectAll={() => toggleSelectAll()}
+                  onRowClick={handleRowClick}
+                  onContextMenu={(e, column) => {
+                    setContextMenu({ x: e.clientX, y: e.clientY, column });
+                  }}
+                  renderCellContent={(record, column, rowIndex) =>
+                    renderCellContent(column, record, rowIndex)
+                  }
+                  evaluateVisibleWhen={evaluateVisibleWhen}
+                  canUseButton={canUseButton}
+                  resolveButtonLabel={resolveButtonLabel}
+                  handleAction={handleAction}
+                  resolveColumnLabel={resolveColumnLabel}
+                  columnWidths={columnWidths}
+                  groupedData={groupedData}
+                  groupByField={groupByField ?? undefined}
+                  collapsedGroups={collapsedGroups}
+                  onToggleGroupCollapse={toggleGroupCollapse}
+                  getRowStyle={getRowStyle}
+                  previewRecordId={previewRecordId}
+                  t={t}
+                  onInlineSave={handleInlineSave}
+                  dictDataCache={dictDataCache.current}
+                  enableSelection={
+                    !!((tableBlock as any)?.table?.selection || (tableBlock as any)?.selection) &&
+                    !listExtensions?.disableRowSelection
+                  }
+                />
+
+                {/* G7 — misc blocks (chart / description / rich-text / divider /
                   stat-card / etc.) dispatched via BlockRenderer fallback
                   registry. Unknown block types surface a visible placeholder. */}
-              {miscListBlocks.length > 0 && runtime && (
-                <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
-                  {miscListBlocks.map((block: any, idx: number) => (
-                    <BlockRenderer
-                      key={block.id || `misc-list-${idx}`}
-                      block={block}
-                      runtime={runtime}
-                      areaId="list-misc"
-                    />
-                  ))}
-                </div>
-              )}
+                {!renderMiscBlocksBeforeTable && miscListBlocks.length > 0 && runtime && (
+                  <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
+                    {miscListBlocks.map((block: any, idx: number) => (
+                      <BlockRenderer
+                        key={block.id || `misc-list-${idx}`}
+                        block={block}
+                        runtime={runtime}
+                        areaId="list-misc"
+                      />
+                    ))}
+                  </div>
+                )}
 
-              {/* Pagination + Bulk Action Toolbar */}
-              <ListPagination
-                current={pagination.current}
-                pageSize={pagination.pageSize}
-                total={pagination.total}
-                onPageChange={handlePageChange}
-                onPageSizeChange={handlePageSizeChange}
-                t={t}
-                selectedCount={selectedIds.size}
-                selectedIds={selectedIdList}
-                modelCode={modelCode}
-                onBulkEdit={() => setBulkEditOpen(true)}
-                onBulkDelete={handleBulkDelete}
-                bulkActions={visibleBulkActions}
-                onBulkAction={handleBulkAction}
-                resolveBulkActionLabel={resolveButtonLabel}
-                onClearSelection={() => setSelectedIds(new Set())}
-              />
-            </>
+                {/* Pagination + Bulk Action Toolbar */}
+                <ListPagination
+                  current={pagination.current}
+                  pageSize={pagination.pageSize}
+                  total={pagination.total}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                  t={t}
+                  selectedCount={selectedIds.size}
+                  selectedIds={selectedIdList}
+                  modelCode={modelCode}
+                  onBulkEdit={() => setBulkEditOpen(true)}
+                  onBulkDelete={handleBulkDelete}
+                  bulkActions={visibleBulkActions}
+                  onBulkAction={handleBulkAction}
+                  resolveBulkActionLabel={resolveButtonLabel}
+                  onClearSelection={() => setSelectedIds(new Set())}
+                />
+              </>
+            )
           ) : (
             <SmartViewRenderer
               view={

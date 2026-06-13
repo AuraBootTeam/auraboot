@@ -25,6 +25,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.time.Instant;
 import java.util.Map;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -122,6 +123,34 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
                 .andExpect(jsonPath("$.data.version").value(1));
+
+        // 5a. list read-model endpoints used by DecisionOps DSL pages must not 500.
+        mockMvc.perform(get("/api/decision/definitions")
+                        .param("keyword", code)
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].decisionCode").value(code))
+                .andExpect(jsonPath("$.data.current").value(1));
+
+        mockMvc.perform(get("/api/decision/rollouts")
+                        .param("decisionCode", code)
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].decisionCode").value(code))
+                .andExpect(jsonPath("$.data.records[0].baselineVersion").value(1))
+                .andExpect(jsonPath("$.data.records[0].status").value("PUBLISHED_ONLY"))
+                .andExpect(jsonPath("$.data.records[0].percentage").value(0.0));
+
+        mockMvc.perform(get("/api/decision/model/fields")
+                        .param("decisionCode", code)
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].entityCode").value("record"))
+                .andExpect(jsonPath("$.data.records[0].path").value("data.amount"))
+                .andExpect(jsonPath("$.data.records[0].refs").value(1));
 
         // 6. evaluate via HTTP → MATCHED for amount > 10000
         mockMvc.perform(post("/api/decision/evaluate").contentType(MediaType.APPLICATION_JSON)

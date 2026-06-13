@@ -2,6 +2,8 @@ package com.auraboot.framework.decision.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.dto.PageResult;
+import com.auraboot.framework.decision.dto.DecisionModelFieldDTO;
+import com.auraboot.framework.decision.dto.DecisionRolloutPolicyDTO;
 import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtDefinitionDTO;
 import com.auraboot.framework.decision.dto.DrtEvaluateRequest;
@@ -12,6 +14,7 @@ import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionDTO;
 import com.auraboot.framework.decision.model.DecisionResult;
 import com.auraboot.framework.decision.model.DecisionValidateResult;
+import com.auraboot.framework.decision.service.DecisionGovernanceQueryService;
 import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.decision.service.DecisionEvaluationService;
 import com.auraboot.framework.decision.service.DecisionVersionService;
@@ -49,6 +52,7 @@ public class DecisionRuntimeController {
     private final DrtDefinitionService definitionService;
     private final DecisionVersionService versionService;
     private final DecisionEvaluationService evaluationService;
+    private final DecisionGovernanceQueryService governanceQueryService;
 
     // ==================== Stateless validation + evaluation ====================
 
@@ -132,6 +136,31 @@ public class DecisionRuntimeController {
         log.info("Listing decision definitions: keyword={}, page={}, size={}", keyword, page, size);
         PageResult<DrtDefinitionDTO> result = definitionService.list(keyword, page, size);
         return ApiResponse.success(result);
+    }
+
+    @GetMapping("/rollouts")
+    @Operation(summary = "List rollout governance preview rows",
+            description = "Read-only projection from decision versions. Traffic routing is shown as not configured "
+                    + "until rollout policies are persisted by a later governance scope.")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_READ)
+    public ApiResponse<PageResult<DecisionRolloutPolicyDTO>> listRollouts(
+            @Parameter(description = "Optional decision code filter") @RequestParam(required = false) String decisionCode,
+            @Parameter(description = "Page number") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
+        log.info("Listing decision rollout preview: decisionCode={}, page={}, size={}", decisionCode, page, size);
+        return ApiResponse.success(governanceQueryService.listRollouts(decisionCode, page, size));
+    }
+
+    @GetMapping("/model/fields")
+    @Operation(summary = "List decision field reference index",
+            description = "Aggregates field references extracted by decision validation.")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_READ)
+    public ApiResponse<PageResult<DecisionModelFieldDTO>> listModelFields(
+            @Parameter(description = "Optional decision code filter") @RequestParam(required = false) String decisionCode,
+            @Parameter(description = "Page number") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
+        log.info("Listing decision model fields: decisionCode={}, page={}, size={}", decisionCode, page, size);
+        return ApiResponse.success(governanceQueryService.listModelFields(decisionCode, page, size));
     }
 
     @PutMapping("/definitions/{code}")

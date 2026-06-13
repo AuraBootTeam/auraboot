@@ -117,4 +117,38 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   addressfield: runtime('picker', 'AddressField', {
     aliases: ['AddressField', 'address_field', 'address'],
   }),
+  decisiondefinitioncatalog: runtime('decisionops', 'DecisionDefinitionCatalogBlock', {
+    aliases: [
+      'DecisionDefinitionCatalogBlock',
+      'decisionDefinitionCatalogBlock',
+      'decision_definition_catalog',
+    ],
+  }),
+  decisiontableworkbench: runtime('decisionops', 'DecisionTableWorkbenchBlock', {
+    aliases: [
+      'DecisionTableWorkbenchBlock',
+      'decisionTableWorkbenchBlock',
+      'decision_table_workbench',
+    ],
+  }),
+  decisionrolloutmonitor: runtime('decisionops', 'DecisionRolloutMonitorBlock', {
+    aliases: [
+      'DecisionRolloutMonitorBlock',
+      'decisionRolloutMonitorBlock',
+      'decision_rollout_monitor',
+    ],
+  }),
+  eventpolicyactions: runtime('decisionops', 'EventPolicyActionsBlock', {
+    aliases: ['EventPolicyActionsBlock', 'eventPolicyActionsBlock', 'event_policy_actions'],
+  }),
+  executionlogtrace: runtime('decisionops', 'ExecutionLogTraceBlock', {
+    aliases: ['ExecutionLogTraceBlock', 'executionLogTraceBlock', 'execution_log_trace'],
+  }),
+  decisionmodelfieldcatalog: runtime('decisionops', 'DecisionModelFieldCatalogBlock', {
+    aliases: [
+      'DecisionModelFieldCatalogBlock',
+      'decisionModelFieldCatalogBlock',
+      'decision_model_field_catalog',
+    ],
+  }),
 };
