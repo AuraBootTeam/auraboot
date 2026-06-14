@@ -87,6 +87,13 @@ interface LoadState {
   message?: string;
 }
 
+interface BoardImageState {
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  sourceUrl?: string;
+  src?: string;
+  message?: string;
+}
+
 export interface GerberViewerBlockRendererProps {
   block: BlockConfig;
   runtime: SchemaRuntime;
@@ -479,6 +486,86 @@ function preferredBoardSvgSide(inspection: QuoteInspection | undefined): BoardSi
   return undefined;
 }
 
+function shouldFetchAuthenticatedBoardImage(sourceUrl: string): boolean {
+  const trimmed = sourceUrl.trim();
+  if (trimmed.startsWith('/api/file/download/')) return true;
+  if (!/^https?:\/\//i.test(trimmed) || typeof window === 'undefined') return false;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.origin === window.location.origin && parsed.pathname.startsWith('/api/file/download/');
+  } catch {
+    return false;
+  }
+}
+
+function formatUnknownError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function boardImageErrorMessage(sourceUrl: string, reason: string): string {
+  return `Could not load the parsed Gerber SVG artifact from ${sourceUrl}: ${reason}. Generated graphics are not shown.`;
+}
+
+function useBoardImageSource(sourceUrl: string | undefined): BoardImageState {
+  const [state, setState] = React.useState<BoardImageState>({ status: 'idle' });
+
+  React.useEffect(() => {
+    if (!sourceUrl) {
+      setState({ status: 'idle' });
+      return;
+    }
+
+    if (!shouldFetchAuthenticatedBoardImage(sourceUrl)) {
+      setState({ status: 'ready', sourceUrl, src: sourceUrl });
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl: string | undefined;
+    setState({ status: 'loading', sourceUrl });
+
+    fetch(sourceUrl, { credentials: 'include' })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const blob = await response.blob();
+        if (blob.type && !blob.type.startsWith('image/')) {
+          throw new Error(`unexpected content type ${blob.type}`);
+        }
+        if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+          throw new Error('object URL API unavailable');
+        }
+        return blob;
+      })
+      .then((blob) => {
+        const nextObjectUrl = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(nextObjectUrl);
+          return;
+        }
+        objectUrl = nextObjectUrl;
+        setState({ status: 'ready', sourceUrl, src: nextObjectUrl });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setState({
+            status: 'error',
+            sourceUrl,
+            message: boardImageErrorMessage(sourceUrl, formatUnknownError(error)),
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [sourceUrl]);
+
+  return state;
+}
+
 function Segmented<T extends string>({
   value,
   options,
@@ -534,12 +621,15 @@ function Metric({
 function GerberSvgUnavailable({
   side,
   hasBoardSvgArtifacts,
+  message,
 }: {
   side: SideFilter;
   hasBoardSvgArtifacts: boolean;
+  message?: string;
 }) {
-  const message =
-    side === 'all' && hasBoardSvgArtifacts
+  const detail = message
+    ? message
+    : side === 'all' && hasBoardSvgArtifacts
       ? 'All sides do not have a single parsed SVG artifact. Select Top or Bottom to inspect the real Gerber render.'
       : 'No parsed Gerber SVG artifact was returned for this view. Generated graphics are hidden so they are not mistaken for parser output.';
   return (
@@ -550,7 +640,24 @@ function GerberSvgUnavailable({
     >
       <div className="max-w-md">
         <div className="text-sm font-semibold text-white">Real Gerber render unavailable</div>
-        <div className="mt-2 text-xs leading-5 text-slate-300">{message}</div>
+        <div className="mt-2 text-xs leading-5 text-slate-300">{detail}</div>
+      </div>
+    </div>
+  );
+}
+
+function GerberSvgLoading() {
+  return (
+    <div
+      role="status"
+      data-testid="gerber-svg-loading"
+      className="flex h-full w-full items-center justify-center bg-slate-950 px-6 text-center"
+    >
+      <div>
+        <div className="text-sm font-semibold text-white">Loading real Gerber render...</div>
+        <div className="mt-2 text-xs leading-5 text-slate-300">
+          Fetching the parser artifact with the active session credentials.
+        </div>
       </div>
     </div>
   );
@@ -642,6 +749,9 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
     0,
   );
   const preferredSvgSide = preferredBoardSvgSide(inspection);
+  const activeBoardSvgUrl = boardSvgUrl(inspection, side);
+  const boardImage = useBoardImageSource(activeBoardSvgUrl);
+  const [boardImageRenderError, setBoardImageRenderError] = React.useState('');
 
   React.useEffect(() => {
     if (selectedRefdes && components.some((component) => component.refdes === selectedRefdes))
@@ -655,6 +765,10 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
       setSide(preferredSvgSide);
     }
   }, [preferredSvgSide, side]);
+
+  React.useEffect(() => {
+    setBoardImageRenderError('');
+  }, [activeBoardSvgUrl, boardImage.src]);
 
   if (remote.status === 'loading' && !inspection) {
     return (
@@ -702,8 +816,9 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
     inspection.project?.code || readPath(lineRecord, 'qo_ql_description') || 'Gerber inspection';
   const projectName = inspection.project?.name || readPath(lineRecord, 'qo_ql_mpn') || '';
   const summary = inspection.summary || {};
-  const activeBoardSvgUrl = boardSvgUrl(inspection, side);
   const hasBoardSvgArtifacts = Boolean(preferredSvgSide);
+  const boardImageError = boardImageRenderError || boardImage.message;
+  const canRenderBoardImage = boardImage.status === 'ready' && Boolean(boardImage.src) && !boardImageError;
 
   return (
     <section className="space-y-3" data-testid="gerber-viewer">
@@ -757,16 +872,30 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
             className="relative overflow-hidden rounded-lg border border-gray-300 bg-gray-950 shadow-sm"
             style={{ aspectRatio: `${board.widthMm} / ${board.heightMm}` }}
           >
-            {activeBoardSvgUrl ? (
+            {canRenderBoardImage ? (
               <img
-                src={activeBoardSvgUrl}
+                src={boardImage.src}
                 alt={`${side === 'top' ? 'Top' : 'Bottom'} Gerber board render`}
                 className="h-full w-full object-contain"
+                onError={() =>
+                  setBoardImageRenderError(
+                    boardImageErrorMessage(
+                      activeBoardSvgUrl || boardImage.sourceUrl || 'Gerber artifact',
+                      'the browser could not decode the image',
+                    ),
+                  )
+                }
               />
+            ) : activeBoardSvgUrl && boardImage.status === 'loading' ? (
+              <GerberSvgLoading />
             ) : (
-              <GerberSvgUnavailable side={side} hasBoardSvgArtifacts={hasBoardSvgArtifacts} />
+              <GerberSvgUnavailable
+                side={side}
+                hasBoardSvgArtifacts={hasBoardSvgArtifacts}
+                message={boardImageError}
+              />
             )}
-            {activeBoardSvgUrl ? (
+            {canRenderBoardImage ? (
               <div className="absolute inset-0">
                 {components.map((component, index) => {
                   const active = component.refdes === selectedRefdes;
