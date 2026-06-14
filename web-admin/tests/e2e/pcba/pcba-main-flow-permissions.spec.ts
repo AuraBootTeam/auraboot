@@ -117,7 +117,7 @@ const DEMO_ENTRIES = {
     // Sales-To-Order IA section (menu pe_crm_crm_customer_request_pcba_rfq).
     id: 'rfq',
     href: '/p/crm_customer_request_pcba_rfq',
-    label: /客户需求-PCBA RFQ|Customer Requests \(PCBA RFQ\)|RFQ/i,
+    label: /^\s*RFQ\s*$/i,
     route: /\/p\/crm_customer_request_pcba_rfq(?:$|[?#])/,
     modelCode: 'crm_customer_request_pcba_rfq',
     parentLabel: /销售到订单|Sales To Order/i,
