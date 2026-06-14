@@ -277,7 +277,7 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
                 <dd className="mt-0.5 min-w-0 break-words text-sm font-semibold leading-snug" title={displayValue}>
                   {href ? (
                     <a
-                      className="inline-block max-w-full break-words text-current underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                      className="inline-block max-w-full cursor-pointer break-words text-blue-700 underline decoration-blue-500 underline-offset-2 hover:text-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                       href={href}
                       onClick={(event) => handleSummaryLinkClick(event, href)}
                     >
