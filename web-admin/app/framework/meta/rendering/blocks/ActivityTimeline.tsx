@@ -14,6 +14,9 @@ import { ResultHelper } from '~/utils/type';
 
 dayjs.extend(relativeTime);
 
+const INTERNAL_ID_PATTERN =
+  /\b(?:01[0-9A-HJKMNP-TV-Z]{24}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/gi;
+
 interface ActivityRecord {
   id: number;
   pid: string;
@@ -147,8 +150,12 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
             {/* Activity entries for this date */}
             <div className="space-y-3">
               {group.entries.map((activity) => {
-                const config =
-                  ACTIVITY_TYPE_CONFIG[activity.activityType] || ACTIVITY_TYPE_CONFIG.SYSTEM;
+                const activityType = normalizeActivityType(activity.activityType);
+                const actorType = normalizeActorType(activity.actorType);
+                const actorLabel = resolveActorLabel(activity, locale);
+                const subject = sanitizeVisibleText(activity.subject);
+                const content = sanitizeVisibleText(activity.content);
+                const config = ACTIVITY_TYPE_CONFIG[activityType] || ACTIVITY_TYPE_CONFIG.SYSTEM;
                 const [icon, _zhLabel, _enLabel, dotColor] = config;
 
                 return (
@@ -156,7 +163,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                     key={activity.id}
                     className="relative"
                     data-testid={`activity-timeline-item-${activity.id}`}
-                    data-activity-type={activity.activityType}
+                    data-activity-type={activityType}
                   >
                     {/* Timeline dot */}
                     <div className={`absolute top-1.5 -left-10 h-3 w-3 rounded-full ${dotColor}`} />
@@ -165,11 +172,9 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                       {/* Header: icon + type badge + actor + time */}
                       <div className="flex items-center gap-2 text-sm">
                         <span className="flex-shrink-0 text-gray-400">{icon}</span>
-                        <ActivityTypeBadge type={activity.activityType} locale={locale} />
-                        <span className="font-medium text-gray-700">
-                          {activity.actorName || (activity.actorType === 'system' ? 'System' : '—')}
-                        </span>
-                        {activity.actorType === 'agent' && (
+                        <ActivityTypeBadge type={activityType} locale={locale} />
+                        <span className="font-medium text-gray-700">{actorLabel}</span>
+                        {actorType === 'agent' && (
                           <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
                             AI
                           </span>
@@ -178,26 +183,14 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                         <time className="text-xs text-gray-400" title={activity.occurredAt}>
                           {formatTime(activity.occurredAt)}
                         </time>
-                        {activity.commandCode && (
-                          <>
-                            <span className="text-gray-300">&middot;</span>
-                            <span className="font-mono text-xs text-gray-400">
-                              {activity.commandCode}
-                            </span>
-                          </>
-                        )}
                       </div>
 
                       {/* Subject */}
-                      {activity.subject && (
-                        <p className="mt-1.5 text-sm text-gray-800">{activity.subject}</p>
-                      )}
+                      {subject && <p className="mt-1.5 text-sm text-gray-800">{subject}</p>}
 
                       {/* Content */}
-                      {activity.content && (
-                        <p className="mt-1 text-xs whitespace-pre-wrap text-gray-500">
-                          {activity.content}
-                        </p>
+                      {content && (
+                        <p className="mt-1 text-xs whitespace-pre-wrap text-gray-500">{content}</p>
                       )}
 
                       {/* Metadata (state transitions) */}
@@ -242,16 +235,65 @@ function ActivityTypeBadge({ type, locale }: { type: string; locale: string }) {
   );
 }
 
+function normalizeActivityType(type: string | null | undefined): string {
+  const normalized = String(type ?? '')
+    .trim()
+    .replace(/-/g, '_')
+    .toUpperCase();
+  if (normalized === 'STATECHANGE') return 'STATE_CHANGE';
+  return normalized || 'SYSTEM';
+}
+
+function normalizeActorType(type: string | null | undefined): string {
+  return String(type ?? '').trim().toLowerCase();
+}
+
+function resolveActorLabel(activity: ActivityRecord, locale: string): string {
+  const actorName = sanitizeVisibleText(activity.actorName);
+  if (actorName) {
+    return actorName;
+  }
+
+  const actorType = normalizeActorType(activity.actorType);
+  if (actorType === 'system') {
+    return locale === 'zh-CN' ? '系统' : 'System';
+  }
+  if (actorType === 'agent') {
+    return locale === 'zh-CN' ? 'AI 助手' : 'AI Assistant';
+  }
+  return '—';
+}
+
+function sanitizeVisibleText(value: string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+  const text = String(value).trim();
+  if (!text) {
+    return null;
+  }
+  const sanitized = text
+    .replace(INTERNAL_ID_PATTERN, '')
+    .replace(/\s+([,.;:，。；：])/g, '$1')
+    .replace(/([（(])\s+|\s+([）)])/g, '$1$2')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return sanitized || null;
+}
+
 function MetadataDisplay({ metadata, locale }: { metadata: string; locale: string }) {
   try {
     const parsed = JSON.parse(metadata);
     // Display state transitions
     if (parsed.fromState && parsed.toState) {
+      const fromState = sanitizeVisibleText(String(parsed.fromState));
+      const toState = sanitizeVisibleText(String(parsed.toState));
+      if (!fromState || !toState) {
+        return null;
+      }
       return (
         <div className="mt-1.5 flex items-center gap-1.5 text-xs">
-          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">
-            {parsed.fromState}
-          </span>
+          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">{fromState}</span>
           <svg
             className="h-3 w-3 flex-shrink-0 text-gray-400"
             fill="none"
@@ -261,7 +303,7 @@ function MetadataDisplay({ metadata, locale }: { metadata: string; locale: strin
           >
             <path d="M5 12h14m-4-4 4 4-4 4" />
           </svg>
-          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700">{parsed.toState}</span>
+          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700">{toState}</span>
         </div>
       );
     }
