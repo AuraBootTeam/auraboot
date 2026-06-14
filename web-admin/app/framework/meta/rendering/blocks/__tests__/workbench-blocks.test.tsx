@@ -1083,6 +1083,46 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByTestId('review-drawer')).toHaveTextContent('Row 5 · LED1 · 待确认');
   });
 
+  it('renders configured decision fields instead of BOM defaults', () => {
+    const runtime = makeReviewDrawerRuntime({
+      ...selectedLine,
+      referenced_rule: '规则A · Excel行 12',
+      rule_formula: '数量×点数×单价；最低收费已纳入',
+      review_note: '完全匹配，自动核算',
+    });
+
+    render(
+      <ReviewDrawerBlockRenderer
+        block={{
+          ...reviewDrawerBlock,
+          compare: {
+            rawTitle: '加工费输入',
+            canonicalTitle: '加工费规则',
+            rawFields: [{ key: 'line', label: '报价行', field: 'bom_std_refdes' }],
+            canonicalFields: [{ key: 'rule', label: '引用规则', field: 'referenced_rule' }],
+          },
+          candidates: {
+            title: '加工费核算',
+            decisionTitle: '核算结论',
+            decisionFields: [
+              { key: 'rule', label: '引用规则', field: 'referenced_rule' },
+              { key: 'formula', label: '公式', field: 'rule_formula' },
+              { key: 'note', label: '提醒', field: 'review_note' },
+            ],
+            empty: { title: '规则以 Excel 为准' },
+          },
+        }}
+        runtime={runtime}
+      />,
+    );
+
+    expect(screen.getByText('核算结论')).toBeInTheDocument();
+    expect(screen.getAllByText('引用规则').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('规则A · Excel行 12').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('数量×点数×单价；最低收费已纳入')).toBeInTheDocument();
+    expect(screen.queryByText('标准编码')).not.toBeInTheDocument();
+  });
+
   it('keeps long BOM refdes titles constrained so drawer actions remain visible', () => {
     const longRefdes = Array.from({ length: 48 }, (_, index) => `C${1000 + index}`).join(',');
     const runtime = makeReviewDrawerRuntime({
