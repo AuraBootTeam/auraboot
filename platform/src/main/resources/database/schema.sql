@@ -7614,7 +7614,7 @@ CREATE TABLE IF NOT EXISTS ab_user_engagement (
     user_id         BIGINT NOT NULL,
     tenant_id       BIGINT NOT NULL,
     target_type     VARCHAR(32) NOT NULL,
-    target_id       VARCHAR(64) NOT NULL,
+    target_id       VARCHAR(255) NOT NULL,
     target_label    VARCHAR(128),
     target_context  JSONB,
     engagement_type VARCHAR(16) NOT NULL,

@@ -62,7 +62,20 @@ public class FileServiceImpl implements FileService {
             "text/plain", "text/csv", "text/markdown", "text/html",
             "application/json", "application/xml",
             "application/x-yaml", "application/yaml", "text/yaml",
-            "application/zip", "application/gzip"
+            "application/zip", "application/gzip",
+            "application/vnd.rar", "application/x-rar-compressed", "application/x-7z-compressed"
+    );
+
+    /**
+     * Manufacturing packages often contain CAM/EDA text files without a stable
+     * browser MIME type. Keep the octet-stream fallback extension-scoped.
+     */
+    private static final Set<String> OCTET_STREAM_ALLOWED_EXTENSIONS = Set.of(
+            "rar", "7z", "pcb",
+            "gbr", "gtl", "gbl", "gto", "gbo", "gts", "gbs", "gko",
+            "gm", "gm1", "gbp", "gdd", "gd1", "g1", "g2",
+            "pho", "art", "drl", "xln", "drr", "rep", "extrep",
+            "ldp", "apr", "apr_lib", "rul", "pos", "cpl"
     );
 
     /** Blocked file extensions (executables, scripts) */
@@ -90,16 +103,16 @@ public class FileServiceImpl implements FileService {
                 throw new BusinessException("File too large: max " + (MAX_FILE_SIZE / 1024 / 1024) + "MB");
             }
 
-            // Validate MIME type
-            String contentType = file.getContentType();
-            if (contentType == null || !ALLOWED_MIME_TYPES.contains(contentType.toLowerCase())) {
-                throw new BusinessException("File type not allowed: " + contentType);
-            }
-
             // Validate file extension
             String extension = getFileExtension(file.getOriginalFilename());
             if (BLOCKED_EXTENSIONS.contains(extension.toLowerCase())) {
                 throw new BusinessException("File extension not allowed: " + extension);
+            }
+
+            // Validate MIME type
+            String contentType = file.getContentType();
+            if (!isAllowedMimeType(contentType, extension)) {
+                throw new BusinessException("File type not allowed: " + contentType);
             }
 
             FileEntity fileEntity = createFileEntity(file, userId);
@@ -304,5 +317,18 @@ public class FileServiceImpl implements FileService {
         }
         int lastDotIndex = filename.lastIndexOf('.');
         return lastDotIndex > 0 ? filename.substring(lastDotIndex + 1) : "";
+    }
+
+    private boolean isAllowedMimeType(String contentType, String extension) {
+        if (contentType == null) {
+            return false;
+        }
+        String normalizedContentType = contentType.toLowerCase();
+        if (ALLOWED_MIME_TYPES.contains(normalizedContentType)) {
+            return true;
+        }
+        return "application/octet-stream".equals(normalizedContentType)
+                && extension != null
+                && OCTET_STREAM_ALLOWED_EXTENSIONS.contains(extension.toLowerCase());
     }
 }

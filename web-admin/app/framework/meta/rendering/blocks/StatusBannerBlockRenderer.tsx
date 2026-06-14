@@ -198,12 +198,15 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
             const key = String(field.key || field.field || field.label);
             const value = readPath(record, field.field);
             if (value === undefined || value === null || value === '') return null;
+            const displayValue = String(value);
             return (
-              <div key={key} className="rounded-md bg-white/60 px-3 py-2">
+              <div key={key} className="min-w-0 rounded-md bg-white/60 px-3 py-2">
                 <dt className="text-xs opacity-70">
                   {getLocalizedText(field.label as LocalizedText, locale, t)}
                 </dt>
-                <dd className="mt-0.5 text-sm font-semibold">{String(value)}</dd>
+                <dd className="mt-0.5 min-w-0 break-words text-sm font-semibold leading-snug" title={displayValue}>
+                  {displayValue}
+                </dd>
               </div>
             );
           })}

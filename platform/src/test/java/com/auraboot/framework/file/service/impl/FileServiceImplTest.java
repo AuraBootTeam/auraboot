@@ -118,6 +118,38 @@ class FileServiceImplTest {
     }
 
     @Test
+    void uploadFile_validManufacturingArchive_persistsAndReturnsResponse() {
+        MultipartFile good = new MockMultipartFile(
+                "file", "gerber-package.rar", "application/vnd.rar", "rar-bytes".getBytes());
+
+        when(storageProvider.upload(anyString(), any(), anyLong(), anyString()))
+                .thenReturn("/uploads/gerber-package.rar");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+
+        var resp = fileService.uploadFile(good, 42L);
+
+        assertThat(resp).isNotNull();
+        assertThat(resp.getOriginalName()).isEqualTo("gerber-package.rar");
+        verify(fileMapper).insert(any(FileEntity.class));
+    }
+
+    @Test
+    void uploadFile_octetStreamCamFile_persistsAndReturnsResponse() {
+        MultipartFile good = new MockMultipartFile(
+                "file", "Board_Outline.gko", "application/octet-stream", "outline".getBytes());
+
+        when(storageProvider.upload(anyString(), any(), anyLong(), anyString()))
+                .thenReturn("/uploads/Board_Outline.gko");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+
+        var resp = fileService.uploadFile(good, 42L);
+
+        assertThat(resp).isNotNull();
+        assertThat(resp.getOriginalName()).isEqualTo("Board_Outline.gko");
+        verify(fileMapper).insert(any(FileEntity.class));
+    }
+
+    @Test
     void uploadFiles_iteratesAndReturnsList() {
         MultipartFile a = new MockMultipartFile("a", "a.png", "image/png", "a".getBytes());
         MultipartFile b = new MockMultipartFile("b", "b.png", "image/png", "b".getBytes());
