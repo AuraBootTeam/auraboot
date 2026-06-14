@@ -3,6 +3,8 @@
  */
 
 import React from 'react';
+import * as LucideIcons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { BlockConfig, ButtonConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -14,6 +16,13 @@ export interface ToolbarBlockRendererProps {
   block: BlockConfig;
   runtime: SchemaRuntime;
 }
+
+const renderIcon = (icon?: ButtonConfig['icon']) => {
+  if (!icon || typeof icon !== 'string') return null;
+  const Icon = (LucideIcons as unknown as Record<string, LucideIcon>)[icon];
+  if (!Icon) return null;
+  return <Icon className="mr-2 h-4 w-4" aria-hidden="true" />;
+};
 
 export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ block, runtime }) => {
   const context = runtime.getContext();
@@ -81,7 +90,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
             data-testid={`toolbar-btn-${button.code}`}
             onClick={() => handleButtonClick(button)}
             disabled={button.disabled}
-            className={`rounded-md px-4 py-2 text-sm font-medium ${
+            className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium ${
               button.variant === 'primary'
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : button.variant === 'danger'
@@ -89,7 +98,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
                   : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
             } ${button.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
           >
-            {button.icon && <span className="mr-2">{button.icon}</span>}
+            {renderIcon(button.icon)}
             {label}
           </button>
         );

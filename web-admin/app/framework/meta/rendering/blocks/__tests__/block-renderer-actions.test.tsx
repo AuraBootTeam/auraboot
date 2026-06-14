@@ -259,6 +259,41 @@ describe('TableBlockRenderer', () => {
     expect(getByText('Alpha')).toBeInTheDocument();
   });
 
+  it('renders link columns through authenticated file download URLs when a file id is present', () => {
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => [
+          {
+            pid: 'doc-1',
+            qo_qd_url: '/01KV2GTQTNJR89R8EZQ1FT9TSQ.xlsx',
+            qo_qd_file_id: '01KV2GTQTNJJ8QSYZS8R5A0YDC',
+          },
+        ],
+        has: () => true,
+        register: vi.fn(),
+      }),
+    });
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      columns: [
+        {
+          field: 'qo_qd_url',
+          label: 'Download',
+          valueType: 'link',
+          render: { text: 'Download Quote', fileIdField: 'qo_qd_file_id' },
+        },
+      ],
+    };
+
+    const { getByRole } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    expect(getByRole('link', { name: 'Download Quote' })).toHaveAttribute(
+      'href',
+      '/api/file/download/01KV2GTQTNJJ8QSYZS8R5A0YDC',
+    );
+  });
+
   it('dispatches new-format row action with the row as record', () => {
     const runtime = makeRuntimeWithData();
     const block = {
