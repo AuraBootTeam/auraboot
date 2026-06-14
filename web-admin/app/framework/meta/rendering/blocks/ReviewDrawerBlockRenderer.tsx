@@ -335,6 +335,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const sourceSummaryItems = Array.isArray(sourceConfig.summary?.items)
     ? sourceConfig.summary.items
     : [];
+  const decisionFields = Array.isArray(candidatesConfig.decisionFields)
+    ? candidatesConfig.decisionFields
+    : [];
   const summaryBadges = Array.isArray((block as any).summaryBadges)
     ? (block as any).summaryBadges
     : [];
@@ -853,30 +856,51 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                 )}
               </h3>
               <dl className="mt-2 space-y-1.5 text-sm">
-                <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
-                  <dt className="text-xs text-gray-500">
-                    {localized(locale, t, '标准编码', 'Standard Code')}
-                  </dt>
-                  <dd className="font-mono text-gray-900">
-                    {formatValue(
-                      readPath(record, 'bom_std_material_code'),
-                      localized(locale, t, '确认候选后写入', 'Pending confirmation'),
-                    )}
-                  </dd>
-                </div>
-                <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
-                  <dt className="text-xs text-gray-500">
-                    {localized(locale, t, '当前状态', 'Reason')}
-                  </dt>
-                  <dd className="break-words text-gray-900">
-                    {formatConfiguredValue(
-                      readPath(record, 'bom_std_reason_code'),
-                      candidatesConfig.reasonField || {},
-                      locale,
-                      t,
-                    )}
-                  </dd>
-                </div>
+                {decisionFields.length > 0 ? (
+                  decisionFields.map((field: any) => {
+                    const key = String(field.key || field.field || field.label);
+                    const label = getLocalizedText(field.label || key, locale, t);
+                    const rawValue = readFieldValue(record, field);
+                    if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
+                    const value = formatConfiguredValue(rawValue, field, locale, t);
+                    return (
+                      <div
+                        key={key}
+                        className="grid grid-cols-[96px_minmax(0,1fr)] gap-2"
+                      >
+                        <dt className="text-xs text-gray-500">{label}</dt>
+                        <dd className="break-words text-gray-900">{value}</dd>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <>
+                    <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
+                      <dt className="text-xs text-gray-500">
+                        {localized(locale, t, '标准编码', 'Standard Code')}
+                      </dt>
+                      <dd className="font-mono text-gray-900">
+                        {formatValue(
+                          readPath(record, 'bom_std_material_code'),
+                          localized(locale, t, '确认候选后写入', 'Pending confirmation'),
+                        )}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
+                      <dt className="text-xs text-gray-500">
+                        {localized(locale, t, '当前状态', 'Reason')}
+                      </dt>
+                      <dd className="break-words text-gray-900">
+                        {formatConfiguredValue(
+                          readPath(record, 'bom_std_reason_code'),
+                          candidatesConfig.reasonField || {},
+                          locale,
+                          t,
+                        )}
+                      </dd>
+                    </div>
+                  </>
+                )}
               </dl>
               {selectedCandidate && (candidatesConfig.selectedFields || []).length > 0 && (
                 <section className="mt-3 rounded-md border border-gray-200 bg-white">
