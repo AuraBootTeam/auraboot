@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -143,6 +143,28 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
   } as unknown as SchemaRuntime;
 }
 
+function stubBoardImageFetch(objectUrl = 'blob:gerber-board-svg') {
+  const createObjectURL = vi.fn().mockReturnValue(objectUrl);
+  const revokeObjectURL = vi.fn();
+  const blob = new Blob(['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" />'], {
+    type: 'image/svg+xml',
+  });
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    blob: vi.fn().mockResolvedValue(blob),
+  });
+
+  vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+  vi.stubGlobal('fetch', fetchMock);
+
+  return { createObjectURL, fetchMock, objectUrl, revokeObjectURL };
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('GerberViewerBlockRenderer', () => {
   it('renders inline inspection metrics, board layers and selected line facts', () => {
     const runtime = makeRuntime();
@@ -227,7 +249,8 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.getByTestId('gerber-marker-J1')).toBeInTheDocument();
   });
 
-  it('normalizes stored file pid SVG URLs to the authenticated file download endpoint', () => {
+  it('normalizes stored file pid SVG URLs and loads them through authenticated fetch', async () => {
+    const { createObjectURL, fetchMock, objectUrl } = stubBoardImageFetch();
     const runtime = makeRuntime();
     const block: BlockConfig = {
       id: 'gerber',
@@ -242,10 +265,44 @@ describe('GerberViewerBlockRenderer', () => {
 
     render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
 
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/file/download/01KV22CQ7PKX3W50Y7MM575ACK', {
+        credentials: 'include',
+      });
+    });
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('img', { name: 'Top Gerber board render' })).toHaveAttribute(
       'src',
-      '/api/file/download/01KV22CQ7PKX3W50Y7MM575ACK',
+      objectUrl,
     );
+    expect(screen.getByTestId('gerber-marker-C4')).toBeInTheDocument();
+  });
+
+  it('shows a real artifact loading error instead of markers when the authenticated SVG request fails', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401 });
+    vi.stubGlobal('fetch', fetchMock);
+    const runtime = makeRuntime();
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: {
+        ...INSPECTION,
+        boardSvgUrls: {
+          top: '/01KV22CQ7PKX3W50Y7MM575ACK.svg',
+        },
+      },
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent('HTTP 401');
+    });
+    expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent(
+      'Generated graphics are not shown',
+    );
+    expect(screen.queryByRole('img', { name: 'Top Gerber board render' })).toBeNull();
+    expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
   });
 
   it('renders persisted line inspection JSON before falling back to the DSL sample', () => {
