@@ -240,7 +240,7 @@ describe('GerberViewerBlockRenderer', () => {
     );
   });
 
-  it('falls back to a parsed line from the bound data source when the selected line has no Gerber facts', () => {
+  it('falls back to a parsed line from the bound data source when the selected line only has default zero Gerber counts', () => {
     const runtime = makeRuntime({
       data: {
         lines: [
@@ -293,6 +293,8 @@ describe('GerberViewerBlockRenderer', () => {
     context.state.selectedLine = {
       pid: 'LINE-UNPARSED',
       qo_ql_description: 'Unparsed resistor',
+      qo_ql_smt_points: 0,
+      qo_ql_tht_points: 0,
     };
     const block: BlockConfig = {
       id: 'gerber',
