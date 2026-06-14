@@ -129,11 +129,40 @@ class PageSchemaSystemTabIntegrationTest extends BaseIntegrationTest {
         assertThat(blocks.get(0).get("blockType")).isEqualTo("field-history");
     }
 
+    @Test
+    @Order(6)
+    void findByPageKey_hiddenSystemTabs_shouldSkipConfiguredKeys() {
+        String pageKey = createPublishedDetailPage(
+                "document",
+                false,
+                Map.of("hiddenSystemTabs", List.of("__approval_comments__", "__field_history__"))
+        );
+        PageSchemaDTO dto = pageSchemaService.findByPageKey(pageKey);
+        assertThat(dto).isNotNull();
+        List<Map<String, Object>> tabs = extractTabs(dto);
+        assertThat(tabs).isNotNull();
+
+        List<String> systemKeys = tabs.stream()
+                .filter(t -> Boolean.TRUE.equals(t.get("system")))
+                .map(t -> (String) t.get("key"))
+                .toList();
+        assertThat(systemKeys).containsExactly("__comments__", "__activity__");
+        assertThat(systemKeys).doesNotContain("__approval_comments__", "__field_history__");
+    }
+
     private String createPublishedDetailPage(String modelCategory) {
         return createPublishedDetailPage(modelCategory, false);
     }
 
     private String createPublishedDetailPage(String modelCategory, boolean includeExplicitFieldHistoryTab) {
+        return createPublishedDetailPage(modelCategory, includeExplicitFieldHistoryTab, null);
+    }
+
+    private String createPublishedDetailPage(
+            String modelCategory,
+            boolean includeExplicitFieldHistoryTab,
+            Map<String, Object> extension
+    ) {
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String modelCode = "page_tab_model_" + modelCategory + "_" + suffix;
         String tableName = "mt_page_tab_" + modelCategory + "_" + suffix;
@@ -173,6 +202,7 @@ class PageSchemaSystemTabIntegrationTest extends BaseIntegrationTest {
         pageRequest.setTitle("Page Tab Test " + suffix);
         pageRequest.setKind("detail");
         pageRequest.setBlocks(createTabsBlocks(includeExplicitFieldHistoryTab));
+        pageRequest.setExtension(extension);
         pageRequest.setSortWeight(0);
 
         PageSchemaDTO created = pageSchemaService.create(pageRequest);

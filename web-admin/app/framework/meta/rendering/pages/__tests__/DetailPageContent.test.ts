@@ -8,7 +8,9 @@ import {
   resolveActiveDetailTab,
   resolveDetailFieldComponent,
   resolveDetailRecordEndpoint,
+  resolveHiddenSystemTabKeys,
   resolveSubTableDataSourceConfig,
+  resolveVisibleDetailTabs,
   shouldRenderDefaultDetailEditAction,
   unwrapDetailRecord,
 } from '../DetailPageContent';
@@ -52,6 +54,22 @@ describe('shouldRenderDefaultDetailEditAction', () => {
 
   it('hides the default edit action when extension.showEdit is false', () => {
     expect(shouldRenderDefaultDetailEditAction({ extension: { showEdit: false } })).toBe(false);
+  });
+});
+
+describe('resolveHiddenSystemTabKeys', () => {
+  it('normalizes hidden system tab keys from array and comma-separated config', () => {
+    expect(
+      [...resolveHiddenSystemTabKeys({
+        extension: { hiddenSystemTabs: ['__approval_comments__', ' __field_history__ '] },
+      })],
+    ).toEqual(['__approval_comments__', '__field_history__']);
+
+    expect(
+      [...resolveHiddenSystemTabKeys({
+        extension: { hideSystemTabs: '__approval_comments__, __field_history__' },
+      })],
+    ).toEqual(['__approval_comments__', '__field_history__']);
   });
 });
 
@@ -222,6 +240,29 @@ describe('resolveActiveDetailTab', () => {
 
   it('returns null when no tabs are configured', () => {
     expect(resolveActiveDetailTab([], 0)).toBeNull();
+  });
+});
+
+describe('resolveVisibleDetailTabs', () => {
+  const tabs = [
+    { key: 'overview', label: 'Overview', blocks: [] },
+    { key: '__comments__', label: 'Comments', system: true, blocks: [] },
+    { key: '__approval_comments__', label: 'Approval Comments', system: true, blocks: [] },
+    { key: '__field_history__', label: 'Field History', system: true, blocks: [] },
+  ] as any;
+
+  it('hides all system tabs while creating a new record', () => {
+    expect(resolveVisibleDetailTabs(tabs, undefined, { extension: {} }).map((tab) => tab.key)).toEqual([
+      'overview',
+    ]);
+  });
+
+  it('hides only configured system tabs for an existing record', () => {
+    expect(
+      resolveVisibleDetailTabs(tabs, '01KTEST', {
+        extension: { hiddenSystemTabs: ['__approval_comments__', '__field_history__'] },
+      }).map((tab) => tab.key),
+    ).toEqual(['overview', '__comments__']);
   });
 });
 

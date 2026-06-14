@@ -334,6 +334,37 @@ export function shouldRenderDefaultDetailEditAction(
   return schema?.extension?.showEdit !== false;
 }
 
+export function resolveHiddenSystemTabKeys(
+  schema: { extension?: Record<string, any> } | undefined | null,
+): Set<string> {
+  const raw = schema?.extension?.hiddenSystemTabs ?? schema?.extension?.hideSystemTabs;
+  if (Array.isArray(raw)) {
+    return new Set(raw.map((key) => String(key).trim()).filter(Boolean));
+  }
+  if (typeof raw === 'string') {
+    return new Set(
+      raw
+        .split(',')
+        .map((key) => key.trim())
+        .filter(Boolean),
+    );
+  }
+  return new Set();
+}
+
+export function resolveVisibleDetailTabs(
+  allTabs: DetailTabConfig[],
+  recordId: string | undefined,
+  schema: { extension?: Record<string, any> } | undefined | null,
+): DetailTabConfig[] {
+  const hiddenSystemTabKeys = resolveHiddenSystemTabKeys(schema);
+  return (recordId ? allTabs : allTabs.filter((tab) => !tab.system)).filter((tab) => {
+    if (!tab.system) return true;
+    const key = typeof tab.key === 'string' ? tab.key : '';
+    return !hiddenSystemTabKeys.has(key);
+  });
+}
+
 export function resolveSubTableDataSourceConfig(
   dataSource: BlockConfig['dataSource'] | undefined,
   schemaDataSources?: Record<string, DataSourceConfig>,
@@ -654,7 +685,7 @@ export function DetailPageContent(props: PageContentProps) {
   const tabsBlockVisible =
     !tabsBlock?.visibleWhen || evaluateVisibleWhen(tabsBlock.visibleWhen);
   const allTabs = tabsBlockVisible ? ((tabsBlock?.tabs || []) as DetailTabConfig[]) : [];
-  const tabs = recordId ? allTabs : allTabs.filter((t) => !t.system);
+  const tabs = resolveVisibleDetailTabs(allTabs, recordId, schema);
   const [activeTab, setActiveTab] = useState(0);
 
   const tabHashKeys = useMemo(

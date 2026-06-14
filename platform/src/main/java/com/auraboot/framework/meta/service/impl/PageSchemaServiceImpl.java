@@ -494,11 +494,14 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         // Get system tabs for this model category and append non-duplicates
         String category = dto.getModelCategory();
         List<Map<String, Object>> systemTabs = SystemTabRegistry.getSystemTabs(category);
+        Set<String> hiddenSystemTabKeys = hiddenSystemTabKeys(dto.getExtension());
         List<Map<String, Object>> mutableTabs = new ArrayList<>(tabsList);
         boolean modified = false;
         for (Map<String, Object> sysTab : systemTabs) {
             String key = (String) sysTab.get("key");
-            if (!existingKeys.contains(key) && !hasEquivalentTab(existingTabs, sysTab)) {
+            if (!hiddenSystemTabKeys.contains(key)
+                    && !existingKeys.contains(key)
+                    && !hasEquivalentTab(existingTabs, sysTab)) {
                 mutableTabs.add(sysTab);
                 modified = true;
             }
@@ -509,6 +512,37 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         }
 
         return dto;
+    }
+
+    private Set<String> hiddenSystemTabKeys(Map<String, Object> extension) {
+        if (extension == null || extension.isEmpty()) {
+            return Set.of();
+        }
+        Object raw = extension.get("hiddenSystemTabs");
+        if (raw == null) {
+            raw = extension.get("hideSystemTabs");
+        }
+        if (raw == null) {
+            return Set.of();
+        }
+
+        Set<String> keys = new HashSet<>();
+        if (raw instanceof Collection<?> collection) {
+            for (Object value : collection) {
+                if (value != null && !value.toString().isBlank()) {
+                    keys.add(value.toString());
+                }
+            }
+            return keys;
+        }
+        if (raw instanceof String value && !value.isBlank()) {
+            for (String key : value.split(",")) {
+                if (!key.isBlank()) {
+                    keys.add(key.trim());
+                }
+            }
+        }
+        return keys;
     }
 
     @SuppressWarnings("unchecked")
