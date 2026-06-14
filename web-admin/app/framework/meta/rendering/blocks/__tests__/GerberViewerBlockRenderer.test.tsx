@@ -185,6 +185,10 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.queryByRole('img', { name: 'PCB layer render' })).toBeNull();
     expect(screen.getByTestId('gerber-metric-board')).toHaveTextContent('98 x 33 mm');
     expect(screen.getByTestId('gerber-metric-parse')).toHaveTextContent('parsed / warning');
+    expect(screen.getByTestId('gerber-validation-summary')).toHaveTextContent(
+      'Validation errors found',
+    );
+    expect(screen.getAllByRole('button', { name: 'All' })).toHaveLength(1);
     expect(screen.getByTestId('gerber-layer-top_copper')).toHaveTextContent('258');
     expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
     expect(screen.getByTestId('gerber-component-row-C4')).toBeInTheDocument();
@@ -353,6 +357,48 @@ describe('GerberViewerBlockRenderer', () => {
     );
   });
 
+  it('promotes informational inspection issues when the quote line validation status requires review', () => {
+    const runtime = makeRuntime();
+    const context = runtime.getContext() as any;
+    context.state.selectedLine = {
+      pid: 'LINE-WARNING',
+      qo_ql_description: 'Persisted inspection warning',
+      qo_ql_gerber_parse_status: 'parsed',
+      qo_ql_gerber_validation_status: 'warning',
+      qo_ql_gerber_inspection: JSON.stringify({
+        project: { code: 'LINE-WARNING', name: 'Warning status inspection' },
+        board: { widthMm: 42, heightMm: 24 },
+        summary: { bomRefCount: 1, cplRefCount: 1, smdCount: 1, thtCount: 0 },
+        issues: [
+          {
+            severity: 'info',
+            code: 'EXCLUDED_NON_PLACEMENT_BOM_REF',
+            refdes: 'P5',
+            message: 'P5 is excluded from placement matching.',
+          },
+        ],
+        components: [],
+      }),
+    };
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: INSPECTION,
+      lineContext: '${state.selectedLine}',
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('gerber-metric-parse')).toHaveTextContent('parsed / warning');
+    expect(screen.getByTestId('gerber-validation-summary')).toHaveTextContent(
+      'Validation warnings found',
+    );
+    expect(screen.getByTestId('gerber-validation-summary')).toHaveTextContent('Warnings 1');
+    expect(screen.getByTestId('gerber-issue-EXCLUDED_NON_PLACEMENT_BOM_REF-P5')).toHaveTextContent(
+      'P5',
+    );
+  });
+
   it('falls back to a parsed line from the bound data source when the selected line only has default zero Gerber counts', () => {
     const runtime = makeRuntime({
       data: {
@@ -460,7 +506,8 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.getByTestId('gerber-issue-bom_process_mismatch-J1')).toHaveTextContent('J1');
     expect(screen.queryByTestId('gerber-marker-U1')).toBeNull();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'All' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Bottom' }));
     fireEvent.change(screen.getByLabelText('Gerber viewer search'), {
       target: { value: 'Header' },
     });
