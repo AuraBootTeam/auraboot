@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * File service implementation backed by {@link StorageProvider} SPI.
@@ -50,6 +51,9 @@ public class FileServiceImpl implements FileService {
 
     /** Max upload size: 50 MB */
     private static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
+
+    private static final Pattern GENERATED_STORAGE_FILE_NAME =
+            Pattern.compile("[0-9A-HJKMNP-TV-Z]{26}(\\.[A-Za-z0-9]{1,16})?");
 
     /** Allowed MIME types for upload */
     private static final Set<String> ALLOWED_MIME_TYPES = Set.of(
@@ -152,6 +156,10 @@ public class FileServiceImpl implements FileService {
     public FileEntity getFileById(String fileId) {
         // Try PID lookup first (ULID string), fallback to numeric ID
         FileEntity entity = findByPid(fileId);
+        if (entity != null) {
+            return entity;
+        }
+        entity = findByGeneratedStorageFileName(fileId);
         if (entity != null) {
             return entity;
         }
@@ -336,6 +344,23 @@ public class FileServiceImpl implements FileService {
         return "application/octet-stream".equals(normalizedContentType)
                 && extension != null
                 && OCTET_STREAM_ALLOWED_EXTENSIONS.contains(extension.toLowerCase());
+    }
+
+    private FileEntity findByGeneratedStorageFileName(String fileId) {
+        if (!StringUtils.hasText(fileId) || !GENERATED_STORAGE_FILE_NAME.matcher(fileId).matches()) {
+            return null;
+        }
+        FileEntity entity = findByFileName(fileId);
+        if (entity != null || fileId.contains(".")) {
+            return entity;
+        }
+        return findByFileName(fileId + ".svg");
+    }
+
+    private FileEntity findByFileName(String fileName) {
+        QueryWrapper<FileEntity> queryWrapper = new QueryWrapper<>();
+        queryWrapper.lambda().eq(FileEntity::getFileName, fileName);
+        return fileMapper.selectOne(queryWrapper);
     }
 
     private boolean isNumericId(String value) {

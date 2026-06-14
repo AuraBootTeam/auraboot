@@ -20,8 +20,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -42,6 +44,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Tag(name = "Files", description = "File upload and management")
 public class FileUploadController {
     private static final Logger LOG = LoggerFactory.getLogger(FileUploadController.class);
+
     @Autowired
     private FileMapper fileMapper;
     @Autowired
@@ -247,16 +250,43 @@ public class FileUploadController {
             // StorageProvider.download() validates path traversal for local storage
             InputStream stream = storageProvider.download(storageKey);
             Resource resource = new InputStreamResource(stream);
-            String encodedFilename = URLEncoder.encode(fileEntity.getOriginalName(), StandardCharsets.UTF_8);
-
+            MediaType contentType = resolveDownloadContentType(fileEntity);
+            String dispositionType = isInlineDisplayType(contentType) ? "inline" : "attachment";
+            String encodedFilename = URLEncoder.encode(downloadFileName(fileEntity, fileId), StandardCharsets.UTF_8);
             return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFilename + "\"")
+                    .contentType(contentType)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, dispositionType + "; filename=\"" + encodedFilename + "\"")
                     .body(resource);
         } catch (SecurityException e) {
             LOG.warn("Path traversal attempt blocked for file {}: {}", fileId, e.getMessage());
             return ResponseEntity.notFound().build();
         }
+    }
+
+    private MediaType resolveDownloadContentType(FileEntity fileEntity) {
+        String mimeType = fileEntity.getMimeType();
+        if (StringUtils.hasText(mimeType)) {
+            try {
+                return MediaType.parseMediaType(mimeType);
+            } catch (InvalidMediaTypeException e) {
+                LOG.debug("Invalid stored MIME type for file {}: {}", fileEntity.getPid(), mimeType);
+            }
+        }
+        return MediaType.APPLICATION_OCTET_STREAM;
+    }
+
+    private boolean isInlineDisplayType(MediaType contentType) {
+        return "image".equalsIgnoreCase(contentType.getType());
+    }
+
+    private String downloadFileName(FileEntity fileEntity, String fileId) {
+        if (StringUtils.hasText(fileEntity.getOriginalName())) {
+            return fileEntity.getOriginalName();
+        }
+        if (StringUtils.hasText(fileEntity.getFileName())) {
+            return fileEntity.getFileName();
+        }
+        return fileId;
     }
 
 /**
