@@ -63,6 +63,7 @@ import { normalizeAction, normalizeButtonProps } from '~/framework/meta/utils/no
 import {
   pickFile,
   uploadCommandFile,
+  resolvePromptUploadAccept,
   resolvePromptUploadKey,
   resolvePromptUploadFilenameKey,
 } from '~/framework/meta/utils/promptUpload';
@@ -139,6 +140,21 @@ function resolveCommandRefreshIds(
   }
   const singleId = toNonBlankString(rawRefresh);
   return singleId ? [singleId] : undefined;
+}
+
+function resolveCommandPayload(
+  actionDef: Record<string, unknown>,
+  runtimeContext: Record<string, unknown>,
+): Record<string, any> {
+  const configured = actionDef.payload;
+  if (!configured || typeof configured !== 'object' || Array.isArray(configured)) {
+    return {};
+  }
+  const out: Record<string, any> = {};
+  for (const [key, value] of Object.entries(configured as Record<string, unknown>)) {
+    out[key] = resolveRuntimeTemplate(value, runtimeContext);
+  }
+  return out;
 }
 
 function resolveCommandErrorMessage(result: unknown, commandCode: string): string {
@@ -480,7 +496,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               record,
               context,
             );
-            let payload = record || context.data || {};
+            let payload = {
+              ...(record || context.data || {}),
+              ...resolveCommandPayload(actionDef as unknown as Record<string, unknown>, runtimeContext),
+            };
             // `promptUpload`: collect a file from the user, upload it, and inject the
             // resulting file id into the payload before the command runs. Strictly
             // guarded by the flag, so non-upload buttons are unaffected.
@@ -490,7 +509,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               // some browsers don't fire a 'cancel' event, so awaiting pickFile()
               // would otherwise hang the loading state and leave the button stuck.
               setLoading(false);
-              const file = await pickFile();
+              const file = await pickFile(resolvePromptUploadAccept(promptUpload));
               if (!file) return; // user dismissed the picker — nothing to do
               setLoading(true);
               const fileId = await uploadCommandFile(file, token);

@@ -298,7 +298,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
 
   it('injects the original filename alongside promptUpload file ids', async () => {
     fetchResultMock.mockResolvedValueOnce({ code: '0', data: { importId: 'BOM-IMPORT-1' } });
-    vi.spyOn(promptUpload, 'pickFile').mockResolvedValueOnce(
+    const pickFileSpy = vi.spyOn(promptUpload, 'pickFile').mockResolvedValueOnce(
       new File(['mpn,qty\nRC0603FR-0710KL,2'], 'corrected-bom-ui-upload.xlsx'),
     );
     vi.spyOn(promptUpload, 'uploadCommandFile').mockResolvedValueOnce('FILE-123');
@@ -320,7 +320,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
     const button = {
       code: 'import_corrected_bom',
       label: 'Upload Corrected BOM',
-      promptUpload: 'corrected_bom_file_id',
+      promptUpload: { key: 'corrected_bom_file_id', accept: '.xlsx,.xls,.csv' },
       action: {
         type: 'command',
         command: 'qo_quote_common:import_corrected_bom',
@@ -347,6 +347,65 @@ describe('useActionHandler - handlerParams.async polling', () => {
         }),
       }),
     );
+    expect(pickFileSpy).toHaveBeenCalledWith('.xlsx,.xls,.csv');
     expect(reload).toHaveBeenCalledWith(['lines', 'quoteSummary']);
+  });
+
+  it('merges action payload with promptUpload file ids for command buttons', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { attachmentId: 'ATT-1' } });
+    vi.spyOn(promptUpload, 'pickFile').mockResolvedValueOnce(
+      new File(['refdes,mpn\nR1,RC0603'], 'raw-bom.xlsx'),
+    );
+    vi.spyOn(promptUpload, 'uploadCommandFile').mockResolvedValueOnce('FILE-RFQ-1');
+
+    const reload = vi.fn().mockResolvedValue(undefined);
+    const runtime = makeRuntime({ form: { pid: 'RFQ-123' } });
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime,
+        navigate: vi.fn() as any,
+        tableName: 'crm_customer_request_pcba_rfq',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        dataSourceManager: { reload } as any,
+        context: {} as any,
+      }),
+    );
+
+    const button = {
+      code: 'upload_raw_bom',
+      label: 'Upload Raw BOM',
+      promptUpload: { key: 'source_file_id', accept: '.xlsx,.xls,.csv' },
+      action: {
+        type: 'command',
+        command: 'crm_customer_request_pcba_rfq:upload_source_attachment',
+        targetRecordId: '${form.pid}',
+        payload: {
+          attachment_type: 'raw_bom',
+        },
+        refresh: ['rfqSourceAttachments'],
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button);
+    });
+
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/crm_customer_request_pcba_rfq:upload_source_attachment',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          targetRecordId: 'RFQ-123',
+          operationType: 'UPDATE',
+          payload: expect.objectContaining({
+            attachment_type: 'raw_bom',
+            source_file_id: 'FILE-RFQ-1',
+            source_filename: 'raw-bom.xlsx',
+          }),
+        }),
+      }),
+    );
+    expect(reload).toHaveBeenCalledWith(['rfqSourceAttachments']);
   });
 });
