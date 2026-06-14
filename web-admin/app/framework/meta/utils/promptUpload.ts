@@ -79,9 +79,26 @@ export async function uploadCommandFile(
  * `promptUpload: "<key>"` → that explicit key.
  */
 export function resolvePromptUploadKey(promptUpload: unknown): string {
-  return typeof promptUpload === 'string' && promptUpload.trim()
-    ? promptUpload.trim()
-    : 'source_file_id';
+  if (typeof promptUpload === 'string' && promptUpload.trim()) {
+    return promptUpload.trim();
+  }
+  if (promptUpload && typeof promptUpload === 'object' && !Array.isArray(promptUpload)) {
+    const key = (promptUpload as Record<string, unknown>).key;
+    if (typeof key === 'string' && key.trim()) {
+      return key.trim();
+    }
+  }
+  return 'source_file_id';
+}
+
+export function resolvePromptUploadAccept(promptUpload: unknown): string {
+  if (promptUpload && typeof promptUpload === 'object' && !Array.isArray(promptUpload)) {
+    const accept = (promptUpload as Record<string, unknown>).accept;
+    if (typeof accept === 'string' && accept.trim()) {
+      return accept.trim();
+    }
+  }
+  return '.xlsx,.xls,.csv';
 }
 
 /**

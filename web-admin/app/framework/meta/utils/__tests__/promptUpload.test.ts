@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolvePromptUploadFilenameKey, resolvePromptUploadKey, uploadCommandFile } from '../promptUpload';
+import {
+  resolvePromptUploadAccept,
+  resolvePromptUploadFilenameKey,
+  resolvePromptUploadKey,
+  uploadCommandFile,
+} from '../promptUpload';
 
 describe('resolvePromptUploadKey', () => {
   it('defaults to source_file_id when promptUpload is boolean true', () => {
@@ -8,6 +13,12 @@ describe('resolvePromptUploadKey', () => {
 
   it('uses the explicit string key when provided', () => {
     expect(resolvePromptUploadKey('bom_lib_source_file_id')).toBe('bom_lib_source_file_id');
+  });
+
+  it('uses the object key when promptUpload is configured with metadata', () => {
+    expect(resolvePromptUploadKey({ key: 'corrected_bom_file_id', accept: '.xlsx,.xls,.csv' })).toBe(
+      'corrected_bom_file_id',
+    );
   });
 
   it('falls back to source_file_id for blank/invalid values', () => {
@@ -29,6 +40,19 @@ describe('resolvePromptUploadFilenameKey', () => {
 
   it('falls back to appending _filename for non-standard keys', () => {
     expect(resolvePromptUploadFilenameKey('attachment')).toBe('attachment_filename');
+  });
+});
+
+describe('resolvePromptUploadAccept', () => {
+  it('uses object accept metadata when configured', () => {
+    expect(resolvePromptUploadAccept({ key: 'gerber_file_id', accept: '.zip,.rar,.gbr,.drl' })).toBe(
+      '.zip,.rar,.gbr,.drl',
+    );
+  });
+
+  it('falls back to spreadsheet uploads for legacy promptUpload values', () => {
+    expect(resolvePromptUploadAccept('corrected_bom_file_id')).toBe('.xlsx,.xls,.csv');
+    expect(resolvePromptUploadAccept(true)).toBe('.xlsx,.xls,.csv');
   });
 });
 
