@@ -528,6 +528,62 @@ describe('StatusBannerBlockRenderer', () => {
     expect(value.closest('div')).toHaveClass('min-w-0');
   });
 
+  it('renders linked summary values and skips system pid fields', () => {
+    const quoteRecord = {
+      qo_quote_status: 'draft',
+      qo_quote_customer: 'Golden SmartHub_MAIN_REV1.3_Design_MFG',
+      qo_quote_crm_account_id: '01KV1FYEZC514WPMAFHYNMGRQM',
+      qo_quote_customer_request_id: '01KV1FYF0SN7N2H5FVMJNJKGEN',
+      pcba_rfq_url: '/p/crm_customer_request_pcba_rfq/view/01KV1FYF1ZMFFAQX08Y7REXAQ0',
+      pid: '01KV1FYF344J67GYF96ZJQEZDS',
+    };
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => quoteRecord,
+        getState: () => ({ data: quoteRecord, loading: false, error: null }),
+        has: () => true,
+        register: vi.fn(),
+        reload: vi.fn(),
+        subscribe: vi.fn(() => () => undefined),
+      }),
+    }) as any;
+    const block: BlockConfig = {
+      id: 'quote_status',
+      blockType: 'status-banner',
+      dataSource: 'summary',
+      statusField: 'qo_quote_status',
+      titleMap: {
+        draft: 'Draft',
+      },
+      summaryFields: [
+        {
+          key: 'customer',
+          label: 'Customer',
+          field: 'qo_quote_customer',
+          linkTo: '/p/crm_account_common/view/${record.qo_quote_crm_account_id}',
+        },
+        {
+          key: 'customerRequest',
+          label: 'Customer Request',
+          field: 'qo_quote_customer_request_id',
+          linkField: ['missing_url', 'pcba_rfq_url'],
+        },
+        { key: 'pid', label: 'PID', field: 'pid' },
+      ],
+    };
+
+    render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(
+      screen.getByRole('link', { name: 'Golden SmartHub_MAIN_REV1.3_Design_MFG' }),
+    ).toHaveAttribute('href', '/p/crm_account_common/view/01KV1FYEZC514WPMAFHYNMGRQM');
+    expect(screen.getByRole('link', { name: '01KV1FYF0SN7N2H5FVMJNJKGEN' })).toHaveAttribute(
+      'href',
+      '/p/crm_customer_request_pcba_rfq/view/01KV1FYF1ZMFFAQX08Y7REXAQ0',
+    );
+    expect(screen.queryByText('01KV1FYF344J67GYF96ZJQEZDS')).not.toBeInTheDocument();
+  });
+
   it('hides when the current status is configured as hidden', () => {
     const runtime = makeRuntime({
       getDataSourceManager: () => ({

@@ -51,6 +51,74 @@ function interpolateTemplate(template: string, record: Record<string, any>): str
   });
 }
 
+function shouldHideSummaryField(field: any): boolean {
+  if (field?.hidden === true) return true;
+  const fieldName = String(field?.field || field?.key || '').trim().toLowerCase();
+  return fieldName === 'pid';
+}
+
+function resolveSummaryFieldLink(
+  field: any,
+  record: Record<string, any>,
+  displayValue: string,
+): string {
+  const linkFields =
+    typeof field?.linkField === 'string'
+      ? [field.linkField]
+      : Array.isArray(field?.linkField)
+        ? field.linkField
+        : [];
+  for (const linkField of linkFields) {
+    const value = readPath(record, String(linkField));
+    if (value !== undefined && value !== null && value !== '') {
+      return String(value);
+    }
+  }
+
+  const template =
+    typeof field?.linkTo === 'string'
+      ? field.linkTo
+      : typeof field?.href === 'string'
+        ? field.href
+        : typeof field?.url === 'string'
+          ? field.url
+          : '';
+  if (!template.trim()) return '';
+
+  let hasMissingValue = false;
+  const href = template.replace(/\$\{([^}]+)\}/g, (_match: string, rawPath: string) => {
+    const path = String(rawPath || '').trim();
+    const value =
+      path === 'value' ? displayValue : readPath(record, path.replace(/^record\./, ''));
+    if (value === undefined || value === null || value === '') {
+      hasMissingValue = true;
+      return '';
+    }
+    return encodeURIComponent(String(value));
+  });
+
+  return hasMissingValue ? '' : href;
+}
+
+function handleSummaryLinkClick(
+  event: React.MouseEvent<HTMLAnchorElement>,
+  href: string,
+): void {
+  if (
+    !href.startsWith('/') ||
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return;
+  }
+  event.preventDefault();
+  window.location.assign(href);
+}
+
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => String(item)) : [];
 }
@@ -196,16 +264,28 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
         <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {summaryFields.map((field: any) => {
             const key = String(field.key || field.field || field.label);
+            if (shouldHideSummaryField(field)) return null;
             const value = readPath(record, field.field);
             if (value === undefined || value === null || value === '') return null;
             const displayValue = String(value);
+            const href = resolveSummaryFieldLink(field, record, displayValue);
             return (
               <div key={key} className="min-w-0 rounded-md bg-white/60 px-3 py-2">
                 <dt className="text-xs opacity-70">
                   {getLocalizedText(field.label as LocalizedText, locale, t)}
                 </dt>
                 <dd className="mt-0.5 min-w-0 break-words text-sm font-semibold leading-snug" title={displayValue}>
-                  {displayValue}
+                  {href ? (
+                    <a
+                      className="inline-block max-w-full break-words text-current underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                      href={href}
+                      onClick={(event) => handleSummaryLinkClick(event, href)}
+                    >
+                      {displayValue}
+                    </a>
+                  ) : (
+                    displayValue
+                  )}
                 </dd>
               </div>
             );
