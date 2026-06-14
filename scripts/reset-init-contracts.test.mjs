@@ -164,14 +164,24 @@ test('plugin import profiles use explicit semantic names and deprecate default',
   assert.deepEqual(profiles.core, [
     'core-meta',
     'core-bpm',
+    'platform-admin',
     'core-decisionops',
     'core-aurabot',
     'page-manager',
     'org-management',
-    'platform-admin',
   ]);
   assert.deepEqual(profiles.demo.slice(0, profiles.core.length), profiles.core);
   assert.ok(profiles.e2e.includes('test-fixtures'));
+  for (const [profile, plugins] of Object.entries(profiles)) {
+    const adminIndex = plugins.indexOf('platform-admin');
+    const decisionOpsIndex = plugins.indexOf('core-decisionops');
+    if (adminIndex >= 0 && decisionOpsIndex >= 0) {
+      assert.ok(
+        adminIndex < decisionOpsIndex,
+        `${profile} must import platform-admin before core-decisionops because DecisionOps webhooks reuse admin_webhook permission`,
+      );
+    }
+  }
 });
 
 test('plugin import retries each plugin before importing dependents', () => {
