@@ -40,7 +40,7 @@ const RFQ_MODEL = 'crm_customer_request_pcba_rfq';
 
 const RFQ_ENTRY = {
   href: `/p/${RFQ_MODEL}`,
-  label: /客户需求-PCBA RFQ|Customer Requests \(PCBA RFQ\)|RFQ/i,
+  label: /^\s*RFQ\s*$/i,
   parentLabel: /销售到订单|Sales To Order/i,
   route: /\/p\/crm_customer_request_pcba_rfq(?:$|[?#])/,
 };

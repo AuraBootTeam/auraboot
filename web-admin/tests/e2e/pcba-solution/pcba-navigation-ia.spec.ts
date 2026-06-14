@@ -73,7 +73,7 @@ const SALES_AND_PROCUREMENT_ENTRIES: PcbaEntry[] = [
     // pe_crm_crm_customer_request_pcba_rfq (pcba-crm menus.json).
     id: 'rfq-list',
     href: '/p/crm_customer_request_pcba_rfq',
-    label: /客户需求-PCBA RFQ|Customer Requests \(PCBA RFQ\)|RFQ/i,
+    label: /^\s*RFQ\s*$/i,
     parentLabel: /销售到订单|Sales To Order/i,
     route: /\/p\/crm_customer_request_pcba_rfq(?:$|[?#])/,
     modelCode: 'crm_customer_request_pcba_rfq',
