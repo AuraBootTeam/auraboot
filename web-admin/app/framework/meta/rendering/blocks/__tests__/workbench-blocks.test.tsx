@@ -1128,6 +1128,87 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.queryByText('标准编码')).not.toBeInTheDocument();
   });
 
+  it('omits empty compare/source/export panels when only candidate review is configured', () => {
+    const runtime = makeRuntime({
+      data: {
+        priceEvidence: [
+          {
+            pid: 'EV-1',
+            qo_pe_part_no: 'D210000007900',
+            qo_pe_source: 'deepseek_llm',
+            qo_pe_unit_price: '8.50',
+            qo_pe_currency: 'CNY',
+            qo_pe_confidence: '0.35',
+            qo_pe_status: 'suggested',
+          },
+        ],
+      },
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        global: {},
+        state: {
+          selectedPriceLine: {
+            pid: 'QL-1',
+            qo_ql_mpn: 'D210000007900',
+            qo_ql_risk: 'shortage',
+          },
+        },
+      }),
+    }) as any;
+
+    render(
+      <ReviewDrawerBlockRenderer
+        block={{
+          id: 'price_review_drawer',
+          blockType: 'review-drawer',
+          context: '${state.selectedPriceLine}',
+          titleTemplate: '${record.qo_ql_mpn}',
+          candidates: {
+            dataSource: 'priceEvidence',
+            title: '查价候选(多源对比)',
+            item: {
+              titleField: 'qo_pe_part_no',
+              scoreField: 'qo_pe_confidence',
+              detailFields: [
+                {
+                  key: 'source',
+                  label: '来源',
+                  field: 'qo_pe_source',
+                  valueMap: {
+                    deepseek_llm: 'DeepSeek建议',
+                  },
+                },
+                { key: 'price', label: '单价', field: 'qo_pe_unit_price' },
+                {
+                  key: 'status',
+                  label: '状态',
+                  field: 'qo_pe_status',
+                  valueMap: {
+                    suggested: '建议价',
+                  },
+                },
+              ],
+            },
+            decisionFields: [{ key: 'risk', label: '风险', field: 'qo_ql_risk' }],
+          },
+        }}
+        runtime={runtime}
+      />,
+    );
+
+    expect(screen.getByTestId('review-drawer-tab-candidates')).toHaveTextContent(
+      '查价候选(多源对比)',
+    );
+    expect(screen.getByTestId('review-drawer-candidate-EV-1')).toHaveTextContent('DeepSeek建议');
+    expect(screen.getByTestId('review-drawer-candidate-EV-1')).toHaveTextContent('建议价');
+    expect(screen.getByTestId('review-drawer')).not.toHaveTextContent('Raw');
+    expect(screen.getByTestId('review-drawer')).not.toHaveTextContent('Canonical');
+    expect(screen.queryByTestId('review-drawer-tab-compare')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('review-drawer-tab-source')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('review-drawer-tab-export')).not.toBeInTheDocument();
+  });
+
   it('keeps long BOM refdes titles constrained so drawer actions remain visible', () => {
     const longRefdes = Array.from({ length: 48 }, (_, index) => `C${1000 + index}`).join(',');
     const runtime = makeReviewDrawerRuntime({
