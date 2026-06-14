@@ -12,7 +12,7 @@ import {
 } from './workbenchBlockUtils';
 
 type BoardSide = 'top' | 'bottom' | 'unknown';
-type SideFilter = BoardSide | 'all';
+type SideFilter = Exclude<BoardSide, 'unknown'>;
 type IssueSeverity = 'error' | 'warning' | 'info';
 type IssueFilter = IssueSeverity | 'all';
 
@@ -102,7 +102,6 @@ export interface GerberViewerBlockRendererProps {
 const DEFAULT_LINE_INSPECTION_FIELD = 'qo_ql_gerber_inspection';
 
 const SIDE_OPTIONS: Array<[SideFilter, string]> = [
-  ['all', 'All'],
   ['top', 'Top'],
   ['bottom', 'Bottom'],
 ];
@@ -117,9 +116,15 @@ const ISSUE_OPTIONS: Array<[IssueFilter, string]> = [
 const FILE_PID_URL_PATTERN = /^\/?([0-9A-HJKMNP-TV-Z]{26})(?:\.[A-Za-z0-9]+)?$/;
 
 const severityClass: Record<IssueSeverity, string> = {
-  error: 'border-rose-200 bg-rose-50 text-rose-800',
-  warning: 'border-amber-200 bg-amber-50 text-amber-900',
-  info: 'border-blue-200 bg-blue-50 text-blue-900',
+  error: 'border-rose-300 border-l-4 bg-rose-50 text-rose-900 shadow-sm',
+  warning: 'border-amber-300 border-l-4 bg-amber-50 text-amber-900 shadow-sm',
+  info: 'border-blue-200 border-l-4 bg-blue-50 text-blue-900',
+};
+
+const severityRank: Record<IssueSeverity, number> = {
+  error: 0,
+  warning: 1,
+  info: 2,
 };
 
 function parseJsonLike(value: unknown): unknown {
@@ -241,6 +246,11 @@ function severityFromValidationStatus(status: unknown): IssueSeverity {
   return 'info';
 }
 
+function actionableSeverityFromValidationStatus(status: unknown): IssueSeverity | undefined {
+  const severity = severityFromValidationStatus(status);
+  return severity === 'info' ? undefined : severity;
+}
+
 function issueCodeFromMessage(message: string, index: number): string {
   const code = message
     .trim()
@@ -268,6 +278,24 @@ function issueCounts(issues: ValidationIssue[]): { errorCount: number; warningCo
     errorCount: issues.filter((issue) => issue.severity === 'error').length,
     warningCount: issues.filter((issue) => issue.severity === 'warning').length,
   };
+}
+
+function issueStats(issues: ValidationIssue[]): {
+  errorCount: number;
+  warningCount: number;
+  infoCount: number;
+  totalCount: number;
+} {
+  return {
+    errorCount: issues.filter((issue) => issue.severity === 'error').length,
+    warningCount: issues.filter((issue) => issue.severity === 'warning').length,
+    infoCount: issues.filter((issue) => issue.severity === 'info').length,
+    totalCount: issues.length,
+  };
+}
+
+function localized(locale: string, zh: string, en: string): string {
+  return locale.toLowerCase().startsWith('zh') ? zh : en;
 }
 
 function layersFromLine(line: Record<string, any> | undefined): LayerManifestItem[] {
@@ -384,7 +412,7 @@ function filterComponents(
 ): ComponentInspection[] {
   const normalizedQuery = query.trim().toUpperCase();
   return (inspection.components || []).filter((component) => {
-    const sideMatches = side === 'all' || component.side === side;
+    const sideMatches = component.side === side;
     const issueMatches =
       issueFilter === 'all' ||
       (component.issues || []).some((issue) => issue.severity === issueFilter);
@@ -392,21 +420,37 @@ function filterComponents(
   });
 }
 
-function filterIssues(
-  inspection: QuoteInspection,
+function filterIssueList(
+  issueList: ValidationIssue[],
   issueFilter: IssueFilter,
   query: string,
 ): ValidationIssue[] {
   const normalizedQuery = query.trim().toUpperCase();
-  return (inspection.issues || []).filter((issue) => {
-    const severityMatches = issueFilter === 'all' || issue.severity === issueFilter;
-    const queryMatches =
-      !normalizedQuery ||
-      issue.refdes?.toUpperCase().includes(normalizedQuery) ||
-      issue.code?.toUpperCase().includes(normalizedQuery) ||
-      issue.message?.toUpperCase().includes(normalizedQuery);
-    return severityMatches && queryMatches;
-  });
+  return issueList
+    .filter((issue) => {
+      const severityMatches = issueFilter === 'all' || issue.severity === issueFilter;
+      const queryMatches =
+        !normalizedQuery ||
+        issue.refdes?.toUpperCase().includes(normalizedQuery) ||
+        issue.code?.toUpperCase().includes(normalizedQuery) ||
+        issue.message?.toUpperCase().includes(normalizedQuery);
+      return severityMatches && queryMatches;
+    })
+    .sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
+}
+
+function effectiveValidationIssues(
+  inspection: QuoteInspection | undefined,
+  line: Record<string, any> | undefined,
+): ValidationIssue[] {
+  const issues = inspection?.issues || [];
+  const lineSeverity = actionableSeverityFromValidationStatus(
+    readPath(line, 'qo_ql_gerber_validation_status'),
+  );
+  if (!lineSeverity || issues.some((issue) => issue.severity !== 'info')) {
+    return issues;
+  }
+  return issues.map((issue) => ({ ...issue, severity: lineSeverity }));
 }
 
 function formatNumber(value: number | undefined, digits = 0): string {
@@ -468,7 +512,7 @@ function boardSvgUrl(
   inspection: QuoteInspection | undefined,
   side: SideFilter,
 ): string | undefined {
-  if (!inspection || side === 'all' || side === 'unknown') return undefined;
+  if (!inspection) return undefined;
   const value = inspection.boardSvgUrls?.[side];
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
@@ -480,7 +524,7 @@ function boardSvgUrl(
   return trimmed;
 }
 
-function preferredBoardSvgSide(inspection: QuoteInspection | undefined): BoardSide | undefined {
+function preferredBoardSvgSide(inspection: QuoteInspection | undefined): SideFilter | undefined {
   if (boardSvgUrl(inspection, 'top')) return 'top';
   if (boardSvgUrl(inspection, 'bottom')) return 'bottom';
   return undefined;
@@ -619,19 +663,13 @@ function Metric({
 }
 
 function GerberSvgUnavailable({
-  side,
-  hasBoardSvgArtifacts,
   message,
 }: {
-  side: SideFilter;
-  hasBoardSvgArtifacts: boolean;
   message?: string;
 }) {
   const detail = message
     ? message
-    : side === 'all' && hasBoardSvgArtifacts
-      ? 'All sides do not have a single parsed SVG artifact. Select Top or Bottom to inspect the real Gerber render.'
-      : 'No parsed Gerber SVG artifact was returned for this view. Generated graphics are hidden so they are not mistaken for parser output.';
+    : 'No parsed Gerber SVG artifact was returned for this side. Generated graphics are hidden so they are not mistaken for parser output.';
   return (
     <div
       role="status"
@@ -641,6 +679,65 @@ function GerberSvgUnavailable({
       <div className="max-w-md">
         <div className="text-sm font-semibold text-white">Real Gerber render unavailable</div>
         <div className="mt-2 text-xs leading-5 text-slate-300">{detail}</div>
+      </div>
+    </div>
+  );
+}
+
+function ValidationSummary({
+  stats,
+  locale,
+}: {
+  stats: ReturnType<typeof issueStats>;
+  locale: string;
+}) {
+  const hasErrors = stats.errorCount > 0;
+  const hasWarnings = stats.warningCount > 0;
+  const requiresReview = hasErrors || hasWarnings;
+  const title = hasErrors
+    ? localized(locale, '发现校验错误', 'Validation errors found')
+    : hasWarnings
+      ? localized(locale, '发现校验警告', 'Validation warnings found')
+      : localized(locale, '校验未发现阻断项', 'No blocking validation issues');
+  const description = requiresReview
+    ? localized(
+        locale,
+        '请优先处理错误和警告，再进入加工费与报价 Excel。',
+        'Review errors and warnings before process fee and quote Excel.',
+      )
+    : localized(
+        locale,
+        '当前 Gerber / CPL 校验没有错误或警告。',
+        'The current Gerber / CPL validation has no errors or warnings.',
+      );
+  const tone = hasErrors
+    ? 'border-rose-300 bg-rose-50 text-rose-900'
+    : hasWarnings
+      ? 'border-amber-300 bg-amber-50 text-amber-900'
+      : 'border-emerald-200 bg-emerald-50 text-emerald-900';
+
+  return (
+    <div
+      role={requiresReview ? 'alert' : 'status'}
+      data-testid="gerber-validation-summary"
+      className={`rounded-lg border p-3 ${tone}`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">{title}</div>
+          <div className="mt-1 text-xs opacity-85">{description}</div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+          <span className="rounded-full border border-rose-200 bg-white/70 px-2 py-1 text-rose-700">
+            {localized(locale, '错误', 'Errors')} {stats.errorCount}
+          </span>
+          <span className="rounded-full border border-amber-200 bg-white/70 px-2 py-1 text-amber-700">
+            {localized(locale, '警告', 'Warnings')} {stats.warningCount}
+          </span>
+          <span className="rounded-full border border-blue-200 bg-white/70 px-2 py-1 text-blue-700">
+            {localized(locale, '信息', 'Info')} {stats.infoCount}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -731,18 +828,22 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
     lineRecord,
     { preferInspectionIssues: Boolean(lineInspection) },
   );
-  const initialSide = preferredBoardSvgSide(inspection) || 'all';
+  const initialSide = preferredBoardSvgSide(inspection) || 'top';
   const [side, setSide] = React.useState<SideFilter>(initialSide);
-  const preferredSideAppliedRef = React.useRef(Boolean(preferredBoardSvgSide(inspection)));
   const board = boardBounds(inspection, lineRecord || {});
   const components = React.useMemo(
     () => (inspection ? filterComponents(inspection, side, issueFilter, query) : []),
     [inspection, side, issueFilter, query],
   );
   const issues = React.useMemo(
-    () => (inspection ? filterIssues(inspection, issueFilter, query) : []),
-    [inspection, issueFilter, query],
+    () =>
+      inspection
+        ? filterIssueList(effectiveValidationIssues(inspection, lineRecord), issueFilter, query)
+        : [],
+    [inspection, lineRecord, issueFilter, query],
   );
+  const allIssues = effectiveValidationIssues(inspection, lineRecord);
+  const validationStats = issueStats(allIssues);
   const layers = inspection?.layerManifest || [];
   const drillHits = (inspection?.drillFiles || []).reduce(
     (sum, file) => sum + numberOr(file.hitCount, 0),
@@ -760,11 +861,10 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
   }, [components, selectedRefdes]);
 
   React.useEffect(() => {
-    if (!preferredSideAppliedRef.current && side === 'all' && preferredSvgSide) {
-      preferredSideAppliedRef.current = true;
+    if (preferredSvgSide && side !== preferredSvgSide && !boardSvgUrl(inspection, side)) {
       setSide(preferredSvgSide);
     }
-  }, [preferredSvgSide, side]);
+  }, [inspection, preferredSvgSide, side]);
 
   React.useEffect(() => {
     setBoardImageRenderError('');
@@ -816,7 +916,6 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
     inspection.project?.code || readPath(lineRecord, 'qo_ql_description') || 'Gerber inspection';
   const projectName = inspection.project?.name || readPath(lineRecord, 'qo_ql_mpn') || '';
   const summary = inspection.summary || {};
-  const hasBoardSvgArtifacts = Boolean(preferredSvgSide);
   const boardImageError = boardImageRenderError || boardImage.message;
   const canRenderBoardImage = boardImage.status === 'ready' && Boolean(boardImage.src) && !boardImageError;
 
@@ -858,12 +957,18 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
           label="Parse / validation"
           value={selectedParseStatus(lineRecord || {})}
           tone={
-            String(readPath(lineRecord, 'qo_ql_gerber_validation_status')).includes('error')
+            severityFromValidationStatus(readPath(lineRecord, 'qo_ql_gerber_validation_status')) ===
+            'error'
               ? 'border-rose-200'
-              : 'border-gray-200'
+              : severityFromValidationStatus(readPath(lineRecord, 'qo_ql_gerber_validation_status')) ===
+                  'warning'
+                ? 'border-amber-200 bg-amber-50'
+                : 'border-gray-200'
           }
         />
       </div>
+
+      <ValidationSummary stats={validationStats} locale={locale} />
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0">
@@ -890,8 +995,6 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
               <GerberSvgLoading />
             ) : (
               <GerberSvgUnavailable
-                side={side}
-                hasBoardSvgArtifacts={hasBoardSvgArtifacts}
                 message={boardImageError}
               />
             )}
@@ -949,7 +1052,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
         <aside className="min-w-0 space-y-3">
           <section className="rounded-lg border border-gray-200 bg-white">
             <div className="border-b border-gray-100 px-3 py-2 text-sm font-semibold text-gray-900">
-              BOM / CPL Issues
+              {localized(locale, '校验问题', 'Validation Issues')}
             </div>
             <div className="max-h-48 space-y-2 overflow-auto p-3">
               {issues.length === 0 ? (
@@ -997,6 +1100,15 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="border-b border-gray-100 px-3 py-2">
+          <div className="text-sm font-semibold text-gray-900">
+            {localized(locale, '当前层器件匹配明细', 'Current Side Component Matches')}
+          </div>
+          <div className="mt-1 text-xs text-gray-500">
+            {localized(locale, '当前层', 'Side')}: {side === 'top' ? 'Top' : 'Bottom'} ·{' '}
+            {localized(locale, '匹配器件', 'Components')} {components.length}
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs">
             <thead className="border-b border-gray-100 bg-gray-50 text-gray-500">

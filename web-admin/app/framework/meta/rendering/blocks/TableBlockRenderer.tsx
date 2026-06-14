@@ -33,6 +33,70 @@ interface DictItem {
   extension?: Record<string, any>;
 }
 
+const FILE_PID_URL_PATTERN = /^\/?([0-9A-HJKMNP-TV-Z]{26})(?:\.[A-Za-z0-9]+)?$/;
+
+function renderConfig(column: ColumnConfig): Record<string, any> {
+  return column.render && typeof column.render === 'object' && !Array.isArray(column.render)
+    ? (column.render as Record<string, any>)
+    : {};
+}
+
+function firstNonBlank(source: Record<string, any>, fields: string[]): unknown {
+  for (const field of fields) {
+    const value = source[field];
+    if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+  }
+  return undefined;
+}
+
+function resolveLinkHref(column: ColumnConfig, row: any, value: unknown): string | undefined {
+  const config = renderConfig(column);
+  const url = value === undefined || value === null ? '' : String(value).trim();
+  const derivedFileIdField = column.field.endsWith('_url')
+    ? `${column.field.slice(0, -4)}_file_id`
+    : '';
+  const fileId = firstNonBlank(row || {}, [
+    String(config.fileIdField || ''),
+    derivedFileIdField,
+    'fileId',
+    'file_id',
+    'qo_qd_file_id',
+  ].filter(Boolean));
+  if (fileId && (!url || FILE_PID_URL_PATTERN.test(url))) {
+    return `/api/file/download/${encodeURIComponent(String(fileId))}`;
+  }
+  return url || (fileId ? `/api/file/download/${encodeURIComponent(String(fileId))}` : undefined);
+}
+
+function renderLinkCell(
+  column: ColumnConfig,
+  row: any,
+  value: unknown,
+  locale: string,
+  t: (key: string) => string,
+): React.ReactNode {
+  const href = resolveLinkHref(column, row, value);
+  if (!href) return <span className="text-gray-400">-</span>;
+  const config = renderConfig(column);
+  const label = config.text
+    ? getLocalizedText(config.text, locale, t)
+    : value === undefined || value === null || value === ''
+      ? 'Download'
+      : String(value);
+  const target = config.target || (href.startsWith('http') ? '_blank' : undefined);
+  return (
+    <a
+      href={href}
+      target={target}
+      rel={target === '_blank' ? 'noreferrer' : undefined}
+      onClick={(event) => event.stopPropagation()}
+      className="font-medium text-blue-600 underline decoration-blue-300 underline-offset-2 hover:text-blue-800"
+    >
+      {label}
+    </a>
+  );
+}
+
 export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, runtime }) => {
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
@@ -204,6 +268,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   // 渲染单元格内容
   const renderCellContent = (column: ColumnConfig, row: any) => {
     const value = row[column.field];
+
+    if (column.valueType === 'link' || column.valueType === 'url') {
+      return renderLinkCell(column, row, value, locale, t);
+    }
 
     // Null/undefined 处理
     if (value === null || value === undefined) {

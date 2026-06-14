@@ -4,6 +4,8 @@
  */
 
 import React from 'react';
+import * as LucideIcons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { BlockConfig, ButtonConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -15,6 +17,13 @@ export interface FormButtonsBlockRendererProps {
   block: BlockConfig;
   runtime: SchemaRuntime;
 }
+
+const renderIcon = (icon?: ButtonConfig['icon']) => {
+  if (!icon || typeof icon !== 'string') return null;
+  const Icon = (LucideIcons as unknown as Record<string, LucideIcon>)[icon];
+  if (!Icon) return null;
+  return <Icon className="mr-2 h-4 w-4" aria-hidden="true" />;
+};
 
 export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> = ({
   block,
@@ -83,7 +92,7 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
     // 确定按钮样式
     const getButtonClassName = () => {
       const baseClass =
-        'px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2';
+        'inline-flex items-center px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2';
 
       if (button.danger) {
         return `${baseClass} text-white bg-red-600 hover:bg-red-700 focus:ring-red-500 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`;
@@ -105,7 +114,7 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
         disabled={disabled}
         className={getButtonClassName()}
       >
-        {button.icon && <span className="mr-2">{button.icon}</span>}
+        {renderIcon(button.icon)}
         {content}
       </button>
     );
