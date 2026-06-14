@@ -209,6 +209,32 @@ class FileServiceImplTest {
     }
 
     @Test
+    void getFileById_pidMiss_fallsBackToGeneratedStorageFileName() {
+        FileEntity entity = new FileEntity();
+        entity.setPid("01KV22CQ7PVHZP41197ZRJFHEM");
+        entity.setFileName("01KV22CQ7PKX3W50Y7MM575ACK.svg");
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(null, entity);
+
+        FileEntity result = fileService.getFileById("01KV22CQ7PKX3W50Y7MM575ACK.svg");
+
+        assertThat(result).isSameAs(entity);
+        verify(fileMapper, never()).selectById((java.io.Serializable) "01KV22CQ7PKX3W50Y7MM575ACK.svg");
+    }
+
+    @Test
+    void getFileById_pidMiss_fallsBackToGeneratedSvgFileNameWhenExtensionWasStripped() {
+        FileEntity entity = new FileEntity();
+        entity.setPid("01KV22CQ7PVHZP41197ZRJFHEM");
+        entity.setFileName("01KV22CQ7PKX3W50Y7MM575ACK.svg");
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(null, null, entity);
+
+        FileEntity result = fileService.getFileById("01KV22CQ7PKX3W50Y7MM575ACK");
+
+        assertThat(result).isSameAs(entity);
+        verify(fileMapper, never()).selectById((java.io.Serializable) "01KV22CQ7PKX3W50Y7MM575ACK");
+    }
+
+    @Test
     void getFilesByUserId_delegatesToMapper() {
         FileEntity e = new FileEntity();
         when(fileMapper.selectByCreatedBy(7L)).thenReturn(List.of(e));

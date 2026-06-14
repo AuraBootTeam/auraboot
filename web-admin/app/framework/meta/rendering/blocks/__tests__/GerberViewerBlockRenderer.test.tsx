@@ -20,13 +20,35 @@ const INSPECTION = {
     warningCount: 1,
   },
   layerManifest: [
-    { filename: 'Gerber_TopLayer.GTL', role: 'top_copper', side: 'top', kind: 'gerber', flashCount: 258 },
-    { filename: 'Gerber_BottomLayer.GBL', role: 'bottom_copper', side: 'bottom', kind: 'gerber', flashCount: 101 },
+    {
+      filename: 'Gerber_TopLayer.GTL',
+      role: 'top_copper',
+      side: 'top',
+      kind: 'gerber',
+      flashCount: 258,
+    },
+    {
+      filename: 'Gerber_BottomLayer.GBL',
+      role: 'bottom_copper',
+      side: 'bottom',
+      kind: 'gerber',
+      flashCount: 101,
+    },
   ],
   drillFiles: [{ filename: 'Drill_PTH_Through.DRL', plated: true, hitCount: 101 }],
   issues: [
-    { severity: 'error', code: 'outside_board', refdes: 'U1', message: 'U1 is outside the board outline.' },
-    { severity: 'warning', code: 'bom_process_mismatch', refdes: 'J1', message: 'J1 process differs from CPL.' },
+    {
+      severity: 'error',
+      code: 'outside_board',
+      refdes: 'U1',
+      message: 'U1 is outside the board outline.',
+    },
+    {
+      severity: 'warning',
+      code: 'bom_process_mismatch',
+      refdes: 'J1',
+      message: 'J1 process differs from CPL.',
+    },
   ],
   excludedBomRefs: [{ refdes: 'TP1', bomItem: { materialCode: 'TP', materialName: 'test point' } }],
   components: [
@@ -51,7 +73,9 @@ const INSPECTION = {
       smd: true,
       pins: 32,
       rotation: 0,
-      issues: [{ severity: 'error', code: 'outside_board', refdes: 'U1', message: 'U1 is outside.' }],
+      issues: [
+        { severity: 'error', code: 'outside_board', refdes: 'U1', message: 'U1 is outside.' },
+      ],
       bomItem: { materialName: 'MCU', process: 'SMT' },
     },
     {
@@ -63,7 +87,14 @@ const INSPECTION = {
       smd: false,
       pins: 4,
       rotation: 180,
-      issues: [{ severity: 'warning', code: 'bom_process_mismatch', refdes: 'J1', message: 'J1 mismatch.' }],
+      issues: [
+        {
+          severity: 'warning',
+          code: 'bom_process_mismatch',
+          refdes: 'J1',
+          message: 'J1 mismatch.',
+        },
+      ],
       bomItem: { materialName: 'Header', process: 'DIP' },
     },
   ],
@@ -126,11 +157,15 @@ describe('GerberViewerBlockRenderer', () => {
 
     expect(screen.getByTestId('gerber-viewer')).toHaveTextContent('A00104001');
     expect(screen.getByTestId('gerber-viewer-board')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'PCB layer render' })).toBeInTheDocument();
+    expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent(
+      'Real Gerber render unavailable',
+    );
+    expect(screen.queryByRole('img', { name: 'PCB layer render' })).toBeNull();
     expect(screen.getByTestId('gerber-metric-board')).toHaveTextContent('98 x 33 mm');
     expect(screen.getByTestId('gerber-metric-parse')).toHaveTextContent('parsed / warning');
     expect(screen.getByTestId('gerber-layer-top_copper')).toHaveTextContent('258');
-    expect(screen.getByTestId('gerber-marker-C4')).toBeInTheDocument();
+    expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
+    expect(screen.getByTestId('gerber-component-row-C4')).toBeInTheDocument();
   });
 
   it('lets selected quote-line Gerber facts override the inline sample', () => {
@@ -159,7 +194,9 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.getByTestId('gerber-metric-board')).toHaveTextContent('120 x 45 mm');
     expect(screen.getByTestId('gerber-metric-smt-tht')).toHaveTextContent('17 / 9');
     expect(screen.getByTestId('gerber-metric-drill')).toHaveTextContent('9');
-    expect(screen.getByTestId('gerber-issue-NO_EXCELLON_FILE-0')).toHaveTextContent('NO_EXCELLON_FILE');
+    expect(screen.getByTestId('gerber-issue-NO_EXCELLON_FILE-0')).toHaveTextContent(
+      'NO_EXCELLON_FILE',
+    );
     expect(screen.getByTestId('gerber-layer-smt_points')).toHaveTextContent('17');
   });
 
@@ -179,17 +216,36 @@ describe('GerberViewerBlockRenderer', () => {
 
     render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
 
-    expect(screen.getByRole('img', { name: 'PCB layer render' })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Top' }));
     const topRender = screen.getByRole('img', { name: 'Top Gerber board render' });
     expect(topRender).toHaveAttribute('src', '/artifacts/a00104001-board-top.svg');
+    expect(screen.getByRole('button', { name: 'Top' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('gerber-marker-C4')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Bottom' }));
     const bottomRender = screen.getByRole('img', { name: 'Bottom Gerber board render' });
     expect(bottomRender).toHaveAttribute('src', '/artifacts/a00104001-board-bottom.svg');
     expect(screen.getByTestId('gerber-marker-J1')).toBeInTheDocument();
+  });
+
+  it('normalizes stored file pid SVG URLs to the authenticated file download endpoint', () => {
+    const runtime = makeRuntime();
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: {
+        ...INSPECTION,
+        boardSvgUrls: {
+          top: '/01KV22CQ7PKX3W50Y7MM575ACK.svg',
+        },
+      },
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByRole('img', { name: 'Top Gerber board render' })).toHaveAttribute(
+      'src',
+      '/api/file/download/01KV22CQ7PKX3W50Y7MM575ACK',
+    );
   });
 
   it('renders persisted line inspection JSON before falling back to the DSL sample', () => {
@@ -256,7 +312,14 @@ describe('GerberViewerBlockRenderer', () => {
             qo_ql_gerber_inspection: JSON.stringify({
               project: { code: 'REAL-LINE-INSPECTION', name: 'Runtime sidecar result' },
               board: { widthMm: 106.6, heightMm: 6.6 },
-              summary: { bomRefCount: 5, cplRefCount: 5, smdCount: 0, thtCount: 5, errorCount: 5, warningCount: 4 },
+              summary: {
+                bomRefCount: 5,
+                cplRefCount: 5,
+                smdCount: 0,
+                thtCount: 5,
+                errorCount: 5,
+                warningCount: 4,
+              },
               issues: [
                 {
                   severity: 'error',
@@ -310,8 +373,12 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.getByTestId('gerber-viewer')).toHaveTextContent('Parsed MCU package');
     expect(screen.getByTestId('gerber-viewer')).not.toHaveTextContent('A00104001');
     expect(screen.getByTestId('gerber-metric-board')).toHaveTextContent('107 x 7 mm');
-    expect(screen.getByTestId('gerber-issue-COMPONENT_OUTSIDE_BOARD-ORPHAN')).toHaveTextContent('ORPHAN');
-    expect(screen.getByTestId('gerber-issue-COMPONENT_OUTSIDE_BOARD-ORPHAN')).toHaveTextContent('COMPONENT_OUTSIDE_BOARD');
+    expect(screen.getByTestId('gerber-issue-COMPONENT_OUTSIDE_BOARD-ORPHAN')).toHaveTextContent(
+      'ORPHAN',
+    );
+    expect(screen.getByTestId('gerber-issue-COMPONENT_OUTSIDE_BOARD-ORPHAN')).toHaveTextContent(
+      'COMPONENT_OUTSIDE_BOARD',
+    );
     expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
   });
 
@@ -320,7 +387,13 @@ describe('GerberViewerBlockRenderer', () => {
     const block: BlockConfig = {
       id: 'gerber',
       blockType: 'gerber-viewer',
-      inspection: INSPECTION,
+      inspection: {
+        ...INSPECTION,
+        boardSvgUrls: {
+          top: '/artifacts/a00104001-board-top.svg',
+          bottom: '/artifacts/a00104001-board-bottom.svg',
+        },
+      },
     };
 
     render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
@@ -330,7 +403,10 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.getByTestId('gerber-issue-bom_process_mismatch-J1')).toHaveTextContent('J1');
     expect(screen.queryByTestId('gerber-marker-U1')).toBeNull();
 
-    fireEvent.change(screen.getByLabelText('Gerber viewer search'), { target: { value: 'Header' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'All' })[0]);
+    fireEvent.change(screen.getByLabelText('Gerber viewer search'), {
+      target: { value: 'Header' },
+    });
     expect(screen.getByTestId('gerber-component-row-J1')).toHaveTextContent('Header');
     expect(screen.queryByTestId('gerber-component-row-C4')).toBeNull();
   });
@@ -340,7 +416,12 @@ describe('GerberViewerBlockRenderer', () => {
     const block: BlockConfig = {
       id: 'gerber',
       blockType: 'gerber-viewer',
-      inspection: INSPECTION,
+      inspection: {
+        ...INSPECTION,
+        boardSvgUrls: {
+          top: '/artifacts/a00104001-board-top.svg',
+        },
+      },
     };
 
     render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);

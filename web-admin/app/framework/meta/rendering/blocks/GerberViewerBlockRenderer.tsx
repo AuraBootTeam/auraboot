@@ -107,6 +107,8 @@ const ISSUE_OPTIONS: Array<[IssueFilter, string]> = [
   ['info', 'Info'],
 ];
 
+const FILE_PID_URL_PATTERN = /^\/?([0-9A-HJKMNP-TV-Z]{26})(?:\.[A-Za-z0-9]+)?$/;
+
 const severityClass: Record<IssueSeverity, string> = {
   error: 'border-rose-200 bg-rose-50 text-rose-800',
   warning: 'border-amber-200 bg-amber-50 text-amber-900',
@@ -177,10 +179,7 @@ function hasLineGerberFacts(line: Record<string, any> | undefined): boolean {
     'qo_ql_board_height_mm',
     'qo_ql_board_area_mm2',
   ];
-  const statusFields = [
-    'qo_ql_gerber_parse_status',
-    'qo_ql_gerber_validation_status',
-  ];
+  const statusFields = ['qo_ql_gerber_parse_status', 'qo_ql_gerber_validation_status'];
   return (
     positiveNumberFields.some((field) => hasPositiveNumberPath(line, field)) ||
     statusFields.some((field) => hasNonBlankPath(line, field)) ||
@@ -188,16 +187,27 @@ function hasLineGerberFacts(line: Record<string, any> | undefined): boolean {
   );
 }
 
-function hasLineInspection(line: Record<string, any> | undefined, lineInspectionField: string): boolean {
+function hasLineInspection(
+  line: Record<string, any> | undefined,
+  lineInspectionField: string,
+): boolean {
   return Boolean(normalizeInspection(readPath(line, lineInspectionField)));
 }
 
-function hasLineInspectionOrFacts(line: Record<string, any> | undefined, lineInspectionField: string): boolean {
+function hasLineInspectionOrFacts(
+  line: Record<string, any> | undefined,
+  lineInspectionField: string,
+): boolean {
   return hasLineInspection(line, lineInspectionField) || hasLineGerberFacts(line);
 }
 
-function firstLineWithInspectionOrFacts(rows: any[], lineInspectionField: string): Record<string, any> | undefined {
-  const records = rows.filter((row): row is Record<string, any> => Boolean(row && typeof row === 'object' && !Array.isArray(row)));
+function firstLineWithInspectionOrFacts(
+  rows: any[],
+  lineInspectionField: string,
+): Record<string, any> | undefined {
+  const records = rows.filter((row): row is Record<string, any> =>
+    Boolean(row && typeof row === 'object' && !Array.isArray(row)),
+  );
   return (
     records.find((row) => hasLineInspection(row, lineInspectionField)) ||
     records.find((row) => hasLineGerberFacts(row))
@@ -237,11 +247,13 @@ function issueCodeFromMessage(message: string, index: number): string {
 function lineIssues(line: Record<string, any> | undefined): ValidationIssue[] {
   if (!line) return [];
   const severity = severityFromValidationStatus(readPath(line, 'qo_ql_gerber_validation_status'));
-  return normalizeStringList(readPath(line, 'qo_ql_gerber_validation_messages')).map((message, index) => ({
-    severity,
-    code: issueCodeFromMessage(message, index),
-    message,
-  }));
+  return normalizeStringList(readPath(line, 'qo_ql_gerber_validation_messages')).map(
+    (message, index) => ({
+      severity,
+      code: issueCodeFromMessage(message, index),
+      message,
+    }),
+  );
 }
 
 function issueCounts(issues: ValidationIssue[]): { errorCount: number; warningCount: number } {
@@ -289,15 +301,21 @@ function mergeLineFactsIntoInspection(
   const height = optionalNumber(readPath(line, 'qo_ql_board_height_mm'));
   const messages = lineIssues(line);
   const shouldUseLineMessages =
-    messages.length > 0 && (!options.preferInspectionIssues || !(inspection?.issues && inspection.issues.length > 0));
+    messages.length > 0 &&
+    (!options.preferInspectionIssues || !(inspection?.issues && inspection.issues.length > 0));
   const counts = issueCounts(messages);
   const lineLayers = layersFromLine(line);
   const merged: QuoteInspection = {
     ...(inspection || {}),
     project: {
       ...(inspection?.project || {}),
-      code:
-        String(readPath(line, 'qo_ql_source_ref') || readPath(line, 'qo_ql_mpn') || readPath(line, 'pid') || inspection?.project?.code || 'Gerber inspection'),
+      code: String(
+        readPath(line, 'qo_ql_source_ref') ||
+          readPath(line, 'qo_ql_mpn') ||
+          readPath(line, 'pid') ||
+          inspection?.project?.code ||
+          'Gerber inspection',
+      ),
       name: String(readPath(line, 'qo_ql_description') || inspection?.project?.name || ''),
     },
     board: {
@@ -320,7 +338,10 @@ function mergeLineFactsIntoInspection(
   return merged;
 }
 
-function boardBounds(inspection: QuoteInspection | undefined, line: Record<string, any>): BoardBounds {
+function boardBounds(
+  inspection: QuoteInspection | undefined,
+  line: Record<string, any>,
+): BoardBounds {
   const board = inspection?.board || {};
   const width = numberOr(board.widthMm, numberOr(readPath(line, 'qo_ql_board_width_mm'), 100));
   const height = numberOr(board.heightMm, numberOr(readPath(line, 'qo_ql_board_height_mm'), 60));
@@ -436,10 +457,26 @@ function selectedParseStatus(line: Record<string, any>): string {
   return `${parse} / ${validation}`;
 }
 
-function boardSvgUrl(inspection: QuoteInspection | undefined, side: SideFilter): string | undefined {
+function boardSvgUrl(
+  inspection: QuoteInspection | undefined,
+  side: SideFilter,
+): string | undefined {
   if (!inspection || side === 'all' || side === 'unknown') return undefined;
   const value = inspection.boardSvgUrls?.[side];
-  return typeof value === 'string' && value.trim() ? value : undefined;
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const pidMatch = trimmed.match(FILE_PID_URL_PATTERN);
+  if (pidMatch) {
+    return `/api/file/download/${pidMatch[1]}`;
+  }
+  return trimmed;
+}
+
+function preferredBoardSvgSide(inspection: QuoteInspection | undefined): BoardSide | undefined {
+  if (boardSvgUrl(inspection, 'top')) return 'top';
+  if (boardSvgUrl(inspection, 'bottom')) return 'bottom';
+  return undefined;
 }
 
 function Segmented<T extends string>({
@@ -472,7 +509,17 @@ function Segmented<T extends string>({
   );
 }
 
-function Metric({ id, label, value, tone }: { id: string; label: string; value: string | number; tone?: string }) {
+function Metric({
+  id,
+  label,
+  value,
+  tone,
+}: {
+  id: string;
+  label: string;
+  value: string | number;
+  tone?: string;
+}) {
   return (
     <div
       data-testid={`gerber-metric-${id}`}
@@ -484,50 +531,28 @@ function Metric({ id, label, value, tone }: { id: string; label: string; value: 
   );
 }
 
-function BoardLayerSvg({
-  board,
-  layers,
+function GerberSvgUnavailable({
   side,
+  hasBoardSvgArtifacts,
 }: {
-  board: BoardBounds;
-  layers: LayerManifestItem[];
   side: SideFilter;
+  hasBoardSvgArtifacts: boolean;
 }) {
-  const shownLayers = layers.filter((layer) => side === 'all' || layer.side === side || layer.side === 'unknown');
-  const laneCount = Math.max(1, shownLayers.length);
+  const message =
+    side === 'all' && hasBoardSvgArtifacts
+      ? 'All sides do not have a single parsed SVG artifact. Select Top or Bottom to inspect the real Gerber render.'
+      : 'No parsed Gerber SVG artifact was returned for this view. Generated graphics are hidden so they are not mistaken for parser output.';
   return (
-    <svg viewBox={`0 0 ${board.widthMm} ${board.heightMm}`} className="h-full w-full" role="img" aria-label="PCB layer render">
-      <defs>
-        <linearGradient id="gerber-board-bg" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stopColor="#172033" />
-          <stop offset="52%" stopColor="#0f766e" />
-          <stop offset="100%" stopColor="#111827" />
-        </linearGradient>
-        <pattern id="gerber-copper-pattern" width="7" height="7" patternUnits="userSpaceOnUse">
-          <path d="M0 3.5H7M3.5 0V7" stroke="#67e8f9" strokeOpacity="0.2" strokeWidth="0.5" />
-        </pattern>
-      </defs>
-      <rect x="0.4" y="0.4" width={board.widthMm - 0.8} height={board.heightMm - 0.8} rx="2.2" fill="url(#gerber-board-bg)" stroke="#a7f3d0" strokeWidth="0.8" />
-      <rect x="2" y="2" width={Math.max(1, board.widthMm - 4)} height={Math.max(1, board.heightMm - 4)} rx="1.5" fill="url(#gerber-copper-pattern)" opacity="0.75" />
-      {shownLayers.slice(0, 12).map((layer, index) => {
-        const y = 3 + (index * (board.heightMm - 6)) / laneCount;
-        const width = Math.max(8, Math.min(board.widthMm - 8, 8 + (layerCount(layer) % Math.max(12, board.widthMm - 8))));
-        const color = layer.kind === 'drill' ? '#fbbf24' : layer.side === 'bottom' ? '#60a5fa' : '#34d399';
-        return (
-          <g key={`${layer.role}-${layer.filename}-${index}`} opacity="0.72">
-            <rect x="4" y={y} width={width} height="0.7" rx="0.35" fill={color} />
-            <circle cx={Math.min(board.widthMm - 5, 5 + width)} cy={y + 0.35} r="0.65" fill={color} />
-          </g>
-        );
-      })}
-      <g opacity="0.32">
-        {Array.from({ length: 10 }).map((_, index) => {
-          const x = 7 + ((index * 17) % Math.max(10, board.widthMm - 14));
-          const y = 5 + ((index * 11) % Math.max(8, board.heightMm - 10));
-          return <circle key={index} cx={x} cy={y} r="0.55" fill="#f8fafc" />;
-        })}
-      </g>
-    </svg>
+    <div
+      role="status"
+      data-testid="gerber-svg-unavailable"
+      className="flex h-full w-full items-center justify-center bg-slate-950 px-6 text-center"
+    >
+      <div className="max-w-md">
+        <div className="text-sm font-semibold text-white">Real Gerber render unavailable</div>
+        <div className="mt-2 text-xs leading-5 text-slate-300">{message}</div>
+      </div>
+    </div>
   );
 }
 
@@ -538,9 +563,15 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
-  const title = getLocalizedText(block.title || (block as any).label || 'Gerber / CPL Viewer', locale, t);
+  const title = getLocalizedText(
+    block.title || (block as any).label || 'Gerber / CPL Viewer',
+    locale,
+    t,
+  );
   const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
-  const configuredInspection = normalizeInspection(resolveRuntimeValue(runtime, (block as any).inspection));
+  const configuredInspection = normalizeInspection(
+    resolveRuntimeValue(runtime, (block as any).inspection),
+  );
   const hasConfiguredInspection = Boolean(configuredInspection);
   const inspectionUrl = resolveRuntimeValue(runtime, (block as any).inspectionUrl);
   const selectedLineRecord = resolveRuntimeValue(runtime, (block as any).lineContext);
@@ -558,7 +589,6 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
   useDataSourceSubscription(runtime, dataSourceId);
 
   const [remote, setRemote] = React.useState<LoadState>({ status: 'idle' });
-  const [side, setSide] = React.useState<SideFilter>('all');
   const [issueFilter, setIssueFilter] = React.useState<IssueFilter>('all');
   const [query, setQuery] = React.useState('');
   const [selectedRefdes, setSelectedRefdes] = React.useState('');
@@ -594,6 +624,9 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
     lineRecord,
     { preferInspectionIssues: Boolean(lineInspection) },
   );
+  const initialSide = preferredBoardSvgSide(inspection) || 'all';
+  const [side, setSide] = React.useState<SideFilter>(initialSide);
+  const preferredSideAppliedRef = React.useRef(Boolean(preferredBoardSvgSide(inspection)));
   const board = boardBounds(inspection, lineRecord || {});
   const components = React.useMemo(
     () => (inspection ? filterComponents(inspection, side, issueFilter, query) : []),
@@ -604,16 +637,31 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
     [inspection, issueFilter, query],
   );
   const layers = inspection?.layerManifest || [];
-  const drillHits = (inspection?.drillFiles || []).reduce((sum, file) => sum + numberOr(file.hitCount, 0), 0);
+  const drillHits = (inspection?.drillFiles || []).reduce(
+    (sum, file) => sum + numberOr(file.hitCount, 0),
+    0,
+  );
+  const preferredSvgSide = preferredBoardSvgSide(inspection);
 
   React.useEffect(() => {
-    if (selectedRefdes && components.some((component) => component.refdes === selectedRefdes)) return;
+    if (selectedRefdes && components.some((component) => component.refdes === selectedRefdes))
+      return;
     setSelectedRefdes(components[0]?.refdes || '');
   }, [components, selectedRefdes]);
 
+  React.useEffect(() => {
+    if (!preferredSideAppliedRef.current && side === 'all' && preferredSvgSide) {
+      preferredSideAppliedRef.current = true;
+      setSide(preferredSvgSide);
+    }
+  }, [preferredSvgSide, side]);
+
   if (remote.status === 'loading' && !inspection) {
     return (
-      <div data-testid="gerber-viewer-loading" className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500">
+      <div
+        data-testid="gerber-viewer-loading"
+        className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500"
+      >
         Loading Gerber inspection...
       </div>
     );
@@ -621,26 +669,41 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
 
   if (remote.status === 'error' && !inspection) {
     return (
-      <div role="alert" data-testid="gerber-viewer-error" className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+      <div
+        role="alert"
+        data-testid="gerber-viewer-error"
+        className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
+      >
         {remote.message || 'Failed to load Gerber inspection'}
       </div>
     );
   }
 
   if (!inspection) {
-    const emptyTitle = getLocalizedText((block as any).empty?.title || 'No Gerber inspection data', locale, t);
+    const emptyTitle = getLocalizedText(
+      (block as any).empty?.title || 'No Gerber inspection data',
+      locale,
+      t,
+    );
     return (
-      <div data-testid="gerber-viewer-empty" className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500">
+      <div
+        data-testid="gerber-viewer-empty"
+        className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500"
+      >
         {emptyTitle}
       </div>
     );
   }
 
-  const selected = (inspection.components || []).find((component) => component.refdes === selectedRefdes);
-  const projectCode = inspection.project?.code || readPath(lineRecord, 'qo_ql_description') || 'Gerber inspection';
+  const selected = (inspection.components || []).find(
+    (component) => component.refdes === selectedRefdes,
+  );
+  const projectCode =
+    inspection.project?.code || readPath(lineRecord, 'qo_ql_description') || 'Gerber inspection';
   const projectName = inspection.project?.name || readPath(lineRecord, 'qo_ql_mpn') || '';
   const summary = inspection.summary || {};
   const activeBoardSvgUrl = boardSvgUrl(inspection, side);
+  const hasBoardSvgArtifacts = Boolean(preferredSvgSide);
 
   return (
     <section className="space-y-3" data-testid="gerber-viewer">
@@ -669,13 +732,21 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
         <Metric id="board" label="Board" value={boardMetric(board)} />
         <Metric id="bom" label="BOM refs" value={formatNumber(summary.bomRefCount)} />
         <Metric id="cpl" label="CPL refs" value={formatNumber(summary.cplRefCount)} />
-        <Metric id="smt-tht" label="SMT / THT" value={`${formatNumber(summary.smdCount)} / ${formatNumber(summary.thtCount)}`} />
+        <Metric
+          id="smt-tht"
+          label="SMT / THT"
+          value={`${formatNumber(summary.smdCount)} / ${formatNumber(summary.thtCount)}`}
+        />
         <Metric id="drill" label="Drill hits" value={formatNumber(drillHits)} />
         <Metric
           id="parse"
           label="Parse / validation"
           value={selectedParseStatus(lineRecord || {})}
-          tone={String(readPath(lineRecord, 'qo_ql_gerber_validation_status')).includes('error') ? 'border-rose-200' : 'border-gray-200'}
+          tone={
+            String(readPath(lineRecord, 'qo_ql_gerber_validation_status')).includes('error')
+              ? 'border-rose-200'
+              : 'border-gray-200'
+          }
         />
       </div>
 
@@ -693,33 +764,35 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
                 className="h-full w-full object-contain"
               />
             ) : (
-              <BoardLayerSvg board={board} layers={layers} side={side} />
+              <GerberSvgUnavailable side={side} hasBoardSvgArtifacts={hasBoardSvgArtifacts} />
             )}
-            <div className="absolute inset-0">
-              {components.map((component, index) => {
-                const active = component.refdes === selectedRefdes;
-                return (
-                  <button
-                    key={`${component.refdes}-${index}`}
-                    type="button"
-                    data-testid={`gerber-marker-${component.refdes}`}
-                    title={`${component.refdes} ${component.footprint}`}
-                    onClick={() => setSelectedRefdes(component.refdes)}
-                    className={`absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-lg transition ${
-                      active ? 'z-10 h-5 w-5 ring-4 ring-white/70' : ''
-                    } ${markerTone(component)}`}
-                    style={markerStyle(component, board)}
-                  >
-                    <span className="sr-only">{component.refdes}</span>
-                    {active && (
-                      <span className="absolute left-4 top-[-9px] rounded bg-gray-950/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                        {component.refdes}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            {activeBoardSvgUrl ? (
+              <div className="absolute inset-0">
+                {components.map((component, index) => {
+                  const active = component.refdes === selectedRefdes;
+                  return (
+                    <button
+                      key={`${component.refdes}-${index}`}
+                      type="button"
+                      data-testid={`gerber-marker-${component.refdes}`}
+                      title={`${component.refdes} ${component.footprint}`}
+                      onClick={() => setSelectedRefdes(component.refdes)}
+                      className={`absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-lg transition ${
+                        active ? 'z-10 h-5 w-5 ring-4 ring-white/70' : ''
+                      } ${markerTone(component)}`}
+                      style={markerStyle(component, board)}
+                    >
+                      <span className="sr-only">{component.refdes}</span>
+                      {active && (
+                        <span className="absolute top-[-9px] left-4 rounded bg-gray-950/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                          {component.refdes}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
           <div
             data-testid="gerber-selected-component"
@@ -733,7 +806,10 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
                 <span>
                   {formatNumber(selected.xMm, 2)}, {formatNumber(selected.yMm, 2)} mm
                 </span>
-                <span>{selected.smd ? 'SMT' : 'THT'} · {selected.pins ?? '-'} pins · {selected.rotation ?? 0} deg</span>
+                <span>
+                  {selected.smd ? 'SMT' : 'THT'} · {selected.pins ?? '-'} pins ·{' '}
+                  {selected.rotation ?? 0} deg
+                </span>
               </>
             ) : (
               <span>No selected component</span>
@@ -743,7 +819,9 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
 
         <aside className="min-w-0 space-y-3">
           <section className="rounded-lg border border-gray-200 bg-white">
-            <div className="border-b border-gray-100 px-3 py-2 text-sm font-semibold text-gray-900">BOM / CPL Issues</div>
+            <div className="border-b border-gray-100 px-3 py-2 text-sm font-semibold text-gray-900">
+              BOM / CPL Issues
+            </div>
             <div className="max-h-48 space-y-2 overflow-auto p-3">
               {issues.length === 0 ? (
                 <div data-testid="gerber-issues-empty" className="text-xs text-gray-500">
@@ -758,7 +836,9 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="font-semibold">{issue.refdes || issue.code}</div>
-                      <div className="max-w-[180px] truncate font-mono text-[10px] uppercase opacity-80">{issue.code}</div>
+                      <div className="max-w-[180px] truncate font-mono text-[10px] uppercase opacity-80">
+                        {issue.code}
+                      </div>
                     </div>
                     <div className="mt-0.5">{issue.message}</div>
                   </div>
@@ -768,7 +848,9 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white">
-            <div className="border-b border-gray-100 px-3 py-2 text-sm font-semibold text-gray-900">Layer Manifest</div>
+            <div className="border-b border-gray-100 px-3 py-2 text-sm font-semibold text-gray-900">
+              Layer Manifest
+            </div>
             <div className="max-h-44 overflow-auto p-2">
               {layers.slice(0, 12).map((layer) => (
                 <div
@@ -812,13 +894,21 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
                   >
                     <td className="px-3 py-2 font-semibold text-gray-900">{component.refdes}</td>
                     <td className="px-3 py-2 text-gray-700">{component.footprint}</td>
-                    <td className="px-3 py-2 text-gray-700">{component.bomItem?.materialName || 'Missing BOM'}</td>
+                    <td className="px-3 py-2 text-gray-700">
+                      {component.bomItem?.materialName || 'Missing BOM'}
+                    </td>
                     <td className="px-3 py-2 text-gray-700">{component.bomItem?.process || '-'}</td>
-                    <td className="px-3 py-2 text-right text-gray-700">{formatNumber(component.xMm, 3)}</td>
-                    <td className="px-3 py-2 text-right text-gray-700">{formatNumber(component.yMm, 3)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">
+                      {formatNumber(component.xMm, 3)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-700">
+                      {formatNumber(component.yMm, 3)}
+                    </td>
                     <td className="px-3 py-2 text-gray-700">{component.side}</td>
                     <td className="px-3 py-2">
-                      <span className={`rounded-full border px-2 py-0.5 ${status.className}`}>{status.label}</span>
+                      <span className={`rounded-full border px-2 py-0.5 ${status.className}`}>
+                        {status.label}
+                      </span>
                     </td>
                   </tr>
                 );
