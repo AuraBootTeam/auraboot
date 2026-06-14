@@ -335,12 +335,25 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const sourceSummaryItems = Array.isArray(sourceConfig.summary?.items)
     ? sourceConfig.summary.items
     : [];
+  const rawFields = Array.isArray(compareConfig.rawFields) ? compareConfig.rawFields : [];
+  const canonicalFields = Array.isArray(compareConfig.canonicalFields)
+    ? compareConfig.canonicalFields
+    : [];
+  const sourceCards = Array.isArray(sourceConfig.cards) ? sourceConfig.cards : [];
+  const sourcePolicies = Array.isArray(sourceConfig.policies) ? sourceConfig.policies : [];
+  const exportFields = Array.isArray(exportConfig.fields) ? exportConfig.fields : [];
   const decisionFields = Array.isArray(candidatesConfig.decisionFields)
     ? candidatesConfig.decisionFields
     : [];
   const summaryBadges = Array.isArray((block as any).summaryBadges)
     ? (block as any).summaryBadges
     : [];
+  const hasComparePanel = rawFields.length > 0 || canonicalFields.length > 0;
+  const hasSourceDetails =
+    sourceCards.length > 0 || sourcePolicies.length > 0 || Boolean(sourceConfig.jsonField);
+  const hasExportDetails = exportFields.length > 0 || exportRows.length > 0;
+  const hasLeftRail =
+    hasComparePanel || sourceSummaryItems.length > 0 || hasSourceDetails || hasExportDetails;
 
   const actionContext = {
     ...context,
@@ -491,52 +504,60 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
       </div>
 
       <div className="min-h-0 max-w-full overflow-hidden bg-gray-50 p-4">
-        <div className="grid h-full min-h-0 min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="min-h-0 min-w-0 space-y-3 overflow-auto pr-1">
-            <div
-              data-testid="review-drawer-tab-compare"
-              className="grid min-w-0 gap-3 lg:grid-cols-2"
-            >
-              <section className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-                <header className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700">
-                  {sectionLabel(
-                    compareConfig.rawTitle ? { title: compareConfig.rawTitle } : null,
-                    locale,
-                    t,
-                    'Raw',
+        <div
+          className={`grid h-full min-h-0 min-w-0 gap-3 ${
+            hasLeftRail ? 'xl:grid-cols-[minmax(0,1fr)_380px]' : 'grid-cols-1'
+          }`}
+        >
+          {hasLeftRail && (
+            <div className="min-h-0 min-w-0 space-y-3 overflow-auto pr-1">
+              {hasComparePanel && (
+                <div
+                  data-testid="review-drawer-tab-compare"
+                  className="grid min-w-0 gap-3 lg:grid-cols-2"
+                >
+                  {rawFields.length > 0 && (
+                    <section className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                      <header className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700">
+                        {sectionLabel(
+                          compareConfig.rawTitle ? { title: compareConfig.rawTitle } : null,
+                          locale,
+                          t,
+                          'Raw',
+                        )}
+                        <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          {localized(locale, t, '只读证据', 'Read-only evidence')}
+                        </span>
+                      </header>
+                      <FieldRows fields={rawFields} record={rawRecord} locale={locale} t={t} />
+                    </section>
                   )}
-                  <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                    {localized(locale, t, '只读证据', 'Read-only evidence')}
-                  </span>
-                </header>
-                <FieldRows
-                  fields={compareConfig.rawFields || []}
-                  record={rawRecord}
-                  locale={locale}
-                  t={t}
-                />
-              </section>
-              <section className="overflow-hidden rounded-lg border border-blue-100 bg-blue-50/40">
-                <header className="flex items-center justify-between gap-3 border-b border-blue-100 bg-white/75 px-3 py-2 text-sm font-semibold text-gray-700">
-                  {sectionLabel(
-                    compareConfig.canonicalTitle ? { title: compareConfig.canonicalTitle } : null,
-                    locale,
-                    t,
-                    'Canonical',
+                  {canonicalFields.length > 0 && (
+                    <section className="overflow-hidden rounded-lg border border-blue-100 bg-blue-50/40">
+                      <header className="flex items-center justify-between gap-3 border-b border-blue-100 bg-white/75 px-3 py-2 text-sm font-semibold text-gray-700">
+                        {sectionLabel(
+                          compareConfig.canonicalTitle
+                            ? { title: compareConfig.canonicalTitle }
+                            : null,
+                          locale,
+                          t,
+                          'Canonical',
+                        )}
+                        <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">
+                          {localized(locale, t, '转换结果', 'Canonical result')}
+                        </span>
+                      </header>
+                      <FieldRows
+                        fields={canonicalFields}
+                        record={canonicalRecord}
+                        fallbackRecord={record}
+                        locale={locale}
+                        t={t}
+                      />
+                    </section>
                   )}
-                  <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">
-                    {localized(locale, t, '转换结果', 'Canonical result')}
-                  </span>
-                </header>
-                <FieldRows
-                  fields={compareConfig.canonicalFields || []}
-                  record={canonicalRecord}
-                  fallbackRecord={record}
-                  locale={locale}
-                  t={t}
-                />
-              </section>
-            </div>
+                </div>
+              )}
 
             {sourceSummaryItems.length > 0 && (
               <section className="rounded-lg border border-gray-200 bg-white p-3">
@@ -589,138 +610,147 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               </section>
             )}
 
-            <details
-              open={sourceConfig.openByDefault === true}
-              data-testid="review-drawer-tab-source"
-              className="overflow-hidden rounded-lg border border-gray-200 bg-white"
-            >
-              <summary className="cursor-pointer bg-white px-3 py-2 text-sm font-semibold text-gray-900">
-                {localized(
-                  locale,
-                  t,
-                  '解析证据与 Profile / LLM Policy',
-                  'Parse evidence and Profile / LLM policy',
-                )}
-              </summary>
-              <div className="space-y-3 border-t border-gray-100 p-3">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {(sourceConfig.cards || []).map((card: any) => {
-                    const key = String(card.key || card.title || card.valueField);
-                    const value = `${formatValue(readFieldValue(sourceRecord, card), card.emptyText)}${
-                      card.unit ? String(card.unit) : ''
-                    }`;
-                    return (
-                      <section
-                        key={key}
-                        className="rounded-lg border border-gray-200 bg-gray-50 p-3"
-                      >
-                        <h3 className="text-xs font-medium text-gray-500">
-                          {getLocalizedText(card.title || key, locale, t)}
-                        </h3>
-                        <div className="mt-2 text-sm font-semibold break-words text-gray-900">
-                          {value}
-                        </div>
-                        {card.description && (
-                          <p className="mt-1 text-xs text-gray-500">
-                            {getLocalizedText(card.description, locale, t)}
-                          </p>
-                        )}
-                      </section>
-                    );
-                  })}
-                </div>
-                {(sourceConfig.policies || []).length > 0 && (
-                  <section className="rounded-lg border border-gray-200 bg-white p-3">
-                    <h3 className="mb-3 text-sm font-semibold text-gray-900">
-                      {getLocalizedText(
-                        sourceConfig.policyTitle || {
-                          'zh-CN': 'LLM 行为由 Profile Policy 控制',
-                          en: 'LLM behavior is controlled by Profile Policy',
-                        },
-                        locale,
-                        t,
-                      )}
-                    </h3>
-                    <div className="grid gap-3 md:grid-cols-3">
-                      {sourceConfig.policies.map((policy: any) => (
-                        <div
-                          key={String(policy.key || policy.title)}
-                          className="rounded-md border border-gray-200 bg-gray-50 p-3"
-                        >
-                          <h4 className="text-sm font-medium text-gray-900">
-                            {getLocalizedText(policy.title || policy.key, locale, t)}
-                          </h4>
-                          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-600">
-                            {(policy.items || []).map((item: any) => (
-                              <li key={String(item)}>{String(item)}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
+            {hasSourceDetails && (
+              <details
+                open={sourceConfig.openByDefault === true}
+                data-testid="review-drawer-tab-source"
+                className="overflow-hidden rounded-lg border border-gray-200 bg-white"
+              >
+                <summary className="cursor-pointer bg-white px-3 py-2 text-sm font-semibold text-gray-900">
+                  {localized(
+                    locale,
+                    t,
+                    '解析证据与 Profile / LLM Policy',
+                    'Parse evidence and Profile / LLM policy',
+                  )}
+                </summary>
+                <div className="space-y-3 border-t border-gray-100 p-3">
+                  {sourceCards.length > 0 && (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      {sourceCards.map((card: any) => {
+                        const key = String(card.key || card.title || card.valueField);
+                        const value = `${formatValue(readFieldValue(sourceRecord, card), card.emptyText)}${
+                          card.unit ? String(card.unit) : ''
+                        }`;
+                        return (
+                          <section
+                            key={key}
+                            className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+                          >
+                            <h3 className="text-xs font-medium text-gray-500">
+                              {getLocalizedText(card.title || key, locale, t)}
+                            </h3>
+                            <div className="mt-2 text-sm font-semibold break-words text-gray-900">
+                              {value}
+                            </div>
+                            {card.description && (
+                              <p className="mt-1 text-xs text-gray-500">
+                                {getLocalizedText(card.description, locale, t)}
+                              </p>
+                            )}
+                          </section>
+                        );
+                      })}
                     </div>
-                  </section>
-                )}
-                {sourceConfig.jsonField && (
-                  <pre
-                    data-testid="review-drawer-source-json"
-                    className="max-h-64 overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-3 text-xs text-blue-100"
-                  >
-                    {JSON.stringify(
-                      parseJsonValue(readPath(sourceRecord, sourceConfig.jsonField)),
-                      null,
-                      2,
-                    )}
-                  </pre>
-                )}
-              </div>
-            </details>
-
-            <details
-              data-testid="review-drawer-tab-export"
-              className="overflow-hidden rounded-lg border border-gray-200 bg-white"
-            >
-              <summary className="cursor-pointer bg-white px-3 py-2 text-sm font-semibold text-gray-900">
-                {localized(locale, t, '决策历史与导出影响', 'Decision history and export impact')}
-              </summary>
-              <div className="space-y-3 border-t border-gray-100 p-3">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {(exportConfig.fields || []).map((field: any) => {
-                    const key = String(field.key || field.field || field.label);
-                    return (
-                      <section
-                        key={key}
-                        className="rounded-lg border border-gray-200 bg-gray-50 p-3"
-                      >
-                        <div className="text-xs text-gray-500">
-                          {getLocalizedText(field.label || key, locale, t)}
-                        </div>
-                        <div className="mt-1 text-sm font-semibold break-words text-gray-900">
-                          {formatConfiguredValue(readFieldValue(record, field), field, locale, t)}
-                        </div>
-                      </section>
-                    );
-                  })}
+                  )}
+                  {sourcePolicies.length > 0 && (
+                    <section className="rounded-lg border border-gray-200 bg-white p-3">
+                      <h3 className="mb-3 text-sm font-semibold text-gray-900">
+                        {getLocalizedText(
+                          sourceConfig.policyTitle || {
+                            'zh-CN': 'LLM 行为由 Profile Policy 控制',
+                            en: 'LLM behavior is controlled by Profile Policy',
+                          },
+                          locale,
+                          t,
+                        )}
+                      </h3>
+                      <div className="grid gap-3 md:grid-cols-3">
+                        {sourcePolicies.map((policy: any) => (
+                          <div
+                            key={String(policy.key || policy.title)}
+                            className="rounded-md border border-gray-200 bg-gray-50 p-3"
+                          >
+                            <h4 className="text-sm font-medium text-gray-900">
+                              {getLocalizedText(policy.title || policy.key, locale, t)}
+                            </h4>
+                            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-600">
+                              {(policy.items || []).map((item: any) => (
+                                <li key={String(item)}>{String(item)}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                  {sourceConfig.jsonField && (
+                    <pre
+                      data-testid="review-drawer-source-json"
+                      className="max-h-64 overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-3 text-xs text-blue-100"
+                    >
+                      {JSON.stringify(
+                        parseJsonValue(readPath(sourceRecord, sourceConfig.jsonField)),
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  )}
                 </div>
-                {exportRows.length > 0 && (
-                  <ol className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
-                    {exportRows.map((row: any, index: number) => (
-                      <li
-                        key={String(row.pid ?? row.id ?? index)}
-                        className="px-3 py-2 text-sm text-gray-700"
-                      >
-                        <span className="font-mono font-semibold">
-                          {formatValue(readPath(row, 'bom_er_filename'), String(row.pid ?? index))}
-                        </span>
-                        <span className="ml-2 text-xs text-gray-500">
-                          Rev {formatValue(readPath(row, 'bom_er_revision_no'))}
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
-            </details>
+              </details>
+            )}
+
+            {hasExportDetails && (
+              <details
+                data-testid="review-drawer-tab-export"
+                className="overflow-hidden rounded-lg border border-gray-200 bg-white"
+              >
+                <summary className="cursor-pointer bg-white px-3 py-2 text-sm font-semibold text-gray-900">
+                  {localized(locale, t, '决策历史与导出影响', 'Decision history and export impact')}
+                </summary>
+                <div className="space-y-3 border-t border-gray-100 p-3">
+                  {exportFields.length > 0 && (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      {exportFields.map((field: any) => {
+                        const key = String(field.key || field.field || field.label);
+                        return (
+                          <section
+                            key={key}
+                            className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+                          >
+                            <div className="text-xs text-gray-500">
+                              {getLocalizedText(field.label || key, locale, t)}
+                            </div>
+                            <div className="mt-1 text-sm font-semibold break-words text-gray-900">
+                              {formatConfiguredValue(readFieldValue(record, field), field, locale, t)}
+                            </div>
+                          </section>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {exportRows.length > 0 && (
+                    <ol className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+                      {exportRows.map((row: any, index: number) => (
+                        <li
+                          key={String(row.pid ?? row.id ?? index)}
+                          className="px-3 py-2 text-sm text-gray-700"
+                        >
+                          <span className="font-mono font-semibold">
+                            {formatValue(readPath(row, 'bom_er_filename'), String(row.pid ?? index))}
+                          </span>
+                          <span className="ml-2 text-xs text-gray-500">
+                            Rev {formatValue(readPath(row, 'bom_er_revision_no'))}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              </details>
+            )}
           </div>
+          )}
 
           <aside
             data-testid="review-drawer-tab-candidates"
