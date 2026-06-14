@@ -487,6 +487,47 @@ describe('StatusBannerBlockRenderer', () => {
     vi.useRealTimers();
   });
 
+  it('keeps long summary values inside their grid cells', () => {
+    const longCustomerName = 'Golden SmartHub_MAIN_REV1.3_Design_MFG';
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => ({
+          quote_status: 'draft',
+          quote_customer: longCustomerName,
+        }),
+        getState: () => ({
+          data: {
+            quote_status: 'draft',
+            quote_customer: longCustomerName,
+          },
+          loading: false,
+          error: null,
+        }),
+        has: () => true,
+        register: vi.fn(),
+        reload: vi.fn(),
+        subscribe: vi.fn(() => () => undefined),
+      }),
+    }) as any;
+    const block: BlockConfig = {
+      id: 'quote_status',
+      blockType: 'status-banner',
+      dataSource: 'summary',
+      statusField: 'quote_status',
+      titleMap: {
+        draft: 'Draft',
+      },
+      summaryFields: [{ key: 'customer', label: 'Customer', field: 'quote_customer' }],
+    };
+
+    render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+    const value = screen.getByText(longCustomerName);
+    expect(value).toHaveClass('break-words');
+    expect(value).toHaveAttribute('title', longCustomerName);
+    expect(value.closest('div')).toHaveClass('min-w-0');
+  });
+
   it('hides when the current status is configured as hidden', () => {
     const runtime = makeRuntime({
       getDataSourceManager: () => ({
