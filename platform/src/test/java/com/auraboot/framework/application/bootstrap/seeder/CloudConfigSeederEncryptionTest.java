@@ -7,15 +7,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +37,28 @@ class CloudConfigSeederEncryptionTest {
     @BeforeEach
     void setUp() {
         seeder = new CloudConfigSeeder(jdbcTemplate, fieldEncryptionService, objectMapper);
+    }
+
+    @Test
+    @DisplayName("seed does not include MiniMax defaults")
+    void seedRowsDoNotIncludeMinimaxDefaults() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(0);
+        when(jdbcTemplate.update(anyString(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
+        lenient().when(fieldEncryptionService.encrypt(anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        seeder.seed();
+
+        ArgumentCaptor<Object> providerCaptor = ArgumentCaptor.forClass(Object.class);
+        ArgumentCaptor<Object> configCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(jdbcTemplate, atLeastOnce()).update(
+                anyString(), any(), any(), any(), providerCaptor.capture(), configCaptor.capture(), any(), any());
+
+        assertFalse(providerCaptor.getAllValues().contains("minimaxi"));
+        assertFalse(configCaptor.getAllValues().stream()
+                .map(String::valueOf)
+                .anyMatch(config -> config.contains("api.minimax.chat") || config.contains("MiniMax")));
     }
 
     @Test

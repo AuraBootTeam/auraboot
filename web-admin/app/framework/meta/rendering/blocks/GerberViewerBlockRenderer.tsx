@@ -154,18 +154,38 @@ function optionalNumber(value: unknown): number | undefined {
   return Number.isFinite(numeric) ? numeric : undefined;
 }
 
+function hasNonBlankPath(line: Record<string, any>, field: string): boolean {
+  const value = readPath(line, field);
+  return value !== undefined && value !== null && String(value).trim() !== '';
+}
+
+function hasPositiveNumberPath(line: Record<string, any>, field: string): boolean {
+  const numeric = Number(readPath(line, field));
+  return Number.isFinite(numeric) && numeric > 0;
+}
+
 function hasLineGerberFacts(line: Record<string, any> | undefined): boolean {
   if (!line) return false;
-  return [
+  const positiveNumberFields = [
     'qo_ql_smt_points',
     'qo_ql_tht_points',
+    'qo_ql_pin_count',
+    'qo_ql_hole_count',
+    'qo_ql_positioning_pin_count',
+    'qo_ql_function_pin_count',
     'qo_ql_board_width_mm',
     'qo_ql_board_height_mm',
     'qo_ql_board_area_mm2',
+  ];
+  const statusFields = [
     'qo_ql_gerber_parse_status',
     'qo_ql_gerber_validation_status',
-    'qo_ql_gerber_validation_messages',
-    ].some((field) => readPath(line, field) !== undefined && readPath(line, field) !== null && readPath(line, field) !== '');
+  ];
+  return (
+    positiveNumberFields.some((field) => hasPositiveNumberPath(line, field)) ||
+    statusFields.some((field) => hasNonBlankPath(line, field)) ||
+    normalizeStringList(readPath(line, 'qo_ql_gerber_validation_messages')).length > 0
+  );
 }
 
 function hasLineInspection(line: Record<string, any> | undefined, lineInspectionField: string): boolean {

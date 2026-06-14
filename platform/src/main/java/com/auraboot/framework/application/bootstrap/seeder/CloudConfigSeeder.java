@@ -82,8 +82,7 @@ public class CloudConfigSeeder {
             "seed_llm_anthropic", "ANTHROPIC_API_KEY",
             "seed_llm_qianwen", "DASHSCOPE_API_KEY",
             "seed_llm_zhipu", "ZHIPU_API_KEY",
-            "seed_llm_moonshot", "MOONSHOT_API_KEY",
-            "seed_llm_minimaxi", "MINIMAX_API_KEY");
+            "seed_llm_moonshot", "MOONSHOT_API_KEY");
 
     public void seed() {
         // Check if already seeded by looking for any seed_ prefixed pid
@@ -111,13 +110,6 @@ public class CloudConfigSeeder {
         }
 
         Object[][] rows = {
-            // LLM provider with a bundled key (legacy; key supersedable via MINIMAX_API_KEY env)
-            {
-                // TODO: Remove API key before open-source release
-                "seed_llm_minimaxi", "platform", "llm", "minimaxi",
-                "{\"apiKey\":\"sk-cp-XNk1pU7mUnMlnRoprZArXq1XhTNVgVgtBXm48BW6XjROAB4vsK2DyEgyCOS7ODpgJWvy9jx9dTQE7tR3q_1mg0ldaiBc-j5H1wwrFzJ3RcqYYLIpL1jW_cI\",\"displayName\":\"MiniMax (海螺AI)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.minimax.chat/v1\",\"defaultModel\":\"MiniMax-M2.5\",\"maxTokens\":4096,\"models\":[\"MiniMax-M2.5\",\"MiniMax-Text-01\",\"abab6.5s-chat\"]}",
-                true, 40
-            },
             // Embedding Providers
             {
                 "seed_emb_openai", "platform", "embedding", "openai",
