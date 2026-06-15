@@ -2,7 +2,7 @@
  * ShortcutsWidget — Workbench widget showing quick action shortcuts.
  *
  * Data source: user favorites from /api/user-engagement API.
- * Falls back to DEFAULT_SHORTCUTS when no favorites are configured.
+ * Falls back to visible menu entries when no favorites are configured.
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -14,6 +14,7 @@ import {
   type UserEngagement,
 } from '~/shared/services/engagementService';
 import { AddFavoriteModal } from '~/plugins/core-dashboard/widgets/workbench/AddFavoriteModal';
+import { useRootLoaderData } from '~/root';
 
 export interface ShortcutItem {
   label: string;
@@ -43,15 +44,20 @@ const I18N_KEYS = {
   reports: 'workbench.shortcuts.reports',
 } as const;
 
-function getDefaultShortcuts(t: (key: string, params?: Record<string, unknown>) => string): ShortcutItem[] {
-  return [
-    { label: t(I18N_KEYS.newLead), icon: '\uD83C\uDFAF', path: '/p/crm_lead/new', color: 'bg-blue-50' },
-    { label: t(I18N_KEYS.newAccount), icon: '\uD83C\uDFE2', path: '/p/crm_account/new', color: 'bg-green-50' },
-    { label: t(I18N_KEYS.newOpportunity), icon: '\uD83D\uDCB0', path: '/p/crm_opportunity/new', color: 'bg-amber-50' },
-    { label: t(I18N_KEYS.taskCenter), icon: '\uD83D\uDCCB', path: '/bpm/task-center', color: 'bg-violet-50' },
-    { label: t(I18N_KEYS.newContract), icon: '\uD83D\uDCC4', path: '/p/cc_contract/new', color: 'bg-orange-50' },
-    { label: t(I18N_KEYS.reports), icon: '\uD83D\uDCCA', path: '/reports/overview', color: 'bg-indigo-50' },
-  ];
+interface UiMenuItem {
+  icon?: string;
+  name?: string;
+  nameKey?: string;
+  path?: string;
+  submenu?: UiMenuItem[];
+}
+
+function flattenMenus(items: UiMenuItem[]): UiMenuItem[] {
+  return items.flatMap((item) => [item, ...(item.submenu ? flattenMenus(item.submenu) : [])]);
+}
+
+function pathMatchesMenu(path: string, menuPath: string): boolean {
+  return path === menuPath || path.startsWith(`${menuPath}/`) || path.startsWith(`${menuPath}?`);
 }
 
 function mapEngagementToShortcut(e: UserEngagement): ShortcutItem {
@@ -70,6 +76,7 @@ export function ShortcutsWidget({
   className = '',
 }: ShortcutsWidgetProps) {
   const { t } = useI18n();
+  const rootData = useRootLoaderData();
   const [items, setItems] = useState<ShortcutItem[]>([]);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -79,25 +86,53 @@ export function ShortcutsWidget({
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   const displayTitle = title ? t(title) : t(I18N_KEYS.title);
+  const menuShortcuts = React.useMemo(() => {
+    const menus = ((rootData?.menus as UiMenuItem[] | undefined) ?? []);
+    return flattenMenus(menus)
+      .filter((item) => item.path && item.path.startsWith('/p/'))
+      .filter((item) => !item.submenu?.length)
+      .map((item) => ({
+        label: item.nameKey ? t(item.nameKey) : item.name || item.path || '',
+        icon: item.icon || '\uD83D\uDCC4',
+        path: item.path as string,
+        color: 'bg-gray-50',
+      }));
+  }, [rootData?.menus, t]);
+
+  const visibleMenuPaths = React.useMemo(
+    () => new Set(menuShortcuts.map((item) => item.path)),
+    [menuShortcuts],
+  );
+
+  const filterToVisibleMenus = useCallback(
+    (shortcuts: ShortcutItem[]) => {
+      if (visibleMenuPaths.size === 0) return shortcuts;
+      return shortcuts.filter((item) =>
+        [...visibleMenuPaths].some((menuPath) => pathMatchesMenu(item.path, menuPath)),
+      );
+    },
+    [visibleMenuPaths],
+  );
 
   const loadFavorites = useCallback(async () => {
     if (overrideShortcuts) {
-      setItems(overrideShortcuts);
+      setItems(filterToVisibleMenus(overrideShortcuts));
       setLoading(false);
       return;
     }
 
     setLoading(true);
     const favorites = await listFavorites('menu');
-    if (favorites.length > 0) {
-      setItems(favorites.map(mapEngagementToShortcut));
+    const visibleFavorites = filterToVisibleMenus(favorites.map(mapEngagementToShortcut));
+    if (visibleFavorites.length > 0) {
+      setItems(visibleFavorites);
       setIsFromFavorites(true);
     } else {
-      setItems(getDefaultShortcuts(t));
+      setItems(menuShortcuts);
       setIsFromFavorites(false);
     }
     setLoading(false);
-  }, [overrideShortcuts, t]);
+  }, [filterToVisibleMenus, menuShortcuts, overrideShortcuts]);
 
   useEffect(() => {
     loadFavorites();
