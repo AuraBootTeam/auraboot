@@ -5,7 +5,7 @@ status: active
 
 # BPMN 2.0 Workflows
 
-Design, deploy, and manage business process workflows with AuraBoot's built-in BPM engine. Based on SmartEngine 3.7.0, the workflow system supports both human approval flows and automated orchestration pipelines.
+Design, deploy, and manage business process workflows with AuraBoot's built-in BPM engine. Based on SmartEngine 4.0.0, the workflow system supports both human approval flows and automated orchestration pipelines.
 
 ## Goal
 
@@ -33,7 +33,7 @@ AuraBoot's BPM system provides two parallel APIs:
               |                                  |
               v                                  v
 +-------------------------------------------------------------+
-|              SmartEngine 3.7.0 (BPMN 2.0 Core)              |
+|              SmartEngine 4.0.0 (BPMN 2.0 Core)              |
 |              PostgreSQL storage (DATABASE mode)               |
 +-------------------------------------------------------------+
 ```
