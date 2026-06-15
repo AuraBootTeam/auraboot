@@ -45,6 +45,10 @@ function flattenMenus(items: UiMenuItem[]): UiMenuItem[] {
   return items.flatMap((item) => [item, ...(item.submenu ? flattenMenus(item.submenu) : [])]);
 }
 
+function pathMatchesMenu(path: string, menuPath: string): boolean {
+  return path === menuPath || path.startsWith(`${menuPath}/`) || path.startsWith(`${menuPath}?`);
+}
+
 function humanizeSegment(segment: string): string {
   return segment
     .replace(/[_-]+/g, ' ')
@@ -86,6 +90,8 @@ export function RecentWidget({
         .map((item) => [item.path as string, item.nameKey ? t(item.nameKey) : item.name || item.path]),
     );
   }, [rootData?.menus, t]);
+
+  const visibleMenuPaths = useMemo(() => new Set(menuTitleMap.keys()), [menuTitleMap]);
 
   useEffect(() => {
     // Show localStorage data immediately (already set via initializer)
@@ -133,7 +139,14 @@ export function RecentWidget({
     return visit.path;
   };
 
-  if (visits.length === 0) {
+  const visibleVisits = useMemo(() => {
+    if (visibleMenuPaths.size === 0) return visits;
+    return visits.filter((visit) =>
+      [...visibleMenuPaths].some((menuPath) => pathMatchesMenu(visit.path, menuPath)),
+    );
+  }, [visibleMenuPaths, visits]);
+
+  if (visibleVisits.length === 0) {
     return (
       <div className={`flex h-full flex-col ${className}`}>
         <div className="mb-3 flex items-center justify-between px-3 pt-3">
@@ -169,7 +182,7 @@ export function RecentWidget({
         </span>
       </div>
       <div className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
-        {visits.map((visit, idx) => {
+        {visibleVisits.map((visit, idx) => {
           const icon = visit.icon || (visit.modelCode && MODEL_ICONS[visit.modelCode]) || '📄';
           const bgColor = (visit.modelCode && MODEL_BG_COLORS[visit.modelCode]) || 'bg-gray-100';
           const primaryTitle = resolveVisitTitle(visit);
