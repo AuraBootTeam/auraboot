@@ -94,6 +94,19 @@ interface BoardImageState {
   message?: string;
 }
 
+type GerberPreviewUnavailableKind =
+  | 'missing-upload'
+  | 'parse-error'
+  | 'needs-review'
+  | 'artifact-error';
+
+interface GerberPreviewUnavailableState {
+  kind: GerberPreviewUnavailableKind;
+  title: string;
+  detail: string;
+  evidence?: string;
+}
+
 export interface GerberViewerBlockRendererProps {
   block: BlockConfig;
   runtime: SchemaRuntime;
@@ -508,6 +521,32 @@ function selectedParseStatus(line: Record<string, any>): string {
   return `${parse} / ${validation}`;
 }
 
+function normalizedStatus(value: unknown): string {
+  const status = String(value || '').trim();
+  return status && status !== '-' ? status : '';
+}
+
+function lineParseStatus(line: Record<string, any> | undefined): string {
+  return normalizedStatus(readPath(line, 'qo_ql_gerber_parse_status'));
+}
+
+function lineValidationStatus(line: Record<string, any> | undefined): string {
+  return normalizedStatus(readPath(line, 'qo_ql_gerber_validation_status'));
+}
+
+function hasGerberStatus(line: Record<string, any> | undefined): boolean {
+  return Boolean(lineParseStatus(line) || lineValidationStatus(line));
+}
+
+function hasFailedGerberStatus(line: Record<string, any> | undefined): boolean {
+  const status = `${lineParseStatus(line)} ${lineValidationStatus(line)}`.toLowerCase();
+  return /(fail|error|invalid|exception|rejected)/.test(status);
+}
+
+function firstValidationMessage(issues: ValidationIssue[]): string | undefined {
+  return issues.map((issue) => issue.message.trim()).find(Boolean);
+}
+
 function boardSvgUrl(
   inspection: QuoteInspection | undefined,
   side: SideFilter,
@@ -547,7 +586,7 @@ function formatUnknownError(error: unknown): string {
 }
 
 function boardImageErrorMessage(sourceUrl: string, reason: string): string {
-  return `Could not load the parsed Gerber SVG artifact from ${sourceUrl}: ${reason}. Generated graphics are not shown.`;
+  return `Could not load the parsed Gerber SVG artifact from ${sourceUrl}: ${reason}.`;
 }
 
 function useBoardImageSource(sourceUrl: string | undefined): BoardImageState {
@@ -662,23 +701,98 @@ function Metric({
   );
 }
 
-function GerberSvgUnavailable({
+function gerberPreviewUnavailableState({
+  locale,
+  line,
+  issues,
   message,
 }: {
+  locale: string;
+  line: Record<string, any> | undefined;
+  issues: ValidationIssue[];
   message?: string;
+}): GerberPreviewUnavailableState {
+  const evidence = firstValidationMessage(issues);
+  if (message) {
+    return {
+      kind: 'artifact-error',
+      title: localized(
+        locale,
+        '板图文件暂时无法加载',
+        'Board preview file could not be loaded',
+      ),
+      detail: `${message} ${localized(
+        locale,
+        '不会显示前端生成的替代预览。',
+        'No generated preview is shown.',
+      )}`,
+    };
+  }
+
+  if (!hasGerberStatus(line) && issues.length === 0) {
+    return {
+      kind: 'missing-upload',
+      title: localized(locale, '未上传 Gerber 文件', 'No Gerber file uploaded'),
+      detail: localized(
+        locale,
+        '上传 Gerber 压缩包后，系统才会生成真实板图预览和层清单。',
+        'Upload a Gerber package to generate the real board preview and layer manifest.',
+      ),
+    };
+  }
+
+  if (hasFailedGerberStatus(line)) {
+    return {
+      kind: 'parse-error',
+      title: localized(locale, 'Gerber 解析需要处理', 'Gerber parsing needs review'),
+      detail: localized(
+        locale,
+        '解析未生成真实板图预览。请查看解析与校验信息后重新上传正确的 Gerber 文件。',
+        'No real board preview was generated. Review the parsing and validation messages, then upload a corrected Gerber package.',
+      ),
+      evidence,
+    };
+  }
+
+  return {
+    kind: 'needs-review',
+    title: localized(locale, 'Gerber 预览需要处理', 'Gerber preview needs attention'),
+    detail: localized(
+      locale,
+      '当前层没有生成真实板图预览。请查看解析输出，或重新上传正确的 Gerber 文件。',
+      'No real board preview was generated for this side. Review parser output or upload a corrected Gerber package.',
+    ),
+    evidence,
+  };
+}
+
+function GerberSvgUnavailable({
+  state,
+}: {
+  state: GerberPreviewUnavailableState;
 }) {
-  const detail = message
-    ? message
-    : 'No parsed Gerber SVG artifact was returned for this side. Generated graphics are hidden so they are not mistaken for parser output.';
+  const tone =
+    state.kind === 'missing-upload'
+      ? 'border-gray-200 bg-gray-50 text-gray-700'
+      : state.kind === 'artifact-error'
+        ? 'border-amber-200 bg-amber-50 text-amber-900'
+        : state.kind === 'parse-error'
+          ? 'border-rose-200 bg-rose-50 text-rose-900'
+          : 'border-blue-200 bg-blue-50 text-blue-900';
   return (
     <div
       role="status"
       data-testid="gerber-svg-unavailable"
-      className="flex h-full w-full items-center justify-center bg-slate-950 px-6 text-center"
+      className={`flex h-full min-h-[220px] w-full items-center justify-center px-6 py-8 text-center ${tone}`}
     >
       <div className="max-w-md">
-        <div className="text-sm font-semibold text-white">Real Gerber render unavailable</div>
-        <div className="mt-2 text-xs leading-5 text-slate-300">{detail}</div>
+        <div className="text-sm font-semibold">{state.title}</div>
+        <div className="mt-2 text-xs leading-5 opacity-85">{state.detail}</div>
+        {state.evidence ? (
+          <div className="mt-3 rounded-md border border-current/15 bg-white/60 px-3 py-2 text-left text-xs leading-5">
+            {state.evidence}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -748,11 +862,11 @@ function GerberSvgLoading() {
     <div
       role="status"
       data-testid="gerber-svg-loading"
-      className="flex h-full w-full items-center justify-center bg-slate-950 px-6 text-center"
+      className="flex h-full min-h-[220px] w-full items-center justify-center bg-gray-50 px-6 py-8 text-center text-gray-700"
     >
       <div>
-        <div className="text-sm font-semibold text-white">Loading real Gerber render...</div>
-        <div className="mt-2 text-xs leading-5 text-slate-300">
+        <div className="text-sm font-semibold">Loading real Gerber preview...</div>
+        <div className="mt-2 text-xs leading-5 text-gray-500">
           Fetching the parser artifact with the active session credentials.
         </div>
       </div>
@@ -918,6 +1032,15 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
   const summary = inspection.summary || {};
   const boardImageError = boardImageRenderError || boardImage.message;
   const canRenderBoardImage = boardImage.status === 'ready' && Boolean(boardImage.src) && !boardImageError;
+  const unavailablePreview = gerberPreviewUnavailableState({
+    locale,
+    line: lineRecord,
+    issues: allIssues,
+    message: boardImageError,
+  });
+  const boardShellTone = canRenderBoardImage
+    ? 'border-gray-300 bg-gray-950'
+    : 'border-gray-200 bg-gray-50';
 
   return (
     <section className="space-y-3" data-testid="gerber-viewer">
@@ -974,7 +1097,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
         <div className="min-w-0">
           <div
             data-testid="gerber-viewer-board"
-            className="relative overflow-hidden rounded-lg border border-gray-300 bg-gray-950 shadow-sm"
+            className={`relative overflow-hidden rounded-lg border shadow-sm ${boardShellTone}`}
             style={{ aspectRatio: `${board.widthMm} / ${board.heightMm}` }}
           >
             {canRenderBoardImage ? (
@@ -994,9 +1117,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
             ) : activeBoardSvgUrl && boardImage.status === 'loading' ? (
               <GerberSvgLoading />
             ) : (
-              <GerberSvgUnavailable
-                message={boardImageError}
-              />
+              <GerberSvgUnavailable state={unavailablePreview} />
             )}
             {canRenderBoardImage ? (
               <div className="absolute inset-0">
