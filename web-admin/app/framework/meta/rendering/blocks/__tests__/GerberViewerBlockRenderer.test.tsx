@@ -179,9 +179,14 @@ describe('GerberViewerBlockRenderer', () => {
 
     expect(screen.getByTestId('gerber-viewer')).toHaveTextContent('A00104001');
     expect(screen.getByTestId('gerber-viewer-board')).toBeInTheDocument();
+    expect(screen.getByTestId('gerber-viewer-board')).not.toHaveClass('bg-gray-950');
     expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent(
-      'Real Gerber render unavailable',
+      'Gerber preview needs attention',
     );
+    expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent(
+      'No real board preview was generated for this side.',
+    );
+    expect(screen.getByTestId('gerber-svg-unavailable')).not.toHaveClass('bg-slate-950');
     expect(screen.queryByRole('img', { name: 'PCB layer render' })).toBeNull();
     expect(screen.getByTestId('gerber-metric-board')).toHaveTextContent('98 x 33 mm');
     expect(screen.getByTestId('gerber-metric-parse')).toHaveTextContent('parsed / warning');
@@ -192,6 +197,84 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.getByTestId('gerber-layer-top_copper')).toHaveTextContent('258');
     expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
     expect(screen.getByTestId('gerber-component-row-C4')).toBeInTheDocument();
+  });
+
+  it('shows upload guidance when no Gerber parse status or artifact exists', () => {
+    const runtime = makeRuntime();
+    const context = runtime.getContext() as any;
+    context.state.selectedLine = {
+      pid: 'LINE-NO-GERBER',
+      qo_ql_description: 'Quote line without Gerber',
+      qo_ql_board_width_mm: 100,
+      qo_ql_board_height_mm: 60,
+    };
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: {
+        project: { code: 'NO-GERBER', name: 'Missing upload quote line' },
+        board: { widthMm: 100, heightMm: 60 },
+        summary: {},
+        layerManifest: [],
+        components: [],
+      },
+      lineContext: '${state.selectedLine}',
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('gerber-metric-parse')).toHaveTextContent('- / -');
+    expect(screen.getByTestId('gerber-viewer-board')).not.toHaveClass('bg-gray-950');
+    expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent(
+      'No Gerber file uploaded',
+    );
+    expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent(
+      'Upload a Gerber package to generate the real board preview and layer manifest.',
+    );
+    expect(screen.queryByRole('img', { name: 'Top Gerber board render' })).toBeNull();
+  });
+
+  it('surfaces parser failures as a friendly missing-preview state', () => {
+    const runtime = makeRuntime();
+    const context = runtime.getContext() as any;
+    context.state.selectedLine = {
+      pid: 'LINE-PARSE-FAILED',
+      qo_ql_description: 'Gerber parser failed',
+      qo_ql_board_width_mm: 88,
+      qo_ql_board_height_mm: 42,
+      qo_ql_gerber_parse_status: 'failed',
+      qo_ql_gerber_validation_status: 'failed',
+      qo_ql_gerber_validation_messages: ['Gerber parser could not identify a board outline.'],
+    };
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: {
+        project: { code: 'PARSE-FAILED', name: 'Parser failure quote line' },
+        board: { widthMm: 88, heightMm: 42 },
+        summary: {},
+        layerManifest: [],
+        components: [],
+      },
+      lineContext: '${state.selectedLine}',
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('gerber-metric-parse')).toHaveTextContent('failed / failed');
+    expect(screen.getByTestId('gerber-validation-summary')).toHaveTextContent(
+      'Validation errors found',
+    );
+    expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent(
+      'Gerber parsing needs review',
+    );
+    expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent(
+      'No real board preview was generated.',
+    );
+    expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent(
+      'Gerber parser could not identify a board outline.',
+    );
+    expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
   });
 
   it('lets selected quote-line Gerber facts override the inline sample', () => {
@@ -300,11 +383,15 @@ describe('GerberViewerBlockRenderer', () => {
     render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent('HTTP 401');
+      expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent(
+        'Board preview file could not be loaded',
+      );
     });
+    expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent('HTTP 401');
     expect(screen.getByTestId('gerber-svg-unavailable')).toHaveTextContent(
-      'Generated graphics are not shown',
+      'No generated preview is shown.',
     );
+    expect(screen.getByTestId('gerber-viewer-board')).not.toHaveClass('bg-gray-950');
     expect(screen.queryByRole('img', { name: 'Top Gerber board render' })).toBeNull();
     expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
   });
