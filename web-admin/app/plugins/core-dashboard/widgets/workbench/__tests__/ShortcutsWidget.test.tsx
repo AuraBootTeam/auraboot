@@ -67,7 +67,7 @@ describe('ShortcutsWidget — redesign', () => {
   it('falls back to visible menu entries when no favorites are configured', async () => {
     const { findAllByTestId } = render(<ShortcutsWidget />);
 
-    const rows = await findAllByTestId('shortcut-row');
+    const rows = (await findAllByTestId('shortcut-row')) as HTMLElement[];
 
     expect(rows.map((row) => row.textContent)).toEqual(
       expect.arrayContaining([expect.stringContaining('客户'), expect.stringContaining('报价单')]),
