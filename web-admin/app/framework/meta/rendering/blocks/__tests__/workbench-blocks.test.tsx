@@ -348,6 +348,47 @@ describe('MetricStripBlockRenderer', () => {
 
     expect(screen.getByTestId('metric-strip-item-dirty')).toHaveTextContent('Dirty');
   });
+
+  it('keeps card metrics fixed-size when a value is long', () => {
+    const runtime = makeRuntime({
+      data: {
+        summary: {
+          feeAmount: 0,
+          ruleFile:
+            'Jiejia-PCBA-process-fee-pricing-rule-V1.3-20260126-updated-copy-with-a-very-long-name.xls',
+          importedAt: '2026-06-15 10:23:03.589449+00',
+        },
+      },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'process_fee_metrics',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      metrics: [
+        { key: 'fee', label: 'Process Fee', valueField: 'feeAmount', tone: 'blue' },
+        {
+          key: 'rule_file',
+          label: 'Rule Excel',
+          valueField: 'ruleFile',
+          subTextField: 'importedAt',
+        },
+      ],
+    };
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip')).toHaveClass('items-stretch');
+    expect(screen.getByTestId('metric-strip-item-fee')).toHaveClass('h-28', 'overflow-hidden');
+    expect(screen.getByTestId('metric-strip-item-rule_file')).toHaveClass(
+      'h-28',
+      'overflow-hidden',
+    );
+    expect(screen.getByTestId('metric-strip-value-rule_file')).toHaveClass(
+      'min-w-0',
+      'truncate',
+    );
+    expect(screen.getByTestId('metric-strip-subtext-rule_file')).toHaveClass('line-clamp-2');
+  });
 });
 
 describe('WorkbenchActionBarBlockRenderer', () => {
