@@ -109,6 +109,48 @@ describe('workbenchBlockUtils action runner', () => {
     expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
   });
 
+  it('polls async command tasks and reloads dependencies while the task is running', async () => {
+    const runtime = makeRuntime() as any;
+    fetchResultMock
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          commandCode: 'qo_quote_common:batch_source_prices',
+          data: { async: true, taskCode: 'TASK-PRICE-1', taskType: 'command-handler' },
+        },
+      })
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { status: 'running', progress: 35, progressMessage: 'Processed 2/7 quote lines' },
+      })
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { status: 'completed', resultData: { processedCount: 7, sourcedCount: 5 } },
+      });
+
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'command.execute',
+      args: {
+        command: 'qo_quote_common:batch_source_prices',
+        targetRecordId: 'QUOTE-1',
+        operationType: 'update',
+        reload: ['bomPriceMetrics', 'bomPriceWaterfall', 'evidence', 'lines'],
+        asyncPollIntervalMs: 0,
+      },
+    });
+
+    const urls = fetchResultMock.mock.calls.map((call) => String(call[0]));
+    expect(urls).toContain('/api/meta/commands/execute/qo_quote_common:batch_source_prices');
+    expect(urls).toContain('/api/async-tasks/TASK-PRICE-1');
+    expect(runtime.__reload).toHaveBeenCalledTimes(3);
+    expect(runtime.__reload).toHaveBeenLastCalledWith([
+      'bomPriceMetrics',
+      'bomPriceWaterfall',
+      'evidence',
+      'lines',
+    ]);
+  });
+
   it('does not reload data sources when command execution fails', async () => {
     const runtime = makeRuntime() as any;
     fetchResultMock.mockResolvedValue({
