@@ -130,6 +130,13 @@ function isAsyncDispatch(data: any): data is { async: true; taskCode: string } {
   return data?.async === true && typeof data.taskCode === 'string' && data.taskCode.trim() !== '';
 }
 
+type AsyncTaskStatus = {
+  status?: string;
+  resultData?: unknown;
+  errorMessage?: string;
+  message?: string;
+};
+
 function resolvePollIntervalMs(args: any): number {
   const value = Number(args?.asyncPollIntervalMs ?? args?.pollIntervalMs ?? 1500);
   return Number.isFinite(value) && value >= 0 ? value : 1500;
@@ -156,14 +163,14 @@ async function pollWorkbenchAsyncTask(
   const maxAttempts = resolvePollAttempts(args);
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const result = await fetchResult(`/api/async-tasks/${encodeURIComponent(taskCode)}`, {
+    const result = await fetchResult<AsyncTaskStatus>(`/api/async-tasks/${encodeURIComponent(taskCode)}`, {
       method: 'get',
     });
     if (!isSuccessResult(result)) {
       throw new Error((result as any).message || (result as any).desc || 'Async task status unavailable');
     }
 
-    const task = result?.data ?? {};
+    const task: AsyncTaskStatus = result?.data ?? {};
     await reloadDataSources(runtime, reloadIds);
 
     const status = String(task.status || '').toLowerCase();

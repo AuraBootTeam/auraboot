@@ -785,7 +785,7 @@ describe('CandidateListBlockRenderer', () => {
 });
 
 describe('ReviewDrawerBlockRenderer', () => {
-  const selectedLine = {
+  const selectedLine: Record<string, unknown> = {
     pid: 'std-1',
     bom_std_row_no: 5,
     bom_std_raw_row_no: 11,
@@ -804,7 +804,7 @@ describe('ReviewDrawerBlockRenderer', () => {
     bom_std_parse_json: '{"profileCode":"JIEJIA_WB_FLEX_MAIN_V1","llm":{"mode":"field_parse"}}',
   };
 
-  function makeReviewDrawerRuntime(line = selectedLine) {
+  function makeReviewDrawerRuntime(line: Record<string, unknown> = selectedLine) {
     return makeRuntime({
       data: {
         rawItems: [
