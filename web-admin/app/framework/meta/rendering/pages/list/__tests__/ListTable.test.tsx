@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ListTable, type ListTableProps } from '../ListTable';
 
@@ -96,5 +96,57 @@ describe('ListTable selection column layout', () => {
     const actionCell = screen.getByTestId('table-cell-0-actions');
     expect(actionCell).toHaveStyle({ width: '112px', maxWidth: '112px' });
     expect(actionCell).not.toHaveClass('w-px');
+  });
+
+  it('fills spare container width with flexible data columns', async () => {
+    const clientWidthDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'clientWidth',
+    );
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 1000,
+    });
+
+    try {
+      const { container } = renderListTable({
+        columns: [
+          { field: 'code', label: '报价单编号', width: 180 },
+          { field: 'customer', label: '客户信息', width: 180 },
+          {
+            field: 'status',
+            label: '状态',
+            width: 120,
+            renderType: 'tag',
+            dictCode: 'quote_status',
+          },
+          {
+            field: 'actions',
+            label: '操作',
+            isActionColumn: true,
+            width: 128,
+            buttons: [{ code: 'view', label: '查看' }],
+          } as any,
+        ],
+        data: [{ pid: 'row-1', code: 'QO-1', customer: '客户 A', status: 'draft' }],
+      });
+
+      await waitFor(() => {
+        expect(container.querySelector('table')).toHaveStyle({ minWidth: '1000px' });
+      });
+
+      const cols = container.querySelectorAll('col');
+      expect(cols).toHaveLength(4);
+      expect(cols[0]).toHaveStyle({ width: '376px' });
+      expect(cols[1]).toHaveStyle({ width: '376px' });
+      expect(cols[2]).toHaveStyle({ width: '120px' });
+      expect(cols[3]).toHaveStyle({ width: '128px' });
+    } finally {
+      if (clientWidthDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'clientWidth', clientWidthDescriptor);
+      } else {
+        delete (HTMLElement.prototype as any).clientWidth;
+      }
+    }
   });
 });

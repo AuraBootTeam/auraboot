@@ -9,7 +9,7 @@
  * - tbody with loading state, empty state, grouped rows, and data rows
  * - Inline editing support, conditional format styles, row selection
  */
-import React, { useMemo, useCallback, useRef } from 'react';
+import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   DndContext,
@@ -45,6 +45,15 @@ interface DictItem {
 const DEFAULT_COLUMN_WIDTH = 160;
 const SELECTION_COLUMN_WIDTH = 40;
 const ACTION_COLUMN_WIDTH = 112;
+
+function isAutoFillColumn(column: ColumnConfig): boolean {
+  if (column.isActionColumn) return false;
+  const renderHint = String((column as any).renderType ?? column.valueType ?? '').toLowerCase();
+  if (renderHint === 'tag' || renderHint === 'boolean' || renderHint === 'progress') return false;
+  if (column.dictCode) return false;
+  if (column.align === 'center' || column.align === 'right') return false;
+  return true;
+}
 
 export interface ListTableProps {
   columns: ColumnConfig[];
@@ -117,6 +126,8 @@ export const ListTable = React.memo(function ListTable({
 }: ListTableProps) {
   const effectiveRowHeight = rowHeight || DEFAULT_ROW_HEIGHT;
   const rowHeightCfg = ROW_HEIGHT_CONFIG[effectiveRowHeight];
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
 
   const getColumnWidth = useCallback(
     (column: ColumnConfig) => {
@@ -130,17 +141,6 @@ export const ListTable = React.memo(function ListTable({
         : DEFAULT_COLUMN_WIDTH;
     },
     [columnWidths],
-  );
-
-  const getCellStyle = useCallback(
-    (column: ColumnConfig): React.CSSProperties => {
-      const width = getColumnWidth(column);
-      return {
-        width: `${width}px`,
-        maxWidth: `${width}px`,
-      };
-    },
-    [getColumnWidth],
   );
 
   const renderReadOnlyCellContent = useCallback(
@@ -187,7 +187,7 @@ export const ListTable = React.memo(function ListTable({
     ? getColumnWidth({ ...actionColumn, width: actionColumn.width ?? ACTION_COLUMN_WIDTH })
     : 0;
 
-  const tableMinWidth = useMemo(() => {
+  const baseTableWidth = useMemo(() => {
     const selectionWidth = enableSelection ? SELECTION_COLUMN_WIDTH : 0;
     const dataWidth = orderedDataColumns.reduce(
       (sum, column) => sum + getColumnWidth(column),
@@ -195,6 +195,70 @@ export const ListTable = React.memo(function ListTable({
     );
     return selectionWidth + dataWidth + actionColumnWidth;
   }, [actionColumnWidth, enableSelection, getColumnWidth, orderedDataColumns]);
+
+  const renderedColumnWidths = useMemo(() => {
+    const baseWidths = Object.fromEntries(
+      orderedDataColumns.map((column) => [column.field, getColumnWidth(column)]),
+    );
+    const extraWidth = Math.max(0, containerWidth - baseTableWidth);
+    if (extraWidth <= 0 || orderedDataColumns.length === 0) return baseWidths;
+
+    const fillColumns = orderedDataColumns.filter(isAutoFillColumn);
+    const targets = fillColumns.length > 0 ? fillColumns : orderedDataColumns;
+    const targetBaseWidth = targets.reduce((sum, column) => sum + baseWidths[column.field], 0);
+    const equalShare = extraWidth / targets.length;
+
+    for (const column of targets) {
+      const baseWidth = baseWidths[column.field];
+      const weightedExtra =
+        targetBaseWidth > 0 ? extraWidth * (baseWidth / targetBaseWidth) : equalShare;
+      baseWidths[column.field] = Math.round(baseWidth + weightedExtra);
+    }
+
+    return baseWidths;
+  }, [baseTableWidth, containerWidth, getColumnWidth, orderedDataColumns]);
+
+  const getRenderedColumnWidth = useCallback(
+    (column: ColumnConfig) => renderedColumnWidths[column.field] ?? getColumnWidth(column),
+    [getColumnWidth, renderedColumnWidths],
+  );
+
+  const renderedTableWidth = useMemo(() => {
+    const selectionWidth = enableSelection ? SELECTION_COLUMN_WIDTH : 0;
+    const dataWidth = orderedDataColumns.reduce(
+      (sum, column) => sum + getRenderedColumnWidth(column),
+      0,
+    );
+    return selectionWidth + dataWidth + actionColumnWidth;
+  }, [actionColumnWidth, enableSelection, getRenderedColumnWidth, orderedDataColumns]);
+
+  const getCellStyle = useCallback(
+    (column: ColumnConfig): React.CSSProperties => {
+      const width = getRenderedColumnWidth(column);
+      return {
+        width: `${width}px`,
+        maxWidth: `${width}px`,
+      };
+    },
+    [getRenderedColumnWidth],
+  );
+
+  useEffect(() => {
+    const element = scrollContainerRef.current;
+    if (!element) return;
+
+    const updateWidth = () => setContainerWidth(element.clientWidth);
+    updateWidth();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateWidth);
+      return () => window.removeEventListener('resize', updateWidth);
+    }
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   // DnD sensors — PointerSensor with distance threshold to avoid accidental drags
   const sensors = useSensors(
@@ -235,9 +299,6 @@ export const ListTable = React.memo(function ListTable({
   const VIRTUAL_THRESHOLD = 50;
   const enableVirtualization = !loading && visibleData.length > VIRTUAL_THRESHOLD && !groupedData;
 
-  // Scroll container ref for the virtualizer
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
   // Virtualizer — always created but only used when enabled
   const rowVirtualizer = useVirtualizer({
     count: enableVirtualization ? visibleData.length : 0,
@@ -261,14 +322,14 @@ export const ListTable = React.memo(function ListTable({
         <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
           <table
             className="min-w-full table-fixed divide-y divide-gray-200"
-            style={{ minWidth: `${tableMinWidth}px` }}
+            style={{ minWidth: `${renderedTableWidth}px` }}
           >
             <colgroup>
               {enableSelection && <col style={{ width: `${SELECTION_COLUMN_WIDTH}px` }} />}
               {orderedDataColumns.map((column) => (
                 <col
                   key={column.field}
-                  style={{ width: `${getColumnWidth(column)}px` }}
+                  style={{ width: `${getRenderedColumnWidth(column)}px` }}
                 />
               ))}
               {actionColumn && <col style={{ width: `${actionColumnWidth}px` }} />}
@@ -294,7 +355,7 @@ export const ListTable = React.memo(function ListTable({
                 {orderedDataColumns.map((column) => {
                   const sortInfo = activeSorts.find((s) => s.fieldCode === column.field);
                   const isSortable = column.sortable !== false;
-                  const colWidth = getColumnWidth(column);
+                  const colWidth = getRenderedColumnWidth(column);
 
                   return (
                     <DraggableColumnHeader
