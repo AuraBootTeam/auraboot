@@ -22,7 +22,7 @@ export interface ShortcutItem {
   icon: string;
   path: string;
   color?: string;
-  engagementId?: string;
+  engagementId?: UserEngagement['id'];
 }
 
 interface ShortcutsWidgetProps {
@@ -147,7 +147,7 @@ export function ShortcutsWidget({
   }, [loadFavorites]);
 
   const handleRemove = useCallback(
-    async (engagementId: string, e: React.MouseEvent) => {
+    async (engagementId: UserEngagement['id'], e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       await removeFavorite(engagementId);
@@ -184,7 +184,9 @@ export function ShortcutsWidget({
         const [moved] = newItems.splice(dragIndex, 1);
         newItems.splice(index, 0, moved);
         setItems(newItems);
-        const ids = newItems.filter((s) => s.engagementId).map((s) => s.engagementId!);
+        const ids = newItems
+          .map((s) => s.engagementId)
+          .filter((id): id is UserEngagement['id'] => id != null);
         if (ids.length > 0) reorderFavorites(ids);
       }
       setDragIndex(null);
