@@ -11,6 +11,7 @@ import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useAuth } from '~/contexts/AuthContext';
+import { useToastContext } from '~/contexts/ToastContext';
 
 export interface ToolbarBlockRendererProps {
   block: BlockConfig;
@@ -34,9 +35,29 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
   // 路由 / 鉴权上下文 — useActionHandler hook 要求
   const navigate = useNavigate();
   const { token } = useAuth();
+  const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
   const schema = runtime.getSchema();
   const tableName = (schema as any).modelCode || schema.id || '';
   const dataSourceManager = runtime.getDataSourceManager();
+  const showToast = React.useCallback(
+    (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+      switch (type) {
+        case 'success':
+          showSuccessToast(message);
+          break;
+        case 'error':
+          showErrorToast(message);
+          break;
+        case 'warning':
+          showWarningToast(message);
+          break;
+        case 'info':
+          showInfoToast(message);
+          break;
+      }
+    },
+    [showSuccessToast, showErrorToast, showWarningToast, showInfoToast],
+  );
 
   const { handleAction } = useActionHandler({
     runtime,
@@ -47,6 +68,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
     locale,
     t,
     token: token || undefined,
+    showToast,
   });
 
   // 处理按钮点击 - 委托给 useActionHandler

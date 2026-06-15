@@ -21,9 +21,15 @@ import { render, fireEvent, waitFor } from '@testing-library/react';
 // ---------------------------------------------------------------------------
 
 const handleActionSpy = vi.fn();
+const useActionHandlerOptionsSpy = vi.fn();
+const showSuccessToastSpy = vi.fn();
+const showErrorToastSpy = vi.fn();
+const showWarningToastSpy = vi.fn();
+const showInfoToastSpy = vi.fn();
 
 vi.mock('~/framework/meta/hooks/useActionHandler', () => ({
-  useActionHandler: () => ({
+  useActionHandler: (options: any) => ({
+    ...(useActionHandlerOptionsSpy(options) ?? {}),
     handleAction: handleActionSpy,
     loading: false,
     error: null,
@@ -33,6 +39,15 @@ vi.mock('~/framework/meta/hooks/useActionHandler', () => ({
 
 vi.mock('~/contexts/AuthContext', () => ({
   useAuth: () => ({ token: 'test-token' }),
+}));
+
+vi.mock('~/contexts/ToastContext', () => ({
+  useToastContext: () => ({
+    showSuccessToast: showSuccessToastSpy,
+    showErrorToast: showErrorToastSpy,
+    showWarningToast: showWarningToastSpy,
+    showInfoToast: showInfoToastSpy,
+  }),
 }));
 
 // Avoid loading heavy tree-data hook internals.
@@ -90,6 +105,11 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
 
 beforeEach(() => {
   handleActionSpy.mockReset();
+  useActionHandlerOptionsSpy.mockReset();
+  showSuccessToastSpy.mockReset();
+  showErrorToastSpy.mockReset();
+  showWarningToastSpy.mockReset();
+  showInfoToastSpy.mockReset();
 });
 
 // ---------------------------------------------------------------------------
@@ -219,6 +239,29 @@ describe('ToolbarBlockRenderer', () => {
     // The renderer synthesises events.onClick.handler from legacy bare button.handler
     // so that useActionHandler's normalizeAction recognises it.
     expect(passedButton.events?.onClick?.handler).toBe('reloadList');
+  });
+
+  it('passes the page toast bridge to useActionHandler for upload feedback', () => {
+    const runtime = makeRuntime();
+    const block = {
+      type: 'toolbar',
+      buttons: [],
+    };
+
+    render(<ToolbarBlockRenderer block={block as any} runtime={runtime} />);
+
+    const options = useActionHandlerOptionsSpy.mock.calls.at(-1)?.[0];
+    expect(options?.showToast).toEqual(expect.any(Function));
+
+    options.showToast('Imported', 'success');
+    options.showToast('Failed', 'error');
+    options.showToast('Check warnings', 'warning');
+    options.showToast('Uploading', 'info');
+
+    expect(showSuccessToastSpy).toHaveBeenCalledWith('Imported');
+    expect(showErrorToastSpy).toHaveBeenCalledWith('Failed');
+    expect(showWarningToastSpy).toHaveBeenCalledWith('Check warnings');
+    expect(showInfoToastSpy).toHaveBeenCalledWith('Uploading');
   });
 });
 

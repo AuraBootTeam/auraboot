@@ -326,6 +326,15 @@ export class SchemaRuntime {
   }
 
   /**
+   * Get the page-level toast bridge configured by useSchemaRuntime.
+   * Block renderers can use this indirectly via action hooks so DSL actions
+   * have the same feedback surface as page-level actions.
+   */
+  getShowToast(): SchemaRuntimeConfig['showToast'] {
+    return this.showToast;
+  }
+
+  /**
    * 获取 Schema
    */
   getSchema(): UnifiedSchema {

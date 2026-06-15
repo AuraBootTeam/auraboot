@@ -157,6 +157,89 @@ function resolveCommandPayload(
   return out;
 }
 
+function formatMessage(params: Record<string, any>, fallback: string): string {
+  return Object.entries(params).reduce(
+    (text, [paramKey, paramValue]) =>
+      text.split(`{${paramKey}}`).join(String(paramValue)),
+    fallback,
+  );
+}
+
+function uploadMessageFallback(
+  locale: string,
+  phase: 'selected' | 'uploaded' | 'completed',
+): string {
+  const isChinese = locale.toLowerCase().startsWith('zh');
+  if (isChinese) {
+    if (phase === 'selected') return '已选择 {filename}，正在上传文件...';
+    if (phase === 'uploaded') return '{filename} 已上传，正在处理...';
+    return '{filename} 已处理完成';
+  }
+  if (phase === 'selected') return '{filename} selected; uploading file...';
+  if (phase === 'uploaded') return '{filename} uploaded; running action...';
+  return '{filename} processed successfully';
+}
+
+function unwrapCommandResultData(commandResult: unknown): Record<string, any> {
+  if (!commandResult || typeof commandResult !== 'object') return {};
+  const envelope = commandResult as Record<string, any>;
+  const data = envelope.data;
+  return data && typeof data === 'object' ? data : envelope;
+}
+
+function buildPromptUploadCompletedMessage(
+  locale: string,
+  fileName: string,
+  commandResult: unknown,
+): string {
+  const data = unwrapCommandResultData(commandResult);
+  const ruleVersion = toNonBlankString(data.ruleVersion);
+  const importedLines = data.importedLines;
+  const status = toNonBlankString(data.status)?.toLowerCase();
+  const isChinese = locale.toLowerCase().startsWith('zh');
+
+  if (ruleVersion && importedLines != null) {
+    if (isChinese) {
+      const statusText = status === 'draft' ? '草稿' : '规则';
+      const effectiveNote = status === 'draft' ? '；发布后生效' : '';
+      return `${fileName} 已导入为${statusText} ${ruleVersion}，共 ${importedLines} 行${effectiveNote}`;
+    }
+    const statusText = status === 'draft' ? 'draft' : 'rule set';
+    const effectiveNote = status === 'draft' ? '; publish it to take effect' : '';
+    return `${fileName} imported as ${statusText} ${ruleVersion}, ${importedLines} lines${effectiveNote}`;
+  }
+
+  return formatMessage(
+    { filename: fileName || 'file' },
+    uploadMessageFallback(locale, 'completed'),
+  );
+}
+
+type ActionToastType = 'success' | 'error' | 'warning' | 'info';
+
+function notifyActionToast(
+  showToast: ((message: string, type: ActionToastType) => void) | undefined,
+  message: string,
+  type: ActionToastType = 'info',
+): void {
+  if (showToast) {
+    showToast(message, type);
+    return;
+  }
+
+  if (
+    typeof window !== 'undefined' &&
+    typeof window.dispatchEvent === 'function' &&
+    typeof CustomEvent !== 'undefined'
+  ) {
+    window.dispatchEvent(
+      new CustomEvent('aura:toast', {
+        detail: { message, variant: type },
+      }),
+    );
+  }
+}
+
 function resolveCommandErrorMessage(result: unknown, commandCode: string): string {
   const body = (result || {}) as Record<string, any>;
   return (
@@ -262,6 +345,13 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     showToast,
     onError,
   } = options;
+  const effectiveShowToast = showToast ?? runtime?.getShowToast?.();
+  const notifyToast = useCallback(
+    (message: string, type: ActionToastType = 'info') => {
+      notifyActionToast(effectiveShowToast, message, type);
+    },
+    [effectiveShowToast],
+  );
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -319,7 +409,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       }
       throw new Error('Async task timed out');
     },
-    [token, showToast],
+    [token],
   );
 
   /**
@@ -370,7 +460,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       const envelope = result.data as any;
       const dispatch = envelope?.data && typeof envelope.data === 'object' ? envelope.data : envelope;
       if (dispatch && dispatch.async === true && dispatch.taskCode) {
-        showToast?.('已提交,后台处理中…', 'info');
+        notifyToast('已提交,后台处理中…', 'info');
         // Open the progress modal immediately in a running state; pollAsyncTask
         // then refreshes it each tick until terminal.
         setActiveTask({ status: 'running', progress: 0 });
@@ -379,7 +469,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
       return result.data;
     },
-    [token, showToast, pollAsyncTask],
+    [token, notifyToast, pollAsyncTask],
   );
 
   /**
@@ -512,7 +602,21 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               const file = await pickFile(resolvePromptUploadAccept(promptUpload));
               if (!file) return; // user dismissed the picker — nothing to do
               setLoading(true);
+              notifyToast(
+                formatMessage(
+                  { filename: file.name },
+                  uploadMessageFallback(locale, 'selected'),
+                ),
+                'info',
+              );
               const fileId = await uploadCommandFile(file, token);
+              notifyToast(
+                formatMessage(
+                  { filename: file.name },
+                  uploadMessageFallback(locale, 'uploaded'),
+                ),
+                'info',
+              );
               payload = {
                 ...payload,
                 [resolvePromptUploadKey(promptUpload)]: fileId,
@@ -533,17 +637,40 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                     : targetRecordId
                       ? 'update'
                       : undefined);
-            await executeCommand(actionDef.command, targetRecordId, payload, operationType);
             const refreshIds = resolveCommandRefreshIds(
               actionDef as unknown as Record<string, unknown>,
               normalizedButton as unknown as Record<string, unknown>,
             );
+            const commandResult = await executeCommand(
+              actionDef.command,
+              targetRecordId,
+              payload,
+              operationType,
+            );
+            if ((commandResult as any)?.__asyncFailed) {
+              return;
+            }
             if (context.loadData) {
               await context.loadData();
-            } else if (refreshIds && dataSourceManager?.reload) {
+            }
+            if (refreshIds && dataSourceManager?.reload) {
               await dataSourceManager.reload(refreshIds);
-            } else {
+            }
+            if (!context.loadData && !(refreshIds && dataSourceManager?.reload)) {
               navigate(`/p/${tableName}`);
+            }
+            if (promptUpload) {
+              const fileName = toNonBlankString(
+                payload[resolvePromptUploadFilenameKey(promptUpload)],
+              );
+              notifyToast(
+                buildPromptUploadCompletedMessage(
+                  locale,
+                  fileName || 'file',
+                  commandResult,
+                ),
+                'success',
+              );
             }
             return;
           }
@@ -621,7 +748,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   locale,
                   t,
                   token,
-                  showToast,
+                  showToast: notifyToast,
                 });
                 return;
               }
@@ -690,7 +817,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             const toastMessage = result.deduped
               ? t('bpm.action.start.deduped', undefined, '该记录已有审批流程在运行')
               : t('bpm.action.start.success', undefined, '审批流程已启动');
-            showToast?.(toastMessage, 'success');
+            notifyToast(toastMessage, 'success');
             if (context.loadData) await context.loadData();
             return;
           }
@@ -746,7 +873,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   await actionRegistry.execute(step.action, {
                     args: step.args,
                     navigate,
-                    showToast: showToast as any,
+                    showToast: notifyToast as any,
                     token,
                     fetchResult: fr,
                     stepEndpoint: step.endpoint?.replace(/\{(\w+)\}/g, (_, key) => {
@@ -770,7 +897,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         const errorObject = err instanceof Error ? err : new Error(errorMessage);
         console.error(`[useActionHandler] Action execution failed (${button.code}):`, err);
         setError(errorMessage);
-        showToast?.(errorMessage, 'error');
+        notifyToast(errorMessage, 'error');
         if (onError) onError(errorObject);
       } finally {
         setLoading(false);
@@ -785,7 +912,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       locale,
       t,
       token,
-      showToast,
+      notifyToast,
       onError,
       executeCommand,
       resolveNavigateTo,
