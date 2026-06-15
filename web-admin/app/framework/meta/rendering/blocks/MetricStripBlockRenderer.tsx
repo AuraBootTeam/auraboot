@@ -172,17 +172,33 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
           });
         }}
         disabled={!clickable}
-        className={`min-h-20 rounded-lg border p-3 text-left shadow-sm ${toneClass[tone] || toneClass.default} ${
+        className={`h-28 min-h-28 overflow-hidden rounded-lg border p-3 text-left shadow-sm ${toneClass[tone] || toneClass.default} ${
           active ? activeToneClass[tone] || activeToneClass.default : ''
         } ${clickable ? 'cursor-pointer hover:shadow' : 'cursor-default'
         }`}
       >
-        <div className="text-xs font-medium text-gray-500">{label}</div>
-        <div className="mt-1 flex items-baseline gap-1">
-          <span className="text-2xl font-semibold">{displayValue}</span>
-          {unit && <span className="text-xs text-gray-500">{String(unit)}</span>}
+        <div className="truncate text-xs font-medium text-gray-500" title={label}>
+          {label}
         </div>
-        {displaySubText && <div className="mt-1 text-xs text-gray-500">{displaySubText}</div>}
+        <div className="mt-1 flex min-w-0 items-baseline gap-1 overflow-hidden">
+          <span
+            className="min-w-0 truncate text-2xl font-semibold"
+            data-testid={`metric-strip-value-${key}`}
+            title={displayValue}
+          >
+            {displayValue}
+          </span>
+          {unit && <span className="flex-shrink-0 text-xs text-gray-500">{String(unit)}</span>}
+        </div>
+        {displaySubText && (
+          <div
+            className="mt-1 line-clamp-2 break-words text-xs text-gray-500"
+            data-testid={`metric-strip-subtext-${key}`}
+            title={displaySubText}
+          >
+            {displaySubText}
+          </div>
+        )}
       </button>
     );
   });
@@ -194,7 +210,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
         className={
           variant === 'chips'
             ? 'flex flex-wrap gap-2'
-            : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6'
+            : 'grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6'
         }
         data-testid="metric-strip"
       >
