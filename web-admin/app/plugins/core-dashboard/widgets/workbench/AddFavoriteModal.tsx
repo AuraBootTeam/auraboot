@@ -10,8 +10,12 @@ import { createPortal } from 'react-dom';
 import { useI18n } from '~/contexts/I18nContext';
 import { get } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import { addFavorite, removeFavorite, listFavorites } from '~/shared/services/engagementService';
-import type { UserEngagement } from '~/shared/services/engagementService';
+import {
+  addFavorite,
+  removeFavorite,
+  listFavorites,
+  type UserEngagement,
+} from '~/shared/services/engagementService';
 import type { MenuItem } from '~/shared/services/menu';
 
 interface AddFavoriteModalProps {
