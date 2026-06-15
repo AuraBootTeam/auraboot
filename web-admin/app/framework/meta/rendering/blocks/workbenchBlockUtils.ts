@@ -122,6 +122,63 @@ function unwrapCommandData(result: any): any {
   return result?.data?.data ?? result?.data ?? result ?? {};
 }
 
+function isSuccessResult(result: any): boolean {
+  return !(result && typeof result === 'object' && 'code' in result && String(result.code) !== '0');
+}
+
+function isAsyncDispatch(data: any): data is { async: true; taskCode: string } {
+  return data?.async === true && typeof data.taskCode === 'string' && data.taskCode.trim() !== '';
+}
+
+function resolvePollIntervalMs(args: any): number {
+  const value = Number(args?.asyncPollIntervalMs ?? args?.pollIntervalMs ?? 1500);
+  return Number.isFinite(value) && value >= 0 ? value : 1500;
+}
+
+function resolvePollAttempts(args: any): number {
+  const value = Number(args?.asyncMaxPollAttempts ?? args?.maxPollAttempts ?? 600);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 600;
+}
+
+function delay(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+}
+
+async function pollWorkbenchAsyncTask(
+  runtime: SchemaRuntime,
+  taskCode: string,
+  reloadIds: string | string[] | undefined,
+  args: any,
+): Promise<any> {
+  const terminalStatuses = new Set(['completed', 'failed', 'cancelled']);
+  const intervalMs = resolvePollIntervalMs(args);
+  const maxAttempts = resolvePollAttempts(args);
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const result = await fetchResult(`/api/async-tasks/${encodeURIComponent(taskCode)}`, {
+      method: 'get',
+    });
+    if (!isSuccessResult(result)) {
+      throw new Error((result as any).message || (result as any).desc || 'Async task status unavailable');
+    }
+
+    const task = result?.data ?? {};
+    await reloadDataSources(runtime, reloadIds);
+
+    const status = String(task.status || '').toLowerCase();
+    if (terminalStatuses.has(status)) {
+      if (status === 'completed') return task.resultData ?? {};
+      if (status === 'cancelled') throw new Error('Task cancelled');
+      throw new Error(task.errorMessage || task.message || 'Async task failed');
+    }
+
+    await delay(intervalMs);
+  }
+
+  throw new Error('Async task timed out');
+}
+
 function readFirstPath(source: any, paths: string[]): any {
   for (const path of paths) {
     const value = readPath(source, path);
@@ -247,15 +304,21 @@ export async function executeSimpleWorkbenchAction(
       if (params[key] === undefined) delete params[key];
     });
 
-    const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+    let result = await fetchResult(`/api/meta/commands/execute/${command}`, {
       method: 'post',
       params,
     });
-    if (result && typeof result === 'object' && 'code' in result && result.code !== '0') {
+    if (!isSuccessResult(result)) {
       throw new Error((result as any).message || (result as any).desc || `${command} failed`);
     }
 
-    await reloadDataSources(runtime, resolveReloadIds(args.reload));
+    const reloadIds = resolveReloadIds(args.reload);
+    const dispatch = unwrapCommandData(result);
+    if (isAsyncDispatch(dispatch)) {
+      result = await pollWorkbenchAsyncTask(runtime, dispatch.taskCode, reloadIds, args);
+    }
+
+    await reloadDataSources(runtime, reloadIds);
     const downloadUrl = resolveDownloadUrl(result, args.download);
     if (downloadUrl) {
       try {
