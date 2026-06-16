@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildFormCommandPayload,
   getFormFieldValueWithAlias,
   mergeLoadedRecordWithDirtyFields,
   normalizeCommandPayloadValue,
   normalizeLoadedFormValue,
   normalizeLoadedRecordForForm,
+  resolveAsyncCommandDispatch,
   shouldBypassFormSubmit,
   unwrapJsonLikeValue,
 } from '../FormPageContent';
@@ -67,6 +69,102 @@ describe('shouldBypassFormSubmit', () => {
   it('treats refresh as a non-submit form button action', () => {
     expect(shouldBypassFormSubmit({ code: 'refresh' }, '')).toBe(true);
     expect(shouldBypassFormSubmit({ code: 'reload', action: 'refresh' }, 'refresh')).toBe(true);
+  });
+});
+
+describe('buildFormCommandPayload', () => {
+  it('keeps ordinary command payloads limited to model-backed fields', () => {
+    const payload = buildFormCommandPayload(
+      {
+        qo_quote_crm_account_id: 'ACC1',
+        unknown_upload_slot: 'FILE-1',
+      },
+      {
+        qo_quote_crm_account_id: { dataType: 'reference' },
+      },
+      [
+        {
+          blockType: 'form-section',
+          fields: [
+            { field: 'qo_quote_crm_account_id' },
+            { field: 'unknown_upload_slot', dataType: 'file' },
+          ],
+        },
+      ],
+    );
+
+    expect(payload).toEqual({ qo_quote_crm_account_id: 'ACC1' });
+  });
+
+  it('includes transient submitPayload fields using their raw DSL data type', () => {
+    const fileValue = [
+      {
+        name: 'customer-gerber.zip',
+        status: 'done',
+        response: { fileId: 'FILE-GERBER-1' },
+        size: 1024,
+        type: 'application/zip',
+      },
+    ];
+
+    const payload = buildFormCommandPayload(
+      {
+        qo_quote_crm_account_id: 'ACC1',
+        gerber_source_file: fileValue,
+        cpl_source_file: [],
+        local_only_note: 'not submitted',
+      },
+      {
+        qo_quote_crm_account_id: { dataType: 'reference' },
+      },
+      [
+        {
+          blockType: 'form-section',
+          fields: [
+            { field: 'qo_quote_crm_account_id' },
+            { field: 'gerber_source_file', dataType: 'file', transient: true, submitPayload: true },
+            { field: 'cpl_source_file', dataType: 'file', transient: true, submitPayload: true },
+            { field: 'local_only_note', dataType: 'string', transient: true },
+          ],
+        },
+      ],
+    );
+
+    expect(payload.qo_quote_crm_account_id).toBe('ACC1');
+    expect(JSON.parse(payload.gerber_source_file)).toEqual([
+      expect.objectContaining({
+        name: 'customer-gerber.zip',
+        fileId: 'FILE-GERBER-1',
+      }),
+    ]);
+    expect(payload).not.toHaveProperty('cpl_source_file');
+    expect(payload).not.toHaveProperty('local_only_note');
+  });
+});
+
+describe('resolveAsyncCommandDispatch', () => {
+  it('detects command-engine async dispatch payloads nested under data', () => {
+    expect(
+      resolveAsyncCommandDispatch({
+        commandCode: 'qo_quote_common:create',
+        data: {
+          async: true,
+          taskCode: ' TASK-1 ',
+        },
+      }),
+    ).toEqual({ taskCode: 'TASK-1' });
+  });
+
+  it('ignores regular synchronous command results', () => {
+    expect(
+      resolveAsyncCommandDispatch({
+        commandCode: 'qo_quote_common:create',
+        data: {
+          recordId: 'Q1',
+        },
+      }),
+    ).toBeNull();
+    expect(resolveAsyncCommandDispatch({ recordId: 'Q1' })).toBeNull();
   });
 });
 

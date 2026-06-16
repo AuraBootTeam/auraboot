@@ -45,6 +45,53 @@ async function visibleFormFieldIds(page: Page): Promise<string[]> {
   );
 }
 
+async function pollAsyncTaskResult(page: Page, taskCode: string): Promise<Record<string, unknown>> {
+  const terminal = new Set(['completed', 'failed', 'cancelled']);
+  let resultData: Record<string, unknown> = {};
+
+  await expect
+    .poll(
+      async () => {
+        const resp = await page.request.get(`/api/async-tasks/${encodeURIComponent(taskCode)}`, {
+          timeout: 15_000,
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok()) {
+          return `http:${resp.status()}:${JSON.stringify(body).slice(0, 500)}`;
+        }
+        const task = ((body as any).data ?? {}) as Record<string, unknown>;
+        const status = String(task.status ?? '').toLowerCase();
+        if (terminal.has(status)) {
+          if (status === 'completed') {
+            resultData = ((task as any).resultData ?? {}) as Record<string, unknown>;
+            return 'completed';
+          }
+          return `terminal:${status}:${JSON.stringify(task).slice(0, 800)}`;
+        }
+        return status || 'pending';
+      },
+      {
+        timeout: 180_000,
+        intervals: [1000, 1500, 2000, 3000],
+        message: `async task ${taskCode} should complete`,
+      },
+    )
+    .toBe('completed');
+
+  return resultData;
+}
+
+async function unwrapCommandResponseData(
+  page: Page,
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const commandData = ((body as any).data?.data ?? {}) as Record<string, unknown>;
+  if (commandData.async === true && typeof commandData.taskCode === 'string') {
+    return pollAsyncTaskResult(page, commandData.taskCode);
+  }
+  return commandData;
+}
+
 async function tableHeaders(page: Page): Promise<string[]> {
   const headers = page.locator('thead th, [role="columnheader"]');
   await expect(headers.first()).toBeVisible({ timeout: 15_000 });
@@ -99,9 +146,15 @@ test.describe('PCBA quote minimal create regression', () => {
       await accountOptionsLoaded;
 
       expect(await visibleFormFieldIds(page)).toEqual([
+        'form-field-corrected_bom_file',
+        'form-field-cpl_source_file',
+        'form-field-gerber_source_file',
         'form-field-qo_quote_crm_account_id',
         'form-field-qo_quote_notes',
       ]);
+      await expect(page.getByTestId('form-field-gerber_source_file')).toBeVisible();
+      await expect(page.getByTestId('form-field-cpl_source_file')).toBeVisible();
+      await expect(page.getByTestId('form-field-corrected_bom_file')).toBeVisible();
       await expect(page.getByTestId('form-field-qo_quote_customer')).toHaveCount(0);
       await expect(page.getByTestId('form-field-qo_quote_tax_rate')).toHaveCount(0);
       await expect(page.getByTestId('form-field-qo_quote_valid_until')).toHaveCount(0);
@@ -126,9 +179,13 @@ test.describe('PCBA quote minimal create regression', () => {
         String((createBody as any).code),
         `qo_quote_common:create response: ${JSON.stringify(createBody).slice(0, 800)}`,
       ).toBe('0');
-      const quoteData = ((createBody as any).data?.data ?? {}) as Record<string, unknown>;
+      const quoteData = await unwrapCommandResponseData(
+        page,
+        createBody as Record<string, unknown>,
+      );
       const quoteId = String(quoteData.recordId ?? quoteData.quoteId ?? quoteData.pid ?? '');
       expect(quoteId, 'quote create should return quote id').toBeTruthy();
+      expect(quoteData.uploadedSourceCount).toBe(0);
       created.quoteId = quoteId;
       created.rows.push({ model: 'qo_quote_common', pid: quoteId });
 
@@ -189,9 +246,12 @@ test.describe('PCBA quote minimal create regression', () => {
         timeout: 20_000,
       });
       await expect(page.getByRole('tab', { name: /BOM价格计算|BOM Price/i })).toBeVisible();
-      await expect(page.getByTestId('toolbar-btn-upload_raw_bom')).toBeVisible({
+      await expect(page.getByTestId('toolbar-btn-upload_raw_bom')).toHaveCount(0);
+      await expect(page.getByTestId('toolbar-btn-upload_gerber_package')).toBeVisible({
         timeout: 20_000,
       });
+      await expect(page.getByTestId('toolbar-btn-upload_cpl')).toBeVisible();
+      await expect(page.getByTestId('toolbar-btn-upload_corrected_bom')).toBeVisible();
 
       const main = page.locator('main');
       await expect(main).not.toContainText('资料准备中');
