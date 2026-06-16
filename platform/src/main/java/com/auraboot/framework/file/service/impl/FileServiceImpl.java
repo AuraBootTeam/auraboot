@@ -10,6 +10,7 @@ import com.auraboot.framework.file.dto.FileUploadResponseDTO;
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.entity.FileRelationEntity;
 import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.file.support.FileNameEncodingSupport;
 import com.auraboot.framework.infrastructure.storage.CdnUrlRewriter;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -293,7 +294,7 @@ public class FileServiceImpl implements FileService {
     }
 
     private FileEntity createFileEntity(MultipartFile file, Long userId) {
-        String originalFilename = file.getOriginalFilename();
+        String originalFilename = FileNameEncodingSupport.normalizeOriginalFilename(file.getOriginalFilename());
         String extension = getFileExtension(originalFilename);
         String filename = UniqueIdGenerator.generate() + "." + extension;
 

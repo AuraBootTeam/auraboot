@@ -35,6 +35,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentCaptor.forClass;
 
 /**
  * Unit tests for {@link FileServiceImpl}.
@@ -115,6 +116,26 @@ class FileServiceImplTest {
         assertThat(resp.getOriginalName()).isEqualTo("pic.png");
         assertThat(resp.getStorageType()).isEqualTo(StorageType.LOCAL);
         verify(fileMapper).insert(any(FileEntity.class));
+    }
+
+    @Test
+    void uploadFile_mojibakeOriginalFilename_persistsRecoveredUtf8Name() {
+        MultipartFile good = new MockMultipartFile(
+                "file",
+                "å\u008E\u009Få§\u008B-E1-V1.3-BOM-20240429.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "xlsx-bytes".getBytes());
+
+        when(storageProvider.upload(anyString(), any(), anyLong(), anyString()))
+                .thenReturn("/uploads/source.xlsx");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+
+        var resp = fileService.uploadFile(good, 42L);
+
+        var captor = forClass(FileEntity.class);
+        verify(fileMapper).insert(captor.capture());
+        assertThat(resp.getOriginalName()).isEqualTo("原始-E1-V1.3-BOM-20240429.xlsx");
+        assertThat(captor.getValue().getOriginalName()).isEqualTo("原始-E1-V1.3-BOM-20240429.xlsx");
     }
 
     @Test

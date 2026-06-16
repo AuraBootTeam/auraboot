@@ -74,4 +74,26 @@ class FileAccessorImplTest {
         assertThat(uploaded.getContentType()).isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         assertThat(uploaded.getBytes()).isEqualTo(bytes);
     }
+
+    @Test
+    void save_recoversMojibakeOriginalNameBeforeUpload() throws Exception {
+        byte[] bytes = "standard-bom".getBytes(StandardCharsets.UTF_8);
+        FileUploadResponseDTO response = new FileUploadResponseDTO();
+        response.setFileId("export-file-pid");
+        response.setOriginalName("原始-BOM.xlsx");
+        response.setFileSize((long) bytes.length);
+        response.setUrl("/api/file/download/export-file-pid");
+        when(fileService.uploadFile(org.mockito.ArgumentMatchers.any(MultipartFile.class), eq(42L)))
+                .thenReturn(response);
+
+        FileAccessor accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+        accessor.save(
+                "å\u008E\u009Få§\u008B-BOM.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                bytes);
+
+        ArgumentCaptor<MultipartFile> fileCaptor = ArgumentCaptor.forClass(MultipartFile.class);
+        verify(fileService).uploadFile(fileCaptor.capture(), eq(42L));
+        assertThat(fileCaptor.getValue().getOriginalFilename()).isEqualTo("原始-BOM.xlsx");
+    }
 }
