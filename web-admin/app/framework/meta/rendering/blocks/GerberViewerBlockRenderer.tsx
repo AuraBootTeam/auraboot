@@ -239,6 +239,25 @@ function firstLineWithInspectionOrFacts(
   );
 }
 
+function recordPid(record: Record<string, any> | undefined): string | undefined {
+  const value = readPath(record, 'pid') || readPath(record, 'id');
+  if (value === undefined || value === null) return undefined;
+  const text = String(value).trim();
+  return text || undefined;
+}
+
+function matchingDataSourceLine(
+  selected: Record<string, any> | undefined,
+  rows: any[],
+): Record<string, any> | undefined {
+  const selectedPid = recordPid(selected);
+  if (!selectedPid) return undefined;
+  return rows.find((row): row is Record<string, any> => {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return false;
+    return recordPid(row) === selectedPid;
+  });
+}
+
 function chooseLineRecord(
   selectedLine: unknown,
   rows: any[],
@@ -248,8 +267,11 @@ function chooseLineRecord(
     selectedLine && typeof selectedLine === 'object' && !Array.isArray(selectedLine)
       ? (selectedLine as Record<string, any>)
       : undefined;
+  if (hasLineInspection(selected, lineInspectionField)) return selected;
+  const matched = matchingDataSourceLine(selected, rows);
+  if (hasLineInspection(matched, lineInspectionField)) return matched;
   if (hasLineInspectionOrFacts(selected, lineInspectionField)) return selected;
-  return firstLineWithInspectionOrFacts(rows, lineInspectionField) || selected;
+  return firstLineWithInspectionOrFacts(rows, lineInspectionField) || matched || selected;
 }
 
 function severityFromValidationStatus(status: unknown): IssueSeverity {
