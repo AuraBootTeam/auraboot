@@ -68,6 +68,38 @@ class FileUploadControllerTest {
                 .andExpect(content().string("pdf"));
     }
 
+    @Test
+    void downloadFile_chineseName_usesUtf8FilenameStar() throws Exception {
+        FileEntity file = storedFile("原始-E1-V1.3-BOM-20240429.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "/tmp/source.xlsx");
+        when(fileService.getFileById("file-pid")).thenReturn(file);
+        when(storageProvider.download("/tmp/source.xlsx"))
+                .thenReturn(new ByteArrayInputStream("xlsx".getBytes(StandardCharsets.UTF_8)));
+
+        mvc.perform(get("/api/file/download/file-pid"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"E1-V1.3-BOM-20240429.xlsx\"; filename*=UTF-8''%E5%8E%9F%E5%A7%8B-E1-V1.3-BOM-20240429.xlsx"))
+                .andExpect(content().string("xlsx"));
+    }
+
+    @Test
+    void downloadFile_legacyMojibakeChineseName_recoversUtf8Filename() throws Exception {
+        FileEntity file = storedFile("å\u008E\u009Få§\u008B-E1-V1.3-BOM-20240429.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "/tmp/source.xlsx");
+        when(fileService.getFileById("file-pid")).thenReturn(file);
+        when(storageProvider.download("/tmp/source.xlsx"))
+                .thenReturn(new ByteArrayInputStream("xlsx".getBytes(StandardCharsets.UTF_8)));
+
+        mvc.perform(get("/api/file/download/file-pid"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"E1-V1.3-BOM-20240429.xlsx\"; filename*=UTF-8''%E5%8E%9F%E5%A7%8B-E1-V1.3-BOM-20240429.xlsx"))
+                .andExpect(content().string("xlsx"));
+    }
+
     private FileEntity storedFile(String originalName, String mimeType, String localPath) {
         FileEntity file = new FileEntity();
         file.setPid("file-pid");

@@ -11,6 +11,7 @@ import com.auraboot.framework.file.dto.FileRelationRequestDTO;
 import com.auraboot.framework.file.dto.FileUploadResponseDTO;
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.file.support.FileNameEncodingSupport;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
@@ -28,8 +29,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -98,7 +97,7 @@ public class FileUploadController {
         // 创建文件实体
         FileEntity fileEntity = new FileEntity();
         fileEntity.setFileName(fileInfo.getFileName());
-        fileEntity.setOriginalName(fileInfo.getOriginalName());
+        fileEntity.setOriginalName(FileNameEncodingSupport.normalizeOriginalFilename(fileInfo.getOriginalName()));
         fileEntity.setFileSize(fileInfo.getFileSize());
         fileEntity.setMimeType(fileInfo.getMimeType());
         // Security: ignore client-provided localPath to prevent arbitrary file read via download endpoint
@@ -252,10 +251,10 @@ public class FileUploadController {
             Resource resource = new InputStreamResource(stream);
             MediaType contentType = resolveDownloadContentType(fileEntity);
             String dispositionType = isInlineDisplayType(contentType) ? "inline" : "attachment";
-            String encodedFilename = URLEncoder.encode(downloadFileName(fileEntity, fileId), StandardCharsets.UTF_8);
             return ResponseEntity.ok()
                     .contentType(contentType)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, dispositionType + "; filename=\"" + encodedFilename + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            FileNameEncodingSupport.contentDisposition(dispositionType, downloadFileName(fileEntity, fileId)))
                     .body(resource);
         } catch (SecurityException e) {
             LOG.warn("Path traversal attempt blocked for file {}: {}", fileId, e.getMessage());
