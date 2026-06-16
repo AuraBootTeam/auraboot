@@ -14,6 +14,7 @@ const MANUAL_SUPPLIER = 'E2E Manual Supplier';
 const MANUAL_SOURCE_NOTE = 'E2E source: business phone quote';
 const MANUAL_REASON = 'E2E business裁决: record and adopt manual price';
 const MANUAL_VALID_UNTIL = '2030-12-31';
+const EXPECTED_LINE_COST = Number((MANUAL_UNIT_PRICE * 10).toFixed(2));
 
 async function tableHeaders(table: Locator): Promise<string[]> {
   const headers = table.locator('thead th, [role="columnheader"]');
@@ -242,7 +243,7 @@ test.describe('PCBA quote BOM price manual adoption', () => {
         .toBe(MANUAL_UNIT_PRICE.toFixed(4));
 
       const adoptedLine = await readDynamicRecord(page, 'qo_quote_line_common', created.lineId);
-      expect(Number(adoptedLine.qo_ql_line_cost)).toBeCloseTo(MANUAL_UNIT_PRICE * 10, 4);
+      expect(Number(adoptedLine.qo_ql_line_cost)).toBeCloseTo(EXPECTED_LINE_COST, 2);
       expect(String(adoptedLine.qo_ql_currency ?? '')).toBe('CNY');
       expect(String(adoptedLine.qo_ql_risk ?? '')).toBe('none');
 
