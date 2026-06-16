@@ -3,6 +3,7 @@ package com.auraboot.framework.plugin.pf4j;
 import com.auraboot.framework.file.dto.FileUploadResponseDTO;
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.file.support.FileNameEncodingSupport;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.plugin.extension.FileAccessor;
 import lombok.RequiredArgsConstructor;
@@ -71,7 +72,8 @@ public class FileAccessorImpl implements FileAccessor {
         }
         String normalized = originalName.replace('\\', '/');
         int lastSlash = normalized.lastIndexOf('/');
-        return lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
+        String basename = lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
+        return FileNameEncodingSupport.normalizeOriginalFilename(basename);
     }
 
     private record ByteArrayMultipartFile(
