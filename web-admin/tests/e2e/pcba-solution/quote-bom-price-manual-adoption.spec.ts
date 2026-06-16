@@ -24,6 +24,14 @@ async function tableHeaders(table: Locator): Promise<string[]> {
   );
 }
 
+async function tableCellTexts(row: Locator): Promise<string[]> {
+  const cells = row.locator('td, [role="cell"]');
+  await expect(cells.first()).toBeVisible({ timeout: 20_000 });
+  return cells.evaluateAll((nodes) =>
+    nodes.map((node) => (node.textContent || '').replace(/\s+/g, ' ').trim()),
+  );
+}
+
 function parseJsonObject(value: unknown): Record<string, any> {
   if (value && typeof value === 'object') return value as Record<string, any>;
   if (typeof value !== 'string') return {};
@@ -101,13 +109,13 @@ test.describe('PCBA quote BOM price manual adoption', () => {
       await expect(priceRow).toBeVisible({ timeout: 30_000 });
       await expect(priceRow).toContainText(created.mpn);
       await expect(priceRow).toContainText(/1\.1111|1\.111|1\.11/);
-      await expect(priceRow).toContainText(/金蝶已查询未命中|未命中/);
 
       const priceTable = priceRow.locator('xpath=ancestor::table[1]');
-      expect(await tableHeaders(priceTable)).toEqual([
+      const headers = await tableHeaders(priceTable);
+      expect(headers).toEqual([
         '物料',
-        '需求采购量',
-        '历史采购价',
+        'BOM用量',
+        '金蝶历史采购价',
         '立创商城',
         '云汉芯城',
         '华强电子网',
@@ -117,6 +125,16 @@ test.describe('PCBA quote BOM price manual adoption', () => {
         '采用来源',
         '当前状态',
       ]);
+      const cellTextByHeader = new Map(
+        (await tableCellTexts(priceRow)).map((text, index) => [
+          headers[index] ?? `column-${index}`,
+          text,
+        ]),
+      );
+      expect(cellTextByHeader.get('BOM用量')).toBe('10');
+      expect(cellTextByHeader.get('金蝶历史采购价')).toBe('未命中');
+      expect(cellTextByHeader.get('采用来源') ?? '').toMatch(/^[-—–]?$/);
+      expect(cellTextByHeader.get('当前状态')).toContain('暂无价格');
 
       const headerText = (await priceTable.locator('thead').innerText()).replace(/\s+/g, ' ');
       expect(headerText).not.toContain('证据');
@@ -124,7 +142,11 @@ test.describe('PCBA quote BOM price manual adoption', () => {
       expect(headerText).not.toContain('刷新');
 
       const beforeWaterfall = await readWaterfallLine(page, created);
-      expect(String(beforeWaterfall.current_price_status ?? '')).toMatch(/金蝶已查询未命中|未命中/);
+      expect(String(beforeWaterfall.bom_qty ?? '')).toBe('10');
+      expect(String(beforeWaterfall.kingdee_recent_price ?? '')).toBe('未命中');
+      expect(String(beforeWaterfall.adopted_source ?? '')).toBe('');
+      expect(String(beforeWaterfall.adopted_source_label ?? '')).toBe('');
+      expect(String(beforeWaterfall.current_price_status ?? '')).toBe('暂无价格');
       expect(String(beforeWaterfall.deepseek_suggested_price ?? '')).toContain('1.1111');
 
       await priceRow.click();
