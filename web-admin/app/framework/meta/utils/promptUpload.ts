@@ -10,6 +10,9 @@
  * and the handler rejects it (e.g. `source_file_id is required`).
  */
 
+const MAX_COMMAND_UPLOAD_SIZE_MB = 50;
+const MAX_COMMAND_UPLOAD_SIZE_BYTES = MAX_COMMAND_UPLOAD_SIZE_MB * 1024 * 1024;
+
 /**
  * Programmatically open the OS file picker and resolve with the chosen File, or
  * null if the user cancels. Kept side-effect-light so it can be invoked from a
@@ -50,6 +53,11 @@ export async function uploadCommandFile(
   token?: string,
   uploadUrl = '/api/file/upload',
 ): Promise<string> {
+  if (file.size > MAX_COMMAND_UPLOAD_SIZE_BYTES) {
+    throw new Error(
+      `文件过大：${file.name} 为 ${formatFileSize(file.size)}，当前上传上限为 ${MAX_COMMAND_UPLOAD_SIZE_MB}MB。请压缩后重试；如为 Gerber/坐标/BOM 资料包，请拆分后分别上传。`,
+    );
+  }
   const formData = new FormData();
   formData.append('file', file);
   const headers: Record<string, string> = {};
@@ -63,7 +71,7 @@ export async function uploadCommandFile(
     credentials: 'include',
   });
   if (!res.ok) {
-    throw new Error(`File upload failed (${res.status})`);
+    throw new Error(await buildUploadFailureMessage(res));
   }
   const json = await res.json();
   const fileId = json?.data?.fileId ?? json?.fileId;
@@ -71,6 +79,49 @@ export async function uploadCommandFile(
     throw new Error('File upload returned no fileId');
   }
   return String(fileId);
+}
+
+async function buildUploadFailureMessage(res: Response): Promise<string> {
+  const details = await readUploadErrorDetails(res);
+  const sizeLimit = details.match(/File too large:\s*max\s*([0-9]+)\s*MB/i)?.[1];
+  if (sizeLimit) {
+    return `文件过大，当前上传上限为 ${sizeLimit}MB。请压缩后重试；如为 Gerber/坐标/BOM 资料包，请拆分后分别上传。`;
+  }
+  if (details.trim()) {
+    return `文件上传失败：${details.trim()}`;
+  }
+  return `File upload failed (${res.status})`;
+}
+
+function formatFileSize(size: number): string {
+  if (size >= 1024 * 1024) {
+    return `${(size / 1024 / 1024).toFixed(1)}MB`;
+  }
+  if (size >= 1024) {
+    return `${(size / 1024).toFixed(1)}KB`;
+  }
+  return `${size}B`;
+}
+
+async function readUploadErrorDetails(res: Response): Promise<string> {
+  try {
+    const json = await res.json();
+    return [
+      json?.message,
+      json?.error,
+      json?.context?.detail,
+      json?.context?.exception,
+      json?.detail,
+    ]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .join(' ');
+  } catch {
+    try {
+      return await res.text();
+    } catch {
+      return '';
+    }
+  }
 }
 
 /**

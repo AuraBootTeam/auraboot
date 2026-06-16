@@ -97,6 +97,38 @@ describe('uploadCommandFile', () => {
     await expect(uploadCommandFile(new File(['x'], 'a.xlsx'))).rejects.toThrow('413');
   });
 
+  it('rejects oversized files before posting them to the backend', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const file = new File([new Uint8Array(51 * 1024 * 1024)], 'large.zip');
+
+    await expect(uploadCommandFile(file)).rejects.toThrow(
+      '文件过大：large.zip 为 51.0MB，当前上传上限为 50MB。请压缩后重试；如为 Gerber/坐标/BOM 资料包，请拆分后分别上传。',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('surfaces backend upload errors with actionable file-size guidance', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          code: '40000',
+          message: 'Business error',
+          context: {
+            detail: 'com.auraboot.framework.exception.BusinessException: File too large: max 50MB',
+          },
+        }),
+      }),
+    );
+
+    await expect(uploadCommandFile(new File(['x'], 'large.zip'))).rejects.toThrow(
+      '文件过大，当前上传上限为 50MB。请压缩后重试；如为 Gerber/坐标/BOM 资料包，请拆分后分别上传。',
+    );
+  });
+
   it('throws when the response carries no fileId', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: {} }) }));
     await expect(uploadCommandFile(new File(['x'], 'a.xlsx'))).rejects.toThrow('no fileId');
