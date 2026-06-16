@@ -501,7 +501,7 @@ export function shouldBypassFormSubmit(
  * record's pid). Falls back to the list page (`/p/{tableName}`) when no
  * override is configured.
  */
-function resolveAfterSubmitRedirect(
+export function resolveAfterSubmitRedirect(
   schema: any,
   tableName: string,
   responseData: any,

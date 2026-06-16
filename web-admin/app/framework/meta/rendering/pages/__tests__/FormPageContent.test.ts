@@ -6,6 +6,7 @@ import {
   normalizeCommandPayloadValue,
   normalizeLoadedFormValue,
   normalizeLoadedRecordForForm,
+  resolveAfterSubmitRedirect,
   resolveAsyncCommandDispatch,
   shouldBypassFormSubmit,
   unwrapJsonLikeValue,
@@ -165,6 +166,45 @@ describe('resolveAsyncCommandDispatch', () => {
       }),
     ).toBeNull();
     expect(resolveAsyncCommandDispatch({ recordId: 'Q1' })).toBeNull();
+  });
+});
+
+describe('resolveAfterSubmitRedirect', () => {
+  it('uses async task final result data for task workbench redirects', () => {
+    expect(
+      resolveAfterSubmitRedirect(
+        {
+          extension: {
+            afterSubmitRedirect: '/p/bom_conversion_task_pcba_workbench/view/{taskId}',
+          },
+        },
+        'bom_start_conversion',
+        {
+          taskId: 'TASK-START-1',
+          status: 'COMPLETED',
+        },
+        undefined,
+      ),
+    ).toBe('/p/bom_conversion_task_pcba_workbench/view/TASK-START-1');
+  });
+
+  it('keeps recordId compatibility for immediate command responses', () => {
+    expect(
+      resolveAfterSubmitRedirect(
+        {
+          extension: {
+            afterSubmitRedirect: '/p/bom_conversion_task_pcba_workbench/view/{recordId}',
+          },
+        },
+        'bom_start_conversion',
+        {
+          data: {
+            recordId: 'TASK-LEGACY-1',
+          },
+        },
+        undefined,
+      ),
+    ).toBe('/p/bom_conversion_task_pcba_workbench/view/TASK-LEGACY-1');
   });
 });
 
