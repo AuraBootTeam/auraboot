@@ -15,12 +15,23 @@ type QuoteLineSeed = {
   mpn: string;
   packageName: string;
   qty: number;
+  itemType?: string;
   unitCost?: number;
   lineCost?: number;
   linePrice?: number;
   smtPoints: number;
   thtPoints: number;
+  boardWidthMm?: number;
+  boardHeightMm?: number;
+  boardAreaMm2?: number;
+  gerberParseStatus?: string;
+  gerberValidationStatus?: string;
+  gerberValidationMessages?: string[];
+  gerberInspection?: Record<string, unknown>;
 };
+
+export const GERBER_RUNTIME_TOP_FILE_ID = '01KV22CQ7PKX3W50Y7MM575ACK';
+export const GERBER_RUNTIME_BOTTOM_FILE_ID = '01KV22CQ7PKX3W50Y7MM575ACM';
 
 export async function executeCommand(
   page: Page,
@@ -165,7 +176,7 @@ async function seedQuoteScaffold(
         'qo_quote_line_common',
         {
           qo_ql_quote_id: quoteId,
-          qo_ql_item_type: 'component',
+          qo_ql_item_type: line.itemType ?? 'component',
           qo_ql_source_ref: line.sourceRef,
           qo_ql_source_row_no: line.sourceRowNo,
           qo_ql_description: line.description,
@@ -179,6 +190,13 @@ async function seedQuoteScaffold(
           qo_ql_line_price: line.linePrice ?? 0,
           qo_ql_smt_points: line.smtPoints,
           qo_ql_tht_points: line.thtPoints,
+          ...(line.boardWidthMm !== undefined ? { qo_ql_board_width_mm: line.boardWidthMm } : {}),
+          ...(line.boardHeightMm !== undefined ? { qo_ql_board_height_mm: line.boardHeightMm } : {}),
+          ...(line.boardAreaMm2 !== undefined ? { qo_ql_board_area_mm2: line.boardAreaMm2 } : {}),
+          ...(line.gerberParseStatus ? { qo_ql_gerber_parse_status: line.gerberParseStatus } : {}),
+          ...(line.gerberValidationStatus ? { qo_ql_gerber_validation_status: line.gerberValidationStatus } : {}),
+          ...(line.gerberValidationMessages ? { qo_ql_gerber_validation_messages: line.gerberValidationMessages } : {}),
+          ...(line.gerberInspection ? { qo_ql_gerber_inspection: line.gerberInspection } : {}),
           qo_ql_risk: 'ok',
           qo_ql_validation_status: 'confirmed',
         },
@@ -274,4 +292,114 @@ export async function seedProcessFeeReviewQuote(page: Page): Promise<CreatedRows
     await cleanupRows(page, created);
     throw error;
   }
+}
+
+export async function seedGerberRuntimeQuote(page: Page): Promise<CreatedRows> {
+  const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
+  return seedQuoteScaffold(page, 'GERBER', [
+    {
+      sourceRef: `GERBER-E2E-${suffix}`,
+      sourceRowNo: 2,
+      description: 'E2E Gerber runtime board',
+      refdes: 'C1,J1',
+      mpn: `E2E-GERBER-${suffix}`,
+      packageName: 'E2E-GERBER-PKG',
+      qty: 1,
+      unitCost: 0.5,
+      lineCost: 0.5,
+      linePrice: 1,
+      smtPoints: 2,
+      thtPoints: 1,
+      boardWidthMm: 42,
+      boardHeightMm: 18,
+      boardAreaMm2: 756,
+      gerberParseStatus: 'parsed',
+      gerberValidationStatus: 'warning',
+      gerberValidationMessages: ['E2E_ALIGNMENT_WARNING'],
+      gerberInspection: {
+        project: {
+          code: 'E2E-GERBER-RUNTIME',
+          name: 'Dynamic line persisted Gerber inspection',
+        },
+        board: {
+          xMinMm: 0,
+          yMinMm: 0,
+          xMaxMm: 42,
+          yMaxMm: 18,
+          widthMm: 42,
+          heightMm: 18,
+        },
+        boardSvgUrls: {
+          top: `/${GERBER_RUNTIME_TOP_FILE_ID}.svg`,
+          bottom: `/${GERBER_RUNTIME_BOTTOM_FILE_ID}.svg`,
+        },
+        summary: {
+          bomRefCount: 2,
+          cplRefCount: 2,
+          smdCount: 2,
+          thtCount: 1,
+          errorCount: 0,
+          warningCount: 1,
+        },
+        layerManifest: [
+          {
+            filename: 'E2E-TopLayer.GTL',
+            role: 'top_copper',
+            side: 'top',
+            kind: 'gerber',
+            flashCount: 2,
+          },
+          {
+            filename: 'E2E-BottomLayer.GBL',
+            role: 'bottom_copper',
+            side: 'bottom',
+            kind: 'gerber',
+            flashCount: 1,
+          },
+        ],
+        drillFiles: [{ filename: 'E2E-PTH.DRL', plated: true, hitCount: 1 }],
+        issues: [
+          {
+            severity: 'warning',
+            code: 'E2E_ALIGNMENT_WARNING',
+            refdes: 'J1',
+            message: 'E2E warning generated from persisted inspection JSON.',
+          },
+        ],
+        components: [
+          {
+            refdes: 'C1',
+            footprint: 'C0603',
+            xMm: 10,
+            yMm: 6,
+            side: 'top',
+            smd: true,
+            pins: 2,
+            rotation: 90,
+            issues: [],
+            bomItem: { materialName: 'E2E capacitor', process: 'SMT' },
+          },
+          {
+            refdes: 'J1',
+            footprint: 'HDR-2P',
+            xMm: 28,
+            yMm: 12,
+            side: 'bottom',
+            smd: false,
+            pins: 2,
+            rotation: 180,
+            issues: [
+              {
+                severity: 'warning',
+                code: 'E2E_ALIGNMENT_WARNING',
+                refdes: 'J1',
+                message: 'E2E bottom-side marker warning.',
+              },
+            ],
+            bomItem: { materialName: 'E2E header', process: 'DIP' },
+          },
+        ],
+      },
+    },
+  ]);
 }
