@@ -437,7 +437,6 @@ compileJava {
 // 配置Spring Boot Maven Plugin等效功能
 bootJar {
     enabled = true
-    archiveClassifier = ''
 }
 
 bootRun {
