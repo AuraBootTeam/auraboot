@@ -140,8 +140,7 @@ const severityRank: Record<IssueSeverity, number> = {
   info: 2,
 };
 
-function parseJsonLike(value: unknown): unknown {
-  if (typeof value !== 'string') return value;
+function tryParseJsonText(value: string): unknown {
   const trimmed = value.trim();
   if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) return value;
   try {
@@ -149,6 +148,35 @@ function parseJsonLike(value: unknown): unknown {
   } catch {
     return value;
   }
+}
+
+function isJsonEnvelope(value: unknown): value is { type?: unknown; value: unknown } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const type = String(record.type || '').toLowerCase();
+  return (
+    (type === 'json' || type === 'jsonb') && Object.prototype.hasOwnProperty.call(record, 'value')
+  );
+}
+
+function parseJsonLike(value: unknown): unknown {
+  let current = value;
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (isJsonEnvelope(current)) {
+      current =
+        typeof current.value === 'string' ? tryParseJsonText(current.value) : current.value;
+      continue;
+    }
+    if (typeof current === 'string') {
+      const parsed = tryParseJsonText(current);
+      if (parsed !== current) {
+        current = parsed;
+        continue;
+      }
+    }
+    break;
+  }
+  return current;
 }
 
 function normalizeStringList(value: unknown): string[] {
