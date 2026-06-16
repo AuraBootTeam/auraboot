@@ -7,6 +7,19 @@ export type CreatedRows = {
   rows: Array<{ model: string; pid: string }>;
 };
 
+export type DynamicFilter = {
+  fieldName: string;
+  operator: string;
+  value: unknown;
+};
+
+export type BomPriceManualReviewSeed = CreatedRows & {
+  lineId: string;
+  mpn: string;
+  suggestedEvidenceId: string;
+  failedEvidenceId: string;
+};
+
 type QuoteLineSeed = {
   sourceRef: string;
   sourceRowNo: number;
@@ -48,7 +61,10 @@ export async function executeCommand(
     timeout: 30_000,
   });
   const body = await resp.json().catch(() => ({}));
-  expect(resp.ok(), `${commandCode} HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`).toBe(true);
+  expect(
+    resp.ok(),
+    `${commandCode} HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`,
+  ).toBe(true);
   expect(String((body as any).code), `${commandCode} should return code=0`).toBe('0');
   return ((body as any).data?.data ?? {}) as Record<string, unknown>;
 }
@@ -64,12 +80,95 @@ export async function dynamicCreate(
     timeout: 15_000,
   });
   const body = await resp.json().catch(() => ({}));
-  expect(resp.ok(), `${model} create HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`).toBe(true);
-  const record = ((body as any).data?.data ?? (body as any).data ?? body) as Record<string, unknown>;
+  expect(
+    resp.ok(),
+    `${model} create HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`,
+  ).toBe(true);
+  const record = ((body as any).data?.data ?? (body as any).data ?? body) as Record<
+    string,
+    unknown
+  >;
   const pid = String(record.pid ?? record.recordId ?? record.id ?? '');
   expect(pid, `${model} create should return pid`).toBeTruthy();
   rows.push({ model, pid });
   return pid;
+}
+
+function extractRecords(body: unknown): Record<string, unknown>[] {
+  const root = body as any;
+  const data = root?.data?.data ?? root?.data ?? root;
+  if (Array.isArray(data)) return data as Record<string, unknown>[];
+  if (Array.isArray(data?.records)) return data.records as Record<string, unknown>[];
+  if (Array.isArray(data?.data)) return data.data as Record<string, unknown>[];
+  if (Array.isArray(data?.list)) return data.list as Record<string, unknown>[];
+  if (Array.isArray(data?.items)) return data.items as Record<string, unknown>[];
+  return [];
+}
+
+export async function readDynamicRecord(
+  page: Page,
+  model: string,
+  pid: string,
+): Promise<Record<string, unknown>> {
+  const resp = await page.request.get(`/api/dynamic/${model}/${pid}`, { timeout: 15_000 });
+  const body = await resp.json().catch(() => ({}));
+  expect(
+    resp.ok(),
+    `${model}/${pid} HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`,
+  ).toBe(true);
+  const record = ((body as any).data?.data ?? (body as any).data ?? body) as Record<
+    string,
+    unknown
+  >;
+  expect(record?.pid ?? record?.id, `${model}/${pid} should return a record`).toBeTruthy();
+  return record;
+}
+
+export async function queryDynamicRecords(
+  page: Page,
+  model: string,
+  filters: DynamicFilter[],
+  options: { pageSize?: number; timeout?: number } = {},
+): Promise<Record<string, unknown>[]> {
+  const filtersParam = encodeURIComponent(JSON.stringify(filters));
+  const pageSize = options.pageSize ?? 50;
+  const resp = await page.request.get(
+    `/api/dynamic/${model}/list?pageNum=1&pageSize=${pageSize}&filters=${filtersParam}`,
+    { timeout: options.timeout ?? 15_000 },
+  );
+  const body = await resp.json().catch(() => ({}));
+  expect(
+    resp.ok(),
+    `${model} list HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`,
+  ).toBe(true);
+  return extractRecords(body);
+}
+
+export async function queryNamedDataSourceRecords(
+  page: Page,
+  queryCode: string,
+  params: Record<string, unknown>,
+): Promise<Record<string, unknown>[]> {
+  const search = new URLSearchParams({
+    datasourceId: `nq:${queryCode}`,
+    valueField: 'pid',
+    labelField: 'name',
+    format: 'records',
+  });
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) search.set(key, String(value));
+  }
+
+  const resp = await page.request.get(`/api/datasource/list?${search.toString()}`, {
+    timeout: 15_000,
+  });
+  const body = await resp.json().catch(() => ({}));
+  expect(
+    resp.ok(),
+    `${queryCode} datasource HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`,
+  ).toBe(true);
+  expect(String((body as any).code), `${queryCode} datasource should return code=0`).toBe('0');
+  return extractRecords(body);
 }
 
 export async function cleanupRows(page: Page, created: CreatedRows): Promise<void> {
@@ -191,11 +290,17 @@ async function seedQuoteScaffold(
           qo_ql_smt_points: line.smtPoints,
           qo_ql_tht_points: line.thtPoints,
           ...(line.boardWidthMm !== undefined ? { qo_ql_board_width_mm: line.boardWidthMm } : {}),
-          ...(line.boardHeightMm !== undefined ? { qo_ql_board_height_mm: line.boardHeightMm } : {}),
+          ...(line.boardHeightMm !== undefined
+            ? { qo_ql_board_height_mm: line.boardHeightMm }
+            : {}),
           ...(line.boardAreaMm2 !== undefined ? { qo_ql_board_area_mm2: line.boardAreaMm2 } : {}),
           ...(line.gerberParseStatus ? { qo_ql_gerber_parse_status: line.gerberParseStatus } : {}),
-          ...(line.gerberValidationStatus ? { qo_ql_gerber_validation_status: line.gerberValidationStatus } : {}),
-          ...(line.gerberValidationMessages ? { qo_ql_gerber_validation_messages: line.gerberValidationMessages } : {}),
+          ...(line.gerberValidationStatus
+            ? { qo_ql_gerber_validation_status: line.gerberValidationStatus }
+            : {}),
+          ...(line.gerberValidationMessages
+            ? { qo_ql_gerber_validation_messages: line.gerberValidationMessages }
+            : {}),
           ...(line.gerberInspection ? { qo_ql_gerber_inspection: line.gerberInspection } : {}),
           qo_ql_risk: 'ok',
           qo_ql_validation_status: 'confirmed',
@@ -229,7 +334,13 @@ export async function seedDownloadableQuote(page: Page): Promise<CreatedRows> {
     },
   ]);
   try {
-    await executeCommand(page, 'qo_quote_common:compute_process_fee', {}, created.quoteId, 'update');
+    await executeCommand(
+      page,
+      'qo_quote_common:compute_process_fee',
+      {},
+      created.quoteId,
+      'update',
+    );
     await executeCommand(
       page,
       'qo_quote_common:override_process_fee',
@@ -250,43 +361,125 @@ export async function seedDownloadableQuote(page: Page): Promise<CreatedRows> {
 
 export async function seedProcessFeeReviewQuote(page: Page): Promise<CreatedRows> {
   const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
-  const created = await seedQuoteScaffold(
-    page,
-    'PFR',
-    [
-      {
-        sourceRef: 'BOM-PFR-UNMATCHED',
-        sourceRowNo: 2,
-        description: 'Unmatched process-fee package',
-        refdes: 'U9',
-        mpn: `E2E-UNMATCHED-${suffix}`,
-        packageName: `NO_RULE_PKG_${suffix}`,
-        qty: 3,
-        unitCost: 0.5,
-        lineCost: 1.5,
-        linePrice: 2,
-        smtPoints: 2,
-        thtPoints: 0,
-      },
-      {
-        sourceRef: 'BOM-PFR-MIXED',
-        sourceRowNo: 3,
-        description: 'Mixed SMT and DIP row requiring manual review',
-        refdes: 'U10,J10',
-        mpn: `E2E-MIXED-${suffix}`,
-        packageName: 'MIXED-PKG',
-        qty: 2,
-        unitCost: 0.75,
-        lineCost: 1.5,
-        linePrice: 2.5,
-        smtPoints: 1,
-        thtPoints: 1,
-      },
-    ],
-  );
+  const created = await seedQuoteScaffold(page, 'PFR', [
+    {
+      sourceRef: 'BOM-PFR-UNMATCHED',
+      sourceRowNo: 2,
+      description: 'Unmatched process-fee package',
+      refdes: 'U9',
+      mpn: `E2E-UNMATCHED-${suffix}`,
+      packageName: `NO_RULE_PKG_${suffix}`,
+      qty: 3,
+      unitCost: 0.5,
+      lineCost: 1.5,
+      linePrice: 2,
+      smtPoints: 2,
+      thtPoints: 0,
+    },
+    {
+      sourceRef: 'BOM-PFR-MIXED',
+      sourceRowNo: 3,
+      description: 'Mixed SMT and DIP row requiring manual review',
+      refdes: 'U10,J10',
+      mpn: `E2E-MIXED-${suffix}`,
+      packageName: 'MIXED-PKG',
+      qty: 2,
+      unitCost: 0.75,
+      lineCost: 1.5,
+      linePrice: 2.5,
+      smtPoints: 1,
+      thtPoints: 1,
+    },
+  ]);
 
   try {
-    await executeCommand(page, 'qo_quote_common:compute_process_fee', {}, created.quoteId, 'update');
+    await executeCommand(
+      page,
+      'qo_quote_common:compute_process_fee',
+      {},
+      created.quoteId,
+      'update',
+    );
+    return created;
+  } catch (error) {
+    await cleanupRows(page, created);
+    throw error;
+  }
+}
+
+export async function seedBomPriceManualReviewQuote(page: Page): Promise<BomPriceManualReviewSeed> {
+  const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
+  const mpn = `E2E-MANUAL-${suffix}`;
+  const created = (await seedQuoteScaffold(page, 'BPM', [
+    {
+      sourceRef: `BOM-BPM-MANUAL-${suffix}`,
+      sourceRowNo: 2,
+      description: 'Manual price E2E resistor',
+      refdes: 'R10',
+      mpn,
+      packageName: '0603',
+      qty: 10,
+      unitCost: 0,
+      lineCost: 0,
+      linePrice: 0,
+      smtPoints: 1,
+      thtPoints: 0,
+    },
+  ])) as BomPriceManualReviewSeed;
+
+  try {
+    const lineId = created.rows.find((row) => row.model === 'qo_quote_line_common')?.pid ?? '';
+    expect(lineId, 'BOM price manual review seed should create one quote line').toBeTruthy();
+    created.lineId = lineId;
+    created.mpn = mpn;
+
+    created.suggestedEvidenceId = await dynamicCreate(
+      page,
+      'qo_price_evidence_common',
+      {
+        qo_pe_quote_line_id: lineId,
+        qo_pe_part_no: mpn,
+        qo_pe_source: 'deepseek_llm',
+        qo_pe_source_ref: `e2e-deepseek-${suffix}`,
+        qo_pe_supplier_name: 'DeepSeek AI',
+        qo_pe_unit_price: 1.1111,
+        qo_pe_currency: 'CNY',
+        qo_pe_moq: 1,
+        qo_pe_mpq: 1,
+        qo_pe_confidence: 0.42,
+        qo_pe_valid_until: '2030-12-31',
+        qo_pe_status: 'suggested',
+        qo_pe_snapshot: {
+          source: 'deepseek_llm',
+          suggestion: 'E2E AI candidate price',
+          queryPartNo: mpn,
+        },
+      },
+      created.rows,
+    );
+
+    created.failedEvidenceId = await dynamicCreate(
+      page,
+      'qo_price_evidence_common',
+      {
+        qo_pe_quote_line_id: lineId,
+        qo_pe_part_no: mpn,
+        qo_pe_source: 'kingdee_purchase_history',
+        qo_pe_source_ref: `e2e-kingdee-not-found-${suffix}`,
+        qo_pe_supplier_name: 'Kingdee history',
+        qo_pe_currency: 'CNY',
+        qo_pe_confidence: 0,
+        qo_pe_status: 'not_found',
+        qo_pe_override_reason: 'E2E historical price missing',
+        qo_pe_snapshot: {
+          source: 'kingdee_purchase_history',
+          failureCode: 'price_not_found',
+          queryPartNo: mpn,
+        },
+      },
+      created.rows,
+    );
+
     return created;
   } catch (error) {
     await cleanupRows(page, created);

@@ -143,6 +143,43 @@ function candidateKey(candidate: any, index: number): string {
   return String(candidate?.pid ?? candidate?.id ?? index);
 }
 
+type ActionFormState = {
+  source: 'candidate' | 'export';
+  actionConfig: any;
+  values: Record<string, string>;
+  errors: Record<string, string>;
+};
+
+function actionFormFields(actionConfig: any): any[] {
+  return Array.isArray(actionConfig?.form?.fields) ? actionConfig.form.fields : [];
+}
+
+function initialActionFormValues(actionConfig: any, runtime: SchemaRuntime): Record<string, string> {
+  return Object.fromEntries(
+    actionFormFields(actionConfig).map((field) => {
+      const name = String(field.name || field.field || '');
+      const value = resolveRuntimeValue(runtime, field.defaultValue ?? '');
+      return [name, value === undefined || value === null ? '' : String(value)];
+    }).filter(([name]) => name),
+  );
+}
+
+function actionWithFormValues(actionConfig: any, formValues: Record<string, string>): any {
+  const onClick = actionConfig?.onClick || {};
+  if (!formValues || Object.keys(formValues).length === 0) return onClick;
+  const args = onClick.args || {};
+  return {
+    ...onClick,
+    args: {
+      ...args,
+      payload: {
+        ...(args.payload || {}),
+        ...formValues,
+      },
+    },
+  };
+}
+
 function Badge({
   badge,
   record,
@@ -244,6 +281,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const [position, setPosition] = useState({ left: 24, top: 24 });
   const [size, setSize] = useState({ width: 1100, height: 640 });
   const [runningAction, setRunningAction] = useState<string | null>(null);
+  const [activeActionForm, setActiveActionForm] = useState<ActionFormState | null>(null);
   const dragRef = useRef<PointerState | null>(null);
   const resizeRef = useRef<PointerState | null>(null);
 
@@ -370,16 +408,73 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
       ? evaluator.evaluateCondition(actionConfig.disabledWhen, actionContext)
       : false;
 
-  const runAction = async (actionConfig: any, source: 'candidate' | 'export') => {
+  const openActionForm = (actionConfig: any, source: 'candidate' | 'export') => {
+    setActiveActionForm({
+      source,
+      actionConfig,
+      values: initialActionFormValues(actionConfig, runtime),
+      errors: {},
+    });
+  };
+
+  const updateActionFormValue = (name: string, value: string) => {
+    setActiveActionForm((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        values: {
+          ...current.values,
+          [name]: value,
+        },
+        errors: {
+          ...current.errors,
+          [name]: '',
+        },
+      };
+    });
+  };
+
+  const validateActionForm = (formState: ActionFormState): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    for (const field of actionFormFields(formState.actionConfig)) {
+      const name = String(field.name || field.field || '');
+      if (!name || !field.required) continue;
+      const value = formState.values[name];
+      if (value === undefined || value === null || String(value).trim() === '') {
+        errors[name] = localized(locale, t, '必填', 'Required');
+      }
+    }
+    return errors;
+  };
+
+  const runAction = async (
+    actionConfig: any,
+    source: 'candidate' | 'export',
+    formValues: Record<string, string> = {},
+  ) => {
     const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
     setRunningAction(`${source}:${code}`);
     try {
-      await executeSimpleWorkbenchAction(runtime, actionConfig.onClick);
+      await executeSimpleWorkbenchAction(runtime, actionWithFormValues(actionConfig, formValues));
     } catch (error) {
       console.error('[ReviewDrawerBlockRenderer] action failed:', error);
     } finally {
       setRunningAction(null);
     }
+  };
+
+  const submitActionForm = async () => {
+    if (!activeActionForm) return;
+    const errors = validateActionForm(activeActionForm);
+    if (Object.keys(errors).length > 0) {
+      setActiveActionForm({
+        ...activeActionForm,
+        errors,
+      });
+      return;
+    }
+    await runAction(activeActionForm.actionConfig, activeActionForm.source, activeActionForm.values);
+    setActiveActionForm(null);
   };
 
   const jumpRow = (offset: number) => {
@@ -780,7 +875,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                         type="button"
                         data-testid={`review-drawer-export-action-${code}`}
                         disabled={disabled}
-                        onClick={() => void runAction(actionConfig, 'export')}
+                        onClick={() => {
+                          if (actionConfig.form) openActionForm(actionConfig, 'export');
+                          else void runAction(actionConfig, 'export');
+                        }}
                         className={`rounded-md px-3 py-2 text-sm font-medium ${
                           buttonClass[actionConfig.variant || 'secondary'] || buttonClass.secondary
                         } disabled:cursor-not-allowed disabled:opacity-50`}
@@ -970,7 +1068,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                         type="button"
                         data-testid={`review-drawer-candidate-action-${code}`}
                         disabled={disabled}
-                        onClick={() => void runAction(actionConfig, 'candidate')}
+                        onClick={() => {
+                          if (actionConfig.form) openActionForm(actionConfig, 'candidate');
+                          else void runAction(actionConfig, 'candidate');
+                        }}
                         className={`rounded-md px-3 py-2 text-sm font-medium ${
                           buttonClass[actionConfig.variant || 'primary'] || buttonClass.primary
                         } disabled:cursor-not-allowed disabled:opacity-50`}
@@ -987,6 +1088,111 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
           </aside>
         </div>
       </div>
+
+      {activeActionForm && (
+        <div
+          className="absolute inset-0 z-[60] flex items-center justify-center bg-slate-950/35 px-4"
+          data-testid="review-drawer-action-form-backdrop"
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            data-testid="review-drawer-action-form"
+            className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-4 shadow-2xl"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitActionForm();
+            }}
+          >
+            <h3 className="text-base font-semibold text-gray-900">
+              {getLocalizedText(
+                activeActionForm.actionConfig.form?.title ||
+                  activeActionForm.actionConfig.label ||
+                  activeActionForm.actionConfig.code,
+                locale,
+                t,
+              )}
+            </h3>
+            <div className="mt-4 space-y-3">
+              {actionFormFields(activeActionForm.actionConfig).map((field) => {
+                const name = String(field.name || field.field || '');
+                if (!name) return null;
+                const label = getLocalizedText(field.label || name, locale, t);
+                const value = activeActionForm.values[name] ?? '';
+                const error = activeActionForm.errors[name];
+                const commonProps = {
+                  id: `review-drawer-action-form-${name}`,
+                  name,
+                  value,
+                  required: field.required === true,
+                  placeholder: getLocalizedText(field.placeholder || '', locale, t),
+                  onChange: (
+                    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+                  ) => updateActionFormValue(name, event.target.value),
+                  className:
+                    'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
+                  'data-testid': `review-drawer-action-form-field-${name}`,
+                };
+                return (
+                  <label key={name} className="block text-sm font-medium text-gray-700">
+                    {label}
+                    {field.type === 'textarea' ? (
+                      <textarea {...commonProps} rows={field.rows || 3} />
+                    ) : field.type === 'select' ? (
+                      <select {...commonProps}>
+                        {(field.options || []).map((option: any) => {
+                          const optionValue = String(option.value ?? option.key ?? option);
+                          return (
+                            <option key={optionValue} value={optionValue}>
+                              {getLocalizedText(option.label || optionValue, locale, t)}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    ) : (
+                      <input
+                        {...commonProps}
+                        type={field.type === 'number' ? 'number' : 'text'}
+                        min={field.min}
+                        max={field.max}
+                        step={field.step}
+                      />
+                    )}
+                    {error && (
+                      <span className="mt-1 block text-xs text-rose-600">{error}</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                onClick={() => setActiveActionForm(null)}
+              >
+                {localized(locale, t, '取消', 'Cancel')}
+              </button>
+              <button
+                type="submit"
+                data-testid="review-drawer-action-form-submit"
+                disabled={Boolean(runningAction)}
+                className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {runningAction
+                  ? t('common.loading')
+                  : getLocalizedText(
+                      activeActionForm.actionConfig.form?.submitLabel ||
+                        activeActionForm.actionConfig.label ||
+                        activeActionForm.actionConfig.code,
+                      locale,
+                      t,
+                    )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {!isMaximized && (
         <button
