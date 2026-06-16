@@ -579,7 +579,9 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
   });
 
-  it('hydrates a partial selected line from the bound data source before deciding SVG availability', () => {
+  it('hydrates a partial selected line from the bound data source before authenticated SVG download', async () => {
+    const { fetchMock, objectUrl } = stubBoardImageFetch();
+    window.sessionStorage.setItem(JWT_TOKEN_KEY, 'viewer-token');
     const runtime = makeRuntime({
       data: {
         lines: [
@@ -595,10 +597,6 @@ describe('GerberViewerBlockRenderer', () => {
             qo_ql_gerber_inspection: JSON.stringify({
               project: { code: 'LINE-PARSED', name: 'Runtime sidecar result' },
               board: { widthMm: 98.254, heightMm: 33.254 },
-              boardSvgUrls: {
-                top: '/artifacts/line-parsed-board-top.svg',
-                bottom: '/artifacts/line-parsed-board-bottom.svg',
-              },
               summary: {
                 bomRefCount: 72,
                 cplRefCount: 0,
@@ -614,6 +612,10 @@ describe('GerberViewerBlockRenderer', () => {
                 },
               ],
               components: [],
+              boardSvgUrls: {
+                top: '/01KV22CQ7PKX3W50Y7MM575ACK.svg',
+                bottom: '/01KV22CQ7PKX3W50Y7MM575ACM.svg',
+              },
             }),
           },
         ],
@@ -643,10 +645,18 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.getByTestId('gerber-validation-summary')).toHaveTextContent(
       'Validation errors found',
     );
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/file/download/01KV22CQ7PKX3W50Y7MM575ACK', {
+        credentials: 'include',
+        headers: {
+          Authorization: 'Bearer viewer-token',
+        },
+      });
+    });
     expect(screen.queryByTestId('gerber-svg-unavailable')).toBeNull();
     expect(screen.getByRole('img', { name: 'Top Gerber board render' })).toHaveAttribute(
       'src',
-      '/artifacts/line-parsed-board-top.svg',
+      objectUrl,
     );
   });
 
