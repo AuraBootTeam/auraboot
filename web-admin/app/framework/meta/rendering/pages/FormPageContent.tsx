@@ -141,6 +141,117 @@ export function normalizeCommandPayloadValue(rawValue: any, dataType?: string): 
   return normalized;
 }
 
+function isEmptySubmittedValue(value: any): boolean {
+  if (value === undefined || value === null) return true;
+  if (Array.isArray(value) && value.length === 0) return true;
+  return (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 0
+  );
+}
+
+function collectSubmitPayloadFieldTypes(blocks: any[] | undefined): Record<string, string> {
+  const fieldTypes: Record<string, string> = {};
+
+  const visit = (items: any[] | undefined) => {
+    for (const block of items ?? []) {
+      if (block?.blockType === 'form-section' && Array.isArray(block.fields)) {
+        for (const rawField of block.fields) {
+          const fieldCode = typeof rawField?.field === 'string' ? rawField.field : '';
+          if (!fieldCode || rawField.submitPayload !== true) continue;
+          fieldTypes[fieldCode] = String(rawField.dataType || 'string');
+        }
+      }
+      visit(block?.blocks);
+      visit(block?.tabs?.flatMap((tab: any) => tab?.blocks ?? []));
+    }
+  };
+
+  visit(blocks);
+  return fieldTypes;
+}
+
+export function buildFormCommandPayload(
+  actionRecord: Record<string, any>,
+  modelFields: Record<string, Pick<FieldMetaInfo, 'dataType'>>,
+  blocks?: any[],
+): Record<string, any> {
+  const submitPayloadFieldTypes = collectSubmitPayloadFieldTypes(blocks);
+  const modelFieldEntries = Object.entries(modelFields);
+
+  if (modelFieldEntries.length > 0) {
+    return Object.fromEntries(
+      Object.entries(actionRecord).flatMap(([key, rawValue]) => {
+        const dataType = modelFields[key]?.dataType || submitPayloadFieldTypes[key];
+        if (!dataType) return [];
+        const value = normalizeCommandPayloadValue(rawValue, dataType);
+        if (isEmptySubmittedValue(value)) return [];
+        return [[key, value]];
+      }),
+    );
+  }
+
+  return Object.fromEntries(
+    Object.entries(actionRecord).flatMap(([key, rawValue]) => {
+      if (
+        key === 'id' ||
+        key === 'pid' ||
+        key === 'tenant_id' ||
+        key === 'created_at' ||
+        key === 'created_by' ||
+        key === 'updated_at' ||
+        key === 'updated_by' ||
+        key === 'deleted_flag' ||
+        key === 'deleted_at' ||
+        key === 'deleted_by' ||
+        key.startsWith('_')
+      ) {
+        return [];
+      }
+      const dataType = submitPayloadFieldTypes[key];
+      const value = dataType ? normalizeCommandPayloadValue(rawValue, dataType) : rawValue;
+      if (isEmptySubmittedValue(value)) return [];
+      return [[key, value]];
+    }),
+  );
+}
+
+export function resolveAsyncCommandDispatch(responseData: any): { taskCode: string } | null {
+  const dispatch =
+    responseData?.data && typeof responseData.data === 'object' ? responseData.data : responseData;
+  const taskCode = dispatch?.taskCode;
+  if (dispatch?.async === true && typeof taskCode === 'string' && taskCode.trim()) {
+    return { taskCode: taskCode.trim() };
+  }
+  return null;
+}
+
+async function pollFormAsyncCommandTask(taskCode: string, token?: string): Promise<any> {
+  const terminal = new Set(['completed', 'failed', 'cancelled']);
+  for (let attempt = 0; attempt < 600; attempt++) {
+    const result = await fetchResult(`/api/async-tasks/${encodeURIComponent(taskCode)}`, {
+      method: 'get',
+      token,
+    });
+    if (!ResultHelper.isSuccess(result)) {
+      throw new Error(
+        (result as any).desc || (result as any).message || 'Async task status unavailable',
+      );
+    }
+    const task = (result as any).data || {};
+    const status = String(task.status || '').toLowerCase();
+    if (terminal.has(status)) {
+      if (status === 'completed') return task.resultData ?? {};
+      if (status === 'cancelled') throw new Error('Task cancelled');
+      throw new Error(task.errorMessage || 'Async task failed');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  throw new Error('Async task timed out');
+}
+
 export function mergeLoadedRecordWithDirtyFields(
   loadedRecord: Record<string, any>,
   currentData: Record<string, any>,
@@ -1251,39 +1362,7 @@ export function FormPageContent(props: PageContentProps) {
       setFieldErrors({});
       setSummaryErrors([]);
       const modelFieldEntries = Object.entries(modelFields);
-      const commandPayload =
-        modelFieldEntries.length > 0
-          ? Object.fromEntries(
-              Object.entries(actionRecord).flatMap(([key, rawValue]) => {
-                if (!modelFields[key]) return [];
-                const value = normalizeCommandPayloadValue(rawValue, modelFields[key].dataType);
-                if (Array.isArray(value) && value.length === 0) return [];
-                if (
-                  value &&
-                  typeof value === 'object' &&
-                  !Array.isArray(value) &&
-                  Object.keys(value).length === 0
-                )
-                  return [];
-                return [[key, value]];
-              }),
-            )
-          : Object.fromEntries(
-              Object.entries(actionRecord).filter(
-                ([key]) =>
-                  key !== 'id' &&
-                  key !== 'pid' &&
-                  key !== 'tenant_id' &&
-                  key !== 'created_at' &&
-                  key !== 'created_by' &&
-                  key !== 'updated_at' &&
-                  key !== 'updated_by' &&
-                  key !== 'deleted_flag' &&
-                  key !== 'deleted_at' &&
-                  key !== 'deleted_by' &&
-                  !key.startsWith('_'),
-              ),
-            );
+      const commandPayload = buildFormCommandPayload(actionRecord, modelFields, schema?.blocks);
 
       // Ensure sourceRecordId is passed through to backend for SideEffect resolution
       if (sourceRecordId && !commandPayload.sourceRecordId) {
@@ -1321,7 +1400,7 @@ export function FormPageContent(props: PageContentProps) {
           },
           token: token || undefined,
         })
-          .then((result) => {
+          .then(async (result) => {
             if (!ResultHelper.isSuccess(result)) {
               const contextError = (result as any).context?.error;
               if (contextError) {
@@ -1331,10 +1410,22 @@ export function FormPageContent(props: PageContentProps) {
               }
               throw new Error(result.desc || result.message || 'Command execution failed');
             }
+            const asyncDispatch = resolveAsyncCommandDispatch(result.data);
+            const responseData = asyncDispatch
+              ? await (async () => {
+                  const message = t('common.asyncProcessing');
+                  showInfoToast(
+                    message && message !== 'common.asyncProcessing'
+                      ? message
+                      : '已提交，后台处理中...',
+                  );
+                  return pollFormAsyncCommandTask(asyncDispatch.taskCode, token || undefined);
+                })()
+              : result.data;
             setFieldErrors({});
             setSummaryErrors([]);
             dirtyFieldsRef.current.clear();
-            navigate(resolveAfterSubmitRedirect(schema, tableName, result.data, recordId));
+            navigate(resolveAfterSubmitRedirect(schema, tableName, responseData, recordId));
           })
           .catch((err) => {
             const errorMessage = err instanceof Error ? err.message : 'Failed to execute command';
@@ -1423,6 +1514,7 @@ export function FormPageContent(props: PageContentProps) {
       notifyValidationFailure,
       recordId,
       schema?.modelCode,
+      schema?.blocks,
       setError,
       fieldMetaLoaded,
       schemaFieldNames,
