@@ -7,8 +7,8 @@ const { listFavoritesMock, rootLoaderData } = vi.hoisted(() => ({
   rootLoaderData: {
     value: {
       menus: [
-        { name: '客户', path: '/p/crm_account_common' },
-        { name: '报价单', path: '/p/qo_quote_common' },
+        { name: '客户', path: '/p/crm_account_common', icon: 'IconBuilding' },
+        { name: '报价单', path: '/p/qo_quote_common', icon: 'FileText' },
       ],
     },
   },
@@ -34,8 +34,8 @@ describe('ShortcutsWidget — redesign', () => {
     listFavoritesMock.mockResolvedValue([]);
     rootLoaderData.value = {
       menus: [
-        { name: '客户', path: '/p/crm_account_common' },
-        { name: '报价单', path: '/p/qo_quote_common' },
+        { name: '客户', path: '/p/crm_account_common', icon: 'IconBuilding' },
+        { name: '报价单', path: '/p/qo_quote_common', icon: 'FileText' },
       ],
     };
   });
@@ -62,6 +62,14 @@ describe('ShortcutsWidget — redesign', () => {
       expect(row.querySelector('[data-testid="shortcut-icon"]')).not.toBeNull();
       expect(row.textContent).toContain('›');
     });
+  });
+
+  it('renders menu icon ids as svg icons instead of raw text', async () => {
+    const { findAllByTestId } = render(<ShortcutsWidget />);
+    const icons = await findAllByTestId('shortcut-icon');
+
+    expect(icons[0].textContent).not.toContain('IconBuilding');
+    expect(icons[0].querySelector('svg')).not.toBeNull();
   });
 
   it('falls back to visible menu entries when no favorites are configured', async () => {

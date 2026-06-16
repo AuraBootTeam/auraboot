@@ -15,6 +15,7 @@ import {
 } from '~/shared/services/engagementService';
 import { AddFavoriteModal } from '~/plugins/core-dashboard/widgets/workbench/AddFavoriteModal';
 import { useRootLoaderData } from '~/root';
+import { resolveIcon } from '~/utils/icon-resolver';
 
 export interface ShortcutItem {
   label: string;
@@ -68,6 +69,13 @@ function mapEngagementToShortcut(e: UserEngagement): ShortcutItem {
     color: e.targetContext?.color || 'bg-gray-50',
     engagementId: e.id,
   };
+}
+
+function renderShortcutIcon(item: ShortcutItem): React.ReactNode {
+  const icon = item.icon?.trim();
+  if (!icon) return resolveIcon('FileText', item.label, 16);
+  if (icon.length <= 2) return icon;
+  return resolveIcon(icon, item.label, 16);
 }
 
 export function ShortcutsWidget({
@@ -254,9 +262,9 @@ export function ShortcutsWidget({
               >
                 <span
                   data-testid="shortcut-icon"
-                  className="w-8 h-8 rounded-lg bg-[#f0f3f7] dark:bg-gray-800 flex items-center justify-center text-[#635bff] text-[14px] font-semibold"
+                  className="w-8 h-8 shrink-0 overflow-hidden rounded-lg bg-[#f0f3f7] dark:bg-gray-800 flex items-center justify-center text-[#635bff] text-[14px] font-semibold"
                 >
-                  {item.icon}
+                  {renderShortcutIcon(item)}
                 </span>
                 <span className="flex-1 truncate text-[13px] font-medium text-gray-700 dark:text-gray-200">
                   {item.label}
