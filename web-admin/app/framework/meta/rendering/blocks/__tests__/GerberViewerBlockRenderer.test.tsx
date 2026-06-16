@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { evaluateCondition as evaluateExpressionCondition } from '~/framework/meta/runtime/expression/evaluator';
+import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 
 import { GerberViewerBlockRenderer } from '../GerberViewerBlockRenderer';
 
@@ -162,6 +163,8 @@ function stubBoardImageFetch(objectUrl = 'blob:gerber-board-svg') {
 }
 
 afterEach(() => {
+  window.sessionStorage.clear();
+  window.localStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -338,6 +341,7 @@ describe('GerberViewerBlockRenderer', () => {
 
   it('normalizes stored file pid SVG URLs and loads them through authenticated fetch', async () => {
     const { createObjectURL, fetchMock, objectUrl } = stubBoardImageFetch();
+    window.sessionStorage.setItem(JWT_TOKEN_KEY, 'viewer-token');
     const runtime = makeRuntime();
     const block: BlockConfig = {
       id: 'gerber',
@@ -355,6 +359,9 @@ describe('GerberViewerBlockRenderer', () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/file/download/01KV22CQ7PKX3W50Y7MM575ACK', {
         credentials: 'include',
+        headers: {
+          Authorization: 'Bearer viewer-token',
+        },
       });
     });
     expect(createObjectURL).toHaveBeenCalledTimes(1);
