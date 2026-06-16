@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BffProxyService,
   isBinaryDownloadPath,
@@ -33,6 +33,10 @@ describe('isBinaryDownloadPath', () => {
 });
 
 describe('BffProxyService', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('does not forward empty JSON bodies on GET or HEAD requests', () => {
     expect(shouldForwardRequestBody('GET')).toBe(false);
     expect(shouldForwardRequestBody('head')).toBe(false);
@@ -76,5 +80,78 @@ describe('BffProxyService', () => {
     expect(headers['access-control-request-method']).toBeUndefined();
     expect(headers['access-control-request-headers']).toBeUndefined();
     expect(headers['sec-fetch-mode']).toBeUndefined();
+  });
+
+  it('proxies large binary downloads without JSON reserialization', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const svgBytes = Buffer.concat([
+      Buffer.from('<?xml version="1.0"?><svg>'),
+      Buffer.alloc(900_000, 'A'),
+      Buffer.from('</svg>'),
+    ]);
+    const fetchMock = vi.fn(async () => {
+      return new globalThis.Response(svgBytes, {
+        status: 200,
+        headers: {
+          'content-type': 'image/svg+xml',
+          'content-length': String(svgBytes.length),
+          'content-disposition': 'inline; filename="board-top.svg"',
+        },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const responseHeaders = new Map<string, string | number | readonly string[]>();
+    const res = {
+      headersSent: false,
+      statusCode: 0,
+      body: undefined as Buffer | undefined,
+      setHeader: vi.fn((key: string, value: string | number | readonly string[]) => {
+        responseHeaders.set(key, value);
+        return res;
+      }),
+      status: vi.fn((statusCode: number) => {
+        res.statusCode = statusCode;
+        return res;
+      }),
+      send: vi.fn((body: Buffer) => {
+        res.body = body;
+        res.headersSent = true;
+        return res;
+      }),
+      json: vi.fn(),
+    };
+
+    await service.handleApiRequest(
+      {
+        method: 'GET',
+        originalUrl: '/api/file/download/01KV6XD0AX2JQ9M3M1VZZFC34J',
+        url: '/api/file/download/01KV6XD0AX2JQ9M3M1VZZFC34J',
+        headers: {
+          authorization: 'Bearer test-token',
+          accept: '*/*',
+          host: 'numnan.com',
+        },
+        ip: '127.0.0.1',
+        connection: { remoteAddress: '127.0.0.1' },
+      } as any,
+      res as any,
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:6443/api/file/download/01KV6XD0AX2JQ9M3M1VZZFC34J',
+      expect.objectContaining({
+        method: 'get',
+        headers: expect.objectContaining({
+          authorization: 'Bearer test-token',
+        }),
+      }),
+    );
+    expect(res.statusCode).toBe(200);
+    expect(responseHeaders.get('Content-Type')).toBe('image/svg+xml');
+    expect(responseHeaders.get('Content-Length')).toBe(String(svgBytes.length));
+    expect(responseHeaders.get('Content-Disposition')).toBe('inline; filename="board-top.svg"');
+    expect(res.body).toEqual(svgBytes);
+    expect(res.json).not.toHaveBeenCalled();
   });
 });
