@@ -14,6 +14,11 @@ import { ArtifactTimelineBlockRenderer } from '../ArtifactTimelineBlockRenderer'
 import { ReviewDrawerBlockRenderer } from '../ReviewDrawerBlockRenderer';
 import { StatusBannerBlockRenderer } from '../StatusBannerBlockRenderer';
 import { useRuntimeStateSubscription } from '../workbenchBlockUtils';
+import { fetchResult } from '~/shared/services/http-client';
+
+vi.mock('~/shared/services/http-client', () => ({
+  fetchResult: vi.fn(() => Promise.resolve({ code: '0', data: {} })),
+}));
 
 function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
   const context: Record<string, any> = {
@@ -1328,6 +1333,99 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByText('导出状态')).not.toBeVisible();
     fireEvent.click(screen.getByTestId('review-drawer-export-action-download_new_bom'));
     expect(runtime.__reload).toHaveBeenCalledWith(['exports']);
+  });
+
+  it('opens a configured candidate action form and merges values into command payload', async () => {
+    const fetchResultMock = vi.mocked(fetchResult);
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: {} } as any);
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        global: {},
+        state: {
+          selectedPriceLine: {
+            pid: 'QL-1',
+            qo_ql_mpn: 'D210000007900',
+          },
+        },
+      }),
+    }) as any;
+
+    render(
+      <ReviewDrawerBlockRenderer
+        block={{
+          id: 'price_review_drawer',
+          blockType: 'review-drawer',
+          context: '${state.selectedPriceLine}',
+          titleTemplate: '${record.qo_ql_mpn}',
+          candidates: {
+            dataSource: 'priceEvidence',
+            title: '查价候选',
+            actions: [
+              {
+                code: 'record_manual_price',
+                label: '录入人工价',
+                requiresSelection: false,
+                onClick: {
+                  action: 'command.execute',
+                  args: {
+                    command: 'qo_quote_line_common:record_manual_price',
+                    targetRecordId: '${state.selectedPriceLine.pid}',
+                    operationType: 'update',
+                    payload: {
+                      source: 'manual',
+                    },
+                    reload: ['priceEvidence'],
+                  },
+                },
+                form: {
+                  title: '录入人工价',
+                  submitLabel: '录入并采用',
+                  fields: [
+                    { name: 'unitPrice', label: '人工单价', type: 'number', required: true },
+                    { name: 'currency', label: '币种', type: 'text', defaultValue: 'CNY' },
+                    { name: 'reason', label: '来源说明', type: 'textarea' },
+                  ],
+                },
+              },
+            ],
+          },
+        }}
+        runtime={runtime}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('review-drawer-candidate-action-record_manual_price'));
+
+    expect(screen.getByTestId('review-drawer-action-form')).toHaveTextContent('录入人工价');
+    fireEvent.change(screen.getByTestId('review-drawer-action-form-field-unitPrice'), {
+      target: { value: '8.88' },
+    });
+    fireEvent.change(screen.getByTestId('review-drawer-action-form-field-reason'), {
+      target: { value: '业务裁决价' },
+    });
+    fireEvent.click(screen.getByTestId('review-drawer-action-form-submit'));
+
+    await waitFor(() => {
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/meta/commands/execute/qo_quote_line_common:record_manual_price',
+        expect.objectContaining({
+          method: 'post',
+          params: expect.objectContaining({
+            targetRecordId: 'QL-1',
+            operationType: 'UPDATE',
+            payload: expect.objectContaining({
+              source: 'manual',
+              unitPrice: '8.88',
+              currency: 'CNY',
+              reason: '业务裁决价',
+            }),
+          }),
+        }),
+      );
+    });
+    expect(runtime.__reload).toHaveBeenCalledWith(['priceEvidence']);
   });
 
   it('honors drawer action conditions for confirmed review decisions', () => {
