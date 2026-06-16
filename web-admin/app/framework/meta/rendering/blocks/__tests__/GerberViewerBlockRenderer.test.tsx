@@ -572,6 +572,77 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.queryByTestId('gerber-marker-C4')).toBeNull();
   });
 
+  it('hydrates a partial selected line from the bound data source before deciding SVG availability', () => {
+    const runtime = makeRuntime({
+      data: {
+        lines: [
+          {
+            pid: 'LINE-PARSED',
+            qo_ql_description: 'Parsed package with persisted board SVGs',
+            qo_ql_gerber_parse_status: 'parsed',
+            qo_ql_gerber_validation_status: 'failed',
+            qo_ql_smt_points: 258,
+            qo_ql_tht_points: 101,
+            qo_ql_board_width_mm: 98.254,
+            qo_ql_board_height_mm: 33.254,
+            qo_ql_gerber_inspection: JSON.stringify({
+              project: { code: 'LINE-PARSED', name: 'Runtime sidecar result' },
+              board: { widthMm: 98.254, heightMm: 33.254 },
+              boardSvgUrls: {
+                top: '/artifacts/line-parsed-board-top.svg',
+                bottom: '/artifacts/line-parsed-board-bottom.svg',
+              },
+              summary: {
+                bomRefCount: 72,
+                cplRefCount: 0,
+                smdCount: 258,
+                thtCount: 101,
+                errorCount: 66,
+              },
+              issues: [
+                {
+                  severity: 'error',
+                  code: 'BOM_REF_WITHOUT_CPL',
+                  message: 'BOM refs were not found in CPL.',
+                },
+              ],
+              components: [],
+            }),
+          },
+        ],
+      },
+    });
+    const context = runtime.getContext() as any;
+    context.state.selectedLine = {
+      pid: 'LINE-PARSED',
+      qo_ql_description: 'Parsed package with persisted board SVGs',
+      qo_ql_gerber_parse_status: 'parsed',
+      qo_ql_gerber_validation_status: 'failed',
+      qo_ql_smt_points: 258,
+      qo_ql_tht_points: 101,
+      qo_ql_board_width_mm: 98.254,
+      qo_ql_board_height_mm: 33.254,
+    };
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      dataSource: 'lines',
+      lineContext: '${state.selectedLine}',
+      lineInspectionField: 'qo_ql_gerber_inspection',
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('gerber-validation-summary')).toHaveTextContent(
+      'Validation errors found',
+    );
+    expect(screen.queryByTestId('gerber-svg-unavailable')).toBeNull();
+    expect(screen.getByRole('img', { name: 'Top Gerber board render' })).toHaveAttribute(
+      'src',
+      '/artifacts/line-parsed-board-top.svg',
+    );
+  });
+
   it('filters issues and markers by severity and search query', () => {
     const runtime = makeRuntime();
     const block: BlockConfig = {
