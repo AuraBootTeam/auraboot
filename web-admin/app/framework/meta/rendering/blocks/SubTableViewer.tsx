@@ -1087,7 +1087,10 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                         ) : (
                           <div className="flex items-center justify-center gap-2">
                             {config.actions
-                              ?.filter((button) => isRowActionVisible(button, row))
+                              ?.filter((button): button is ButtonConfig => {
+                                if (!button) return false;
+                                return isRowActionVisible(button, row);
+                              })
                               .map((button) => {
                                 const loadingKey = `${row.pid || row.id}:${button.code}:${rowIndex}`;
                                 const isLoading = rowActionLoadingKey === loadingKey;
