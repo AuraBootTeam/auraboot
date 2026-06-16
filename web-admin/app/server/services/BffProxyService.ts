@@ -272,26 +272,47 @@ export class BffProxyService {
 
       logger.info(`[${requestId}] Starting binary download from ${backendUrl}`);
 
-      const axiosConfig: AxiosRequestConfig = {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+      const requestInit: RequestInit = {
         method: req.method.toLowerCase() as any,
-        url: backendUrl,
         headers,
-        responseType: 'arraybuffer',
-        timeout: 60000, // 60秒超时
-        httpAgent: noProxyHttpAgent,
-        httpsAgent: noProxyHttpsAgent,
-        proxy: false as const,
+        signal: controller.signal,
       };
       if (shouldForwardRequestBody(req.method)) {
-        axiosConfig.data = req.body;
+        requestInit.body =
+          typeof req.body === 'string'
+            ? req.body
+            : Buffer.isBuffer(req.body)
+              ? new Uint8Array(req.body)
+            : JSON.stringify(req.body ?? {});
       }
 
-      const response = await axios(axiosConfig);
+      let response: globalThis.Response;
+      try {
+        response = await fetch(backendUrl, requestInit);
+      } finally {
+        clearTimeout(timeout);
+      }
+      const responseBody = Buffer.from(await response.arrayBuffer());
+
+      if (!response.ok) {
+        logger.error(
+          `[${requestId}] Binary download backend returned ${response.status}: ${responseBody
+            .toString('utf8')
+            .slice(0, 300)}`,
+        );
+        res
+          .status(response.status)
+          .setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
+        res.send(responseBody);
+        return;
+      }
 
       // 转发响应头
-      const contentType = toResponseHeaderValue(response.headers['content-type']);
-      const contentDisposition = toResponseHeaderValue(response.headers['content-disposition']);
-      const contentLength = toResponseHeaderValue(response.headers['content-length']);
+      const contentType = toResponseHeaderValue(response.headers.get('content-type'));
+      const contentDisposition = toResponseHeaderValue(response.headers.get('content-disposition'));
+      const contentLength = toResponseHeaderValue(response.headers.get('content-length'));
 
       if (contentType !== undefined) {
         res.setHeader('Content-Type', contentType);
@@ -305,10 +326,10 @@ export class BffProxyService {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
       // 发送二进制数据
-      res.status(response.status).send(Buffer.from(response.data));
+      res.status(response.status).send(responseBody);
 
       logger.info(
-        `[${requestId}] Binary download completed, size: ${response.data.byteLength} bytes`,
+        `[${requestId}] Binary download completed, size: ${responseBody.byteLength} bytes`,
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
