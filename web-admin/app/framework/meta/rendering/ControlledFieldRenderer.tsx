@@ -23,6 +23,7 @@ import type { ExpressionContext } from '~/framework/meta/runtime/expression/cont
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
 import { FieldError } from '~/ui/ui/field-meta';
+import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 
 export interface ControlledFieldRendererProps {
   field: FieldConfig;
@@ -109,7 +110,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   }, [field.dictCode, field.component, isTreeComponent]);
 
   // Resolve field label from i18n keys with progressive fallback.
-  let resolvedLabel: string | undefined = typeof field.label === 'string' ? field.label : undefined;
+  let resolvedLabel = getLocalizedText(field.label, context.locale || 'zh-CN', t) || undefined;
   if (!resolvedLabel) {
     const modelCode = (field as any).modelCode || (context as any).modelCode;
     if (modelCode) {

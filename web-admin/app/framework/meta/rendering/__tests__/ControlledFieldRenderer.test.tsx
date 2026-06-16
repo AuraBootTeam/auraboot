@@ -49,6 +49,55 @@ describe('ControlledFieldRenderer', () => {
     expect(missingKeyWarnings).toEqual([]);
   });
 
+  it('passes localized page labels through to SmartUpload fields', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid="component-loader">{componentName}</div>;
+      },
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'gerber_source_file',
+            label: {
+              'zh-CN': 'Gerber/PCB资料包',
+              en: 'Gerber/PCB Package',
+            },
+            component: 'SmartUpload',
+            dataType: 'file',
+            props: {
+              accept: '.zip,.rar,.7z',
+              maxCount: 1,
+            },
+          } as any
+        }
+        value={undefined}
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader')).toHaveTextContent('SmartUpload');
+    });
+
+    expect(screen.getByText('Gerber/PCB资料包')).toBeInTheDocument();
+    expect(capturedPropsSpy).toHaveBeenCalledTimes(1);
+    expect(capturedPropsSpy.mock.calls[0]?.[0]?.props?.label).toBeUndefined();
+  });
+
   it('routes sys_user reference fields to the system user search endpoint', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
