@@ -31,6 +31,8 @@ interface ValidationIssue {
   code: string;
   refdes?: string;
   message: string;
+  remediation?: string;
+  details?: Record<string, any>;
 }
 
 interface ComponentInspection {
@@ -118,13 +120,6 @@ const DEFAULT_LINE_INSPECTION_FIELD = 'qo_ql_gerber_inspection';
 const SIDE_OPTIONS: Array<[SideFilter, string]> = [
   ['top', 'Top'],
   ['bottom', 'Bottom'],
-];
-
-const ISSUE_OPTIONS: Array<[IssueFilter, string]> = [
-  ['all', 'All'],
-  ['error', 'Errors'],
-  ['warning', 'Warnings'],
-  ['info', 'Info'],
 ];
 
 const FILE_PID_URL_PATTERN = /^\/?([0-9A-HJKMNP-TV-Z]{26})(?:\.[A-Za-z0-9]+)?$/;
@@ -359,6 +354,168 @@ function issueStats(issues: ValidationIssue[]): {
 
 function localized(locale: string, zh: string, en: string): string {
   return locale.toLowerCase().startsWith('zh') ? zh : en;
+}
+
+// Localized templates for the language-neutral diagnostic codes emitted by the
+// Gerber/CPL/BOM sidecar (see aura-quote sidecar/gerber-parser/gerber_points.py
+// DIAGNOSTICS + _build_inspection). The sidecar `message` is an English/zh
+// default; the UI owns the user-facing text (§3 i18n). `{placeholder}` tokens
+// are filled from issue.refdes + issue.details. Unknown codes fall back to the
+// raw sidecar message so a new code never renders blank.
+interface DiagnosticText {
+  zh: string;
+  en: string;
+  remedyZh?: string;
+  remedyEn?: string;
+}
+
+const DIAGNOSTIC_I18N: Record<string, DiagnosticText> = {
+  // BOM ↔ CPL matrix issues (sidecar default messages are English).
+  BOM_REF_WITHOUT_CPL: {
+    zh: '{refdes}:在 BOM 贴装清单中存在,但 CPL 坐标文件中未找到。',
+    en: '{refdes} exists in BOM placement refs but was not found in CPL.',
+    remedyZh: '请确认该位号是否漏导出坐标,或在 BOM 中应标记为 DNP/非贴装。',
+    remedyEn: 'Confirm the refdes was exported to the CPL, or mark it DNP/non-placement in the BOM.',
+  },
+  CPL_REF_WITHOUT_BOM: {
+    zh: '{refdes}:在 CPL 坐标文件中存在,但 BOM 贴装清单中未找到。',
+    en: '{refdes} exists in CPL but was not found in BOM placement refs.',
+    remedyZh: '请确认该位号是否漏录 BOM,或 CPL 中为多余位号。',
+    remedyEn: 'Confirm the refdes is missing from the BOM, or is a stray entry in the CPL.',
+  },
+  COMPONENT_OUTSIDE_BOARD: {
+    zh: '{refdes}:坐标 ({xMm}, {yMm}) 超出板框范围。',
+    en: '{refdes} coordinate ({xMm}, {yMm}) is outside the board outline.',
+    remedyZh: '请确认 CPL 原点与 Gerber 原点是否一致。',
+    remedyEn: 'Confirm the CPL origin matches the Gerber origin.',
+  },
+  DNP_REF_PRESENT_IN_CPL: {
+    zh: '{refdes}:在 BOM 中标记为 DNP/非贴装,却出现在 CPL 坐标文件中。',
+    en: '{refdes} is marked DNP/non-placement in BOM but appears in CPL.',
+  },
+  PROCESS_SMD_MISMATCH: {
+    zh: '{refdes}:CPL 中为 SMD(贴片),但 BOM 工艺为 {process}。',
+    en: '{refdes} is SMD in CPL but BOM process is {process}.',
+  },
+  PROCESS_THT_MISMATCH: {
+    zh: '{refdes}:CPL 中为非贴片,但 BOM 工艺为 {process}。',
+    en: '{refdes} is non-SMD in CPL but BOM process is {process}.',
+  },
+  DUPLICATE_BOM_REF: {
+    zh: '{refdes}:在多个 BOM 贴装行中重复出现。',
+    en: '{refdes} appears in more than one BOM placement row.',
+  },
+  DUPLICATE_CPL_REF: {
+    zh: '{refdes}:在 CPL 坐标文件中重复出现。',
+    en: '{refdes} appears more than once in the CPL coordinate file.',
+  },
+  DNP_BOM_REF_EXCLUDED: {
+    zh: '{refdes}:为 BOM 中 DNP/非贴装物料,已从贴装匹配中排除。',
+    en: '{refdes} is a DNP/non-placement BOM item and was excluded from placement matching.',
+  },
+  EXCLUDED_NON_PLACEMENT_BOM_REF: {
+    zh: '{refdes}:为 BOM 中非贴装物料,已从贴装匹配中排除。',
+    en: '{refdes} is a non-placement BOM item and was excluded from placement matching.',
+  },
+  // Parser/board diagnostics (DIAGNOSTICS catalog).
+  UNSUPPORTED_LEGACY_DRILL: {
+    zh: '检测到非标准/二进制钻孔文件(疑似 Protel 旧格式),无法解析孔数。',
+    en: 'Non-standard/binary drill file detected (likely legacy Protel); hole count could not be parsed.',
+    remedyZh: '请用 CAD 重新导出标准 Excellon(M48 文本)钻孔文件后重试。',
+    remedyEn: 'Re-export a standard Excellon (M48 text) drill file from your CAD tool and retry.',
+  },
+  GERBER_TOO_DENSE_FOR_PREVIEW: {
+    zh: 'Gerber 铜层过密/过大,已跳过板面 SVG 预览(仅用板框尺寸);点数与巡检不受影响。',
+    en: 'Gerber copper layer too dense/large; board SVG preview skipped (outline size only). Point counts/inspection unaffected.',
+    remedyZh: '如需该板预览,建议改用栅格图(PNG)预览;板尺寸/点数已正常解析。',
+    remedyEn: 'For a preview of this board use a raster (PNG) preview; size/point counts already parsed.',
+  },
+  SUSPICIOUS_SLOT_ONLY_DRILL: {
+    zh: '钻孔以铣槽(routed slot)为主,圆形插件孔为 0;若此板应有插件孔请核对钻孔文件。',
+    en: 'Drilling is mostly routed slots with 0 round through-holes; verify the drill file if this board should have plated holes.',
+    remedyZh: '确认是否为纯 SMT 板;铣槽如需计费请单独核算。',
+    remedyEn: 'Confirm whether this is an SMT-only board; price routed slots separately if billable.',
+  },
+  PANEL_OR_OVERSIZE_SUSPECTED: {
+    zh: '板框尺寸偏大,疑似拼板或含工艺边;报价前请确认单板尺寸。',
+    en: 'Board outline is large; likely a panel or includes process edges. Confirm the single-board size before quoting.',
+    remedyZh: '确认是否为拼板并提供单板尺寸。',
+    remedyEn: 'Confirm whether it is a panel and provide the single-board size.',
+  },
+  CPL_ORIGIN_MISMATCH_SUSPECTED: {
+    zh: 'CPL 坐标系与 Gerber 原点疑似不一致(可能为中心原点),已跳过逐个越界判定。',
+    en: 'CPL coordinate origin likely differs from the Gerber origin (possibly center origin); per-component out-of-board checks were skipped.',
+    remedyZh: '如需精确 DFM,请提供基准点/原点对齐信息。',
+    remedyEn: 'For precise DFM, provide the fiducial/origin alignment reference.',
+  },
+  SMT_POINTS_HIGH_REVIEW: {
+    zh: 'SMT flash 数偏高,可能含过孔/测试点;报价点数建议以 CPL 元件数为准。',
+    en: 'SMT flash count is high (may include vias/test points); use the CPL component count for quoting points.',
+    remedyZh: '用 CPL 元件数交叉核对贴装点数。',
+    remedyEn: 'Cross-check the placement point count against the CPL component count.',
+  },
+  DRILL_PARSE_FAILED: {
+    zh: '钻孔文件解析失败。',
+    en: 'Drill file parse failed.',
+    remedyZh: '请检查钻孔文件是否为标准 Excellon(M48)格式。',
+    remedyEn: 'Check the drill file is a standard Excellon (M48) file.',
+  },
+  BOARD_SVG_RENDER_FAILED: {
+    zh: '板框 SVG 预览渲染失败,已回退到铜层包围盒尺寸。',
+    en: 'Board SVG preview render failed; fell back to the copper bounding-box size.',
+  },
+  NO_SMT_FLASHES: {
+    zh: '未在铜层发现 SMT 焊盘 flash。',
+    en: 'No SMT pad flashes found on the copper layer.',
+  },
+  NO_EXCELLON_FILE: {
+    zh: '未提供钻孔文件,已跳过插件孔统计。',
+    en: 'No drill file provided; through-hole count skipped.',
+    remedyZh: '如需 THT 统计请上传 Excellon 钻孔文件。',
+    remedyEn: 'Upload an Excellon drill file to count through-holes.',
+  },
+  NO_THT_DRILLS: {
+    zh: '钻孔文件未发现圆形插件孔。',
+    en: 'No round through-holes found in the drill file.',
+  },
+  BOARD_BOUNDS_MISSING: {
+    zh: '未能确定板框尺寸。',
+    en: 'Could not determine the board outline size.',
+  },
+};
+
+function interpolateDiagnostic(template: string, issue: ValidationIssue): string {
+  const ctx: Record<string, any> = { refdes: issue.refdes ?? '', ...(issue.details ?? {}) };
+  return template.replace(/\{(\w+)\}/g, (match, key) =>
+    ctx[key] !== undefined && ctx[key] !== null && ctx[key] !== '' ? String(ctx[key]) : match,
+  );
+}
+
+function formatDiagnostic(issue: ValidationIssue, locale: string): string {
+  const entry = DIAGNOSTIC_I18N[issue.code];
+  if (!entry) return issue.message || issue.code; // graceful fallback for an unmapped code
+  const text = interpolateDiagnostic(localized(locale, entry.zh, entry.en), issue);
+  // If a placeholder could not be resolved (e.g. inspection JSON persisted before
+  // a detail field existed), fall back to the sidecar's complete default message.
+  if (/\{[A-Za-z]\w*\}/.test(text)) return issue.message || text;
+  return text;
+}
+
+function formatRemediation(issue: ValidationIssue, locale: string): string | null {
+  const entry = DIAGNOSTIC_I18N[issue.code];
+  const text = entry
+    ? localized(locale, entry.remedyZh ?? '', entry.remedyEn ?? '')
+    : issue.remediation ?? '';
+  return text ? interpolateDiagnostic(text, issue) : null;
+}
+
+function issueOptions(locale: string): Array<[IssueFilter, string]> {
+  return [
+    ['all', localized(locale, '全部', 'All')],
+    ['error', localized(locale, '错误', 'Errors')],
+    ['warning', localized(locale, '警告', 'Warnings')],
+    ['info', localized(locale, '信息', 'Info')],
+  ];
 }
 
 function layersFromLine(line: Record<string, any> | undefined): LayerManifestItem[] {
@@ -1126,7 +1283,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Segmented value={side} options={SIDE_OPTIONS} onChange={setSide} />
-          <Segmented value={issueFilter} options={ISSUE_OPTIONS} onChange={setIssueFilter} />
+          <Segmented value={issueFilter} options={issueOptions(locale)} onChange={setIssueFilter} />
           <input
             aria-label="Gerber viewer search"
             className="rounded-control border-border bg-panel focus-visible:shadow-focus h-9 w-44 border px-3 text-xs outline-none focus:outline-none"
@@ -1251,24 +1408,33 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
             <div className="max-h-48 space-y-2 overflow-auto p-3">
               {issues.length === 0 ? (
                 <div data-testid="gerber-issues-empty" className="text-text-2 text-xs">
-                  No matching issues
+                  {localized(locale, '无匹配的校验问题', 'No matching issues')}
                 </div>
               ) : (
-                issues.map((issue, index) => (
-                  <div
-                    key={`${issue.code}-${issue.refdes || 'global'}-${index}`}
-                    data-testid={`gerber-issue-${issue.code}-${issue.refdes || index}`}
-                    className={`rounded-control border px-2.5 py-2 text-xs ${severityClass[issue.severity] || severityClass.info}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="font-semibold">{issue.refdes || issue.code}</div>
-                      <div className="max-w-[180px] truncate font-mono text-[10px] uppercase opacity-80">
-                        {issue.code}
+                issues.map((issue, index) => {
+                  const remediation = formatRemediation(issue, locale);
+                  return (
+                    <div
+                      key={`${issue.code}-${issue.refdes || 'global'}-${index}`}
+                      data-testid={`gerber-issue-${issue.code}-${issue.refdes || index}`}
+                      className={`rounded-control border px-2.5 py-2 text-xs ${severityClass[issue.severity] || severityClass.info}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="font-semibold">{issue.refdes || issue.code}</div>
+                        <div className="max-w-[180px] truncate font-mono text-[10px] uppercase opacity-80">
+                          {issue.code}
+                        </div>
                       </div>
+                      <div className="mt-0.5">{formatDiagnostic(issue, locale)}</div>
+                      {remediation ? (
+                        <div className="mt-1 opacity-70">
+                          {localized(locale, '建议:', 'Suggestion: ')}
+                          {remediation}
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="mt-0.5">{issue.message}</div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </section>
