@@ -532,6 +532,30 @@ export const DESIGNER_I18N = {
       } as L,
       candidatesLabel: { 'zh-CN': '候选', 'en-US': 'Candidates' } as L,
       decisionLabel: { 'zh-CN': '决策', 'en-US': 'Decision' } as L,
+      // Display / data blocks (stat-card / description / record-comments /
+      // embedded-list) representative previews. Same contract as the workbench
+      // family: the designer canvas shows a config-driven placeholder; the live
+      // /p/ page renders the fully data-bound platform renderer.
+      statCardNotConfigured: {
+        'zh-CN': '未配置指标卡',
+        'en-US': 'No stat card configured',
+      } as L,
+      descriptionEmpty: {
+        'zh-CN': '未配置描述内容',
+        'en-US': 'No description content',
+      } as L,
+      recordCommentsPreview: {
+        'zh-CN': '记录评论(实时数据在记录详情页加载)',
+        'en-US': 'Record comments — live thread loads on the record detail page',
+      } as L,
+      embeddedListNotConfigured: {
+        'zh-CN': '未配置内嵌列表(需设置模型编码)',
+        'en-US': 'No embedded list configured (set a model code)',
+      } as L,
+      embeddedListPreview: {
+        'zh-CN': '内嵌列表(实时记录在已发布页面加载)',
+        'en-US': 'Embedded list — live records load on the published page',
+      } as L,
     },
 
     // Inspector shell
