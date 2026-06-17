@@ -250,17 +250,17 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
           {hasValue ? (
             <>
               {currencySymbol && (
-                <span className="text-sm font-medium text-gray-500">{currencySymbol}</span>
+                <span className="text-body text-text-2 font-medium">{currencySymbol}</span>
               )}
-              <span className="text-lg font-semibold text-gray-900 tabular-nums">
+              <span className="text-text text-lg font-semibold tabular-nums">
                 {formatDisplay(field.value)}
               </span>
             </>
           ) : (
-            <span className="text-sm text-gray-400">-</span>
+            <span className="text-body text-text-3">-</span>
           )}
           {baseEquivalent && (
-            <span className="ml-2 text-xs text-gray-400">
+            <span className="text-aux text-text-3 ml-2">
               \u2248 {baseCurrencySymbol}
               {baseEquivalent.amount} @ {baseEquivalent.rate}
             </span>
@@ -272,10 +272,10 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
 
   // Variant-based border colors
   const borderColor = hasError
-    ? 'border-red-400'
+    ? 'border-status-red'
     : isFocused
-      ? 'border-blue-500 ring-2 ring-blue-500/20'
-      : 'border-gray-300 hover:border-gray-400';
+      ? 'border-accent shadow-focus'
+      : 'border-border-strong hover:border-text-3';
 
   return (
     <FieldBase
@@ -287,12 +287,12 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
       className="mb-4"
     >
       <div
-        className={`flex items-center overflow-hidden rounded-lg border bg-white shadow-sm transition-all duration-150 ${borderColor} ${sizeConfig.height} ${className}`}
+        className={`rounded-control bg-panel shadow-card flex items-center overflow-hidden border transition-all duration-150 ${borderColor} ${sizeConfig.height} ${className}`}
       >
         {/* Currency symbol pill prefix */}
         {currencySymbol && (
           <div
-            className={`flex h-full shrink-0 items-center border-r border-gray-200 bg-gray-50 font-medium text-gray-500 select-none ${sizeConfig.pill}`}
+            className={`border-border bg-subtle text-text-2 flex h-full shrink-0 items-center border-r font-medium select-none ${sizeConfig.pill}`}
           >
             {currencySymbol}
           </div>
@@ -307,7 +307,7 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
           value={displayValue}
           placeholder={placeholderText || '0.00'}
           disabled={disabledValue}
-          className={`h-full w-full border-none bg-transparent text-right text-gray-900 tabular-nums outline-none placeholder:text-gray-400 ${sizeConfig.input} ${sizeConfig.text}`}
+          className={`text-text placeholder:text-text-3 h-full w-full border-none bg-transparent text-right tabular-nums outline-none ${sizeConfig.input} ${sizeConfig.text}`}
           onChange={handleChange}
           onBlur={handleBlur}
           onFocus={handleFocus}
@@ -320,7 +320,7 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
 
       {/* Base currency equivalent */}
       {baseEquivalent && (
-        <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
+        <div className="text-aux text-text-3 mt-1.5 flex items-center gap-1">
           <svg
             className="h-3 w-3"
             viewBox="0 0 12 12"
@@ -334,14 +334,14 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
             \u2248 {baseCurrencySymbol}
             {baseEquivalent.amount}
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-text-3">|</span>
           <span>Rate: {baseEquivalent.rate}</span>
         </div>
       )}
 
       {/* Range indicator */}
       {(min !== undefined || max !== undefined) && (
-        <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
+        <div className="text-aux text-text-3 mt-1.5 flex items-center gap-1">
           <svg
             className="h-3 w-3"
             viewBox="0 0 12 12"
