@@ -10,9 +10,11 @@
  * manual-entry fallback (`inspector-field-<path>-manual`) so a draft / external /
  * not-yet-loaded code can still be bound (forward compatibility).
  *
- * This suite proves the new control end to end:
- *   - the dropdown lists real published models (ab_announcement is present),
- *   - selecting a model from the dropdown updates the binding,
+ * This suite proves the new control end to end (seed-agnostic — it depends only
+ * on the model it seeds itself plus ≥1 other published model, never on a
+ * specific fixture model, so leaner plugin profiles still pass):
+ *   - the dropdown is a real <select> listing published models (≥2 options),
+ *   - selecting a different (non-seed) model from the dropdown updates the binding,
  *   - the binding persists through designer-save and a GET /api/pages readback,
  *   - the manual-entry fallback can bind a model not surfaced by the dropdown
  *     selection and that also persists.
@@ -32,10 +34,14 @@ const ADMIN_STORAGE_STATE =
   process.env.PW_ADMIN_STORAGE_STATE ||
   (process.env.PW_STORAGE_DIR ? `${process.env.PW_STORAGE_DIR}/admin.json` : './tests/storage/admin.json');
 
-// Two published platform/e2e meta-models present in every OSS stack.
+// The suite seeds its own page bound to this published platform model, so it is
+// always present in the dropdown regardless of which plugin profile the stack
+// imported. The "select a different model" test derives its target from the
+// live dropdown options (seed-agnostic) rather than a hard-coded fixture code.
 const SEED_MODEL = 'ab_announcement'; // 系统公告
-const SELECT_MODEL = 'e2et_order'; // 测试订单 — chosen via the dropdown
-const MANUAL_MODEL = 'e2et_customer'; // 客户 — bound via the manual fallback
+// A code that is NOT surfaced as a real model option — used only to exercise the
+// manual-entry fallback, which binds an arbitrary (draft / external) code.
+const MANUAL_MODEL = 'e2et_customer';
 
 interface DslBlock {
   id?: string;
@@ -155,9 +161,19 @@ test.describe.serial('Unified Designer inspector model-select golden', () => {
     await expect(modelSelect).toHaveJSProperty('tagName', 'SELECT');
 
     // The dropdown is populated from /api/meta/models — it lists real published
-    // models. The seeded model is the current value; the target model is offered.
+    // models. Seed-agnostic: the seeded model (always created by this suite) is
+    // the current value, and the control offers at least the seeded model option
+    // plus one or more other published models (leaner seed stacks still pass —
+    // we no longer hard-depend on a specific extra model like e2et_order being
+    // present, only that the dropdown is populated from real models).
     await expect(modelSelect).toHaveValue(SEED_MODEL);
-    await expect(modelSelect.locator(`option[value="${SELECT_MODEL}"]`)).toHaveCount(1);
+    // The option list is filled by an async GET /api/meta/models, so poll the
+    // option count (≥2 = the empty-unset option + ≥1 real published model)
+    // instead of reading it once, which could race the fetch under load.
+    await expect
+      .poll(() => modelSelect.locator('option').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(2);
+    await expect(modelSelect.locator(`option[value="${SEED_MODEL}"]`)).toHaveCount(1);
     await testInfo.attach('d1-model-dropdown', {
       body: await page.screenshot(),
       contentType: 'image/png',
@@ -172,8 +188,40 @@ test.describe.serial('Unified Designer inspector model-select golden', () => {
 
     const modelSelect = page.getByTestId('inspector-field-dataSource.model');
     await expect(modelSelect).toBeVisible({ timeout: 10_000 });
-    await modelSelect.selectOption(SELECT_MODEL);
-    await expect(modelSelect).toHaveValue(SELECT_MODEL);
+
+    // Seed-agnostic: pick a real published model option from the dropdown that
+    // is NOT the seeded model and NOT the empty-unset option, instead of a
+    // hard-coded code (e2et_order) that only the full e2e-fixtures seed carries.
+    // Leaner seed stacks (core + announcement) still expose ≥1 other model, so
+    // this proves "select a real model from the dropdown" without binding the
+    // test to a specific fixture model.
+    //
+    // The option list is populated by an async GET /api/meta/models, so poll
+    // until a non-seed option is present (the fetch may lag under load — reading
+    // the options eagerly would otherwise race the fetch and see only the seed).
+    const readNonSeedOption = () =>
+      page.evaluate(
+        ([testid, seed]) => {
+          const select = document.querySelector(`[data-testid="${testid}"]`) as HTMLSelectElement | null;
+          if (!select) return null;
+          for (const option of Array.from(select.options)) {
+            if (option.value && option.value !== seed) return option.value;
+          }
+          return null;
+        },
+        ['inspector-field-dataSource.model', SEED_MODEL] as const,
+      );
+    await expect
+      .poll(readNonSeedOption, {
+        message: 'a non-seed published model is offered by the dropdown',
+        timeout: 15_000,
+      })
+      .toBeTruthy();
+    const targetModel = await readNonSeedOption();
+    expect(targetModel, 'a non-seed published model is offered by the dropdown').toBeTruthy();
+
+    await modelSelect.selectOption(targetModel!);
+    await expect(modelSelect).toHaveValue(targetModel!);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await testInfo.attach('d1-model-selected', {
       body: await page.screenshot(),
@@ -185,7 +233,7 @@ test.describe.serial('Unified Designer inspector model-select golden', () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 30_000 });
     await selectBlock(page, FORM_ROOT);
-    await expect(page.getByTestId('inspector-field-dataSource.model')).toHaveValue(SELECT_MODEL);
+    await expect(page.getByTestId('inspector-field-dataSource.model')).toHaveValue(targetModel!);
     await testInfo.attach('d1-model-reloaded', {
       body: await page.screenshot(),
       contentType: 'image/png',
@@ -195,7 +243,7 @@ test.describe.serial('Unified Designer inspector model-select golden', () => {
     const block = findBlockById(persisted.blocks, FORM_ROOT);
     expect(block).toMatchObject({
       blockType: 'form',
-      dataSource: expect.objectContaining({ model: SELECT_MODEL }),
+      dataSource: expect.objectContaining({ model: targetModel! }),
     });
   });
 

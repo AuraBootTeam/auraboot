@@ -11,8 +11,19 @@ import {
   type DragData,
   type DropIntent,
 } from '../dnd/dndShared';
+import {
+  blocksWithinMarquee,
+  rectFromPoints,
+  type BlockRect,
+  type PixelRect,
+} from '../utils/marqueeHitTest';
 
 const SPAN_PRESETS = [3, 4, 6, 8, 12] as const;
+
+// A box-select drag only begins once the pointer travels past this threshold,
+// so a plain click on the empty canvas (which clears selection) is never
+// mistaken for a marquee.
+const MARQUEE_START_THRESHOLD_PX = 6;
 
 export type ActiveDropIntent = { blockId: string; intent: DropIntent } | null;
 
@@ -39,6 +50,12 @@ interface CanvasHostProps {
   onPatchBlock: (blockId: string, updater: (block: DslBlockV3) => DslBlockV3) => void;
   canDeleteBlock: (blockId: string) => boolean;
   onDeleteBlock: (blockId: string) => void;
+  /**
+   * Box-select callback: invoked on marquee pointer-up with the ids of every
+   * canvas block the selection rectangle covered. An empty array means the
+   * marquee hit nothing (the caller may clear or leave the selection intact).
+   */
+  onMarqueeSelect?: (blockIds: string[]) => void;
 }
 
 export function CanvasHost({
@@ -54,8 +71,13 @@ export function CanvasHost({
   onPatchBlock,
   canDeleteBlock,
   onDeleteBlock,
+  onMarqueeSelect,
 }: CanvasHostProps) {
   const { locale } = useI18n();
+  const hostRef = React.useRef<HTMLElement | null>(null);
+  // The canvas host renders only in edit / layout modes (preview swaps in the
+  // runtime renderer), so box-select is available in both designer modes.
+  const marquee = useMarqueeSelect(hostRef, onMarqueeSelect);
   const kindLabel = resolveDesignerText(
     DESIGNER_I18N.unified.canvasKind[document.kind] ?? DESIGNER_I18N.unified.canvasKind.composite,
     locale,
@@ -80,9 +102,24 @@ export function CanvasHost({
 
   return (
     <main
-      className="min-h-[420px] flex-1 overflow-auto bg-slate-100 p-3 lg:p-6 xl:overflow-auto"
+      ref={hostRef}
+      className="relative min-h-[420px] flex-1 overflow-auto bg-slate-100 p-3 lg:p-6 xl:overflow-auto"
       data-testid="unified-canvas-host"
+      onPointerDown={marquee.onHostPointerDown}
     >
+      {marquee.rect ? (
+        <div
+          aria-hidden="true"
+          data-testid="marquee-rect"
+          className="pointer-events-none absolute z-20 rounded-sm border border-blue-400 bg-blue-200/30"
+          style={{
+            left: marquee.rect.left,
+            top: marquee.rect.top,
+            width: marquee.rect.width,
+            height: marquee.rect.height,
+          }}
+        />
+      ) : null}
       <div className="mx-auto min-w-[720px] max-w-7xl space-y-4 xl:min-w-0">
         <RootDropZone rootAccepts={rootAccepts}>
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -119,6 +156,167 @@ export function CanvasHost({
       </div>
     </main>
   );
+}
+
+/** Marquee rectangle in host-content (scroll-content) coordinates, for rendering. */
+interface MarqueeRenderRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+interface MarqueeState {
+  rect: MarqueeRenderRect | null;
+  onHostPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
+}
+
+/**
+ * Box-select (geometric marquee) gesture for the canvas.
+ *
+ * A pointer-down on the EMPTY canvas (not on a block, not on an interactive
+ * control) arms a marquee. Once the pointer travels past a small threshold the
+ * selection rectangle appears and tracks the pointer; on pointer-up the blocks
+ * the rectangle covers are resolved (via the pure {@link blocksWithinMarquee})
+ * and reported through `onMarqueeSelect`. A pointer-up below the threshold is a
+ * plain empty-canvas click and selects nothing (no marquee shown).
+ *
+ * The gesture never starts on a block frame (those keep their own click → select
+ * + drag-handle behaviour) so single-select, palette drops and dashboard widget
+ * moves are all left intact.
+ */
+function useMarqueeSelect(
+  hostRef: React.RefObject<HTMLElement | null>,
+  onMarqueeSelect?: (blockIds: string[]) => void,
+): MarqueeState {
+  const [rect, setRect] = React.useState<MarqueeRenderRect | null>(null);
+
+  const onHostPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return; // primary button only
+    if (!onMarqueeSelect) return;
+    const host = hostRef.current;
+    if (!host) return;
+    // Only start on truly empty canvas: not on a block frame, not on an
+    // interactive control / drag handle. Anything inside a canvas block keeps
+    // its existing selection / drag behaviour.
+    if (isOnBlockOrInteractive(event.target)) return;
+
+    const startClientX = event.clientX;
+    const startClientY = event.clientY;
+    let started = false;
+
+    const toContentPoint = (clientX: number, clientY: number) => {
+      const hostRect = host.getBoundingClientRect();
+      return {
+        x: clientX - hostRect.left + host.scrollLeft,
+        y: clientY - hostRect.top + host.scrollTop,
+      };
+    };
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const dx = Math.abs(moveEvent.clientX - startClientX);
+      const dy = Math.abs(moveEvent.clientY - startClientY);
+      if (!started && dx < MARQUEE_START_THRESHOLD_PX && dy < MARQUEE_START_THRESHOLD_PX) {
+        return;
+      }
+      started = true;
+      const start = toContentPoint(startClientX, startClientY);
+      const current = toContentPoint(moveEvent.clientX, moveEvent.clientY);
+      setRect({
+        left: Math.min(start.x, current.x),
+        top: Math.min(start.y, current.y),
+        width: Math.abs(current.x - start.x),
+        height: Math.abs(current.y - start.y),
+      });
+    };
+
+    const handleEnd = (endEvent: PointerEvent) => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('pointercancel', handleEnd);
+      setRect(null);
+      if (!started) return; // a plain click, not a drag — select nothing
+
+      // Resolve hits in viewport-pixel space (matches getBoundingClientRect),
+      // so the marquee and block rects share one coordinate frame.
+      const marqueeRect: PixelRect = rectFromPoints(
+        { x: startClientX, y: startClientY },
+        { x: endEvent.clientX, y: endEvent.clientY },
+      );
+      const blockRects = collectCanvasBlockRects(host);
+      const hitIds = blocksWithinMarquee(marqueeRect, blockRects);
+      // Prefer the innermost hits: a covered ancestor container (e.g. the page
+      // root that wraps every section) is dropped when the box also covers one
+      // of its descendants, so "drag across two sibling sections" selects just
+      // those two, not the container around them.
+      onMarqueeSelect(dropAncestorBlocks(host, hitIds));
+    };
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleEnd);
+    window.addEventListener('pointercancel', handleEnd);
+  };
+
+  return { rect, onHostPointerDown };
+}
+
+/**
+ * True when the pointer-down target is inside a canvas block frame or on an
+ * interactive control (so the marquee must not start there). The marquee only
+ * begins on the empty canvas band / scroll background.
+ */
+function isOnBlockOrInteractive(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  if (target.closest('[data-testid^="canvas-block-"]')) return true;
+  return isInteractivePointerTarget(target);
+}
+
+/**
+ * Snapshot every rendered canvas block's bounding rectangle (viewport pixels)
+ * keyed by its block id, for marquee hit-testing. Reads the live DOM at
+ * pointer-up time so rects reflect the current scroll/layout.
+ */
+function collectCanvasBlockRects(host: HTMLElement): BlockRect[] {
+  const PREFIX = 'canvas-block-';
+  const nodes = host.querySelectorAll<HTMLElement>(`[data-testid^="${PREFIX}"]`);
+  const rects: BlockRect[] = [];
+  nodes.forEach((node) => {
+    const testid = node.getAttribute('data-testid');
+    if (!testid) return;
+    const blockId = testid.slice(PREFIX.length);
+    if (!blockId) return;
+    const r = node.getBoundingClientRect();
+    rects.push({
+      blockId,
+      rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+    });
+  });
+  return rects;
+}
+
+/**
+ * Drop any hit block whose DOM node is an ancestor of another hit block's node,
+ * keeping only the innermost selections. This is a structural (not geometric)
+ * filter: a parent container's rect always covers its children, so without this
+ * a marquee over two sibling sections would also grab the page-root container
+ * that wraps them. Computed from the live DOM (`node.contains`).
+ */
+function dropAncestorBlocks(host: HTMLElement, hitIds: string[]): string[] {
+  if (hitIds.length <= 1) return hitIds;
+  const nodeById = new Map<string, HTMLElement>();
+  for (const id of hitIds) {
+    const node = host.querySelector<HTMLElement>(`[data-testid="canvas-block-${id}"]`);
+    if (node) nodeById.set(id, node);
+  }
+  return hitIds.filter((id) => {
+    const node = nodeById.get(id);
+    if (!node) return false;
+    // Keep `id` only if it is NOT an ancestor of any other hit block.
+    for (const [otherId, otherNode] of nodeById) {
+      if (otherId !== id && node.contains(otherNode)) return false;
+    }
+    return true;
+  });
 }
 
 function RootDropZone({
