@@ -21,7 +21,7 @@ dependencies {
     compileOnly project(':')  // Platform core (StorageProvider, StorageProperties, StorageType)
 
     // AWS SDK v2
-    implementation platform('software.amazon.awssdk:bom:2.46.2')
+    implementation platform('software.amazon.awssdk:bom:2.46.6')
     implementation 'software.amazon.awssdk:s3'
 
     compileOnly 'org.projectlombok:lombok:1.18.40'
