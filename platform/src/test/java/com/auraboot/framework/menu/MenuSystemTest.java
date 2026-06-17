@@ -10,6 +10,7 @@ import com.auraboot.framework.menu.service.MenuService;
 import com.auraboot.framework.permission.dto.PermissionCreateRequest;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.service.PermissionService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +50,9 @@ class MenuSystemTest extends BaseIntegrationTest {
 
     @Autowired
     private PermissionService permissionService;
+
+    @Autowired
+    private UserPermissionService userPermissionService;
 
     @Autowired
     private RolePermissionMapper rolePermissionMapper;
@@ -93,6 +97,29 @@ class MenuSystemTest extends BaseIntegrationTest {
     }
 
     /**
+     * Create a child menu guarded by a specific permission code.
+     */
+    private Menu createChildMenuWithPermission(
+            String nameSuffix,
+            Long parentId,
+            int orderNo,
+            String permissionCode) {
+        Menu menu = new Menu();
+        menu.setTenantId(getTestTenant().getId());
+        menu.setPid(UniqueIdGenerator.generate());
+        menu.setParentId(parentId);
+        menu.setName("menu_" + nameSuffix + "_" + System.nanoTime());
+        menu.setPath("/" + nameSuffix.replace("_", "-") + "/child-" + System.nanoTime());
+        menu.setType(1);
+        menu.setPermissionCode(permissionCode);
+        menu.setVisible(true);
+        menu.setOrderNo(orderNo);
+        menu.setStatus(MenuStatus.ACTIVE);
+        menu.setCreatedBy(getTestUser().getId());
+        return menuService.createMenu(menu);
+    }
+
+    /**
      * Create a button menu (type=2) under a parent menu.
      */
     private Menu createButtonMenu(String nameSuffix, Long parentId, String permissionCode) {
@@ -114,16 +141,7 @@ class MenuSystemTest extends BaseIntegrationTest {
      * Create a unique permission and bind it to the test role.
      */
     private PermissionDTO createPermissionAndBind(String prefix) {
-        String uniqueCode = "MENU." + prefix + "_" + System.nanoTime() + ".view";
-        PermissionCreateRequest request = new PermissionCreateRequest();
-        request.setCode(uniqueCode);
-        request.setName(prefix + " View Permission");
-        request.setDescription("Test permission for " + prefix);
-        request.setResourceType("menu");
-        request.setResourceCode(prefix);
-        request.setAction("view");
-        request.setSource("system");
-        PermissionDTO perm = permissionService.create(request);
+        PermissionDTO perm = createPermissionOnly(prefix);
 
         // Bind to test role
         RolePermission binding = new RolePermission();
@@ -139,6 +157,22 @@ class MenuSystemTest extends BaseIntegrationTest {
         rolePermissionMapper.insert(binding);
 
         return perm;
+    }
+
+    /**
+     * Create a unique permission without binding it to the test role.
+     */
+    private PermissionDTO createPermissionOnly(String prefix) {
+        String uniqueCode = "MENU." + prefix + "_" + System.nanoTime() + ".view";
+        PermissionCreateRequest request = new PermissionCreateRequest();
+        request.setCode(uniqueCode);
+        request.setName(prefix + " View Permission");
+        request.setDescription("Test permission for " + prefix);
+        request.setResourceType("menu");
+        request.setResourceCode(prefix);
+        request.setAction("view");
+        request.setSource("system");
+        return permissionService.create(request);
     }
 
     // ========================================================================
@@ -396,6 +430,37 @@ class MenuSystemTest extends BaseIntegrationTest {
         // Then: pagePid should be persisted and retrievable
         assertThat(retrieved).isNotNull();
         assertThat(retrieved.getPagePid()).isEqualTo(pagePid);
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("E5-12: User menu tree filters leaf menus by permissionCode")
+    void e5_12_userMenuTreeFiltersByPermissionCode() {
+        // Given: one menu guarded by an assigned permission and one by an unassigned permission
+        PermissionDTO allowedPerm = createPermissionAndBind("e5_tree_allowed");
+        PermissionDTO deniedPerm = createPermissionOnly("e5_tree_denied");
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+
+        Menu parent = createDirectoryMenu("e5_perm_tree");
+        Menu allowedMenu = createChildMenuWithPermission(
+                "e5_tree_allowed",
+                parent.getId(),
+                10,
+                allowedPerm.getCode());
+        Menu deniedMenu = createChildMenuWithPermission(
+                "e5_tree_denied",
+                parent.getId(),
+                20,
+                deniedPerm.getCode());
+
+        // When
+        List<Menu> userTree = menuService.getUserMenuTree(getTestUser().getId(), getTestTenant().getId());
+        List<Menu> flat = flattenTree(userTree);
+
+        // Then: the parent remains because it has an allowed child, but denied leaf is removed
+        assertThat(flat).anyMatch(m -> m.getId().equals(parent.getId()));
+        assertThat(flat).anyMatch(m -> m.getId().equals(allowedMenu.getId()));
+        assertThat(flat).noneMatch(m -> m.getId().equals(deniedMenu.getId()));
     }
 
     // ========================================================================

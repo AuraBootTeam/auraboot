@@ -93,7 +93,17 @@ export default function CatchAllRoute() {
           token,
         });
 
-        if (!ResultHelper.isSuccess(menuResult) || !menuResult.data) {
+        if (!ResultHelper.isSuccess(menuResult)) {
+          const message =
+            String(menuResult.code) === '403'
+              ? menuResult.message || menuResult.desc || 'Access denied'
+              : `Menu configuration not found for path "${location.pathname}"`;
+          setError(message);
+          setLoading(false);
+          return;
+        }
+
+        if (!menuResult.data) {
           setError(`Menu configuration not found for path "${location.pathname}"`);
           setLoading(false);
           return;

@@ -168,8 +168,10 @@ export class ScopedStateManager {
       i18n: scope.i18n,
       locale: this.globalState.locale,
       dict: {},
-      row: undefined,
-      args: undefined,
+      row: scope.row,
+      args: scope.args,
+      ...(scope.record !== undefined ? { record: scope.record } : {}),
+      ...(scope.$page !== undefined ? { $page: scope.$page } : {}),
 
       // 内置函数
       hasPermission: (permission: string) => {

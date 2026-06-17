@@ -102,6 +102,7 @@ export function usePageRuntime(
           t,
           disableAutoFetch: false,
           skipDataSourceRegistration: true,
+          initialContext: additionalContext,
         },
   );
 

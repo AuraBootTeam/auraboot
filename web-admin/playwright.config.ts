@@ -51,6 +51,21 @@ const artifactDir = process.env.PW_ARTIFACT_DIR || './test-results/artifacts';
 const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
 const resultsJson = process.env.PW_RESULTS_JSON || './test-results/results.json';
 const deepSpecPattern = /.*-deep\.spec\.ts$/;
+const quoteOpsCurrentSpecNames = [
+  'quote-bom-focused-menu-and-permissions',
+  'bom-workbench-golden',
+  'quote-minimal-create-regression',
+  'quote-bom-visual-feedback-golden',
+  'quote-corrected-bom-upload-golden',
+  'quote-bom-price-manual-adoption',
+  'quote-process-fee-review',
+  'quote-gerber-runtime',
+  'quote-excel-download',
+];
+const quoteOpsCurrentGatePattern = new RegExp(
+  String.raw`.*\/pcba-solution\/(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$`,
+);
+const pcbaLegacySpecPattern = /.*\/pcba-legacy\/.*\.spec\.ts$/;
 
 const enterpriseScopeDirs = [
   'annual-plan',
@@ -223,7 +238,7 @@ export default defineConfig({
             testDir: './tests/e2e',
             // Exclude resource-intensive deep designer tests — they get their own project (chromium-deep)
             // with workers:1 to prevent browser OOM crashes from concurrent heavy DOM operations.
-            testIgnore: deepSpecPattern,
+            testIgnore: [deepSpecPattern, pcbaLegacySpecPattern],
             dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
@@ -234,6 +249,7 @@ export default defineConfig({
             name: 'chromium-deep',
             testDir: './tests/e2e',
             testMatch: deepSpecPattern,
+            testIgnore: pcbaLegacySpecPattern,
             // Run AFTER chromium completes — ensures deep designer tests don't compete
             // for browser resources with the main test suite (prevents OOM crashes).
             dependencies: ['chromium'],
@@ -252,7 +268,12 @@ export default defineConfig({
           {
             name: 'oss',
             testDir: './tests/e2e',
-            testIgnore: [deepSpecPattern, ...enterpriseScopeRegexes, contractScopeRegex],
+            testIgnore: [
+              deepSpecPattern,
+              pcbaLegacySpecPattern,
+              ...enterpriseScopeRegexes,
+              contractScopeRegex,
+            ],
             dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
@@ -263,7 +284,7 @@ export default defineConfig({
             name: 'oss-deep',
             testDir: './tests/e2e',
             testMatch: deepSpecPattern,
-            testIgnore: [...enterpriseScopeRegexes, contractScopeRegex],
+            testIgnore: [pcbaLegacySpecPattern, ...enterpriseScopeRegexes, contractScopeRegex],
             dependencies: ['oss'],
             timeout: 120_000,
             use: {
@@ -319,11 +340,40 @@ export default defineConfig({
           },
         ]
       : []),
+    ...(runProfile === 'quoteops'
+      ? [
+          {
+            name: 'quoteops',
+            testDir: './tests/e2e',
+            testMatch: quoteOpsCurrentGatePattern,
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+            },
+          },
+        ]
+      : []),
+    ...(runProfile === 'pcba-legacy'
+      ? [
+          {
+            name: 'pcba-legacy',
+            testDir: './tests/e2e',
+            testMatch: pcbaLegacySpecPattern,
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+            },
+          },
+        ]
+      : []),
     ...(runProfile === 'smoke'
       ? [
           {
             name: 'smoke',
             testDir: './tests/e2e',
+            testIgnore: pcbaLegacySpecPattern,
             grep: /@smoke/,
             dependencies: ['auth'],
             use: {
@@ -338,6 +388,7 @@ export default defineConfig({
           {
             name: 'critical',
             testDir: './tests/e2e',
+            testIgnore: pcbaLegacySpecPattern,
             grep: /@critical|@smoke/,
             dependencies: ['auth'],
             use: {

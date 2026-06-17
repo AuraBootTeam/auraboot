@@ -18,8 +18,19 @@
 import { type Page, type Locator, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
+const CURRENT_DYNAMIC_PAGE_KEY_ALIASES: Record<string, string> = {
+  'crm-account': 'crm_account_common',
+  crm_account: 'crm_account_common',
+  crm_account_list: 'crm_account_common',
+};
+
 export function normalizeDynamicPageKey(pageKey: string): string {
-  return pageKey.replace(/-/g, '_');
+  const normalized = pageKey.replace(/-/g, '_');
+  return (
+    CURRENT_DYNAMIC_PAGE_KEY_ALIASES[pageKey] ??
+    CURRENT_DYNAMIC_PAGE_KEY_ALIASES[normalized] ??
+    normalized
+  );
 }
 
 // ---------------------------------------------------------------------------
