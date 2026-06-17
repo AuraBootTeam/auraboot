@@ -7,7 +7,7 @@ settings:
 overrides:
   '@hono/node-server': ^1.19.13
   brace-expansion: 1.1.13
-  dompurify: ^3.4.9
+  dompurify: ^3.4.8
   esbuild: ^0.27.7
   fast-uri: ^3.1.2
   hono: ^4.12.23
@@ -77,8 +77,8 @@ importers:
         specifier: ^12.4.2
         version: 12.11.1(@types/node@22.19.18)
       js-yaml:
-        specifier: ^4.1.1
-        version: 4.1.1
+        specifier: ^4.2.0
+        version: 4.2.0
       ora:
         specifier: ^9.3.0
         version: 9.4.0
@@ -282,7 +282,7 @@ importers:
         specifier: ^1.11.20
         version: 1.11.20
       dompurify:
-        specifier: ^3.4.9
+        specifier: ^3.4.8
         version: 3.4.10
       dotenv:
         specifier: ^17.2.1
@@ -3900,8 +3900,8 @@ packages:
     resolution: {integrity: sha512-PMSmkqxr106Xa156c2M265Z+FTrPl+oxd/rgOQy2tijQeK5TxQ43psO1ZCwhVOSdnn+RzkzlRz/eY4BgJBYVpg==}
     hasBin: true
 
-  js-yaml@4.1.1:
-    resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
+  js-yaml@4.2.0:
+    resolution: {integrity: sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==}
     hasBin: true
 
   jsbarcode@3.12.3:
@@ -6523,7 +6523,7 @@ snapshots:
       globals: 13.24.0
       ignore: 5.3.2
       import-fresh: 3.3.1
-      js-yaml: 4.1.1
+      js-yaml: 4.2.0
       minimatch: 3.1.5
       strip-json-comments: 3.1.1
     transitivePeerDependencies:
@@ -8885,7 +8885,7 @@ snapshots:
       imurmurhash: 0.1.4
       is-glob: 4.0.3
       is-path-inside: 3.0.3
-      js-yaml: 4.1.1
+      js-yaml: 4.2.0
       json-stable-stringify-without-jsonify: 1.0.1
       levn: 0.4.1
       lodash.merge: 4.6.2
@@ -9594,7 +9594,7 @@ snapshots:
       argparse: 1.0.10
       esprima: 4.0.1
 
-  js-yaml@4.1.1:
+  js-yaml@4.2.0:
     dependencies:
       argparse: 2.0.1
 
