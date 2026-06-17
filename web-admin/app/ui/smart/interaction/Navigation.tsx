@@ -146,7 +146,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       return (
         <span
           className={cn(
-            'h-2 w-2 rounded-full',
+            'rounded-pill h-2 w-2',
             badge.color ? `bg-${badge.color}-500` : 'bg-red-500',
           )}
         />
@@ -157,7 +157,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       return (
         <span
           className={cn(
-            'min-w-[16px] rounded-full px-1.5 py-0.5 text-center text-xs text-white',
+            'rounded-pill min-w-[16px] px-1.5 py-0.5 text-center text-xs text-white',
             badge.color ? `bg-${badge.color}-500` : 'bg-red-500',
           )}
         >
@@ -347,7 +347,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
     const tabClasses = (item: NavigationItem) =>
       cn('tab-item flex items-center gap-2 px-4 py-2 border-b-2 transition-colors cursor-pointer', {
-        'border-blue-500 text-accent': activeKey === item.key,
+        'border-accent text-accent': activeKey === item.key,
         'border-transparent text-text-2 hover:text-text': activeKey !== item.key,
         'text-sm': tabConfig?.size === 'small',
         'text-lg': tabConfig?.size === 'large',
@@ -370,7 +370,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
               {tabConfig?.closable && (
                 <button
-                  className="ml-2 rounded p-0.5 hover:bg-gray-200"
+                  className="hover:bg-hover ml-2 rounded p-0.5"
                   onClick={(e) => {
                     e.stopPropagation();
                     onTabEdit?.(item.key, 'remove');

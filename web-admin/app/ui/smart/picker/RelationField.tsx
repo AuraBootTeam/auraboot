@@ -206,7 +206,7 @@ export const RelationField: React.FC<RelationFieldProps> = ({
       {label && (
         <label htmlFor={name} className="text-text-2 block text-sm font-medium">
           {label}
-          {required && <span className="ml-1 text-red-500">*</span>}
+          {required && <span className="text-status-red ml-1">*</span>}
         </label>
       )}
 

@@ -2,13 +2,7 @@
 import * as React from 'react';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import { FieldBase } from '~/ui/ui/field-base';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/ui/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/ui/ui/select';
 import { fieldErrorFocusStyles } from '~/ui/ui/field-styles';
 import { cn } from '~/utils/cn';
 

@@ -89,12 +89,14 @@ export function BaseResourceSelect({
 
   if (loadError) {
     return (
-      <div className={`flex items-center gap-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-600 ${className || ''}`}>
+      <div
+        className={`rounded-control border-status-red bg-status-red-bg text-status-red flex items-center gap-2 border px-3 py-2 text-sm ${className || ''}`}
+      >
         <span className="flex-1">{loadError}</span>
         <button
           type="button"
           onClick={doFetch}
-          className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-100 focus:outline-none"
+          className="text-status-red shrink-0 rounded px-2 py-0.5 text-xs font-medium hover:bg-red-100 focus:outline-none"
         >
           {st('$i18n:common.retry', 'Retry')}
         </button>
@@ -117,13 +119,13 @@ export function BaseResourceSelect({
         }}
         placeholder={placeholder || 'Select...'}
         disabled={disabled}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        className="rounded-control border-border-strong focus:border-accent focus-visible:shadow-focus disabled:bg-hover w-full border px-3 py-2 text-sm focus:outline-none"
       />
       {isOpen && (
-        <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
-          {loading && <div className="px-3 py-2 text-sm text-gray-400">Loading...</div>}
+        <div className="rounded-control border-border bg-panel absolute z-50 mt-1 max-h-48 w-full overflow-y-auto border shadow-lg">
+          {loading && <div className="text-text-3 px-3 py-2 text-sm">Loading...</div>}
           {!loading && filtered.length === 0 && (
-            <div className="px-3 py-2 text-sm text-gray-400">No results</div>
+            <div className="text-text-3 px-3 py-2 text-sm">No results</div>
           )}
           {filtered.map((option) => (
             <button
@@ -134,13 +136,13 @@ export function BaseResourceSelect({
                 setSearch(null);
                 setIsOpen(false);
               }}
-              className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${
-                option.value === value ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+              className={`hover:bg-accent-weak w-full px-3 py-2 text-left text-sm ${
+                option.value === value ? 'bg-accent-weak text-accent' : 'text-text-2'
               }`}
             >
               <div className="font-medium">{option.label}</div>
               {option.description && (
-                <div className="text-xs text-gray-400">{option.description}</div>
+                <div className="text-text-3 text-xs">{option.description}</div>
               )}
             </button>
           ))}

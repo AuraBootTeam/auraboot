@@ -82,7 +82,7 @@ const sizeStyles = {
 
 const variantStyles = {
   default: 'border-border-strong dark:border-gray-600 dark:bg-gray-700 dark:text-white',
-  error: 'border-status-red focus:border-red-500 focus:ring-red-500 dark:border-red-600',
+  error: 'border-status-red focus:border-status-red focus:ring-red-500 dark:border-red-600',
 };
 
 export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
@@ -368,7 +368,7 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
                   e.stopPropagation();
                   handleExpand(node.key);
                 }}
-                className="mr-2 rounded p-1 hover:bg-gray-200 dark:hover:bg-gray-500"
+                className="hover:bg-hover mr-2 rounded p-1 dark:hover:bg-gray-500"
               >
                 <svg
                   className={clsx('h-3 w-3 transition-transform', isExpanded && 'rotate-90')}

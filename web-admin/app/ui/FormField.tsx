@@ -32,9 +32,9 @@ interface TextareaFieldProps extends BaseFieldProps {
 
 // 基础样式类
 const baseInputClasses =
-  'w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:focus:border-blue-400';
-const errorInputClasses = 'border-red-500 dark:border-red-400';
-const normalInputClasses = 'border-gray-300 dark:border-gray-600';
+  'w-full px-3 py-2 border rounded-control shadow-sm focus:outline-none focus-visible:shadow-focus dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:focus:border-blue-400';
+const errorInputClasses = 'border-status-red dark:border-red-400';
+const normalInputClasses = 'border-border-strong dark:border-gray-600';
 
 // 输入框组件
 export function InputField({
@@ -53,9 +53,9 @@ export function InputField({
     <div className={className}>
       <label
         htmlFor={name}
-        className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+        className="text-text-2 mb-2 block text-sm font-medium dark:text-gray-300"
       >
-        {label} {required && <span className="text-red-500">*</span>}
+        {label} {required && <span className="text-status-red">*</span>}
       </label>
       <input
         type={type}
@@ -67,7 +67,7 @@ export function InputField({
         className={`${baseInputClasses} ${error ? errorInputClasses : normalInputClasses}`}
         placeholder={placeholder}
       />
-      {error && <p className="mt-1 text-sm text-red-500 dark:text-red-400">{error}</p>}
+      {error && <p className="text-status-red mt-1 text-sm dark:text-red-400">{error}</p>}
     </div>
   );
 }
@@ -89,9 +89,9 @@ export function SelectField({
     <div className={className}>
       <label
         htmlFor={name}
-        className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+        className="text-text-2 mb-2 block text-sm font-medium dark:text-gray-300"
       >
-        {label} {required && <span className="text-red-500">*</span>}
+        {label} {required && <span className="text-status-red">*</span>}
       </label>
       <select
         id={name}
@@ -108,7 +108,7 @@ export function SelectField({
           </option>
         ))}
       </select>
-      {error && <p className="mt-1 text-sm text-red-500 dark:text-red-400">{error}</p>}
+      {error && <p className="text-status-red mt-1 text-sm dark:text-red-400">{error}</p>}
     </div>
   );
 }
@@ -130,9 +130,9 @@ export function TextareaField({
     <div className={className}>
       <label
         htmlFor={name}
-        className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+        className="text-text-2 mb-2 block text-sm font-medium dark:text-gray-300"
       >
-        {label} {required && <span className="text-red-500">*</span>}
+        {label} {required && <span className="text-status-red">*</span>}
       </label>
       <textarea
         id={name}
@@ -144,7 +144,7 @@ export function TextareaField({
         className={`${baseInputClasses} ${error ? errorInputClasses : normalInputClasses}`}
         placeholder={placeholder}
       />
-      {error && <p className="mt-1 text-sm text-red-500 dark:text-red-400">{error}</p>}
+      {error && <p className="text-status-red mt-1 text-sm dark:text-red-400">{error}</p>}
     </div>
   );
 }

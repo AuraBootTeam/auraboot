@@ -213,16 +213,16 @@ export default function AddressSelector({
     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
       {/* 省份选择 */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          省份 <span className="text-red-500">*</span>
+        <label className="text-text-2 mb-1 block text-sm font-medium">
+          省份 <span className="text-status-red">*</span>
         </label>
         <div className="relative">
           <select
             value={value.provinceCode || ''}
             onChange={handleProvinceChange}
             disabled={disabled}
-            className={`w-full appearance-none rounded-lg border bg-white px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50 ${
-              errors.provinceCode ? 'border-red-300' : 'border-gray-300'
+            className={`rounded-card bg-panel focus-visible:shadow-focus disabled:bg-subtle w-full appearance-none border px-3 py-2 focus:outline-none disabled:cursor-not-allowed ${
+              errors.provinceCode ? 'border-status-red' : 'border-border-strong'
             }`}
           >
             <option value="">请选择省份</option>
@@ -232,23 +232,25 @@ export default function AddressSelector({
               </option>
             ))}
           </select>
-          <ChevronDownIcon className="pointer-events-none absolute top-2.5 right-3 h-5 w-5 text-gray-400" />
+          <ChevronDownIcon className="text-text-3 pointer-events-none absolute top-2.5 right-3 h-5 w-5" />
         </div>
-        {errors.provinceCode && <p className="mt-1 text-sm text-red-600">{errors.provinceCode}</p>}
+        {errors.provinceCode && (
+          <p className="text-status-red mt-1 text-sm">{errors.provinceCode}</p>
+        )}
       </div>
 
       {/* 城市选择 */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          城市 <span className="text-red-500">*</span>
+        <label className="text-text-2 mb-1 block text-sm font-medium">
+          城市 <span className="text-status-red">*</span>
         </label>
         <div className="relative">
           <select
             value={value.cityCode || ''}
             onChange={handleCityChange}
             disabled={disabled || !value.provinceCode || loading.cities}
-            className={`w-full appearance-none rounded-lg border bg-white px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50 ${
-              errors.cityCode ? 'border-red-300' : 'border-gray-300'
+            className={`rounded-card bg-panel focus-visible:shadow-focus disabled:bg-subtle w-full appearance-none border px-3 py-2 focus:outline-none disabled:cursor-not-allowed ${
+              errors.cityCode ? 'border-status-red' : 'border-border-strong'
             }`}
           >
             <option value="">{loading.cities ? '加载中...' : '请选择城市'}</option>
@@ -258,23 +260,23 @@ export default function AddressSelector({
               </option>
             ))}
           </select>
-          <ChevronDownIcon className="pointer-events-none absolute top-2.5 right-3 h-5 w-5 text-gray-400" />
+          <ChevronDownIcon className="text-text-3 pointer-events-none absolute top-2.5 right-3 h-5 w-5" />
         </div>
-        {errors.cityCode && <p className="mt-1 text-sm text-red-600">{errors.cityCode}</p>}
+        {errors.cityCode && <p className="text-status-red mt-1 text-sm">{errors.cityCode}</p>}
       </div>
 
       {/* 区县选择 */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          区县 <span className="text-red-500">*</span>
+        <label className="text-text-2 mb-1 block text-sm font-medium">
+          区县 <span className="text-status-red">*</span>
         </label>
         <div className="relative">
           <select
             value={value.districtCode || ''}
             onChange={handleDistrictChange}
             disabled={disabled || !value.cityCode || loading.districts}
-            className={`w-full appearance-none rounded-lg border bg-white px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50 ${
-              errors.districtCode ? 'border-red-300' : 'border-gray-300'
+            className={`rounded-card bg-panel focus-visible:shadow-focus disabled:bg-subtle w-full appearance-none border px-3 py-2 focus:outline-none disabled:cursor-not-allowed ${
+              errors.districtCode ? 'border-status-red' : 'border-border-strong'
             }`}
           >
             <option value="">{loading.districts ? '加载中...' : '请选择区县'}</option>
@@ -284,20 +286,22 @@ export default function AddressSelector({
               </option>
             ))}
           </select>
-          <ChevronDownIcon className="pointer-events-none absolute top-2.5 right-3 h-5 w-5 text-gray-400" />
+          <ChevronDownIcon className="text-text-3 pointer-events-none absolute top-2.5 right-3 h-5 w-5" />
         </div>
-        {errors.districtCode && <p className="mt-1 text-sm text-red-600">{errors.districtCode}</p>}
+        {errors.districtCode && (
+          <p className="text-status-red mt-1 text-sm">{errors.districtCode}</p>
+        )}
       </div>
 
       {/* 街道选择 */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">街道</label>
+        <label className="text-text-2 mb-1 block text-sm font-medium">街道</label>
         <div className="relative">
           <select
             value={value.streetCode || ''}
             onChange={handleStreetChange}
             disabled={disabled || !value.districtCode || loading.streets}
-            className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50"
+            className="rounded-card border-border-strong bg-panel focus-visible:shadow-focus disabled:bg-subtle w-full appearance-none border px-3 py-2 focus:outline-none disabled:cursor-not-allowed"
           >
             <option value="">{loading.streets ? '加载中...' : '请选择街道'}</option>
             {streets.map((street) => (
@@ -306,7 +310,7 @@ export default function AddressSelector({
               </option>
             ))}
           </select>
-          <ChevronDownIcon className="pointer-events-none absolute top-2.5 right-3 h-5 w-5 text-gray-400" />
+          <ChevronDownIcon className="text-text-3 pointer-events-none absolute top-2.5 right-3 h-5 w-5" />
         </div>
       </div>
     </div>
