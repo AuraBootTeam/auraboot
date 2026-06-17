@@ -67,7 +67,9 @@ export default function TenantFormFields({
       contactPhone: t('tenant.label.contactPhone', undefined, '联系电话'),
       website: t('tenant.label.website', undefined, '官方网站'),
       description: t(
-        variant === 'selection' ? 'tenant.label.description.short' : 'tenant.label.description.full',
+        variant === 'selection'
+          ? 'tenant.label.description.short'
+          : 'tenant.label.description.full',
         undefined,
         variant === 'selection' ? '描述' : '企业描述',
       ),
@@ -78,7 +80,9 @@ export default function TenantFormFields({
   const getPlaceholder = (field: string) => {
     const placeholders = {
       name: t(
-        variant === 'selection' ? 'tenant.placeholder.name.selection' : 'tenant.placeholder.name.full',
+        variant === 'selection'
+          ? 'tenant.placeholder.name.selection'
+          : 'tenant.placeholder.name.full',
         undefined,
         variant === 'selection' ? '输入租户名称' : '请输入企业名称',
       ),

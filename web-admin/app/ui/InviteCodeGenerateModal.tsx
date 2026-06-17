@@ -65,7 +65,7 @@ export default function InviteCodeGenerateModal({
 
   return (
     <div className="bg-opacity-50 fixed inset-0 z-50 flex h-full w-full items-center justify-center overflow-y-auto bg-black">
-      <div className="relative mx-4 w-full max-w-md transform rounded-2xl bg-white shadow-2xl transition-all">
+      <div className="bg-panel relative mx-4 w-full max-w-md transform rounded-2xl shadow-2xl transition-all">
         {/* 模态框头部 */}
         <div className="rounded-t-2xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
           <div className="flex items-center justify-between">
@@ -87,7 +87,7 @@ export default function InviteCodeGenerateModal({
             <>
               {/* 有效期选择 */}
               <div className="mb-6">
-                <label className="mb-3 block text-sm font-medium text-gray-700">
+                <label className="text-text-2 mb-3 block text-sm font-medium">
                   选择邀请码有效期
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -95,10 +95,10 @@ export default function InviteCodeGenerateModal({
                     <button
                       key={option.value}
                       onClick={() => setSelectedExpiryDays(option.value)}
-                      className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      className={`rounded-card border px-3 py-2 text-sm transition-colors ${
                         selectedExpiryDays === option.value
-                          ? 'border-blue-600 bg-blue-600 text-white'
-                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                          ? 'border-accent bg-accent text-white'
+                          : 'border-border-strong bg-panel text-text-2 hover:bg-subtle'
                       }`}
                     >
                       {option.label}
@@ -108,7 +108,7 @@ export default function InviteCodeGenerateModal({
               </div>
 
               {/* 预览信息 */}
-              <div className="mb-6 rounded-lg bg-blue-50 p-4">
+              <div className="rounded-card bg-accent-weak mb-6 p-4">
                 <div className="flex items-center text-blue-800">
                   <CalendarDaysIcon className="mr-2 h-4 w-4" />
                   <span className="text-sm">
@@ -121,7 +121,7 @@ export default function InviteCodeGenerateModal({
               <button
                 onClick={handleGenerate}
                 disabled={loading}
-                className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 text-white transition-all duration-200 hover:from-blue-700 hover:to-blue-800 disabled:opacity-50"
+                className="rounded-card w-full bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 text-white transition-all duration-200 hover:from-blue-700 hover:to-blue-800 disabled:opacity-50"
               >
                 {loading ? '生成中...' : '生成邀请码'}
               </button>
@@ -130,26 +130,26 @@ export default function InviteCodeGenerateModal({
             <>
               {/* 生成成功显示 */}
               <div className="mb-6 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-                  <ShareIcon className="h-8 w-8 text-green-600" />
+                <div className="rounded-pill mx-auto mb-4 flex h-16 w-16 items-center justify-center bg-green-100">
+                  <ShareIcon className="text-status-green h-8 w-8" />
                 </div>
-                <h4 className="mb-2 text-lg font-semibold text-gray-900">邀请码生成成功！</h4>
-                <p className="text-sm text-gray-600">请将邀请码分享给新成员</p>
+                <h4 className="text-text mb-2 text-lg font-semibold">邀请码生成成功！</h4>
+                <p className="text-text-2 text-sm">请将邀请码分享给新成员</p>
               </div>
 
               {/* 邀请码展示 */}
-              <div className="mb-4 rounded-lg bg-gray-50 p-4">
-                <label className="mb-2 block text-sm font-medium text-gray-700">邀请码</label>
+              <div className="rounded-card bg-subtle mb-4 p-4">
+                <label className="text-text-2 mb-2 block text-sm font-medium">邀请码</label>
                 <div className="flex items-center space-x-2">
                   <input
                     type="text"
                     value={inviteCode}
                     readOnly
-                    className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-center font-mono text-lg tracking-wider"
+                    className="rounded-card border-border-strong bg-panel flex-1 border px-3 py-2 text-center font-mono text-lg tracking-wider"
                   />
                   <button
                     onClick={copyInviteCode}
-                    className="rounded-lg bg-blue-600 px-3 py-2 text-white transition-colors hover:bg-blue-700"
+                    className="rounded-card bg-accent hover:bg-accent-hover px-3 py-2 text-white transition-colors"
                     title="复制邀请码"
                   >
                     <ClipboardDocumentIcon className="h-5 w-5" />
@@ -158,7 +158,7 @@ export default function InviteCodeGenerateModal({
               </div>
 
               {/* 邀请码信息 */}
-              <div className="mb-6 rounded-lg bg-amber-50 p-4">
+              <div className="rounded-card bg-status-amber-bg mb-6 p-4">
                 <div className="flex items-center text-amber-800">
                   <CalendarDaysIcon className="mr-2 h-4 w-4" />
                   <span className="text-sm font-medium">
@@ -170,7 +170,7 @@ export default function InviteCodeGenerateModal({
               {/* 完成按钮 */}
               <button
                 onClick={handleClose}
-                className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 text-white transition-all duration-200 hover:from-blue-700 hover:to-blue-800"
+                className="rounded-card w-full bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 text-white transition-all duration-200 hover:from-blue-700 hover:to-blue-800"
               >
                 完成
               </button>

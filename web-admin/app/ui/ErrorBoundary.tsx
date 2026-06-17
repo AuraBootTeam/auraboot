@@ -185,7 +185,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
       // 默认的错误 UI
       return (
-        <div className="error-boundary-container rounded-lg border border-red-200 bg-red-50 p-6">
+        <div className="error-boundary-container rounded-card bg-status-red-bg border border-red-200 p-6">
           <div className="flex items-start space-x-3">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">

@@ -200,7 +200,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
         {label && (
           <label className="text-text-2 mb-1 block text-sm font-medium">
             {label}
-            {required && <span className="ml-0.5 text-red-500">*</span>}
+            {required && <span className="text-status-red ml-0.5">*</span>}
           </label>
         )}
         {name && <input type="hidden" name={name} value={hiddenValue} />}
@@ -239,7 +239,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
       {label && (
         <label className="text-text-2 mb-1 block text-sm font-medium">
           {label}
-          {required && <span className="ml-0.5 text-red-500">*</span>}
+          {required && <span className="text-status-red ml-0.5">*</span>}
         </label>
       )}
       {name && <input type="hidden" name={name} value={hiddenValue} />}
@@ -262,7 +262,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
               <span
                 key={m.id}
                 data-testid={`member-picker-selected-${m.id}`}
-                className="rounded-pill bg-hover text-text inline-flex items-center gap-1 py-0.5 pr-1 pl-0.5 text-sm transition-colors hover:bg-gray-200"
+                className="rounded-pill bg-hover text-text hover:bg-hover inline-flex items-center gap-1 py-0.5 pr-1 pl-0.5 text-sm transition-colors"
               >
                 <span
                   className={cn(
@@ -296,7 +296,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                   'rounded-pill inline-flex items-center gap-1 border border-dashed px-2 py-0.5 text-xs transition-colors',
                   selectedMembers.length === 0
                     ? 'border-border-strong text-text-3 hover:border-border-strong hover:text-text-2'
-                    : 'border-border-strong text-text-3 hover:border-blue-400 hover:text-blue-500',
+                    : 'border-border-strong text-text-3 hover:text-accent hover:border-blue-400',
                 )}
               >
                 <Plus className="h-3 w-3" />
@@ -332,7 +332,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
             <div className="max-h-56 overflow-y-auto py-1">
               {loading ? (
                 <div className="text-text-3 flex flex-col items-center justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                  <Loader2 className="text-accent h-5 w-5 animate-spin" />
                   <span className="mt-2 text-xs">Searching...</span>
                 </div>
               ) : options.length === 0 ? (
@@ -374,7 +374,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                           </span>
                           {isSelected && (
                             <svg
-                              className="h-4 w-4 flex-shrink-0 text-blue-500"
+                              className="text-accent h-4 w-4 flex-shrink-0"
                               fill="currentColor"
                               viewBox="0 0 20 20"
                             >

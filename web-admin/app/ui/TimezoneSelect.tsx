@@ -103,12 +103,12 @@ export default function TimezoneSelect({
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
-        className="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-left focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+        className="rounded-card border-border-strong bg-panel focus-visible:shadow-focus disabled:bg-hover flex w-full items-center justify-between border px-3 py-2 text-left focus:border-transparent focus:outline-none disabled:cursor-not-allowed"
         data-testid={testId ? `${testId}-trigger` : undefined}
       >
         <span className="truncate text-sm">{selectedLabel || value}</span>
         <svg
-          className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`text-text-3 h-4 w-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -122,7 +122,7 @@ export default function TimezoneSelect({
         <>
           {/* Backdrop */}
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute z-20 mt-1 flex max-h-72 w-full flex-col rounded-lg border border-gray-200 bg-white shadow-lg">
+          <div className="rounded-card border-border bg-panel absolute z-20 mt-1 flex max-h-72 w-full flex-col border shadow-lg">
             {/* Search input */}
             <div className="border-b p-2">
               <input
@@ -131,14 +131,14 @@ export default function TimezoneSelect({
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="搜索时区（北京、Tokyo、UTC...）"
                 autoFocus
-                className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="border-border-strong focus-visible:shadow-focus w-full rounded border px-3 py-1.5 text-sm focus:border-transparent focus:outline-none"
                 data-testid={testId ? `${testId}-search` : undefined}
               />
             </div>
             {/* Options */}
             <ul className="flex-1 overflow-y-auto">
               {filtered.length === 0 ? (
-                <li className="px-3 py-2 text-sm text-gray-500">未找到匹配的时区</li>
+                <li className="text-text-2 px-3 py-2 text-sm">未找到匹配的时区</li>
               ) : (
                 filtered.map((tz) => (
                   <li key={tz.value}>
@@ -149,7 +149,7 @@ export default function TimezoneSelect({
                         setIsOpen(false);
                         setSearch('');
                       }}
-                      className={`w-full px-3 py-1.5 text-left text-sm hover:bg-blue-50 ${tz.value === value ? 'bg-blue-50 font-medium text-blue-700' : 'text-gray-700'}`}
+                      className={`hover:bg-accent-weak w-full px-3 py-1.5 text-left text-sm ${tz.value === value ? 'bg-accent-weak text-accent font-medium' : 'text-text-2'}`}
                       data-testid={testId ? `${testId}-option-${tz.value}` : undefined}
                     >
                       {tz.label}

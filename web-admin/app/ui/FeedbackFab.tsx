@@ -14,7 +14,7 @@ export default function FeedbackFab() {
       onClick={() => navigate('/feedback')}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="fixed right-6 bottom-6 z-40 flex items-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-white shadow-lg transition-all duration-200 hover:bg-blue-700 hover:shadow-xl"
+      className="rounded-pill bg-accent hover:bg-accent-hover fixed right-6 bottom-6 z-40 flex items-center gap-2 px-4 py-3 text-white shadow-lg transition-all duration-200 hover:shadow-xl"
       title="Send Feedback"
     >
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

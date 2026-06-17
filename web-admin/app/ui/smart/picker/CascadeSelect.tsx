@@ -423,7 +423,7 @@ export const CascadeSelect: React.FC<CascadeSelectProps> = ({
       {label && (
         <label className="text-text-2 block text-sm font-medium dark:text-gray-300">
           {label}
-          {required && <span className="ml-1 text-red-500">*</span>}
+          {required && <span className="text-status-red ml-1">*</span>}
         </label>
       )}
 

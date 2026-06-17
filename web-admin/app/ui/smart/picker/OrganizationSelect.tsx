@@ -224,7 +224,7 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
           {node.children && node.children.length > 0 && (
             <button
               onClick={(e) => toggleExpanded(node.id, e)}
-              className="mr-1 rounded p-1 hover:bg-gray-200"
+              className="hover:bg-hover mr-1 rounded p-1"
             >
               {expandedNodes.has(node.id) ? (
                 <ChevronDown className="h-3 w-3" />
