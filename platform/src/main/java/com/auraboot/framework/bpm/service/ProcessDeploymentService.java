@@ -3,6 +3,7 @@ package com.auraboot.framework.bpm.service;
 import com.auraboot.smart.framework.engine.SmartEngine;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
+import com.auraboot.framework.bpm.converter.BpmnConversionException;
 import com.auraboot.framework.bpm.converter.JsonToBpmnConverter;
 import com.auraboot.framework.bpm.entity.BpmNodeHook;
 import com.auraboot.framework.bpm.mapper.BpmNodeHookMapper;
@@ -725,6 +726,43 @@ public class ProcessDeploymentService {
         return jsonToBpmnConverter.convertFromJsonNode(
                 parseCanonicalDesignerJson(designerJson, processKey, processName));
     }
+
+    /**
+     * Server-side pre-deploy validation of a designerJson (G-B1).
+     *
+     * <p>Compiles the designerJson to BPMN XML and exercises the version-injection
+     * step <em>without</em> persisting or deploying. This surfaces conversion-level
+     * errors the client-side validator cannot catch — unsupported node types (G-B2),
+     * exclusive-gateway flows missing a condition, malformed designerJson, and the
+     * raw-{@code >} name corruption guarded by {@link BpmnProcessVersionUtil} — so the
+     * designer can show actionable errors before the user clicks Deploy (which would
+     * otherwise fail late inside SmartEngine with a swallowed root cause).
+     *
+     * @return a {@link ValidationResult} — {@code valid=true, errors=[]} when the
+     *         designerJson would compile + version-inject cleanly.
+     */
+    public ValidationResult validateDesignerJson(String designerJson, String processKey, String processName) {
+        List<String> errors = new java.util.ArrayList<>();
+        if (!StringUtils.hasText(designerJson)) {
+            errors.add("designerJson is empty");
+            return new ValidationResult(false, errors);
+        }
+        String key = StringUtils.hasText(processKey) ? processKey : "validation_preview";
+        try {
+            String bpmnXml = compileDesignerJson(designerJson, key, processName);
+            // Exercise version injection too — it has its own failure modes
+            // (raw '>' in name corrupting the <process> attribute set).
+            BpmnProcessVersionUtil.ensureProcessVersion(bpmnXml, "1.0.0");
+        } catch (BpmnConversionException e) {
+            errors.add(e.getMessage());
+        } catch (Exception e) {
+            errors.add("Validation failed: " + e.getMessage());
+        }
+        return new ValidationResult(errors.isEmpty(), errors);
+    }
+
+    /** Result of server-side designerJson validation (G-B1). */
+    public record ValidationResult(boolean valid, List<String> errors) {}
 
     private com.fasterxml.jackson.databind.node.ObjectNode parseCanonicalDesignerJson(
             String designerJson, String processKey, String processName) {
