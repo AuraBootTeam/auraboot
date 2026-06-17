@@ -11,6 +11,7 @@ import {
 import {
   cleanupRows,
   executeCommand,
+  isTransientViteDynamicImportIssue,
   queryDynamicRecords,
   readDynamicRecord,
   seedBomWorkbench,
@@ -113,7 +114,17 @@ async function clickSidebarPage(
     }
   }
   await waitForDynamicPageLoad(page, 20_000);
-  await expect(page.locator('main')).toContainText(label, { timeout: 20_000 });
+  const main = page.locator('main');
+  const contentLoaded = await expect(main)
+    .toContainText(label, { timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!contentLoaded) {
+    // Fresh Vite runtimes can force a one-time dependency-optimization reload after menu entry.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForDynamicPageLoad(page, 20_000);
+    await expect(main).toContainText(label, { timeout: 20_000 });
+  }
 }
 
 test.describe('BOM standardization workbench golden', () => {
@@ -126,11 +137,15 @@ test.describe('BOM standardization workbench golden', () => {
     const consoleIssues: string[] = [];
     page.on('console', (message) => {
       const text = message.text();
+      if (isTransientViteDynamicImportIssue(text)) return;
       if (/Expression evaluation failed|Cannot read properties|ReferenceError|TypeError/i.test(text)) {
         consoleIssues.push(`${message.type()}: ${text}`);
       }
     });
-    page.on('pageerror', (error) => consoleIssues.push(`pageerror: ${error.message}`));
+    page.on('pageerror', (error) => {
+      if (isTransientViteDynamicImportIssue(error.message)) return;
+      consoleIssues.push(`pageerror: ${error.message}`);
+    });
 
     try {
       await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
