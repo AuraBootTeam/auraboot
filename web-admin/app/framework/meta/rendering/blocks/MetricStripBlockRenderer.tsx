@@ -34,7 +34,12 @@ const activeToneClass: Record<string, string> = {
   default: 'ring-2 ring-gray-300 ring-offset-1',
 };
 
-function mappedMetricValue(value: any, metric: any, locale: string, t: (key: string) => string): string {
+function mappedMetricValue(
+  value: any,
+  metric: any,
+  locale: string,
+  t: (key: string) => string,
+): string {
   const valueMap = metric?.valueMap;
   if (valueMap && typeof valueMap === 'object') {
     const keys = [
@@ -48,9 +53,7 @@ function mappedMetricValue(value: any, metric: any, locale: string, t: (key: str
     }
   }
   if (typeof value === 'boolean') {
-    const fallback = value
-      ? { 'zh-CN': '是', en: 'Yes' }
-      : { 'zh-CN': '否', en: 'No' };
+    const fallback = value ? { 'zh-CN': '是', en: 'Yes' } : { 'zh-CN': '否', en: 'No' };
     return getLocalizedText(fallback, locale, t);
   }
   if (value === null || value === undefined || value === '') return '-';
@@ -89,7 +92,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
       <div
         role="alert"
         data-testid="metric-strip-error"
-        className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+        className="rounded-control bg-status-red-bg text-status-red border border-red-200 p-3 text-sm"
       >
         {message || 'Failed to load metrics'}
       </div>
@@ -100,7 +103,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
     return (
       <div
         data-testid="metric-strip-loading"
-        className="rounded-md border border-gray-200 bg-white p-3 text-sm text-gray-500"
+        className="rounded-control border-border bg-panel text-text-2 border p-3 text-sm"
       >
         {t('common.loading') !== 'common.loading' ? t('common.loading') : 'Loading...'}
       </div>
@@ -110,7 +113,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
   if (metrics.length === 0) {
     return (
       <div
-        className="rounded-md border border-gray-200 bg-white p-3 text-sm text-gray-500"
+        className="rounded-control border-border bg-panel text-text-2 border p-3 text-sm"
         data-testid="metric-strip-empty"
       >
         {t('common.noData') !== 'common.noData' ? t('common.noData') : 'No data'}
@@ -123,18 +126,46 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
       return !metric.visibleWhen || evaluator.evaluateCondition(metric.visibleWhen, context);
     })
     .map((metric: any) => {
-    const key = String(metric.key || metric.valueField || metric.label);
-    const label = getLocalizedText(metric.label || key, locale, t);
-    const value = metric.valueField ? readPath(record, metric.valueField) : metric.value;
-    const unit = metric.unitField ? readPath(record, metric.unitField) : metric.unit;
-    const subText = metric.subTextField ? readPath(record, metric.subTextField) : metric.subText;
-    const displaySubText = renderMetricAuxText(subText, locale, t);
-    const tone = metric.tone || 'default';
-    const clickable = Boolean(metric.onClick);
-    const active = metric.activeWhen ? evaluator.evaluateCondition(metric.activeWhen, context) : false;
-    const displayValue = mappedMetricValue(value, metric, locale, t);
+      const key = String(metric.key || metric.valueField || metric.label);
+      const label = getLocalizedText(metric.label || key, locale, t);
+      const value = metric.valueField ? readPath(record, metric.valueField) : metric.value;
+      const unit = metric.unitField ? readPath(record, metric.unitField) : metric.unit;
+      const subText = metric.subTextField ? readPath(record, metric.subTextField) : metric.subText;
+      const displaySubText = renderMetricAuxText(subText, locale, t);
+      const tone = metric.tone || 'default';
+      const clickable = Boolean(metric.onClick);
+      const active = metric.activeWhen
+        ? evaluator.evaluateCondition(metric.activeWhen, context)
+        : false;
+      const displayValue = mappedMetricValue(value, metric, locale, t);
 
-    if (variant === 'chips') {
+      if (variant === 'chips') {
+        return (
+          <button
+            key={key}
+            type="button"
+            data-testid={`metric-strip-item-${key}`}
+            onClick={() => {
+              void executeSimpleWorkbenchAction(runtime, metric.onClick).catch((error) => {
+                console.error('[MetricStripBlockRenderer] action failed:', error);
+              });
+            }}
+            disabled={!clickable}
+            className={`rounded-pill inline-flex min-h-9 items-center gap-2 border px-3 py-1.5 text-sm ${
+              toneClass[tone] || toneClass.default
+            } ${active ? activeToneClass[tone] || activeToneClass.default : ''} ${
+              clickable ? 'cursor-pointer hover:shadow-sm' : 'cursor-default'
+            } ${metric.align === 'end' ? 'ml-auto' : ''}`}
+          >
+            <span className="font-medium">{label}</span>
+            <span className="rounded-pill bg-white/70 px-2 py-0.5 text-xs font-semibold">
+              {displayValue}
+              {unit ? ` ${String(unit)}` : ''}
+            </span>
+          </button>
+        );
+      }
+
       return (
         <button
           key={key}
@@ -146,66 +177,39 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
             });
           }}
           disabled={!clickable}
-          className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
-            toneClass[tone] || toneClass.default
-          } ${active ? activeToneClass[tone] || activeToneClass.default : ''} ${
-            clickable ? 'cursor-pointer hover:shadow-sm' : 'cursor-default'
-          } ${metric.align === 'end' ? 'ml-auto' : ''}`}
+          className={`rounded-card h-28 min-h-28 overflow-hidden border p-3 text-left shadow-sm ${toneClass[tone] || toneClass.default} ${
+            active ? activeToneClass[tone] || activeToneClass.default : ''
+          } ${clickable ? 'cursor-pointer hover:shadow' : 'cursor-default'}`}
         >
-          <span className="font-medium">{label}</span>
-          <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-semibold">
-            {displayValue}
-            {unit ? ` ${String(unit)}` : ''}
-          </span>
+          <div className="text-text-2 truncate text-xs font-medium" title={label}>
+            {label}
+          </div>
+          <div className="mt-1 flex min-w-0 items-baseline gap-1 overflow-hidden">
+            <span
+              className="min-w-0 truncate text-2xl font-semibold"
+              data-testid={`metric-strip-value-${key}`}
+              title={displayValue}
+            >
+              {displayValue}
+            </span>
+            {unit && <span className="text-text-2 flex-shrink-0 text-xs">{String(unit)}</span>}
+          </div>
+          {displaySubText && (
+            <div
+              className="text-text-2 mt-1 line-clamp-2 text-xs break-words"
+              data-testid={`metric-strip-subtext-${key}`}
+              title={displaySubText}
+            >
+              {displaySubText}
+            </div>
+          )}
         </button>
       );
-    }
-
-    return (
-      <button
-        key={key}
-        type="button"
-        data-testid={`metric-strip-item-${key}`}
-        onClick={() => {
-          void executeSimpleWorkbenchAction(runtime, metric.onClick).catch((error) => {
-            console.error('[MetricStripBlockRenderer] action failed:', error);
-          });
-        }}
-        disabled={!clickable}
-        className={`h-28 min-h-28 overflow-hidden rounded-lg border p-3 text-left shadow-sm ${toneClass[tone] || toneClass.default} ${
-          active ? activeToneClass[tone] || activeToneClass.default : ''
-        } ${clickable ? 'cursor-pointer hover:shadow' : 'cursor-default'
-        }`}
-      >
-        <div className="truncate text-xs font-medium text-gray-500" title={label}>
-          {label}
-        </div>
-        <div className="mt-1 flex min-w-0 items-baseline gap-1 overflow-hidden">
-          <span
-            className="min-w-0 truncate text-2xl font-semibold"
-            data-testid={`metric-strip-value-${key}`}
-            title={displayValue}
-          >
-            {displayValue}
-          </span>
-          {unit && <span className="flex-shrink-0 text-xs text-gray-500">{String(unit)}</span>}
-        </div>
-        {displaySubText && (
-          <div
-            className="mt-1 line-clamp-2 break-words text-xs text-gray-500"
-            data-testid={`metric-strip-subtext-${key}`}
-            title={displaySubText}
-          >
-            {displaySubText}
-          </div>
-        )}
-      </button>
-    );
-  });
+    });
 
   return (
     <section data-testid={`metric-strip-${block.id || 'block'}`}>
-      {title && <h3 className="mb-2 text-sm font-medium text-gray-700">{title}</h3>}
+      {title && <h3 className="text-text-2 mb-2 text-sm font-medium">{title}</h3>}
       <div
         className={
           variant === 'chips'

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { cn } from '~/utils/cn';
-import { fieldControlBase } from '~/ui/ui/field-styles';
+import { fieldControlBase, fieldVariantStyles, fieldFocusStyles } from '~/ui/ui/field-styles';
 
 export interface TextareaProps extends React.ComponentPropsWithoutRef<'textarea'> {}
 
@@ -9,10 +9,12 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     <textarea
       ref={ref}
       className={cn(
-        `flex ${fieldControlBase} border-gray-300 bg-white text-sm text-gray-900`,
-        'placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none',
-        'focus-visible:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50',
-        'dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400',
+        'text-body flex min-h-[80px] px-3 py-2',
+        fieldControlBase,
+        fieldVariantStyles.default,
+        'placeholder:text-text-3 dark:placeholder:text-gray-400',
+        fieldFocusStyles,
+        'disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
       {...props}

@@ -43,6 +43,7 @@ common:
   my_records: 我的记录
   created_today: 今日新建
   modified_this_week: 本周修改
+  preset_views: 预设视图
   options_load_failed: 选项加载失败
   retry: 重试
 

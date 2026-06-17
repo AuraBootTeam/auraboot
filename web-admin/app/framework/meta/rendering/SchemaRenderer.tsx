@@ -58,7 +58,7 @@ export const SchemaRenderer: React.FC<SchemaRendererProps> = ({
     const title = getLocalizedText(schema.title, locale, t);
     return (
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+        <h1 className="text-text text-2xl font-bold">{title}</h1>
       </div>
     );
   };
@@ -95,7 +95,7 @@ export const SchemaRenderer: React.FC<SchemaRendererProps> = ({
 export const SchemaRendererWithContainer: React.FC<SchemaRendererProps> = (props) => {
   return (
     <div className="mx-auto w-full px-2 py-3">
-      <div className="rounded-lg bg-white p-6 shadow-sm">
+      <div className="rounded-card bg-panel p-6 shadow-sm">
         <SchemaRenderer {...props} />
       </div>
     </div>

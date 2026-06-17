@@ -38,6 +38,7 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(loadPageSchemaV3).mockResolvedValue({
       document: createDocument('document_one', 'Document One'),
       source: { type: 'page', pid: 'page_1', pageKey: 'document_one' },
+      published: false,
     });
 
     render(<UnifiedDesignerPage />);
@@ -82,12 +83,14 @@ describe('UnifiedDesignerPage', () => {
         return {
           document: createDocument('document_two', 'Document Two'),
           source: { type: 'page', pid: 'page_2', pageKey: 'document_two' },
+          published: false,
         };
       }
 
       return {
         document: createDocument('document_one', 'Document One'),
         source: { type: 'page', pid: 'page_1', pageKey: 'document_one' },
+        published: false,
       };
     });
 

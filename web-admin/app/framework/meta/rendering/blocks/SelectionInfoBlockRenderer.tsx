@@ -60,14 +60,13 @@ export const SelectionInfoBlockRenderer: React.FC<SelectionInfoBlockRendererProp
 
   const selection = readStateValue(runtime, String(stateKey));
   const summary = summarizeSelection(selection);
-  const fallbackTitle = t('common.selection') !== 'common.selection' ? t('common.selection') : 'Selection';
-  const title = block.title
-    ? getLocalizedText(block.title, locale, t)
-    : fallbackTitle;
+  const fallbackTitle =
+    t('common.selection') !== 'common.selection' ? t('common.selection') : 'Selection';
+  const title = block.title ? getLocalizedText(block.title, locale, t) : fallbackTitle;
 
   return (
     <div
-      className={`selection-info-block rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 ${block.className || ''}`}
+      className={`selection-info-block rounded-control border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 ${block.className || ''}`}
       data-testid="selection-info-block"
       data-block-type="selection-info"
     >

@@ -117,21 +117,31 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
   const pinnedItems = items.filter((i) => i.pinned);
   const overflowItems = items.filter((i) => !i.pinned);
 
-  const toggleVisible = useCallback((code: string) => {
-    setItems((prev) => {
-      const next = prev.map((item) => (item.code === code ? { ...item, visible: !item.visible } : item));
-      emitChange(next);
-      return next;
-    });
-  }, [emitChange]);
+  const toggleVisible = useCallback(
+    (code: string) => {
+      setItems((prev) => {
+        const next = prev.map((item) =>
+          item.code === code ? { ...item, visible: !item.visible } : item,
+        );
+        emitChange(next);
+        return next;
+      });
+    },
+    [emitChange],
+  );
 
-  const togglePinned = useCallback((code: string) => {
-    setItems((prev) => {
-      const next = prev.map((item) => (item.code === code ? { ...item, pinned: !item.pinned } : item));
-      emitChange(next);
-      return next;
-    });
-  }, [emitChange]);
+  const togglePinned = useCallback(
+    (code: string) => {
+      setItems((prev) => {
+        const next = prev.map((item) =>
+          item.code === code ? { ...item, pinned: !item.pinned } : item,
+        );
+        emitChange(next);
+        return next;
+      });
+    },
+    [emitChange],
+  );
 
   // Drag within pinned or overflow sections
   const handleDragStart = useCallback((index: number, section: 'pinned' | 'overflow') => {
@@ -166,7 +176,8 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         const [removed] = reordered.splice(from, 1);
         reordered.splice(to, 0, removed);
 
-        const next = section === 'pinned' ? [...reordered, ...otherItems] : [...otherItems, ...reordered];
+        const next =
+          section === 'pinned' ? [...reordered, ...otherItems] : [...otherItems, ...reordered];
         emitChange(next);
         return next;
       });
@@ -177,11 +188,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
     dragSection.current = null;
   }, [emitChange]);
 
-  const renderItem = (
-    item: ActionItem,
-    index: number,
-    section: 'pinned' | 'overflow',
-  ) => (
+  const renderItem = (item: ActionItem, index: number, section: 'pinned' | 'overflow') => (
     <div
       key={item.code}
       data-testid={`action-config-row-${item.code}`}
@@ -193,20 +200,20 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
       className={cn(
         'flex items-center gap-2 rounded px-3 py-2 text-sm transition-colors',
         'cursor-grab active:cursor-grabbing',
-        'hover:bg-gray-50',
+        'hover:bg-hover',
         !item.visible && 'opacity-50',
       )}
     >
       {/* Drag handle */}
-      <svg className="h-4 w-4 shrink-0 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+      <svg className="text-text-3 h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
         <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z" />
       </svg>
 
       {/* Label */}
-      <span className="flex-1 truncate text-gray-700">
+      <span className="text-text-2 flex-1 truncate">
         {item.label}
         {item.isBuiltin && (
-          <span className="ml-1.5 text-[10px] font-normal text-gray-400">(built-in)</span>
+          <span className="text-text-3 ml-1.5 text-[10px] font-normal">(built-in)</span>
         )}
       </span>
 
@@ -215,15 +222,31 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         type="button"
         data-testid={`action-config-pin-${item.code}`}
         onClick={() => togglePinned(item.code)}
-        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600"
+        className="text-text-3 hover:bg-hover hover:text-accent rounded p-1"
         title={item.pinned ? 'Move to menu' : 'Pin to toolbar'}
       >
         {item.pinned ? (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
             <path d="M12 5v14M5 12l7 7 7-7" />
           </svg>
         ) : (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
             <path d="M12 19V5M5 12l7-7 7 7" />
           </svg>
         )}
@@ -236,7 +259,9 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         onClick={() => toggleVisible(item.code)}
         className={cn(
           'rounded p-1 transition-colors',
-          item.visible ? 'text-green-600 hover:bg-green-50' : 'text-gray-300 hover:bg-gray-100',
+          item.visible
+            ? 'text-status-green hover:bg-status-green-bg'
+            : 'text-text-3 hover:bg-hover',
         )}
         title={item.visible ? 'Hide button' : 'Show button'}
       >
@@ -266,15 +291,15 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       data-testid="action-config-panel"
     >
-      <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+      <div className="rounded-card bg-panel w-full max-w-md shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-          <h3 className="text-base font-semibold text-gray-900">Configure Buttons</h3>
+        <div className="border-border flex items-center justify-between border-b px-5 py-4">
+          <h3 className="text-text text-base font-semibold">Configure Buttons</h3>
           <button
             type="button"
             data-testid="action-config-close"
             onClick={onClose}
-            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-control text-text-3 hover:bg-hover hover:text-text-2 p-1"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -290,12 +315,12 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         {/* Body */}
         <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
           {/* Toolbar (pinned) section */}
-          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+          <div className="text-text-2 mb-2 text-xs font-medium tracking-wide uppercase">
             Toolbar
           </div>
           <div className="mb-3 space-y-0.5">
             {pinnedItems.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-gray-400 italic">No pinned buttons</div>
+              <div className="text-text-3 px-3 py-2 text-sm italic">No pinned buttons</div>
             ) : (
               pinnedItems.map((item, idx) => renderItem(item, idx, 'pinned'))
             )}
@@ -303,24 +328,23 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
 
           {/* Divider */}
           <div className="my-3 flex items-center gap-2">
-            <div className="flex-1 border-t border-gray-200" />
-            <span className="text-xs text-gray-400">Below this line: in ··· menu</span>
-            <div className="flex-1 border-t border-gray-200" />
+            <div className="border-border flex-1 border-t" />
+            <span className="text-text-3 text-xs">Below this line: in ··· menu</span>
+            <div className="border-border flex-1 border-t" />
           </div>
 
           {/* Overflow section */}
-          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+          <div className="text-text-2 mb-2 text-xs font-medium tracking-wide uppercase">
             More Menu
           </div>
           <div className="space-y-0.5">
             {overflowItems.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-gray-400 italic">No overflow buttons</div>
+              <div className="text-text-3 px-3 py-2 text-sm italic">No overflow buttons</div>
             ) : (
               overflowItems.map((item, idx) => renderItem(item, idx, 'overflow'))
             )}
           </div>
         </div>
-
       </div>
     </div>
   );

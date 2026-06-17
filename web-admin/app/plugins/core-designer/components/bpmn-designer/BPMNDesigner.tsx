@@ -25,6 +25,8 @@ import {
   createProcessDefinition,
   updateProcessDefinition,
   getProcessDefinitionById,
+  serializeDesignerJson,
+  validateDesignerJson,
 } from '~/plugins/core-designer/components/bpmn-designer/services/bpmnService';
 
 /**
@@ -55,6 +57,7 @@ export function BPMNDesigner() {
     viewingVersionId,
     viewMode,
     monitorInstanceId,
+    setSelectedNode,
     setSaving,
     setDirty,
     validate,
@@ -76,8 +79,12 @@ export function BPMNDesigner() {
     service: bpmnVersionService,
     resourcePid: processDefinition?.key,
     onRollbackComplete: () => {
-      // Reload the process definition after rollback
-      // BPMN does not currently support rollback, so this is a no-op
+      // G-U3: BPMN version rollback is not yet supported (a real restore must
+      // re-deploy the historical BPMN to SmartEngine). Rather than leave the
+      // rollback action a SILENT no-op (the user clicks and nothing happens),
+      // give explicit feedback and steer them to the supported path: preview the
+      // version, then Save-as-new to roll forward.
+      showWarningToast(t('bpmn.version.rollback_unsupported'));
     },
   });
 
@@ -270,15 +277,35 @@ export function BPMNDesigner() {
     }
   };
 
-  const handleValidate = () => {
+  const handleValidate = async () => {
+    // 1) client-side structural validation — sets validationResult so the
+    //    canvas highlights offending nodes (G-U1) and the banner lists errors.
     const result = validate();
-    if (result.valid) {
-      showSuccessToast(t('bpmn.validate.passed'));
-    } else {
+    if (!result.valid) {
       const errorMsg = result.errors
         .map((e) => `[${e.type.toUpperCase()}] ${t(e.message, e.messageParams)}`)
         .join('; ');
       showErrorToast(`${t('bpmn.validate.result')}: ${errorMsg}`);
+      return;
+    }
+
+    // 2) server-side pre-deploy validation (G-B1) — catches converter-level
+    //    errors the client cannot (unsupported node types, exclusive-gateway
+    //    flows missing a condition, raw-'>' name corruption) BEFORE Deploy,
+    //    where the SmartEngine root cause is easily swallowed.
+    try {
+      const designerJson = serializeDesignerJson({ nodes, edges, aura: processAura });
+      const server = await validateDesignerJson(designerJson, processKey, processName);
+      if (server.valid) {
+        showSuccessToast(t('bpmn.validate.passed'));
+      } else {
+        showErrorToast(`${t('bpmn.validate.result')}: ${server.errors.join('; ')}`);
+      }
+    } catch (e) {
+      // Network/endpoint failure must not be silently swallowed; surface it.
+      showErrorToast(
+        `${t('bpmn.validate.result')}: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   };
 
@@ -482,7 +509,24 @@ export function BPMNDesigner() {
               </p>
               <ul className="mt-1 list-inside list-disc text-xs text-red-700">
                 {validationResult.errors.slice(0, 3).map((error, index) => (
-                  <li key={index}>{t(error.message, error.messageParams)}</li>
+                  <li key={index}>
+                    {error.nodeId ? (
+                      // G-U4: clickable -> select & locate the offending node
+                      // (the node is already red-ringed via G-U1).
+                      <button
+                        type="button"
+                        data-testid="bpmn-validation-error-locate"
+                        data-node-id={error.nodeId}
+                        onClick={() => setSelectedNode(error.nodeId ?? null)}
+                        className="cursor-pointer text-left underline decoration-dotted underline-offset-2 hover:text-red-900"
+                        title={t('bpmn.validate.locate_node')}
+                      >
+                        {t(error.message, error.messageParams)}
+                      </button>
+                    ) : (
+                      t(error.message, error.messageParams)
+                    )}
+                  </li>
                 ))}
               </ul>
             </div>

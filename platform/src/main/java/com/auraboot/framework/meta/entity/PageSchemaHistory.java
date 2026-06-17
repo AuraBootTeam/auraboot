@@ -1,6 +1,6 @@
 package com.auraboot.framework.meta.entity;
 
-import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
+import com.auraboot.framework.application.database.mybatis.JsonbMapTypeHandler;
 import com.auraboot.framework.environment.annotation.EnvScoped;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
@@ -21,7 +21,7 @@ import java.util.Map;
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
-@TableName("ab_page_schema_history")
+@TableName(value = "ab_page_schema_history", autoResultMap = true)
 @EnvScoped
 public class PageSchemaHistory {
 
@@ -32,16 +32,23 @@ public class PageSchemaHistory {
     private Long tenantId;
 
     /**
-     * 关联的页面Schema PID
+     * 关联的页面Schema PID.
+     *
+     * <p>Column is {@code pid} (not {@code page_pid}); the hand-written mapper
+     * {@code @Select} queries already use {@code pid}, but the MyBatis-Plus
+     * auto-generated {@code insert} used this {@code @TableField} value, so a
+     * wrong name made every version snapshot INSERT fail
+     * ({@code column "page_pid" ... does not exist}) and read-mapping leave this
+     * field null.
      */
-    @TableField("page_pid")
+    @TableField("pid")
     private String pid;
 
     /**
      * Full snapshot of the page schema at the time of the operation.
      * Contains: kind, profile, layout, blocks, meta_info, version info, etc.
      */
-    @TableField(value = "snapshot", typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)
+    @TableField(value = "snapshot", typeHandler = JsonbMapTypeHandler.class, jdbcType = JdbcType.OTHER)
     private Map<String, Object> snapshot;
 
     /**

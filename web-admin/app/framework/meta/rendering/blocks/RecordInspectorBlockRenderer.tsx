@@ -27,7 +27,7 @@ export const RecordInspectorBlockRenderer: React.FC<RecordInspectorBlockRenderer
     const emptyTitle = getLocalizedText(empty.title || 'Select a record', locale, t);
     return (
       <aside
-        className="min-h-48 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-500"
+        className="rounded-card border-border bg-panel text-text-2 min-h-48 border p-4 text-sm"
         data-testid="record-inspector-empty"
       >
         {emptyTitle}
@@ -36,7 +36,7 @@ export const RecordInspectorBlockRenderer: React.FC<RecordInspectorBlockRenderer
   }
 
   return (
-    <aside className="rounded-lg border border-gray-200 bg-white" data-testid="record-inspector">
+    <aside className="rounded-card border-border bg-panel border" data-testid="record-inspector">
       {fields.length > 0 && (
         <dl className="grid gap-3 p-3 sm:grid-cols-2">
           {fields.map((field: any) => {
@@ -45,8 +45,8 @@ export const RecordInspectorBlockRenderer: React.FC<RecordInspectorBlockRenderer
             const value = readPath(contextRecord, field.path || field.field);
             return (
               <div key={fieldCode} className={field.span === 2 ? 'sm:col-span-2' : undefined}>
-                <dt className="text-xs font-medium text-gray-500">{label}</dt>
-                <dd className="mt-1 min-h-5 break-words text-sm text-gray-900">
+                <dt className="text-text-2 text-xs font-medium">{label}</dt>
+                <dd className="text-text mt-1 min-h-5 text-sm break-words">
                   {value === null || value === undefined || value === '' ? '-' : String(value)}
                 </dd>
               </div>

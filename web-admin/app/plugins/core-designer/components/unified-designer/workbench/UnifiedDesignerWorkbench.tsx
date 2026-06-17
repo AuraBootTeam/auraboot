@@ -1,4 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
+import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import {
   DndContext,
   DragOverlay,
@@ -57,7 +59,12 @@ import {
   canMoveExistingBlockBeforeTarget,
   canMoveExistingBlockToParent,
 } from '../dnd/moveBlockGuards';
-import { WorkbenchToolbar, type DesignerSaveStatus } from './WorkbenchToolbar';
+import {
+  WorkbenchToolbar,
+  type DesignerPublishStatus,
+  type DesignerSaveStatus,
+} from './WorkbenchToolbar';
+import { VersionHistoryPanel } from './VersionHistoryPanel';
 import { ResourcePanel } from './ResourcePanel';
 import { CanvasHost, type ActiveDropIntent } from '../canvas/CanvasHost';
 import { InspectorHost } from './InspectorHost';
@@ -82,6 +89,28 @@ export interface UnifiedDesignerWorkbenchProps {
   returnHref?: string;
   onSave?: (document: PageSchemaV3) => Promise<void> | void;
   /**
+   * The persisted page id (pid) when the document is page-bound. Required to
+   * enable the publish / unpublish action points (a local/new document has none).
+   */
+  pageId?: string;
+  /** Initial publish state of the page-bound document (defaults to draft). */
+  initialPublished?: boolean;
+  /**
+   * Publish the saved page. Resolves true on success. Errors are caught by the
+   * toolbar and surfaced as inline feedback (mirrors onSave).
+   */
+  onPublish?: (pid: string) => Promise<boolean> | boolean;
+  /** Unpublish the saved page, returning it to draft. */
+  onUnpublish?: (pid: string) => Promise<boolean> | boolean;
+  /**
+   * Reload the page document from the backend (e.g. after a version rollback,
+   * which restores the target snapshot's blocks onto the live page). Resolves
+   * the freshly-loaded document so the workbench can reset its canvas + undo
+   * history to the restored state. When omitted, the version-history rollback
+   * action point is not wired.
+   */
+  onReloadDocument?: (pid: string) => Promise<PageSchemaV3 | null>;
+  /**
    * Enable the in-designer AI copilot (tools-off /generate-page). Pass `true` for
    * defaults, or an object with `domainGuidance` to flavor the system prompt for a
    * specific surface (e.g. a QR scan-landing page).
@@ -96,8 +125,14 @@ export function UnifiedDesignerWorkbench({
   modelFieldsByModel = {},
   returnHref,
   onSave,
+  pageId,
+  initialPublished = false,
+  onPublish,
+  onUnpublish,
+  onReloadDocument,
   aiCopilot,
 }: UnifiedDesignerWorkbenchProps) {
+  const { locale } = useI18n();
   const initialSnapshot = serializeDocument(initialDocument);
   const [documentHistory, setDocumentHistory] = useState(() => ({
     document: initialDocument,
@@ -109,10 +144,15 @@ export function UnifiedDesignerWorkbench({
   const [saveStatus, setSaveStatus] = useState<DesignerSaveStatus>('saved');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [validationErrorCount, setValidationErrorCount] = useState(0);
+  const [publishStatus, setPublishStatus] = useState<DesignerPublishStatus>(
+    initialPublished ? 'published' : 'draft',
+  );
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [mode, setMode] = useState<WorkbenchMode>('edit');
   const [previewDeviceId, setPreviewDeviceId] = useState<string>(DEFAULT_DEVICE_PREVIEW_ID);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
   const [activeDropIntent, setActiveDropIntent] = useState<ActiveDropIntent>(null);
   const document = documentHistory.document;
@@ -679,6 +719,106 @@ export function UnifiedDesignerWorkbench({
     }
   };
 
+  const handlePublish = async () => {
+    if (!pageId || !onPublish) return;
+    setPublishError(null);
+    setPublishStatus('publishing');
+    try {
+      const ok = await onPublish(pageId);
+      setPublishStatus(ok ? 'published' : 'error');
+      if (!ok) setPublishError('Failed to publish page.');
+    } catch (error) {
+      setPublishStatus('error');
+      setPublishError(resolvePublishErrorMessage(error));
+    }
+  };
+
+  const handleUnpublish = async () => {
+    if (!pageId || !onUnpublish) return;
+    setPublishError(null);
+    setPublishStatus('unpublishing');
+    try {
+      const ok = await onUnpublish(pageId);
+      setPublishStatus(ok ? 'draft' : 'error');
+      if (!ok) setPublishError('Failed to unpublish page.');
+    } catch (error) {
+      setPublishStatus('error');
+      setPublishError(resolvePublishErrorMessage(error));
+    }
+  };
+
+  // Reset the canvas + undo history to a freshly-loaded document. Used after a
+  // version rollback: the backend has restored the target snapshot's blocks onto
+  // the live page, so we replace local state with the reloaded document and mark
+  // it clean/saved (it now matches the backend exactly).
+  const resetToDocument = (nextDocument: PageSchemaV3) => {
+    const snapshot = serializeDocument(nextDocument);
+    setDocumentHistory({
+      document: nextDocument,
+      history: [snapshot],
+      historyIndex: 0,
+    });
+    savedSnapshotRef.current = snapshot;
+    setSavedSnapshot(snapshot);
+    setSaveStatus('saved');
+    setSaveError(null);
+    setValidationErrorCount(0);
+    setSelectedBlockId(null);
+  };
+
+  // After a successful rollback: reload the restored page document, reset the
+  // canvas to it, and close the version panel. If the reload yields nothing
+  // (e.g. the page was concurrently deleted) we leave the canvas as-is and just
+  // close the panel — the rollback itself already succeeded on the backend.
+  const handleVersionRolledBack = async () => {
+    if (pageId && onReloadDocument) {
+      const reloaded = await onReloadDocument(pageId);
+      if (reloaded) resetToDocument(reloaded);
+    }
+    setVersionPanelOpen(false);
+  };
+
+  // Export — serialize the current document to a downloadable .page.json file.
+  // Pure client-side: no backend call, exports exactly what is on the canvas
+  // (including unsaved edits) so the artifact is a faithful snapshot.
+  const handleExport = () => {
+    const fileName = `${document.pageKey || document.id || 'page'}.page.json`;
+    const json = JSON.stringify(document, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = window.document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    window.document.body.appendChild(anchor);
+    anchor.click();
+    window.document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
+  // Import — read a chosen JSON file, validate it is a PageSchemaV3, then load it
+  // through updateDocument so it joins the undo stack (and dirties the doc). On
+  // any parse/shape failure the document is left untouched and an inline error
+  // is shown via the existing save-error channel.
+  const handleImportFile = (file: File) => {
+    setSaveError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const imported = parseImportedDocument(reader.result);
+      if (!imported) {
+        setSaveStatus('error');
+        setSaveError(resolveDesignerText(DESIGNER_I18N.unified.importInvalid, locale));
+        return;
+      }
+      updateDocument(() => imported);
+      setSelectedBlockId(null);
+    };
+    reader.onerror = () => {
+      setSaveStatus('error');
+      setSaveError(resolveDesignerText(DESIGNER_I18N.unified.importInvalid, locale));
+    };
+    reader.readAsText(file);
+  };
+
   const aiCopilotEnabled = !!aiCopilot;
   const aiDomainGuidance =
     typeof aiCopilot === 'object' && aiCopilot ? aiCopilot.domainGuidance : undefined;
@@ -741,12 +881,28 @@ export function UnifiedDesignerWorkbench({
         canRedo={canRedo}
         returnHref={returnHref}
         aiCopilotEnabled={aiCopilotEnabled}
+        pageId={pageId}
+        publishStatus={publishStatus}
+        publishError={publishError}
         onModeChange={setMode}
         onUndo={handleUndo}
         onRedo={handleRedo}
         onSave={handleSave}
+        onPublish={onPublish ? handlePublish : undefined}
+        onUnpublish={onUnpublish ? handleUnpublish : undefined}
+        onExport={handleExport}
+        onImportFile={handleImportFile}
         onOpenAiCopilot={() => setAiDialogOpen(true)}
+        onOpenVersions={pageId ? () => setVersionPanelOpen(true) : undefined}
       />
+      {pageId ? (
+        <VersionHistoryPanel
+          pid={pageId}
+          open={versionPanelOpen}
+          onClose={() => setVersionPanelOpen(false)}
+          onRolledBack={handleVersionRolledBack}
+        />
+      ) : null}
       {aiCopilotEnabled ? (
         <AiDesignDialog
           open={aiDialogOpen}
@@ -911,6 +1067,46 @@ function resolveSaveErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
   if (typeof error === 'string' && error.trim()) return error;
   return 'Failed to save page schema.';
+}
+
+function resolvePublishErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+  return 'Failed to publish page.';
+}
+
+/**
+ * Parse and shape-validate a file read result into a PageSchemaV3. Returns null
+ * for any failure (not a string, invalid JSON, or not a V3 document) so the
+ * caller can leave the current document untouched and surface an inline error.
+ * The contract mirrors the readLocalDocument guard in unified-designer.tsx and
+ * the loader's hasRecursiveV3Blocks check: schemaVersion 3 + id/kind + blocks[].
+ */
+function parseImportedDocument(raw: FileReader['result']): PageSchemaV3 | null {
+  if (typeof raw !== 'string') return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+  const candidate = parsed as Record<string, unknown>;
+  const validKind =
+    candidate.kind === 'form' ||
+    candidate.kind === 'list' ||
+    candidate.kind === 'detail' ||
+    candidate.kind === 'dashboard' ||
+    candidate.kind === 'composite';
+  if (
+    candidate.schemaVersion !== 3 ||
+    typeof candidate.id !== 'string' ||
+    !validKind ||
+    !Array.isArray(candidate.blocks)
+  ) {
+    return null;
+  }
+  return parsed as PageSchemaV3;
 }
 
 function findModelCodeForSelection(path: PageSchemaV3['blocks']): string | null {

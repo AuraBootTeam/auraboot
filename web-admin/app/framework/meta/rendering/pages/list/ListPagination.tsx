@@ -21,6 +21,8 @@ export interface ListPaginationProps {
   modelCode: string;
   onBulkEdit: () => void;
   onBulkDelete: (ids: string[]) => Promise<void>;
+  /** Export only the selected records (T9). */
+  onBulkExport?: (ids: string[]) => void;
   bulkActions?: ButtonConfig[];
   onBulkAction?: (button: ButtonConfig, ids: string[]) => void | Promise<void>;
   resolveBulkActionLabel?: (button: ButtonConfig) => string;
@@ -39,6 +41,7 @@ export function ListPagination({
   modelCode,
   onBulkEdit,
   onBulkDelete,
+  onBulkExport,
   bulkActions,
   onBulkAction,
   resolveBulkActionLabel,
@@ -65,10 +68,12 @@ export function ListPagination({
         modelCode={modelCode}
         onBulkEdit={onBulkEdit}
         onBulkDelete={onBulkDelete}
+        onBulkExport={onBulkExport}
         bulkActions={bulkActions}
         onBulkAction={onBulkAction}
         resolveActionLabel={resolveBulkActionLabel}
         onClearSelection={onClearSelection}
+        t={t}
       />
     </>
   );

@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { Redo2, Undo2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Download, History, Redo2, Undo2, Upload } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import type { PageSchemaV3, WorkbenchMode } from '../types';
 
 export type DesignerSaveStatus = 'saved' | 'dirty' | 'saving' | 'invalid' | 'error';
+
+/** Lifecycle state of the publish/unpublish action point. */
+export type DesignerPublishStatus = 'draft' | 'publishing' | 'published' | 'unpublishing' | 'error';
 
 interface WorkbenchToolbarProps {
   document: PageSchemaV3;
@@ -17,11 +20,30 @@ interface WorkbenchToolbarProps {
   canRedo: boolean;
   returnHref?: string;
   aiCopilotEnabled?: boolean;
+  /**
+   * The persisted page id (pid) when the document is page-bound. Publish /
+   * unpublish are only available for a saved page; a local/new document has no
+   * pid and the publish button stays disabled.
+   */
+  pageId?: string;
+  publishStatus?: DesignerPublishStatus;
+  publishError?: string | null;
   onModeChange: (mode: WorkbenchMode) => void;
   onUndo: () => void;
   onRedo: () => void;
   onSave: () => void;
+  onPublish?: () => void;
+  onUnpublish?: () => void;
+  onExport?: () => void;
+  /** Receives the chosen file from the hidden import input. */
+  onImportFile?: (file: File) => void;
   onOpenAiCopilot?: () => void;
+  /**
+   * Open the version-history panel. Only wired (and the button only enabled) for
+   * a saved, page-bound document — a new/local page has no pid and therefore no
+   * server-side version history.
+   */
+  onOpenVersions?: () => void;
 }
 
 export function WorkbenchToolbar({
@@ -35,15 +57,32 @@ export function WorkbenchToolbar({
   canRedo,
   returnHref,
   aiCopilotEnabled,
+  pageId,
+  publishStatus = 'draft',
+  publishError,
   onModeChange,
   onUndo,
   onRedo,
   onSave,
+  onPublish,
+  onUnpublish,
+  onExport,
+  onImportFile,
   onOpenAiCopilot,
+  onOpenVersions,
 }: WorkbenchToolbarProps) {
   const { locale } = useI18n();
   const saveDisabled = !isDirty || saveStatus === 'saving' || saveStatus === 'invalid';
   const [showLeaveWarning, setShowLeaveWarning] = useState(false);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Publish is only meaningful for a saved, clean page: a new/local document has
+  // no pid, and a dirty document must be saved first so the published version
+  // matches the canvas. While a publish/unpublish round-trip is in flight the
+  // button is disabled to prevent double submits.
+  const publishBusy = publishStatus === 'publishing' || publishStatus === 'unpublishing';
+  const isPublished = publishStatus === 'published';
+  const publishDisabled = !pageId || isDirty || publishBusy;
 
   useEffect(() => {
     if (!isDirty) setShowLeaveWarning(false);
@@ -161,6 +200,117 @@ export function WorkbenchToolbar({
             title={saveError}
           >
             {saveError}
+          </span>
+        ) : null}
+        {/* Export / import — pure client-side JSON round-trip, no backend. */}
+        <div className="ml-2 grid grid-cols-2 rounded-md border border-slate-200 bg-white">
+          <button
+            type="button"
+            data-testid="designer-export"
+            aria-label={resolveDesignerText(DESIGNER_I18N.unified.exportPage, locale)}
+            title={resolveDesignerText(DESIGNER_I18N.unified.exportPage, locale)}
+            onClick={onExport}
+            className="inline-flex h-8 w-8 items-center justify-center border-r border-slate-200 text-slate-600 hover:bg-slate-50"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            data-testid="designer-import"
+            aria-label={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
+            title={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
+            onClick={() => importInputRef.current?.click()}
+            className="inline-flex h-8 w-8 items-center justify-center text-slate-600 hover:bg-slate-50"
+          >
+            <Upload className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json,.json"
+          data-testid="designer-import-input"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            // Reset the value so selecting the same file twice re-fires change.
+            event.target.value = '';
+            if (file) onImportFile?.(file);
+          }}
+        />
+        {/* Version history — only for a saved page (GET/POST /api/pages/{pid}/versions). */}
+        <button
+          type="button"
+          data-testid="designer-versions"
+          aria-label={resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)}
+          title={
+            !pageId
+              ? resolveDesignerText(DESIGNER_I18N.unified.versionsSaveFirst, locale)
+              : resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)
+          }
+          disabled={!pageId}
+          onClick={onOpenVersions}
+          className={`ml-2 inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 ${
+            pageId
+              ? 'text-slate-600 hover:bg-slate-50'
+              : 'cursor-not-allowed text-slate-300'
+          }`}
+        >
+          <History className="h-4 w-4" aria-hidden="true" />
+        </button>
+        {/* Publish — only for a saved, clean page (POST /api/pages/{pid}/publish). */}
+        <button
+          type="button"
+          data-testid="designer-publish"
+          disabled={publishDisabled}
+          title={
+            !pageId
+              ? resolveDesignerText(DESIGNER_I18N.unified.publishSaveFirst, locale)
+              : undefined
+          }
+          onClick={onPublish}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+            publishDisabled
+              ? 'cursor-not-allowed bg-slate-200 text-slate-500'
+              : 'bg-emerald-600 text-white hover:bg-emerald-700'
+          }`}
+        >
+          {resolveDesignerText(
+            publishStatus === 'publishing'
+              ? DESIGNER_I18N.unified.publishing
+              : isPublished
+                ? DESIGNER_I18N.unified.published
+                : DESIGNER_I18N.unified.publish,
+            locale,
+          )}
+        </button>
+        {isPublished || publishStatus === 'unpublishing' ? (
+          <button
+            type="button"
+            data-testid="designer-unpublish"
+            disabled={publishBusy || isDirty || !pageId}
+            onClick={onUnpublish}
+            className={`rounded-md border px-3 py-1.5 text-sm font-medium ${
+              publishBusy || isDirty || !pageId
+                ? 'cursor-not-allowed border-slate-200 text-slate-400'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            {resolveDesignerText(
+              publishStatus === 'unpublishing'
+                ? DESIGNER_I18N.unified.unpublishing
+                : DESIGNER_I18N.unified.unpublish,
+              locale,
+            )}
+          </button>
+        ) : null}
+        {publishStatus === 'error' && publishError ? (
+          <span
+            className="max-w-[320px] truncate rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700"
+            data-testid="designer-publish-error"
+            title={publishError}
+          >
+            {publishError}
           </span>
         ) : null}
         {showLeaveWarning && returnHref ? (

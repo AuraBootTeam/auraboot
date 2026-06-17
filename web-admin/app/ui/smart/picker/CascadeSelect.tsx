@@ -130,7 +130,7 @@ const CascadeDropdown: React.FC<CascadeDropdownProps> = ({
 
   return (
     <div ref={containerRef} className="relative min-w-[150px] flex-1">
-      <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+      <label className="text-text-2 mb-1 block text-xs font-medium dark:text-gray-400">
         {levelLabel}
       </label>
 
@@ -141,31 +141,27 @@ const CascadeDropdown: React.FC<CascadeDropdownProps> = ({
         onClick={handleTriggerClick}
         disabled={isDisabled}
         className={cn(
-          'flex h-9 w-full items-center justify-between rounded-md border bg-white px-3 py-2 text-sm shadow-sm',
-          'focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none',
+          'rounded-control bg-panel flex h-9 w-full items-center justify-between border px-3 py-2 text-sm shadow-sm',
+          'focus-visible:shadow-focus focus:outline-none',
           'disabled:cursor-not-allowed disabled:opacity-50',
           'dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100',
           isDisabled
-            ? 'cursor-not-allowed border-gray-200 bg-gray-50 dark:bg-gray-900'
-            : 'border-gray-300 hover:border-gray-400',
-          hasError && 'border-red-500 focus:ring-red-500',
-          isOpen && 'border-blue-500 ring-2 ring-blue-500',
+            ? 'border-border bg-subtle cursor-not-allowed dark:bg-gray-900'
+            : 'border-border-strong hover:border-border-strong',
+          hasError && 'border-status-red focus:ring-red-500',
+          isOpen && 'border-accent ring-2 ring-blue-500',
         )}
       >
         <span
           className={cn(
             'truncate text-left',
-            !selectedOption && 'text-gray-400',
-            isDisabled && 'text-gray-400',
+            !selectedOption && 'text-text-3',
+            isDisabled && 'text-text-3',
           )}
         >
           {isLoading ? (
             <span className="flex items-center gap-1.5">
-              <svg
-                className="h-3.5 w-3.5 animate-spin text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
+              <svg className="text-text-3 h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle
                   className="opacity-25"
                   cx="12"
@@ -180,7 +176,7 @@ const CascadeDropdown: React.FC<CascadeDropdownProps> = ({
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 />
               </svg>
-              <span className="text-gray-400">Loading...</span>
+              <span className="text-text-3">Loading...</span>
             </span>
           ) : selectedOption ? (
             selectedOption.label
@@ -192,7 +188,7 @@ const CascadeDropdown: React.FC<CascadeDropdownProps> = ({
         {/* Chevron icon */}
         <svg
           className={cn(
-            'ml-2 h-4 w-4 shrink-0 text-gray-400 transition-transform duration-200',
+            'text-text-3 ml-2 h-4 w-4 shrink-0 transition-transform duration-200',
             isOpen && 'rotate-180',
           )}
           fill="none"
@@ -208,13 +204,13 @@ const CascadeDropdown: React.FC<CascadeDropdownProps> = ({
         <div
           data-testid={`cascade-dropdown-${name}-${level}`}
           className={cn(
-            'absolute z-[100] mt-1 max-h-60 w-full min-w-[8rem] overflow-auto rounded-md border border-gray-200 bg-white p-1 shadow-md',
+            'rounded-control border-border bg-panel absolute z-[100] mt-1 max-h-60 w-full min-w-[8rem] overflow-auto border p-1 shadow-md',
             'animate-in fade-in-0 zoom-in-95',
             'dark:border-gray-700 dark:bg-gray-800',
           )}
         >
           {options.length === 0 ? (
-            <div className="px-2 py-4 text-center text-sm text-gray-400">No options</div>
+            <div className="text-text-3 px-2 py-4 text-center text-sm">No options</div>
           ) : (
             options.map((option) => {
               const isSelected = option.value === selectedValue;
@@ -226,16 +222,16 @@ const CascadeDropdown: React.FC<CascadeDropdownProps> = ({
                   onClick={() => handleSelect(option.value)}
                   className={cn(
                     'relative flex w-full cursor-default items-center rounded-sm py-1.5 pr-2 pl-8 text-left text-sm outline-none select-none',
-                    'hover:bg-gray-100 hover:text-gray-900',
+                    'hover:bg-hover hover:text-text',
                     'dark:hover:bg-gray-700 dark:hover:text-gray-100',
-                    isSelected && 'bg-gray-50 dark:bg-gray-700/50',
+                    isSelected && 'bg-subtle dark:bg-gray-700/50',
                   )}
                 >
                   {/* Checkmark for selected item */}
                   <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
                     {isSelected && (
                       <svg
-                        className="h-4 w-4 text-blue-600 dark:text-blue-400"
+                        className="text-accent h-4 w-4 dark:text-blue-400"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -425,9 +421,9 @@ export const CascadeSelect: React.FC<CascadeSelectProps> = ({
     <div className={cn('space-y-2', className)}>
       {/* Label */}
       {label && (
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="text-text-2 block text-sm font-medium dark:text-gray-300">
           {label}
-          {required && <span className="ml-1 text-red-500">*</span>}
+          {required && <span className="text-status-red ml-1">*</span>}
         </label>
       )}
 
@@ -457,13 +453,11 @@ export const CascadeSelect: React.FC<CascadeSelectProps> = ({
 
       {/* Selected path display */}
       {value.length > 0 && value.some(Boolean) && (
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Selected: {getDisplayValue()}
-        </div>
+        <div className="text-text-2 text-sm dark:text-gray-400">Selected: {getDisplayValue()}</div>
       )}
 
       {/* Error */}
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-status-red text-sm">{error}</p>}
     </div>
   );
 };

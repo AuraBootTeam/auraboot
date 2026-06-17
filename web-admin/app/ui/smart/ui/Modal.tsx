@@ -24,12 +24,12 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className={clsx('w-full max-w-2xl rounded-lg bg-white shadow-lg', className)}>
-        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-          <div className="text-lg font-semibold text-gray-900">{title}</div>
+      <div className={clsx('rounded-card bg-panel w-full max-w-2xl shadow-lg', className)}>
+        <div className="border-border flex items-center justify-between border-b px-4 py-3">
+          <div className="text-text text-lg font-semibold">{title}</div>
           <button
             type="button"
-            className="text-gray-400 hover:text-gray-500"
+            className="text-text-3 hover:text-text-2"
             onClick={onCancel}
             aria-label="Close"
           >
@@ -38,7 +38,7 @@ export const Modal: React.FC<ModalProps> = ({
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-4">{children}</div>
         {footer && (
-          <div className="rounded-b-lg border-t border-gray-200 bg-gray-50 px-4 py-3">{footer}</div>
+          <div className="rounded-b-card border-border bg-subtle border-t px-4 py-3">{footer}</div>
         )}
       </div>
     </div>

@@ -51,7 +51,7 @@ export default function InviteCodeManageModal({
 
   return (
     <div className="bg-opacity-50 fixed inset-0 z-50 flex h-full w-full items-center justify-center overflow-y-auto bg-black">
-      <div className="relative mx-4 w-full max-w-md transform rounded-2xl bg-white shadow-2xl transition-all">
+      <div className="bg-panel relative mx-4 w-full max-w-md transform rounded-2xl shadow-2xl transition-all">
         {/* 模态框头部 */}
         <div className="rounded-t-2xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
           <div className="flex items-center justify-between">
@@ -67,10 +67,10 @@ export default function InviteCodeManageModal({
 
         <div className="p-6">
           {/* 当前邀请码信息 */}
-          <div className="mb-4 rounded-lg bg-green-50 p-4">
+          <div className="rounded-card bg-status-green-bg mb-4 p-4">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-sm font-medium text-green-800">当前邀请码</span>
-              <span className="text-xs text-green-600">
+              <span className="text-status-green text-xs">
                 {new Date(currentInviteCode.expiredAt).toLocaleDateString()}
               </span>
             </div>
@@ -79,11 +79,11 @@ export default function InviteCodeManageModal({
                 type="text"
                 value={currentInviteCode.code}
                 readOnly
-                className="flex-1 rounded-lg border border-green-300 bg-white px-3 py-2 text-center font-mono text-lg tracking-wider"
+                className="rounded-card bg-panel flex-1 border border-green-300 px-3 py-2 text-center font-mono text-lg tracking-wider"
               />
               <button
                 onClick={copyInviteCode}
-                className="rounded-lg bg-green-600 px-3 py-2 text-white transition-colors hover:bg-green-700"
+                className="rounded-card bg-green-600 px-3 py-2 text-white transition-colors hover:bg-green-700"
                 title="复制邀请码"
               >
                 <ClipboardDocumentIcon className="h-5 w-5" />
@@ -96,7 +96,7 @@ export default function InviteCodeManageModal({
             <button
               onClick={handleRefresh}
               disabled={loading}
-              className="flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-3 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-card bg-accent hover:bg-accent-hover flex w-full items-center justify-center px-4 py-3 text-white transition-colors disabled:opacity-50"
             >
               <ArrowPathIcon className="mr-2 h-5 w-5" />
               刷新邀请码
@@ -104,7 +104,7 @@ export default function InviteCodeManageModal({
 
             <button
               onClick={handleRevoke}
-              className="flex w-full items-center justify-center rounded-lg bg-red-600 px-4 py-3 text-white transition-colors hover:bg-red-700"
+              className="rounded-card flex w-full items-center justify-center bg-red-600 px-4 py-3 text-white transition-colors hover:bg-red-700"
             >
               <NoSymbolIcon className="mr-2 h-5 w-5" />
               作废邀请码
@@ -112,7 +112,7 @@ export default function InviteCodeManageModal({
 
             <button
               onClick={onClose}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-700 transition-colors hover:bg-gray-50"
+              className="rounded-card border-border-strong text-text-2 hover:bg-subtle w-full border px-4 py-3 transition-colors"
             >
               关闭
             </button>

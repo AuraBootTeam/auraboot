@@ -1,9 +1,75 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
+import { get } from '~/shared/services/http-client';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import { getByPath } from '../utils/dotPath';
 import type { DslBlockV3, ModelFieldDefinition } from '../types';
 import { getInspectorFields } from './schemas';
+
+/** A selectable model option for `type: 'model'` inspector fields. */
+interface ModelOption {
+  /** The modelCode persisted into the block (e.g. dataSource.model). */
+  value: string;
+  /** Human-readable label shown in the dropdown. */
+  label: string;
+}
+
+interface MetaModelRecord {
+  code?: string;
+  displayName?: string;
+}
+
+interface MetaModelPage {
+  records?: MetaModelRecord[];
+}
+
+/**
+ * Load the published meta-model list once so every `type: 'model'` inspector
+ * field can render a real dropdown (modelCode value, displayName label) instead
+ * of a free-text box. The list is fetched a single time per inspector mount and
+ * shared across all model fields. On failure the dropdown degrades to the
+ * manual-entry fallback (the current value is always preserved), so a missing
+ * MODEL_READ permission or an offline backend never blocks authoring.
+ *
+ * GET /api/meta/models returns a MyBatis-Plus page: `data.records[]` (NOT
+ * `data.data[]`). Verified against the live OSS backend (2026-06-17).
+ */
+function useModelOptions(): { options: ModelOption[]; loaded: boolean } {
+  const [options, setOptions] = useState<ModelOption[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void get<MetaModelPage>('/api/meta/models', {
+      page: 1,
+      size: 500,
+      currentOnly: 'true',
+      status: 'published',
+    })
+      .then((result) => {
+        if (cancelled) return;
+        const records = result?.data?.records ?? [];
+        const mapped = records
+          .filter((record): record is Required<Pick<MetaModelRecord, 'code'>> & MetaModelRecord =>
+            Boolean(record.code),
+          )
+          .map((record) => ({
+            value: record.code as string,
+            label: record.displayName ? `${record.displayName} (${record.code})` : (record.code as string),
+          }));
+        setOptions(mapped);
+        setLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { options, loaded };
+}
 
 interface SchemaInspectorProps {
   block: DslBlockV3 | null;
@@ -22,6 +88,7 @@ function resolveInspectorLabel(label: string, locale: string): string {
 export function SchemaInspector({ block, modelFields = [], onChange }: SchemaInspectorProps) {
   const { locale } = useI18n();
   const fields = getInspectorFields(block);
+  const { options: modelOptions } = useModelOptions();
   const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic');
 
   useEffect(() => {
@@ -87,6 +154,7 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
                   value: option.value,
                 }))}
                 modelFields={modelFields}
+                modelOptions={modelOptions}
                 locale={locale}
                 onChange={onChange}
               />
@@ -213,6 +281,7 @@ function InspectorField({
   defaultValue,
   options,
   modelFields,
+  modelOptions,
   locale,
   onChange,
 }: {
@@ -223,6 +292,7 @@ function InspectorField({
   defaultValue?: unknown;
   options?: { label: string; value: string }[];
   modelFields: ModelFieldDefinition[];
+  modelOptions: ModelOption[];
   locale: string;
   onChange: (path: string, value: unknown) => void;
 }) {
@@ -291,6 +361,49 @@ function InspectorField({
             </option>
           ))}
         </select>
+      </label>
+    );
+  }
+
+  if (type === 'model') {
+    const currentValue = typeof value === 'string' ? value : '';
+    // Forward-compatible: if the bound modelCode is not in the published list
+    // (e.g. a draft/external model, or the list failed to load), surface it as a
+    // leading option so the dropdown never silently drops the current binding.
+    const hasCurrent = currentValue && modelOptions.some((option) => option.value === currentValue);
+    const selectOptions = hasCurrent || !currentValue
+      ? modelOptions
+      : [{ label: currentValue, value: currentValue }, ...modelOptions];
+    const manualId = `${id}-manual`;
+
+    return (
+      <label className="block">
+        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {label}
+        </span>
+        <select
+          data-testid={id}
+          value={currentValue}
+          onChange={(event) => onChange(path, event.target.value)}
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        >
+          <option value="">{resolveDesignerText(DESIGNER_I18N.unified.unset, locale)}</option>
+          {selectOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {/* Manual-entry fallback: an author can still bind a model code that is
+            not in the published list (draft / cross-plugin / not yet loaded). */}
+        <input
+          data-testid={manualId}
+          type="text"
+          value={currentValue}
+          placeholder={resolveDesignerText(DESIGNER_I18N.unified.unset, locale)}
+          onChange={(event) => onChange(path, event.target.value)}
+          className="mt-1.5 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 font-mono text-xs text-slate-500 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
       </label>
     );
   }

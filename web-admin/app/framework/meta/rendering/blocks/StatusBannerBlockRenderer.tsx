@@ -45,7 +45,9 @@ function readLocalizedMapValue(
 
 function interpolateTemplate(template: string, record: Record<string, any>): string {
   return template.replace(/\$\{([^}]+)\}/g, (_match, rawPath) => {
-    const path = String(rawPath || '').trim().replace(/^record\./, '');
+    const path = String(rawPath || '')
+      .trim()
+      .replace(/^record\./, '');
     const value = readPath(record, path);
     return value === undefined || value === null || value === '' ? '-' : String(value);
   });
@@ -53,7 +55,9 @@ function interpolateTemplate(template: string, record: Record<string, any>): str
 
 function shouldHideSummaryField(field: any): boolean {
   if (field?.hidden === true) return true;
-  const fieldName = String(field?.field || field?.key || '').trim().toLowerCase();
+  const fieldName = String(field?.field || field?.key || '')
+    .trim()
+    .toLowerCase();
   return fieldName === 'pid';
 }
 
@@ -88,8 +92,7 @@ function resolveSummaryFieldLink(
   let hasMissingValue = false;
   const href = template.replace(/\$\{([^}]+)\}/g, (_match: string, rawPath: string) => {
     const path = String(rawPath || '').trim();
-    const value =
-      path === 'value' ? displayValue : readPath(record, path.replace(/^record\./, ''));
+    const value = path === 'value' ? displayValue : readPath(record, path.replace(/^record\./, ''));
     if (value === undefined || value === null || value === '') {
       hasMissingValue = true;
       return '';
@@ -100,10 +103,7 @@ function resolveSummaryFieldLink(
   return hasMissingValue ? '' : href;
 }
 
-function handleSummaryLinkClick(
-  event: React.MouseEvent<HTMLAnchorElement>,
-  href: string,
-): void {
+function handleSummaryLinkClick(event: React.MouseEvent<HTMLAnchorElement>, href: string): void {
   if (
     !href.startsWith('/') ||
     event.defaultPrevented ||
@@ -140,9 +140,15 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
   const errorField = String((block as any).errorField || 'errorMessage');
   const status = String(readPath(record, statusField) || '').trim();
   const hideStatuses = useMemo(() => new Set(asStringArray((block as any).hideStatuses)), [block]);
-  const failedStatuses = useMemo(() => new Set(asStringArray((block as any).failedStatuses)), [block]);
+  const failedStatuses = useMemo(
+    () => new Set(asStringArray((block as any).failedStatuses)),
+    [block],
+  );
   const polling = (block as any).poll || {};
-  const pollStatuses = useMemo(() => new Set(asStringArray(polling.enabledWhenStatuses)), [polling]);
+  const pollStatuses = useMemo(
+    () => new Set(asStringArray(polling.enabledWhenStatuses)),
+    [polling],
+  );
   const refreshPageStatuses = useMemo(
     () => new Set(asStringArray(polling.refreshPageWhenStatuses)),
     [polling],
@@ -155,9 +161,12 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
 
   useEffect(() => {
     if (!shouldPoll || !manager?.reload) return undefined;
-    const intervalId = window.setInterval(() => {
-      void manager.reload(reloadDataSources);
-    }, Math.max(1000, pollIntervalMs));
+    const intervalId = window.setInterval(
+      () => {
+        void manager.reload(reloadDataSources);
+      },
+      Math.max(1000, pollIntervalMs),
+    );
     return () => window.clearInterval(intervalId);
   }, [manager, pollIntervalMs, reloadDataSources.join('|'), shouldPoll]);
 
@@ -183,7 +192,7 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
     return (
       <div
         data-testid={`status-banner-${block.id || 'block'}-loading`}
-        className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-500"
+        className="rounded-card border-border bg-panel text-text-2 border p-3 text-sm"
       >
         {t('common.loading') !== 'common.loading' ? t('common.loading') : 'Loading...'}
       </div>
@@ -199,7 +208,7 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
       <div
         role="alert"
         data-testid={`status-banner-${block.id || 'block'}-error`}
-        className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+        className="rounded-card border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
       >
         {message}
       </div>
@@ -233,12 +242,12 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
   return (
     <section
       data-testid={`status-banner-${block.id || 'block'}`}
-      className={`rounded-lg border p-4 shadow-sm ${toneClass[String(tone)] || toneClass.gray}`}
+      className={`rounded-card border p-4 shadow-sm ${toneClass[String(tone)] || toneClass.gray}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <span
-            className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
+            className={`rounded-pill mt-1 h-2.5 w-2.5 shrink-0 ${
               dotClass[String(tone)] || dotClass.gray
             } ${shouldPoll ? 'animate-pulse' : ''}`}
           />
@@ -248,7 +257,7 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
           </div>
         </div>
         {shouldPoll && (
-          <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-medium">
+          <span className="rounded-pill bg-white/70 px-2.5 py-1 text-xs font-medium">
             {getLocalizedText(
               (block as any).autoRefreshLabel || {
                 'zh-CN': '自动刷新中',
@@ -270,14 +279,17 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
             const displayValue = String(value);
             const href = resolveSummaryFieldLink(field, record, displayValue);
             return (
-              <div key={key} className="min-w-0 rounded-md bg-white/60 px-3 py-2">
+              <div key={key} className="rounded-control min-w-0 bg-white/60 px-3 py-2">
                 <dt className="text-xs opacity-70">
                   {getLocalizedText(field.label as LocalizedText, locale, t)}
                 </dt>
-                <dd className="mt-0.5 min-w-0 break-words text-sm font-semibold leading-snug" title={displayValue}>
+                <dd
+                  className="mt-0.5 min-w-0 text-sm leading-snug font-semibold break-words"
+                  title={displayValue}
+                >
                   {href ? (
                     <a
-                      className="inline-block max-w-full cursor-pointer break-words text-blue-700 underline decoration-blue-500 underline-offset-2 hover:text-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                      className="text-accent inline-block max-w-full cursor-pointer break-words underline decoration-blue-500 underline-offset-2 hover:text-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                       href={href}
                       onClick={(event) => handleSummaryLinkClick(event, href)}
                     >

@@ -238,7 +238,7 @@ class BpmTaskActionsFallbackTest extends BaseIntegrationTest {
             log.info("APF-01 PASSED: approveTask injected taskResult=approved → approvedBranch reached");
         } catch (Exception e) {
             log.warn("APF-01: failed (SmartEngine not available): {}", e.getMessage(), e);
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task action fallback failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -262,7 +262,7 @@ class BpmTaskActionsFallbackTest extends BaseIntegrationTest {
             log.info("APF-02 PASSED: rejectTask injected taskResult=rejected → rejectedBranch reached");
         } catch (Exception e) {
             log.warn("APF-02: failed: {}", e.getMessage(), e);
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task action fallback failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -292,7 +292,7 @@ class BpmTaskActionsFallbackTest extends BaseIntegrationTest {
             log.info("APF-03 PASSED: caller taskResult='custom_value' preserved → defaultBranch reached");
         } catch (Exception e) {
             log.warn("APF-03: failed: {}", e.getMessage(), e);
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task action fallback failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 

@@ -372,13 +372,13 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       data-testid={`field-${field.field}`}
     >
       {resolvedLabel && (
-        <label htmlFor={field.field} className="mb-1 block text-sm font-medium text-gray-700">
+        <label htmlFor={field.field} className="text-text-2 mb-1 block text-sm font-medium">
           {resolvedLabel}
-          {isRequired && <span className="ml-0.5 text-red-500">*</span>}
+          {isRequired && <span className="text-status-red ml-0.5">*</span>}
         </label>
       )}
       {shouldRenderAsText ? (
-        <div className="py-2 text-sm text-gray-900">
+        <div className="text-text py-2 text-sm">
           {typeof value === 'object' ? JSON.stringify(value) : String(value)}
         </div>
       ) : (

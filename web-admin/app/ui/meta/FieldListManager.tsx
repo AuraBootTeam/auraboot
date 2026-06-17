@@ -60,14 +60,14 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
     <tr
       ref={setNodeRef}
       style={style}
-      className={`${isDragging ? 'bg-blue-50' : 'bg-white'} hover:bg-gray-50`}
+      className={`${isDragging ? 'bg-accent-weak' : 'bg-panel'} hover:bg-subtle`}
     >
       {/* Drag Handle */}
       <td className="px-4 py-4 whitespace-nowrap">
         <button
           {...attributes}
           {...listeners}
-          className="cursor-move text-gray-400 hover:text-gray-600"
+          className="text-text-3 hover:text-text-2 cursor-move"
           title="拖动排序"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,43 +82,43 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
       </td>
 
       {/* Field Code */}
-      <td className="px-6 py-4 font-mono text-sm whitespace-nowrap text-gray-900">
+      <td className="text-text px-6 py-4 font-mono text-sm whitespace-nowrap">
         {field.code || field.fieldCode}
       </td>
 
       {/* Data Type */}
-      <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-900">{field.dataType}</td>
+      <td className="text-text px-6 py-4 text-sm whitespace-nowrap">{field.dataType}</td>
 
       {/* Required */}
-      <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-900">
+      <td className="text-text px-6 py-4 text-sm whitespace-nowrap">
         {field.required ? (
-          <span className="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
+          <span className="rounded-pill inline-flex bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
             必填
           </span>
         ) : (
-          <span className="text-gray-400">-</span>
+          <span className="text-text-3">-</span>
         )}
       </td>
 
       {/* Readonly */}
-      <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-900">
+      <td className="text-text px-6 py-4 text-sm whitespace-nowrap">
         {field.readonly ? (
-          <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">
+          <span className="rounded-pill bg-subtle text-text inline-flex px-2 py-1 text-xs font-medium">
             只读
           </span>
         ) : (
-          <span className="text-gray-400">-</span>
+          <span className="text-text-3">-</span>
         )}
       </td>
 
       {/* Visible */}
-      <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-900">
+      <td className="text-text px-6 py-4 text-sm whitespace-nowrap">
         {field.visible !== false ? (
-          <span className="inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+          <span className="rounded-pill inline-flex bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
             显示
           </span>
         ) : (
-          <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">
+          <span className="rounded-pill bg-subtle text-text inline-flex px-2 py-1 text-xs font-medium">
             隐藏
           </span>
         )}
@@ -128,11 +128,11 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
       <td className="px-6 py-4 text-sm whitespace-nowrap">
         {field.dictCode ? (
           <div className="flex items-center gap-2">
-            <span className="font-mono text-gray-900">{field.dictCode}</span>
+            <span className="text-text font-mono">{field.dictCode}</span>
             {onDictConfig && (
               <button
                 onClick={onDictConfig}
-                className="text-blue-600 hover:text-blue-800"
+                className="text-accent hover:text-blue-800"
                 title="配置字典"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -148,11 +148,11 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-gray-400">-</span>
+            <span className="text-text-3">-</span>
             {onDictConfig && (
               <button
                 onClick={onDictConfig}
-                className="text-xs text-blue-600 hover:text-blue-800"
+                className="text-accent text-xs hover:text-blue-800"
                 title="配置字典"
               >
                 配置
@@ -163,14 +163,14 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
       </td>
 
       {/* Display Order */}
-      <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">{field.displayOrder}</td>
+      <td className="text-text-2 px-6 py-4 text-sm whitespace-nowrap">{field.displayOrder}</td>
 
       {/* Actions */}
       <td className="px-6 py-4 text-sm whitespace-nowrap">
-        <button onClick={onConfigure} className="mr-3 text-blue-600 hover:text-blue-900">
+        <button onClick={onConfigure} className="text-accent mr-3 hover:text-blue-900">
           配置
         </button>
-        <button onClick={onUnbind} className="text-red-600 hover:text-red-900">
+        <button onClick={onUnbind} className="text-status-red hover:text-red-900">
           移除
         </button>
       </td>
@@ -254,7 +254,7 @@ export function FieldListManager({
       <>
         <div className="py-12 text-center">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="text-text-3 mx-auto h-12 w-12"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -266,13 +266,13 @@ export function FieldListManager({
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">暂无字段</h3>
-          <p className="mt-1 text-sm text-gray-500">开始为模型添加字段</p>
+          <h3 className="text-text mt-2 text-sm font-medium">暂无字段</h3>
+          <p className="text-text-2 mt-1 text-sm">开始为模型添加字段</p>
           <div className="mt-6">
             <button
               data-testid="model-fields-add-button"
               onClick={handleOpenDialog}
-              className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
+              className="rounded-control bg-accent hover:bg-accent-hover focus-visible:shadow-focus inline-flex items-center border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm focus:outline-none"
             >
               <svg
                 className="mr-2 -ml-1 h-5 w-5"
@@ -309,13 +309,13 @@ export function FieldListManager({
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-medium text-gray-900">字段列表</h3>
-            <p className="mt-1 text-sm text-gray-500">拖动字段可调整显示顺序</p>
+            <h3 className="text-text text-lg font-medium">字段列表</h3>
+            <p className="text-text-2 mt-1 text-sm">拖动字段可调整显示顺序</p>
           </div>
           <button
             data-testid="model-fields-add-button"
             onClick={handleOpenDialog}
-            className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
+            className="rounded-control bg-accent hover:bg-accent-hover focus-visible:shadow-focus inline-flex items-center border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm focus:outline-none"
           >
             <svg
               className="mr-2 -ml-1 h-5 w-5"
@@ -336,54 +336,54 @@ export function FieldListManager({
 
         {/* Loading Indicator */}
         {isReordering && (
-          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3">
+          <div className="rounded-control bg-accent-weak mb-4 border border-blue-200 p-3">
             <div className="flex items-center">
-              <div className="mr-3 h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600"></div>
+              <div className="rounded-pill border-accent mr-3 h-4 w-4 animate-spin border-b-2"></div>
               <span className="text-sm text-blue-800">正在保存排序...</span>
             </div>
           </div>
         )}
 
         {/* Field Table */}
-        <div className="ring-opacity-5 overflow-x-auto rounded-lg shadow ring-1 ring-black">
+        <div className="ring-opacity-5 rounded-card overflow-x-auto shadow ring-1 ring-black">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
-            <table className="min-w-full divide-y divide-gray-300">
-              <thead className="bg-gray-50">
+            <table className="divide-border min-w-full divide-y">
+              <thead className="bg-subtle">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  <th className="text-text-2 px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
                     排序
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
                     字段编码
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
                     数据类型
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
                     必填
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
                     只读
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
                     可见
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
                     字典
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
                     顺序
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
                     操作
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-border bg-panel divide-y">
                 <SortableContext
                   items={localFields.map((f) => f.id)}
                   strategy={verticalListSortingStrategy}

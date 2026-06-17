@@ -28,7 +28,7 @@ export const Tag: React.FC<TagProps> = ({
   className,
 }) => {
   const classes = clsx(
-    'inline-flex items-center rounded-full font-medium',
+    'inline-flex items-center rounded-pill font-medium',
     colorClassMap[color],
     sizeClassMap[size],
     className,

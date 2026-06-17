@@ -79,20 +79,20 @@ export function ColumnContextMenu({
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-[1000] min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+      className="rounded-card border-border bg-panel fixed z-[1000] min-w-[180px] border py-1 shadow-lg"
       style={{
         left: Math.min(x, window.innerWidth - 200),
         top: Math.min(y, window.innerHeight - 300),
       }}
     >
       {menuItems.map((item, idx) => {
-        if (item === 'divider') return <div key={idx} className="my-1 h-px bg-gray-100" />;
+        if (item === 'divider') return <div key={idx} className="bg-hover my-1 h-px" />;
         if (!item || typeof item === 'string') return null;
         return (
           <button
             key={idx}
             type="button"
-            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${item.active ? 'font-medium text-blue-600' : 'text-gray-700'}`}
+            className={`hover:bg-hover flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${item.active ? 'text-accent font-medium' : 'text-text-2'}`}
             onClick={() => {
               item.onClick();
               onClose();
@@ -100,7 +100,7 @@ export function ColumnContextMenu({
           >
             <span className="w-4 text-center text-xs">{item.icon}</span>
             <span className="flex-1">{item.label}</span>
-            {item.active && <span className="text-xs text-blue-500">✓</span>}
+            {item.active && <span className="text-accent text-xs">✓</span>}
           </button>
         );
       })}

@@ -63,10 +63,21 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
     // Only dispatch buttons that have at least one recognizable action source
     // (preserves original behavior: buttons without events.onClick were no-ops)
     const isBuiltinRefresh = String(button.code || '').toLowerCase() === 'refresh';
-    if (!isBuiltinRefresh && !button.events?.onClick && !button.action && !button.commandCode && !button.navigateTo && !button.apiAction && !button.handler) {
+    if (
+      !isBuiltinRefresh &&
+      !button.events?.onClick &&
+      !button.action &&
+      !button.commandCode &&
+      !button.navigateTo &&
+      !button.apiAction &&
+      !button.handler
+    ) {
       return;
     }
-    handleAction(button, (context.form as Record<string, any>) || (context.data as Record<string, any>));
+    handleAction(
+      button,
+      (context.form as Record<string, any>) || (context.data as Record<string, any>),
+    );
   };
 
   // 渲染单个按钮
@@ -92,17 +103,17 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
     // 确定按钮样式
     const getButtonClassName = () => {
       const baseClass =
-        'inline-flex items-center px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2';
+        'inline-flex items-center px-4 py-2 text-sm font-medium rounded-control focus:outline-none focus-visible:shadow-focus';
 
       if (button.danger) {
-        return `${baseClass} text-white bg-red-600 hover:bg-red-700 focus:ring-red-500 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`;
+        return `${baseClass} text-white bg-red-600 hover:bg-red-700 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`;
       }
 
       if (button.primary) {
-        return `${baseClass} text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`;
+        return `${baseClass} text-white bg-accent hover:bg-accent-hover ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`;
       }
 
-      return `${baseClass} text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 focus:ring-blue-500 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`;
+      return `${baseClass} text-text-2 bg-panel border border-border-strong hover:bg-subtle ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`;
     };
 
     return (
@@ -121,7 +132,7 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
   };
 
   return (
-    <div className="form-buttons mt-6 border-t border-gray-200 pt-4">
+    <div className="form-buttons border-border mt-6 border-t pt-4">
       <div className="flex justify-end space-x-3">
         {buttons.map((button) => renderButton(button))}
       </div>

@@ -135,9 +135,9 @@ harness/打分/持久化全在,缺的只是 **回归门 + 定时/触发 + key + 
 (`crm:create_complaint` / `qc:create_capa` / `dsl.query` + 各自「不许删/不许 release/不许越权动作」),
 并经结构 + 可评分一致性单测守护(expected/forbidden 不重叠、读路由 forbid 变更工具、perfect 选择评 correct+safe)。
 已**接进 `ScheduledCapabilityEvalJob`**(`include-archetype-cases` 默认 true,与自动生成用例合并跑)。
-🔑 **block 点(LLM key)**:用真模型跑这些用例量化质量(`evaluateToolSelection(tenant,"llm",AgentArchetypeEvalCases.all())`
-以及每 agent 非-`stubToolUse` nightly smoke)需 LLM key —— 拿到 key 后补真栈 quality 跑;CI 内确定性价值 = 用例契约 + 一致性守护。
-后续刀:扩充每 agent 用例量(各 10-20 条)+ expectedInputKeys 的参数级评分。
+✅ **真模型量化已落地(2026-06-17,首测)**:`AgentArchetypeLiveQualityIT`(`@Tag("agent-eval-live")`,`DEEPSEEK_API_KEY` gated)用真 DeepSeek(`deepseek-chat`)对 5 个原型任务跑 `LlmToolSelectionService.selectTools`,自包含 7 工具 catalog(不依赖 crm/qc 插件加载,隔离"模型判断"与"插件是否加载"两个变量)。**首测结果:toolCorrect 5/5(100%)/ safe 5/5(100%)/ precise 5/5(100%)/ hallucinated 0**——真模型在生产 agent 的真实任务上选对工具、不越禁用边界、不幻觉。同环境 `CapabilityEvalLiveIT` 3/3(受控 catalog + 持久化 eval_mode=llm)。⚠️ **口径**:单样本、5 任务、单工具选择(未测多步/参数抽取质量/`discoverTools` 真插件 catalog),是正向信号非综合 benchmark。
+🔑 **仍 key-gated**:每 agent 非-`stubToolUse` nightly smoke + `evaluateToolSelection(tenant,"llm",all())` 走真 `discoverTools` 路径(需 crm/qc 插件 host 栈)。
+后续刀:扩充每 agent 用例量(各 10-20 条)+ `expectedInputKeys` 参数级评分 + k-of-n 抗噪重采样 + 接进 `ScheduledCapabilityEvalJob` 的真模型 nightly。
 
 **④ 闭 L4 在线 eval —— ✅ 骨架+确定性判官已落地(`AgentOnlineEvalService` + `AgentTurnQualityJudge` + `HeuristicTurnQualityJudge`)**
 `AgentOnlineEvalService.sampleAndJudge(tenant, sinceHours, maxRuns)` 采样 `ab_agent_observation` 真回合
@@ -145,8 +145,9 @@ harness/打分/持久化全在,缺的只是 **回归门 + 定时/触发 + key + 
 (healthyRate / failRate / costFlaggedRate / avgScore / unhealthy turns)。默认判官 = **确定性 `HeuristicTurnQualityJudge`**
 (从 observable 信号:完成/失败/error severity/`alert_*`/`cost_warning` 打分,**零 token**),
 pure 信号折叠 + 判分 + 聚合全单测守护(12 测)。这是唯一覆盖**真实生产分布**的层。
+✅ **运营回路已接通(2026-06-17,无 key 部分)**:`OnlineEvalQualityGate`(纯阈值门,9 单测:healthy/各维越界/多违规/空采样 no-op/边界含端)+ `ScheduledOnlineEvalJob`(`@Scheduled` cron `0 0 4 * * *`,`aura.agent.online-eval.scheduled.enabled` 默认关,越阈值经 `AgentObservationService.publish("online_eval.degraded", …)` emit + WARN,5 单测)+ 读端点 `GET /api/agent/eval/online?sinceHours&maxRuns`(看板数据源)。门禁默认 `min-healthy-rate 0.80 / max-fail-rate 0.20 / max-cost-flagged-rate 0.20 / min-avg-score 0.50`,operator 开 flag + 设 `tenant-id` 即生效,零运行时行为改变。
 🔑 **block 点(LLM key)**:把判官换成**真模型读 turn detail 评细粒度质量/幻觉/纠正**(同 `AgentTurnQualityJudge` 接口)需 LLM key;拿到 key 后加 `LlmTurnQualityJudge` 实现。
-后续刀:定时触发 `sampleAndJudge` + 越阈值 emit 观测告警(同 ① 的 scheduler 模式)+ 质量看板 NQ/页面。
+后续刀:**质量看板 DSL 页**(消费 `/eval/online` 端点,按 §2.2 需独立 golden 会话:浏览器证据 + 后端数据成对)+ operator 开 flag 后的 nightly heuristic 趋势线。
 
 ### 节奏/门禁矩阵
 

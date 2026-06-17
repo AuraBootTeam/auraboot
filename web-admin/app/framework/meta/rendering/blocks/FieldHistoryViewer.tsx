@@ -80,10 +80,10 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
   if (loading) {
     return (
       <div
-        className="flex items-center justify-center py-12 text-gray-400"
+        className="text-text-3 flex items-center justify-center py-12"
         data-testid="field-history-loading"
       >
-        <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+        <div className="rounded-pill border-border-strong mr-2 h-5 w-5 animate-spin border-2 border-t-blue-500" />
         {locale === 'zh-CN' ? '加载变更历史...' : 'Loading change history...'}
       </div>
     );
@@ -91,7 +91,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
 
   if (error) {
     return (
-      <div className="py-8 text-center text-sm text-red-500" data-testid="field-history-error">
+      <div className="text-status-red py-8 text-center text-sm" data-testid="field-history-error">
         {error}
       </div>
     );
@@ -99,7 +99,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
 
   if (changes.length === 0) {
     return (
-      <div className="py-12 text-center text-sm text-gray-400" data-testid="field-history-empty">
+      <div className="text-text-3 py-12 text-center text-sm" data-testid="field-history-empty">
         {locale === 'zh-CN' ? '暂无变更记录' : 'No change history'}
       </div>
     );
@@ -117,23 +117,23 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
         {groups.map((group, gi) => (
           <div key={gi} className="relative" data-testid={`field-history-group-${gi}`}>
             {/* Timeline dot */}
-            <div className="absolute top-1 -left-10 h-3 w-3 rounded-full border-2 border-blue-500 bg-white" />
+            <div className="rounded-pill border-accent bg-panel absolute top-1 -left-10 h-3 w-3 border-2" />
 
             {/* Header: actor + time */}
-            <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
-              <span className="font-medium text-gray-700">{group.actorName || '—'}</span>
+            <div className="text-text-2 mb-2 flex items-center gap-2 text-xs">
+              <span className="text-text-2 font-medium">{group.actorName || '—'}</span>
               <span>&middot;</span>
               <time>{formatTime(group.changedAt, locale)}</time>
               {group.commandCode && (
                 <>
                   <span>&middot;</span>
-                  <span className="text-gray-400">{group.commandCode}</span>
+                  <span className="text-text-3">{group.commandCode}</span>
                 </>
               )}
             </div>
 
             {/* Change entries */}
-            <div className="divide-y divide-gray-100 rounded-lg border border-gray-100 bg-gray-50">
+            <div className="rounded-card bg-subtle divide-y divide-gray-100 border border-gray-100">
               {group.entries.map((entry) => (
                 <div
                   key={entry.id}
@@ -143,20 +143,20 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
                 >
                   <ChangeTypeBadge type={entry.changeType} locale={locale} />
                   <div className="min-w-0 flex-1">
-                    <span className="font-medium text-gray-700">
+                    <span className="text-text-2 font-medium">
                       {entry.fieldLabel || entry.fieldCode}
                     </span>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
+                    <div className="text-text-2 mt-0.5 flex items-center gap-1.5 text-xs">
                       {entry.changeType === 'added' ? (
                         <span
-                          className="max-w-[200px] truncate text-green-600"
+                          className="text-status-green max-w-[200px] truncate"
                           title={entry.newValue || ''}
                         >
                           {entry.newValue || '—'}
                         </span>
                       ) : entry.changeType === 'removed' ? (
                         <span
-                          className="max-w-[200px] truncate text-red-500 line-through"
+                          className="text-status-red max-w-[200px] truncate line-through"
                           title={entry.oldValue || ''}
                         >
                           {entry.oldValue || '—'}
@@ -164,13 +164,13 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
                       ) : (
                         <>
                           <span
-                            className="max-w-[140px] truncate text-red-500 line-through"
+                            className="text-status-red max-w-[140px] truncate line-through"
                             title={entry.oldValue || ''}
                           >
                             {entry.oldValue || '—'}
                           </span>
                           <svg
-                            className="h-3 w-3 flex-shrink-0 text-gray-400"
+                            className="text-text-3 h-3 w-3 flex-shrink-0"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth={2}
@@ -179,7 +179,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
                             <path d="M5 12h14m-4-4 4 4-4 4" />
                           </svg>
                           <span
-                            className="max-w-[140px] truncate text-green-600"
+                            className="text-status-green max-w-[140px] truncate"
                             title={entry.newValue || ''}
                           >
                             {entry.newValue || '—'}
@@ -188,7 +188,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
                       )}
                     </div>
                     {entry.changeReason && (
-                      <p className="mt-1 text-xs text-gray-400 italic">{entry.changeReason}</p>
+                      <p className="text-text-3 mt-1 text-xs italic">{entry.changeReason}</p>
                     )}
                   </div>
                 </div>

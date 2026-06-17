@@ -72,7 +72,7 @@ interface TreeSelectProps {
 }
 
 const baseStyles =
-  'rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+  'rounded-card border transition-all focus:outline-none focus-visible:shadow-focus disabled:opacity-50 disabled:cursor-not-allowed';
 
 const sizeStyles = {
   small: 'px-2 py-1 text-sm min-h-[2rem]',
@@ -81,9 +81,8 @@ const sizeStyles = {
 };
 
 const variantStyles = {
-  default:
-    'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white',
-  error: 'border-red-300 focus:border-red-500 focus:ring-red-500 dark:border-red-600',
+  default: 'border-border-strong dark:border-gray-600 dark:bg-gray-700 dark:text-white',
+  error: 'border-status-red focus:border-status-red focus:ring-red-500 dark:border-red-600',
 };
 
 export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
@@ -354,10 +353,10 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
           <div
             data-testid={`tree-select-option-${node.value}`}
             className={clsx(
-              'flex cursor-pointer items-center px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600',
-              isSelected && canSelect && 'bg-blue-50 dark:bg-blue-900',
+              'hover:bg-hover flex cursor-pointer items-center px-3 py-2 dark:hover:bg-gray-600',
+              isSelected && canSelect && 'bg-accent-weak dark:bg-blue-900',
               node.disabled && 'cursor-not-allowed opacity-50',
-              !canSelect && leafOnly && 'text-gray-400 dark:text-gray-500',
+              !canSelect && leafOnly && 'text-text-3 dark:text-gray-500',
             )}
             style={{ paddingLeft: `${12 + level * 20}px` }}
             onClick={() => !node.disabled && !readOnly && handleLabelClick(node)}
@@ -369,7 +368,7 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
                   e.stopPropagation();
                   handleExpand(node.key);
                 }}
-                className="mr-2 rounded p-1 hover:bg-gray-200 dark:hover:bg-gray-500"
+                className="hover:bg-hover mr-2 rounded p-1 dark:hover:bg-gray-500"
               >
                 <svg
                   className={clsx('h-3 w-3 transition-transform', isExpanded && 'rotate-90')}
@@ -394,11 +393,11 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
                   e.stopPropagation();
                   !node.disabled && !readOnly && handleNodeSelect(node.value);
                 }}
-                className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-600"
+                className="border-border-strong text-accent mr-2 h-4 w-4 rounded"
               />
             )}
 
-            <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">{node.label}</span>
+            <span className="text-text-2 flex-1 text-sm dark:text-gray-300">{node.label}</span>
           </div>
 
           {hasChildren && isExpanded && (
@@ -449,12 +448,12 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
             sizeStyles[size],
             variantStyles[finalVariant],
             'flex w-full cursor-pointer items-center justify-between',
-            readOnly && 'cursor-not-allowed bg-gray-50 dark:bg-gray-800',
+            readOnly && 'bg-subtle cursor-not-allowed dark:bg-gray-800',
             className,
           )}
           onClick={() => !readOnly && setIsOpen(!isOpen)}
         >
-          <span className={clsx('flex-1 truncate', !hasValue && 'text-gray-500')}>
+          <span className={clsx('flex-1 truncate', !hasValue && 'text-text-2')}>
             {getDisplayText()}
           </span>
 
@@ -467,7 +466,7 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
                   e.stopPropagation();
                   handleClear();
                 }}
-                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                className="text-text-3 hover:text-text-2 p-1 dark:hover:text-gray-300"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -499,10 +498,10 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
         {isOpen && (
           <div
             data-testid="tree-select-popup"
-            className="absolute z-10 mt-1 w-full rounded-lg border border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-700"
+            className="rounded-card border-border-strong bg-panel absolute z-10 mt-1 w-full border shadow-lg dark:border-gray-600 dark:bg-gray-700"
           >
             {searchable && (
-              <div className="border-b border-gray-200 p-2 dark:border-gray-600">
+              <div className="border-border border-b p-2 dark:border-gray-600">
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -510,7 +509,7 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
                   placeholder={st('搜索...')}
                   value={searchValue}
                   onChange={(e) => handleSearch(e.target.value)}
-                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-500 dark:bg-gray-600 dark:text-white"
+                  className="border-border-strong focus-visible:shadow-focus w-full rounded border px-2 py-1 text-sm focus:outline-none dark:border-gray-500 dark:bg-gray-600 dark:text-white"
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -520,7 +519,7 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
               {filteredTreeData.length > 0 ? (
                 filteredTreeData.map((node) => renderTreeNode(node))
               ) : (
-                <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                <div className="text-text-2 px-3 py-2 text-sm dark:text-gray-400">
                   {searchValue ? st('无匹配结果') : st('暂无数据')}
                 </div>
               )}
@@ -571,8 +570,8 @@ export function TreeSelectSideBar({
   focusItem: any;
 }) {
   return (
-    <div className="w-full rounded-lg bg-white p-4 shadow-sm dark:bg-gray-800">
-      <h2 className="mb-6 border-b pb-3 text-center text-xl font-bold text-gray-900 dark:text-white">
+    <div className="rounded-card bg-panel w-full p-4 shadow-sm dark:bg-gray-800">
+      <h2 className="text-text mb-6 border-b pb-3 text-center text-xl font-bold dark:text-white">
         树形选择框属性设置
       </h2>
 
@@ -580,7 +579,7 @@ export function TreeSelectSideBar({
         <div className="flex items-center">
           <label
             htmlFor="props.label"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             标签：
           </label>
@@ -588,14 +587,14 @@ export function TreeSelectSideBar({
             name="props.label"
             onChange={onChange}
             value={focusItem.props?.label || ''}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.placeholder"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             占位符：
           </label>
@@ -603,14 +602,14 @@ export function TreeSelectSideBar({
             name="props.placeholder"
             onChange={onChange}
             value={focusItem.props?.placeholder || ''}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.size"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             尺寸：
           </label>
@@ -618,7 +617,7 @@ export function TreeSelectSideBar({
             name="props.size"
             onChange={onChange}
             value={focusItem.props?.size || 'medium'}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="small">小</option>
             <option value="medium">中</option>
@@ -629,7 +628,7 @@ export function TreeSelectSideBar({
         <div className="flex items-center">
           <label
             htmlFor="props.inline"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             内联显示：
           </label>
@@ -638,14 +637,14 @@ export function TreeSelectSideBar({
             name="props.inline"
             onChange={onChange}
             checked={focusItem.props?.inline || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.multiple"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             多选：
           </label>
@@ -654,14 +653,14 @@ export function TreeSelectSideBar({
             name="props.multiple"
             onChange={onChange}
             checked={focusItem.props?.multiple || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.checkable"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             显示复选框：
           </label>
@@ -670,14 +669,14 @@ export function TreeSelectSideBar({
             name="props.checkable"
             onChange={onChange}
             checked={focusItem.props?.checkable || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.leafOnly"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             仅选叶子节点：
           </label>
@@ -686,14 +685,14 @@ export function TreeSelectSideBar({
             name="props.leafOnly"
             onChange={onChange}
             checked={focusItem.props?.leafOnly !== false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.cascade"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             级联选择：
           </label>
@@ -702,14 +701,14 @@ export function TreeSelectSideBar({
             name="props.cascade"
             onChange={onChange}
             checked={focusItem.props?.cascade || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.searchable"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             可搜索：
           </label>
@@ -718,14 +717,14 @@ export function TreeSelectSideBar({
             name="props.searchable"
             onChange={onChange}
             checked={focusItem.props?.searchable || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.clearable"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             可清除：
           </label>
@@ -734,14 +733,14 @@ export function TreeSelectSideBar({
             name="props.clearable"
             onChange={onChange}
             checked={focusItem.props?.clearable || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.readOnly"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             只读：
           </label>
@@ -750,12 +749,12 @@ export function TreeSelectSideBar({
             name="props.readOnly"
             onChange={onChange}
             checked={focusItem.props?.readOnly || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-text-2 mb-2 block text-sm font-medium dark:text-gray-300">
             树形数据配置：
           </label>
           <textarea
@@ -767,9 +766,9 @@ export function TreeSelectSideBar({
             }
             placeholder='[{"key":"1","value":"node1","label":"节点1","children":[...]}]'
             rows={6}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 font-mono text-sm shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-text-2 mt-1 text-xs dark:text-gray-400">
             JSON 格式的树形数据，支持 key、value、label、disabled、children 字段
           </p>
         </div>
@@ -777,7 +776,7 @@ export function TreeSelectSideBar({
         <div className="flex items-center">
           <label
             htmlFor="props.maxTagCount"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             最大标签数：
           </label>
@@ -787,7 +786,7 @@ export function TreeSelectSideBar({
             onChange={onChange}
             value={focusItem.props?.maxTagCount || 3}
             min="1"
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
       </div>

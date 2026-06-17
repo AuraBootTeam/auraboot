@@ -135,14 +135,18 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
         const fromVersion = versions.find((v) => v.id === fromId);
         const toVersion = versions.find((v) => v.id === toId);
         if (fromVersion && toVersion) {
-          // Map API field names to local types
-          const changes = (result.data.differences || []).map((diff) => ({
-            field: diff.fieldPath,
-            oldValue: diff.sourceValue,
-            newValue: diff.targetValue,
-            changeType:
-              diff.type === 'added' ? 'add' : diff.type === 'removed' ? 'remove' : 'modify',
-          }));
+          // Map API field names to local types. The backend serializes
+          // DifferenceType by name (UPPERCASE: ADDED/REMOVED/MODIFIED), so
+          // normalize defensively rather than comparing case-sensitively.
+          const changes = (result.data.differences || []).map((diff) => {
+            const kind = String(diff.type ?? '').toLowerCase();
+            return {
+              field: diff.fieldPath,
+              oldValue: diff.sourceValue,
+              newValue: diff.targetValue,
+              changeType: kind === 'added' ? 'add' : kind === 'removed' ? 'remove' : 'modify',
+            };
+          });
           setComparison({
             fromVersion,
             toVersion,

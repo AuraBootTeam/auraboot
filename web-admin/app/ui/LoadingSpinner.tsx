@@ -24,7 +24,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ message = 'åŠ è½
     <div className="flex items-center justify-center p-8">
       <div className="flex items-center space-x-2">
         <span className="loading loading-spinner loading-lg"></span>
-        <span className="text-gray-600">{message}</span>
+        <span className="text-text-2">{message}</span>
       </div>
     </div>
   );

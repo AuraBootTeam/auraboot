@@ -97,7 +97,7 @@ export default function Toast({ message, type, show, onClose, duration = 4000 }:
       <div
         role="alert"
         aria-live="assertive"
-        className={`pointer-events-auto w-full max-w-md min-w-80 ${styles.bg} ${styles.shadow} transform rounded-lg backdrop-blur-sm transition-all duration-300 ease-out ${
+        className={`pointer-events-auto w-full max-w-md min-w-80 ${styles.bg} ${styles.shadow} rounded-card transform backdrop-blur-sm transition-all duration-300 ease-out ${
           isVisible && !isLeaving
             ? 'translate-y-0 scale-100 opacity-100'
             : '-translate-y-full scale-95 opacity-0'
@@ -111,7 +111,7 @@ export default function Toast({ message, type, show, onClose, duration = 4000 }:
             </div>
             <div className="ml-4 flex-shrink-0">
               <button
-                className="inline-flex rounded-md p-1 text-white/70 transition-colors duration-200 hover:bg-white/10 hover:text-white focus:ring-2 focus:ring-white/30 focus:outline-none"
+                className="rounded-control hover:bg-panel/10 inline-flex p-1 text-white/70 transition-colors duration-200 hover:text-white focus:ring-2 focus:ring-white/30 focus:outline-none"
                 onClick={handleClose}
               >
                 <XMarkIcon className="h-4 w-4" />
@@ -122,9 +122,9 @@ export default function Toast({ message, type, show, onClose, duration = 4000 }:
 
         {/* 进度条 */}
         {duration > 0 && (
-          <div className="h-1 overflow-hidden rounded-b-lg bg-white/20">
+          <div className="bg-panel/20 h-1 overflow-hidden rounded-b-lg">
             <div
-              className="h-full bg-white/40 transition-all ease-linear"
+              className="bg-panel/40 h-full transition-all ease-linear"
               style={{
                 width: progressStarted && !isLeaving ? '0%' : '100%',
                 transitionDuration: progressStarted && !isLeaving ? `${duration}ms` : '0ms',

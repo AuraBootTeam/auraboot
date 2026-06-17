@@ -154,12 +154,12 @@ export const AgentToolPicker = forwardRef<HTMLDivElement, AgentToolPickerProps>(
           <div className="relative" ref={dropdownRef}>
             {/* Selected tags */}
             <div
-              className={`flex min-h-[38px] cursor-pointer flex-wrap gap-1.5 rounded-lg border border-gray-300 bg-white p-2 dark:border-gray-600 dark:bg-gray-800 ${readOnly ? 'cursor-not-allowed opacity-60' : 'hover:border-blue-400'}`}
+              className={`rounded-card border-border-strong bg-panel flex min-h-[38px] cursor-pointer flex-wrap gap-1.5 border p-2 dark:border-gray-600 dark:bg-gray-800 ${readOnly ? 'cursor-not-allowed opacity-60' : 'hover:border-accent'}`}
               onClick={() => !readOnly && setOpen(!open)}
               data-testid={`tool-picker-${name}`}
             >
               {selected.length === 0 && (
-                <span className="text-sm text-gray-400">
+                <span className="text-text-3 text-sm">
                   {placeholderText || st('agent.selectTools', 'Select tools...')}
                 </span>
               )}
@@ -168,13 +168,13 @@ export const AgentToolPicker = forwardRef<HTMLDivElement, AgentToolPickerProps>(
                 return (
                   <span
                     key={s.toolCode}
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${typeColors[s.toolType] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                    className={`rounded-pill inline-flex items-center gap-1 px-2 py-0.5 text-xs ${typeColors[s.toolType] || 'text-text-2 bg-gray-100 dark:bg-gray-700 dark:text-gray-300'}`}
                   >
                     {tool?.tool_name || s.toolCode}
                     {!readOnly && (
                       <button
                         type="button"
-                        className="ml-0.5 hover:text-red-500"
+                        className="hover:text-status-red ml-0.5"
                         onClick={(e) => {
                           e.stopPropagation();
                           removeTool(s.toolCode);
@@ -191,12 +191,12 @@ export const AgentToolPicker = forwardRef<HTMLDivElement, AgentToolPickerProps>(
 
             {/* Dropdown */}
             {open && (
-              <div className="absolute z-50 mt-1 max-h-64 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800">
+              <div className="rounded-card border-border bg-panel absolute z-50 mt-1 max-h-64 w-full overflow-hidden border shadow-lg dark:border-gray-600 dark:bg-gray-800">
                 {/* Search */}
-                <div className="border-b border-gray-200 p-2 dark:border-gray-700">
+                <div className="border-border border-b p-2 dark:border-gray-700">
                   <input
                     type="text"
-                    className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    className="rounded-control border-border bg-subtle text-text focus-visible:shadow-focus w-full border px-3 py-1.5 text-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                     placeholder={st('agent.searchTools', 'Search tools...')}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -208,9 +208,9 @@ export const AgentToolPicker = forwardRef<HTMLDivElement, AgentToolPickerProps>(
                 {/* Tool list */}
                 <div className="max-h-48 overflow-y-auto">
                   {loading ? (
-                    <div className="p-3 text-center text-sm text-gray-400">Loading...</div>
+                    <div className="text-text-3 p-3 text-center text-sm">Loading...</div>
                   ) : filtered.length === 0 ? (
-                    <div className="p-3 text-center text-sm text-gray-400">
+                    <div className="text-text-3 p-3 text-center text-sm">
                       {tools.length === 0
                         ? st('agent.noToolsAvailable', 'No tools available. Sync tools first.')
                         : st('agent.noMatch', 'No matching tools')}
@@ -221,27 +221,27 @@ export const AgentToolPicker = forwardRef<HTMLDivElement, AgentToolPickerProps>(
                       return (
                         <div
                           key={tool.tool_code}
-                          className={`flex cursor-pointer items-start gap-2 px-3 py-2 transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}`}
+                          className={`flex cursor-pointer items-start gap-2 px-3 py-2 transition-colors ${isSelected ? 'bg-accent-weak dark:bg-blue-900/20' : 'hover:bg-subtle dark:hover:bg-gray-700/30'}`}
                           onClick={() => toggleTool(tool)}
                         >
                           <input
                             type="checkbox"
                             checked={isSelected}
                             readOnly
-                            className="mt-1 rounded border-gray-300"
+                            className="rounded-control border-border-strong mt-1"
                           />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                              <span className="text-text text-sm font-medium dark:text-white">
                                 {tool.tool_name}
                               </span>
                               <span
-                                className={`rounded px-1.5 py-0.5 text-[10px] ${typeColors[tool.tool_type] || 'bg-gray-100 text-gray-600'}`}
+                                className={`rounded-control px-1.5 py-0.5 text-[10px] ${typeColors[tool.tool_type] || 'text-text-2 bg-gray-100'}`}
                               >
                                 {tool.tool_type}
                               </span>
                             </div>
-                            <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+                            <div className="text-text-2 mt-0.5 truncate text-xs dark:text-gray-400">
                               {tool.tool_description || tool.tool_code}
                             </div>
                           </div>

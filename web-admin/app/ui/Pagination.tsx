@@ -97,8 +97,8 @@ export const Pagination: React.FC<PaginationProps> = ({
             onClick={() => handlePageChange(i)}
             className={`rounded border px-3 py-1 ${
               i === current
-                ? 'border-blue-600 bg-blue-600 text-white'
-                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                ? 'border-accent bg-accent text-white'
+                : 'border-border-strong bg-panel text-text-2 hover:bg-subtle'
             }`}
           >
             {i}
@@ -116,14 +116,14 @@ export const Pagination: React.FC<PaginationProps> = ({
           <button
             key={1}
             onClick={() => handlePageChange(1)}
-            className="rounded border border-gray-300 bg-white px-3 py-1 text-gray-700 hover:bg-gray-50"
+            className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1"
           >
             1
           </button>,
         );
         if (start > 2) {
           buttons.push(
-            <span key="ellipsis-start" className="px-2 text-gray-500">
+            <span key="ellipsis-start" className="text-text-2 px-2">
               ...
             </span>,
           );
@@ -138,8 +138,8 @@ export const Pagination: React.FC<PaginationProps> = ({
             onClick={() => handlePageChange(i)}
             className={`rounded border px-3 py-1 ${
               i === current
-                ? 'border-blue-600 bg-blue-600 text-white'
-                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                ? 'border-accent bg-accent text-white'
+                : 'border-border-strong bg-panel text-text-2 hover:bg-subtle'
             }`}
           >
             {i}
@@ -151,7 +151,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       if (end < totalPages) {
         if (end < totalPages - 1) {
           buttons.push(
-            <span key="ellipsis-end" className="px-2 text-gray-500">
+            <span key="ellipsis-end" className="text-text-2 px-2">
               ...
             </span>,
           );
@@ -160,7 +160,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           <button
             key={totalPages}
             onClick={() => handlePageChange(totalPages)}
-            className="rounded border border-gray-300 bg-white px-3 py-1 text-gray-700 hover:bg-gray-50"
+            className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1"
           >
             {totalPages}
           </button>,
@@ -176,9 +176,9 @@ export const Pagination: React.FC<PaginationProps> = ({
   }
 
   return (
-    <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
+    <div className="border-border flex items-center justify-between border-t px-6 py-4">
       {/* 左侧：统计信息 */}
-      <div className="text-sm text-gray-700">
+      <div className="text-text-2 text-sm">
         {(() => {
           const pageText = t('common.page_of');
           return pageText && pageText !== 'common.page_of'
@@ -201,7 +201,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           data-testid="pagination-first"
           onClick={() => handlePageChange(1)}
           disabled={current === 1}
-          className="rounded border border-gray-300 bg-white px-3 py-1 text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {(() => {
             const v = t('common.first_page');
@@ -214,7 +214,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           data-testid="pagination-prev"
           onClick={() => handlePageChange(current - 1)}
           disabled={current === 1}
-          className="rounded border border-gray-300 bg-white px-3 py-1 text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {(() => {
             const v = t('common.previous_page');
@@ -230,7 +230,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           data-testid="pagination-next"
           onClick={() => handlePageChange(current + 1)}
           disabled={current === totalPages}
-          className="rounded border border-gray-300 bg-white px-3 py-1 text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {(() => {
             const v = t('common.next_page');
@@ -243,7 +243,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           data-testid="pagination-last"
           onClick={() => handlePageChange(totalPages)}
           disabled={current === totalPages}
-          className="rounded border border-gray-300 bg-white px-3 py-1 text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {(() => {
             const v = t('common.last_page');
@@ -255,7 +255,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       {/* 右侧：每页条数选择 */}
       {showPageSizeSelector && onPageSizeChange && (
         <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-700">
+          <span className="text-text-2 text-sm">
             {(() => {
               const v = t('common.items_per_page');
               return v !== 'common.items_per_page' ? v : '每页';
@@ -266,7 +266,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             data-testid="pagination-page-size"
             value={pageSize}
             onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-            className="rounded border border-gray-300 px-2 py-1 text-sm"
+            className="border-border-strong rounded border px-2 py-1 text-sm"
           >
             {pageSizeOptions.map((option) => (
               <option key={option} value={option}>

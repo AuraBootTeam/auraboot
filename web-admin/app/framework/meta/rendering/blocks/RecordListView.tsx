@@ -56,10 +56,15 @@ export interface RecordListViewProps {
   testIdPrefix?: string;
 }
 
-function inferValueType(column: ColumnConfig, value: any, record?: Record<string, any>): string | undefined {
+function inferValueType(
+  column: ColumnConfig,
+  value: any,
+  record?: Record<string, any>,
+): string | undefined {
   if (column.valueType) return column.valueType;
   const field = column.field || '';
-  if (field.endsWith('_id') || (record && record[`${field}_display`] !== undefined)) return 'reference';
+  if (field.endsWith('_id') || (record && record[`${field}_display`] !== undefined))
+    return 'reference';
   if (field.endsWith('_at')) return 'datetime';
   if (field.endsWith('_date')) return 'date';
   if (field.endsWith('_time')) return 'time';
@@ -105,7 +110,13 @@ export function RecordListView({
     () =>
       ({
         kind: 'list',
-        blocks: [{ id: `${modelCode}_embedded_table`, blockType: 'table', table: { columns, pagination: { pageSize } } }],
+        blocks: [
+          {
+            id: `${modelCode}_embedded_table`,
+            blockType: 'table',
+            table: { columns, pagination: { pageSize } },
+          },
+        ],
       }) as unknown as UnifiedSchema,
     [modelCode, columns, pageSize],
   );
@@ -168,9 +179,13 @@ export function RecordListView({
 
   // Filter popovers
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
-  const [fieldPickerAnchor, setFieldPickerAnchor] = useState<{ x: number; y: number } | undefined>();
+  const [fieldPickerAnchor, setFieldPickerAnchor] = useState<
+    { x: number; y: number } | undefined
+  >();
   const [editingChipIdx, setEditingChipIdx] = useState<number | null>(null);
-  const [valuePopoverAnchor, setValuePopoverAnchor] = useState<{ x: number; y: number } | undefined>();
+  const [valuePopoverAnchor, setValuePopoverAnchor] = useState<
+    { x: number; y: number } | undefined
+  >();
 
   // Dict cache for dict-backed columns
   const dictCodes = useMemo(
@@ -218,8 +233,11 @@ export function RecordListView({
       const value = record[column.field];
       const effectiveValueType = inferValueType(column, value, record);
 
-      if (!((column as any).allowNullRenderer === true) && (value === null || value === undefined)) {
-        return <span className="text-gray-400">-</span>;
+      if (
+        !((column as any).allowNullRenderer === true) &&
+        (value === null || value === undefined)
+      ) {
+        return <span className="text-text-3">-</span>;
       }
 
       const dictCode = (column as any).dictCode as string | undefined;
@@ -230,7 +248,7 @@ export function RecordListView({
         if (item) {
           const colorCls = DICT_COLOR_MAP[item.extension?.color || 'blue'] || DICT_COLOR_MAP.blue;
           return (
-            <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${colorCls}`}>
+            <span className={`rounded-pill inline-flex px-2 py-1 text-xs font-medium ${colorCls}`}>
               {item.label}
             </span>
           );
@@ -310,7 +328,7 @@ export function RecordListView({
               onChange={(e) => setKeywordInput(e.target.value)}
               placeholder={t('common.search') || 'Search'}
               data-testid={`${testIdPrefix}-search`}
-              className="h-9 w-64 rounded-md border border-gray-300 px-3 text-sm focus:border-blue-500 focus:outline-none"
+              className="rounded-control border-border-strong focus-visible:shadow-focus h-9 w-64 border px-3 text-sm focus:outline-none"
             />
           )}
           {filterable && (
@@ -322,7 +340,9 @@ export function RecordListView({
               onSortsChange={setSorts}
               onAddFilter={(e?: React.MouseEvent) => {
                 const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
-                setFieldPickerAnchor(rect ? { x: rect.left, y: rect.bottom + 4 } : { x: 300, y: 200 });
+                setFieldPickerAnchor(
+                  rect ? { x: rect.left, y: rect.bottom + 4 } : { x: 300, y: 200 },
+                );
                 setFieldPickerOpen(true);
               }}
               onChipClick={(idx, e) => {
@@ -355,19 +375,25 @@ export function RecordListView({
             modelCode={modelCode}
             columnOrder={columnOrder}
             onColumnReorder={noop}
-            onColumnResize={(field, width) => setColumnWidths((prev) => ({ ...prev, [field]: width }))}
+            onColumnResize={(field, width) =>
+              setColumnWidths((prev) => ({ ...prev, [field]: width }))
+            }
             onToggleSort={(field) => toggleSort(field)}
             onSelectRow={noop}
             onSelectAll={noop}
             onRowClick={(record) =>
               onRowClick
                 ? onRowClick(record)
-                : navigate(`/p/${modelCode}/view/${encodeURIComponent(String(record.pid ?? record.id ?? ''))}`)
+                : navigate(
+                    `/p/${modelCode}/view/${encodeURIComponent(String(record.pid ?? record.id ?? ''))}`,
+                  )
             }
             onContextMenu={noop}
             renderCellContent={renderCellContent}
             evaluateVisibleWhen={() => true}
-            resolveButtonLabel={(b: ButtonConfig) => resolveColumnLabel(b as unknown as ColumnConfig)}
+            resolveButtonLabel={(b: ButtonConfig) =>
+              resolveColumnLabel(b as unknown as ColumnConfig)
+            }
             handleAction={noop}
             resolveColumnLabel={resolveColumnLabel}
             columnWidths={columnWidths}
@@ -418,13 +444,17 @@ export function RecordListView({
               anchorEl={valuePopoverAnchor}
               fieldCode={chipFilters[editingChipIdx].fieldCode}
               fieldLabel={
-                fieldMetadata.find((f) => f.fieldCode === chipFilters[editingChipIdx]!.fieldCode)?.label ??
-                chipFilters[editingChipIdx]!.fieldCode
+                fieldMetadata.find((f) => f.fieldCode === chipFilters[editingChipIdx]!.fieldCode)
+                  ?.label ?? chipFilters[editingChipIdx]!.fieldCode
               }
               fieldType={
-                fieldMetadata.find((f) => f.fieldCode === chipFilters[editingChipIdx]!.fieldCode)?.fieldType ?? 'text'
+                fieldMetadata.find((f) => f.fieldCode === chipFilters[editingChipIdx]!.fieldCode)
+                  ?.fieldType ?? 'text'
               }
-              dictCode={fieldMetadata.find((f) => f.fieldCode === chipFilters[editingChipIdx]!.fieldCode)?.dictCode}
+              dictCode={
+                fieldMetadata.find((f) => f.fieldCode === chipFilters[editingChipIdx]!.fieldCode)
+                  ?.dictCode
+              }
               token={token}
               operator={chipFilters[editingChipIdx].operator}
               value={chipFilters[editingChipIdx].value}
@@ -433,7 +463,9 @@ export function RecordListView({
                 // to searchParams and local chips update localChips.
                 handleChipFiltersChange(
                   chipFilters.map((c, i) =>
-                    i === editingChipIdx ? { ...c, operator: operator as ViewFilterConfig['operator'], value } : c,
+                    i === editingChipIdx
+                      ? { ...c, operator: operator as ViewFilterConfig['operator'], value }
+                      : c,
                   ),
                 );
                 setEditingChipIdx(null);
@@ -441,7 +473,9 @@ export function RecordListView({
               onCancel={() => {
                 // Drop an empty chip that was never given a value.
                 handleChipFiltersChange(
-                  chipFilters.filter((c, i) => !(i === editingChipIdx && (c.value == null || c.value === ''))),
+                  chipFilters.filter(
+                    (c, i) => !(i === editingChipIdx && (c.value == null || c.value === '')),
+                  ),
                 );
                 setEditingChipIdx(null);
               }}

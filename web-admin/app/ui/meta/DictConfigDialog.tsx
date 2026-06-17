@@ -250,20 +250,21 @@ export function DictConfigDialog({
       {/* Dialog */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div
-          className="relative flex max-h-[90vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl"
+          className="rounded-card bg-panel relative flex max-h-[90vh] w-full max-w-4xl flex-col shadow-xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="border-b border-gray-200 px-6 py-4">
+          <div className="border-border border-b px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">配置字段字典</h2>
-                <p className="mt-1 text-sm text-gray-500">
+                <h2 className="text-text text-xl font-semibold">配置字段字典</h2>
+                <p className="text-text-2 mt-1 text-sm">
                   字段:{' '}
-                  <span className="font-mono text-blue-600">{field.code || field.fieldCode}</span>
+                  <span className="text-accent font-mono">{field.code || field.fieldCode}</span>
                   {field.dictCode && (
                     <span className="ml-2">
-                      · 当前绑定: <span className="font-mono text-green-600">{field.dictCode}</span>
+                      · 当前绑定:{' '}
+                      <span className="text-status-green font-mono">{field.dictCode}</span>
                     </span>
                   )}
                 </p>
@@ -271,7 +272,7 @@ export function DictConfigDialog({
               <button
                 onClick={handleClose}
                 disabled={saving || creating}
-                className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                className="text-text-3 hover:text-text-2 disabled:opacity-50"
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -285,13 +286,13 @@ export function DictConfigDialog({
             </div>
 
             {/* Tabs */}
-            <div className="mt-4 flex border-b border-gray-200">
+            <div className="border-border mt-4 flex border-b">
               <button
                 onClick={() => setActiveTab('select')}
                 className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
                   activeTab === 'select'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'text-accent border-accent'
+                    : 'text-text-2 hover:text-text-2 border-transparent'
                 }`}
               >
                 选择已有字典
@@ -300,8 +301,8 @@ export function DictConfigDialog({
                 onClick={() => setActiveTab('create')}
                 className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
                   activeTab === 'create'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'text-accent border-accent'
+                    : 'text-text-2 hover:text-text-2 border-transparent'
                 }`}
               >
                 创建新字典
@@ -320,17 +321,17 @@ export function DictConfigDialog({
                     value={searchKeyword}
                     onChange={(e) => setSearchKeyword(e.target.value)}
                     placeholder="搜索字典名称..."
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
                   />
                 </div>
 
                 {/* Dictionary List */}
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
-                    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+                    <div className="rounded-pill border-accent h-8 w-8 animate-spin border-b-2"></div>
                   </div>
                 ) : dicts.length === 0 ? (
-                  <div className="py-12 text-center text-gray-500">
+                  <div className="text-text-2 py-12 text-center">
                     <p>未找到字典</p>
                     <p className="mt-2 text-sm">请尝试创建新字典</p>
                   </div>
@@ -340,18 +341,18 @@ export function DictConfigDialog({
                       <div
                         key={dict.pid}
                         onClick={() => handleDictSelect(dict)}
-                        className={`cursor-pointer rounded-md border p-4 transition-colors ${
+                        className={`rounded-control cursor-pointer border p-4 transition-colors ${
                           selectedDict?.pid === dict.pid
-                            ? 'border-blue-200 bg-blue-50'
-                            : 'border-gray-200 hover:bg-gray-50'
+                            ? 'bg-accent-weak border-blue-200'
+                            : 'border-border hover:bg-subtle'
                         }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-900">{dict.name}</span>
-                              <span className="font-mono text-xs text-gray-500">({dict.code})</span>
-                              <span className="inline-flex rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">
+                              <span className="text-text text-sm font-medium">{dict.name}</span>
+                              <span className="text-text-2 font-mono text-xs">({dict.code})</span>
+                              <span className="bg-subtle text-text inline-flex rounded px-2 py-0.5 text-xs font-medium">
                                 {dict.dictType}
                               </span>
                               {dict.status === 'published' && (
@@ -361,12 +362,12 @@ export function DictConfigDialog({
                               )}
                             </div>
                             {dict.remark && (
-                              <p className="mt-1 text-xs text-gray-500">{dict.remark}</p>
+                              <p className="text-text-2 mt-1 text-xs">{dict.remark}</p>
                             )}
                           </div>
                           {selectedDict?.pid === dict.pid && (
                             <svg
-                              className="h-5 w-5 text-blue-600"
+                              className="text-accent h-5 w-5"
                               fill="currentColor"
                               viewBox="0 0 20 20"
                             >
@@ -388,37 +389,37 @@ export function DictConfigDialog({
                 {/* Dictionary Basic Info */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      字典编码 <span className="text-red-500">*</span>
+                    <label className="text-text-2 mb-1 block text-sm font-medium">
+                      字典编码 <span className="text-status-red">*</span>
                     </label>
                     <input
                       type="text"
                       value={dictForm.code}
                       onChange={(e) => setDictForm({ ...dictForm, code: e.target.value })}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
                       placeholder="dict_field_name"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      字典名称 <span className="text-red-500">*</span>
+                    <label className="text-text-2 mb-1 block text-sm font-medium">
+                      字典名称 <span className="text-status-red">*</span>
                     </label>
                     <input
                       type="text"
                       value={dictForm.name}
                       onChange={(e) => setDictForm({ ...dictForm, name: e.target.value })}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
                       placeholder="字段名称字典"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">字典类型</label>
+                  <label className="text-text-2 mb-1 block text-sm font-medium">字典类型</label>
                   <select
                     value={dictForm.dictType}
                     onChange={(e) => setDictForm({ ...dictForm, dictType: e.target.value as any })}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
                   >
                     <option value="simple">简单字典</option>
                     <option value="tree">树形字典</option>
@@ -427,12 +428,12 @@ export function DictConfigDialog({
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">备注</label>
+                  <label className="text-text-2 mb-1 block text-sm font-medium">备注</label>
                   <textarea
                     value={dictForm.remark}
                     onChange={(e) => setDictForm({ ...dictForm, remark: e.target.value })}
                     rows={2}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
                     placeholder="字典说明..."
                   />
                 </div>
@@ -440,12 +441,12 @@ export function DictConfigDialog({
                 {/* Dictionary Items */}
                 <div>
                   <div className="mb-2 flex items-center justify-between">
-                    <label className="block text-sm font-medium text-gray-700">
-                      字典项 <span className="text-red-500">*</span>
+                    <label className="text-text-2 block text-sm font-medium">
+                      字典项 <span className="text-status-red">*</span>
                     </label>
                     <button
                       onClick={handleAddItem}
-                      className="text-sm text-blue-600 hover:text-blue-800"
+                      className="text-accent text-sm hover:text-blue-800"
                     >
                       + 添加项
                     </button>
@@ -458,14 +459,14 @@ export function DictConfigDialog({
                           value={item.value}
                           onChange={(e) => handleItemChange(index, 'value', e.target.value)}
                           placeholder="值"
-                          className="flex-1 rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 focus:outline-none"
                         />
                         <input
                           type="text"
                           value={item.label}
                           onChange={(e) => handleItemChange(index, 'label', e.target.value)}
                           placeholder="标签"
-                          className="flex-1 rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 focus:outline-none"
                         />
                         <input
                           type="number"
@@ -474,11 +475,11 @@ export function DictConfigDialog({
                             handleItemChange(index, 'sortOrder', parseInt(e.target.value) || 0)
                           }
                           placeholder="排序"
-                          className="w-20 rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          className="rounded-control border-border-strong focus-visible:shadow-focus w-20 border px-3 py-2 focus:outline-none"
                         />
                         <button
                           onClick={() => handleRemoveItem(index)}
-                          className="px-3 py-2 text-red-600 hover:text-red-800"
+                          className="text-status-red px-3 py-2 hover:text-red-800"
                         >
                           <svg
                             className="h-5 w-5"
@@ -503,13 +504,13 @@ export function DictConfigDialog({
           </div>
 
           {/* Footer */}
-          <div className="flex justify-between border-t border-gray-200 px-6 py-4">
+          <div className="border-border flex justify-between border-t px-6 py-4">
             <div>
               {field.dictCode && activeTab === 'select' && (
                 <button
                   onClick={handleUnbindDict}
                   disabled={saving || creating}
-                  className="rounded-md border border-red-300 px-4 py-2 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  className="rounded-control border-status-red hover:bg-status-red-bg border px-4 py-2 text-red-700 disabled:opacity-50"
                 >
                   解绑字典
                 </button>
@@ -519,7 +520,7 @@ export function DictConfigDialog({
               <button
                 onClick={handleClose}
                 disabled={saving || creating}
-                className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2 disabled:opacity-50"
               >
                 取消
               </button>
@@ -527,10 +528,10 @@ export function DictConfigDialog({
                 <button
                   onClick={handleBindDict}
                   disabled={saving || !selectedDict}
-                  className="flex items-center rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-control bg-accent hover:bg-accent-hover flex items-center px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving && (
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                    <div className="rounded-pill mr-2 h-4 w-4 animate-spin border-b-2 border-white"></div>
                   )}
                   {field.dictCode ? '更换字典' : '绑定字典'}
                 </button>
@@ -538,10 +539,10 @@ export function DictConfigDialog({
                 <button
                   onClick={handleCreateDict}
                   disabled={creating}
-                  className="flex items-center rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-control flex items-center bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {creating && (
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                    <div className="rounded-pill mr-2 h-4 w-4 animate-spin border-b-2 border-white"></div>
                   )}
                   创建并绑定
                 </button>

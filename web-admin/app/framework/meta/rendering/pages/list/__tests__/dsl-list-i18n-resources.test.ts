@@ -3,7 +3,8 @@
  *
  * The OSS frontend probes specific i18n keys (`common.sort`, `common.fields`,
  * `common.add_filter`, `common.my_records`, `common.created_today`,
- * `common.modified_this_week`, `common.search`, `common.filter`,
+ * `common.modified_this_week`, `common.preset_views`, `common.search`,
+ * `common.filter`,
  * `common.created_at`, `common.create`, `common.detail`, `common.submit`)
  * when rendering DSL list pages. If any of these go missing from
  * `platform/src/main/resources/i18n.zh-CN.yaml`, users will see English
@@ -17,10 +18,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const REPO_ROOT = path.resolve(__dirname, '../../../../../../../..');
-const ZH_CN_YAML = path.resolve(
-  REPO_ROOT,
-  'platform/src/main/resources/i18n.zh-CN.yaml',
-);
+const ZH_CN_YAML = path.resolve(REPO_ROOT, 'platform/src/main/resources/i18n.zh-CN.yaml');
 
 const REQUIRED_COMMON_KEYS = [
   // Toolbar literals (#3)
@@ -37,6 +35,7 @@ const REQUIRED_COMMON_KEYS = [
   'my_records',
   'created_today',
   'modified_this_week',
+  'preset_views',
   // System audit field column headers (#2)
   'created_at',
   'updated_at',
@@ -93,17 +92,13 @@ describe('DSL list page i18n zh-CN yaml resource', () => {
     expect(Object.keys(common).length).toBeGreaterThan(10);
   });
 
-  it.each(REQUIRED_COMMON_KEYS)(
-    'zh-CN yaml defines common.%s with Chinese characters',
-    (key) => {
-      const common = readCommonBlock(ZH_CN_YAML);
-      const value = common[key];
-      expect(value, `common.${key} must be defined to avoid leaking English literal`).toBeDefined();
-      expect((value as string).length, `common.${key} value must be non-empty`).toBeGreaterThan(0);
-      expect(
-        /[一-龥]/.test(value),
-        `common.${key}="${value}" must contain Chinese characters`,
-      ).toBe(true);
-    },
-  );
+  it.each(REQUIRED_COMMON_KEYS)('zh-CN yaml defines common.%s with Chinese characters', (key) => {
+    const common = readCommonBlock(ZH_CN_YAML);
+    const value = common[key];
+    expect(value, `common.${key} must be defined to avoid leaking English literal`).toBeDefined();
+    expect((value as string).length, `common.${key} value must be non-empty`).toBeGreaterThan(0);
+    expect(/[一-龥]/.test(value), `common.${key}="${value}" must contain Chinese characters`).toBe(
+      true,
+    );
+  });
 });

@@ -87,14 +87,17 @@ export interface ProcessFeeRuleMatrixBlockProps {
 }
 
 export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatrixBlockProps) {
-  const dataSource = typeof block.dataSource === 'string' ? block.dataSource : 'processFeeRuleLines';
+  const dataSource =
+    typeof block.dataSource === 'string' ? block.dataSource : 'processFeeRuleLines';
   useDataSourceSubscription(runtime, dataSource);
   useRuntimeStateSubscription(runtime);
 
   const sourceRows = readDataSourceRows(runtime, dataSource);
   const selectedRuleSet = resolveRuntimeValue(runtime, (block as any).selectedRuleSet) || {};
   const quoteId = String(resolveRuntimeValue(runtime, (block as any).quoteId) || '');
-  const saveCommand = String((block as any).saveCommand || 'qo_quote_common:save_process_fee_rule_matrix');
+  const saveCommand = String(
+    (block as any).saveCommand || 'qo_quote_common:save_process_fee_rule_matrix',
+  );
   const reloadIds = Array.isArray((block as any).reload) ? (block as any).reload : [];
   const [rows, setRows] = React.useState<MatrixRow[]>(() => toMatrixRows(sourceRows));
   const [stageFilter, setStageFilter] = React.useState('');
@@ -102,7 +105,10 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
   const [sortField, setSortField] = React.useState<RuleField | null>(null);
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
   const [pasteText, setPasteText] = React.useState('');
-  const [saveState, setSaveState] = React.useState<{ status: 'idle' | 'saving' | 'saved' | 'error'; message: string }>({
+  const [saveState, setSaveState] = React.useState<{
+    status: 'idle' | 'saving' | 'saved' | 'error';
+    message: string;
+  }>({
     status: 'idle',
     message: '',
   });
@@ -118,11 +124,14 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
   const originalSignature = React.useMemo(() => signature(originalRows), [originalRows]);
   const currentSignature = React.useMemo(() => signature(rows), [rows]);
   const dirty = originalSignature !== currentSignature;
-  const dirtyRowCount = React.useMemo(() => countDirtyRows(originalRows, rows), [originalRows, rows]);
+  const dirtyRowCount = React.useMemo(
+    () => countDirtyRows(originalRows, rows),
+    [originalRows, rows],
+  );
   const stageOptions = React.useMemo(
     () =>
-      Array.from(new Set(rows.map((row) => row.qo_pfrl_process_stage).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b, 'zh-CN'),
+      Array.from(new Set(rows.map((row) => row.qo_pfrl_process_stage).filter(Boolean))).sort(
+        (a, b) => a.localeCompare(b, 'zh-CN'),
       ),
     [rows],
   );
@@ -140,9 +149,10 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
     return [...filtered].sort((a, b) => {
       const left = sortableValue(a[sortField]);
       const right = sortableValue(b[sortField]);
-      const result = typeof left === 'number' && typeof right === 'number'
-        ? left - right
-        : String(left).localeCompare(String(right), 'zh-CN');
+      const result =
+        typeof left === 'number' && typeof right === 'number'
+          ? left - right
+          : String(left).localeCompare(String(right), 'zh-CN');
       return sortDir === 'asc' ? result : -result;
     });
   }, [rows, searchText, sortDir, sortField, stageFilter]);
@@ -173,10 +183,7 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
   };
 
   const addRow = () => {
-    setRows((current) => [
-      ...current,
-      emptyRow(`new-${Date.now()}`),
-    ]);
+    setRows((current) => [...current, emptyRow(`new-${Date.now()}`)]);
     setSaveState({ status: 'idle', message: '' });
   };
 
@@ -209,7 +216,10 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
     await runtime.getDataSourceManager?.().reload?.(reloadIds);
     const data = (result as any).data?.data ?? (result as any).data ?? {};
     const version = data.ruleVersion ? String(data.ruleVersion) : 'draft';
-    setSaveState({ status: 'saved', message: `已保存 ${data.savedLines ?? rows.length} 行 · ${version}` });
+    setSaveState({
+      status: 'saved',
+      message: `已保存 ${data.savedLines ?? rows.length} 行 · ${version}`,
+    });
   };
 
   const selectedVersion = String(selectedRuleSet.qo_pfrs_version || '-');
@@ -217,7 +227,10 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
   const isPublished = selectedStatus === 'published';
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white" data-testid="process-fee-rule-matrix">
+    <section
+      className="rounded-control bg-panel border border-slate-200"
+      data-testid="process-fee-rule-matrix"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -235,7 +248,7 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className="inline-flex items-center rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-control inline-flex items-center border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
             onClick={addRow}
           >
             <Plus className="mr-1.5 h-4 w-4" />
@@ -245,7 +258,7 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
             type="button"
             data-testid="process-fee-save-matrix"
             disabled={issues.length > 0 || saveState.status === 'saving'}
-            className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-control bg-accent hover:bg-accent-hover inline-flex items-center px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             onClick={saveMatrix}
           >
             <Save className="mr-1.5 h-4 w-4" />
@@ -261,7 +274,7 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
             aria-label="工序筛选"
             value={stageFilter}
             onChange={(event) => setStageFilter(event.target.value)}
-            className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+            className="rounded-control bg-panel focus-visible:shadow-focus mt-1 h-9 w-full border border-slate-200 px-2 text-sm text-slate-900 focus:outline-none"
           >
             <option value="">全部工序</option>
             {stageOptions.map((stage) => (
@@ -277,7 +290,7 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
             aria-label="关键字"
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
-            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+            className="rounded-control focus-visible:shadow-focus mt-1 h-9 w-full border border-slate-200 px-2 text-sm text-slate-900 focus:outline-none"
           />
         </label>
         <label className="text-xs font-medium text-slate-600">
@@ -286,14 +299,14 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
             aria-label="粘贴矩阵"
             value={pasteText}
             onChange={(event) => setPasteText(event.target.value)}
-            className="mt-1 h-16 w-full resize-y rounded-md border border-slate-200 px-2 py-1.5 font-mono text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+            className="rounded-control focus-visible:shadow-focus mt-1 h-16 w-full resize-y border border-slate-200 px-2 py-1.5 font-mono text-xs text-slate-900 focus:outline-none"
           />
         </label>
         <button
           type="button"
           data-testid="process-fee-apply-paste"
           onClick={applyPaste}
-          className="mt-5 inline-flex h-9 items-center justify-center rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="rounded-control mt-5 inline-flex h-9 items-center justify-center border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           <ClipboardPaste className="mr-1.5 h-4 w-4" />
           应用粘贴
@@ -301,7 +314,7 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
       </div>
 
       {issues.length > 0 ? (
-        <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+        <div className="bg-status-amber-bg flex items-start gap-2 border-b border-amber-200 px-4 py-2 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="space-y-1">
             {issues.slice(0, 4).map((issue, index) => (
@@ -329,8 +342,12 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
                 >
                   <button
                     type="button"
-                    data-testid={column.field === 'qo_pfrl_unit_price' ? 'process-fee-sort-unit-price' : undefined}
-                    className="inline-flex items-center gap-1 hover:text-blue-700"
+                    data-testid={
+                      column.field === 'qo_pfrl_unit_price'
+                        ? 'process-fee-sort-unit-price'
+                        : undefined
+                    }
+                    className="hover:text-accent inline-flex items-center gap-1"
                     onClick={() => {
                       if (sortField === column.field) {
                         setSortDir((current) => (current === 'asc' ? 'desc' : 'asc'));
@@ -359,14 +376,23 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
               </tr>
             ) : (
               visibleRows.map((row) => (
-                <tr key={row.__rowId} className={issueByRow.has(row.__rowId) ? 'bg-amber-50' : 'odd:bg-white even:bg-slate-50/60'}>
+                <tr
+                  key={row.__rowId}
+                  className={
+                    issueByRow.has(row.__rowId)
+                      ? 'bg-status-amber-bg'
+                      : 'odd:bg-panel even:bg-slate-50/60'
+                  }
+                >
                   {COLUMNS.map((column) => (
                     <td key={column.field} className="border-b border-slate-100 px-1 py-1">
                       <input
                         data-testid={`process-fee-cell-${column.field}`}
                         value={row[column.field]}
-                        onChange={(event) => updateCell(row.__rowId, column.field, event.target.value)}
-                        className={`h-8 w-full rounded border border-transparent bg-transparent px-2 text-sm text-slate-900 focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none ${
+                        onChange={(event) =>
+                          updateCell(row.__rowId, column.field, event.target.value)
+                        }
+                        className={`focus:bg-panel focus-visible:shadow-focus h-8 w-full rounded border border-transparent bg-transparent px-2 text-sm text-slate-900 focus:outline-none ${
                           column.align === 'right' ? 'text-right font-mono' : ''
                         }`}
                       />
@@ -377,7 +403,7 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
                       type="button"
                       aria-label="删除规则行"
                       onClick={() => removeRow(row.__rowId)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-rose-50 hover:text-rose-700"
+                      className="rounded-control inline-flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-rose-50 hover:text-rose-700"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -404,13 +430,21 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
   );
 }
 
-function StatusPill({ children, tone }: { children: React.ReactNode; tone: 'amber' | 'blue' | 'slate' }) {
+function StatusPill({
+  children,
+  tone,
+}: {
+  children: React.ReactNode;
+  tone: 'amber' | 'blue' | 'slate';
+}) {
   const cls = {
     amber: 'border-amber-200 bg-amber-50 text-amber-700',
     blue: 'border-blue-200 bg-blue-50 text-blue-700',
     slate: 'border-slate-200 bg-slate-50 text-slate-600',
   }[tone];
-  return <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>;
+  return (
+    <span className={`rounded-pill border px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>
+  );
 }
 
 function toMatrixRows(rows: Array<Record<string, unknown>>): MatrixRow[] {
@@ -452,7 +486,10 @@ function validateRows(rows: MatrixRow[]): ValidationIssue[] {
     }
     const unitPrice = numeric(row.qo_pfrl_unit_price);
     if (unitPrice == null || unitPrice <= 0) {
-      issues.push({ rowId: row.__rowId, message: `row ${rowNo} unit price must be greater than 0` });
+      issues.push({
+        rowId: row.__rowId,
+        message: `row ${rowNo} unit price must be greater than 0`,
+      });
     }
     const minQty = integer(row.qo_pfrl_min_qty);
     const maxQty = integer(row.qo_pfrl_max_qty);

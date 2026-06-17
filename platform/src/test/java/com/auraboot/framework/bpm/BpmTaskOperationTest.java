@@ -55,6 +55,15 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
 
     /**
      * Simple process BPMN: Start -> UserTask(task1) -> End
+     *
+     * Two placeholders: %s process id, %s task1 assignee id. The assignee is
+     * bound to the current actor (BpmSecurityUtil.getCurrentUserId()) so the
+     * operating user IS the task assignee — task operations (complete / approve /
+     * reject / rollback / delegate / transfer) enforce assignee authorization and
+     * would otherwise be rejected ("User not authorized" / "No taskAssigneeInstance
+     * found"). Previously the assignee was a hardcoded "testuser1" that never
+     * matched the actor, and the resulting engine exceptions were silently
+     * swallowed into Assumptions.assumeTrue(false) skips (false-pass — G-T3).
      */
     private static final String TASK_TEST_BPMN = """
             <?xml version="1.0" encoding="UTF-8"?>
@@ -66,12 +75,17 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
                 <sequenceFlow id="flow1" sourceRef="start" targetRef="task1"/>
                 <userTask id="task1" name="Review Task"
                           smart:assigneeType="user"
-                          smart:assigneeId="testuser1"/>
+                          smart:assigneeId="%s"/>
                 <sequenceFlow id="flow2" sourceRef="task1" targetRef="end"/>
                 <endEvent id="end" name="End"/>
               </process>
             </definitions>
             """;
+
+    /** The actor running the test = the task assignee bound into the BPMN. */
+    private static String currentActor() {
+        return com.auraboot.framework.bpm.util.BpmSecurityUtil.getCurrentUserId();
+    }
 
     // ==================== Helper Methods ====================
 
@@ -80,7 +94,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
      */
     private String createAndDeployProcess(String suffix) {
         String processKey = "task-test-" + suffix + "-" + System.nanoTime();
-        String bpmn = String.format(TASK_TEST_BPMN, processKey);
+        String bpmn = String.format(TASK_TEST_BPMN, processKey, currentActor());
 
         ProcessDeploymentService.CreateProcessRequest request =
                 new ProcessDeploymentService.CreateProcessRequest(
@@ -132,7 +146,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
         } catch (Exception e) {
             log.warn("D2-01: Start process failed (SmartEngine not fully initialized): {}", e.getMessage());
             // SmartEngine may require database-mode tables; test environment may not support full engine
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -150,7 +164,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-02 PASSED: Todo tasks retrieved, count={}", todoTasks.size());
         } catch (Exception e) {
             log.warn("D2-02: Todo list query failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -170,7 +184,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-03 PASSED: Completed tasks retrieved, count={}", completedTasks.size());
         } catch (Exception e) {
             log.warn("D2-03: Completed list query failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -194,7 +208,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-04 PASSED: Task detail retrieved, taskId={}", taskDetail.getInstanceId());
         } catch (Exception e) {
             log.warn("D2-04: Task detail failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -218,7 +232,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-05 PASSED: Task claimed successfully, taskId={}", taskId);
         } catch (Exception e) {
             log.warn("D2-05: Claim task failed (may be partially implemented): {}", e.getMessage());
-            Assumptions.assumeTrue(false, "Claim not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -249,7 +263,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             }
         } catch (Exception e) {
             log.warn("D2-06: Complete task failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -274,7 +288,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-07 PASSED: Task approved, taskId={}", taskId);
         } catch (Exception e) {
             log.warn("D2-07: Approve task failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -298,7 +312,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-08 PASSED: Task rejected, taskId={}", taskId);
         } catch (Exception e) {
             log.warn("D2-08: Reject task failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -326,7 +340,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-09 PASSED: Task delegated, taskId={}", taskId);
         } catch (Exception e) {
             log.warn("D2-09: Delegate task failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -350,7 +364,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-10 PASSED: Task transferred, taskId={}", taskId);
         } catch (Exception e) {
             log.warn("D2-10: Transfer task failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "Transfer not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -358,6 +372,12 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
 
     @Test
     @Order(11)
+    @Disabled("BLOCKED-UPSTREAM (G-B5): SmartEngine rollback does not populate "
+            + "se_process_rollback_record.operator_user_id (NOT NULL) and exposes no operator "
+            + "parameter — same root cause as add/remove-sign (se_assignee_operation_record). "
+            + "Any real rollback fails with a constraint violation. Tracked in "
+            + "docs/backlog/2026-06-17-bpmn-designer-golden-gap.md. Previously hidden by "
+            + "Assumptions.assumeTrue(false) (false-pass — G-T3).")
     @DisplayName("D2-11: Rollback task - back to specified node")
     void d2_11_rollbackTask() {
         try {
@@ -374,7 +394,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-11 PASSED: Task rolled back, taskId={}", taskId);
         } catch (Exception e) {
             log.warn("D2-11: Rollback task failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "Rollback not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -382,6 +402,12 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
 
     @Test
     @Order(12)
+    @Disabled("BLOCKED-UPSTREAM (G-B5): SmartEngine addTaskAssigneeCandidateWithReason "
+            + "does not populate se_assignee_operation_record.operator_user_id (NOT NULL), and "
+            + "the engine API/candidate model expose no operator parameter — any real add-sign "
+            + "fails with a constraint violation. Tracked in docs/backlog/2026-06-17-bpmn-designer-golden-gap.md. "
+            + "Re-enable once the engine fork accepts an operator. Previously this real failure was "
+            + "hidden by Assumptions.assumeTrue(false) (false-pass — G-T3).")
     @DisplayName("D2-12: Add sign - add additional approver to task")
     void d2_12_addSign() {
         try {
@@ -398,7 +424,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-12 PASSED: Sign added, taskId={}", taskId);
         } catch (Exception e) {
             log.warn("D2-12: Add sign failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "Add sign not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -406,6 +432,9 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
 
     @Test
     @Order(13)
+    @Disabled("BLOCKED-UPSTREAM (G-B5): depends on add-sign, which hits the same "
+            + "se_assignee_operation_record.operator_user_id NOT NULL upstream gap. See D2-12. "
+            + "Tracked in docs/backlog/2026-06-17-bpmn-designer-golden-gap.md.")
     @DisplayName("D2-13: Remove sign - remove approver from task")
     void d2_13_removeSign() {
         try {
@@ -423,7 +452,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-13 PASSED: Sign removed, taskId={}", taskId);
         } catch (Exception e) {
             log.warn("D2-13: Remove sign failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "Remove sign not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -445,7 +474,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-14 PASSED: Process instance suspended, instanceId={}", instance.getInstanceId());
         } catch (Exception e) {
             log.warn("D2-14: Suspend instance failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "Suspend not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -471,7 +500,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-15 PASSED: Process instance resumed, instanceId={}", instance.getInstanceId());
         } catch (Exception e) {
             log.warn("D2-15: Resume instance failed (known fixme): {}", e.getMessage());
-            Assumptions.assumeTrue(false, "Resume not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -498,7 +527,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             }
         } catch (Exception e) {
             log.warn("D2-16: Terminate instance failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "Terminate not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -543,7 +572,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
                     status.completedNodes() != null ? status.completedNodes().size() : 0);
         } catch (Exception e) {
             log.warn("D2-17: Process status failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -561,7 +590,7 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             log.info("D2-18 PASSED: Processes started by user={}, count={}", userId, myProcesses.size());
         } catch (Exception e) {
             log.warn("D2-18: Started-by-me query failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM task op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 }
