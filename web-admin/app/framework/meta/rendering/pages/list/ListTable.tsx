@@ -29,6 +29,7 @@ import {
 } from '~/framework/smart/types/savedView';
 import { DraggableColumnHeader } from './DraggableColumnHeader';
 import { RowActionButtons } from './RowActionButtons';
+import { SummaryRow, hasAnyAggregate } from './SummaryRow';
 import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 
@@ -84,6 +85,13 @@ export interface ListTableProps {
   onInlineSave?: (field: string, value: any, record: Record<string, any>) => Promise<void>;
   dictDataCache?: Map<string, DictItem[]>;
   enableSelection?: boolean;
+  /**
+   * Column summary/footer row (T10). `undefined` → auto (shown when any column
+   * declares an `aggregate`); `false` suppresses it; `true` forces it.
+   */
+  showSummaryRow?: boolean;
+  /** Active locale for summary number/currency formatting (default 'en'). */
+  locale?: string;
 }
 
 export const ListTable = React.memo(function ListTable({
@@ -119,6 +127,8 @@ export const ListTable = React.memo(function ListTable({
   onInlineSave,
   dictDataCache,
   enableSelection = true,
+  showSummaryRow,
+  locale = 'en',
 }: ListTableProps) {
   const effectiveRowHeight = rowHeight || DEFAULT_ROW_HEIGHT;
   const rowHeightCfg = ROW_HEIGHT_CONFIG[effectiveRowHeight];
@@ -281,6 +291,16 @@ export const ListTable = React.memo(function ListTable({
     if (!groupedData || !groupByField) return data;
     return data.filter((r) => !collapsedGroups.has(String(r[groupByField] ?? '(empty)')));
   }, [data, groupedData, groupByField, collapsedGroups]);
+
+  // Column summary/footer row (T10). Auto-show when any column declares an
+  // `aggregate`; an explicit `showSummaryRow` prop overrides. Aggregates cover
+  // the rows currently rendered on this page (see SummaryRow / columnAggregation).
+  const columnsHaveAggregate = useMemo(
+    () => hasAnyAggregate(orderedDataColumns),
+    [orderedDataColumns],
+  );
+  const renderSummaryRow =
+    showSummaryRow === false ? false : (showSummaryRow ?? false) || columnsHaveAggregate;
 
   // Virtual scrolling threshold — only virtualize when we have many rows
   const VIRTUAL_THRESHOLD = 50;
@@ -668,6 +688,19 @@ export const ListTable = React.memo(function ListTable({
                 })
               )}
             </tbody>
+
+            {/* Column aggregation summary footer (T10) — current page rows */}
+            {renderSummaryRow && !loading && visibleData.length > 0 && (
+              <SummaryRow
+                columns={orderedDataColumns}
+                rows={visibleData}
+                enableSelection={enableSelection}
+                hasActionColumn={!!actionColumn}
+                getColumnWidth={getRenderedColumnWidth}
+                locale={locale}
+                t={t}
+              />
+            )}
           </table>
         </SortableContext>
       </DndContext>

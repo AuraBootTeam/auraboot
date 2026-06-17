@@ -560,6 +560,13 @@ function ListPageContentInner(props: PageContentProps) {
     !!((tableBlock as any)?.table?.selection || (tableBlock as any)?.selection) &&
     !listExtensions?.disableRowSelection;
 
+  // T10 — column aggregation summary footer. DSL opt-in via the table block
+  // (`table.showSummaryRow`); `undefined` lets ListTable auto-show the footer
+  // whenever any column declares an `aggregate`. Aggregates cover the current
+  // page only — a cross-page grand total would require a backend sum endpoint.
+  const summaryRowEnabled = ((tableBlock as any)?.table?.showSummaryRow ??
+    (tableBlock as any)?.showSummaryRow) as boolean | undefined;
+
   // G7 dispatch — list pages hardcode table/filters/toolbar/tabs/form-buttons
   // in the layout above, but any additional block types in the schema
   // (chart / description / rich-text / divider / stat-card / etc.) were
@@ -3680,6 +3687,8 @@ function ListPageContentInner(props: PageContentProps) {
                 onInlineSave={handleInlineSave}
                 dictDataCache={dictDataCache.current}
                 enableSelection={selectionEnabled}
+                showSummaryRow={summaryRowEnabled}
+                locale={locale}
               />
 
               {/* G7 — misc blocks (chart / description / rich-text / divider /
