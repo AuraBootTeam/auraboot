@@ -276,7 +276,7 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
       if (sortConfig?.field !== fieldCode) {
         return (
           <svg
-            className="h-4 w-4 text-gray-400"
+            className="text-text-3 h-4 w-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -294,7 +294,7 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
       if (sortConfig.direction === 'asc') {
         return (
           <svg
-            className="h-4 w-4 text-blue-600"
+            className="text-accent h-4 w-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -305,12 +305,7 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
       }
 
       return (
-        <svg
-          className="h-4 w-4 text-blue-600"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg className="text-accent h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       );
@@ -330,17 +325,17 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
 
       {/* 对话框 */}
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="relative flex max-h-[90vh] w-full max-w-7xl flex-col rounded-lg bg-white shadow-xl">
+        <div className="rounded-card bg-panel relative flex max-h-[90vh] w-full max-w-7xl flex-col shadow-xl">
           {/* 标题栏 */}
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">列表预览</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              预览模型 <span className="font-mono text-blue-600">{model.code}</span> 生成的动态列表
+          <div className="border-border border-b px-6 py-4">
+            <h2 className="text-text text-lg font-semibold">列表预览</h2>
+            <p className="text-text-2 mt-1 text-sm">
+              预览模型 <span className="text-accent font-mono">{model.code}</span> 生成的动态列表
             </p>
           </div>
 
           {/* 工具栏 */}
-          <div className="border-b border-gray-200 bg-gray-50 px-6 py-3">
+          <div className="border-border bg-subtle border-b px-6 py-3">
             <div className="flex items-center gap-4">
               <div className="flex-1">
                 <input
@@ -348,10 +343,10 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
                   value={searchKeyword}
                   onChange={(e) => handleSearch(e.target.value)}
                   placeholder="搜索..."
-                  className="w-full max-w-md rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="rounded-control border-border-strong focus-visible:shadow-focus w-full max-w-md border px-3 py-2 focus:outline-none"
                 />
               </div>
-              <div className="text-sm text-gray-600">共 {filteredAndSortedData.length} 条记录</div>
+              <div className="text-text-2 text-sm">共 {filteredAndSortedData.length} 条记录</div>
             </div>
           </div>
 
@@ -359,19 +354,19 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
           <div className="flex-1 overflow-auto px-6 py-4">
             {sortedBindings.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-gray-500">该模型还没有关联任何字段</p>
-                <p className="mt-2 text-sm text-gray-400">请先添加字段后再预览列表</p>
+                <p className="text-text-2">该模型还没有关联任何字段</p>
+                <p className="text-text-3 mt-2 text-sm">请先添加字段后再预览列表</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="divide-border min-w-full divide-y">
+                  <thead className="bg-subtle">
                     <tr>
                       {sortedBindings.map((binding) => (
                         <th
                           key={binding.fieldCode}
                           onClick={() => handleSort(binding.fieldCode)}
-                          className="cursor-pointer px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase hover:bg-gray-100"
+                          className="text-text-2 hover:bg-hover cursor-pointer px-6 py-3 text-left text-xs font-medium tracking-wider uppercase"
                         >
                           <div className="flex items-center gap-2">
                             <span>{binding.fieldName}</span>
@@ -379,36 +374,36 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
                           </div>
                         </th>
                       ))}
-                      <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                      <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
                         操作
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
+                  <tbody className="divide-border bg-panel divide-y">
                     {currentPageData.length === 0 ? (
                       <tr>
                         <td
                           colSpan={sortedBindings.length + 1}
-                          className="px-6 py-12 text-center text-gray-500"
+                          className="text-text-2 px-6 py-12 text-center"
                         >
                           没有找到匹配的数据
                         </td>
                       </tr>
                     ) : (
                       currentPageData.map((row) => (
-                        <tr key={row.id} className="hover:bg-gray-50">
+                        <tr key={row.id} className="hover:bg-subtle">
                           {sortedBindings.map((binding) => (
                             <td
                               key={binding.fieldCode}
-                              className="px-6 py-4 text-sm whitespace-nowrap text-gray-900"
+                              className="text-text px-6 py-4 text-sm whitespace-nowrap"
                             >
                               {formatFieldValue(binding, row[binding.fieldCode])}
                             </td>
                           ))}
-                          <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-                            <button className="mr-3 text-blue-600 hover:text-blue-700">查看</button>
-                            <button className="mr-3 text-blue-600 hover:text-blue-700">编辑</button>
-                            <button className="text-red-600 hover:text-red-700">删除</button>
+                          <td className="text-text-2 px-6 py-4 text-sm whitespace-nowrap">
+                            <button className="text-accent hover:text-accent mr-3">查看</button>
+                            <button className="text-accent hover:text-accent mr-3">编辑</button>
+                            <button className="text-status-red hover:text-red-700">删除</button>
                           </td>
                         </tr>
                       ))
@@ -421,9 +416,9 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
 
           {/* 分页控件 */}
           {sortedBindings.length > 0 && filteredAndSortedData.length > 0 && (
-            <div className="border-t border-gray-200 bg-gray-50 px-6 py-3">
+            <div className="border-border bg-subtle border-t px-6 py-3">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">
+                <div className="text-text-2 text-sm">
                   显示 {(pagination.page - 1) * pagination.pageSize + 1} 到{' '}
                   {Math.min(pagination.page * pagination.pageSize, filteredAndSortedData.length)}{' '}
                   条， 共 {filteredAndSortedData.length} 条
@@ -432,7 +427,7 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
                   <button
                     onClick={() => handlePageChange(pagination.page - 1)}
                     disabled={pagination.page === 1}
-                    className="rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-control border-border-strong hover:bg-hover border px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     上一页
                   </button>
@@ -453,10 +448,10 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
                         <button
                           key={pageNum}
                           onClick={() => handlePageChange(pageNum)}
-                          className={`rounded-md border px-3 py-1 text-sm ${
+                          className={`rounded-control border px-3 py-1 text-sm ${
                             pagination.page === pageNum
-                              ? 'border-blue-600 bg-blue-600 text-white'
-                              : 'border-gray-300 hover:bg-gray-100'
+                              ? 'border-accent bg-accent text-white'
+                              : 'border-border-strong hover:bg-hover'
                           }`}
                         >
                           {pageNum}
@@ -467,7 +462,7 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
                   <button
                     onClick={() => handlePageChange(pagination.page + 1)}
                     disabled={pagination.page >= totalPages}
-                    className="rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-control border-border-strong hover:bg-hover border px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     下一页
                   </button>
@@ -477,10 +472,10 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
           )}
 
           {/* 底部按钮 */}
-          <div className="flex justify-end border-t border-gray-200 px-6 py-4">
+          <div className="border-border flex justify-end border-t px-6 py-4">
             <button
               onClick={onClose}
-              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2"
             >
               关闭
             </button>

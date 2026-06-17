@@ -136,14 +136,14 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
    */
   const getStatusStyle = useCallback((status: ReleaseStatus): string => {
     const styleMap: Record<ReleaseStatus, string> = {
-      pending: 'bg-gray-100 text-gray-800',
+      pending: 'bg-subtle text-text',
       generating: 'bg-blue-100 text-blue-800',
       validated: 'bg-green-100 text-green-800',
       projecting: 'bg-blue-100 text-blue-800',
       published: 'bg-green-100 text-green-800',
       failed: 'bg-red-100 text-red-800',
     };
-    return styleMap[status] || 'bg-gray-100 text-gray-800';
+    return styleMap[status] || 'bg-subtle text-text';
   }, []);
 
   /**
@@ -199,12 +199,12 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
               {/* 步骤图标 */}
               <div className="flex flex-col items-center">
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                  className={`rounded-pill flex h-8 w-8 items-center justify-center ${
                     stepStatus === 'completed'
                       ? 'bg-green-500 text-white'
                       : stepStatus === 'active'
                         ? 'bg-blue-500 text-white'
-                        : 'bg-gray-200 text-gray-500'
+                        : 'bg-hover text-text-2'
                   }`}
                 >
                   {stepStatus === 'completed' ? (
@@ -216,7 +216,7 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
                       />
                     </svg>
                   ) : stepStatus === 'active' ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                    <div className="rounded-pill h-4 w-4 animate-spin border-b-2 border-white"></div>
                   ) : (
                     <span className="text-sm font-medium">{index + 1}</span>
                   )}
@@ -224,7 +224,7 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
                 {index < steps.length - 1 && (
                   <div
                     className={`h-12 w-0.5 ${
-                      stepStatus === 'completed' ? 'bg-green-500' : 'bg-gray-200'
+                      stepStatus === 'completed' ? 'bg-green-500' : 'bg-hover'
                     }`}
                   />
                 )}
@@ -234,14 +234,14 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
               <div className="flex-1 pb-8">
                 <h4
                   className={`text-sm font-medium ${
-                    stepStatus === 'active' ? 'text-blue-900' : 'text-gray-900'
+                    stepStatus === 'active' ? 'text-blue-900' : 'text-text'
                   }`}
                 >
                   {step.label}
                 </h4>
-                <p className="mt-1 text-sm text-gray-500">{step.description}</p>
+                <p className="text-text-2 mt-1 text-sm">{step.description}</p>
                 {stepStatus === 'active' && releaseStatus.message && (
-                  <p className="mt-2 text-sm text-blue-600">{releaseStatus.message}</p>
+                  <p className="text-accent mt-2 text-sm">{releaseStatus.message}</p>
                 )}
               </div>
             </div>
@@ -260,13 +260,13 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
 
       {/* 对话框 */}
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl">
+        <div className="rounded-card bg-panel relative flex max-h-[90vh] w-full max-w-2xl flex-col shadow-xl">
           {/* 标题栏 */}
-          <div className="border-b border-gray-200 px-6 py-4">
+          <div className="border-border border-b px-6 py-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+              <div className="rounded-pill flex h-10 w-10 items-center justify-center bg-blue-100">
                 <svg
-                  className="h-6 w-6 text-blue-600"
+                  className="text-accent h-6 w-6"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -280,8 +280,8 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
                 </svg>
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Git-First工作流</h2>
-                <p className="text-sm text-gray-500">所有变更将通过Git流程处理</p>
+                <h2 className="text-text text-lg font-semibold">Git-First工作流</h2>
+                <p className="text-text-2 text-sm">所有变更将通过Git流程处理</p>
               </div>
             </div>
           </div>
@@ -289,12 +289,12 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
           {/* 内容区域 */}
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {/* Git-First说明 */}
-            <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div className="rounded-card bg-accent-weak mb-6 border border-blue-200 p-4">
               <h3 className="mb-2 text-sm font-medium text-blue-900">什么是Git-First模式？</h3>
-              <p className="mb-3 text-sm text-blue-700">
+              <p className="text-accent mb-3 text-sm">
                 Git-First模式将Git作为唯一的数据源，所有模型定义的变更都会：
               </p>
-              <ol className="list-inside list-decimal space-y-1 text-sm text-blue-700">
+              <ol className="text-accent list-inside list-decimal space-y-1 text-sm">
                 <li>生成DSL文件并提交到Git仓库</li>
                 <li>创建Release进行版本管理</li>
                 <li>自动验证DSL格式和依赖关系</li>
@@ -307,10 +307,10 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
             {releaseId && (
               <div className="mb-6">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-base font-medium text-gray-900">Release状态跟踪</h3>
+                  <h3 className="text-text text-base font-medium">Release状态跟踪</h3>
                   {releaseStatus && (
                     <span
-                      className={`rounded-full px-3 py-1 text-sm font-medium ${getStatusStyle(releaseStatus.status)}`}
+                      className={`rounded-pill px-3 py-1 text-sm font-medium ${getStatusStyle(releaseStatus.status)}`}
                     >
                       {getStatusText(releaseStatus.status)}
                     </span>
@@ -319,8 +319,8 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
 
                 {loading && !releaseStatus ? (
                   <div className="flex items-center justify-center py-8">
-                    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
-                    <span className="ml-3 text-gray-600">加载中...</span>
+                    <div className="rounded-pill border-accent h-8 w-8 animate-spin border-b-2"></div>
+                    <span className="text-text-2 ml-3">加载中...</span>
                   </div>
                 ) : releaseStatus ? (
                   <div>
@@ -329,7 +329,7 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
 
                     {/* 错误信息 */}
                     {releaseStatus.status === 'failed' && releaseStatus.errorMessage && (
-                      <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4">
+                      <div className="rounded-card bg-status-red-bg mt-4 border border-red-200 p-4">
                         <h4 className="mb-2 text-sm font-medium text-red-900">处理失败</h4>
                         <p className="text-sm text-red-700">{releaseStatus.errorMessage}</p>
                       </div>
@@ -337,24 +337,24 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
 
                     {/* 成功提示 */}
                     {releaseStatus.status === 'published' && (
-                      <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                      <div className="rounded-card border-status-green bg-status-green-bg mt-4 border p-4">
                         <h4 className="mb-2 text-sm font-medium text-green-900">发布成功</h4>
-                        <p className="text-sm text-green-700">
+                        <p className="text-status-green text-sm">
                           模型已成功发布，现在可以在系统中使用了。
                         </p>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-gray-500">无法加载Release状态</div>
+                  <div className="text-text-2 py-8 text-center">无法加载Release状态</div>
                 )}
               </div>
             )}
 
             {/* 注意事项 */}
-            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
-              <h3 className="mb-2 text-sm font-medium text-yellow-900">注意事项</h3>
-              <ul className="list-inside list-disc space-y-1 text-sm text-yellow-700">
+            <div className="rounded-card border-status-amber bg-status-amber-bg border p-4">
+              <h3 className="text-status-amber mb-2 text-sm font-medium">注意事项</h3>
+              <ul className="text-status-amber list-inside list-disc space-y-1 text-sm">
                 <li>Release处理通常需要几秒到几分钟时间</li>
                 <li>处理期间请勿关闭此窗口</li>
                 <li>如果处理失败，可以查看错误信息并重试</li>
@@ -364,11 +364,11 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
           </div>
 
           {/* 底部按钮 */}
-          <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+          <div className="border-border flex justify-end gap-3 border-t px-6 py-4">
             {releaseStatus && isTerminalStatus(releaseStatus.status) && (
               <button
                 onClick={onClose}
-                className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-white"
               >
                 完成
               </button>
@@ -376,7 +376,7 @@ export function GitFirstNotice({ visible, releaseId, onClose }: GitFirstNoticePr
             {(!releaseStatus || !isTerminalStatus(releaseStatus.status)) && (
               <button
                 onClick={onClose}
-                className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2"
               >
                 后台运行
               </button>
