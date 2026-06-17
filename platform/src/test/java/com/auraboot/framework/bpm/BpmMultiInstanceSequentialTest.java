@@ -131,16 +131,22 @@ class BpmMultiInstanceSequentialTest extends BaseIntegrationTest {
     // =====================================================================
     @Test
     @Disabled("""
-            BLOCKED-UPSTREAM (GAP-263 / SEQ-MI-GAP-1): SmartEngine fork engine deficit.
-            Diagnosed root cause (UserTaskBehavior.handleMultiInstance:177-294):
-            totalInstanceCount = totalExecutionInstanceList.size() reflects already-
-            created EI rows, not the collection cardinality. After task #1 completes
-            the variable nrOfInstances=1 and nrOfCompletedInstances=1, so the BPMN-
-            standard completionCondition (nrOfCompletedInstances == nrOfInstances)
-            evaluates true and the activity exits before compensateExecutionAndTask
-            (line 238) can spawn iteration #2. Fix MUST land in the SmartEngine fork
-            — bind nrOfInstances to the cached collection cardinality at enter()
-            time (per BPMN 2.0 §13.2). See docs/backlog/technical.md GAP-263.""")
+            Multi-element sequential MI does not yet iterate end-to-end (empirically
+            verified 2026-06-17 against SmartEngine 4.0.1: after task #1 completes,
+            0 new tasks spawn). NOTE: the engine DOES support sequential MI
+            (UserTaskBehavior.handleMultiInstance + compensateExecutionAndTask,
+            priority-driven countersign); single-element (SEQ-02) and empty (SEQ-03)
+            sequential MI both pass. The multi-element gap has TWO root causes:
+            (1) handleMultiInstance derives nrOfInstances from totalExecutionInstanceList
+                .size() (created-so-far = 1 for sequential), so completionCondition
+                'nrOfCompletedInstances == nrOfInstances' is true after task #1; and
+            (2) the next candidate cannot be resolved at complete-time because the
+                AuraBoot dispatcher reads smart:miCollection from context.getRequest()
+                — populated at start, but the complete-command request lacks it.
+            Full fix = engine caches/persists the resolved MI candidate list at enter
+            and reuses it at compensate (independent of the complete-time request),
+            plus binds nrOfInstances to the full candidate cardinality. Scoped as a
+            SmartEngine follow-up; NOT a 'cannot do sequential' limitation.""")
     @DisplayName("SEQ-01: sequential MI with 3 approvers advances one-by-one to completion")
     void sequentialMiAdvancesOneByOne() {
         ProcessInstance instance = deployAndStart("three", List.of("u1", "u2", "u3"));
@@ -217,16 +223,6 @@ class BpmMultiInstanceSequentialTest extends BaseIntegrationTest {
     // the assertion below catches it.
     // =====================================================================
     @Test
-    @Disabled("""
-            BLOCKED-UPSTREAM (GAP-263 / SEQ-MI-GAP-2): SmartEngine fork engine deficit.
-            Platform-side IdAndGroupTaskAssigneeDispatcher fallback fixed in this
-            branch — empty miCollection now returns []-empty candidate list (no
-            silent starter fallback). However SmartEngine UserTaskBehavior.enter
-            (lines 70-108) still creates an empty ActivityInstance with no TIs and
-            never calls execute() / setNeedPause(false), so the MI activity hangs.
-            Fix MUST land in SmartEngine fork — when MI candidate list is empty,
-            short-circuit ACTIVITY_END and advance through the outgoing sequenceFlow
-            per BPMN 2.0 §13.2. See docs/backlog/technical.md GAP-263.""")
     @DisplayName("SEQ-03: empty collection → MI activity is skipped, instance completes")
     void sequentialMiEmptyCollection() {
         ProcessInstance instance = deployAndStart("empty", List.of());
