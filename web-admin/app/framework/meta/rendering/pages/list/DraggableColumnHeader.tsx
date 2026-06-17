@@ -37,14 +37,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
   draggable = true,
   width,
 }: DraggableColumnHeaderProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: column.field,
     disabled: !draggable,
   });
@@ -93,7 +86,12 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
     transform: CSS.Transform.toString(transform),
     transition,
     ...(isDragging
-      ? { opacity: 0.6, backgroundColor: '#dbeafe', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 50 }
+      ? {
+          opacity: 0.6,
+          backgroundColor: '#dbeafe',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 50,
+        }
       : {}),
     ...(width
       ? { width: typeof width === 'number' ? `${width}px` : width }
@@ -106,7 +104,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
   if (column.isActionColumn) {
     return (
       <th
-        className="sticky right-0 z-20 w-px border-l border-gray-200 bg-gray-50 px-2 py-3 text-xs font-medium tracking-wider text-gray-500 uppercase shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]"
+        className="border-border bg-subtle text-text-2 sticky right-0 z-20 w-px border-l px-2 py-3 text-xs font-medium tracking-wider uppercase shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]"
         data-testid={`table-header-${column.field}`}
       >
         {label}
@@ -117,7 +115,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
   return (
     <th
       ref={setNodeRef}
-      className={`group/th relative bg-gray-50 px-6 py-3 text-xs font-medium tracking-wider text-gray-500 uppercase ${
+      className={`group/th bg-subtle text-text-2 relative px-6 py-3 text-xs font-medium tracking-wider uppercase ${
         column.align === 'right'
           ? 'text-right'
           : column.align === 'center'
@@ -125,9 +123,9 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
             : 'text-left'
       } ${
         isFrozenRight
-          ? 'sticky right-0 z-20 border-l border-gray-200 bg-gray-50 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]'
+          ? 'border-border bg-subtle sticky right-0 z-20 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]'
           : isFrozenLeft
-            ? 'sticky left-0 z-20 border-r border-gray-200 bg-gray-50 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]'
+            ? 'border-border bg-subtle sticky left-0 z-20 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]'
             : ''
       } ${sortable ? 'select-none' : ''}`}
       style={style}
@@ -144,7 +142,13 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
             aria-label="Drag to reorder column"
             onClick={(e) => e.stopPropagation()}
           >
-            <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" className="text-gray-400">
+            <svg
+              width="10"
+              height="14"
+              viewBox="0 0 10 14"
+              fill="currentColor"
+              className="text-text-3"
+            >
               <circle cx="3" cy="2" r="1.2" />
               <circle cx="7" cy="2" r="1.2" />
               <circle cx="3" cy="7" r="1.2" />
@@ -157,7 +161,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
 
         {/* Label + sort indicator — click to toggle sort */}
         <span
-          className={`flex flex-1 cursor-pointer items-center gap-1 ${sortable ? 'hover:text-gray-700' : ''}`}
+          className={`flex flex-1 cursor-pointer items-center gap-1 ${sortable ? 'hover:text-text-2' : ''}`}
           onClick={handleSortClick}
           data-testid={`table-header-sort-${column.field}`}
         >
@@ -166,10 +170,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
             <span
               className={`transition-opacity ${sortInfo ? 'opacity-100' : 'opacity-0 group-hover/th:opacity-40'}`}
             >
-              <SortIndicator
-                direction={sortInfo?.direction}
-                priority={sortInfo?.priority}
-              />
+              <SortIndicator direction={sortInfo?.direction} priority={sortInfo?.priority} />
             </span>
           )}
         </span>
@@ -177,7 +178,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
         {/* Column context menu trigger */}
         <button
           type="button"
-          className="absolute top-1/2 right-1 -translate-y-1/2 rounded p-0.5 text-gray-400 opacity-0 transition-opacity group-hover/th:opacity-100 hover:bg-gray-200 hover:text-gray-600"
+          className="text-text-3 hover:bg-hover hover:text-text-2 absolute top-1/2 right-1 -translate-y-1/2 rounded p-0.5 opacity-0 transition-opacity group-hover/th:opacity-100"
           onClick={(e) => {
             e.stopPropagation();
             onContextMenu(e, column);
@@ -192,10 +193,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
       </div>
 
       {/* Resize handle */}
-      <ColumnResizeHandle
-        width={currentWidth}
-        onResize={handleResizeComplete}
-      />
+      <ColumnResizeHandle width={currentWidth} onResize={handleResizeComplete} />
     </th>
   );
 });

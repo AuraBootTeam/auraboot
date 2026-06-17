@@ -40,10 +40,7 @@ function DropdownMenu({
     const rect = el.getBoundingClientRect();
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-    const estimatedHeight = Math.max(
-      DROPDOWN_ESTIMATED_HEIGHT,
-      moreButtons.length * 32 + 8,
-    );
+    const estimatedHeight = Math.max(DROPDOWN_ESTIMATED_HEIGHT, moreButtons.length * 32 + 8);
     let top = rect.bottom + 4;
     if (top + estimatedHeight > viewportHeight) {
       // Flip above trigger when there is no room below.
@@ -65,7 +62,7 @@ function DropdownMenu({
 
   return (
     <div
-      className="fixed z-[9999] min-w-[120px] rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+      className="rounded-control border-border bg-panel fixed z-[9999] min-w-[120px] border py-1 shadow-lg"
       style={{
         top: pos.top,
         left: pos.left,
@@ -86,7 +83,7 @@ function DropdownMenu({
             handleAction(btn, record);
           }}
           className={`block w-full px-3 py-1.5 text-left text-sm transition-colors ${
-            btn.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-50'
+            btn.danger ? 'text-status-red hover:bg-status-red-bg' : 'text-text-2 hover:bg-hover'
           }`}
         >
           {resolveButtonLabel(btn)}
@@ -133,8 +130,8 @@ export function RowActionButtons({
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const visibleButtons = buttons.filter((button) =>
-    canUseButton(button) && evaluateVisibleWhen(button.visibleWhen, record),
+  const visibleButtons = buttons.filter(
+    (button) => canUseButton(button) && evaluateVisibleWhen(button.visibleWhen, record),
   );
 
   if (visibleButtons.length === 0) return null;
@@ -151,10 +148,10 @@ export function RowActionButtons({
             e.stopPropagation();
             handleAction(btn, record);
           }}
-          className={`rounded-md px-2 py-1 text-sm font-medium transition-colors ${
+          className={`rounded-control px-2 py-1 text-sm font-medium transition-colors ${
             btn.danger
-              ? 'text-red-600 hover:bg-red-50 hover:text-red-800'
-              : 'text-blue-600 hover:bg-blue-50 hover:text-blue-800'
+              ? 'text-status-red hover:bg-status-red-bg hover:text-red-800'
+              : 'text-accent hover:bg-accent-weak hover:text-blue-800'
           }`}
         >
           {resolveButtonLabel(btn)}
@@ -177,7 +174,7 @@ export function RowActionButtons({
           e.stopPropagation();
           handleAction(primaryBtn, record);
         }}
-        className="rounded-md px-2 py-1 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800"
+        className="rounded-control text-accent hover:bg-accent-weak px-2 py-1 text-sm font-medium transition-colors hover:text-blue-800"
       >
         {resolveButtonLabel(primaryBtn)}
       </button>
@@ -199,7 +196,7 @@ export function RowActionButtons({
               e.stopPropagation();
               setOpen(!open);
             }}
-            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-control text-text-3 hover:bg-hover hover:text-text-2 p-1 transition-colors"
             aria-label="More actions"
           >
             <svg

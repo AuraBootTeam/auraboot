@@ -260,9 +260,7 @@ export function ListModals({
         chipFilters[editingChipIdx] &&
         (() => {
           const cf = chipFilters[editingChipIdx];
-          const fieldMeta = tableColumns.find(
-            (c: ColumnConfig) => c.field === cf.fieldCode,
-          ) as any;
+          const fieldMeta = tableColumns.find((c: ColumnConfig) => c.field === cf.fieldCode) as any;
           return (
             <FilterValuePopover
               open
@@ -274,7 +272,7 @@ export function ListModals({
                     ? fieldMeta.label
                     : fieldMeta.label?.['zh-CN'] || cf.fieldCode
                   : (() => {
-                      const mc = (schema?.modelCode || tableName);
+                      const mc = schema?.modelCode || tableName;
                       const key = `model.${mc}.${cf.fieldCode}.label`;
                       const resolved = t(key);
                       return resolved !== key ? resolved : cf.fieldCode;
