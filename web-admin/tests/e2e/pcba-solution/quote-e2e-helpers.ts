@@ -100,6 +100,14 @@ export type CommandProbeResult = {
   text: string;
 };
 
+export function isTransientViteDynamicImportIssue(text: string): boolean {
+  return (
+    /Failed to fetch dynamically imported module:\s+https?:\/\/(?:127\.0\.0\.1|localhost):\d+\/app\//i.test(
+      text,
+    ) || /React Router caught the following error during render.*Failed to fetch dynamically imported module/i.test(text)
+  );
+}
+
 async function clickSidebarPage(page: Page, href: string, label: RegExp): Promise<void> {
   const nav = page.locator('nav, aside, [role="navigation"]').first();
   const link = nav.locator(`a[href="${href}"]`).or(nav.getByRole('link', { name: label })).first();
@@ -117,7 +125,17 @@ async function clickSidebarPage(page: Page, href: string, label: RegExp): Promis
     }
   }
   await waitForDynamicPageLoad(page, 20_000);
-  await expect(page.locator('main')).toContainText(label, { timeout: 20_000 });
+  const main = page.locator('main');
+  const contentLoaded = await expect(main)
+    .toContainText(label, { timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!contentLoaded) {
+    // Fresh Vite runtimes can force a one-time dependency-optimization reload after menu entry.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForDynamicPageLoad(page, 20_000);
+    await expect(main).toContainText(label, { timeout: 20_000 });
+  }
 }
 
 export async function openQuoteDetailFromList(page: Page, created: CreatedRows): Promise<void> {
