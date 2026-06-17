@@ -274,11 +274,13 @@ dependencies {
     implementation "io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64"
 
     // SmartEngine - Workflow engine
-    implementation ('com.auraboot.smart.framework:smart-engine-extension-storage-mysql:4.0.0') {
+    // 4.0.1 adds explicit-operator overloads (rollback / add-sign / remove-sign)
+    // so operator_user_id is populated for assigned-but-unclaimed tasks (G-B5).
+    implementation ('com.auraboot.smart.framework:smart-engine-extension-storage-mysql:4.0.1') {
         // Pin transitive dependencies to avoid unexpected changes
         exclude group: 'org.slf4j', module: 'slf4j-log4j12'
     }
-    implementation ('com.auraboot.smart.framework:smart-engine-extension-storage-custom:4.0.0') {
+    implementation ('com.auraboot.smart.framework:smart-engine-extension-storage-custom:4.0.1') {
         exclude group: 'org.slf4j', module: 'slf4j-log4j12'
     }
     implementation 'org.mvel:mvel2:2.5.2.Final'
