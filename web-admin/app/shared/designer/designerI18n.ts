@@ -376,6 +376,41 @@ export const DESIGNER_I18N = {
       'en-US': 'Import failed: not a valid page JSON (schemaVersion 3 required)',
     } as L,
 
+    // Version history / snapshot / rollback
+    // (GET/POST /api/pages/{pid}/versions, POST .../rollback/{historyId})
+    versions: { 'zh-CN': '版本', 'en-US': 'Versions' } as L,
+    versionHistory: { 'zh-CN': '版本历史', 'en-US': 'Version history' } as L,
+    versionsSaveFirst: {
+      'zh-CN': '请先保存页面再查看版本',
+      'en-US': 'Save the page before viewing versions',
+    } as L,
+    versionCreateSnapshot: { 'zh-CN': '创建快照', 'en-US': 'Create snapshot' } as L,
+    versionCreatingSnapshot: { 'zh-CN': '创建中…', 'en-US': 'Creating…' } as L,
+    versionSnapshotReason: {
+      'zh-CN': '快照说明（可选）',
+      'en-US': 'Snapshot description (optional)',
+    } as L,
+    versionRollback: { 'zh-CN': '回滚', 'en-US': 'Roll back' } as L,
+    versionRollingBack: { 'zh-CN': '回滚中…', 'en-US': 'Rolling back…' } as L,
+    versionRollbackConfirm: {
+      'zh-CN': '确认回滚到此版本？当前画布将被替换。',
+      'en-US': 'Roll back to this version? The current canvas will be replaced.',
+    } as L,
+    versionRollbackConfirmYes: { 'zh-CN': '确认回滚', 'en-US': 'Confirm rollback' } as L,
+    versionRollbackCancel: { 'zh-CN': '取消', 'en-US': 'Cancel' } as L,
+    versionCurrent: { 'zh-CN': '当前', 'en-US': 'Current' } as L,
+    versionLoading: { 'zh-CN': '加载版本中…', 'en-US': 'Loading versions…' } as L,
+    versionEmpty: { 'zh-CN': '暂无版本记录', 'en-US': 'No versions yet' } as L,
+    versionClose: { 'zh-CN': '关闭', 'en-US': 'Close' } as L,
+    versionNumber: { 'zh-CN': '版本', 'en-US': 'Version' } as L,
+    versionOperationCreate: { 'zh-CN': '创建', 'en-US': 'Create' } as L,
+    versionOperationUpdate: { 'zh-CN': '更新', 'en-US': 'Update' } as L,
+    versionOperationPublish: { 'zh-CN': '发布', 'en-US': 'Publish' } as L,
+    versionOperationArchive: { 'zh-CN': '归档', 'en-US': 'Archive' } as L,
+    versionOperationDelete: { 'zh-CN': '删除', 'en-US': 'Delete' } as L,
+    versionOperationRestore: { 'zh-CN': '回滚', 'en-US': 'Rollback' } as L,
+    versionOperationSnapshot: { 'zh-CN': '快照', 'en-US': 'Snapshot' } as L,
+
     // Runtime preview (RecursiveBlockRenderer)
     runtime: {
       aiReviewHint: {

@@ -129,6 +129,17 @@ export default function UnifiedDesignerPage() {
     return true;
   };
 
+  // Reload the page document from the backend after a version rollback. The
+  // backend has restored the target snapshot's blocks onto the live page, so we
+  // re-read it and return the V3 document for the workbench to reset its canvas.
+  const handleReloadDocument = async (pid: string): Promise<PageSchemaV3 | null> => {
+    const loaded = await loadPageSchemaV3({ pageId: pid });
+    setSource(loaded.source);
+    setPublished(loaded.published);
+    setDocument(loaded.document);
+    return loaded.document;
+  };
+
   if (error) {
     return (
       <div className="grid min-h-[420px] place-items-center bg-slate-100 p-6 text-sm text-red-700">
@@ -158,6 +169,7 @@ export default function UnifiedDesignerPage() {
       initialPublished={source.type === 'page' ? published : false}
       onPublish={source.type === 'page' ? handlePublish : undefined}
       onUnpublish={source.type === 'page' ? handleUnpublish : undefined}
+      onReloadDocument={source.type === 'page' ? handleReloadDocument : undefined}
     />
   );
 }

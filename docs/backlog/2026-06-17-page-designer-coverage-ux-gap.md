@@ -185,13 +185,21 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 | C1 Publish/Unpublish 行动点(统一 workbench 加按钮 + repository publishPageSchemaV3,只 pageId+非dirty 可点)| ✅ DONE | `publish-export-import-golden.spec.ts`:真按钮→POST→**后端 GET 反查** status=published/draft + publishedAt;sad 无 pid 禁用 |
 | C2 Export/Import 行动点(export 序列化 download `<key>.page.json` / import file→parse+shape 校验→载入入 undo 栈) | ✅ DONE | export 真 `waitForEvent('download')` 验**文件内容** schemaVersion 3 + blocks;import `setInputFiles`→canvas+save readback;sad 非法/v2 JSON 内联错不替换 |
 
+### ✅ Slice 5 C3 Version history + Rollback UI(commit `5b836a4a`+`56c1a36b`,3 E2E + 206 designer 单测独立重跑 0 fail,host-first 隔离 slot 51)
+| 项 | 状态 | 证据 |
+|----|------|------|
+| C3 Version history 面板 + Create snapshot + Rollback 行动点(后端端点 #711 已证明;repository getPageVersions/createPageVersion/rollbackPageToVersion + VersionHistoryPanel.tsx drawer + 工具栏 designer-versions 按钮) | ✅ DONE | `version-history-golden.spec.ts` 3/3:snapshot→列表增→编辑+save→2nd snapshot→rollback 最早版本→**画布回显 + `GET /api/pages/{pid}` 后端反查 blocks 恢复 + version 号增**;sad 无 pid 禁用 / 取消确认不回滚 |
+| 🐛 #717 model-select 单测回归(本 slice 顺手修)| ✅ FIXED | #717 把 `dataSource.model` 改 `<select>`+manual 后,2 个 UnifiedDesignerWorkbench 单测仍 fireEvent 驱动空 select 致 model 留空(jsdom 无 model 列表)→ 改用 `-manual` fallback input 绑定;SchemaInspector 未改,全量 206 designer 单测绿 |
+| C3 diff/compare UI | ⏸ defer | compareVersions 端点在,UI 未接,显式 follow-up |
+
 ### ⏸ NOT-MET(roadmap,**未完成,不假报**)
 - **A7** mid-drag drop-indicator/ghost 视觉断言(@dnd-kit 中途手势最易 flake,ROI 最低)→ defer。
 - **A11/A12** chart 类型广度 / input·layout 广度 → defer。
 - **E1/E2** widget 全 24 chart 配置、19 workbench block palette 可视化 authoring → 大特性(多周),未做。
-- **C3/C4/C5** Version/Diff/Rollback UI、kind 切换、多选 → 大特性,未做。
+- **C3-diff / C4/C5** Version diff viewer、kind 切换、多选 → 大特性,未做(C3 list+rollback 已交付)。
 - **D2/D4** 富属性控件全接入(dict/namedQuery/command/permission 选择器)、字段级校验反馈;**B3** REST diff blocks 下钻 → 未做。
-- **🐛 latent bug(取证发现,未修,roadmap)**:`ViewModelService.listViewModels()` 读 `result?.data?.data`,但 `GET /api/meta/models` 真 shape 是 `data.records[]`(MyBatis-Plus IPage)→ 读空。Slice 3 的 `useModelOptions()` 已读对(`data.records`);ViewModelService 消费点待单独修 + 全仓 grep `data.data` 该端点其他消费方。
+- **🧪 测试鲁棒性 follow-up**:`inspector-model-select-golden.spec.ts:146` 依赖特定 published model 在 seed 中(`option[value=SELECT_MODEL]` toHaveCount 1),bootstrap-only/leaner seed 栈(如 15 model 的 slot)会 fail —— seed 敏感非代码 bug;应改断言"select 存在 + ≥1 真 model option"而非锁定具体 model。
+- **🐛 ViewModelService latent bug** — ✅ 已由 #725 闭环(读 `data.records`),本行历史保留。
 
 ### 复核五项结论(P5)
 1. **方向** ✅ 对齐:增量硬化"测试覆盖+后端联动",未漂移;大特性如实划入 roadmap。

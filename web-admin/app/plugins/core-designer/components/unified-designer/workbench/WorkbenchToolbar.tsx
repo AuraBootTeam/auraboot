@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Download, Redo2, Undo2, Upload } from 'lucide-react';
+import { Download, History, Redo2, Undo2, Upload } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import type { PageSchemaV3, WorkbenchMode } from '../types';
@@ -38,6 +38,12 @@ interface WorkbenchToolbarProps {
   /** Receives the chosen file from the hidden import input. */
   onImportFile?: (file: File) => void;
   onOpenAiCopilot?: () => void;
+  /**
+   * Open the version-history panel. Only wired (and the button only enabled) for
+   * a saved, page-bound document — a new/local page has no pid and therefore no
+   * server-side version history.
+   */
+  onOpenVersions?: () => void;
 }
 
 export function WorkbenchToolbar({
@@ -63,6 +69,7 @@ export function WorkbenchToolbar({
   onExport,
   onImportFile,
   onOpenAiCopilot,
+  onOpenVersions,
 }: WorkbenchToolbarProps) {
   const { locale } = useI18n();
   const saveDisabled = !isDirty || saveStatus === 'saving' || saveStatus === 'invalid';
@@ -231,6 +238,26 @@ export function WorkbenchToolbar({
             if (file) onImportFile?.(file);
           }}
         />
+        {/* Version history — only for a saved page (GET/POST /api/pages/{pid}/versions). */}
+        <button
+          type="button"
+          data-testid="designer-versions"
+          aria-label={resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)}
+          title={
+            !pageId
+              ? resolveDesignerText(DESIGNER_I18N.unified.versionsSaveFirst, locale)
+              : resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)
+          }
+          disabled={!pageId}
+          onClick={onOpenVersions}
+          className={`ml-2 inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 ${
+            pageId
+              ? 'text-slate-600 hover:bg-slate-50'
+              : 'cursor-not-allowed text-slate-300'
+          }`}
+        >
+          <History className="h-4 w-4" aria-hidden="true" />
+        </button>
         {/* Publish — only for a saved, clean page (POST /api/pages/{pid}/publish). */}
         <button
           type="button"
