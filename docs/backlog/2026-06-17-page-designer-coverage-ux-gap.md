@@ -192,10 +192,16 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 | 🐛 #717 model-select 单测回归(本 slice 顺手修)| ✅ FIXED | #717 把 `dataSource.model` 改 `<select>`+manual 后,2 个 UnifiedDesignerWorkbench 单测仍 fireEvent 驱动空 select 致 model 留空(jsdom 无 model 列表)→ 改用 `-manual` fallback input 绑定;SchemaInspector 未改,全量 206 designer 单测绿 |
 | C3 diff/compare UI(commit `d766a438`,Slice 6)| ✅ DONE | `VersionHistoryPanel` Compare 模式(选两版本→`version-compare-run`)+ diff 视图(`version-diff-summary` + 差异行 ADDED/REMOVED/MODIFIED badge + 源→目标值 + 空态);repository `comparePageVersions`;`version-diff-golden.spec.ts` 2/2 真栈后端 compare(happy modifiedFields≥1 + sad 相同快照 totalDifferences=0)。**粗粒度如实**:REST compare 顶层 key 级(blocks 整 blob+title+rowVersion),UI 显示真实响应不造前端 drill-down。顺带修 studio VersionHistoryPanel 大小写 latent bug(`'added'` 永不匹配 UPPERCASE enum→case-insensitive)。**C3 三件套 list+rollback+diff 全闭环** |
 
+### ✅ Slice 7 E1 widget 新 chart 类型(commit `9c7dfdbe`,3 chart golden + 209 单测独立重跑 0 fail,host-first 隔离 slot 8)
+| 项 | 状态 | 证据 |
+|----|------|------|
+| E1(部分)widget +3 chart 类型 pie/area/progress 端到端 | ✅ DONE | inspector widgetType +3 选项 + **真 runtime mini-renderer**(`RuntimePieChart` SVG 扇形 / `RuntimeAreaChart` SVG 填充 path / `RuntimeProgressWidget` 阈值带百分比条)+ `WIDGET_BODY_TYPES` guard(progress 读 props.value 跳过 number-card 框);`widget-chart-types-golden.spec.ts` 3/3 真栈(save readback widgetType+props + runtime 真渲染非空 DOM:扇形/填充/进度条 + 截图复核);advanced-props 5/5 无回归 |
+| §15 修正 | 📌 记录 | 派发前取证发现 widget runtime 是手写 5 种 mini-renderer **非 SharedChartFactory** → 加新 type 必须配真渲染器(非单纯加选项,否则假选项 §2.2)。本切片加 3 type;**全 24 type parity = widget runtime 统一到 SharedChartFactory,是更大 follow-up** |
+
 ### ⏸ NOT-MET(roadmap,**未完成,不假报**)
 - **A7** mid-drag drop-indicator/ghost 视觉断言(@dnd-kit 中途手势最易 flake,ROI 最低)→ defer。
 - **A11/A12** chart 类型广度 / input·layout 广度 → defer。
-- **E1/E2** widget 全 24 chart 配置、19 workbench block palette 可视化 authoring → 大特性(多周),未做。
+- **E1(剩余)/E2** widget 全 24 chart parity(runtime 统一 SharedChartFactory)、19 workbench block palette 可视化 authoring → 大特性(多周),未做。
 - **C4/C5** kind 切换、多选/批量 → 大特性,未做(C3 三件套 list+rollback+diff 已全交付)。
 - **D2/D4** 富属性控件全接入(dict/namedQuery/command/permission 选择器)、字段级校验反馈;**B3** REST diff blocks 下钻 → 未做。
 - **🧪 测试鲁棒性 follow-up**:`inspector-model-select-golden.spec.ts:146` 依赖特定 published model 在 seed 中(`option[value=SELECT_MODEL]` toHaveCount 1),bootstrap-only/leaner seed 栈(如 15 model 的 slot)会 fail —— seed 敏感非代码 bug;应改断言"select 存在 + ≥1 真 model option"而非锁定具体 model。
