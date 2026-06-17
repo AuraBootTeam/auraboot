@@ -4,25 +4,26 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '~/utils/cn';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-control text-body font-medium transition-colors focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        default: 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600',
-        destructive: 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600',
+        default:
+          'bg-accent text-white hover:bg-accent-hover dark:bg-blue-500 dark:hover:bg-blue-600',
+        destructive:
+          'bg-status-red text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600',
         outline:
-          'border border-gray-300 bg-white hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-100',
+          'border border-border-strong bg-panel text-text hover:bg-hover dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-100',
         secondary:
-          'bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600',
-        ghost:
-          'hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100',
-        link: 'text-blue-600 underline-offset-4 hover:underline dark:text-blue-400',
+          'bg-subtle text-text hover:bg-hover dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600',
+        ghost: 'hover:bg-hover hover:text-text dark:hover:bg-gray-800 dark:hover:text-gray-100',
+        link: 'text-accent underline-offset-4 hover:underline dark:text-blue-400',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-8 rounded-md px-3 text-xs',
-        lg: 'h-12 rounded-md px-8 text-base',
-        icon: 'h-10 w-10',
+        default: 'h-[var(--ds-control-md)] px-4 py-2',
+        sm: 'h-[var(--ds-control-sm)] px-3 text-aux',
+        lg: 'h-[var(--ds-control-lg)] px-8 text-section',
+        icon: 'h-[var(--ds-control-md)] w-[var(--ds-control-md)]',
       },
     },
     defaultVariants: {

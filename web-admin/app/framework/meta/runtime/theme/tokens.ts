@@ -121,6 +121,176 @@ export const designTokens = {
  */
 export type DesignToken = typeof designTokens;
 
+/* ==========================================================================
+ * dsTokens — canonical UX Design System tokens (single source of truth)
+ * --------------------------------------------------------------------------
+ * Spec : auraboot-enterprise/docs/standards/core/ux-design-system.md §1
+ * Ref  : auraboot-enterprise/docs/mockups/ux-design-system/index.html
+ *
+ * These are the authoritative visual tokens. They flow into Tailwind v4 via the
+ * generated `@theme` block (see `buildThemeCss`) which emits utilities
+ * (bg-accent, text-text-2, border-border-strong, rounded-control, …) AND CSS
+ * custom properties (var(--color-accent), …) consumed across `app/ui`.
+ *
+ * Additive: the legacy `designTokens` object + `resolveToken` DSL `$path`
+ * resolver above are intentionally left as-is for backward compatibility.
+ * ========================================================================== */
+export const dsTokens = {
+  font: {
+    // UI sans stack (CJK-aware); data/number columns use mono with tabular-nums
+    ui: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif',
+    mono: 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace',
+  },
+  color: {
+    text: '#1A1A1E',
+    text2: '#5A5E66',
+    text3: '#9A9DA5',
+    border: '#ECEDEF',
+    borderStrong: '#E2E3E6',
+    bg: '#F7F7F8',
+    panel: '#FFFFFF',
+    subtle: '#FAFAFB',
+    hover: '#F3F4F6',
+    selection: '#EEF4FF',
+    accent: '#2563EB',
+    accentHover: '#1D4ED8',
+    accentWeak: '#EFF4FF',
+  },
+  // §1.3 semantic status colors — business dicts pick from these 5 only.
+  status: {
+    gray: { fg: '#71717A', bg: '#F1F1F3' }, // draft / not-started / closed
+    blue: { fg: '#2563EB', bg: '#EAF1FE' }, // in-progress / processing
+    amber: { fg: '#C2750A', bg: '#FBF1E2' }, // pending / warning
+    green: { fg: '#15A34A', bg: '#E7F6ED' }, // done / passed / normal
+    red: { fg: '#DC2626', bg: '#FCECEC' }, // error / rejected / failed / overdue
+  },
+  // 4px spacing grid (adds the 12/20 steps the legacy scale skipped).
+  space: {
+    1: '4px',
+    2: '8px',
+    3: '12px',
+    4: '16px',
+    5: '20px',
+    6: '24px',
+    8: '32px',
+  },
+  radius: {
+    control: '6px',
+    card: '8px',
+    cardLg: '10px',
+    pill: '9999px',
+  },
+  // Control heights — same-form input/select/button must align to one of these.
+  control: {
+    sm: '28px',
+    md: '32px',
+    lg: '40px',
+    field: '34px', // form-field default (slightly taller for tap comfort)
+  },
+  // Type scale: page title / section / body / aux / eyebrow.
+  textScale: {
+    title: { size: '20px', weight: '660' },
+    section: { size: '15px', weight: '620' },
+    body: { size: '13.5px', weight: '400' },
+    aux: { size: '12.5px', weight: '400' },
+    eyebrow: { size: '11.5px', weight: '600' },
+  },
+  shadow: {
+    card: '0 1px 2px rgba(16,18,23,.03)',
+    pop: '0 1px 2px rgba(16,18,23,.04), 0 8px 24px -6px rgba(16,18,23,.14)',
+    toast: '0 6px 20px -4px rgba(16,18,23,.22)',
+  },
+  // Unified focus ring (standard §1/§2 authoritative = 3px accent-weak; the
+  // mockup currently renders 2px — flagged for sync).
+  focusRing: '0 0 0 3px #EFF4FF',
+  disabledOpacity: '0.5',
+} as const;
+
+/**
+ * dsTokens 类型
+ */
+export type DsTokens = typeof dsTokens;
+
+/**
+ * Derive the Tailwind v4 `@theme` block + companion `:root` custom properties
+ * from dsTokens. Output is deterministic so a committed copy
+ * (`app/styles/tokens.theme.css`) can be drift-checked against it, keeping
+ * dsTokens the single source of truth.
+ *
+ * `@theme` entries generate utilities (bg-accent, text-text-2, rounded-control,
+ * shadow-focus, text-title, …) and expose the values as CSS variables.
+ * The `:root` companion carries tokens that have no Tailwind theme namespace
+ * (control heights, the spacing grid for raw CSS, disabled opacity).
+ */
+export function buildThemeCss(tokens: DsTokens = dsTokens): string {
+  const c = tokens.color;
+  const lines: string[] = [];
+
+  lines.push(
+    '/* AUTO-GENERATED from dsTokens in app/framework/meta/runtime/theme/tokens.ts — do not edit by hand. Run `pnpm gen:tokens`. */',
+  );
+  lines.push('@theme {');
+
+  lines.push(`  --font-ui: ${tokens.font.ui};`);
+  lines.push(`  --font-mono: ${tokens.font.mono};`);
+  lines.push('');
+
+  lines.push(`  --color-text: ${c.text};`);
+  lines.push(`  --color-text-2: ${c.text2};`);
+  lines.push(`  --color-text-3: ${c.text3};`);
+  lines.push(`  --color-border: ${c.border};`);
+  lines.push(`  --color-border-strong: ${c.borderStrong};`);
+  lines.push(`  --color-bg: ${c.bg};`);
+  lines.push(`  --color-panel: ${c.panel};`);
+  lines.push(`  --color-subtle: ${c.subtle};`);
+  lines.push(`  --color-hover: ${c.hover};`);
+  lines.push(`  --color-selection: ${c.selection};`);
+  lines.push(`  --color-accent: ${c.accent};`);
+  lines.push(`  --color-accent-hover: ${c.accentHover};`);
+  lines.push(`  --color-accent-weak: ${c.accentWeak};`);
+  lines.push('');
+
+  for (const [name, pair] of Object.entries(tokens.status)) {
+    lines.push(`  --color-status-${name}: ${pair.fg};`);
+    lines.push(`  --color-status-${name}-bg: ${pair.bg};`);
+  }
+  lines.push('');
+
+  lines.push(`  --radius-control: ${tokens.radius.control};`);
+  lines.push(`  --radius-card: ${tokens.radius.card};`);
+  lines.push(`  --radius-card-lg: ${tokens.radius.cardLg};`);
+  lines.push(`  --radius-pill: ${tokens.radius.pill};`);
+  lines.push('');
+
+  lines.push(`  --shadow-card: ${tokens.shadow.card};`);
+  lines.push(`  --shadow-pop: ${tokens.shadow.pop};`);
+  lines.push(`  --shadow-toast: ${tokens.shadow.toast};`);
+  lines.push(`  --shadow-focus: ${tokens.focusRing};`);
+  lines.push('');
+
+  for (const [name, def] of Object.entries(tokens.textScale)) {
+    lines.push(`  --text-${name}: ${def.size};`);
+    lines.push(`  --text-${name}--font-weight: ${def.weight};`);
+  }
+  lines.push('}');
+  lines.push('');
+
+  lines.push('/* Design-system raw custom properties (non-utility access). */');
+  lines.push(':root {');
+  lines.push(`  --ds-control-sm: ${tokens.control.sm};`);
+  lines.push(`  --ds-control-md: ${tokens.control.md};`);
+  lines.push(`  --ds-control-lg: ${tokens.control.lg};`);
+  lines.push(`  --ds-control-field: ${tokens.control.field};`);
+  for (const [step, value] of Object.entries(tokens.space)) {
+    lines.push(`  --ds-space-${step}: ${value};`);
+  }
+  lines.push(`  --ds-disabled-opacity: ${tokens.disabledOpacity};`);
+  lines.push('}');
+  lines.push('');
+
+  return lines.join('\n');
+}
+
 /**
  * 解析 Design Token
  * 将 $token.path 转换为实际的 CSS 值
