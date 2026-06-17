@@ -349,6 +349,28 @@ export function UnifiedDesignerWorkbench({
     setMultiSelectedIds((current) => (current.size === 0 ? current : new Set()));
   };
 
+  // Box-select (geometric marquee) result: the canvas reports the ids of every
+  // block its selection rectangle covered. We replace the multi-selection with
+  // those ids (a fresh marquee is a fresh selection, not additive) and make the
+  // last one the primary selection so the inspector + drop context stay live.
+  // An empty marquee (covered nothing) clears the multi-selection. The primary
+  // single-selection is left untouched on an empty marquee so an accidental
+  // empty drag does not blow away the current inspector target.
+  const handleMarqueeSelect = (blockIds: string[]) => {
+    if (blockIds.length === 0) {
+      clearMultiSelection();
+      return;
+    }
+    if (blockIds.length === 1) {
+      // A marquee that grabbed exactly one block behaves like a single select.
+      setMultiSelectedIds((current) => (current.size === 0 ? current : new Set()));
+      setSelectedBlockId(blockIds[0]);
+      return;
+    }
+    setMultiSelectedIds(new Set(blockIds));
+    setSelectedBlockId(blockIds[blockIds.length - 1]);
+  };
+
   // Batch-delete every deletable block in the multi-selection in a single
   // history step (one updateDocument → one undo). Undeletable blocks (the root
   // kind container) are silently skipped. Selection is cleared afterwards.
@@ -1109,6 +1131,7 @@ export function UnifiedDesignerWorkbench({
               onPatchBlock={patchBlock}
               canDeleteBlock={canDeleteBlock}
               onDeleteBlock={handleDeleteBlock}
+              onMarqueeSelect={handleMarqueeSelect}
             />
             <InspectorHost
               selectedBlock={selectedBlock}
