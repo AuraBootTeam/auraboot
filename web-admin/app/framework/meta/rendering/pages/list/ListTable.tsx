@@ -20,7 +20,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
-import type { ColumnConfig, ButtonConfig } from '~/framework/meta/schemas/types';
+import type { ColumnConfig, ButtonConfig, TreeConfig } from '~/framework/meta/schemas/types';
 import {
   ROW_HEIGHT_CONFIG,
   DEFAULT_ROW_HEIGHT,
@@ -30,6 +30,7 @@ import {
 import { DraggableColumnHeader } from './DraggableColumnHeader';
 import { RowActionButtons } from './RowActionButtons';
 import { SummaryRow, hasAnyAggregate } from './SummaryRow';
+import { buildRowTree, flattenVisible, collectAllNodeIds } from './rowTree';
 import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 
@@ -42,6 +43,9 @@ interface DictItem {
 const DEFAULT_COLUMN_WIDTH = 160;
 const SELECTION_COLUMN_WIDTH = 40;
 const ACTION_COLUMN_WIDTH = 112;
+// Per-depth left indent (px) for tree rows (T10). Matches the SubTable /
+// TreeView indent feel; the chevron sits within this space.
+const TREE_INDENT_PX = 20;
 
 function isAutoFillColumn(column: ColumnConfig): boolean {
   if (column.isActionColumn) return false;
@@ -92,6 +96,15 @@ export interface ListTableProps {
   showSummaryRow?: boolean;
   /** Active locale for summary number/currency formatting (default 'en'). */
   locale?: string;
+  /**
+   * Expandable tree rows (T10). DSL opt-in via the table block
+   * (`table.treeConfig`). When set, self-referencing rows (by `treeConfig.
+   * parentField`) render as an indented tree with expand/collapse chevrons in
+   * the first data column. When unset, the table renders flat exactly as
+   * before. Tree mode disables row virtualization (tree datasets are small and
+   * virtualization assumes a flat, uniform list — same trade-off as grouping).
+   */
+  treeConfig?: TreeConfig;
 }
 
 export const ListTable = React.memo(function ListTable({
@@ -129,6 +142,7 @@ export const ListTable = React.memo(function ListTable({
   enableSelection = true,
   showSummaryRow,
   locale = 'en',
+  treeConfig,
 }: ListTableProps) {
   const effectiveRowHeight = rowHeight || DEFAULT_ROW_HEIGHT;
   const rowHeightCfg = ROW_HEIGHT_CONFIG[effectiveRowHeight];
@@ -292,6 +306,50 @@ export const ListTable = React.memo(function ListTable({
     return data.filter((r) => !collapsedGroups.has(String(r[groupByField] ?? '(empty)')));
   }, [data, groupedData, groupByField, collapsedGroups]);
 
+  // Tree rows (T10) — only active when `treeConfig` is configured AND grouping
+  // is not (the two are mutually exclusive layouts). Build the nested tree from
+  // the current page's rows and flatten it down to the rows currently visible
+  // given `expandedTreeIds`. The first data column gets per-depth indent + a
+  // chevron for nodes that have children (see the row render below).
+  const treeMode = !!treeConfig && !groupedData;
+  const treeIdField = 'pid';
+  const rowTree = useMemo(() => {
+    if (!treeMode) return [];
+    return buildRowTree(data, { idField: treeIdField, parentField: treeConfig!.parentField });
+  }, [treeMode, data, treeConfig]);
+  // Expanded node ids. Initialised to "all expanded" when the config opts in
+  // (`defaultExpanded` defaults to true), recomputed when the underlying tree
+  // identity changes so newly loaded data starts in the configured state.
+  const [expandedTreeIds, setExpandedTreeIds] = useState<Set<string>>(new Set());
+  const lastTreeSignatureRef = useRef<string>('');
+  useEffect(() => {
+    if (!treeMode) return;
+    const signature = data.map((r) => String(r.pid ?? r.id ?? '')).join('|');
+    if (signature === lastTreeSignatureRef.current) return;
+    lastTreeSignatureRef.current = signature;
+    const defaultExpanded = treeConfig?.defaultExpanded ?? true;
+    setExpandedTreeIds(
+      defaultExpanded
+        ? collectAllNodeIds(rowTree, { idField: treeIdField, parentField: treeConfig!.parentField })
+        : new Set<string>(),
+    );
+  }, [treeMode, data, rowTree, treeConfig]);
+  const toggleTreeRow = useCallback((id: string) => {
+    setExpandedTreeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const visibleTreeRows = useMemo(() => {
+    if (!treeMode) return [];
+    return flattenVisible(rowTree, expandedTreeIds, {
+      idField: treeIdField,
+      parentField: treeConfig!.parentField,
+    });
+  }, [treeMode, rowTree, expandedTreeIds, treeConfig]);
+
   // Column summary/footer row (T10). Auto-show when any column declares an
   // `aggregate`; an explicit `showSummaryRow` prop overrides. Aggregates cover
   // the rows currently rendered on this page (see SummaryRow / columnAggregation).
@@ -302,9 +360,11 @@ export const ListTable = React.memo(function ListTable({
   const renderSummaryRow =
     showSummaryRow === false ? false : (showSummaryRow ?? false) || columnsHaveAggregate;
 
-  // Virtual scrolling threshold — only virtualize when we have many rows
+  // Virtual scrolling threshold — only virtualize when we have many rows.
+  // Tree mode opts out (rows aren't a flat uniform list — same as grouping).
   const VIRTUAL_THRESHOLD = 50;
-  const enableVirtualization = !loading && visibleData.length > VIRTUAL_THRESHOLD && !groupedData;
+  const enableVirtualization =
+    !loading && visibleData.length > VIRTUAL_THRESHOLD && !groupedData && !treeMode;
 
   // Virtualizer — always created but only used when enabled
   const rowVirtualizer = useVirtualizer({
@@ -313,6 +373,67 @@ export const ListTable = React.memo(function ListTable({
     estimateSize: () => rowHeightCfg.px,
     overscan: 10,
   });
+
+  // i18n aria-labels for the tree expand/collapse chevron (T10). The runtime
+  // `t` returns the key unchanged when no resource is registered, so fall back
+  // to an English default — matching the translateOrFallback pattern used by
+  // the list layer elsewhere.
+  const expandLabel = (() => {
+    const key = 'list.expand_row';
+    const resolved = t(key);
+    return resolved && resolved !== key ? resolved : 'Expand row';
+  })();
+  const collapseLabel = (() => {
+    const key = 'list.collapse_row';
+    const resolved = t(key);
+    return resolved && resolved !== key ? resolved : 'Collapse row';
+  })();
+
+  // First-column tree affordance (T10): a depth-proportional left indent plus a
+  // chevron toggle for nodes that have children (aligned spacer otherwise so
+  // labels line up). Token-styled (`text-text-3`); the chevron rotates on
+  // expand. Returns the wrapped cell content for the tree's label column.
+  const renderTreeAffordance = (
+    content: React.ReactNode,
+    depth: number,
+    hasChildren: boolean,
+    expanded: boolean,
+    rowId: string,
+  ): React.ReactNode => (
+    <div
+      className="flex min-w-0 items-center"
+      style={{ paddingLeft: `${depth * TREE_INDENT_PX}px` }}
+    >
+      {hasChildren ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleTreeRow(rowId);
+          }}
+          aria-label={expanded ? collapseLabel : expandLabel}
+          aria-expanded={expanded}
+          data-testid={`tree-toggle-${rowId}`}
+          className="text-text-3 hover:text-text-2 focus-visible:shadow-focus mr-1 flex h-5 w-5 flex-none items-center justify-center rounded focus:outline-none"
+        >
+          <svg
+            className={`h-3.5 w-3.5 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      ) : (
+        // Aligned spacer so leaf labels line up with siblings that have chevrons.
+        <span className="mr-1 h-5 w-5 flex-none" aria-hidden="true" />
+      )}
+      <div className="min-w-0 flex-1 truncate">{content}</div>
+    </div>
+  );
 
   return (
     <div
@@ -457,8 +578,124 @@ export const ListTable = React.memo(function ListTable({
                 })()
               )}
 
+              {/* Tree rows (T10) — depth-first flattened, indented, with a
+                  chevron toggle in the first data column. Takes priority over
+                  the flat/virtualized branches when `treeConfig` is set. */}
+              {treeMode && !loading && data.length > 0
+                ? visibleTreeRows.map((node, index) => {
+                    const record = node.row;
+                    const rowId = record.pid || record.id || '';
+                    const cfInline = getRowStyle?.(record);
+                    const firstColumnField = orderedDataColumns[0]?.field;
+                    return (
+                      <tr
+                        key={rowId || index}
+                        data-testid={`table-row-${index}`}
+                        data-tree-depth={node.depth}
+                        className={`group cursor-pointer hover:bg-hover${selectedIds.has(rowId) ? 'bg-accent-weak' : ''}${previewRecordId === rowId ? 'bg-accent-weak/50' : ''}`}
+                        style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
+                        onClick={() => onRowClick(record)}
+                      >
+                        {enableSelection && (
+                          <td
+                            className={`px-3 ${rowHeightCfg.pyClass} print-hide w-10`}
+                            data-print="hide"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(rowId)}
+                              onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
+                              className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
+                              data-testid={`row-checkbox-${index}`}
+                            />
+                          </td>
+                        )}
+
+                        {orderedDataColumns.map((column) => {
+                          const tdFrozenPos = column.fixed || (column as any).frozenPosition;
+                          const tdFrozenLeft = tdFrozenPos === 'left';
+                          const tdFrozenRight = tdFrozenPos === 'right';
+                          const isFirstColumn = column.field === firstColumnField;
+                          const cellInner =
+                            column.editable && onInlineSave ? (
+                              <InlineEditCell
+                                column={column}
+                                value={record[column.field]}
+                                record={record}
+                                onSave={onInlineSave}
+                                editable
+                                dictItems={
+                                  column.dictCode && dictDataCache
+                                    ? (dictDataCache.get(column.dictCode) ?? [])
+                                    : undefined
+                                }
+                              >
+                                {renderCellContent(record, column, index)}
+                              </InlineEditCell>
+                            ) : (
+                              renderReadOnlyCellContent(record, column, index)
+                            );
+                          return (
+                            <td
+                              key={column.field}
+                              style={getCellStyle(column)}
+                              data-testid={`table-cell-${index}-${column.field}`}
+                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap ${
+                                column.align === 'right'
+                                  ? 'text-right'
+                                  : column.align === 'center'
+                                    ? 'text-center'
+                                    : ''
+                              } ${
+                                tdFrozenRight
+                                  ? 'border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]'
+                                  : tdFrozenLeft
+                                    ? 'border-border bg-panel group-hover:bg-hover sticky left-0 z-10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]'
+                                    : ''
+                              }`}
+                            >
+                              {isFirstColumn
+                                ? renderTreeAffordance(
+                                    cellInner,
+                                    node.depth,
+                                    node.hasChildren,
+                                    expandedTreeIds.has(rowId),
+                                    rowId,
+                                  )
+                                : cellInner}
+                            </td>
+                          );
+                        })}
+
+                        {actionColumn && (
+                          <td
+                            data-testid={`table-cell-${index}-actions`}
+                            className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
+                            style={{
+                              width: `${actionColumnWidth}px`,
+                              maxWidth: `${actionColumnWidth}px`,
+                            }}
+                          >
+                            <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
+                              <RowActionButtons
+                                buttons={actionColumn.buttons || []}
+                                record={record}
+                                evaluateVisibleWhen={evaluateVisibleWhen}
+                                canUseButton={canUseButton}
+                                resolveButtonLabel={resolveButtonLabel}
+                                handleAction={handleAction}
+                              />
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                : null}
+
               {/* Data rows — virtualized when row count exceeds threshold */}
-              {!loading && data.length > 0 && enableVirtualization ? (
+              {!treeMode && !loading && data.length > 0 && enableVirtualization ? (
                 <>
                   {/* Top spacer for virtual scroll offset */}
                   {rowVirtualizer.getVirtualItems().length > 0 && (
@@ -586,6 +823,7 @@ export const ListTable = React.memo(function ListTable({
                 </>
               ) : (
                 /* Non-virtualized data rows (small datasets or grouped data) */
+                !treeMode &&
                 !loading &&
                 data.length > 0 &&
                 visibleData.map((record, index) => {

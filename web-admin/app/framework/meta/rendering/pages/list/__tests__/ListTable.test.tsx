@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ListTable, type ListTableProps } from '../ListTable';
 
@@ -198,5 +198,118 @@ describe('ListTable selection column layout', () => {
         delete (HTMLElement.prototype as any).clientWidth;
       }
     }
+  });
+});
+
+describe('ListTable expandable tree rows (T10)', () => {
+  const treeColumns = [{ field: 'name', label: 'Name', width: 220 }];
+  const treeData = [
+    { pid: 'root', name: 'Root', parent_id: null },
+    { pid: 'child1', name: 'Child One', parent_id: 'root' },
+    { pid: 'child2', name: 'Child Two', parent_id: 'root' },
+    { pid: 'grandchild', name: 'Grandchild', parent_id: 'child1' },
+    { pid: 'root2', name: 'Root Two', parent_id: null },
+  ];
+
+  it('does not render any tree affordance when treeConfig is unset (flat mode)', () => {
+    renderListTable({ columns: treeColumns, data: treeData });
+    // Flat mode shows ALL rows (no expand state) and no chevron toggles.
+    expect(screen.getByText('Grandchild')).toBeInTheDocument();
+    expect(screen.queryByTestId('tree-toggle-root')).not.toBeInTheDocument();
+    // 5 rows rendered flat.
+    expect(screen.getByTestId('table-row-4')).toBeInTheDocument();
+  });
+
+  it('renders chevrons only on parent rows and indents by depth when expanded', () => {
+    renderListTable({
+      columns: treeColumns,
+      data: treeData,
+      treeConfig: { parentField: 'parent_id' },
+    });
+    // defaultExpanded → everything visible. Parents have toggles, leaves do not.
+    expect(screen.getByTestId('tree-toggle-root')).toBeInTheDocument();
+    expect(screen.getByTestId('tree-toggle-child1')).toBeInTheDocument();
+    expect(screen.queryByTestId('tree-toggle-child2')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tree-toggle-grandchild')).not.toBeInTheDocument();
+
+    // Indent encoded via data-tree-depth on the row.
+    const rows = screen.getAllByTestId(/^table-row-/);
+    const depthByName = (name: string) =>
+      Number(screen.getByText(name).closest('tr')?.getAttribute('data-tree-depth') ?? 'NaN');
+    expect(depthByName('Root')).toBe(0);
+    expect(depthByName('Child One')).toBe(1);
+    expect(depthByName('Grandchild')).toBe(2);
+    expect(depthByName('Root Two')).toBe(0);
+    // 5 rows when fully expanded.
+    expect(rows).toHaveLength(5);
+  });
+
+  it('collapsing a parent hides its subtree; expanding restores it', () => {
+    renderListTable({
+      columns: treeColumns,
+      data: treeData,
+      treeConfig: { parentField: 'parent_id' },
+    });
+    expect(screen.getByText('Grandchild')).toBeInTheDocument();
+
+    // Collapse child1 → grandchild hidden, child2 (sibling) still visible.
+    fireEvent.click(screen.getByTestId('tree-toggle-child1'));
+    expect(screen.queryByText('Grandchild')).not.toBeInTheDocument();
+    expect(screen.getByText('Child Two')).toBeInTheDocument();
+
+    // Collapse root → both children gone, root2 stays.
+    fireEvent.click(screen.getByTestId('tree-toggle-root'));
+    expect(screen.queryByText('Child One')).not.toBeInTheDocument();
+    expect(screen.queryByText('Child Two')).not.toBeInTheDocument();
+    expect(screen.getByText('Root Two')).toBeInTheDocument();
+
+    // Re-expand root → direct children return (grandchild stays hidden because
+    // child1 is still collapsed).
+    fireEvent.click(screen.getByTestId('tree-toggle-root'));
+    expect(screen.getByText('Child One')).toBeInTheDocument();
+    expect(screen.queryByText('Grandchild')).not.toBeInTheDocument();
+  });
+
+  it('starts collapsed (only roots) when defaultExpanded is false', () => {
+    renderListTable({
+      columns: treeColumns,
+      data: treeData,
+      treeConfig: { parentField: 'parent_id', defaultExpanded: false },
+    });
+    expect(screen.getByText('Root')).toBeInTheDocument();
+    expect(screen.getByText('Root Two')).toBeInTheDocument();
+    expect(screen.queryByText('Child One')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('tree-toggle-root'));
+    expect(screen.getByText('Child One')).toBeInTheDocument();
+  });
+
+  it('toggle click does not trigger row navigation (stopPropagation)', () => {
+    const onRowClick = vi.fn();
+    renderListTable({
+      columns: treeColumns,
+      data: treeData,
+      treeConfig: { parentField: 'parent_id' },
+      onRowClick,
+    });
+    fireEvent.click(screen.getByTestId('tree-toggle-root'));
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('exposes an aria-expanded + aria-label on the chevron toggle', () => {
+    renderListTable({
+      columns: treeColumns,
+      data: treeData,
+      treeConfig: { parentField: 'parent_id' },
+    });
+    const toggle = screen.getByTestId('tree-toggle-root');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('aria-label', 'Collapse row');
+    fireEvent.click(toggle);
+    // After collapse the SAME root toggle still exists (root is still a visible
+    // parent) and flips its aria state.
+    const toggleAfter = screen.getByTestId('tree-toggle-root');
+    expect(toggleAfter).toHaveAttribute('aria-expanded', 'false');
+    expect(toggleAfter).toHaveAttribute('aria-label', 'Expand row');
   });
 });
