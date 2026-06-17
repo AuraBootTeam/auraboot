@@ -500,6 +500,38 @@ export const DESIGNER_I18N = {
         'en-US': 'Representative preview — live data renders on the published page',
       } as L,
       metricPlaceholderValue: { 'zh-CN': '—', 'en-US': '—' } as L,
+      // Workbench-family batch 2 (workbench-action-bar / review-drawer /
+      // evidence-panel / record-inspector / candidate-list / artifact-timeline)
+      // representative previews. Same contract as metric-strip / status-banner:
+      // the designer canvas shows a config-driven placeholder; the live /p/ page
+      // renders the fully data-bound platform renderer.
+      noActionsConfigured: { 'zh-CN': '未配置操作', 'en-US': 'No actions configured' } as L,
+      noEvidenceSections: {
+        'zh-CN': '未配置证据分区',
+        'en-US': 'No evidence sections configured',
+      } as L,
+      noInspectorFields: {
+        'zh-CN': '未配置检视字段',
+        'en-US': 'No inspector fields configured',
+      } as L,
+      noCandidateFields: {
+        'zh-CN': '未配置候选字段',
+        'en-US': 'No candidate fields configured',
+      } as L,
+      noTimelineFields: {
+        'zh-CN': '未配置时间线字段',
+        'en-US': 'No timeline fields configured',
+      } as L,
+      reviewDrawerPreview: {
+        'zh-CN': '行级复核浮层',
+        'en-US': 'Row review drawer',
+      } as L,
+      reviewDrawerNotConfigured: {
+        'zh-CN': '未配置复核上下文',
+        'en-US': 'No review context configured',
+      } as L,
+      candidatesLabel: { 'zh-CN': '候选', 'en-US': 'Candidates' } as L,
+      decisionLabel: { 'zh-CN': '决策', 'en-US': 'Decision' } as L,
     },
 
     // Inspector shell
