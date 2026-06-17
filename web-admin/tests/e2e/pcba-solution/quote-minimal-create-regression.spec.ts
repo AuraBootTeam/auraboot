@@ -1,9 +1,13 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
-import { navigateToDynamicPage, queryFilteredList, waitForDynamicPageLoad, waitForFormReady } from '../helpers';
-import { cleanupRows, executeCommand, type CreatedRows } from './quote-e2e-helpers';
-
-const CREATE_URL = '/p/qo_quote_common/new?commandCode=qo_quote_common%3Acreate';
+import { navigateToDynamicPage, queryFilteredList, waitForFormReady } from '../helpers';
+import {
+  cleanupRows,
+  executeCommand,
+  openQuoteCreateFormFromList,
+  openQuoteDetailFromList,
+  type CreatedRows,
+} from './quote-e2e-helpers';
 
 async function readDynamicRecord(
   page: Page,
@@ -141,7 +145,7 @@ test.describe('PCBA quote minimal create regression', () => {
         )
         .catch(() => null);
 
-      await page.goto(CREATE_URL, { waitUntil: 'domcontentloaded' });
+      await openQuoteCreateFormFromList(page);
       await waitForFormReady(page, 20_000);
       await accountOptionsLoaded;
 
@@ -240,8 +244,7 @@ test.describe('PCBA quote minimal create regression', () => {
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('折扣%');
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('有效期至');
 
-      await page.goto(`/p/qo_quote_common/view/${quoteId}`, { waitUntil: 'domcontentloaded' });
-      await waitForDynamicPageLoad(page, 20_000);
+      await openQuoteDetailFromList(page, created);
       await expect(page.getByRole('tab', { name: /资料上传|Source Upload/ })).toBeVisible({
         timeout: 20_000,
       });

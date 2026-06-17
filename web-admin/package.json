@@ -29,6 +29,7 @@
     "test:contract": "PW_PROFILE=contract playwright test",
     "test:enterprise:smoke": "PW_PROFILE=enterprise-smoke playwright test",
     "test:enterprise:full": "PW_PROFILE=enterprise-full playwright test",
+    "test:quoteops": "PW_PROFILE=quoteops playwright test",
     "test:scope:audit": "node scripts/e2e-scope-audit.mjs",
     "test:agent:crm": "node tests/api/agent/run-crm-agent-validation.mjs",
     "test:agent:crm:auth": "NO_PROXY=localhost,127.0.0.1 PW_PROFILE=full PW_WORKERS=1 playwright test -c playwright.noweb.config.ts tests/auth.setup.ts --project=auth --reporter=line",

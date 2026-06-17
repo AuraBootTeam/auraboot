@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import {
   cleanupRows,
+  openQuoteDetailFromList,
   queryDynamicRecords,
   queryNamedDataSourceRecords,
   readDynamicRecord,
@@ -98,9 +99,7 @@ test.describe('PCBA quote BOM price manual adoption', () => {
         )
         .catch(() => null);
 
-      await page.goto(`/p/qo_quote_common/view/${created.quoteId}#bom_price`, {
-        waitUntil: 'domcontentloaded',
-      });
+      await openQuoteDetailFromList(page, created);
       const bomPriceTab = page.getByRole('tab', { name: /BOM价格计算|BOM Price/i });
       await expect(bomPriceTab).toBeVisible({ timeout: 20_000 });
       await bomPriceTab.click();

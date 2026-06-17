@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
+const storageState =
+  process.env.PW_ADMIN_STORAGE_STATE ||
+  (process.env.PW_STORAGE_DIR ? `${process.env.PW_STORAGE_DIR}/admin.json` : './tests/storage/admin.json');
 
 /**
  * Quick test config — no setup/auth projects, reuses existing server.
@@ -27,7 +30,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     actionTimeout: 10000,
     navigationTimeout: 15000,
-    storageState: './tests/storage/admin.json',
+    storageState,
     launchOptions: {
       args: ['--no-proxy-server'],
     },

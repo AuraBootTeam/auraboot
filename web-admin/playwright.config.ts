@@ -51,6 +51,23 @@ const artifactDir = process.env.PW_ARTIFACT_DIR || './test-results/artifacts';
 const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
 const resultsJson = process.env.PW_RESULTS_JSON || './test-results/results.json';
 const deepSpecPattern = /.*-deep\.spec\.ts$/;
+const quoteOpsCurrentSpecNames = [
+  'quote-bom-focused-menu-and-permissions',
+  'bom-workbench-golden',
+  'quote-minimal-create-regression',
+  'quote-bom-visual-feedback-golden',
+  'quote-corrected-bom-upload-golden',
+  'quote-bom-price-manual-adoption',
+  'quote-process-fee-review',
+  'quote-gerber-runtime',
+  'quote-excel-download',
+];
+const quoteOpsCurrentGatePattern = new RegExp(
+  String.raw`.*\/pcba-solution\/(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$`,
+);
+const pcbaSolutionLegacySpecPattern = new RegExp(
+  String.raw`.*\/pcba-solution\/(?!(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$).*\.spec\.ts$`,
+);
 
 const enterpriseScopeDirs = [
   'annual-plan',
@@ -296,6 +313,7 @@ export default defineConfig({
             name: 'enterprise-smoke',
             testDir: './tests/e2e',
             testMatch: enterpriseProfileMatch,
+            testIgnore: pcbaSolutionLegacySpecPattern,
             grep: /@smoke/,
             dependencies: ['auth'],
             use: {
@@ -311,6 +329,21 @@ export default defineConfig({
             name: 'enterprise-full',
             testDir: './tests/e2e',
             testMatch: enterpriseProfileMatch,
+            testIgnore: pcbaSolutionLegacySpecPattern,
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+            },
+          },
+        ]
+      : []),
+    ...(runProfile === 'quoteops'
+      ? [
+          {
+            name: 'quoteops',
+            testDir: './tests/e2e',
+            testMatch: quoteOpsCurrentGatePattern,
             dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
