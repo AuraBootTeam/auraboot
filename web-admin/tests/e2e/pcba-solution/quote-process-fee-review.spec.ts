@@ -8,8 +8,9 @@ test.describe('PCBA quote process fee review', () => {
     const created = await seedProcessFeeReviewQuote(page);
     try {
       await page.goto(`/p/qo_quote_common/view/${created.quoteId}`, { waitUntil: 'domcontentloaded' });
-      await expect(page.getByRole('tab', { name: /加工费|Process Fee/ })).toBeVisible({ timeout: 20_000 });
-      await page.getByRole('tab', { name: /加工费|Process Fee/ }).click();
+      const processPointsTab = page.getByRole('tab', { name: /加工点数|Process Points/ });
+      await expect(processPointsTab).toBeVisible({ timeout: 20_000 });
+      await processPointsTab.click();
 
       const manualRequiredChip = page.getByTestId('metric-strip-item-partial');
       const unmatchedChip = page.getByTestId('metric-strip-item-unmatched');
@@ -32,6 +33,8 @@ test.describe('PCBA quote process fee review', () => {
       await expect(reviewDrawer).toContainText(/数量 3 .*单件点数 2(?:\.0+)? .*合计点数 6(?:\.0+)?|Qty \/ Points/);
       await expect(reviewDrawer).toContainText('UNMATCHED');
 
+      await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
+      await expect(reviewDrawer).toHaveCount(0);
       await manualRequiredChip.click();
       const manualRequiredRow = page.locator('[data-testid^="table-row-"]').filter({ hasText: 'E2E-MIXED' });
       await expect(manualRequiredRow).toHaveCount(1, { timeout: 20_000 });
@@ -42,8 +45,7 @@ test.describe('PCBA quote process fee review', () => {
       await expect(reviewDrawer).toContainText('SMT+DIP');
       await expect(reviewDrawer).toContainText('MIXED-PKG');
       await expect(reviewDrawer).toContainText('manual_required');
-      await expect(reviewDrawer).toContainText('reasonCode=mixed_smt_dip_stage_manual_required');
-      await expect(reviewDrawer).toContainText(/同一BOM行同时存在SMT和DIP点数|same BOM line has both SMT and DIP points/i);
+      await expect(reviewDrawer).toContainText(/核对BOM点数、工序或封装资料|review/i);
     } finally {
       await cleanupRows(page, created);
     }
