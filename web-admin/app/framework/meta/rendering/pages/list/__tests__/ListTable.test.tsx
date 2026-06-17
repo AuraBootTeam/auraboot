@@ -98,6 +98,56 @@ describe('ListTable selection column layout', () => {
     expect(actionCell).not.toHaveClass('w-px');
   });
 
+  it('does not render the summary footer when no column declares an aggregate', () => {
+    renderListTable();
+    expect(screen.queryByTestId('list-summary-row')).not.toBeInTheDocument();
+  });
+
+  it('auto-renders the summary footer when a column declares an aggregate', () => {
+    renderListTable({
+      columns: [
+        { field: 'name', label: 'Name', width: 200 },
+        { field: 'amount', label: 'Amount', width: 140, aggregate: 'sum', align: 'right' } as any,
+      ],
+      data: [
+        { pid: 'r1', name: 'A', amount: 100 },
+        { pid: 'r2', name: 'B', amount: 250 },
+      ],
+    });
+    const footer = screen.getByTestId('list-summary-row');
+    expect(footer).toBeInTheDocument();
+    // 100 + 250 = 350
+    expect(screen.getByTestId('summary-cell-amount')).toHaveTextContent('350');
+  });
+
+  it('suppresses the summary footer when showSummaryRow is false even if aggregates exist', () => {
+    renderListTable({
+      showSummaryRow: false,
+      columns: [
+        { field: 'name', label: 'Name', width: 200 },
+        { field: 'amount', label: 'Amount', width: 140, aggregate: 'sum', align: 'right' } as any,
+      ],
+      data: [{ pid: 'r1', name: 'A', amount: 100 }],
+    });
+    expect(screen.queryByTestId('list-summary-row')).not.toBeInTheDocument();
+  });
+
+  it('force-renders the summary footer when showSummaryRow is true', () => {
+    renderListTable({
+      showSummaryRow: true,
+      columns: [
+        { field: 'name', label: 'Name', width: 200, aggregate: 'count' } as any,
+        { field: 'kind', label: 'Kind', width: 110 },
+      ],
+      data: [
+        { pid: 'r1', name: 'A', kind: 'x' },
+        { pid: 'r2', name: 'B', kind: 'y' },
+      ],
+    });
+    expect(screen.getByTestId('list-summary-row')).toBeInTheDocument();
+    expect(screen.getByTestId('summary-cell-name')).toHaveTextContent('2');
+  });
+
   it('fills spare container width with flexible data columns', async () => {
     const clientWidthDescriptor = Object.getOwnPropertyDescriptor(
       HTMLElement.prototype,
