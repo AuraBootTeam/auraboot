@@ -126,6 +126,21 @@ public class ProcessDefinitionController {
 
     // ==================== Create/Update Endpoints ====================
 
+    @PostMapping("/validate")
+    @RequirePermission(MetaPermission.WORKFLOW_READ)
+    @Operation(summary = "Validate designer JSON",
+            description = "Compile a designerJson to BPMN XML server-side without persisting or "
+                    + "deploying, returning structured errors (unsupported node types, gateway "
+                    + "flows missing conditions, malformed JSON). Lets the designer surface "
+                    + "deploy-blocking errors before the user clicks Deploy (G-B1).")
+    public ApiResponse<ProcessDeploymentService.ValidationResult> validate(
+            @RequestBody ValidateProcessRequest request) {
+        ProcessDeploymentService.ValidationResult result =
+                deploymentService.validateDesignerJson(
+                        request.designerJson(), request.processKey(), request.processName());
+        return ApiResponse.success(result);
+    }
+
     @PostMapping
     @RequirePermission(MetaPermission.WORKFLOW_MANAGE)
     @Operation(summary = "Create process definition", description = "Create a new process definition")
@@ -396,6 +411,13 @@ public class ProcessDefinitionController {
             String designerJson,
             Map<String, Object> formBindings,
             List<Map<String, Object>> businessDataBindings
+    ) {}
+
+    /** Request body for POST /validate — server-side designerJson pre-deploy check (G-B1). */
+    public record ValidateProcessRequest(
+            String processKey,
+            String processName,
+            String designerJson
     ) {}
 
     public record UpdateProcessRequest(
