@@ -73,6 +73,21 @@ import {
   isQuickFilterPresetKey,
 } from './list/quickFilterPresets';
 import { resolveListRowClickMode } from './list/rowClickNavigation';
+import { SelectAllMatchingBanner } from './list/SelectAllMatchingBanner';
+import {
+  type SelectionState,
+  createSelectionModel,
+  toggleRow as selectionToggleRow,
+  selectPage as selectionSelectPage,
+  clearPage as selectionClearPage,
+  enterAllMatching as selectionEnterAllMatching,
+  clearSelection as selectionClearSelection,
+  isSelected as selectionIsSelected,
+  selectedCount as selectionSelectedCount,
+  isPageFullySelected as selectionIsPageFullySelected,
+  getExplicitIds as selectionGetExplicitIds,
+  isAllMatching as selectionIsAllMatching,
+} from './list/selectionModel';
 import { savedViewService } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
@@ -360,7 +375,12 @@ function ListPageContentInner(props: PageContentProps) {
   const [data, setData] = useState<DynamicEntity[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // T9 — cross-page selection model. `selectionState` is the single source of
+  // truth (explicit picked ids, or all-matching mode with an exclusion set);
+  // the page-scoped `selectedIds` Set + counts below are derived from it.
+  const [selectionState, setSelectionState] = useState<SelectionState>(() =>
+    createSelectionModel(),
+  );
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [pageState, setPageState] = useState(() => ({
     filters: { ...urlFilters } as Record<string, any>,
@@ -499,7 +519,46 @@ function ListPageContentInner(props: PageContentProps) {
       (tableBlock as any)?.table?.bulkActions ?? (tableBlock as any)?.bulkActions ?? [];
     return Array.isArray(configured) ? configured : [];
   }, [tableBlock]);
-  const selectedIdList = useMemo(() => Array.from(selectedIds), [selectedIds]);
+  // T9 — ids of the rows currently loaded on this page (cross-page selection
+  // accumulates across these as the user pages).
+  const pageRowIds = useMemo(
+    () => data.map((r) => r.pid || r.id || '').filter(Boolean) as string[],
+    [data],
+  );
+  const allMatchingSelected = selectionIsAllMatching(selectionState);
+  // Page-scoped Set of selected ids — what the table's checkboxes render from
+  // (the table compares against the visible page's row ids).
+  const selectedIds = useMemo(
+    () => new Set(pageRowIds.filter((id) => selectionIsSelected(selectionState, id))),
+    [pageRowIds, selectionState],
+  );
+  // Whether every loaded row on this page is selected (drives the header
+  // checkbox + the "select all N matching" banner offer).
+  const pageFullySelected = useMemo(
+    () => selectionIsPageFullySelected(selectionState, pageRowIds),
+    [selectionState, pageRowIds],
+  );
+  // Effective selected count across all pages (page picks, or total-minus-
+  // exclusions in all-matching mode).
+  const effectiveSelectedCount = selectionSelectedCount(selectionState, pagination.total);
+  // Explicit ids for bulk ops/export. In all-matching mode there is no finite
+  // client-side id list — callers branch on `allMatchingSelected` and export by
+  // the current filter instead.
+  const explicitSelectedIds = useMemo(
+    () => selectionGetExplicitIds(selectionState),
+    [selectionState],
+  );
+  // The concrete ids a bulk op (delete/edit/custom action) should target. In
+  // explicit mode this is the full cross-page pick; in all-matching mode we
+  // fall back to the currently-selected rows on this page (a finite, safe set)
+  // — export is the cross-page path and uses the filter directly.
+  const selectedIdList = allMatchingSelected ? Array.from(selectedIds) : explicitSelectedIds;
+  // Whether row selection (checkbox column + bulk bar + select-all banner) is
+  // active for this page — DSL opt-in via the table block, minus any host-level
+  // override.
+  const selectionEnabled =
+    !!((tableBlock as any)?.table?.selection || (tableBlock as any)?.selection) &&
+    !listExtensions?.disableRowSelection;
 
   // G7 dispatch — list pages hardcode table/filters/toolbar/tabs/form-buttons
   // in the layout above, but any additional block types in the schema
@@ -1572,28 +1631,36 @@ function ListPageContentInner(props: PageContentProps) {
     loadData({ page: 0, size: pagination.pageSize, filters });
   }, [loadData, pagination.pageSize, filters]);
 
-  // Bulk selection handlers
+  // Bulk selection handlers (T9 — backed by the cross-page selection model).
   const toggleRowSelection = useCallback((recordId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(recordId)) next.delete(recordId);
-      else next.add(recordId);
-      return next;
-    });
+    setSelectionState((prev) => selectionToggleRow(prev, recordId));
   }, []);
 
+  // Header checkbox: toggle whole-page selection. If the page is already fully
+  // selected, un-check it; otherwise select every loaded row on the page.
   const toggleSelectAll = useCallback(() => {
-    setSelectedIds((prev) => {
-      if (prev.size === data.length && data.length > 0) return new Set();
-      return new Set(data.map((r) => r.pid || r.id || '').filter(Boolean));
-    });
-  }, [data]);
+    setSelectionState((prev) =>
+      selectionIsPageFullySelected(prev, pageRowIds)
+        ? selectionClearPage(prev, pageRowIds)
+        : selectionSelectPage(prev, pageRowIds),
+    );
+  }, [pageRowIds]);
+
+  // Banner action: opt into "select all N matching the current filter".
+  const handleSelectAllMatching = useCallback(() => {
+    setSelectionState((prev) => selectionEnterAllMatching(prev));
+  }, []);
+
+  // Banner action: drop back from all-matching to no selection.
+  const clearAllSelection = useCallback(() => {
+    setSelectionState((prev) => selectionClearSelection(prev));
+  }, []);
 
   const handleBulkDelete = useCallback(
     async (ids: string[]) => {
       const mc = schema?.modelCode || tableName;
       await dynamicService.batchDelete(mc, ids);
-      setSelectedIds(new Set());
+      setSelectionState(selectionClearSelection);
       loadData({ page: 0, size: pagination.pageSize, filters });
     },
     [schema?.modelCode, tableName, loadData, pagination.pageSize, filters],
@@ -1685,7 +1752,7 @@ function ListPageContentInner(props: PageContentProps) {
       }
 
       if (successCount > 0) {
-        setSelectedIds(new Set());
+        setSelectionState(selectionClearSelection);
         await loadData({ page: 0, size: pagination.pageSize, filters });
       }
 
@@ -1726,7 +1793,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   const handleBulkEditComplete = useCallback(() => {
     setBulkEditOpen(false);
-    setSelectedIds(new Set());
+    setSelectionState(selectionClearSelection);
     loadData({ page: 0, size: pagination.pageSize, filters });
   }, [loadData, pagination.pageSize, filters]);
 
@@ -2537,6 +2604,12 @@ function ListPageContentInner(props: PageContentProps) {
       if (!canUseButton(button)) return false;
       if (!button.visibleWhen) return true;
       const selectedIdsArray = selectedIdList;
+      // In all-matching mode the selection spans every filtered record, so the
+      // visibility count reflects the effective total (minus exclusions), not
+      // just the finite id array.
+      const visibleSelectedCount = allMatchingSelected
+        ? effectiveSelectedCount
+        : selectedIdsArray.length;
       const conditionContext = {
         ...buildToolbarConditionContext(
           { total: pagination.total, records: data },
@@ -2544,16 +2617,25 @@ function ListPageContentInner(props: PageContentProps) {
             state: {
               filters,
               selectedIds: selectedIdsArray,
-              selectedCount: selectedIdsArray.length,
+              selectedCount: visibleSelectedCount,
             },
           }),
         ),
         selectedIds: selectedIdsArray,
-        selectedCount: selectedIdsArray.length,
+        selectedCount: visibleSelectedCount,
       };
       return evaluateCondition(button.visibleWhen, conditionContext as any);
     });
-  }, [canUseButton, data, filters, pagination.total, selectedIdList, tableBulkActions]);
+  }, [
+    canUseButton,
+    data,
+    filters,
+    pagination.total,
+    selectedIdList,
+    allMatchingSelected,
+    effectiveSelectedCount,
+    tableBulkActions,
+  ]);
 
   // Build export filter conditions for toolbar
   const exportFilterConditions = useMemo(() => {
@@ -2582,16 +2664,20 @@ function ListPageContentInner(props: PageContentProps) {
     return conditions.length > 0 ? conditions : undefined;
   }, [filters, getTabFilter]);
 
-  // Handle export from toolbar
-  const handleExport = useCallback(
-    async (format: 'xlsx' | 'csv') => {
+  // Shared export request — posts the given conditions to the export endpoint
+  // and triggers a browser download of the returned file.
+  const runExport = useCallback(
+    async (
+      format: 'xlsx' | 'csv',
+      conditions: Array<{ field: string; operator: string; value: unknown }> | undefined,
+    ) => {
       try {
         const res = await fetch(`/api/dynamic/${modelCode}/export`, {
           method: 'post',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             format: format === 'xlsx' ? 'excel' : 'csv',
-            conditions: exportFilterConditions,
+            conditions,
           }),
         });
         if (!res.ok) throw new Error('Export request failed');
@@ -2610,7 +2696,36 @@ function ListPageContentInner(props: PageContentProps) {
         showErrorToast(err instanceof Error ? err.message : 'Export failed');
       }
     },
-    [modelCode, exportFilterConditions, showErrorToast],
+    [modelCode, showErrorToast],
+  );
+
+  // Handle export from toolbar — exports the full/filtered result set.
+  const handleExport = useCallback(
+    async (format: 'xlsx' | 'csv') => {
+      await runExport(format, exportFilterConditions);
+    },
+    [runExport, exportFilterConditions],
+  );
+
+  // T9 — export ONLY the selected records.
+  //  - explicit mode: the current filter scope plus an `IN pid (...)` condition
+  //    restricting the export to the picked ids (which may span pages).
+  //  - all-matching mode: there is no finite id list — export the whole filtered
+  //    set (the same conditions a normal export would use).
+  const handleExportSelected = useCallback(
+    async (format: 'xlsx' | 'csv' = 'xlsx') => {
+      if (allMatchingSelected) {
+        await runExport(format, exportFilterConditions);
+        return;
+      }
+      if (explicitSelectedIds.length === 0) return;
+      const conditions = [
+        ...(exportFilterConditions ?? []),
+        { field: 'pid', operator: 'IN', value: explicitSelectedIds },
+      ];
+      await runExport(format, conditions);
+    },
+    [allMatchingSelected, runExport, exportFilterConditions, explicitSelectedIds],
   );
 
   // Row height from current view config (with fallback)
@@ -3513,6 +3628,20 @@ function ListPageContentInner(props: PageContentProps) {
                 }
               />
 
+              {/* T9 — cross-page select-all banner. Shown once the whole page
+                  is selected and more matching records exist beyond it, or
+                  while in "all N matching" mode. */}
+              <SelectAllMatchingBanner
+                enabled={selectionEnabled}
+                pageFullySelected={pageFullySelected}
+                allMatchingSelected={allMatchingSelected}
+                pageSelectedCount={selectedIds.size}
+                total={pagination.total}
+                onSelectAllMatching={handleSelectAllMatching}
+                onClearSelection={clearAllSelection}
+                t={t}
+              />
+
               {/* Table area — extracted to ListTable with DnD column reorder */}
               <ListTable
                 columns={tableColumns}
@@ -3550,10 +3679,7 @@ function ListPageContentInner(props: PageContentProps) {
                 t={t}
                 onInlineSave={handleInlineSave}
                 dictDataCache={dictDataCache.current}
-                enableSelection={
-                  !!((tableBlock as any)?.table?.selection || (tableBlock as any)?.selection) &&
-                  !listExtensions?.disableRowSelection
-                }
+                enableSelection={selectionEnabled}
               />
 
               {/* G7 — misc blocks (chart / description / rich-text / divider /
@@ -3580,15 +3706,16 @@ function ListPageContentInner(props: PageContentProps) {
                 onPageChange={handlePageChange}
                 onPageSizeChange={handlePageSizeChange}
                 t={t}
-                selectedCount={selectedIds.size}
+                selectedCount={effectiveSelectedCount}
                 selectedIds={selectedIdList}
                 modelCode={modelCode}
                 onBulkEdit={() => setBulkEditOpen(true)}
                 onBulkDelete={handleBulkDelete}
+                onBulkExport={() => handleExportSelected('xlsx')}
                 bulkActions={visibleBulkActions}
                 onBulkAction={handleBulkAction}
                 resolveBulkActionLabel={resolveButtonLabel}
-                onClearSelection={() => setSelectedIds(new Set())}
+                onClearSelection={clearAllSelection}
               />
             </>
           ) : (
@@ -3618,7 +3745,7 @@ function ListPageContentInner(props: PageContentProps) {
             // BulkEditModal
             bulkEditOpen={bulkEditOpen}
             onBulkEditClose={() => setBulkEditOpen(false)}
-            selectedIds={Array.from(selectedIds)}
+            selectedIds={selectedIdList}
             modelCode={modelCode}
             bulkEditFields={tableColumns
               .filter((c) => !c.isActionColumn && c.field)
