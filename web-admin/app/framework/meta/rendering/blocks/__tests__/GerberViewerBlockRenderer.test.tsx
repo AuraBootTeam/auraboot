@@ -763,6 +763,82 @@ describe('GerberViewerBlockRenderer', () => {
     expect(screen.queryByTestId('gerber-component-row-C4')).toBeNull();
   });
 
+  it('localizes diagnostic messages by code and interpolates context (zh-CN)', () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (key: string) => key,
+        form: {},
+        global: {},
+        state: { selectedLine: { qo_ql_gerber_validation_status: 'failed' } },
+      }),
+    });
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: {
+        ...INSPECTION,
+        issues: [
+          {
+            severity: 'error',
+            code: 'COMPONENT_OUTSIDE_BOARD',
+            refdes: 'U7',
+            message: 'U7 coordinate (99, 99) is outside the board outline.',
+            details: { xMm: 99, yMm: 99 },
+          },
+          {
+            severity: 'error',
+            code: 'BOM_REF_WITHOUT_CPL',
+            refdes: 'C12',
+            message: 'C12 exists in BOM placement refs but was not found in CPL.',
+            details: { materialCode: 'X', materialName: 'cap' },
+          },
+        ],
+      },
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    // Localized Chinese message with the refdes + coordinates interpolated.
+    const outside = screen.getByTestId('gerber-issue-COMPONENT_OUTSIDE_BOARD-U7');
+    expect(outside).toHaveTextContent('坐标 (99, 99) 超出板框范围');
+    expect(outside).toHaveTextContent('建议'); // localized remediation line
+    expect(outside).not.toHaveTextContent('outside the board outline'); // not the English sidecar default
+    expect(screen.getByTestId('gerber-issue-BOM_REF_WITHOUT_CPL-C12')).toHaveTextContent(
+      '在 BOM 贴装清单中存在,但 CPL 坐标文件中未找到',
+    );
+    // The code badge stays as the language-neutral key.
+    expect(outside).toHaveTextContent('COMPONENT_OUTSIDE_BOARD');
+    // Severity filter tabs are localized.
+    expect(screen.getByRole('button', { name: '警告' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '错误' })).toBeTruthy();
+  });
+
+  it('falls back to the sidecar message for an unmapped diagnostic code', () => {
+    const runtime = makeRuntime(); // en-US
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: {
+        ...INSPECTION,
+        issues: [
+          {
+            severity: 'warning',
+            code: 'SOME_FUTURE_CODE',
+            refdes: 'Z1',
+            message: 'a brand new diagnostic the UI table does not know yet',
+          },
+        ],
+      },
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('gerber-issue-SOME_FUTURE_CODE-Z1')).toHaveTextContent(
+      'a brand new diagnostic the UI table does not know yet',
+    );
+  });
+
   it('updates selected component details when a board marker is clicked', async () => {
     const runtime = makeRuntime();
     const block: BlockConfig = {
