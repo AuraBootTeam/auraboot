@@ -106,29 +106,29 @@ export function CrudTemplateWizard({
 
       <div className="flex min-h-screen items-center justify-center p-4">
         <div
-          className="relative w-full max-w-3xl rounded-2xl bg-white shadow-xl"
+          className="bg-panel relative w-full max-w-3xl rounded-2xl shadow-xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="border-b border-gray-200 px-6 py-5">
-            <h2 className="text-lg font-semibold text-gray-900">生成基础 CRUD 页面</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              为模型 <span className="font-mono text-blue-600">{modelName}</span>{' '}
+          <div className="border-border border-b px-6 py-5">
+            <h2 className="text-text text-lg font-semibold">生成基础 CRUD 页面</h2>
+            <p className="text-text-2 mt-1 text-sm">
+              为模型 <span className="text-accent font-mono">{modelName}</span>{' '}
               生成页面骨架，后续可继续进入设计器调整。
             </p>
           </div>
 
           <div className="space-y-6 px-6 py-6">
             {generationError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-card-lg bg-status-red-bg border border-red-200 px-4 py-3 text-sm text-red-700">
                 {generationError}
               </div>
             )}
 
             {generationResult ? (
               <div className="space-y-5">
-                <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4">
+                <div className="rounded-card-lg border-status-green bg-status-green-bg border px-4 py-4">
                   <div className="text-sm font-medium text-green-800">页面生成成功</div>
-                  <div className="mt-1 text-sm text-green-700">
+                  <div className="text-status-green mt-1 text-sm">
                     已生成 {generationResult.generatedResources.pages.length} 个页面资源。
                   </div>
                 </div>
@@ -137,15 +137,15 @@ export function CrudTemplateWizard({
                   {generationResult.generatedResources.pages.map((page) => (
                     <div
                       key={page.id}
-                      className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3"
+                      className="rounded-card-lg border-border bg-subtle flex items-center justify-between border px-4 py-3"
                     >
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{page.pageName}</div>
-                        <div className="mt-1 text-xs text-gray-500">{page.route}</div>
+                        <div className="text-text text-sm font-medium">{page.pageName}</div>
+                        <div className="text-text-2 mt-1 text-xs">{page.route}</div>
                       </div>
                       <button
                         onClick={() => navigate(`/page-designer/${page.pid || page.id}`)}
-                        className="rounded-md border border-blue-300 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"
+                        className="rounded-control text-accent hover:bg-accent-weak border border-blue-300 px-3 py-2 text-sm"
                       >
                         编辑设计
                       </button>
@@ -156,56 +156,58 @@ export function CrudTemplateWizard({
             ) : (
               <>
                 <div>
-                  <h3 className="mb-3 text-sm font-medium text-gray-900">生成内容</h3>
+                  <h3 className="text-text mb-3 text-sm font-medium">生成内容</h3>
                   <div className="space-y-3">
-                    <label className="flex cursor-pointer items-start rounded-xl border border-gray-200 p-4 hover:bg-gray-50">
+                    <label className="rounded-card-lg border-border hover:bg-subtle flex cursor-pointer items-start border p-4">
                       <input
                         data-testid="crud-generate-list"
                         type="checkbox"
                         checked={config.generateList}
                         onChange={(e) => updateConfig('generateList', e.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="border-border-strong text-accent focus-visible:shadow-focus mt-1 h-4 w-4 rounded focus:outline-none"
                       />
                       <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">列表页</div>
-                        <div className="text-sm text-gray-500">默认带筛选、表格、操作列</div>
+                        <div className="text-text text-sm font-medium">列表页</div>
+                        <div className="text-text-2 text-sm">默认带筛选、表格、操作列</div>
                       </div>
                     </label>
 
-                    <label className="flex cursor-pointer items-start rounded-xl border border-gray-200 p-4 hover:bg-gray-50">
+                    <label className="rounded-card-lg border-border hover:bg-subtle flex cursor-pointer items-start border p-4">
                       <input
                         data-testid="crud-generate-form"
                         type="checkbox"
                         checked={config.generateForm}
                         onChange={(e) => updateConfig('generateForm', e.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="border-border-strong text-accent focus-visible:shadow-focus mt-1 h-4 w-4 rounded focus:outline-none"
                       />
                       <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">表单页</div>
-                        <div className="text-sm text-gray-500">默认带可编辑字段与保存动作</div>
+                        <div className="text-text text-sm font-medium">表单页</div>
+                        <div className="text-text-2 text-sm">默认带可编辑字段与保存动作</div>
                       </div>
                     </label>
 
-                    <label className="flex cursor-pointer items-start rounded-xl border border-gray-200 p-4 hover:bg-gray-50">
+                    <label className="rounded-card-lg border-border hover:bg-subtle flex cursor-pointer items-start border p-4">
                       <input
                         data-testid="crud-generate-detail"
                         type="checkbox"
                         checked={config.generateDetail}
                         onChange={(e) => updateConfig('generateDetail', e.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="border-border-strong text-accent focus-visible:shadow-focus mt-1 h-4 w-4 rounded focus:outline-none"
                       />
                       <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">详情页</div>
-                        <div className="text-sm text-gray-500">默认展示所有可见字段</div>
+                        <div className="text-text text-sm font-medium">详情页</div>
+                        <div className="text-text-2 text-sm">默认展示所有可见字段</div>
                       </div>
                     </label>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                <div className="rounded-card-lg border-border bg-subtle text-text-2 border px-4 py-3 text-sm">
                   将生成：
-                  <span className="ml-1 font-medium text-gray-900">
-                    {generatedKinds.length > 0 ? generatedKinds.join('、') : '请至少选择一个页面类型'}
+                  <span className="text-text ml-1 font-medium">
+                    {generatedKinds.length > 0
+                      ? generatedKinds.join('、')
+                      : '请至少选择一个页面类型'}
                   </span>
                   <span className="ml-1">，并自动发布。</span>
                 </div>
@@ -217,30 +219,30 @@ export function CrudTemplateWizard({
                       type="checkbox"
                       checked={config.openDesignerAfterGenerate ?? true}
                       onChange={(e) => updateConfig('openDesignerAfterGenerate', e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
                     />
-                    <span className="ml-2 text-sm text-gray-700">生成后自动打开页面设计</span>
+                    <span className="text-text-2 ml-2 text-sm">生成后自动打开页面设计</span>
                   </label>
 
                   <button
                     type="button"
                     onClick={() => setShowAdvanced((prev) => !prev)}
-                    className="text-sm text-blue-600 hover:text-blue-800"
+                    className="text-accent text-sm hover:text-blue-800"
                   >
                     {showAdvanced ? '收起更多选项' : '更多选项'}
                   </button>
 
                   {showAdvanced && (
-                    <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
+                    <div className="rounded-card-lg border-border bg-panel space-y-4 border p-4">
                       <label className="flex items-center">
                         <input
                           data-testid="crud-enable-export"
                           type="checkbox"
                           checked={config.enableExport}
                           onChange={(e) => updateConfig('enableExport', e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
                         />
-                        <span className="ml-2 text-sm text-gray-700">列表页启用导出</span>
+                        <span className="text-text-2 ml-2 text-sm">列表页启用导出</span>
                       </label>
 
                       <label className="flex items-center">
@@ -249,9 +251,9 @@ export function CrudTemplateWizard({
                           type="checkbox"
                           checked={config.enableImport}
                           onChange={(e) => updateConfig('enableImport', e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
                         />
-                        <span className="ml-2 text-sm text-gray-700">列表页启用导入</span>
+                        <span className="text-text-2 ml-2 text-sm">列表页启用导入</span>
                       </label>
 
                       <label className="flex items-center">
@@ -260,9 +262,9 @@ export function CrudTemplateWizard({
                           type="checkbox"
                           checked={config.createMenu}
                           onChange={(e) => updateConfig('createMenu', e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
                         />
-                        <span className="ml-2 text-sm text-gray-700">同时创建菜单</span>
+                        <span className="text-text-2 ml-2 text-sm">同时创建菜单</span>
                       </label>
 
                       {config.createMenu && (
@@ -271,7 +273,7 @@ export function CrudTemplateWizard({
                           value={config.menuName || ''}
                           onChange={(e) => updateConfig('menuName', e.target.value)}
                           placeholder={`${modelName}管理`}
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 text-sm focus:outline-none"
                         />
                       )}
 
@@ -281,9 +283,9 @@ export function CrudTemplateWizard({
                           type="checkbox"
                           checked={config.createPermissions}
                           onChange={(e) => updateConfig('createPermissions', e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
                         />
-                        <span className="ml-2 text-sm text-gray-700">同时创建权限</span>
+                        <span className="text-text-2 ml-2 text-sm">同时创建权限</span>
                       </label>
 
                       <label className="flex items-center">
@@ -293,25 +295,25 @@ export function CrudTemplateWizard({
                           checked={config.assignRoles}
                           onChange={(e) => updateConfig('assignRoles', e.target.checked)}
                           disabled={!config.createPermissions}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                          className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none disabled:opacity-50"
                         />
-                        <span className="ml-2 text-sm text-gray-700">同时分配给当前角色</span>
+                        <span className="text-text-2 ml-2 text-sm">同时分配给当前角色</span>
                       </label>
                     </div>
                   )}
                 </div>
 
-                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                <div className="rounded-card-lg bg-accent-weak text-accent border border-blue-200 px-4 py-3 text-sm">
                   默认只生成页面资源，不再自动改菜单、权限和角色。
                 </div>
               </>
             )}
           </div>
 
-          <div className="flex justify-between border-t border-gray-200 px-6 py-4">
+          <div className="border-border flex justify-between border-t px-6 py-4">
             <button
               onClick={onClose}
-              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2"
             >
               取消
             </button>
@@ -320,7 +322,7 @@ export function CrudTemplateWizard({
               <button
                 data-testid="crud-complete"
                 onClick={handleComplete}
-                className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+                className="rounded-control bg-green-600 px-4 py-2 text-white hover:bg-green-700"
               >
                 完成
               </button>
@@ -329,7 +331,7 @@ export function CrudTemplateWizard({
                 data-testid="crud-generate-submit"
                 onClick={handleGenerate}
                 disabled={!canGenerate || generating}
-                className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {generating ? '生成中...' : '生成页面'}
               </button>
