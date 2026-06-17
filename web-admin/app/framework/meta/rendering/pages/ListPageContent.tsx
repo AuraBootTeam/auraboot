@@ -23,6 +23,7 @@ import type {
   ColumnConfig,
   FieldConfig,
   ButtonConfig,
+  TableConfig,
 } from '~/framework/meta/schemas/types';
 import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
@@ -566,6 +567,14 @@ function ListPageContentInner(props: PageContentProps) {
   // page only — a cross-page grand total would require a backend sum endpoint.
   const summaryRowEnabled = ((tableBlock as any)?.table?.showSummaryRow ??
     (tableBlock as any)?.showSummaryRow) as boolean | undefined;
+
+  // T10 — expandable tree rows. DSL opt-in via the table block
+  // (`table.treeConfig: { parentField }`). When present, self-referencing rows
+  // render as an indented tree with expand/collapse chevrons; when absent the
+  // table stays flat (byte-identical to today). Aggregation/sorting unaffected.
+  const treeConfig = ((tableBlock as any)?.table?.treeConfig ?? (tableBlock as any)?.treeConfig) as
+    | TableConfig['treeConfig']
+    | undefined;
 
   // G7 dispatch — list pages hardcode table/filters/toolbar/tabs/form-buttons
   // in the layout above, but any additional block types in the schema
@@ -3689,6 +3698,7 @@ function ListPageContentInner(props: PageContentProps) {
                 enableSelection={selectionEnabled}
                 showSummaryRow={summaryRowEnabled}
                 locale={locale}
+                treeConfig={treeConfig}
               />
 
               {/* G7 — misc blocks (chart / description / rich-text / divider /
