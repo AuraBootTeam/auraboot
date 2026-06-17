@@ -16,14 +16,25 @@ const SPAN_PRESETS = [3, 4, 6, 8, 12] as const;
 
 export type ActiveDropIntent = { blockId: string; intent: DropIntent } | null;
 
+/**
+ * Canvas selection callback. The optional `modifiers.additive` flag is set when
+ * the user shift / cmd / ctrl + clicks a block, signalling a multi-select toggle
+ * (vs. a plain click which is single-select). Internal canvas call sites (drag,
+ * move controls, widget pointer handlers) omit it and behave as a single select.
+ */
+export type CanvasSelectModifiers = { additive?: boolean };
+export type CanvasSelectHandler = (blockId: string, modifiers?: CanvasSelectModifiers) => void;
+
 interface CanvasHostProps {
   document: PageSchemaV3;
   mode: DesignerMode;
   selectedBlockId: string | null;
+  /** Ids in the additive multi-selection (rendered with a selection ring). */
+  multiSelectedIds?: Set<string>;
   activeDrag: DragData | null;
   activeDropIntent: ActiveDropIntent;
   rootAccepts: boolean;
-  onSelect: (blockId: string) => void;
+  onSelect: CanvasSelectHandler;
   onMoveBefore: (movingBlockId: string, targetBlockId: string) => void;
   onPatchBlock: (blockId: string, updater: (block: DslBlockV3) => DslBlockV3) => void;
   canDeleteBlock: (blockId: string) => boolean;
@@ -34,6 +45,7 @@ export function CanvasHost({
   document,
   mode,
   selectedBlockId,
+  multiSelectedIds,
   activeDrag,
   activeDropIntent,
   rootAccepts,
@@ -90,6 +102,7 @@ export function CanvasHost({
               siblingBlocks={document.blocks}
               mode={mode}
               selectedBlockId={selectedBlockId}
+              multiSelectedIds={multiSelectedIds}
               activeDrag={activeDrag}
               activeDropIntent={activeDropIntent}
               locale={locale}
@@ -140,11 +153,12 @@ interface BlockFrameProps {
   siblingBlocks?: DslBlockV3[];
   mode: DesignerMode;
   selectedBlockId: string | null;
+  multiSelectedIds?: Set<string>;
   activeDrag: DragData | null;
   activeDropIntent: ActiveDropIntent;
   locale: string;
   dashboardSiblings?: DslBlockV3[];
-  onSelect: (blockId: string) => void;
+  onSelect: CanvasSelectHandler;
   onMoveBefore: (movingBlockId: string, targetBlockId: string) => void;
   onMoveWidget: (blockId: string, layoutPatch: Record<string, number>) => void;
   onResizeWidget: (blockId: string, layoutPatch: Record<string, number>) => void;
@@ -159,6 +173,7 @@ function BlockFrame(props: BlockFrameProps) {
     siblingBlocks,
     mode,
     selectedBlockId,
+    multiSelectedIds,
     activeDrag,
     activeDropIntent,
     locale,
@@ -172,6 +187,7 @@ function BlockFrame(props: BlockFrameProps) {
     onDeleteBlock,
   } = props;
   const selected = selectedBlockId === block.id;
+  const multiSelected = multiSelectedIds?.has(block.id) ?? false;
   const isDashboardWidget = block.blockType === 'widget' && Boolean(dashboardSiblings);
   const siblingIndex = siblingBlocks?.findIndex((sibling) => sibling.id === block.id) ?? -1;
   const previousSibling = siblingIndex > 0 ? siblingBlocks?.[siblingIndex - 1] : undefined;
@@ -226,13 +242,17 @@ function BlockFrame(props: BlockFrameProps) {
       ref={setRefs}
       data-testid={`canvas-block-${block.id}`}
       data-selected={selected ? 'true' : 'false'}
+      data-multi-selected={multiSelected ? 'true' : 'false'}
       data-layout-x={isDashboardWidget ? widgetX : undefined}
       data-layout-y={isDashboardWidget ? widgetY : undefined}
       data-layout-span={columnSpan}
       data-drop-intent={currentDropIntent}
       onClick={(event) => {
         event.stopPropagation();
-        onSelect(block.id);
+        // shift / cmd / ctrl + click toggles the block in the multi-selection;
+        // a plain click is a single select (handled by the workbench).
+        const additive = event.shiftKey || event.metaKey || event.ctrlKey;
+        onSelect(block.id, { additive });
       }}
       onPointerDown={(event) => {
         if (!isDashboardWidget) return;
@@ -248,7 +268,7 @@ function BlockFrame(props: BlockFrameProps) {
       className={`group relative rounded-lg border bg-white transition ${
         currentDropIntent === 'inside'
           ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-100'
-          : selected
+          : selected || multiSelected
           ? 'border-blue-500 ring-2 ring-blue-100'
           : 'border-slate-200 hover:border-blue-300'
       } ${isDragging ? 'opacity-50' : ''}`}
@@ -343,6 +363,7 @@ function BlockFrame(props: BlockFrameProps) {
         block={block}
         mode={mode}
         selectedBlockId={selectedBlockId}
+        multiSelectedIds={multiSelectedIds}
         activeDrag={activeDrag}
         activeDropIntent={activeDropIntent}
         locale={locale}
