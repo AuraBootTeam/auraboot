@@ -8,7 +8,7 @@ created: 2026-06-17
 
 > 配套 gap+方案文档 `docs/backlog/2026-06-17-page-designer-coverage-ux-gap.md`(含 §5 逐 slice 交付状态 + 复核五项)。本 campaign 走 `/aura-endgame`,首轮 P0→P6 后由 owner 逐轮 steer 推进 9 个增量切片。
 
-## 全 campaign 交付摘要:9 个 PR,全部主对话独立重跑验证
+## 全 campaign 交付摘要:13 个 PR,全部主对话独立重跑验证
 
 | PR | 维度 | 内容 | 独立验证 |
 |---|---|---|---|
@@ -21,10 +21,16 @@ created: 2026-06-17
 | #744 | 组件 | E1 widget +3 chart 类型 pie/area/progress(真 runtime 渲染器) | 3 E2E + 209 单测 |
 | #751 | 交互 | C5 画布多选 + 批量删除(+ 修 CanvasHost 嵌套 pass-through) | 4 E2E + 216 单测 |
 | #756 | 交互+鲁棒性 | C5 box-select marquee(命中纯函数+单测)+ golden:146 seed-agnostic | 3 E2E + 233 单测 |
+| #758 | 复盘 | 全 campaign 复盘文档(本文,9-PR 时点) | docs |
+| #766 | 组件(E2 首切片) | metric-strip + status-banner workbench 块 authoring(bare-path inspector + 代表性预览 + live `/p/` 真渲染) | 4 E2E + 242 单测 |
+| #767 | 组件(E2 批次2) | workbench-family 再 6 块(action-bar/review-drawer/evidence-panel/record-inspector/candidate-list/artifact-timeline)→ **family 8 块全交付** | 12 E2E + 259 单测 |
+| #773 | 组件(E2 展示块) | 4 非 family 块(stat-card/description/record-comments/embedded-list)→ **设计器 blockType 32→36** | 6 E2E + 272 单测 |
 
-**累计 ~120 测试**,全部主对话 `--rerun-tasks`/`--no-deps` 独立重跑验证(非仅信 subagent 自报)。覆盖六维:后端联动 / 测试覆盖 / 属性 UX / C1-C3 行动点(publish·export·import·version·rollback·diff)/ E1 chart / C5 多选·批量·框选。
+**累计 ~160 测试**,全部主对话 `--rerun-tasks`/`--no-deps`/`branch --contains` 独立重跑验证(非仅信 subagent 自报)。覆盖六维 + 组件扩展:后端联动 / 测试覆盖 / 属性 UX / C1-C3 行动点(publish·export·import·version·rollback·diff)/ E1 chart / C5 多选·批量·框选 / **E2 设计器 blockType 32→36(workbench-family 8 + 展示数据 4,含 live `/p/` 真平台渲染器绑定数据验证)**。
 
-**NOT-MET(如实标,未假报,待后续会话 steer)**:E2(19 workbench block palette,最大特性)/ C4(kind 切换,需设计决策)/ E1 剩余(widget 全 24 chart parity,需 runtime 统一 SharedChartFactory)/ A7·A11·A12·D2·D4·B3。
+> 关键架构(§15,贯穿 E1/E2):统一设计器自有 runtime(`DslBlockV3` / `RecursiveBlockRenderer`)≠ 平台 meta rendering(`BlockConfig` 数据绑定渲染器)是**两套 block 模型**。workbench/展示块在设计器内是**代表性预览**(config-driven),完整数据绑定渲染由 live `/p/` 平台 runtime 负责;inspector 用**块顶层 bare-path key**(平台渲染器从 `block.metrics`/`block.toneMap` 读,非 `props.*`)。不做完整两 runtime 桥接(bounded 不冒架构险)。
+
+**NOT-MET(如实标,未假报,待后续会话 steer)**:E2 余 12 个非 family 块(chart/trace-graph/form-buttons/form-wizard/filters/toolbar/monthly-grid/divider/rich-text/gerber-viewer/selection-info/text,**同范式机械重复,范式已固化在 gap doc + 已合并代码可照抄**)/ C4(kind 切换,需设计决策:换 kind 后不兼容 block 丢弃/警告/保留)/ E1 剩余(widget 全 24 chart parity,需 runtime 统一 SharedChartFactory)/ A7·A11·A12·D2·D4·B3。
 
 > 下方「首轮(Slice 1-2)」详细反思保留为方法论样板;「全 campaign 追加教训」记 Slice 3-9 的新弯路与纪律。
 
