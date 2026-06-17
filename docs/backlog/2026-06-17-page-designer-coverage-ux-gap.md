@@ -215,10 +215,16 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 |----|------|------|
 | E2 再加 6 块补全 workbench-family(workbench-action-bar/review-drawer/evidence-panel/record-inspector/candidate-list/artifact-timeline)| ✅ DONE | 照 Slice 10 范式:BlockRegistry+kindPolicy 注册 6 块(record-inspector 含子块 allowedChildren)+ inspector bare-path keys(`actions`/`sections`/`fields`/`item`/`candidates`/`compare`/`summaryBadges` 等,**读各平台渲染器顶层 prop,无假字段**)+ `RecursiveBlockRenderer` 6 个代表性预览;`workbench-blocks-batch2-authoring-golden.spec.ts` 8/8(B1-B6 每块 authoring+readback〔props 落块顶层〕+预览、B7 非法 JSON sad、**L1 live `/p/c/` 真平台渲染器 + 候选→record-inspector/evidence-panel/review-drawer 交互状态绑定**);Slice 10 baseline 4/4 无回归。**workbench-family 现共 8 块在设计器** |
 
+### ✅ Slice 12 E2 非 family 展示/数据块(commit `be9b2f20`,6 E2E + 272 单测独立重跑 0 fail,host-first 隔离 slot 71)
+| 项 | 状态 | 证据 |
+|----|------|------|
+| E2 加 4 个非 family 块(stat-card / description / record-comments / embedded-list)| ✅ DONE | 照范式逐块读平台渲染器取真 prop 路径:stat-card(`dataSource`+`statCard` obj)/ description(`content`,bare+props 混合处理)/ record-comments(title only,无 block 级数据)/ embedded-list(bare `modelCode`/`parentField`/`columns`/`pageSize`/`searchable`/`filterable`);BlockRegistry+kindPolicy+inspector(无假字段)+代表性预览;`display-blocks-authoring-golden.spec.ts` 6/6(B1-B4 authoring+readback、B5 非法 JSON sad、**L1 live `/p/c/` 真平台渲染器 stat-card 真值 128〔ds_orders.open_total〕+ embedded-list RecordListView**)。**设计器内置 blockType 现 36(原 32)** |
+| 诚实 caveat | 📌 记录 | record-comments **无 L1 live 渲染**(仅 detail-page 路径派发、modelCode/recordPid 由页面+记录上下文推导、无 block 级数据可绑)—— 平台固有约束非 shortcut,已注释;palette+inspector+预览+authoring 真绿 |
+
 ### ⏸ NOT-MET(roadmap,**未完成,不假报**)
 - **A7** mid-drag drop-indicator/ghost 视觉断言(@dnd-kit 中途手势最易 flake,ROI 最低)→ defer。
 - **A11/A12** chart 类型广度 / input·layout 广度 → defer。
-- **E1(剩余)** widget 全 24 chart parity(runtime 统一 SharedChartFactory)/ **E2(剩余)** 非 workbench-family 的 DSL 块(chart/stat-card/trace-graph/embedded-list/record-comments/form-buttons/form-wizard/filters/toolbar/description/monthly-grid)palette + 完整数据绑定设计器渲染 → 大特性,未做(**workbench-family 8 块已全交付**)。
+- **E1(剩余)** widget 全 24 chart parity(runtime 统一 SharedChartFactory)/ **E2(剩余)** 余 12 个非 family 块(chart/trace-graph/form-buttons/form-wizard/filters/toolbar/monthly-grid/divider/rich-text/gerber-viewer/selection-info/text)palette + 完整数据绑定设计器渲染 → 大特性,未做(**workbench-family 8 块 + 4 展示/数据块已交付,设计器现 36 blockType**)。
 - **C4** kind 切换 → 未做(C5 多选+批量+框选已全交付)。
 - **D2/D4** 富属性控件全接入(dict/namedQuery/command/permission 选择器)、字段级校验反馈;**B3** REST diff blocks 下钻 → 未做。
 - **🧪 测试鲁棒性 follow-up** — ✅ 已由 Slice 9(`3dac2092`)闭环:`inspector-model-select-golden:152` 改 seed-agnostic 断言(SELECT + option ≥2),不再锁定具体 model;leaner seed 栈也过。本行历史保留。
