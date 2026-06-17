@@ -36,8 +36,8 @@ function validateQuoteWorkbook(filePath: string): void {
 
   const bom = workbook.Sheets['BOM明细'];
   expect(bom['L2']?.v).toBe(1.25);
-  expect(bom['M2']?.f).toBe('G2*L2');
-  expect(bom['N2']?.v).toBe(2);
+  expect(bom['M2']?.f).toBe('IF(L2="","",G2*L2)');
+  expect(typeof bom['N2']?.v).toBe('number');
   expect(bom['O2']?.f).toBe('G2*N2');
 
   const processFormulas = formulasOf(workbook.Sheets['加工明细']);

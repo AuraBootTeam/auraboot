@@ -15,6 +15,7 @@ const MANUAL_SOURCE_NOTE = 'E2E source: business phone quote';
 const MANUAL_REASON = 'E2E business裁决: record and adopt manual price';
 const MANUAL_VALID_UNTIL = '2030-12-31';
 const EXPECTED_LINE_COST = Number((MANUAL_UNIT_PRICE * 10).toFixed(2));
+const PURCHASE_ANALYSIS_RECENT_PRICE_LABEL = '采购分析近期价';
 
 async function tableHeaders(table: Locator): Promise<string[]> {
   const headers = table.locator('thead th, [role="columnheader"]');
@@ -115,7 +116,7 @@ test.describe('PCBA quote BOM price manual adoption', () => {
       expect(headers).toEqual([
         '物料',
         'BOM用量',
-        '金蝶历史采购价',
+        PURCHASE_ANALYSIS_RECENT_PRICE_LABEL,
         '立创商城',
         '云汉芯城',
         '华强电子网',
@@ -132,9 +133,9 @@ test.describe('PCBA quote BOM price manual adoption', () => {
         ]),
       );
       expect(cellTextByHeader.get('BOM用量')).toBe('10');
-      expect(cellTextByHeader.get('金蝶历史采购价')).toBe('未命中');
+      expect(cellTextByHeader.get(PURCHASE_ANALYSIS_RECENT_PRICE_LABEL) ?? '').toMatch(/^[-—–]?$/);
       expect(cellTextByHeader.get('采用来源') ?? '').toMatch(/^[-—–]?$/);
-      expect(cellTextByHeader.get('当前状态')).toContain('暂无价格');
+      expect(cellTextByHeader.get('当前状态')).toContain('AI建议待确认');
 
       const headerText = (await priceTable.locator('thead').innerText()).replace(/\s+/g, ' ');
       expect(headerText).not.toContain('证据');
@@ -143,10 +144,10 @@ test.describe('PCBA quote BOM price manual adoption', () => {
 
       const beforeWaterfall = await readWaterfallLine(page, created);
       expect(String(beforeWaterfall.bom_qty ?? '')).toBe('10');
-      expect(String(beforeWaterfall.kingdee_recent_price ?? '')).toBe('未命中');
+      expect(String(beforeWaterfall.kingdee_latest_purchase_price ?? '')).toBe('');
       expect(String(beforeWaterfall.adopted_source ?? '')).toBe('');
       expect(String(beforeWaterfall.adopted_source_label ?? '')).toBe('');
-      expect(String(beforeWaterfall.current_price_status ?? '')).toBe('暂无价格');
+      expect(String(beforeWaterfall.current_price_status ?? '')).toBe('AI建议待确认');
       expect(String(beforeWaterfall.deepseek_suggested_price ?? '')).toContain('1.1111');
 
       await priceRow.click();
