@@ -179,7 +179,10 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-field-dataSource.model')).toHaveValue('customer');
     expect(screen.getByTestId('inspector-field-props.selectionMode')).toHaveValue('');
 
-    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model'), {
+    // The model control is a dropdown of published models plus a manual-entry
+    // fallback; with no model list loaded (no API in jsdom) an arbitrary code is
+    // bound through the `-manual` text input rather than the empty <select>.
+    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
       target: { value: 'account' },
     });
     fireEvent.change(screen.getByTestId('inspector-field-props.selectionMode'), {
@@ -646,7 +649,9 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.change(screen.getByTestId('inspector-field-title'), {
       target: { value: 'Line items' },
     });
-    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model'), {
+    // Bind the sub-table model via the manual-entry fallback (the <select> has no
+    // options without a loaded model list in jsdom).
+    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
       target: { value: 'customer' },
     });
     fireEvent.change(screen.getByTestId('inspector-field-dataSource.parentField'), {

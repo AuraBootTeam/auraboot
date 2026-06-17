@@ -13,6 +13,7 @@ import type {
   PageSchemaDTO,
   PageSchemaCreateRequest,
   PageSchemaUpdateRequest,
+  PageSchemaVersionCreateRequest,
   PaginationResult,
   PageSchemaVersionDTO,
   PageSchemaVersionComparisonDTO,
@@ -114,6 +115,20 @@ export async function unpublishPage(pid: string): Promise<Result<PageSchemaDTO>>
  */
 export async function getVersionHistory(pid: string): Promise<Result<PageSchemaVersionDTO[]>> {
   return get<PageSchemaVersionDTO[]>(`${API_BASE}/{pid}/versions`, { pid });
+}
+
+/**
+ * Create a page version snapshot (POST /api/pages/{pid}/versions).
+ *
+ * The backend (PageSchemaController.createVersion) takes the operation +
+ * description from the body and stamps the operator from the JWT, returning the
+ * newly created PageSchemaVersionDTO.
+ */
+export async function createVersion(
+  pid: string,
+  request: PageSchemaVersionCreateRequest,
+): Promise<Result<PageSchemaVersionDTO>> {
+  return post<PageSchemaVersionDTO>(`${API_BASE}/{pid}/versions`, { pid, ...request });
 }
 
 /**
