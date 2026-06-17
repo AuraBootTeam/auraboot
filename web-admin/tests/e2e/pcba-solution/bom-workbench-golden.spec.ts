@@ -100,11 +100,20 @@ async function clickSidebarPage(
   const nav = page.locator('nav, aside, [role="navigation"]').first();
   const link = nav.locator(`a[href="${href}"]`).or(nav.getByRole('link', { name: label })).first();
   await expect(link).toBeVisible({ timeout: 10_000 });
-  await Promise.all([
-    page.waitForURL((url) => url.pathname === href, { timeout: 15_000 }).catch(() => null),
-    link.click(),
-  ]);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await link.scrollIntoViewIfNeeded();
+    await link.click();
+    const navigated = await page
+      .waitForURL((url) => url.pathname === href, { timeout: 8_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (navigated) break;
+    if (attempt === 1) {
+      await expect.poll(() => new URL(page.url()).pathname).toBe(href);
+    }
+  }
   await waitForDynamicPageLoad(page, 20_000);
+  await expect(page.locator('main')).toContainText(label, { timeout: 20_000 });
 }
 
 test.describe('BOM standardization workbench golden', () => {
