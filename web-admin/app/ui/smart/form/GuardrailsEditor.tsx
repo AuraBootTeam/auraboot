@@ -150,7 +150,7 @@ export const GuardrailsEditor = forwardRef<HTMLDivElement, GuardrailsEditorProps
             <div className="mb-2 flex justify-end">
               <button
                 type="button"
-                className="text-xs text-gray-500 transition-colors hover:text-blue-500 dark:text-gray-400"
+                className="text-text-2 hover:text-accent text-xs transition-colors dark:text-gray-400"
                 onClick={() => setShowRaw(!showRaw)}
               >
                 {showRaw ? 'Structured View' : 'Raw JSON'}
@@ -160,14 +160,14 @@ export const GuardrailsEditor = forwardRef<HTMLDivElement, GuardrailsEditorProps
             {showRaw ? (
               <textarea
                 name={name}
-                className="h-40 w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                className="rounded-card border-border-strong bg-panel text-text focus-visible:shadow-focus h-40 w-full resize-y border px-3 py-2 font-mono text-sm focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                 value={value || '{}'}
                 onChange={(e) => handleRawChange(e.target.value)}
                 readOnly={readOnly}
                 data-testid="guardrails-raw"
               />
             ) : (
-              <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
+              <div className="rounded-card border-border bg-subtle/50 space-y-3 border p-3 dark:border-gray-700 dark:bg-gray-800/50">
                 {GUARDRAIL_FIELDS.map((field) => (
                   <GuardrailField
                     key={field.key}
@@ -204,19 +204,19 @@ function GuardrailField({
     return (
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{field.label}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">{field.desc}</div>
+          <div className="text-text-2 text-sm font-medium dark:text-gray-300">{field.label}</div>
+          <div className="text-text-2 text-xs dark:text-gray-400">{field.desc}</div>
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={!!value}
           disabled={readOnly}
-          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${value ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'} ${readOnly ? 'opacity-50' : ''}`}
+          className={`rounded-pill relative inline-flex h-5 w-9 items-center transition-colors ${value ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-600'} ${readOnly ? 'opacity-50' : ''}`}
           onClick={() => onChange(!value)}
         >
           <span
-            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${value ? 'translate-x-4' : 'translate-x-0.5'}`}
+            className={`rounded-pill inline-block h-3.5 w-3.5 transform bg-white transition-transform ${value ? 'translate-x-4' : 'translate-x-0.5'}`}
           />
         </button>
       </div>
@@ -228,13 +228,13 @@ function GuardrailField({
 
     return (
       <div>
-        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{field.label}</div>
-        <div className="mb-1 text-xs text-gray-500 dark:text-gray-400">{field.desc}</div>
+        <div className="text-text-2 text-sm font-medium dark:text-gray-300">{field.label}</div>
+        <div className="text-text-2 mb-1 text-xs dark:text-gray-400">{field.desc}</div>
         <div className="mb-1 flex flex-wrap gap-1">
           {tags.map((tag: string, i: number) => (
             <span
               key={i}
-              className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300"
+              className="rounded-pill bg-status-red-bg text-status-red inline-flex items-center gap-1 px-2 py-0.5 text-xs dark:bg-red-900/30 dark:text-red-300"
             >
               {tag}
               {!readOnly && (
@@ -252,7 +252,7 @@ function GuardrailField({
         {!readOnly && (
           <input
             type="text"
-            className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            className="rounded-control border-border-strong bg-panel text-text w-full border px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             placeholder="Type tool code and press Enter"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -274,12 +274,12 @@ function GuardrailField({
     <div>
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{field.label}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">{field.desc}</div>
+          <div className="text-text-2 text-sm font-medium dark:text-gray-300">{field.label}</div>
+          <div className="text-text-2 text-xs dark:text-gray-400">{field.desc}</div>
         </div>
         <input
           type="number"
-          className="w-32 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          className="rounded-control border-border-strong bg-panel text-text w-32 border px-2 py-1 text-right text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
           value={value ?? ''}
           step={field.step}
           min={field.min}
