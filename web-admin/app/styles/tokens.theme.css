@@ -1,0 +1,67 @@
+/* AUTO-GENERATED from dsTokens in app/framework/meta/runtime/theme/tokens.ts — do not edit by hand. Run `pnpm gen:tokens`. */
+@theme {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --color-text: #1A1A1E;
+  --color-text-2: #5A5E66;
+  --color-text-3: #9A9DA5;
+  --color-border: #ECEDEF;
+  --color-border-strong: #E2E3E6;
+  --color-bg: #F7F7F8;
+  --color-panel: #FFFFFF;
+  --color-subtle: #FAFAFB;
+  --color-hover: #F3F4F6;
+  --color-selection: #EEF4FF;
+  --color-accent: #2563EB;
+  --color-accent-hover: #1D4ED8;
+  --color-accent-weak: #EFF4FF;
+
+  --color-status-gray: #71717A;
+  --color-status-gray-bg: #F1F1F3;
+  --color-status-blue: #2563EB;
+  --color-status-blue-bg: #EAF1FE;
+  --color-status-amber: #C2750A;
+  --color-status-amber-bg: #FBF1E2;
+  --color-status-green: #15A34A;
+  --color-status-green-bg: #E7F6ED;
+  --color-status-red: #DC2626;
+  --color-status-red-bg: #FCECEC;
+
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --radius-card-lg: 10px;
+  --radius-pill: 9999px;
+
+  --shadow-card: 0 1px 2px rgba(16,18,23,.03);
+  --shadow-pop: 0 1px 2px rgba(16,18,23,.04), 0 8px 24px -6px rgba(16,18,23,.14);
+  --shadow-toast: 0 6px 20px -4px rgba(16,18,23,.22);
+  --shadow-focus: 0 0 0 3px #EFF4FF;
+
+  --text-title: 20px;
+  --text-title--font-weight: 660;
+  --text-section: 15px;
+  --text-section--font-weight: 620;
+  --text-body: 13.5px;
+  --text-body--font-weight: 400;
+  --text-aux: 12.5px;
+  --text-aux--font-weight: 400;
+  --text-eyebrow: 11.5px;
+  --text-eyebrow--font-weight: 600;
+}
+
+/* Design-system raw custom properties (non-utility access). */
+:root {
+  --ds-control-sm: 28px;
+  --ds-control-md: 32px;
+  --ds-control-lg: 40px;
+  --ds-control-field: 34px;
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-8: 32px;
+  --ds-disabled-opacity: 0.5;
+}
