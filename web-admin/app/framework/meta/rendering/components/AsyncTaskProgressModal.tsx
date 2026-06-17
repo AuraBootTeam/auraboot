@@ -71,7 +71,11 @@ function fmt(n: number | undefined): string {
   return (n ?? 0).toLocaleString();
 }
 
-export function AsyncTaskProgressModal({ task, onClose, onBackground }: AsyncTaskProgressModalProps) {
+export function AsyncTaskProgressModal({
+  task,
+  onClose,
+  onBackground,
+}: AsyncTaskProgressModalProps) {
   const [expanded, setExpanded] = useState(false);
   const terminal = isTerminal(task.status);
   const progress = Math.max(0, Math.min(100, task.progress ?? 0));
@@ -81,7 +85,7 @@ export function AsyncTaskProgressModal({ task, onClose, onBackground }: AsyncTas
     <div className="flex justify-end">
       <button
         type="button"
-        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white"
         onClick={onClose}
       >
         关闭
@@ -91,7 +95,7 @@ export function AsyncTaskProgressModal({ task, onClose, onBackground }: AsyncTas
     <div className="flex justify-end">
       <button
         type="button"
-        className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-subtle border px-4 py-2 text-sm font-medium"
         onClick={onBackground}
       >
         后台运行
@@ -111,23 +115,23 @@ export function AsyncTaskProgressModal({ task, onClose, onBackground }: AsyncTas
       {!terminal && (
         <div className="space-y-4">
           <div>
-            <div className="mb-1 flex justify-between text-sm text-gray-600">
+            <div className="text-text-2 mb-1 flex justify-between text-sm">
               <span>导入进行中…</span>
               <span>{progress}%</span>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+            <div className="rounded-pill h-2 w-full overflow-hidden bg-gray-200">
               <div
                 role="progressbar"
                 aria-valuenow={progress}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                className="h-2 rounded-full bg-blue-600 transition-all"
+                className="rounded-pill bg-accent h-2 transition-all"
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
           {live && (
-            <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
+            <div className="text-text-2 grid grid-cols-2 gap-2 text-sm">
               <div>
                 总计 / Total: <span className="font-medium">{fmt(live.total)}</span>
               </div>
@@ -135,13 +139,13 @@ export function AsyncTaskProgressModal({ task, onClose, onBackground }: AsyncTas
                 已处理: <span className="font-medium">{fmt(live.processed)}</span>
               </div>
               <div>
-                成功: <span className="font-medium text-green-600">{fmt(live.ok)}</span>
+                成功: <span className="text-status-green font-medium">{fmt(live.ok)}</span>
               </div>
               <div>
-                失败: <span className="font-medium text-red-600">{fmt(live.failed)}</span>
+                失败: <span className="text-status-red font-medium">{fmt(live.failed)}</span>
               </div>
               <div>
-                跳过: <span className="font-medium text-amber-600">{fmt(live.skipped)}</span>
+                跳过: <span className="text-status-amber font-medium">{fmt(live.skipped)}</span>
               </div>
             </div>
           )}
@@ -151,30 +155,36 @@ export function AsyncTaskProgressModal({ task, onClose, onBackground }: AsyncTas
       {/* Completed state: summary + optional failures list */}
       {task.status === 'completed' && task.resultData && (
         <div className="space-y-3">
-          <div className="text-base font-semibold text-gray-900">导入完成 / Completed</div>
+          <div className="text-text text-base font-semibold">导入完成 / Completed</div>
           {task.resultData.totalRows === 0 ? (
-            <div className="text-sm text-gray-600">未导入任何数据 / No rows</div>
+            <div className="text-text-2 text-sm">未导入任何数据 / No rows</div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
+              <div className="text-text-2 grid grid-cols-2 gap-2 text-sm">
                 <div>
                   总行数: <span className="font-medium">{fmt(task.resultData.totalRows)}</span>
                 </div>
                 <div>
                   成功:{' '}
-                  <span className="font-medium text-green-600">{fmt(task.resultData.importedRows)}</span>
+                  <span className="text-status-green font-medium">
+                    {fmt(task.resultData.importedRows)}
+                  </span>
                 </div>
                 <div>
                   跳过:{' '}
-                  <span className="font-medium text-amber-600">{fmt(task.resultData.skippedRows)}</span>
+                  <span className="text-status-amber font-medium">
+                    {fmt(task.resultData.skippedRows)}
+                  </span>
                 </div>
                 <div>
                   失败:{' '}
-                  <span className="font-medium text-red-600">{fmt(task.resultData.failedRows)}</span>
+                  <span className="text-status-red font-medium">
+                    {fmt(task.resultData.failedRows)}
+                  </span>
                 </div>
               </div>
               {task.resultData.failedRows > 0 && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-3">
+                <div className="rounded-control bg-status-red-bg border border-red-200 p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <button
                       type="button"
@@ -186,7 +196,7 @@ export function AsyncTaskProgressModal({ task, onClose, onBackground }: AsyncTas
                     <button
                       type="button"
                       data-testid="copy-failures"
-                      className="rounded border border-red-300 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-100"
+                      className="border-status-red bg-panel rounded border px-2 py-1 text-xs text-red-700 hover:bg-red-100"
                       onClick={handleCopyFailures}
                     >
                       复制
@@ -221,7 +231,7 @@ export function AsyncTaskProgressModal({ task, onClose, onBackground }: AsyncTas
       {task.status === 'failed' && (
         <div className="space-y-2">
           <div className="text-base font-semibold text-red-700">导入失败 / Failed</div>
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <div className="rounded-control bg-status-red-bg border border-red-200 p-3 text-sm text-red-800">
             {task.errorMessage || '未知错误 / Unknown error'}
           </div>
         </div>

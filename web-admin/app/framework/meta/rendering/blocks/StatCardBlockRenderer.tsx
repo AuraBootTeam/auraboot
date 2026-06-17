@@ -80,18 +80,18 @@ export const StatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ bl
 
   return (
     <div
-      className={`stat-card-block rounded-lg border border-gray-200 bg-white p-4 shadow-sm ${block.className || ''}`}
+      className={`stat-card-block rounded-card border-border bg-panel border p-4 shadow-sm ${block.className || ''}`}
       data-testid="stat-card-block"
       data-block-type="stat-card"
     >
       {title && (
-        <div className="text-xs font-medium tracking-wider text-gray-500 uppercase">{title}</div>
+        <div className="text-text-2 text-xs font-medium tracking-wider uppercase">{title}</div>
       )}
       <div className="mt-2 flex items-baseline gap-2">
-        <span className="text-2xl font-semibold text-gray-900" data-testid="stat-card-value">
+        <span className="text-text text-2xl font-semibold" data-testid="stat-card-value">
           {String(value)}
         </span>
-        {unit && <span className="text-sm text-gray-500">{unit}</span>}
+        {unit && <span className="text-text-2 text-sm">{unit}</span>}
       </div>
       {trend && (
         <div className={`mt-1 text-xs ${trendClass}`} data-testid="stat-card-trend">

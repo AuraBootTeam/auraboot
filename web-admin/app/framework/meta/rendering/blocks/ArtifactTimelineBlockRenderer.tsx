@@ -34,16 +34,12 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
   const rows = readDataSourceRows(runtime, dataSourceId);
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
   const title = getLocalizedText(block.title || (block as any).label || 'Artifacts', locale, t);
-  const emptyTitle = getLocalizedText(
-    (block as any).empty?.title || 'No artifacts',
-    locale,
-    t,
-  );
+  const emptyTitle = getLocalizedText((block as any).empty?.title || 'No artifacts', locale, t);
 
   if (dataSourceState?.loading) {
     return (
       <div
-        className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500"
+        className="rounded-control border-border bg-panel text-text-2 border p-4 text-sm"
         data-testid="artifact-timeline-loading"
       >
         {t('common.loading') !== 'common.loading' ? t('common.loading') : 'Loading...'}
@@ -54,7 +50,7 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
   if (rows.length === 0) {
     return (
       <div
-        className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500"
+        className="rounded-control border-border bg-panel text-text-2 border p-4 text-sm"
         data-testid="artifact-timeline-empty"
       >
         {emptyTitle}
@@ -63,9 +59,9 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
   }
 
   return (
-    <section className="rounded-lg border border-gray-200 bg-white" data-testid="artifact-timeline">
+    <section className="rounded-card border-border bg-panel border" data-testid="artifact-timeline">
       <div className="border-b border-gray-100 px-4 py-3">
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+        <h3 className="text-text text-sm font-semibold">{title}</h3>
       </div>
       <ol className="divide-y divide-gray-100">
         {rows.map((row: any, index: number) => {
@@ -76,7 +72,9 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
           const status = readPath(row, item.statusField);
           const hash = readPath(row, item.hashField);
           const fileId = readPath(row, item.fileIdField);
-          const downloadUrl = fileId ? `/api/file/download/${encodeURIComponent(String(fileId))}` : undefined;
+          const downloadUrl = fileId
+            ? `/api/file/download/${encodeURIComponent(String(fileId))}`
+            : undefined;
 
           return (
             <li
@@ -87,7 +85,7 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
               <div className="mt-1 h-2.5 w-2.5 rounded-full bg-blue-500" />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-semibold text-gray-900">
+                  <span className="text-text font-mono text-sm font-semibold">
                     {String(titleValue)}
                   </span>
                   {revision !== undefined && revision !== null && (
@@ -101,18 +99,16 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
                     </span>
                   )}
                 </div>
-                {subtitle && <div className="mt-1 text-xs text-gray-500">{String(subtitle)}</div>}
+                {subtitle && <div className="text-text-2 mt-1 text-xs">{String(subtitle)}</div>}
                 {hash && (
-                  <div className="mt-1 font-mono text-xs text-gray-500">
-                    {shortHash(hash)}
-                  </div>
+                  <div className="text-text-2 mt-1 font-mono text-xs">{shortHash(hash)}</div>
                 )}
               </div>
               {downloadUrl && (
                 <a
                   href={downloadUrl}
                   data-testid={`artifact-timeline-download-${rowKey}`}
-                  className="self-start rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-control border-border-strong text-text-2 hover:bg-subtle self-start border px-3 py-1.5 text-xs font-medium"
                 >
                   {t('common.download') !== 'common.download' ? t('common.download') : 'Download'}
                 </a>

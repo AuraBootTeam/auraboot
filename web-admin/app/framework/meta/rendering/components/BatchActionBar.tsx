@@ -42,8 +42,8 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
   if (selectedIds.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-lg">
-      <span className="text-sm font-medium text-gray-600">{selectedIds.length} selected</span>
+    <div className="rounded-card border-border bg-panel fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 border px-4 py-2.5 shadow-lg">
+      <span className="text-text-2 text-sm font-medium">{selectedIds.length} selected</span>
 
       <div className="h-5 w-px bg-gray-200" />
 
@@ -51,7 +51,7 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
         <button
           key={button.code}
           onClick={() => handleAction(button)}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`rounded-control px-3 py-1.5 text-sm font-medium transition-colors ${
             button.danger
               ? 'bg-red-50 text-red-700 hover:bg-red-100'
               : button.primary
@@ -67,7 +67,7 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
 
       <button
         onClick={onClear}
-        className="px-3 py-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700"
+        className="text-text-2 hover:text-text-2 px-3 py-1.5 text-sm transition-colors"
       >
         Clear
       </button>

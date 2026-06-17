@@ -35,7 +35,11 @@ import {
   readDataSourceState,
   useDataSourceSubscription,
 } from './workbenchBlockUtils';
-import { TraceGraphCanvas, type TraceNode, type TraceEdge } from '~/components/trace/TraceGraphCanvas';
+import {
+  TraceGraphCanvas,
+  type TraceNode,
+  type TraceEdge,
+} from '~/components/trace/TraceGraphCanvas';
 
 // ---------------------------------------------------------------------------
 // Row shapes
@@ -86,10 +90,7 @@ function inferMode(rows: unknown[]): TraceMode {
  * @param mode   'consumption' | 'genealogy'. If omitted the mode is inferred
  *               from the shape of the first row.
  */
-export function buildTraceGraph(
-  rows: unknown[],
-  mode?: TraceMode,
-): TraceGraph {
+export function buildTraceGraph(rows: unknown[], mode?: TraceMode): TraceGraph {
   const resolvedMode: TraceMode = mode ?? inferMode(rows);
 
   const nodeMap = new Map<string, TraceNode>();
@@ -200,7 +201,7 @@ export const TraceGraphBlockRenderer: React.FC<TraceGraphBlockRendererProps> = (
     return (
       <div
         data-testid="trace-graph-loading"
-        className="flex min-h-[420px] items-center justify-center rounded border border-gray-200 bg-white text-sm text-gray-500"
+        className="border-border bg-panel text-text-2 flex min-h-[420px] items-center justify-center rounded border text-sm"
       >
         {t('common.loading') !== 'common.loading' ? t('common.loading') : 'Loading…'}
       </div>
@@ -217,7 +218,7 @@ export const TraceGraphBlockRenderer: React.FC<TraceGraphBlockRendererProps> = (
       <div
         role="alert"
         data-testid="trace-graph-error"
-        className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+        className="bg-status-red-bg text-status-red rounded border border-red-200 p-4 text-sm"
       >
         {message || 'Failed to load trace data'}
       </div>
@@ -229,7 +230,7 @@ export const TraceGraphBlockRenderer: React.FC<TraceGraphBlockRendererProps> = (
     return (
       <div
         data-testid="trace-graph-empty"
-        className="flex min-h-[420px] items-center justify-center rounded border border-gray-200 bg-white text-sm text-gray-500"
+        className="border-border bg-panel text-text-2 flex min-h-[420px] items-center justify-center rounded border text-sm"
       >
         {t('common.noData') !== 'common.noData' ? t('common.noData') : 'No trace data'}
       </div>

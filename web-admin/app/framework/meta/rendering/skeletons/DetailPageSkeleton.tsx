@@ -19,7 +19,7 @@ export const DetailPageSkeleton: React.FC = () => {
       </div>
 
       {/* Description block */}
-      <div className="rounded-lg border border-gray-200 p-6">
+      <div className="rounded-card border-border border p-6">
         <div className="grid grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="space-y-1">
@@ -32,14 +32,14 @@ export const DetailPageSkeleton: React.FC = () => {
 
       {/* Tabs */}
       <div className="space-y-4">
-        <div className="flex items-center gap-4 border-b border-gray-200 pb-2">
+        <div className="border-border flex items-center gap-4 border-b pb-2">
           <div className={`h-4 w-16 ${shimmer}`} />
           <div className={`h-4 w-20 ${shimmer}`} />
           <div className={`h-4 w-16 ${shimmer}`} />
         </div>
 
         {/* Tab content — table */}
-        <div className="overflow-hidden rounded-lg border border-gray-200">
+        <div className="rounded-card border-border overflow-hidden border">
           {Array.from({ length: 4 }).map((_, rowIdx) => (
             <div
               key={rowIdx}

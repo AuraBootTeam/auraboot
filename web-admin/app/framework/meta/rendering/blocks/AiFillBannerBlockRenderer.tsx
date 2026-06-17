@@ -51,11 +51,12 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
   const [error, setError] = useState<string | null>(null);
 
   const endpoint = (block as any).endpoint || DEFAULT_ENDPOINT;
-  const placeholder = getLocalizedText((block as any).placeholder, locale)
-    || t('ai.fill.placeholder')
-    || (locale === 'zh-CN'
-        ? '示例:下周三家里有事请假 2 天'
-        : 'e.g. take 2 days off starting next Wednesday for personal reasons');
+  const placeholder =
+    getLocalizedText((block as any).placeholder, locale) ||
+    t('ai.fill.placeholder') ||
+    (locale === 'zh-CN'
+      ? '示例:下周三家里有事请假 2 天'
+      : 'e.g. take 2 days off starting next Wednesday for personal reasons');
   const examples: string[] = (block as any).examples || [];
 
   const onSubmit = useCallback(async () => {
@@ -87,8 +88,9 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
         setOpen(false);
         setNlInput('');
       } else {
-        setError(t('ai.fill.no_fields_extracted')
-          || 'AI could not extract any fields from your input.');
+        setError(
+          t('ai.fill.no_fields_extracted') || 'AI could not extract any fields from your input.',
+        );
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -99,24 +101,27 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
   }, [nlInput, endpoint, applyFields, t]);
 
   return (
-    <div data-testid="ai-fill-banner" className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-4">
+    <div
+      data-testid="ai-fill-banner"
+      className="rounded-control bg-accent-weak mb-4 border border-blue-200 p-4"
+    >
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="font-medium text-blue-900">
             {t('ai.fill.banner_title') || (locale === 'zh-CN' ? '智能填写' : 'AI Fill')}
           </div>
-          <div className="text-sm text-blue-700">
-            {t('ai.fill.banner_hint')
-              || (locale === 'zh-CN'
-                  ? '用自然语言描述,AI 帮你填好表单'
-                  : 'Describe in natural language; AI fills the form for you')}
+          <div className="text-accent text-sm">
+            {t('ai.fill.banner_hint') ||
+              (locale === 'zh-CN'
+                ? '用自然语言描述,AI 帮你填好表单'
+                : 'Describe in natural language; AI fills the form for you')}
           </div>
         </div>
         <button
           type="button"
           data-testid="ai-fill-trigger"
           onClick={() => setOpen(true)}
-          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="bg-accent hover:bg-accent-hover rounded px-4 py-2 text-sm font-medium text-white"
         >
           {t('ai.fill.button_label') || (locale === 'zh-CN' ? '智能填写' : 'Fill with AI')}
         </button>
@@ -131,7 +136,7 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
           onClick={() => !loading && setOpen(false)}
         >
           <div
-            className="w-[480px] max-w-[92vw] rounded-md bg-white p-5 shadow-lg"
+            className="rounded-control bg-panel w-[480px] max-w-[92vw] p-5 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 text-base font-semibold">
@@ -143,18 +148,18 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
               onChange={(e) => setNlInput(e.target.value)}
               placeholder={placeholder}
               rows={4}
-              className="mb-3 w-full resize-y rounded border border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="border-border-strong focus-visible:shadow-focus mb-3 w-full resize-y rounded border p-2 text-sm focus:outline-none"
               disabled={loading}
             />
             {examples.length > 0 && (
-              <div className="mb-3 text-xs text-gray-500">
-                {(t('ai.fill.examples_label') || (locale === 'zh-CN' ? '示例:' : 'Examples:'))}{' '}
+              <div className="text-text-2 mb-3 text-xs">
+                {t('ai.fill.examples_label') || (locale === 'zh-CN' ? '示例:' : 'Examples:')}{' '}
                 {examples.map((ex, i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={() => setNlInput(ex)}
-                    className="ml-1 inline-block rounded bg-gray-100 px-2 py-0.5 hover:bg-gray-200"
+                    className="bg-hover hover:bg-hover ml-1 inline-block rounded px-2 py-0.5"
                     disabled={loading}
                   >
                     {ex}
@@ -163,7 +168,10 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
               </div>
             )}
             {error && (
-              <div data-testid="ai-fill-error" className="mb-3 rounded bg-red-50 p-2 text-sm text-red-700">
+              <div
+                data-testid="ai-fill-error"
+                className="bg-status-red-bg mb-3 rounded p-2 text-sm text-red-700"
+              >
                 {error}
               </div>
             )}
@@ -172,7 +180,7 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
                 type="button"
                 onClick={() => setOpen(false)}
                 disabled={loading}
-                className="rounded px-3 py-1.5 text-sm hover:bg-gray-100"
+                className="hover:bg-hover rounded px-3 py-1.5 text-sm"
               >
                 {t('common.cancel') || (locale === 'zh-CN' ? '取消' : 'Cancel')}
               </button>
@@ -181,11 +189,11 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
                 data-testid="ai-fill-confirm"
                 onClick={onSubmit}
                 disabled={loading || !nlInput.trim()}
-                className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:bg-blue-300"
+                className="bg-accent hover:bg-accent-hover rounded px-3 py-1.5 text-sm text-white disabled:bg-blue-300"
               >
                 {loading
-                  ? (t('ai.fill.parsing') || (locale === 'zh-CN' ? '解析中…' : 'Parsing…'))
-                  : (t('ai.fill.apply') || (locale === 'zh-CN' ? '应用' : 'Apply'))}
+                  ? t('ai.fill.parsing') || (locale === 'zh-CN' ? '解析中…' : 'Parsing…')
+                  : t('ai.fill.apply') || (locale === 'zh-CN' ? '应用' : 'Apply')}
               </button>
             </div>
           </div>

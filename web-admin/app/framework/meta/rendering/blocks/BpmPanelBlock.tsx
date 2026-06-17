@@ -59,7 +59,7 @@ function SectionPlaceholder({ section }: { section: BpmPanelSection }) {
   return (
     <div
       data-testid={`bpm-section-${section}`}
-      className="rounded border border-dashed border-gray-300 bg-white p-4 text-xs text-gray-400"
+      className="border-border-strong bg-panel text-text-3 rounded border border-dashed p-4 text-xs"
     >
       {section} section placeholder
     </div>
@@ -128,7 +128,7 @@ export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
       <div
         data-testid="bpm-panel"
         data-state="loading"
-        className="rounded border border-gray-200 bg-gray-50 p-6 text-sm text-gray-500"
+        className="border-border bg-subtle text-text-2 rounded border p-6 text-sm"
       >
         Loading workflow state...
       </div>
@@ -140,7 +140,7 @@ export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
       <div
         data-testid="bpm-panel"
         data-state="error"
-        className="rounded border border-red-200 bg-red-50 p-6 text-sm text-red-700"
+        className="bg-status-red-bg rounded border border-red-200 p-6 text-sm text-red-700"
       >
         Failed to load workflow state: {error.message}
       </div>
@@ -152,7 +152,7 @@ export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
       <div
         data-testid="bpm-panel"
         data-state="empty"
-        className="rounded border border-gray-200 bg-white p-6 text-sm text-gray-500"
+        className="border-border bg-panel text-text-2 rounded border p-6 text-sm"
       >
         No workflow instance for this record.
       </div>
@@ -184,11 +184,7 @@ export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
         if (section === 'operations') {
           return (
             <div key={section} data-testid="bpm-section-operations">
-              <BpmOperationsSection
-                instance={instance}
-                onActionComplete={handleReload}
-                t={t}
-              />
+              <BpmOperationsSection instance={instance} onActionComplete={handleReload} t={t} />
             </div>
           );
         }

@@ -112,12 +112,12 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
             data-testid={`toolbar-btn-${button.code}`}
             onClick={() => handleButtonClick(button)}
             disabled={button.disabled}
-            className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium ${
+            className={`rounded-control inline-flex items-center px-4 py-2 text-sm font-medium ${
               button.variant === 'primary'
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                ? 'bg-accent hover:bg-accent-hover text-white'
                 : button.variant === 'danger'
                   ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  : 'border-border-strong bg-panel text-text-2 hover:bg-hover border'
             } ${button.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
           >
             {renderIcon(button.icon)}
