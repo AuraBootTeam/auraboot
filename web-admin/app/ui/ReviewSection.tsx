@@ -98,7 +98,7 @@ function StarRating({
             {filled ? (
               <StarIcon className={`${cls} text-amber-400`} />
             ) : (
-              <StarOutlineIcon className={`${cls} text-gray-300 hover:text-amber-300`} />
+              <StarOutlineIcon className={`${cls} text-text-3 hover:text-amber-300`} />
             )}
           </button>
         );
@@ -162,10 +162,10 @@ function WriteForm({ ratingMode, parentId, onSubmit, onCancel, placeholder }: Wr
     <form onSubmit={handleSubmit} className="space-y-3">
       {ratingMode !== 'disabled' && !parentId && (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">Rating / 评分:</span>
+          <span className="text-text-2 text-sm">Rating / 评分:</span>
           <StarRating value={rating} onChange={setRating} size="md" />
           {ratingMode === 'required' && !rating && (
-            <span className="text-xs text-gray-400">(required / 必填)</span>
+            <span className="text-text-3 text-xs">(required / 必填)</span>
           )}
         </div>
       )}
@@ -175,7 +175,7 @@ function WriteForm({ ratingMode, parentId, onSubmit, onCancel, placeholder }: Wr
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Title (optional) / 标题（选填）"
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
+          className="rounded-card border-border w-full border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
         />
       )}
       <textarea
@@ -186,14 +186,14 @@ function WriteForm({ ratingMode, parentId, onSubmit, onCancel, placeholder }: Wr
           (parentId ? 'Write a reply... / 写回复...' : 'Write a review... / 写评论...')
         }
         rows={parentId ? 2 : 4}
-        className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
+        className="rounded-card border-border w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
       />
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-status-red text-xs">{error}</p>}
       <div className="flex items-center gap-2">
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+          className="rounded-card bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
         >
           {submitting
             ? 'Submitting... / 提交中...'
@@ -205,7 +205,7 @@ function WriteForm({ ratingMode, parentId, onSubmit, onCancel, placeholder }: Wr
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+            className="text-text-2 hover:text-text-2 px-4 py-1.5 text-sm"
           >
             Cancel / 取消
           </button>
@@ -238,42 +238,40 @@ function ReviewItem({ review, depth, maxDepth, ratingMode, onVote, onReply }: Re
 
   return (
     <div className={`${indent ? 'ml-6 border-l-2 border-indigo-100 pl-4' : ''}`}>
-      <div className={`${review.owner ? 'rounded-lg bg-indigo-50 p-4' : 'py-3'}`}>
+      <div className={`${review.owner ? 'rounded-card bg-indigo-50 p-4' : 'py-3'}`}>
         <div className="flex items-start gap-3">
           {/* Avatar placeholder */}
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-200">
-            <span className="text-xs font-semibold text-gray-600">
+          <div className="rounded-pill bg-hover flex h-8 w-8 flex-shrink-0 items-center justify-center">
+            <span className="text-text-2 text-xs font-semibold">
               {(review.userName || 'U').charAt(0).toUpperCase()}
             </span>
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-text text-sm font-medium">
                 {review.userName || 'Anonymous'}
               </span>
               {review.owner && (
-                <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-medium text-white">
+                <span className="rounded-pill bg-indigo-600 px-2 py-0.5 text-xs font-medium text-white">
                   Developer / 开发者
                 </span>
               )}
               {review.rating && ratingMode !== 'disabled' && (
                 <StarRating value={review.rating} readOnly />
               )}
-              <span className="text-xs text-gray-400">{timeAgo(review.createdAt)}</span>
+              <span className="text-text-3 text-xs">{timeAgo(review.createdAt)}</span>
             </div>
 
-            {review.title && (
-              <p className="mt-1 text-sm font-semibold text-gray-800">{review.title}</p>
-            )}
+            {review.title && <p className="text-text mt-1 text-sm font-semibold">{review.title}</p>}
             {review.content && (
-              <p className="mt-1 text-sm whitespace-pre-wrap text-gray-700">{review.content}</p>
+              <p className="text-text-2 mt-1 text-sm whitespace-pre-wrap">{review.content}</p>
             )}
 
             <div className="mt-2 flex items-center gap-3">
               <button
                 onClick={() => onVote(review.pid)}
-                className="flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-indigo-600"
+                className="text-text-3 flex items-center gap-1 text-xs transition-colors hover:text-indigo-600"
               >
                 <HandThumbUpIcon className="h-3.5 w-3.5" />
                 {review.helpfulCount > 0
@@ -283,7 +281,7 @@ function ReviewItem({ review, depth, maxDepth, ratingMode, onVote, onReply }: Re
               {depth < maxDepth && (
                 <button
                   onClick={() => setShowReplyForm((v) => !v)}
-                  className="flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-indigo-600"
+                  className="text-text-3 flex items-center gap-1 text-xs transition-colors hover:text-indigo-600"
                 >
                   <ChatBubbleLeftIcon className="h-3.5 w-3.5" />
                   Reply / 回复
@@ -335,13 +333,13 @@ function RatingSummary({ summary }: { summary: ReviewSummary }) {
     <div className="mb-6 flex items-start gap-8">
       {/* Overall score */}
       <div className="flex flex-shrink-0 flex-col items-center gap-1">
-        <span className="text-4xl font-bold text-gray-900">
+        <span className="text-text text-4xl font-bold">
           {summary.averageRating ? summary.averageRating.toFixed(1) : '—'}
         </span>
         {summary.averageRating && (
           <StarRating value={Math.round(summary.averageRating)} readOnly size="sm" />
         )}
-        <span className="text-xs text-gray-400">{total} reviews / 条评论</span>
+        <span className="text-text-3 text-xs">{total} reviews / 条评论</span>
       </div>
 
       {/* Distribution bars */}
@@ -351,15 +349,15 @@ function RatingSummary({ summary }: { summary: ReviewSummary }) {
           const pct = total > 0 ? Math.round((count / total) * 100) : 0;
           return (
             <div key={star} className="flex items-center gap-2">
-              <span className="w-4 text-xs text-gray-500">{star}</span>
+              <span className="text-text-2 w-4 text-xs">{star}</span>
               <StarIcon className="h-3 w-3 flex-shrink-0 text-amber-400" />
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+              <div className="rounded-pill bg-hover h-2 flex-1 overflow-hidden">
                 <div
-                  className="h-2 rounded-full bg-amber-400 transition-all"
+                  className="rounded-pill h-2 bg-amber-400 transition-all"
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <span className="w-6 text-xs text-gray-400">{count}</span>
+              <span className="text-text-3 w-6 text-xs">{count}</span>
             </div>
           );
         })}
@@ -499,13 +497,13 @@ export default function ReviewSection({ targetType, targetId }: ReviewSectionPro
   };
 
   return (
-    <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
+    <div className="rounded-card border-border bg-panel mt-6 border p-6">
       {/* Section header */}
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">
+        <h2 className="text-text text-lg font-semibold">
           Reviews / 评论
           {summary && summary.totalCount > 0 && (
-            <span className="ml-2 text-sm font-normal text-gray-400">({summary.totalCount})</span>
+            <span className="text-text-3 ml-2 text-sm font-normal">({summary.totalCount})</span>
           )}
         </h2>
         <div className="flex items-center gap-1">
@@ -513,10 +511,8 @@ export default function ReviewSection({ targetType, targetId }: ReviewSectionPro
             <button
               key={s}
               onClick={() => setSort(s)}
-              className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                sort === s
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              className={`rounded-pill px-3 py-1 text-xs transition-colors ${
+                sort === s ? 'bg-indigo-600 text-white' : 'bg-hover text-text-2 hover:bg-hover'
               }`}
             >
               {s === 'helpful' ? 'Most Helpful / 最有用' : 'Newest / 最新'}
@@ -531,18 +527,18 @@ export default function ReviewSection({ targetType, targetId }: ReviewSectionPro
       )}
 
       {/* Write form */}
-      <div className="mb-6 rounded-lg border border-gray-100 bg-gray-50 p-4">
-        <h3 className="mb-3 text-sm font-medium text-gray-700">Write a Review / 写评论</h3>
+      <div className="rounded-card bg-subtle mb-6 border border-gray-100 p-4">
+        <h3 className="text-text-2 mb-3 text-sm font-medium">Write a Review / 写评论</h3>
         <WriteForm ratingMode={config.ratingMode} onSubmit={handleSubmitReview} />
       </div>
 
       {/* Review list */}
       {loading ? (
         <div className="flex justify-center py-8">
-          <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-indigo-600" />
+          <div className="rounded-pill h-6 w-6 animate-spin border-b-2 border-indigo-600" />
         </div>
       ) : reviews.length === 0 ? (
-        <div className="py-12 text-center text-gray-400">
+        <div className="text-text-3 py-12 text-center">
           <ChatBubbleLeftIcon className="mx-auto mb-2 h-10 w-10 text-gray-200" />
           <p className="text-sm">No reviews yet / 暂无评论</p>
           <p className="mt-1 text-xs">Be the first to leave a review! / 抢先留下第一条评论！</p>

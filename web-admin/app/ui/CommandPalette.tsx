@@ -407,7 +407,7 @@ export function CommandPalette() {
           />
         </svg>
         <span className="hidden md:inline">{t('search.placeholder', 'Search...')}</span>
-        <kbd className="hidden items-center gap-0.5 rounded bg-gray-200 px-1.5 py-0.5 font-mono text-[10px] font-medium text-gray-400 md:inline-flex dark:bg-gray-600 dark:text-gray-500">
+        <kbd className="bg-hover text-text-3 hidden items-center gap-0.5 rounded px-1.5 py-0.5 font-mono text-[10px] font-medium md:inline-flex dark:bg-gray-600 dark:text-gray-500">
           {isMac ? '⌘' : 'Ctrl'}K
         </kbd>
       </button>
@@ -417,7 +417,7 @@ export function CommandPalette() {
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-[100] bg-black/50" />
           <DialogPrimitive.Content
-            className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[15%] left-1/2 z-[100] w-full max-w-xl -translate-x-1/2 rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+            className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-card-lg border-border bg-panel fixed top-[15%] left-1/2 z-[100] w-full max-w-xl -translate-x-1/2 border shadow-2xl dark:border-gray-700 dark:bg-gray-900"
             onKeyDown={handleKeyDown}
             data-testid="command-palette"
           >
@@ -427,9 +427,9 @@ export function CommandPalette() {
             </DialogPrimitive.Title>
 
             {/* Search input */}
-            <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+            <div className="border-border flex items-center gap-3 border-b px-4 py-3 dark:border-gray-700">
               <svg
-                className="h-5 w-5 shrink-0 text-gray-400"
+                className="text-text-3 h-5 w-5 shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -447,13 +447,13 @@ export function CommandPalette() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('search.inputPlaceholder', 'Search pages, records, docs...')}
-                className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none dark:text-gray-100 dark:placeholder-gray-500"
+                className="text-text flex-1 bg-transparent text-sm placeholder-gray-400 outline-none dark:text-gray-100 dark:placeholder-gray-500"
                 data-testid="command-palette-input"
               />
               {searching && (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                <div className="rounded-pill border-accent h-4 w-4 animate-spin border-2 border-t-transparent" />
               )}
-              <kbd className="rounded border border-gray-200 bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500">
+              <kbd className="border-border bg-hover text-text-3 rounded border px-1.5 py-0.5 font-mono text-[10px] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500">
                 Esc
               </kbd>
             </div>
@@ -465,13 +465,13 @@ export function CommandPalette() {
               data-testid="command-palette-results"
             >
               {allResults.length === 0 && query.trim() && !searching && (
-                <div className="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+                <div className="text-text-3 px-4 py-8 text-center text-sm dark:text-gray-500">
                   {t('search.noResults', 'No results found')}
                 </div>
               )}
 
               {allResults.length === 0 && !query.trim() && (
-                <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-gray-500">
+                <div className="text-text-3 px-4 py-6 text-center text-sm dark:text-gray-500">
                   {t('search.hint', 'Type to search pages, records and docs')}
                 </div>
               )}
@@ -479,7 +479,7 @@ export function CommandPalette() {
               {/* Group: Recent */}
               {allResults.some((r) => r.kind === 'recent') && (
                 <div className="mb-1">
-                  <div className="px-3 py-1.5 text-[11px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                  <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
                     {t('search.recent', 'Recent')}
                   </div>
                   {allResults
@@ -497,7 +497,7 @@ export function CommandPalette() {
                           onMouseEnter={() => setActiveIndex(globalIdx)}
                         >
                           <svg
-                            className="h-4 w-4 shrink-0 text-gray-400"
+                            className="text-text-3 h-4 w-4 shrink-0"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -519,7 +519,7 @@ export function CommandPalette() {
               {/* Group: Pages */}
               {menuMatches.length > 0 && (
                 <div className="mb-1">
-                  <div className="px-3 py-1.5 text-[11px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                  <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
                     {t('search.pages', 'Pages')}
                   </div>
                   {allResults
@@ -535,7 +535,7 @@ export function CommandPalette() {
                           onMouseEnter={() => setActiveIndex(globalIdx)}
                         >
                           <svg
-                            className="h-4 w-4 shrink-0 text-gray-400"
+                            className="text-text-3 h-4 w-4 shrink-0"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -550,12 +550,10 @@ export function CommandPalette() {
                           <div className="min-w-0 flex-1">
                             <span className="truncate">{r.item.name}</span>
                             {r.item.parentName && (
-                              <span className="ml-2 text-xs text-gray-400">
-                                {r.item.parentName}
-                              </span>
+                              <span className="text-text-3 ml-2 text-xs">{r.item.parentName}</span>
                             )}
                           </div>
-                          <span className="shrink-0 text-xs text-gray-400">{r.item.path}</span>
+                          <span className="text-text-3 shrink-0 text-xs">{r.item.path}</span>
                         </ResultRow>
                       );
                     })}
@@ -565,7 +563,7 @@ export function CommandPalette() {
               {/* Group: Records */}
               {recordResults.length > 0 && (
                 <div className="mb-1">
-                  <div className="px-3 py-1.5 text-[11px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                  <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
                     {t('search.records', 'Records')}
                   </div>
                   {allResults
@@ -583,7 +581,7 @@ export function CommandPalette() {
                           onMouseEnter={() => setActiveIndex(globalIdx)}
                         >
                           <svg
-                            className="h-4 w-4 shrink-0 text-blue-500"
+                            className="text-accent h-4 w-4 shrink-0"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -598,7 +596,7 @@ export function CommandPalette() {
                           <div className="min-w-0 flex-1">
                             <span className="truncate">{r.hit.displayText}</span>
                           </div>
-                          <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-400 dark:bg-gray-800">
+                          <span className="bg-hover text-text-3 shrink-0 rounded px-1.5 py-0.5 text-xs dark:bg-gray-800">
                             {r.hit.modelName}
                           </span>
                         </ResultRow>
@@ -610,7 +608,7 @@ export function CommandPalette() {
               {/* Group: Docs (RAG) */}
               {docResults.length > 0 && (
                 <div className="mb-1">
-                  <div className="px-3 py-1.5 text-[11px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                  <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
                     {t('search.docs', 'Docs')}
                   </div>
                   {allResults
@@ -644,7 +642,7 @@ export function CommandPalette() {
                           </svg>
                           <div className="min-w-0 flex-1">
                             <div className="truncate font-medium">{r.hit.docName}</div>
-                            <div className="truncate text-xs text-gray-400 dark:text-gray-500">
+                            <div className="text-text-3 truncate text-xs dark:text-gray-500">
                               {snippet}
                             </div>
                           </div>
@@ -659,22 +657,22 @@ export function CommandPalette() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between border-t border-gray-200 px-4 py-2 text-[11px] text-gray-400 dark:border-gray-700 dark:text-gray-500">
+            <div className="border-border text-text-3 flex items-center justify-between border-t px-4 py-2 text-[11px] dark:border-gray-700 dark:text-gray-500">
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
-                  <kbd className="rounded border border-gray-200 bg-gray-100 px-1 py-0.5 font-mono dark:border-gray-700 dark:bg-gray-800">
+                  <kbd className="border-border bg-hover rounded border px-1 py-0.5 font-mono dark:border-gray-700 dark:bg-gray-800">
                     ↑↓
                   </kbd>
                   {t('search.navigate', 'Navigate')}
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="rounded border border-gray-200 bg-gray-100 px-1 py-0.5 font-mono dark:border-gray-700 dark:bg-gray-800">
+                  <kbd className="border-border bg-hover rounded border px-1 py-0.5 font-mono dark:border-gray-700 dark:bg-gray-800">
                     ↵
                   </kbd>
                   {t('search.open', 'Open')}
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="rounded border border-gray-200 bg-gray-100 px-1 py-0.5 font-mono dark:border-gray-700 dark:bg-gray-800">
+                  <kbd className="border-border bg-hover rounded border px-1 py-0.5 font-mono dark:border-gray-700 dark:bg-gray-800">
                     Esc
                   </kbd>
                   {t('search.close', 'Close')}
@@ -711,10 +709,10 @@ function ResultRow({
       data-index={dataIndex}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
-      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+      className={`rounded-card flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
         active
-          ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-          : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
+          ? 'bg-accent-weak text-accent dark:bg-blue-900/30 dark:text-blue-300'
+          : 'text-text-2 hover:bg-subtle dark:text-gray-300 dark:hover:bg-gray-800'
       }`}
     >
       {children}

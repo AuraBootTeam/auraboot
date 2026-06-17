@@ -30,13 +30,13 @@ export interface ErrorAlertProps {
 
 export const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, title = '加载失败' }) => {
   return (
-    <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+    <div className="rounded-card bg-status-red-bg border border-red-200 p-6">
       <h3 className="mb-2 text-lg font-medium text-red-800">{title}</h3>
-      <p className="mb-4 text-red-600">{error}</p>
+      <p className="text-status-red mb-4">{error}</p>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+          className="rounded-control bg-red-600 px-4 py-2 text-white hover:bg-red-700"
         >
           重试
         </button>

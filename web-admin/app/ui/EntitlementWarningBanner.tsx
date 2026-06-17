@@ -16,8 +16,8 @@ export function EntitlementWarningBanner() {
           key={w.pluginId}
           className={`flex items-center gap-2 px-4 py-2 text-sm ${
             w.warning?.severity === 'warning'
-              ? 'border-b border-yellow-200 bg-yellow-50 text-yellow-800'
-              : 'border-b border-blue-200 bg-blue-50 text-blue-800'
+              ? 'bg-status-amber-bg border-b border-yellow-200 text-yellow-800'
+              : 'bg-accent-weak border-b border-blue-200 text-blue-800'
           }`}
         >
           <span className="font-medium">{w.pluginId}</span>

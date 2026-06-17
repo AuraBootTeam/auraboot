@@ -75,7 +75,7 @@ export default function ConfirmDialog({
   const confirmBtnClass =
     variant === 'danger'
       ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500 text-white'
-      : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-white';
+      : 'bg-accent hover:bg-accent-hover focus:ring-blue-500 text-white';
 
   const titleId = 'confirm-dialog-title';
   const descId = 'confirm-dialog-desc';
@@ -97,13 +97,13 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        className="relative mx-4 w-full max-w-md scale-100 transform rounded-lg bg-white opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800"
+        className="rounded-card bg-panel relative mx-4 w-full max-w-md scale-100 transform opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800"
       >
         <div className="p-6">
-          <h3 id={titleId} className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 id={titleId} className="text-text mb-2 text-lg font-semibold dark:text-white">
             {title}
           </h3>
-          <p id={descId} className="text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-300">
+          <p id={descId} className="text-text-2 text-sm whitespace-pre-wrap dark:text-gray-300">
             {content}
           </p>
         </div>
@@ -111,7 +111,7 @@ export default function ConfirmDialog({
           <button
             data-testid="confirm-cancel"
             onClick={onCancel}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            className="rounded-card border-border-strong bg-panel text-text-2 hover:bg-subtle border px-4 py-2 text-sm font-medium transition-colors focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
             {resolvedCancelText}
           </button>
@@ -119,7 +119,7 @@ export default function ConfirmDialog({
             ref={confirmBtnRef}
             data-testid="confirm-ok"
             onClick={onConfirm}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none ${confirmBtnClass}`}
+            className={`rounded-card px-4 py-2 text-sm font-medium transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none ${confirmBtnClass}`}
           >
             {resolvedConfirmText}
           </button>

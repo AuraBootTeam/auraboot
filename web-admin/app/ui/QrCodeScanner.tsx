@@ -189,11 +189,11 @@ export default function QrCodeScanner({ isOpen, onClose, onScan }: QrCodeScanner
           onClick={onClose}
         ></div>
 
-        <div className="inline-block transform overflow-hidden rounded-lg bg-white px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle">
+        <div className="rounded-card bg-panel inline-block transform overflow-hidden px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle">
           <div className="absolute top-0 right-0 pt-4 pr-4">
             <button
               type="button"
-              className="rounded-md bg-white text-gray-400 hover:text-gray-600 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
+              className="rounded-control bg-panel text-text-3 hover:text-text-2 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
               onClick={onClose}
             >
               <span className="sr-only">关闭</span>
@@ -202,13 +202,13 @@ export default function QrCodeScanner({ isOpen, onClose, onScan }: QrCodeScanner
           </div>
 
           <div className="sm:flex sm:items-start">
-            <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
+            <div className="rounded-pill mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
               <QrCodeIcon className="h-6 w-6 text-indigo-600" />
             </div>
             <div className="mt-3 flex-1 text-center sm:mt-0 sm:ml-4 sm:text-left">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">扫描设备二维码</h3>
+              <h3 className="text-text text-lg leading-6 font-medium">扫描设备二维码</h3>
               <div className="mt-2">
-                <p className="text-sm text-gray-500">
+                <p className="text-text-2 text-sm">
                   请将摄像头对准TV设备上显示的二维码，或手动输入设备登录码
                 </p>
               </div>
@@ -219,10 +219,10 @@ export default function QrCodeScanner({ isOpen, onClose, onScan }: QrCodeScanner
             <div className="mb-4 flex justify-center space-x-3">
               <button
                 onClick={() => setIsManualMode(false)}
-                className={`rounded-md px-4 py-2 text-sm font-medium ${
+                className={`rounded-control px-4 py-2 text-sm font-medium ${
                   !isManualMode
                     ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    : 'bg-hover text-text-2 hover:bg-gray-300'
                 }`}
               >
                 <CameraIcon className="mr-1 inline h-4 w-4" />
@@ -230,10 +230,10 @@ export default function QrCodeScanner({ isOpen, onClose, onScan }: QrCodeScanner
               </button>
               <button
                 onClick={() => setIsManualMode(true)}
-                className={`rounded-md px-4 py-2 text-sm font-medium ${
+                className={`rounded-control px-4 py-2 text-sm font-medium ${
                   isManualMode
                     ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    : 'bg-hover text-text-2 hover:bg-gray-300'
                 }`}
               >
                 手动输入
@@ -243,7 +243,7 @@ export default function QrCodeScanner({ isOpen, onClose, onScan }: QrCodeScanner
             {!isManualMode ? (
               <div className="space-y-4">
                 <div
-                  className="relative overflow-hidden rounded-lg bg-black"
+                  className="rounded-card relative overflow-hidden bg-black"
                   style={{ aspectRatio: '16/9' }}
                 >
                   <video
@@ -257,7 +257,7 @@ export default function QrCodeScanner({ isOpen, onClose, onScan }: QrCodeScanner
 
                   {/* 扫描框 */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="flex h-48 w-48 items-center justify-center rounded-lg border-2 border-dashed border-white">
+                    <div className="rounded-card flex h-48 w-48 items-center justify-center border-2 border-dashed border-white">
                       <div className="text-center text-white">
                         <QrCodeIcon className="mx-auto mb-2 h-8 w-8" />
                         <p className="text-sm">将二维码放在框内</p>
@@ -266,20 +266,20 @@ export default function QrCodeScanner({ isOpen, onClose, onScan }: QrCodeScanner
                   </div>
                 </div>
 
-                <p className="text-center text-xs text-gray-500">
+                <p className="text-text-2 text-center text-xs">
                   提示：如果无法使用摄像头，可以切换到手动输入模式
                 </p>
               </div>
             ) : (
               <form onSubmit={handleManualSubmit} className="space-y-4">
                 <div>
-                  <label htmlFor="manual-code" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="manual-code" className="text-text-2 block text-sm font-medium">
                     设备登录码或二维码内容
                   </label>
                   <textarea
                     id="manual-code"
                     rows={4}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    className="rounded-control border-border-strong mt-1 block w-full shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     placeholder="请输入设备登录码或粘贴二维码的完整内容..."
                     value={manualCode}
                     onChange={(e) => setManualCode(e.target.value)}
@@ -290,13 +290,13 @@ export default function QrCodeScanner({ isOpen, onClose, onScan }: QrCodeScanner
                   <button
                     type="button"
                     onClick={onClose}
-                    className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
+                    className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-subtle border px-4 py-2 text-sm font-medium shadow-sm focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
                   >
                     取消
                   </button>
                   <button
                     type="submit"
-                    className="rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
+                    className="rounded-control border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
                   >
                     确认
                   </button>

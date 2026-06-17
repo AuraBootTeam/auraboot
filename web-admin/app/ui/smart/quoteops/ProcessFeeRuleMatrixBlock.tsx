@@ -314,7 +314,7 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
       </div>
 
       {issues.length > 0 ? (
-        <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+        <div className="bg-status-amber-bg flex items-start gap-2 border-b border-amber-200 px-4 py-2 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="space-y-1">
             {issues.slice(0, 4).map((issue, index) => (
@@ -443,7 +443,7 @@ function StatusPill({
     slate: 'border-slate-200 bg-slate-50 text-slate-600',
   }[tone];
   return (
-    <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>
+    <span className={`rounded-pill border px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>
   );
 }
 

@@ -238,7 +238,7 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                 selectedUsers.map((user) => (
                   <span
                     key={user.id}
-                    className="rounded-pill bg-hover text-text inline-flex items-center gap-1.5 py-0.5 pr-1.5 pl-0.5 text-sm transition-colors hover:bg-gray-200"
+                    className="rounded-pill bg-hover text-text hover:bg-hover inline-flex items-center gap-1.5 py-0.5 pr-1.5 pl-0.5 text-sm transition-colors"
                   >
                     <span
                       className={`rounded-pill flex h-5 w-5 flex-shrink-0 items-center justify-center text-[10px] font-semibold text-white ${getAvatarColor(user.name)}`}
@@ -300,7 +300,7 @@ export const UserSelect: React.FC<UserSelectProps> = ({
             <div className="max-h-60 overflow-y-auto py-1">
               {loading ? (
                 <div className="text-text-3 flex flex-col items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  <Loader2 className="text-accent h-6 w-6 animate-spin" />
                   <span className="mt-2 text-sm">{st('加载中...')}</span>
                 </div>
               ) : users.length === 0 ? (
@@ -331,7 +331,7 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                             <span className="truncate text-sm font-medium">{user.name}</span>
                             {selected && (
                               <svg
-                                className="h-4 w-4 flex-shrink-0 text-blue-500"
+                                className="text-accent h-4 w-4 flex-shrink-0"
                                 fill="currentColor"
                                 viewBox="0 0 20 20"
                               >
