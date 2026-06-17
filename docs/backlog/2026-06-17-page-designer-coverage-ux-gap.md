@@ -179,10 +179,15 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 | D1 `type:'model'` → model 选择器(SchemaInspector 加 'model' 分支 + `useModelOptions()` 拉 published model 列表 + 手敲兜底前向兼容) | ✅ DONE | `inspector-model-select-golden.spec.ts` 3/3(下拉 68 真实选项 + select·manual 双路 persist)|
 | D3 tabs/tab/action-bar/filter-bar 专属 inspector | ⏸ **诚实跳过** | 取证证 tab label 走 title 兜底、容器其它 props 运行时不消费 → 建 inspector 会引入假字段(§2.2),不做 |
 
+### ✅ Slice 4 缺失行动点(commit `53f43a1fb`,16 E2E 合跑独立重跑 0 fail,host-first 隔离 slot 45)
+| 项 | 状态 | 证据 |
+|----|------|------|
+| C1 Publish/Unpublish 行动点(统一 workbench 加按钮 + repository publishPageSchemaV3,只 pageId+非dirty 可点)| ✅ DONE | `publish-export-import-golden.spec.ts`:真按钮→POST→**后端 GET 反查** status=published/draft + publishedAt;sad 无 pid 禁用 |
+| C2 Export/Import 行动点(export 序列化 download `<key>.page.json` / import file→parse+shape 校验→载入入 undo 栈) | ✅ DONE | export 真 `waitForEvent('download')` 验**文件内容** schemaVersion 3 + blocks;import `setInputFiles`→canvas+save readback;sad 非法/v2 JSON 内联错不替换 |
+
 ### ⏸ NOT-MET(roadmap,**未完成,不假报**)
 - **A7** mid-drag drop-indicator/ghost 视觉断言(@dnd-kit 中途手势最易 flake,ROI 最低)→ defer。
 - **A11/A12** chart 类型广度 / input·layout 广度 → defer。
-- **C1/C2** 统一 workbench 加 Publish/Export/Import 行动点(API 齐、UI 缺)→ 中等工作量,未做。
 - **E1/E2** widget 全 24 chart 配置、19 workbench block palette 可视化 authoring → 大特性(多周),未做。
 - **C3/C4/C5** Version/Diff/Rollback UI、kind 切换、多选 → 大特性,未做。
 - **D2/D4** 富属性控件全接入(dict/namedQuery/command/permission 选择器)、字段级校验反馈;**B3** REST diff blocks 下钻 → 未做。
