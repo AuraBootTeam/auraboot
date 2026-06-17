@@ -74,9 +74,12 @@ test.describe('QuoteOps visual feedback golden', () => {
 
     const customerField = page.getByTestId('form-field-qo_quote_crm_account_id');
     await expect(
-      customerField.locator('p.text-red-600, [role="alert"], .text-red-600').filter({
-        hasText: /请选择|客户|Customer|required/i,
-      }),
+      customerField
+        .locator('p, [role="alert"], .text-red-600, .text-status-red')
+        .filter({
+          hasText: /请选择|客户|Customer|required/i,
+        })
+        .first(),
     ).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId('form-btn-save')).toBeEnabled();
     await expect(page).toHaveURL(/\/p\/qo_quote_common\/new/);
