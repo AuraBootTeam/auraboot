@@ -87,10 +87,11 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
 
     const variantClasses = {
       default:
-        'text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600',
+        'accent-accent bg-subtle border-border-strong rounded focus:outline-none focus-visible:shadow-focus dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600',
       outline:
-        'text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500',
-      filled: 'text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500',
+        'accent-accent bg-panel border-2 border-border-strong rounded focus:outline-none focus-visible:shadow-focus',
+      filled:
+        'accent-accent bg-subtle border-border-strong rounded focus:outline-none focus-visible:shadow-focus',
     };
 
     const containerClasses = 'flex items-center';
@@ -99,7 +100,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
       sizeClasses[size as keyof typeof sizeClasses],
       variantClasses[variant as keyof typeof variantClasses],
       resolvedDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
-      meta.showError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : '',
+      meta.showError ? 'border-status-red' : '',
       'transition-colors duration-200',
     ]
       .filter(Boolean)
@@ -113,7 +114,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
         label={labelText}
         required={requiredValue}
         labelPosition="right"
-        labelClassName={`text-sm font-medium text-gray-900 dark:text-gray-300 ${
+        labelClassName={`text-body font-medium text-text dark:text-gray-300 ${
           resolvedDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
         }`}
         error={meta.showError ? st(meta.meta.error) : undefined}
