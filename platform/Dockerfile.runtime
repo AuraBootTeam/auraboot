@@ -13,7 +13,8 @@ RUN addgroup -g 1000 appuser && \
     mkdir -p /app/data/files /app/data/git-repos /app/data/artifacts && \
     chown -R appuser:appuser /app
 
-COPY --chown=appuser:appuser build/libs/*.jar app.jar
+# Use the executable boot jar (bootJar 'boot' classifier); plain library jar also exists in build/libs
+COPY --chown=appuser:appuser build/libs/*-boot.jar app.jar
 
 USER appuser
 
