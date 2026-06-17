@@ -200,8 +200,10 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         // 获取当前页面Schema
         PageSchema currentSchema = findPageSchemaByPid(pagePid);
         
-        // 先创建当前版本的备份
-        createVersion(pagePid, "backup_before_rollback", operatorPid, "回滚前备份");
+        // 先创建当前版本的备份。
+        // op code must fit the ab_page_schema_history.op column (varchar(20));
+        // "backup_before_rollback" is 22 chars and overflows → use a 19-char code.
+        createVersion(pagePid, "pre_rollback_backup", operatorPid, "回滚前备份");
         
         // 从快照恢复数据
         restoreSchemaFromSnapshot(currentSchema, targetHistory.getSnapshot());
@@ -216,37 +218,35 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
 
     @Override
     public boolean canRollbackToVersion(String pagePid, Long historyId) {
-        try {
-            // 基本参数验证
-            if (!StringUtils.hasText(pagePid) || historyId == null) {
-                return false;
-            }
-            
-            // 检查页面是否存在
-            PageSchema currentSchema = pageSchemaMapper.selectByPid(pagePid);
-            if (currentSchema == null || currentSchema.getDeletedFlag()) {
-                return false;
-            }
-            
-            // 检查目标版本是否存在
-            PageSchemaHistory targetHistory = pageSchemaHistoryMapper.selectById(historyId);
-            if (targetHistory == null || !pagePid.equals(targetHistory.getPid())) {
-                return false;
-            }
-            
-            // 检查快照数据是否完整
-            Map<String, Object> snapshot = targetHistory.getSnapshot();
-            if (snapshot == null || snapshot.isEmpty()) {
-                return false;
-            }
-            
-            // 检查是否有必要的字段
-            return snapshot.containsKey("name") && snapshot.containsKey("blocks");
-            
-        } catch (Exception e) {
-            log.error("检查回滚条件时发生错误: pagePid={}, historyId={}", pagePid, historyId, e);
+        // 基本参数验证
+        if (!StringUtils.hasText(pagePid) || historyId == null) {
             return false;
         }
+
+        // 检查页面是否存在
+        PageSchema currentSchema = pageSchemaMapper.selectByPid(pagePid);
+        if (currentSchema == null || currentSchema.getDeletedFlag()) {
+            return false;
+        }
+
+        // 检查目标版本是否存在
+        PageSchemaHistory targetHistory = pageSchemaHistoryMapper.selectById(historyId);
+        if (targetHistory == null || !pagePid.equals(targetHistory.getPid())) {
+            return false;
+        }
+
+        // 检查快照数据是否完整
+        Map<String, Object> snapshot = targetHistory.getSnapshot();
+        if (snapshot == null || snapshot.isEmpty()) {
+            return false;
+        }
+
+        // 检查是否有必要的字段 (name + blocks 是回滚恢复所需的最小快照)。
+        // 不再 catch(Exception): 这是一个纯读取 + null/字段存在性检查的方法,任何
+        // DB / 反序列化异常都应向上抛出,由调用方 (rollbackToVersion 的事务) 决定,
+        // 而不是被静默吞掉退化成 "false"(那样会把真实的基础设施故障伪装成
+        // "无法回滚",违反红线 §8 禁 catch(Exception) 吞异常)。
+        return snapshot.containsKey("name") && snapshot.containsKey("blocks");
     }
 
     // ==================== 版本发布管理 ====================
