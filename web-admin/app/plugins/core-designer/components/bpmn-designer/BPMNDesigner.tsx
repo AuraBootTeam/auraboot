@@ -57,6 +57,7 @@ export function BPMNDesigner() {
     viewingVersionId,
     viewMode,
     monitorInstanceId,
+    setSelectedNode,
     setSaving,
     setDirty,
     validate,
@@ -78,8 +79,12 @@ export function BPMNDesigner() {
     service: bpmnVersionService,
     resourcePid: processDefinition?.key,
     onRollbackComplete: () => {
-      // Reload the process definition after rollback
-      // BPMN does not currently support rollback, so this is a no-op
+      // G-U3: BPMN version rollback is not yet supported (a real restore must
+      // re-deploy the historical BPMN to SmartEngine). Rather than leave the
+      // rollback action a SILENT no-op (the user clicks and nothing happens),
+      // give explicit feedback and steer them to the supported path: preview the
+      // version, then Save-as-new to roll forward.
+      showWarningToast(t('bpmn.version.rollback_unsupported'));
     },
   });
 
@@ -504,7 +509,24 @@ export function BPMNDesigner() {
               </p>
               <ul className="mt-1 list-inside list-disc text-xs text-red-700">
                 {validationResult.errors.slice(0, 3).map((error, index) => (
-                  <li key={index}>{t(error.message, error.messageParams)}</li>
+                  <li key={index}>
+                    {error.nodeId ? (
+                      // G-U4: clickable -> select & locate the offending node
+                      // (the node is already red-ringed via G-U1).
+                      <button
+                        type="button"
+                        data-testid="bpmn-validation-error-locate"
+                        data-node-id={error.nodeId}
+                        onClick={() => setSelectedNode(error.nodeId ?? null)}
+                        className="cursor-pointer text-left underline decoration-dotted underline-offset-2 hover:text-red-900"
+                        title={t('bpmn.validate.locate_node')}
+                      >
+                        {t(error.message, error.messageParams)}
+                      </button>
+                    ) : (
+                      t(error.message, error.messageParams)
+                    )}
+                  </li>
                 ))}
               </ul>
             </div>
