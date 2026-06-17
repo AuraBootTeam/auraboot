@@ -77,13 +77,18 @@ Real gaps cluster in three areas: **LLM-backed features stuck at keyword/TODO st
   summaries persist) and a live provider; out of scope for this remediation round.
 - Tracker: design note to be added to `docs/standards/meta/` when picked up.
 
-### A5 — L3 approval close-loop has no browser E2E 🟠 P1 (deferred — needs frontend stack)
+### A5 — L3 approval close-loop browser E2E ✅ DONE (2026-06-11, `acp-approval-closeloop.spec.ts`)
 
-- Evidence: e2e specs cover ACP CRUD/lifecycle/dashboard; no spec drives
-  pending-approval card → user approves → command executes → state change assertion.
-  This is the core promise of the AI-governance whitepaper §5.
-- Why deferred: requires full web stack + golden run; schedule as its own session per
-  §2.2 golden discipline.
+- ~~No spec drives pending-approval card → user approves → command executes → state change.~~
+  Added `web-admin/tests/e2e/agent-control-plane/acp-approval-closeloop.spec.ts` (3 tests)
+  driving the full UI close-loop: a gated tool surfaces as a pending approval row →
+  rowAction 同意/拒绝 (`action.command = acp:approve_request` / `acp:reject_request`) →
+  command pipeline → `AgentApprovalGateService.approve/reject` (fail-secure, policy-driven) →
+  persisted `ab_agent_approval.approval_status` flips pending → approved/rejected.
+- Precondition baked into the spec: the approval references an `ab_approval_policy` whose
+  `approver_rules` grant the acting admin, so approve/reject actually pass authorization.
+- Run: full web stack + golden (`acp-approval-closeloop` 3/3 PASS on 2026-06-11, per the
+  capability verification matrix `2026-06-11-agent-capability-verification-matrix.md` §TL;DR).
 
 ### A6 — Zero live-LLM regression tests ✅ DONE (2026-06-11, opt-in DeepSeek suite)
 
@@ -176,7 +181,9 @@ Real gaps cluster in three areas: **LLM-backed features stuck at keyword/TODO st
 | 2 | B3 permission annotations | **done** — ChatBI `META_CHATBI_USE` (r1) + five `acp.*` codes registered & annotated across agent controllers (r2); user-facing flows intentionally ungated |
 | 3 | C1 doc alignment (enterprise PR) | **done** — affordance/collaboration docs updated + `acp-implementation-map.md` added |
 | 3 | C2 SSE enum reconciliation | **done** (r2) — dead `/chat` path + legacy enum removed, `AuraBotSseEventName` = wire protocol |
-| — | A4/A5/A6/B4 + B2 loop-core | deferred, tracked above with owners/preconditions |
+| 3 | A5 approval close-loop browser E2E | **done** (2026-06-11) — `acp-approval-closeloop.spec.ts` 3/3 (see A5) |
+| 3 | A6 live-LLM regression suite | **done** (2026-06-11) — `CapabilityEvalLiveIT` 3/3, DEEPSEEK_API_KEY-gated (see A6) |
+| — | A4/B4 + B2 loop-core | deferred, tracked above with owners/preconditions |
 
 ## 5. Claims from earlier reviews verified as ALREADY FIXED (do not re-open)
 
