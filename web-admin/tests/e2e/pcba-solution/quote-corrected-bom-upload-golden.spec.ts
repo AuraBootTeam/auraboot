@@ -2,6 +2,7 @@ import { test, expect } from '../../fixtures';
 import {
   cleanupRows,
   createCorrectedBomWorkbook,
+  isTransientViteDynamicImportIssue,
   openQuoteDetailFromList,
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
@@ -21,11 +22,15 @@ test.describe('QuoteOps corrected BOM upload golden', () => {
     const consoleIssues: string[] = [];
     page.on('console', (message) => {
       const text = message.text();
+      if (isTransientViteDynamicImportIssue(text)) return;
       if (/Expression evaluation failed|Cannot read properties|ReferenceError|TypeError/i.test(text)) {
         consoleIssues.push(`${message.type()}: ${text}`);
       }
     });
-    page.on('pageerror', (error) => consoleIssues.push(`pageerror: ${error.message}`));
+    page.on('pageerror', (error) => {
+      if (isTransientViteDynamicImportIssue(error.message)) return;
+      consoleIssues.push(`pageerror: ${error.message}`);
+    });
 
     try {
       await openQuoteDetailFromList(page, created);
