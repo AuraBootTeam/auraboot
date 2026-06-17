@@ -2,7 +2,10 @@ import React, { forwardRef } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
 import type { DatePickerProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
-import { useExpressionValue, useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import {
+  useExpressionValue,
+  useSmartField,
+} from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
@@ -258,8 +261,8 @@ export function DatePickerSideBar({
   focusItem: any;
 }) {
   return (
-    <div className="w-full rounded-lg bg-white p-4 shadow-sm dark:bg-gray-800">
-      <h2 className="mb-6 border-b pb-3 text-center text-xl font-bold text-gray-900 dark:text-white">
+    <div className="rounded-card bg-panel w-full p-4 shadow-sm dark:bg-gray-800">
+      <h2 className="text-text mb-6 border-b pb-3 text-center text-xl font-bold dark:text-white">
         日期时间选择器属性设置
       </h2>
 
@@ -267,7 +270,7 @@ export function DatePickerSideBar({
         <div className="flex items-center">
           <label
             htmlFor="props.label"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             标签：
           </label>
@@ -275,14 +278,14 @@ export function DatePickerSideBar({
             name="props.label"
             onChange={onChange}
             value={focusItem.props?.label || ''}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.placeholder"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             占位符：
           </label>
@@ -290,14 +293,14 @@ export function DatePickerSideBar({
             name="props.placeholder"
             onChange={onChange}
             value={focusItem.props?.placeholder || ''}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.dateType"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             类型：
           </label>
@@ -305,7 +308,7 @@ export function DatePickerSideBar({
             name="props.dateType"
             onChange={onChange}
             value={focusItem.props?.dateType || 'date'}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="date">日期</option>
             <option value="datetime-local">日期时间</option>
@@ -318,7 +321,7 @@ export function DatePickerSideBar({
         <div className="flex items-center">
           <label
             htmlFor="props.size"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             尺寸：
           </label>
@@ -326,7 +329,7 @@ export function DatePickerSideBar({
             name="props.size"
             onChange={onChange}
             value={focusItem.props?.size || 'medium'}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="small">小</option>
             <option value="medium">中</option>
@@ -337,7 +340,7 @@ export function DatePickerSideBar({
         <div className="flex items-center">
           <label
             htmlFor="props.inline"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             内联显示：
           </label>
@@ -346,14 +349,14 @@ export function DatePickerSideBar({
             name="props.inline"
             onChange={onChange}
             checked={focusItem.props?.inline || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="rounded-control border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.required"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             必填：
           </label>
@@ -362,14 +365,14 @@ export function DatePickerSideBar({
             name="props.required"
             onChange={onChange}
             checked={focusItem.props?.required || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="rounded-control border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.showToday"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             显示今天按钮：
           </label>
@@ -378,14 +381,14 @@ export function DatePickerSideBar({
             name="props.showToday"
             onChange={onChange}
             checked={focusItem.props?.showToday || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="rounded-control border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.clearable"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             可清除：
           </label>
@@ -394,14 +397,14 @@ export function DatePickerSideBar({
             name="props.clearable"
             onChange={onChange}
             checked={focusItem.props?.clearable || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="rounded-control border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.disabled"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             禁用：
           </label>
@@ -410,14 +413,14 @@ export function DatePickerSideBar({
             name="props.disabled"
             onChange={onChange}
             checked={focusItem.props?.disabled || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="rounded-control border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.minDate"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             最小日期：
           </label>
@@ -426,14 +429,14 @@ export function DatePickerSideBar({
             name="props.minDate"
             onChange={onChange}
             value={focusItem.props?.minDate || ''}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.maxDate"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             最大日期：
           </label>
@@ -442,14 +445,14 @@ export function DatePickerSideBar({
             name="props.maxDate"
             onChange={onChange}
             value={focusItem.props?.maxDate || ''}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.step"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium dark:text-gray-300"
           >
             步长：
           </label>
@@ -459,7 +462,7 @@ export function DatePickerSideBar({
             onChange={onChange}
             value={focusItem.props?.step || ''}
             placeholder="时间步长（秒）"
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 shadow-sm focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
       </div>
