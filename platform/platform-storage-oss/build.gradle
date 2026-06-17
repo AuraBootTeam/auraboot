@@ -21,7 +21,7 @@ dependencies {
     compileOnly project(':')
 
     // Alibaba Cloud OSS SDK
-    implementation 'com.aliyun.oss:aliyun-sdk-oss:3.17.4'
+    implementation 'com.aliyun.oss:aliyun-sdk-oss:3.18.5'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.40'
