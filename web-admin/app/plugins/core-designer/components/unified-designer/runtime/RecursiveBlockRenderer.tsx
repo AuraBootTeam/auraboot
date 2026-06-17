@@ -2940,7 +2940,12 @@ function RuntimeWidget({ block, runtimeServices, pageContext, blockPath }: Runti
 
   const effectiveBlock = mergeWidgetData(block, runtimeData);
   const subtitle = getStringProp(block.props?.subtitle);
-  const value = getStringProp(effectiveBlock.props?.value);
+  // Body widgets (charts / table / markdown / progress) own their visual via
+  // RuntimeWidgetBody. Progress in particular consumes props.value as a percentage,
+  // so the number-card single-value box must not steal it; suppress it here.
+  const value = isWidgetBodyType(block.widgetType)
+    ? ''
+    : getStringProp(effectiveBlock.props?.value);
   const emptyText = getStringProp(effectiveBlock.props?.emptyText);
   const staticErrorText = getStringProp(effectiveBlock.props?.errorText);
   const errorText = runtimeError?.message || staticErrorText;
@@ -3033,12 +3038,40 @@ function RuntimeWidget({ block, runtimeServices, pageContext, blockPath }: Runti
   );
 }
 
+// Widget types whose visual is rendered by RuntimeWidgetBody (a chart / table /
+// markdown / progress bar) rather than the number-card value box. The RuntimeWidget
+// wrapper consults this set so a body widget that happens to carry a `props.value`
+// (e.g. progress reads props.value as its percentage) is not short-circuited into
+// the number-card single-value display.
+const WIDGET_BODY_TYPES = new Set([
+  'bar-chart',
+  'line-chart',
+  'pie-chart',
+  'area-chart',
+  'progress',
+  'table',
+  'markdown',
+]);
+
+function isWidgetBodyType(widgetType: string | undefined): boolean {
+  return typeof widgetType === 'string' && WIDGET_BODY_TYPES.has(widgetType);
+}
+
 function RuntimeWidgetBody({ block }: { block: DslBlockV3 }) {
   if (block.widgetType === 'bar-chart') {
     return <RuntimeBarChart block={block} />;
   }
   if (block.widgetType === 'line-chart') {
     return <RuntimeLineChart block={block} />;
+  }
+  if (block.widgetType === 'pie-chart') {
+    return <RuntimePieChart block={block} />;
+  }
+  if (block.widgetType === 'area-chart') {
+    return <RuntimeAreaChart block={block} />;
+  }
+  if (block.widgetType === 'progress') {
+    return <RuntimeProgressWidget block={block} />;
   }
   if (block.widgetType === 'table') {
     return <RuntimeWidgetTable block={block} />;
@@ -3100,6 +3133,158 @@ function RuntimeLineChart({ block }: { block: DslBlockV3 }) {
     >
       <polyline fill="none" stroke="#2563eb" strokeWidth="3" points={polyline} />
     </svg>
+  );
+}
+
+// Categorical palette for the pie slices. These map 1:1 to the slate/blue family
+// already used by the bar/line mini-renderers so the widget stays on-token; pure
+// SVG fills (no chart library) keep the runtime preview dependency-free.
+const PIE_SLICE_COLORS = [
+  'fill-blue-500',
+  'fill-emerald-500',
+  'fill-amber-500',
+  'fill-violet-500',
+  'fill-rose-500',
+  'fill-cyan-500',
+];
+
+function polarToCartesian(cx: number, cy: number, r: number, angle: number): [number, number] {
+  const rad = ((angle - 90) * Math.PI) / 180;
+  return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+}
+
+function RuntimePieChart({ block }: { block: DslBlockV3 }) {
+  const series = getSeries(block.props?.series);
+  const total = series.reduce((sum, item) => sum + Math.max(item.value, 0), 0);
+  if (!series.length || total <= 0) return <RuntimeWidgetEmpty block={block} />;
+
+  const size = 64;
+  const center = size / 2;
+  const radius = center;
+  let cursor = 0;
+
+  return (
+    <svg
+      className="mt-auto h-16 w-full overflow-visible"
+      viewBox={`0 0 ${size} ${size}`}
+      data-testid={`runtime-widget-pie-${block.id}`}
+      data-total={String(total)}
+      data-slices={String(series.length)}
+      role="img"
+      aria-label={getBlockLabel(block)}
+    >
+      {series.map((item, index) => {
+        const fraction = Math.max(item.value, 0) / total;
+        const startAngle = cursor * 360;
+        cursor += fraction;
+        const endAngle = cursor * 360;
+        // A single-slice pie (fraction === 1) cannot be drawn with one arc path
+        // (start point === end point), so render it as a full circle instead.
+        if (fraction >= 1) {
+          return (
+            <circle
+              key={`${item.label}-${index}`}
+              cx={center}
+              cy={center}
+              r={radius}
+              className={PIE_SLICE_COLORS[index % PIE_SLICE_COLORS.length]}
+              data-testid={`runtime-widget-pie-slice-${block.id}-${index}`}
+              data-value={String(item.value)}
+            />
+          );
+        }
+        const [startX, startY] = polarToCartesian(center, center, radius, startAngle);
+        const [endX, endY] = polarToCartesian(center, center, radius, endAngle);
+        const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+        const path = `M ${center} ${center} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY} Z`;
+        return (
+          <path
+            key={`${item.label}-${index}`}
+            d={path}
+            className={PIE_SLICE_COLORS[index % PIE_SLICE_COLORS.length]}
+            data-testid={`runtime-widget-pie-slice-${block.id}-${index}`}
+            data-value={String(item.value)}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+function RuntimeAreaChart({ block }: { block: DslBlockV3 }) {
+  const series = getSeries(block.props?.series);
+  if (!series.length) return <RuntimeWidgetEmpty block={block} />;
+  const points = series.map((item) => item.value);
+  const maxValue = Math.max(...points, 1);
+  const width = 120;
+  const height = 56;
+  const coords = points.map((value, index) => {
+    const x = points.length === 1 ? width / 2 : (index / (points.length - 1)) * width;
+    const y = height - (value / maxValue) * height;
+    return [x, y] as const;
+  });
+  const line = coords.map(([x, y]) => `${x},${y}`).join(' ');
+  // Close the path back along the baseline to fill the area beneath the line.
+  const firstX = coords[0][0];
+  const lastX = coords[coords.length - 1][0];
+  const areaPath = `M ${firstX},${height} L ${coords
+    .map(([x, y]) => `${x},${y}`)
+    .join(' L ')} L ${lastX},${height} Z`;
+
+  return (
+    <svg
+      className="mt-auto h-16 w-full overflow-visible"
+      viewBox={`0 0 ${width} ${height}`}
+      data-testid={`runtime-widget-area-${block.id}`}
+      data-points={points.join(',')}
+      role="img"
+      aria-label={getBlockLabel(block)}
+    >
+      <path
+        d={areaPath}
+        className="fill-blue-500/20 stroke-none"
+        data-testid={`runtime-widget-area-fill-${block.id}`}
+      />
+      <polyline className="fill-none stroke-blue-500" strokeWidth="3" points={line} />
+    </svg>
+  );
+}
+
+function RuntimeProgressWidget({ block }: { block: DslBlockV3 }) {
+  const raw = getNumberProp(block.props?.value);
+  if (raw === null) return <RuntimeWidgetEmpty block={block} />;
+  const percent = Math.max(0, Math.min(100, raw));
+  // Optional thresholds re-colour the bar by band (e.g. green ≥80 / amber ≥50 /
+  // red below). Thresholds are [{ value, color }] sorted high→low; the first one
+  // the percentage meets wins. Without thresholds the bar stays accent blue.
+  const band = pickThresholdColor(block.props?.thresholds, percent);
+
+  return (
+    <div className="mt-auto pt-3" data-testid={`runtime-widget-progress-${block.id}`}>
+      <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
+        <span data-testid={`runtime-widget-progress-label-${block.id}`}>{getBlockLabel(block)}</span>
+        <span
+          className="font-semibold text-slate-700"
+          data-testid={`runtime-widget-progress-value-${block.id}`}
+        >
+          {percent}%
+        </span>
+      </div>
+      <div
+        className="h-2 w-full overflow-hidden rounded-full bg-slate-200"
+        role="progressbar"
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div
+          className={`h-full rounded-full ${band}`}
+          data-testid={`runtime-widget-progress-bar-${block.id}`}
+          data-percent={String(percent)}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -3507,6 +3692,54 @@ function getSeries(value: unknown): Array<{ label: string; value: number }> {
     if (!label || !Number.isFinite(numericValue)) return [];
     return [{ label, value: numericValue }];
   });
+}
+
+function getNumberProp(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+// Maps a threshold band color name to an on-token bar fill class. Unknown / absent
+// colors fall through to the accent blue used by the other mini-renderers.
+const THRESHOLD_BAR_COLORS: Record<string, string> = {
+  green: 'bg-emerald-500',
+  emerald: 'bg-emerald-500',
+  amber: 'bg-amber-500',
+  yellow: 'bg-amber-500',
+  red: 'bg-rose-500',
+  rose: 'bg-rose-500',
+  blue: 'bg-blue-500',
+};
+
+/**
+ * Pick the progress bar fill from threshold bands. `thresholds` is the same
+ * [{ value, color }] shape the number-card widget already authors; bands are
+ * evaluated high→low and the first one the percentage meets (>=) wins. Returns
+ * the accent blue when no band matches or thresholds are absent/invalid.
+ */
+function pickThresholdColor(thresholds: unknown, percent: number): string {
+  const fallback = 'bg-blue-500';
+  if (!Array.isArray(thresholds)) return fallback;
+  const bands = thresholds
+    .flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const record = item as Record<string, unknown>;
+      const at = getNumberProp(record.value);
+      const color = getStringProp(record.color).toLowerCase();
+      if (at === null || !color) return [];
+      return [{ at, color }];
+    })
+    .sort((a, b) => b.at - a.at);
+  for (const band of bands) {
+    if (percent >= band.at) {
+      return THRESHOLD_BAR_COLORS[band.color] ?? fallback;
+    }
+  }
+  return fallback;
 }
 
 function getStringArray(value: unknown): string[] {
