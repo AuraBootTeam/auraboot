@@ -121,16 +121,16 @@ const I18nTextInput: React.FC<I18nTextInputProps> = (props) => {
     <div className={`smart-i18n-text-input ${className}`}>
       {/* Field label */}
       {label && (
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="text-text-2 mb-1 block text-sm font-medium">
           {label}
-          {required && <span className="ml-1 text-red-500">*</span>}
+          {required && <span className="text-status-red ml-1">*</span>}
         </label>
       )}
 
       {/* Locale tab strip */}
-      <div className="overflow-hidden rounded-md border border-gray-200">
+      <div className="rounded-control border-border overflow-hidden border">
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 bg-gray-50">
+        <div className="border-border bg-subtle flex border-b">
           {ALL_LOCALES.map((locale) => (
             <button
               key={locale}
@@ -139,8 +139,8 @@ const I18nTextInput: React.FC<I18nTextInputProps> = (props) => {
               className={[
                 'px-3 py-2 text-xs font-medium transition-colors',
                 activeLocale === locale
-                  ? '-mb-px border-b-2 border-blue-500 bg-white text-blue-600'
-                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700',
+                  ? 'border-accent bg-panel text-accent -mb-px border-b-2'
+                  : 'text-text-2 hover:bg-hover hover:text-text-2',
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -166,10 +166,10 @@ const I18nTextInput: React.FC<I18nTextInputProps> = (props) => {
             onChange={(e) => handleChange(activeLocale, e.target.value)}
             className={[
               'w-full resize-none text-sm outline-none',
-              'placeholder:text-gray-400',
+              'placeholder:text-text-3',
               disabled || readOnly
-                ? 'cursor-not-allowed bg-gray-50 text-gray-500'
-                : 'bg-white text-gray-900',
+                ? 'bg-subtle text-text-2 cursor-not-allowed'
+                : 'bg-panel text-text',
             ].join(' ')}
           />
         </div>
@@ -195,7 +195,7 @@ const MissingTranslationsHint: React.FC<MissingTranslationsHintProps> = ({ value
   if (missing.length === 0) return null;
 
   return (
-    <p className="mt-1 text-xs text-amber-600">
+    <p className="text-status-amber mt-1 text-xs">
       缺少翻译: {missing.map((locale) => I18N_LOCALE_LABELS[locale] ?? locale).join('、')}
     </p>
   );
