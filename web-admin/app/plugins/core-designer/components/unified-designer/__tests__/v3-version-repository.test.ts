@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  comparePageVersions,
   createPageVersion,
   getPageVersions,
   rollbackPageToVersion,
@@ -107,5 +108,55 @@ describe('PageSchema V3 version repository', () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe('cannot rollback');
+  });
+
+  it('comparePageVersions returns the comparison DTO on code 0', async () => {
+    // Shape mirrors the real backend wire format captured against the live
+    // compare endpoint: DifferenceType serialized UPPERCASE, blocks/title as
+    // stringified JSON blobs (coarse-grained top-level key diff).
+    const comparisonData = {
+      sourceVersion: { historyId: 1, pagePid: 'p1', version: 1, operation: 'snapshot' },
+      targetVersion: { historyId: 2, pagePid: 'p1', version: 1, operation: 'snapshot' },
+      differences: [
+        {
+          fieldPath: 'blocks',
+          type: 'MODIFIED',
+          sourceValue: '[{"id":"a"}]',
+          targetValue: '[{"id":"b"}]',
+          description: '修改字段: blocks',
+        },
+      ],
+      summary: {
+        totalDifferences: 1,
+        addedFields: 0,
+        removedFields: 0,
+        modifiedFields: 1,
+        hasMajorChanges: true,
+      },
+    };
+    const compareVersions = vi.fn().mockResolvedValue({ code: '0', data: comparisonData });
+    const api = baseApi({ compareVersions });
+
+    const result = await comparePageVersions('p1', 1, 2, api);
+
+    expect(compareVersions).toHaveBeenCalledWith('p1', 1, 2);
+    expect(result.ok).toBe(true);
+    expect(result.data).toEqual(comparisonData);
+  });
+
+  it('comparePageVersions surfaces a non-0 code as an error string (no throw)', async () => {
+    const compareVersions = vi.fn().mockResolvedValue({ code: '404', message: 'version not found' });
+    const api = baseApi({ compareVersions });
+
+    const result = await comparePageVersions('p1', 1, 99, api);
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('version not found');
+  });
+
+  it('comparePageVersions reports a clear error when the api lacks the method', async () => {
+    const result = await comparePageVersions('p1', 1, 2, baseApi());
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/not available/i);
   });
 });

@@ -193,10 +193,17 @@ export interface VersionInfo {
 /**
  * Field difference detail
  * Matches: PageSchemaVersionComparisonDTO.FieldDifference
+ *
+ * `type` is the backend `DifferenceType` enum serialized by name — Jackson
+ * writes enums via `name()` (no `@JsonValue` / WRITE_ENUMS_USING_TO_STRING on
+ * the platform mapper), so the wire value is UPPERCASE (`ADDED` / `REMOVED` /
+ * `MODIFIED`). The diff viewer normalizes case defensively all the same.
  */
+export type FieldDifferenceType = 'ADDED' | 'REMOVED' | 'MODIFIED';
+
 export interface FieldDifference {
   fieldPath: string;
-  type: 'added' | 'removed' | 'modified';
+  type: FieldDifferenceType;
   sourceValue?: unknown;
   targetValue?: unknown;
   description?: string;
