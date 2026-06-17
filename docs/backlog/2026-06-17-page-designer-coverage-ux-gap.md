@@ -172,13 +172,21 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 | A6 Advanced JSON tab(valid persist + invalid 错误态不写回 sad-path) | ✅ DONE | 同上 |
 | A8 dirty pill + leave-warning(**真零先验**) | ✅ DONE | 同上 |
 
+### ✅ Slice 3 属性面板 UX(commit `15ce7d93c`,8 E2E 独立重跑 0 fail,host-first 隔离 slot 44)
+| 项 | 状态 | 证据 |
+|----|------|------|
+| A3 widget 高级图表属性 E2E(thresholds/series/columns/rows/markdown/drillDownTo/refreshInterval/format,均运行时消费) | ✅ DONE | `widget-advanced-props-golden.spec.ts` 5/5(含 sad-path 无效 JSON 不写回)|
+| D1 `type:'model'` → model 选择器(SchemaInspector 加 'model' 分支 + `useModelOptions()` 拉 published model 列表 + 手敲兜底前向兼容) | ✅ DONE | `inspector-model-select-golden.spec.ts` 3/3(下拉 68 真实选项 + select·manual 双路 persist)|
+| D3 tabs/tab/action-bar/filter-bar 专属 inspector | ⏸ **诚实跳过** | 取证证 tab label 走 title 兜底、容器其它 props 运行时不消费 → 建 inspector 会引入假字段(§2.2),不做 |
+
 ### ⏸ NOT-MET(roadmap,**未完成,不假报**)
 - **A7** mid-drag drop-indicator/ghost 视觉断言(@dnd-kit 中途手势最易 flake,ROI 最低)→ defer。
-- **A3/A11/A12** widget 高级图表属性 / chart 类型广度 / input·layout 广度 → defer。
-- **Slice 3 D3/D1/C1/C2**(tabs/action-bar 专属 inspector、model 选择器、Publish/Export/Import 行动点)→ 中等工作量,未做。
+- **A11/A12** chart 类型广度 / input·layout 广度 → defer。
+- **C1/C2** 统一 workbench 加 Publish/Export/Import 行动点(API 齐、UI 缺)→ 中等工作量,未做。
 - **E1/E2** widget 全 24 chart 配置、19 workbench block palette 可视化 authoring → 大特性(多周),未做。
 - **C3/C4/C5** Version/Diff/Rollback UI、kind 切换、多选 → 大特性,未做。
-- **D2/D4** 富属性控件全接入、字段级校验反馈;**B3** REST diff blocks 下钻 → 未做。
+- **D2/D4** 富属性控件全接入(dict/namedQuery/command/permission 选择器)、字段级校验反馈;**B3** REST diff blocks 下钻 → 未做。
+- **🐛 latent bug(取证发现,未修,roadmap)**:`ViewModelService.listViewModels()` 读 `result?.data?.data`,但 `GET /api/meta/models` 真 shape 是 `data.records[]`(MyBatis-Plus IPage)→ 读空。Slice 3 的 `useModelOptions()` 已读对(`data.records`);ViewModelService 消费点待单独修 + 全仓 grep `data.data` 该端点其他消费方。
 
 ### 复核五项结论(P5)
 1. **方向** ✅ 对齐:增量硬化"测试覆盖+后端联动",未漂移;大特性如实划入 roadmap。
