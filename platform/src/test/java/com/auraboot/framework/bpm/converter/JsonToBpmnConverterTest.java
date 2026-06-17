@@ -1612,4 +1612,54 @@ class JsonToBpmnConverterTest {
             assertFalse(xml.contains("<smart:out"), xml);
         }
     }
+
+    @Nested
+    @DisplayName("Unknown node type handling (G-B2)")
+    class UnknownNodeType {
+
+        @Test
+        @DisplayName("should throw BpmnConversionException for an unsupported node type instead of silently dropping it")
+        void shouldThrowForUnknownNodeType() {
+            String json = """
+                {
+                  "key":"unknown_node_proc","name":"Unknown Node Proc",
+                  "nodes":[
+                    {"id":"s","type":"startEvent","position":{"x":0,"y":0},"data":{"type":"startEvent","label":""}},
+                    {"id":"weird","type":"businessRuleTask","position":{"x":1,"y":0},"data":{"type":"businessRuleTask","label":"Weird"}},
+                    {"id":"e","type":"endEvent","position":{"x":2,"y":0},"data":{"type":"endEvent","label":""}}
+                  ],
+                  "edges":[
+                    {"id":"f1","source":"s","target":"weird","data":{}},
+                    {"id":"f2","source":"weird","target":"e","data":{}}
+                  ]
+                }
+                """;
+            BpmnConversionException ex = assertThrows(BpmnConversionException.class,
+                    () -> jsonToBpmn.convert(json));
+            // Message must name the offending type and node id so the user can fix the diagram.
+            assertTrue(ex.getMessage().contains("businessRuleTask"), ex.getMessage());
+            assertTrue(ex.getMessage().contains("weird"), ex.getMessage());
+        }
+
+        @Test
+        @DisplayName("should still convert successfully when all node types are supported")
+        void shouldConvertWhenAllTypesSupported() {
+            String json = """
+                {
+                  "key":"all_supported","name":"All Supported",
+                  "nodes":[
+                    {"id":"s","type":"startEvent","position":{"x":0,"y":0},"data":{"type":"startEvent","label":""}},
+                    {"id":"t","type":"userTask","position":{"x":1,"y":0},"data":{"type":"userTask","label":"Approve"}},
+                    {"id":"e","type":"endEvent","position":{"x":2,"y":0},"data":{"type":"endEvent","label":""}}
+                  ],
+                  "edges":[
+                    {"id":"f1","source":"s","target":"t","data":{}},
+                    {"id":"f2","source":"t","target":"e","data":{}}
+                  ]
+                }
+                """;
+            String xml = jsonToBpmn.convert(json);
+            assertTrue(xml.contains("<userTask "), xml);
+        }
+    }
 }
