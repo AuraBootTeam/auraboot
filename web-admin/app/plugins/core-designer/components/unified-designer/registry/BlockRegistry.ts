@@ -156,6 +156,10 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
         'record-inspector',
         'candidate-list',
         'artifact-timeline',
+        'stat-card',
+        'description',
+        'record-comments',
+        'embedded-list',
       ],
       inspector: toInspectorSchema('detail'),
       layoutCapability: 'span',
@@ -184,6 +188,8 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
         'record-inspector',
         'candidate-list',
         'artifact-timeline',
+        'stat-card',
+        'description',
       ],
       inspector: toInspectorSchema('dashboard'),
       layoutCapability: 'span',
@@ -233,6 +239,8 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
         'record-inspector',
         'candidate-list',
         'artifact-timeline',
+        'stat-card',
+        'description',
       ],
       inspector: toInspectorSchema('columns'),
       layoutCapability: 'span',
@@ -265,6 +273,8 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
         'record-inspector',
         'candidate-list',
         'artifact-timeline',
+        'stat-card',
+        'description',
       ],
       inspector: toInspectorSchema('tab'),
       layoutCapability: 'span',
@@ -423,6 +433,59 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
       icon: 'git-commit-horizontal',
       category: 'workbench',
       inspector: toInspectorSchema('artifact-timeline'),
+      layoutCapability: 'span',
+    },
+    // Display / data blocks (non workbench-family). These are backed by the
+    // platform meta-rendering renderers on the live /p/ page:
+    //   stat-card      ← StatCardBlockRenderer       (single-metric KPI card)
+    //   description    ← DescriptionBlockRenderer     (static rich-text panel)
+    //   record-comments← RecordComments (via DetailPageContent) (comment thread)
+    //   embedded-list  ← EmbeddedListBlockRenderer    (in-page filterable list)
+    // Same architecture as the workbench family: the designer adds palette +
+    // inspector + a config-driven representative preview here; full data binding
+    // renders on the live page. Inspector keys mirror the EXACT paths the platform
+    // renderers read — verified against each renderer source:
+    //   - stat-card: cfg = { ...block.props, ...block.statCard }; so the metric
+    //     object lives at block.statCard (bare), value/unit/trend/trendDirection/
+    //     valueField inside it. dataSource is a bare string id (named data source).
+    //   - description: reads block.content ?? props.content ?? props.text — a
+    //     BARE+props mixed path; the inspector exposes the bare `content`.
+    //   - record-comments: reads NO block-level data config — modelCode/recordPid
+    //     are derived from the surrounding detail page + current record. So its
+    //     only authorable surface is the designer title (+ the universal AI lock).
+    //   - embedded-list: bare top-level modelCode / parentField / columns / title /
+    //     pageSize / searchable / filterable; resolves the parent record id from the
+    //     detail route, so it is a DETAIL-only block.
+    {
+      blockType: 'stat-card',
+      label: { 'en-US': 'Stat card', 'zh-CN': '指标卡' },
+      icon: 'gauge',
+      category: 'dashboard',
+      inspector: toInspectorSchema('stat-card'),
+      layoutCapability: 'span',
+    },
+    {
+      blockType: 'description',
+      label: { 'en-US': 'Description', 'zh-CN': '描述文本' },
+      icon: 'text',
+      category: 'detail',
+      inspector: toInspectorSchema('description'),
+      layoutCapability: 'span',
+    },
+    {
+      blockType: 'record-comments',
+      label: { 'en-US': 'Record comments', 'zh-CN': '记录评论' },
+      icon: 'message-square',
+      category: 'detail',
+      inspector: toInspectorSchema('record-comments'),
+      layoutCapability: 'span',
+    },
+    {
+      blockType: 'embedded-list',
+      label: { 'en-US': 'Embedded list', 'zh-CN': '内嵌列表' },
+      icon: 'list',
+      category: 'list',
+      inspector: toInspectorSchema('embedded-list'),
       layoutCapability: 'span',
     },
   ]);

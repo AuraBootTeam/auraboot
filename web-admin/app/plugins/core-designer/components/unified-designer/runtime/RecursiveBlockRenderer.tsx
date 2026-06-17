@@ -277,6 +277,14 @@ function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: Runtim
       return <RuntimeCandidateListPreview block={block} />;
     case 'artifact-timeline':
       return <RuntimeArtifactTimelinePreview block={block} />;
+    case 'stat-card':
+      return <RuntimeStatCardPreview block={block} />;
+    case 'description':
+      return <RuntimeDescriptionPreview block={block} />;
+    case 'record-comments':
+      return <RuntimeRecordCommentsPreview block={block} />;
+    case 'embedded-list':
+      return <RuntimeEmbeddedListPreview block={block} />;
     default: {
       // Plugin-contributed custom blocks may register a runtime renderer
       // (e.g. AuraQR's scannability-qc live score). When present it fully
@@ -1349,6 +1357,261 @@ function RuntimeReviewDrawerPreview({ block }: { block: DslBlockV3 }) {
         data-testid={`runtime-review-drawer-hint-${block.id}`}
       >
         {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Display / data block representative previews (stat-card / description /
+// record-comments / embedded-list). Same architecture as the workbench previews
+// above: read the BARE top-level config the platform renderers read, render a
+// config-driven representative placeholder (no live data), an empty / not-
+// configured state, and the shared display preview hint. Live data binding renders
+// on the published /p/ page via the platform renderers
+// (framework/meta/rendering/blocks/*). Token-backed utility classes only — no raw
+// hex.
+// ---------------------------------------------------------------------------
+
+function RuntimeStatCardPreview({ block }: { block: DslBlockV3 }) {
+  const t = useRuntimeText();
+  // StatCardBlockRenderer: cfg = { ...block.props, ...block.statCard }. Mirror
+  // that read order so the preview surfaces whatever the live renderer would.
+  const statCard = getRawRecord(block, 'statCard');
+  const props = isRecord(block.props) ? block.props : {};
+  const cfg = { ...props, ...statCard };
+  const unit = getStringProp(cfg.unit) || getStringProp(cfg.suffix);
+  const trend = getStringProp(cfg.trend) || getStringProp(cfg.change);
+  const trendDirection = getStringProp(cfg.trendDirection) || 'flat';
+  const valueField = getStringProp(cfg.valueField);
+  const dataSourceId = getStringProp(
+    (block as unknown as Record<string, unknown>).dataSource,
+  );
+  // A representative card needs at least a title, an inline value, a bound value
+  // field, or a data source to be meaningful.
+  const inlineValue =
+    cfg.value !== undefined && cfg.value !== null ? String(cfg.value) : '';
+  const configured = Boolean(
+    inlineValue || valueField || dataSourceId || getBlockLabel(block),
+  );
+  const trendClass =
+    trendDirection === 'up'
+      ? 'text-emerald-600'
+      : trendDirection === 'down'
+        ? 'text-rose-600'
+        : 'text-slate-500';
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-stat-card-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {!configured ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-stat-card-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.statCardNotConfigured)}
+        </div>
+      ) : (
+        <div
+          className="rounded-md border border-slate-200 p-3 shadow-sm"
+          data-testid={`runtime-stat-card-sample-${block.id}`}
+        >
+          <div className="flex items-baseline gap-2">
+            <span
+              className="text-2xl font-semibold text-slate-900"
+              data-testid={`runtime-stat-card-value-${block.id}`}
+            >
+              {inlineValue || t(DESIGNER_I18N.unified.runtime.metricPlaceholderValue)}
+            </span>
+            {unit ? <span className="text-sm text-slate-500">{unit}</span> : null}
+          </div>
+          {trend ? (
+            <div
+              className={`mt-1 text-xs ${trendClass}`}
+              data-testid={`runtime-stat-card-trend-${block.id}`}
+            >
+              {trend}
+            </div>
+          ) : null}
+          {valueField || dataSourceId ? (
+            <div
+              className="mt-2 text-xs text-slate-400"
+              data-testid={`runtime-stat-card-binding-${block.id}`}
+            >
+              {[dataSourceId, valueField].filter(Boolean).join(' · ')}
+            </div>
+          ) : null}
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-stat-card-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeDescriptionPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  // DescriptionBlockRenderer reads block.content ?? props.content ?? props.text.
+  // Mirror that bare+props read order. The live renderer sanitizes HTML; the
+  // preview shows the resolved text (representative, not the sanitized HTML run).
+  const raw = block as unknown as Record<string, unknown>;
+  const props = isRecord(block.props) ? block.props : {};
+  const contentSource = raw.content ?? props.content ?? props.text;
+  const content = readLocalizedLabel(contentSource, locale);
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-description-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {content ? (
+        <div
+          className="rounded-control border border-blue-200 bg-blue-50 p-3 text-sm text-slate-700"
+          data-testid={`runtime-description-content-${block.id}`}
+        >
+          {content}
+        </div>
+      ) : (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-description-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.descriptionEmpty)}
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-description-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeRecordCommentsPreview({ block }: { block: DslBlockV3 }) {
+  const t = useRuntimeText();
+  // RecordComments derives modelCode + recordPid from the surrounding detail page
+  // + current record — it has NO block-level data config. The preview is therefore
+  // a static representative scaffold (input + thread placeholder); the live thread
+  // loads only on the published record detail page.
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-record-comments-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      <div
+        className="space-y-2"
+        data-testid={`runtime-record-comments-sample-${block.id}`}
+      >
+        <div className="rounded-control border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
+          {t(DESIGNER_I18N.unified.runtime.recordCommentsPreview)}
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="rounded-pill mt-0.5 flex h-7 w-7 items-center justify-center bg-blue-100 text-xs font-medium text-blue-600">
+            U
+          </span>
+          <div className="min-w-0 flex-1 rounded-md border border-slate-100 bg-white px-3 py-2 text-sm text-slate-500">
+            {t(DESIGNER_I18N.unified.runtime.metricPlaceholderValue)}
+          </div>
+        </div>
+      </div>
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-record-comments-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeEmbeddedListPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  // EmbeddedListBlockRenderer reads bare block.modelCode (or childModel),
+  // block.parentField (or foreignKey), block.columns (or table.columns). The
+  // preview shows the bound model + the column headers (representative); the live
+  // list renders on the published page (records are parent-scoped at runtime).
+  const raw = block as unknown as Record<string, unknown>;
+  const modelCode =
+    getStringProp(raw.modelCode) || getStringProp(raw.childModel);
+  const parentField =
+    getStringProp(raw.parentField) || getStringProp(raw.foreignKey);
+  const columns = getRawArray(block, 'columns');
+  const configured = Boolean(modelCode);
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-embedded-list-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {!configured ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-embedded-list-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.embeddedListNotConfigured)}
+        </div>
+      ) : (
+        <div
+          className="overflow-hidden rounded-md border border-slate-200"
+          data-testid={`runtime-embedded-list-sample-${block.id}`}
+        >
+          <div
+            className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500"
+            data-testid={`runtime-embedded-list-binding-${block.id}`}
+          >
+            <span className="font-mono font-medium text-slate-700">{modelCode}</span>
+            {parentField ? <span>{parentField}</span> : null}
+          </div>
+          {columns.length > 0 ? (
+            <div
+              className="flex flex-wrap gap-2 px-3 py-2"
+              data-testid={`runtime-embedded-list-columns-${block.id}`}
+            >
+              {columns.map((column, index) => {
+                const key =
+                  getStringProp(column.field) || getStringProp(column.key) || String(index);
+                const label = readLocalizedLabel(column.label, locale) || key;
+                return (
+                  <span
+                    key={key}
+                    data-testid={`runtime-embedded-list-column-${key}`}
+                    className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600"
+                  >
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="px-3 py-2 text-xs text-slate-400">
+              {t(DESIGNER_I18N.unified.runtime.noData)}
+            </div>
+          )}
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-embedded-list-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.embeddedListPreview)}
       </div>
     </section>
   );
