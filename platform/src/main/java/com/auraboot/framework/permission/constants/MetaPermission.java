@@ -58,6 +58,18 @@ public final class MetaPermission {
     public static final String PAGE_SCHEMA_READ = "page.page.read";
 
     /**
+     * Legacy page schema manage permission used by PageSchema write APIs
+     * (create / update / publish / unpublish / delete / version / rollback).
+     *
+     * <p>Kept separate from {@link #PAGE_MANAGE}: existing tenants and plugin
+     * roles grant {@code page.page.manage}, the literal previously inlined as a
+     * string across {@code PageSchemaController}. Promoting it to a constant
+     * keeps the {@code @RequirePermission} value in one place (paired with
+     * {@link #PAGE_SCHEMA_READ}).
+     */
+    public static final String PAGE_SCHEMA_MANAGE = "page.page.manage";
+
+    /**
      * Page designer management permission
      */
     public static final String PAGE_DESIGNER_MANAGE = "meta.designer.update";

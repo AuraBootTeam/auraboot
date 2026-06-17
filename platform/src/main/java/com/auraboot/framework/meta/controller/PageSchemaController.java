@@ -129,7 +129,7 @@ public class PageSchemaController {
      */
     @PostMapping
     @Operation(summary = "创建页面配置", description = "创建新的页面配置（草稿状态）")
-    @RequirePermission("page.page.manage")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_MANAGE)
     public ApiResponse<PageSchemaDTO> create(
             @Parameter(description = "创建请求参数") @Valid @RequestBody PageSchemaCreateRequest request,
             @Parameter(hidden = true) @CurrentUserId Long userId) {
@@ -149,7 +149,7 @@ public class PageSchemaController {
      */
     @PutMapping("/{pid}")
     @Operation(summary = "更新页面配置", description = "根据PID更新页面配置信息（草稿状态）")
-    @RequirePermission("page.page.manage")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_MANAGE)
     public ApiResponse<PageSchemaDTO> update(
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(description = "更新请求参数") @Valid @RequestBody PageSchemaUpdateRequest request,
@@ -170,7 +170,7 @@ public class PageSchemaController {
      */
     @PostMapping("/{pid}/publish")
     @Operation(summary = "发布页面配置", description = "将页面配置发布为正式版本（Git-First流程）")
-    @RequirePermission("page.page.manage")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_MANAGE)
     public ApiResponse<PageSchemaDTO> publish(
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(hidden = true) @CurrentUserId Long userId) {
@@ -188,7 +188,7 @@ public class PageSchemaController {
      */
     @PostMapping("/{pid}/unpublish")
     @Operation(summary = "取消发布页面配置", description = "取消页面配置的发布状态")
-    @RequirePermission("page.page.manage")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_MANAGE)
     public ApiResponse<PageSchemaDTO> unpublish(
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(hidden = true) @CurrentUserId Long userId) {
@@ -206,7 +206,7 @@ public class PageSchemaController {
      */
     @DeleteMapping("/{pid}")
     @Operation(summary = "删除页面配置", description = "软删除指定的页面配置")
-    @RequirePermission("page.page.manage")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_MANAGE)
     public ApiResponse<Void> delete(
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(hidden = true) @CurrentUserId Long userId) {
@@ -245,15 +245,19 @@ public class PageSchemaController {
      */
     @PostMapping("/{pid}/versions")
     @Operation(summary = "创建页面版本", description = "为页面配置创建新的版本记录")
-    @RequirePermission("page.page.manage")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_MANAGE)
     public ApiResponse<PageSchemaVersionDTO> createVersion(
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(description = "创建版本请求") @RequestBody PageSchemaVersionCreateRequest request,
-            @CurrentUserId String currentUserId) {
-        log.info("创建页面版本: pid={}, request={}, userId={}", logSafe(pid), logSafe(request), logSafe(currentUserId));
+            @Parameter(hidden = true) @CurrentUserId Long userId) {
+        // CurrentUserIdResolver always resolves a Long user id; binding it to a
+        // String parameter triggers "argument type mismatch" → 500. Accept the
+        // Long and stringify it for the operator field the version service expects.
+        String operatorId = userId != null ? String.valueOf(userId) : null;
+        log.info("创建页面版本: pid={}, request={}, userId={}", logSafe(pid), logSafe(request), userId);
         String operation = request.getOperation() != null ? request.getOperation() : "update";
         String description = request.getDescription() != null ? request.getDescription() : "Version created";
-        PageSchemaVersionDTO result = pageSchemaVersionService.createVersion(pid, operation, currentUserId, description);
+        PageSchemaVersionDTO result = pageSchemaVersionService.createVersion(pid, operation, operatorId, description);
         return ApiResponse.success(result);
     }
 
@@ -268,14 +272,18 @@ public class PageSchemaController {
      */
     @PostMapping("/{pid}/rollback/{historyId}")
     @Operation(summary = "版本回滚", description = "将页面配置回滚到指定版本")
-    @RequirePermission("page.page.manage")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_MANAGE)
     public ApiResponse<PageSchemaVersionDTO> rollbackToVersion(
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(description = "历史版本ID") @PathVariable Long historyId,
             @Parameter(description = "回滚原因") @RequestParam String reason,
-            @CurrentUserId String currentUserId) {
-        log.info("版本回滚: pid={}, historyId={}, reason={}, userId={}", logSafe(pid), historyId, logSafe(reason), logSafe(currentUserId));
-        PageSchemaVersionDTO result = pageSchemaVersionService.rollbackToVersion(pid, historyId, currentUserId, reason);
+            @Parameter(hidden = true) @CurrentUserId Long userId) {
+        // CurrentUserIdResolver always resolves a Long user id; binding it to a
+        // String parameter triggers "argument type mismatch" → 500. Accept the
+        // Long and stringify it for the operator field the version service expects.
+        String operatorId = userId != null ? String.valueOf(userId) : null;
+        log.info("版本回滚: pid={}, historyId={}, reason={}, userId={}", logSafe(pid), historyId, logSafe(reason), userId);
+        PageSchemaVersionDTO result = pageSchemaVersionService.rollbackToVersion(pid, historyId, operatorId, reason);
         return ApiResponse.success(result);
     }
 
