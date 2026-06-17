@@ -131,24 +131,30 @@ no `@theme inline` refactor needed; light `@theme` unchanged.
 
 ## Session status (2026-06-17, `/goal` 完成ux backlog)
 
-**DONE + MERGED:** T1 (tokens), T2 (base controls), **T3** (smart/meta/loose sweep +
-dark mode), T7 (Upload), G1+G2 (gates). 10 PRs (#707/708/709/710/712/713/720/721/724/726).
-The G1 gate now CI-enforces no-regression on both the palette and i18n burn-downs.
+**DONE + MERGED (14 PRs):** T1 (tokens), T2 (base controls), **T3** (smart/meta/loose
+sweep + dark mode), **T4–T6** (list/form/detail + renderer-block token layer +
+**real-browser golden** — see `RENDERER-GOLDEN-2026-06-17.md`), T7 (Upload), G1+G2
+(gates, scanning `app/ui` + the renderer layer).
+PRs #707/708/709/710/712/713/720/721/724/726/727/733/735 + the golden verification.
+The G1 gate CI-enforces no-regression on palette (1278) + i18n (111).
 
-## Remaining work (resumable — needs a fresh session + host-first golden stack)
+## Remaining work (resumable)
 
-| Item               | Scope                                                                                                                             | Status      | Notes                                                                                                                   |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
-| T4 list renderer   | `ListPageContent` / `list/ListTable` (compact rows, status dots, batch bar, conditional format, saved-to-view hint)               | not started | **needs host-first golden stack** (§2.1 Phase-0: backend bootRun + Vite/BFF + seed). Real-page browser golden required. |
-| T5 form renderer   | `FormPageContent` / `FormDialog` (validation presentation, reference picker, sub-table, visibleWhen; + Upload interactive golden) | not started | host-first golden stack.                                                                                                |
-| T6 detail renderer | `DetailPageContent` (read-only/tabs/sub-table totals/timeline/state toolbar)                                                      | not started | host-first golden stack.                                                                                                |
-| T8–T10             | saved-view presets (`ListPageContent:2584`) / cross-page select / aggregation·tree·import·autosave                                | not started | ROI-ordered, non-blocking.                                                                                              |
-| T3 sweep tail      | residual 742 decorative/slate/shade-pair colors + `app.css` `.decisionops-*` (367 hex)                                            | optional    | mostly documented exceptions; tackle the slate/decisionops with T4. Gate holds the line.                                |
+| Item                  | Scope                                                                                                 | Status      | Notes                                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
+| T8 saved-view presets | `ListPageContent:2584` 我的记录/今日新建/本周修改 hardcoded → persisted SavedView presets             | not started | feature; verify via the host-golden recipe in RENDERER-GOLDEN-2026-06-17.md                          |
+| T9 cross-page select  | cross-page select-all + export-selected-only (currently page-only + full/filtered export)             | not started | feature; needs backend select-set + golden                                                           |
+| T10 list gaps         | column aggregation summary row · expand/tree · generic import · form autosave (draft)                 | not started | ROI-ordered, non-blocking                                                                            |
+| T4–T6 deeper golden   | batch/multi-select bar (§3) + detail sub-tab inner content (timeline §5) on a selection-enabled model | optional    | renderers support these; this golden's demo seed didn't exercise them (see golden report follow-ups) |
+| T3 sweep tail         | residual decorative/slate/shade-pair colors + `app.css` `.decisionops-*` (367 hex)                    | optional    | documented exceptions; gate holds the line                                                           |
 
-> T4–T6 are renderer **redesigns** verified by real-browser golden against the mockup
-> (§2.2) — they require the host stack and are a multi-session effort, not a token sweep.
-> Resume: `node scripts/check-design-tokens.mjs --update-baseline` for current counts;
-> cheat-sheet above; standard `docs/standards/core/ux-design-system.md` §3/§4/§5.
+> **Host-golden recipe that works** (for T8–T10 verification) is in
+> `RENDERER-GOLDEN-2026-06-17.md`: prebuilt `platform/build/libs/AuraBoot-*-boot.jar`
+>
+> - isolated DB + free port + `pnpm dev:full` (SPRING_BOOT_URL/PROXY_TARGET) +
+>   `POST /api/bootstrap/setup` + demo profile + Playwright. (NB: boot jar has an OTel
+>   version-skew packaging bug — exclude the tracing autoconfigs at launch.)
+>   Standard: `docs/standards/core/ux-design-system.md` §3/§4/§5.
 
 ## Notes / decisions
 
