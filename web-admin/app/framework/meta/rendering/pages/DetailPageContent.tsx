@@ -521,11 +521,8 @@ function DetailPageContentInner(props: PageContentProps) {
 
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
-  // Use usePageRuntime instead of useDynamicPageSetup
-  const { runtime, dataSourceManager, t, locale, navigate } = usePageRuntime(schema, {
-    token: token || undefined,
-    showToast,
-    additionalContext: {
+  const runtimeContext = useMemo(
+    () => ({
       record: recordData,
       row: recordData,
       form: recordData,
@@ -535,7 +532,15 @@ function DetailPageContentInner(props: PageContentProps) {
         pageKey: (schema as any)?.pageKey,
         recordId: recordId || undefined,
       },
-    },
+    }),
+    [recordData, recordId, schema],
+  );
+
+  // Use usePageRuntime instead of useDynamicPageSetup
+  const { runtime, dataSourceManager, t, locale, navigate } = usePageRuntime(schema, {
+    token: token || undefined,
+    showToast,
+    additionalContext: runtimeContext,
   });
 
   // Use unified action handler for toolbar buttons (commandCode, navigateTo)
