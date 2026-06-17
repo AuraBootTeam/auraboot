@@ -1244,6 +1244,140 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('repeater_new_repeater');
   });
 
+  it('toggles canvas multi-selection with modifier-click and shows the batch bar', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+
+    // Plain click selects a single block; no multi-select bar yet.
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_name'));
+    expect(screen.getByTestId('canvas-block-field_customer_name')).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
+    expect(screen.queryByTestId('multi-select-bar')).not.toBeInTheDocument();
+
+    // shift+click adds a second block to the multi-selection -> bar appears.
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_phone'), { shiftKey: true });
+    expect(screen.getByTestId('multi-select-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('multi-select-count')).toHaveTextContent('已选 2 项');
+    expect(screen.getByTestId('canvas-block-field_customer_phone')).toHaveAttribute(
+      'data-multi-selected',
+      'true',
+    );
+    // The modifier-clicked block also becomes the primary selection (inspector target).
+    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_customer_phone');
+
+    // cmd+click adds a third (column from the table) -> count updates to 3.
+    fireEvent.click(screen.getByTestId('canvas-block-column_title'), { metaKey: true });
+    expect(screen.getByTestId('multi-select-count')).toHaveTextContent('已选 3 项');
+    expect(screen.getByTestId('canvas-block-column_title')).toHaveAttribute(
+      'data-multi-selected',
+      'true',
+    );
+  });
+
+  it('removes a block from the multi-selection when modifier-clicked again', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_name'), { shiftKey: true });
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_phone'), { shiftKey: true });
+    fireEvent.click(screen.getByTestId('canvas-block-column_title'), { shiftKey: true });
+    expect(screen.getByTestId('multi-select-count')).toHaveTextContent('已选 3 项');
+
+    // Modifier-clicking an already-selected block toggles it back out.
+    fireEvent.click(screen.getByTestId('canvas-block-column_title'), { ctrlKey: true });
+    expect(screen.getByTestId('multi-select-count')).toHaveTextContent('已选 2 项');
+    expect(screen.getByTestId('canvas-block-column_title')).toHaveAttribute(
+      'data-multi-selected',
+      'false',
+    );
+  });
+
+  it('clears the multi-selection on a plain click (returning to single select)', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_name'), { shiftKey: true });
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_phone'), { shiftKey: true });
+    expect(screen.getByTestId('multi-select-bar')).toBeInTheDocument();
+
+    // A plain (no-modifier) click on a single block collapses the selection.
+    fireEvent.click(screen.getByTestId('canvas-block-column_status'));
+    expect(screen.queryByTestId('multi-select-bar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('canvas-block-field_customer_name')).toHaveAttribute(
+      'data-multi-selected',
+      'false',
+    );
+    expect(screen.getByTestId('canvas-block-column_status')).toHaveAttribute('data-selected', 'true');
+  });
+
+  it('clears the multi-selection with the bar clear button without deleting blocks', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_name'), { shiftKey: true });
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_phone'), { shiftKey: true });
+
+    fireEvent.click(screen.getByTestId('multi-select-clear'));
+
+    expect(screen.queryByTestId('multi-select-bar')).not.toBeInTheDocument();
+    // Both blocks remain on the canvas.
+    expect(screen.getByTestId('canvas-block-field_customer_name')).toBeInTheDocument();
+    expect(screen.getByTestId('canvas-block-field_customer_phone')).toBeInTheDocument();
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存');
+  });
+
+  it('batch-deletes the multi-selected blocks in one undoable step', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_name'), { shiftKey: true });
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_phone'), { shiftKey: true });
+    expect(screen.getByTestId('multi-select-count')).toHaveTextContent('已选 2 项');
+
+    fireEvent.click(screen.getByTestId('multi-select-delete'));
+
+    expect(screen.queryByTestId('canvas-block-field_customer_name')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('canvas-block-field_customer_phone')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('multi-select-bar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
+
+    // A single undo restores both deleted blocks (one history step).
+    fireEvent.click(screen.getByTestId('designer-undo'));
+    expect(screen.getByTestId('canvas-block-field_customer_name')).toBeInTheDocument();
+    expect(screen.getByTestId('canvas-block-field_customer_phone')).toBeInTheDocument();
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存');
+  });
+
+  it('skips undeletable root blocks during a batch delete and removes only deletable ones', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+
+    // form_customer is a top-level (root) block and is not deletable; field_customer_name is.
+    fireEvent.click(screen.getByTestId('canvas-block-form_customer'), { shiftKey: true });
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_name'), { shiftKey: true });
+    expect(screen.getByTestId('multi-select-count')).toHaveTextContent('已选 2 项');
+
+    fireEvent.click(screen.getByTestId('multi-select-delete'));
+
+    // Deletable child removed; undeletable root container kept.
+    expect(screen.queryByTestId('canvas-block-field_customer_name')).not.toBeInTheDocument();
+    expect(screen.getByTestId('canvas-block-form_customer')).toBeInTheDocument();
+    expect(screen.queryByTestId('multi-select-bar')).not.toBeInTheDocument();
+  });
+
+  it('drops a palette block into the primary selection while a multi-selection is active', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+
+    // Establish a multi-selection whose last (primary) block is a form section.
+    fireEvent.click(screen.getByTestId('canvas-block-field_customer_name'), { shiftKey: true });
+    fireEvent.click(screen.getByTestId('canvas-block-section_basic'), { shiftKey: true });
+    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('section_basic');
+
+    // The drop context still follows the primary selection (selectedBlockId is
+    // intact), so a palette add lands inside section_basic.
+    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
+    fireEvent.click(screen.getByTestId('palette-add-repeater'));
+
+    expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toBeInTheDocument();
+    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('repeater_new_repeater');
+  });
+
   it('adds a page-level palette block to the canvas root', () => {
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
 
