@@ -145,10 +145,7 @@ function isEmptySubmittedValue(value: any): boolean {
   if (value === undefined || value === null) return true;
   if (Array.isArray(value) && value.length === 0) return true;
   return (
-    value &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    Object.keys(value).length === 0
+    value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0
   );
 }
 
@@ -1754,7 +1751,17 @@ export function FormPageContent(props: PageContentProps) {
       },
       getContext: () => ({ record: formData, pageContext }),
     }),
-    [formData, initialFormData, recordId, tableName, token, locale, t, clearFieldError, pageContext],
+    [
+      formData,
+      initialFormData,
+      recordId,
+      tableName,
+      token,
+      locale,
+      t,
+      clearFieldError,
+      pageContext,
+    ],
   );
 
   // Null schema guard
@@ -1783,17 +1790,17 @@ export function FormPageContent(props: PageContentProps) {
         className="mx-auto w-full px-2 py-3"
         data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
       >
-        <div className="rounded-lg bg-white shadow-sm">
+        <div className="rounded-card bg-panel shadow-sm">
           {/* Page Header */}
-          <div className="border-b border-gray-200 px-6 py-4">
+          <div className="border-border border-b px-6 py-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium text-gray-900">
+              <h2 className="text-text text-lg font-medium">
                 {getLocalizedText(schema.title, locale, t)}
               </h2>
               <Link
                 to={`/p/${tableName}`}
                 data-testid="form-back-link"
-                className="text-sm text-blue-600 hover:text-blue-800"
+                className="text-accent text-sm hover:text-blue-800"
               >
                 {t('action.back')}
               </Link>
@@ -1803,7 +1810,7 @@ export function FormPageContent(props: PageContentProps) {
           {/* Error Summary */}
           {summaryErrors.length > 0 ? (
             <div
-              className="mx-6 mt-4 rounded-md border border-red-200 bg-red-50 p-4"
+              className="rounded-control bg-status-red-bg mx-6 mt-4 border border-red-200 p-4"
               data-testid="form-error-summary"
             >
               <p className="text-sm font-medium text-red-700">
@@ -1811,25 +1818,25 @@ export function FormPageContent(props: PageContentProps) {
                   ? `请先修正以下 ${summaryErrors.length} 项问题`
                   : '请先修正以下问题'}
               </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-red-600">
+              <ul className="text-status-red mt-2 list-disc space-y-1 pl-5">
                 {summaryErrors.map((message) => (
                   <li key={message}>{message}</li>
                 ))}
               </ul>
             </div>
           ) : error ? (
-            <div className="mx-6 mt-4 rounded-md border border-red-200 bg-red-50 p-4">
-              <p className="text-red-600">{error}</p>
+            <div className="rounded-control bg-status-red-bg mx-6 mt-4 border border-red-200 p-4">
+              <p className="text-status-red">{error}</p>
             </div>
           ) : null}
 
           {/* URL-prefill hint: shown when modelCode was seeded from ?modelCode=xxx */}
           {urlSeededModelCode && !isEditMode && (
             <div
-              className="mx-6 mt-4 rounded-md border border-blue-200 bg-blue-50 p-3"
+              className="rounded-control bg-accent-weak mx-6 mt-4 border border-blue-200 p-3"
               data-testid="form-modelcode-prefill-hint"
             >
-              <p className="text-sm text-blue-700">
+              <p className="text-accent text-sm">
                 {(
                   t('pageSchemaForm.modelCodePrefillHint') || `Creating from model "{modelCode}"`
                 ).replace('{modelCode}', urlSeededModelCode)}
@@ -1841,171 +1848,169 @@ export function FormPageContent(props: PageContentProps) {
           <form className="p-6" data-testid="dynamic-form" onSubmit={(e) => e.preventDefault()}>
             {!mainRecordLoaded ? (
               <div
-                className="py-8 text-center text-sm text-gray-400"
+                className="text-text-3 py-8 text-center text-sm"
                 data-testid="dynamic-form-loading"
               >
                 {t('common.loading') || 'Loading...'}
               </div>
             ) : (
               <>
-              {customBlocks.length > 0 && customBlocks.map((block: any) => {
-                // Honour DSL visibility condition (matches form-section behavior below).
-                if (block.visibleWhen && !evaluateCondition(block.visibleWhen, pageContext)) {
-                  return null;
-                }
-                // Missing component name → surface a visible error, mirroring
-                // BlockRenderer's pattern. Silent-null would hide DSL typos.
-                if (!block.component) {
-                  return (
-                    <BlockErrorBoundary key={block.id} blockType="custom" blockId={block.id}>
-                      <div
-                        className="mb-5 rounded border border-red-300 bg-red-50 p-4"
-                        data-block-id={block.id}
-                      >
-                        <p className="text-red-800">
-                          Custom block missing `component`: {block.id}
-                        </p>
-                      </div>
-                    </BlockErrorBoundary>
-                  );
-                }
-                return (
-                  <BlockErrorBoundary
-                    key={block.id}
-                    blockType="custom"
-                    blockId={block.id}
-                  >
-                    <div
-                      data-block-id={block.id}
-                      className={`block-custom mb-5 ${block.className || ''}`}
-                    >
-                      <ComponentLoader
-                        componentName={block.component}
-                        props={{ block, runtime: customBlockRuntime }}
-                      />
-                    </div>
-                  </BlockErrorBoundary>
-                );
-              })}
-              {formBlocks &&
-              formBlocks.length > 0 && (
-                <div className="space-y-5">
-                  {formBlocks.map((block: any, blockIndex: number) => {
-                    // Check block visibility condition
-                    if (block.visibleWhen) {
-                      const isVisible = evaluateCondition(block.visibleWhen, pageContext);
-                      if (!isVisible) {
-                        return null;
-                      }
+                {customBlocks.length > 0 &&
+                  customBlocks.map((block: any) => {
+                    // Honour DSL visibility condition (matches form-section behavior below).
+                    if (block.visibleWhen && !evaluateCondition(block.visibleWhen, pageContext)) {
+                      return null;
                     }
-
-                    return (
-                      <div key={block.id || `block-${blockIndex}`} className="form-section">
-                        {/* Section Title */}
-                        {block.title && (
-                          <h3 className="mb-4 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">
-                            {getLocalizedText(block.title, locale, t)}
-                          </h3>
-                        )}
-
-                        {/* Section Fields */}
-                        {block.fields && block.fields.length > 0 && (
-                          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-                            {block.fields.map((rawField: any) => {
-                              // L1 SDK: skip hidden fields from external fieldPermissions
-                              const externalPerm = fieldPermissions?.[rawField.field];
-                              if (externalPerm === 'hidden') return null;
-
-                              // Enrich field with metadata (component, dictCode) when available
-                              const meta = modelFields[rawField.field];
-                              const mergedValidationRules = mergeFieldValidationRules(
-                                rawField,
-                                meta,
-                                t,
-                                locale,
-                              );
-                              const maxLength = Number(meta?.feature?.validation?.maxLength);
-                              // Use pre-computed extensionProps (stable reference from modelFields)
-                              const extensionProps = meta?.extensionProps;
-                              let field = meta
-                                ? {
-                                    ...rawField,
-                                    modelCode: schema?.modelCode || tableName,
-                                    label: rawField.label || meta.displayName || rawField.label,
-                                    dataType: rawField.dataType || meta.dataType,
-                                    component:
-                                      rawField.component ||
-                                      meta.component ||
-                                      resolveComponentByFieldMeta(meta.dataType),
-                                    dictCode:
-                                      rawField.dictCode ||
-                                      meta.dictCode ||
-                                      extensionProps?.dictCode,
-                                    refTarget: mergeRefTarget(rawField.refTarget, meta.refTarget),
-                                    referenceModelCode:
-                                      rawField.referenceModelCode || meta.referenceModelCode,
-                                    required: rawField.required ?? meta.required,
-                                    readOnly:
-                                      rawField.readOnly ??
-                                      meta.extension?.readOnly ??
-                                      (meta.extension as any)?.extension?.readOnly ??
-                                      (extensionProps?.computed === true ? true : undefined),
-                                    validation: mergedValidationRules,
-                                    props: {
-                                      ...(extensionProps || {}),
-                                      ...(rawField.props || {}),
-                                      ...(Number.isFinite(maxLength) &&
-                                      maxLength > 0 &&
-                                      !rawField.props?.maxLength
-                                        ? { maxLength }
-                                        : {}),
-                                    },
-                                  }
-                                : { ...rawField, modelCode: schema?.modelCode || tableName };
-
-                              // L1 SDK: apply external readonly permission override
-                              if (externalPerm === 'readonly') {
-                                field = { ...field, readOnly: true };
-                              }
-
-                              // Check field visibility condition
-                              if (field.visibleWhen) {
-                                const isVisible = evaluateCondition(field.visibleWhen, pageContext);
-                                if (!isVisible) {
-                                  return null;
-                                }
-                              }
-
-                              // Calculate column span based on field layout or DSL span
-                              const colSpan =
-                                field.layout?.colSpan || (field.span ? field.span * 6 : 6);
-                              const isFullWidth = colSpan >= 12;
-
-                              return (
-                                <div
-                                  key={field.field}
-                                  data-testid={`form-field-${field.field}`}
-                                  data-ab-testid={deriveTestId(
-                                    'form',
-                                    schema?.modelCode || tableName,
-                                    'field',
-                                    field.field,
-                                  )}
-                                  className={isFullWidth ? 'md:col-span-2' : ''}
-                                >
-                                  {renderSmartField(field)}
-                                </div>
-                              );
-                            })}
+                    // Missing component name → surface a visible error, mirroring
+                    // BlockRenderer's pattern. Silent-null would hide DSL typos.
+                    if (!block.component) {
+                      return (
+                        <BlockErrorBoundary key={block.id} blockType="custom" blockId={block.id}>
+                          <div
+                            className="border-status-red bg-status-red-bg mb-5 rounded border p-4"
+                            data-block-id={block.id}
+                          >
+                            <p className="text-red-800">
+                              Custom block missing `component`: {block.id}
+                            </p>
                           </div>
-                        )}
-                      </div>
+                        </BlockErrorBoundary>
+                      );
+                    }
+                    return (
+                      <BlockErrorBoundary key={block.id} blockType="custom" blockId={block.id}>
+                        <div
+                          data-block-id={block.id}
+                          className={`block-custom mb-5 ${block.className || ''}`}
+                        >
+                          <ComponentLoader
+                            componentName={block.component}
+                            props={{ block, runtime: customBlockRuntime }}
+                          />
+                        </div>
+                      </BlockErrorBoundary>
                     );
                   })}
-                </div>
-              )}
-              {runtime &&
-                layoutBlocks.length > 0 && (
+                {formBlocks && formBlocks.length > 0 && (
+                  <div className="space-y-5">
+                    {formBlocks.map((block: any, blockIndex: number) => {
+                      // Check block visibility condition
+                      if (block.visibleWhen) {
+                        const isVisible = evaluateCondition(block.visibleWhen, pageContext);
+                        if (!isVisible) {
+                          return null;
+                        }
+                      }
+
+                      return (
+                        <div key={block.id || `block-${blockIndex}`} className="form-section">
+                          {/* Section Title */}
+                          {block.title && (
+                            <h3 className="border-border text-text mb-4 border-b pb-2 text-base font-semibold">
+                              {getLocalizedText(block.title, locale, t)}
+                            </h3>
+                          )}
+
+                          {/* Section Fields */}
+                          {block.fields && block.fields.length > 0 && (
+                            <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+                              {block.fields.map((rawField: any) => {
+                                // L1 SDK: skip hidden fields from external fieldPermissions
+                                const externalPerm = fieldPermissions?.[rawField.field];
+                                if (externalPerm === 'hidden') return null;
+
+                                // Enrich field with metadata (component, dictCode) when available
+                                const meta = modelFields[rawField.field];
+                                const mergedValidationRules = mergeFieldValidationRules(
+                                  rawField,
+                                  meta,
+                                  t,
+                                  locale,
+                                );
+                                const maxLength = Number(meta?.feature?.validation?.maxLength);
+                                // Use pre-computed extensionProps (stable reference from modelFields)
+                                const extensionProps = meta?.extensionProps;
+                                let field = meta
+                                  ? {
+                                      ...rawField,
+                                      modelCode: schema?.modelCode || tableName,
+                                      label: rawField.label || meta.displayName || rawField.label,
+                                      dataType: rawField.dataType || meta.dataType,
+                                      component:
+                                        rawField.component ||
+                                        meta.component ||
+                                        resolveComponentByFieldMeta(meta.dataType),
+                                      dictCode:
+                                        rawField.dictCode ||
+                                        meta.dictCode ||
+                                        extensionProps?.dictCode,
+                                      refTarget: mergeRefTarget(rawField.refTarget, meta.refTarget),
+                                      referenceModelCode:
+                                        rawField.referenceModelCode || meta.referenceModelCode,
+                                      required: rawField.required ?? meta.required,
+                                      readOnly:
+                                        rawField.readOnly ??
+                                        meta.extension?.readOnly ??
+                                        (meta.extension as any)?.extension?.readOnly ??
+                                        (extensionProps?.computed === true ? true : undefined),
+                                      validation: mergedValidationRules,
+                                      props: {
+                                        ...(extensionProps || {}),
+                                        ...(rawField.props || {}),
+                                        ...(Number.isFinite(maxLength) &&
+                                        maxLength > 0 &&
+                                        !rawField.props?.maxLength
+                                          ? { maxLength }
+                                          : {}),
+                                      },
+                                    }
+                                  : { ...rawField, modelCode: schema?.modelCode || tableName };
+
+                                // L1 SDK: apply external readonly permission override
+                                if (externalPerm === 'readonly') {
+                                  field = { ...field, readOnly: true };
+                                }
+
+                                // Check field visibility condition
+                                if (field.visibleWhen) {
+                                  const isVisible = evaluateCondition(
+                                    field.visibleWhen,
+                                    pageContext,
+                                  );
+                                  if (!isVisible) {
+                                    return null;
+                                  }
+                                }
+
+                                // Calculate column span based on field layout or DSL span
+                                const colSpan =
+                                  field.layout?.colSpan || (field.span ? field.span * 6 : 6);
+                                const isFullWidth = colSpan >= 12;
+
+                                return (
+                                  <div
+                                    key={field.field}
+                                    data-testid={`form-field-${field.field}`}
+                                    data-ab-testid={deriveTestId(
+                                      'form',
+                                      schema?.modelCode || tableName,
+                                      'field',
+                                      field.field,
+                                    )}
+                                    className={isFullWidth ? 'md:col-span-2' : ''}
+                                  >
+                                    {renderSmartField(field)}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {runtime && layoutBlocks.length > 0 && (
                   <div className="mt-5 space-y-5" data-testid="form-layout-blocks">
                     {layoutBlocks.map((block: any, blockIndex: number) => (
                       <BlockRenderer
@@ -2035,7 +2040,7 @@ export function FormPageContent(props: PageContentProps) {
               return (
                 <div key={blockKey} className="mt-6">
                   {block.title && (
-                    <h3 className="mb-4 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">
+                    <h3 className="border-border text-text mb-4 border-b pb-2 text-base font-semibold">
                       {getLocalizedText(block.title, locale, t)}
                     </h3>
                   )}
@@ -2051,12 +2056,12 @@ export function FormPageContent(props: PageContentProps) {
                       isEditable={!subTableConfig.readOnly}
                     />
                   ) : !editDataLoaded ? (
-                    <div className="py-4 text-center text-sm text-gray-400">
+                    <div className="text-text-3 py-4 text-center text-sm">
                       {t('common.loading') || 'Loading...'}
                     </div>
                   ) : !isEditMode ? (
                     /* Create mode: show placeholder — lines can be added after saving */
-                    <div className="rounded-lg border border-dashed border-gray-300 py-6 text-center text-sm text-gray-400">
+                    <div className="rounded-card border-border-strong text-text-3 border border-dashed py-6 text-center text-sm">
                       {t('common.saveFirstToAddLines') !== 'common.saveFirstToAddLines'
                         ? t('common.saveFirstToAddLines')
                         : 'Save the record first, then add line items on the detail page'}
@@ -2080,7 +2085,7 @@ export function FormPageContent(props: PageContentProps) {
               effectiveButtonBlock &&
               effectiveButtonBlock.buttons &&
               effectiveButtonBlock.buttons.length > 0 && (
-                <div className="mt-6 flex justify-end space-x-3 border-t border-gray-200 pt-6">
+                <div className="border-border mt-6 flex justify-end space-x-3 border-t pt-6">
                   {effectiveButtonBlock.buttons.map((button: any) => {
                     // Check button visibility condition
                     if (button.visibleWhen) {
@@ -2102,10 +2107,10 @@ export function FormPageContent(props: PageContentProps) {
                         )}
                         onClick={() => handleFormAction(button)}
                         disabled={loading || !submitReady}
-                        className={`rounded-md px-4 py-2 text-sm font-medium ${
+                        className={`rounded-control px-4 py-2 text-sm font-medium ${
                           button.primary
-                            ? 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400'
-                            : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:bg-gray-100'
+                            ? 'bg-accent hover:bg-accent-hover text-white disabled:bg-blue-400'
+                            : 'border-border-strong bg-panel text-text-2 hover:bg-hover border disabled:bg-gray-100'
                         } ${button.danger ? 'bg-red-600 text-white hover:bg-red-700' : ''} disabled:cursor-not-allowed`}
                       >
                         {loading && button.code === 'submit' && (

@@ -99,8 +99,16 @@ export function ListToolbar({
   );
 
   const quickFilters: Array<{ key: QuickFilterKey; label: string; icon: string }> = [
-    { key: 'my_records', label: t('common.my_records', undefined, 'My Records'), icon: '\uD83D\uDC64' },
-    { key: 'created_today', label: t('common.created_today', undefined, 'Created Today'), icon: '\uD83D\uDCC5' },
+    {
+      key: 'my_records',
+      label: t('common.my_records', undefined, 'My Records'),
+      icon: '\uD83D\uDC64',
+    },
+    {
+      key: 'created_today',
+      label: t('common.created_today', undefined, 'Created Today'),
+      icon: '\uD83D\uDCC5',
+    },
     {
       key: 'modified_this_week',
       label: t('common.modified_this_week', undefined, 'Modified This Week'),
@@ -130,11 +138,11 @@ export function ListToolbar({
             onChange={(e) => onKeywordChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('common.search', undefined, 'Search') + '...'}
-            className="h-8 w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:outline-none sm:w-[240px]"
+            className="rounded-card border-border bg-subtle text-text-2 focus:bg-panel focus-visible:shadow-focus h-8 w-full border pr-3 pl-8 text-xs placeholder-gray-400 focus:outline-none sm:w-[240px]"
             data-testid="list-search-input"
           />
           <svg
-            className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400"
+            className="text-text-3 absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -160,10 +168,10 @@ export function ListToolbar({
           >
             <button
               type="button"
-              className={`flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-card flex items-center gap-1 border px-3 py-1.5 text-xs font-medium transition-colors ${
                 activeSorts.length > 0
-                  ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100'
-                  : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                  ? 'bg-accent-weak text-accent border-blue-200 hover:bg-blue-100'
+                  : 'border-border text-text-2 hover:bg-hover hover:text-text-2'
               }`}
               data-testid="sort-popover-trigger"
             >
@@ -177,7 +185,7 @@ export function ListToolbar({
               </svg>
               {t('common.sort', undefined, 'Sort')}
               {activeSorts.length > 0 && (
-                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                <span className="rounded-pill bg-accent flex h-4 w-4 items-center justify-center text-[10px] font-bold text-white">
                   {activeSorts.length}
                 </span>
               )}
@@ -190,7 +198,7 @@ export function ListToolbar({
           <button
             type="button"
             onClick={onColumnSettingsOpen}
-            className="flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+            className="rounded-card border-border text-text-2 hover:bg-hover hover:text-text-2 flex items-center gap-1 border px-3 py-1.5 text-xs font-medium transition-colors"
             data-testid="column-settings-btn"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,10 +224,10 @@ export function ListToolbar({
           <button
             type="button"
             onClick={onFilterFormToggle}
-            className={`flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`rounded-card flex items-center gap-1 border px-3 py-1.5 text-xs font-medium transition-colors ${
               filterFormVisible
-                ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100'
-                : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                ? 'bg-accent-weak text-accent border-blue-200 hover:bg-blue-100'
+                : 'border-border text-text-2 hover:bg-hover hover:text-text-2'
             }`}
             data-testid="filters-toggle"
           >
@@ -238,7 +246,12 @@ export function ListToolbar({
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
             </svg>
           </button>
         )}
@@ -258,10 +271,10 @@ export function ListToolbar({
                 type="button"
                 onClick={() => onQuickFilter(qf.key)}
                 data-testid={`quick-filter-${qf.key}`}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
                   activeQuickFilter === qf.key
-                    ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-300'
-                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                    ? 'bg-accent-weak text-accent ring-1 ring-blue-300'
+                    : 'bg-subtle text-text-2 hover:bg-hover'
                 }`}
               >
                 {qf.label}

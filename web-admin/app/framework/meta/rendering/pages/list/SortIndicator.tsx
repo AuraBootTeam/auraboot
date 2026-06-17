@@ -26,7 +26,7 @@ export function SortIndicator({ direction, priority }: SortIndicatorProps) {
         <path d="M4 11.5L1 7.5H7Z" fill={downColor} />
       </svg>
       {isActive && priority != null && priority > 0 && (
-        <span className="absolute -top-1.5 -right-2 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
+        <span className="rounded-pill bg-accent absolute -top-1.5 -right-2 flex h-3.5 w-3.5 items-center justify-center text-[9px] font-bold text-white">
           {priority}
         </span>
       )}

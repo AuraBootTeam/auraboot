@@ -34,19 +34,19 @@ describe('SortIndicator', () => {
     const { getByText } = render(<SortIndicator direction="asc" priority={2} />);
     const badge = getByText('2');
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveClass('rounded-full', 'bg-blue-600');
+    expect(badge).toHaveClass('rounded-pill', 'bg-accent');
   });
 
   it('does not render priority badge when priority is undefined', () => {
     const { container } = render(<SortIndicator direction="asc" />);
     // Should only have the svg span, no badge span
-    const badges = container.querySelectorAll('.rounded-full');
+    const badges = container.querySelectorAll('.rounded-pill');
     expect(badges).toHaveLength(0);
   });
 
   it('does not render priority badge when priority is 0', () => {
     const { container } = render(<SortIndicator direction="asc" priority={0} />);
-    const badges = container.querySelectorAll('.rounded-full');
+    const badges = container.querySelectorAll('.rounded-pill');
     expect(badges).toHaveLength(0);
   });
 });
