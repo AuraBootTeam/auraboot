@@ -145,8 +145,9 @@ harness/打分/持久化全在,缺的只是 **回归门 + 定时/触发 + key + 
 (healthyRate / failRate / costFlaggedRate / avgScore / unhealthy turns)。默认判官 = **确定性 `HeuristicTurnQualityJudge`**
 (从 observable 信号:完成/失败/error severity/`alert_*`/`cost_warning` 打分,**零 token**),
 pure 信号折叠 + 判分 + 聚合全单测守护(12 测)。这是唯一覆盖**真实生产分布**的层。
+✅ **运营回路已接通(2026-06-17,无 key 部分)**:`OnlineEvalQualityGate`(纯阈值门,9 单测:healthy/各维越界/多违规/空采样 no-op/边界含端)+ `ScheduledOnlineEvalJob`(`@Scheduled` cron `0 0 4 * * *`,`aura.agent.online-eval.scheduled.enabled` 默认关,越阈值经 `AgentObservationService.publish("online_eval.degraded", …)` emit + WARN,5 单测)+ 读端点 `GET /api/agent/eval/online?sinceHours&maxRuns`(看板数据源)。门禁默认 `min-healthy-rate 0.80 / max-fail-rate 0.20 / max-cost-flagged-rate 0.20 / min-avg-score 0.50`,operator 开 flag + 设 `tenant-id` 即生效,零运行时行为改变。
 🔑 **block 点(LLM key)**:把判官换成**真模型读 turn detail 评细粒度质量/幻觉/纠正**(同 `AgentTurnQualityJudge` 接口)需 LLM key;拿到 key 后加 `LlmTurnQualityJudge` 实现。
-后续刀:定时触发 `sampleAndJudge` + 越阈值 emit 观测告警(同 ① 的 scheduler 模式)+ 质量看板 NQ/页面。
+后续刀:**质量看板 DSL 页**(消费 `/eval/online` 端点,按 §2.2 需独立 golden 会话:浏览器证据 + 后端数据成对)+ operator 开 flag 后的 nightly heuristic 趋势线。
 
 ### 节奏/门禁矩阵
 
