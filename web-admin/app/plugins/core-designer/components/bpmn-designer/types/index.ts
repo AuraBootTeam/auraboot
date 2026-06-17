@@ -281,6 +281,9 @@ export interface ProcessAuraConfig {
 // Node monitor status (used in monitor mode)
 export type NodeMonitorStatus = 'active' | 'completed' | 'idle';
 
+// Node validation status (used in design mode after a Validate run) — G-U1
+export type NodeValidationStatus = 'error' | 'warning' | null;
+
 // 组件库项配置
 export interface BPMNPaletteItem {
   type: BPMNNodeType;
