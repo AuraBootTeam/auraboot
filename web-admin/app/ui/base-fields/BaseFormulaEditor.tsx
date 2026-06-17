@@ -38,9 +38,9 @@ export function BaseFormulaEditor({
   return (
     <div className={cn('mb-4', className)}>
       {label && (
-        <label htmlFor={name} className="mb-1 block text-sm font-medium text-gray-700">
+        <label htmlFor={name} className="text-text-2 mb-1 block text-sm font-medium">
           {label}
-          {adapter.required && <span className="ml-1 text-red-500">*</span>}
+          {adapter.required && <span className="text-status-red ml-1">*</span>}
         </label>
       )}
       <FormulaEditor
@@ -52,7 +52,7 @@ export function BaseFormulaEditor({
         fields={fields}
         fetchFunctions={fetchFunctions}
       />
-      {!hasError && helpText && <p className="mt-1 text-xs text-gray-500">{helpText}</p>}
+      {!hasError && helpText && <p className="text-text-2 mt-1 text-xs">{helpText}</p>}
     </div>
   );
 }

@@ -164,23 +164,23 @@ export const MultiSelect = forwardRef<HTMLDivElement, MultiSelectProps>(
       >
         <div
           className={clsx(
-            'min-h-[2.5rem] rounded-lg border px-3 py-2 transition-all',
+            'rounded-card min-h-[2.5rem] border px-3 py-2 transition-all',
             readOnly
-              ? 'cursor-default bg-gray-50 dark:bg-gray-800'
-              : 'cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none',
-            error ? 'border-red-300' : 'border-gray-300',
+              ? 'bg-subtle cursor-default dark:bg-gray-800'
+              : 'focus:border-accent focus-visible:shadow-focus cursor-pointer focus:outline-none',
+            error ? 'border-status-red' : 'border-border-strong',
             'dark:border-gray-600 dark:bg-gray-700 dark:text-white',
           )}
           onClick={() => !readOnly && setIsOpen(!isOpen)} // 只读模式下不允许打开下拉菜单
         >
           {selectedOptions.length === 0 ? (
-            <span className="text-gray-500">{placeholderText}</span>
+            <span className="text-text-2">{placeholderText}</span>
           ) : (
             <div className="flex flex-wrap gap-1">
               {selectedOptions.map((option) => (
                 <span
                   key={option.key}
-                  className="inline-flex items-center rounded-md bg-blue-100 px-2 py-1 text-xs text-blue-800"
+                  className="rounded-control bg-accent-weak inline-flex items-center px-2 py-1 text-xs text-blue-800"
                 >
                   {option.label}
                   {!readOnly && ( // 只读模式下不显示删除按钮
@@ -190,7 +190,7 @@ export const MultiSelect = forwardRef<HTMLDivElement, MultiSelectProps>(
                         e.stopPropagation();
                         handleRemoveOption(option.value);
                       }}
-                      className="ml-1 text-blue-600 hover:text-blue-800"
+                      className="text-accent ml-1 hover:text-blue-800"
                     >
                       ×
                     </button>
@@ -203,15 +203,15 @@ export const MultiSelect = forwardRef<HTMLDivElement, MultiSelectProps>(
 
         {isOpen &&
           !readOnly && ( // 只读模式下不显示下拉菜单
-            <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-700">
+            <div className="rounded-card border-border-strong bg-panel absolute z-10 mt-1 w-full border shadow-lg dark:border-gray-600 dark:bg-gray-700">
               {searchable && (
-                <div className="border-b border-gray-200 p-2 dark:border-gray-600">
+                <div className="border-border border-b p-2 dark:border-gray-600">
                   <input
                     type="text"
                     placeholder={st('搜索选项...')}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-500 dark:bg-gray-600 dark:text-white"
+                    className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-2 py-1 text-sm focus:outline-none dark:border-gray-500 dark:bg-gray-600 dark:text-white"
                   />
                 </div>
               )}
@@ -221,8 +221,8 @@ export const MultiSelect = forwardRef<HTMLDivElement, MultiSelectProps>(
                   <div
                     key={option.key}
                     className={clsx(
-                      'cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600',
-                      currentValue.includes(option.value) && 'bg-blue-50 dark:bg-blue-900',
+                      'hover:bg-hover cursor-pointer px-3 py-2 dark:hover:bg-gray-600',
+                      currentValue.includes(option.value) && 'bg-accent-weak dark:bg-blue-900',
                       option.disabled && 'cursor-not-allowed opacity-50',
                     )}
                     onClick={() => !option.disabled && handleOptionToggle(option.value)}
@@ -233,11 +233,9 @@ export const MultiSelect = forwardRef<HTMLDivElement, MultiSelectProps>(
                         checked={currentValue.includes(option.value)}
                         disabled={option.disabled}
                         readOnly
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                        className="rounded-control border-border-strong text-accent h-4 w-4"
                       />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">
-                        {option.label}
-                      </span>
+                      <span className="text-text-2 text-sm dark:text-gray-300">{option.label}</span>
                     </div>
                   </div>
                 ))}

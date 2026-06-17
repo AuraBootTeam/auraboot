@@ -357,6 +357,94 @@ export const DESIGNER_I18N = {
     stay: { 'zh-CN': '留下', 'en-US': 'Stay' } as L,
     leave: { 'zh-CN': '离开', 'en-US': 'Leave' } as L,
 
+    // Publish / unpublish (POST /api/pages/{pid}/publish — page.page.manage)
+    publish: { 'zh-CN': '发布', 'en-US': 'Publish' } as L,
+    publishing: { 'zh-CN': '发布中', 'en-US': 'Publishing' } as L,
+    published: { 'zh-CN': '已发布', 'en-US': 'Published' } as L,
+    unpublish: { 'zh-CN': '取消发布', 'en-US': 'Unpublish' } as L,
+    unpublishing: { 'zh-CN': '取消发布中', 'en-US': 'Unpublishing' } as L,
+    publishSaveFirst: {
+      'zh-CN': '请先保存页面再发布',
+      'en-US': 'Save the page before publishing',
+    } as L,
+
+    // Export / import (pure client-side JSON download / upload)
+    exportPage: { 'zh-CN': '导出', 'en-US': 'Export' } as L,
+    importPage: { 'zh-CN': '导入', 'en-US': 'Import' } as L,
+    importInvalid: {
+      'zh-CN': '导入失败：不是有效的页面 JSON（需 schemaVersion 3）',
+      'en-US': 'Import failed: not a valid page JSON (schemaVersion 3 required)',
+    } as L,
+
+    // Version history / snapshot / rollback
+    // (GET/POST /api/pages/{pid}/versions, POST .../rollback/{historyId})
+    versions: { 'zh-CN': '版本', 'en-US': 'Versions' } as L,
+    versionHistory: { 'zh-CN': '版本历史', 'en-US': 'Version history' } as L,
+    versionsSaveFirst: {
+      'zh-CN': '请先保存页面再查看版本',
+      'en-US': 'Save the page before viewing versions',
+    } as L,
+    versionCreateSnapshot: { 'zh-CN': '创建快照', 'en-US': 'Create snapshot' } as L,
+    versionCreatingSnapshot: { 'zh-CN': '创建中…', 'en-US': 'Creating…' } as L,
+    versionSnapshotReason: {
+      'zh-CN': '快照说明（可选）',
+      'en-US': 'Snapshot description (optional)',
+    } as L,
+    versionRollback: { 'zh-CN': '回滚', 'en-US': 'Roll back' } as L,
+    versionRollingBack: { 'zh-CN': '回滚中…', 'en-US': 'Rolling back…' } as L,
+    versionRollbackConfirm: {
+      'zh-CN': '确认回滚到此版本？当前画布将被替换。',
+      'en-US': 'Roll back to this version? The current canvas will be replaced.',
+    } as L,
+    versionRollbackConfirmYes: { 'zh-CN': '确认回滚', 'en-US': 'Confirm rollback' } as L,
+    versionRollbackCancel: { 'zh-CN': '取消', 'en-US': 'Cancel' } as L,
+    versionCurrent: { 'zh-CN': '当前', 'en-US': 'Current' } as L,
+    versionLoading: { 'zh-CN': '加载版本中…', 'en-US': 'Loading versions…' } as L,
+    versionEmpty: { 'zh-CN': '暂无版本记录', 'en-US': 'No versions yet' } as L,
+    versionClose: { 'zh-CN': '关闭', 'en-US': 'Close' } as L,
+    versionNumber: { 'zh-CN': '版本', 'en-US': 'Version' } as L,
+    versionOperationCreate: { 'zh-CN': '创建', 'en-US': 'Create' } as L,
+    versionOperationUpdate: { 'zh-CN': '更新', 'en-US': 'Update' } as L,
+    versionOperationPublish: { 'zh-CN': '发布', 'en-US': 'Publish' } as L,
+    versionOperationArchive: { 'zh-CN': '归档', 'en-US': 'Archive' } as L,
+    versionOperationDelete: { 'zh-CN': '删除', 'en-US': 'Delete' } as L,
+    versionOperationRestore: { 'zh-CN': '回滚', 'en-US': 'Rollback' } as L,
+    versionOperationSnapshot: { 'zh-CN': '快照', 'en-US': 'Snapshot' } as L,
+
+    // Version compare / diff viewer
+    // (GET /api/pages/{pid}/versions/{from}/compare/{to})
+    versionCompareEnter: { 'zh-CN': '对比版本', 'en-US': 'Compare versions' } as L,
+    versionCompareExit: { 'zh-CN': '退出对比', 'en-US': 'Exit compare' } as L,
+    versionCompareHint: {
+      'zh-CN': '选择两个版本进行对比',
+      'en-US': 'Select two versions to compare',
+    } as L,
+    versionCompareRun: { 'zh-CN': '对比所选版本', 'en-US': 'Compare selected' } as L,
+    versionCompareComputing: { 'zh-CN': '对比中…', 'en-US': 'Comparing…' } as L,
+    versionCompareBack: { 'zh-CN': '返回版本列表', 'en-US': 'Back to versions' } as L,
+    versionCompareSelectedCount: {
+      'zh-CN': '已选 {n} / 2',
+      'en-US': '{n} of 2 selected',
+    } as L,
+    versionDiffSource: { 'zh-CN': '源版本', 'en-US': 'Source' } as L,
+    versionDiffTarget: { 'zh-CN': '目标版本', 'en-US': 'Target' } as L,
+    versionDiffAdded: { 'zh-CN': '新增', 'en-US': 'Added' } as L,
+    versionDiffRemoved: { 'zh-CN': '删除', 'en-US': 'Removed' } as L,
+    versionDiffModified: { 'zh-CN': '修改', 'en-US': 'Modified' } as L,
+    versionDiffSummary: {
+      'zh-CN': '{added} 新增 / {removed} 删除 / {modified} 修改',
+      'en-US': '{added} added / {removed} removed / {modified} modified',
+    } as L,
+    versionDiffNoChanges: {
+      'zh-CN': '两个版本之间没有差异',
+      'en-US': 'No differences between the two versions',
+    } as L,
+    versionDiffSourceValue: { 'zh-CN': '源值', 'en-US': 'Source value' } as L,
+    versionDiffTargetValue: { 'zh-CN': '目标值', 'en-US': 'Target value' } as L,
+    versionDiffExpand: { 'zh-CN': '展开', 'en-US': 'Expand' } as L,
+    versionDiffCollapse: { 'zh-CN': '收起', 'en-US': 'Collapse' } as L,
+    versionDiffEmptyValue: { 'zh-CN': '（空）', 'en-US': '(empty)' } as L,
+
     // Runtime preview (RecursiveBlockRenderer)
     runtime: {
       aiReviewHint: {

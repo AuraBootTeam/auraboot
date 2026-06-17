@@ -14,7 +14,10 @@ import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import type { ToolbarActionConfig } from '~/framework/smart/types/savedView';
 import { cn } from '~/utils/cn';
 import { ActionConfigPanel } from './ActionConfigPanel';
-import { reportTemplateService, type ReportTemplateDTO } from '~/shared/services/reportTemplateService';
+import {
+  reportTemplateService,
+  type ReportTemplateDTO,
+} from '~/shared/services/reportTemplateService';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
 
@@ -232,12 +235,12 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
           data-testid={`toolbar-btn-${button.code}`}
           onClick={() => onAction(button)}
           className={cn(
-            'rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150',
+            'rounded-card px-4 py-2 text-sm font-medium transition-colors duration-150',
             button.primary || button.variant === 'primary'
-              ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700'
+              ? 'bg-accent hover:bg-accent-hover text-white shadow-sm'
               : button.variant === 'danger' || button.danger
                 ? 'bg-red-600 text-white shadow-sm hover:bg-red-700'
-                : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
+                : 'border-border bg-panel text-text-2 hover:bg-hover border',
           )}
         >
           {resolveLabel(button)}
@@ -245,226 +248,223 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
       ))}
 
       {/* More button with overflow menu */}
-      {showMoreButton && <div ref={menuRef} className="relative inline-block">
-        <button
-          type="button"
-          data-testid="toolbar-more-menu"
-          onClick={() => setMenuOpen(!menuOpen)}
-          disabled={generatingReport}
-          className={cn(
-            'inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 text-gray-500',
-            'hover:bg-gray-50 hover:text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            'transition-colors duration-150',
-          )}
-          title="More actions"
-        >
-          {generatingReport ? (
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
-          ) : (
-            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-            </svg>
-          )}
-        </button>
-
-        {menuOpen && (
-          <div className="absolute right-0 z-50 mt-1 min-w-[200px] rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
-            {/* Overflow action buttons */}
-            {overflowButtons.map((button) => (
-              <button
-                key={button.code}
-                type="button"
-                data-testid={`more-menu-action-${button.code}`}
-                onClick={() => {
-                  setMenuOpen(false);
-                  onAction(button);
-                }}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-              >
-                {resolveLabel(button)}
-              </button>
-            ))}
-
-            {overflowButtons.length > 0 && <div className="mx-2 my-1 h-px bg-gray-100" />}
-
-            {/* Built-in actions — conditionally rendered based on config visibility */}
-            {!hideBuiltInImport && builtinVisibility._import && (
-              <button
-                type="button"
-                data-testid="more-menu-import"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onImport();
-                }}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <svg
-                  className="h-4 w-4 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                  />
-                </svg>
-                Import
-              </button>
+      {showMoreButton && (
+        <div ref={menuRef} className="relative inline-block">
+          <button
+            type="button"
+            data-testid="toolbar-more-menu"
+            onClick={() => setMenuOpen(!menuOpen)}
+            disabled={generatingReport}
+            className={cn(
+              'rounded-card border-border bg-panel text-text-2 inline-flex items-center justify-center border p-2',
+              'hover:bg-hover hover:text-text-2 focus-visible:shadow-focus focus:outline-none',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              'transition-colors duration-150',
             )}
-
-            {!hideBuiltInExport && builtinVisibility._export_excel && (
-              <button
-                type="button"
-                data-testid="more-menu-export-excel"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onExport('xlsx');
-                }}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <svg
-                  className="h-4 w-4 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                Export Excel
-              </button>
-            )}
-
-            {!hideBuiltInExport && builtinVisibility._export_csv && (
-              <button
-                type="button"
-                data-testid="more-menu-export-csv"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onExport('csv');
-                }}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <svg
-                  className="h-4 w-4 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                Export CSV
-              </button>
-            )}
-
-            {!hideBuiltInPrint && builtinVisibility._print && (
-              <button
-                type="button"
-                data-testid="more-menu-print"
-                onClick={handlePrint}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <svg
-                  className="h-4 w-4 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                  />
-                </svg>
-                Print
-              </button>
-            )}
-
-            {(loadingReports || reportTemplates.length > 0) && (
-              <>
-                <div className="mx-2 my-1 h-px bg-gray-100" />
-                {loadingReports ? (
-                  <div className="px-3.5 py-2 text-center text-xs text-gray-400">
-                    Loading reports...
-                  </div>
-                ) : (
-                  reportTemplates.map((tpl) => (
-                    <button
-                      key={tpl.pid}
-                      type="button"
-                      data-testid={`more-menu-report-${tpl.code}`}
-                      onClick={() => handleGenerateReport(tpl)}
-                      className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <span className="truncate">{tpl.name}</span>
-                      <span
-                        className={cn(
-                          'ml-auto inline-flex shrink-0 items-center rounded px-1 py-0.5 text-[10px] font-medium',
-                          tpl.outputFormat === 'pdf'
-                            ? 'bg-red-50 text-red-600'
-                            : tpl.outputFormat === 'xlsx'
-                              ? 'bg-green-50 text-green-600'
-                              : 'bg-blue-50 text-blue-600',
-                        )}
-                      >
-                        {tpl.outputFormat}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </>
-            )}
-
-            <div className="mx-2 my-1 h-px bg-gray-100" />
-
-            {/* Configure buttons link */}
-            <button
-              type="button"
-              data-testid="more-menu-configure-buttons"
-              onClick={() => {
-                setMenuOpen(false);
-                setConfigPanelOpen(true);
-              }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm font-medium text-blue-600 hover:bg-blue-50"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
+            title="More actions"
+          >
+            {generatingReport ? (
+              <span className="rounded-pill border-border-strong border-t-accent h-4 w-4 animate-spin border-2" />
+            ) : (
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
               </svg>
-              Configure buttons...
-            </button>
-          </div>
-        )}
-      </div>}
+            )}
+          </button>
+
+          {menuOpen && (
+            <div className="rounded-card-lg border-border bg-panel absolute right-0 z-50 mt-1 min-w-[200px] border py-1 shadow-lg">
+              {/* Overflow action buttons */}
+              {overflowButtons.map((button) => (
+                <button
+                  key={button.code}
+                  type="button"
+                  data-testid={`more-menu-action-${button.code}`}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onAction(button);
+                  }}
+                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                >
+                  {resolveLabel(button)}
+                </button>
+              ))}
+
+              {overflowButtons.length > 0 && <div className="mx-2 my-1 h-px bg-gray-100" />}
+
+              {/* Built-in actions — conditionally rendered based on config visibility */}
+              {!hideBuiltInImport && builtinVisibility._import && (
+                <button
+                  type="button"
+                  data-testid="more-menu-import"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onImport();
+                  }}
+                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                >
+                  <svg
+                    className="text-text-3 h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                    />
+                  </svg>
+                  Import
+                </button>
+              )}
+
+              {!hideBuiltInExport && builtinVisibility._export_excel && (
+                <button
+                  type="button"
+                  data-testid="more-menu-export-excel"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onExport('xlsx');
+                  }}
+                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                >
+                  <svg
+                    className="text-text-3 h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  Export Excel
+                </button>
+              )}
+
+              {!hideBuiltInExport && builtinVisibility._export_csv && (
+                <button
+                  type="button"
+                  data-testid="more-menu-export-csv"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onExport('csv');
+                  }}
+                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                >
+                  <svg
+                    className="text-text-3 h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  Export CSV
+                </button>
+              )}
+
+              {!hideBuiltInPrint && builtinVisibility._print && (
+                <button
+                  type="button"
+                  data-testid="more-menu-print"
+                  onClick={handlePrint}
+                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                >
+                  <svg
+                    className="text-text-3 h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                    />
+                  </svg>
+                  Print
+                </button>
+              )}
+
+              {(loadingReports || reportTemplates.length > 0) && (
+                <>
+                  <div className="mx-2 my-1 h-px bg-gray-100" />
+                  {loadingReports ? (
+                    <div className="text-text-3 px-3.5 py-2 text-center text-xs">
+                      Loading reports...
+                    </div>
+                  ) : (
+                    reportTemplates.map((tpl) => (
+                      <button
+                        key={tpl.pid}
+                        type="button"
+                        data-testid={`more-menu-report-${tpl.code}`}
+                        onClick={() => handleGenerateReport(tpl)}
+                        className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                      >
+                        <span className="truncate">{tpl.name}</span>
+                        <span
+                          className={cn(
+                            'ml-auto inline-flex shrink-0 items-center rounded px-1 py-0.5 text-[10px] font-medium',
+                            tpl.outputFormat === 'pdf'
+                              ? 'bg-red-50 text-red-600'
+                              : tpl.outputFormat === 'xlsx'
+                                ? 'bg-green-50 text-green-600'
+                                : 'bg-blue-50 text-blue-600',
+                          )}
+                        >
+                          {tpl.outputFormat}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </>
+              )}
+
+              <div className="mx-2 my-1 h-px bg-gray-100" />
+
+              {/* Configure buttons link */}
+              <button
+                type="button"
+                data-testid="more-menu-configure-buttons"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setConfigPanelOpen(true);
+                }}
+                className="text-accent hover:bg-accent-weak flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm font-medium"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+                Configure buttons...
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Action config panel */}
       {configPanelOpen && (

@@ -19,12 +19,14 @@ export interface ModelListItem {
 }
 
 /**
- * Backend PageResult structure.
+ * Backend MyBatis-Plus IPage structure. The paginated `/api/meta/models`
+ * endpoint serializes rows under `records` (not `data`); reading `.data`
+ * here silently returned an empty list (the model dropdown never populated).
  */
 interface PageResult<T> {
-  data: T[];
+  records: T[];
   total: number;
-  page: number;
+  current: number;
   size: number;
 }
 
@@ -74,7 +76,7 @@ export class ViewModelService {
       modelType: 'view',
       currentOnly: 'true',
     });
-    return result?.data?.data ?? [];
+    return result?.data?.records ?? [];
   }
 }
 

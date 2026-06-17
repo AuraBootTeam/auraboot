@@ -7,14 +7,12 @@
 
 import React from 'react';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
-import type {
-  ToolbarActionConfig,
-  SavedView,
-  ViewType,
-} from '~/framework/smart/types/savedView';
+import type { ToolbarActionConfig, SavedView, ViewType } from '~/framework/smart/types/savedView';
 import { ViewSelector } from '~/framework/smart/components/view/ViewSelector';
 import { ToolbarActionGroup } from './ToolbarActionGroup';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
+import { PresetViewBar } from './PresetViewBar';
+import type { QuickFilterPresetKey } from './quickFilterPresets';
 
 export interface ListPageHeaderProps {
   /** Page title (already localized) */
@@ -41,6 +39,12 @@ export interface ListPageHeaderProps {
   evaluateVisible: (button: ButtonConfig) => boolean;
   onImport: () => void;
   onExport: (format: 'xlsx' | 'csv') => void;
+  /** Active preset view (T8); null when none selected */
+  activePreset?: QuickFilterPresetKey | null;
+  /** Toggle a preset view on/off */
+  onSelectPreset?: (key: QuickFilterPresetKey) => void;
+  /** Hide the preset-view bar (e.g. config-only pages) */
+  hidePresetViews?: boolean;
   /** Current filter conditions for export */
   exportFilters?: Array<{ field: string; operator: string; value: unknown }>;
   /** Whether this is a tenant member page (shows Invite button) */
@@ -72,6 +76,9 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   evaluateVisible,
   onImport,
   onExport,
+  activePreset,
+  onSelectPreset,
+  hidePresetViews,
   exportFilters,
   isTenantMemberPage,
   onInvite,
@@ -82,10 +89,10 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   hideBuiltInPrint,
 }) => {
   return (
-    <div className="border-b border-gray-200 px-6 py-3">
+    <div className="border-border border-b px-6 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <h2 className="text-text text-lg font-semibold">{title}</h2>
           {!hideSavedViews && (
             <ViewSelector
               views={savedViews}
@@ -98,6 +105,12 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               onViewTypeChange={onViewTypeChange}
             />
           )}
+          {!hidePresetViews && onSelectPreset && (
+            <>
+              <div className="bg-border hidden h-5 w-px sm:block" aria-hidden />
+              <PresetViewBar activePreset={activePreset ?? null} onSelectPreset={onSelectPreset} />
+            </>
+          )}
         </div>
         <div
           className="print-hide flex items-center gap-2"
@@ -109,7 +122,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               type="button"
               data-testid="invite-section"
               onClick={onInvite}
-              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700"
+              className="rounded-control inline-flex items-center gap-1.5 bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700"
             >
               Invite
             </button>
@@ -119,7 +132,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               type="button"
               data-testid="member-import-entry"
               onClick={onImportMembers}
-              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors duration-150 hover:bg-blue-700"
+              className="rounded-control bg-accent hover:bg-accent-hover inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors duration-150"
             >
               Import Members
             </button>

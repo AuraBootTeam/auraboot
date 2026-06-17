@@ -51,7 +51,9 @@ export function FieldCreationForm({
   onChange,
 }: FieldCreationFormProps) {
   const { ensureLoaded, getEnumOptions } = useDslRegistry();
-  useEffect(() => { ensureLoaded(); }, [ensureLoaded]);
+  useEffect(() => {
+    ensureLoaded();
+  }, [ensureLoaded]);
   const DATA_TYPES =
     getEnumOptions('DataType').length > 0 ? getEnumOptions('DataType') : DATA_TYPES_FALLBACK;
 
@@ -127,38 +129,38 @@ export function FieldCreationForm({
     <div className="space-y-4">
       {/* Field Code */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          字段编码 <span className="text-red-500">*</span>
+        <label className="text-text-2 mb-1 block text-sm font-medium">
+          字段编码 <span className="text-status-red">*</span>
         </label>
         <input
           type="text"
           value={formData.code}
           onChange={(e) => handleChange('code', e.target.value)}
           placeholder="例如: user_name, email, age"
-          className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none ${
+          className={`rounded-control w-full border px-3 py-2 focus:ring-2 focus:outline-none ${
             errors.code
-              ? 'border-red-300 focus:ring-red-500'
-              : 'border-gray-300 focus:ring-blue-500'
+              ? 'border-status-red focus-visible:shadow-focus focus:outline-none'
+              : 'border-border-strong focus-visible:shadow-focus focus:outline-none'
           }`}
         />
-        {errors.code && <p className="mt-1 text-sm text-red-600">{errors.code}</p>}
-        <p className="mt-1 text-xs text-gray-500">
+        {errors.code && <p className="text-status-red mt-1 text-sm">{errors.code}</p>}
+        <p className="text-text-2 mt-1 text-xs">
           字段编码必须以字母开头，只能包含字母、数字和下划线
         </p>
       </div>
 
       {/* Data Type */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          数据类型 <span className="text-red-500">*</span>
+        <label className="text-text-2 mb-1 block text-sm font-medium">
+          数据类型 <span className="text-status-red">*</span>
         </label>
         <select
           value={formData.dataType}
           onChange={(e) => handleChange('dataType', e.target.value)}
-          className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none ${
+          className={`rounded-control w-full border px-3 py-2 focus:ring-2 focus:outline-none ${
             errors.dataType
-              ? 'border-red-300 focus:ring-red-500'
-              : 'border-gray-300 focus:ring-blue-500'
+              ? 'border-status-red focus-visible:shadow-focus focus:outline-none'
+              : 'border-border-strong focus-visible:shadow-focus focus:outline-none'
           }`}
         >
           {DATA_TYPES.map((type) => (
@@ -167,14 +169,14 @@ export function FieldCreationForm({
             </option>
           ))}
         </select>
-        {errors.dataType && <p className="mt-1 text-sm text-red-600">{errors.dataType}</p>}
+        {errors.dataType && <p className="text-status-red mt-1 text-sm">{errors.dataType}</p>}
       </div>
 
       {/* Computed Expression (only for COMPUTED type) */}
       {formData.dataType === 'computed' && (
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            计算表达式 <span className="text-red-500">*</span>
+          <label className="text-text-2 mb-1 block text-sm font-medium">
+            计算表达式 <span className="text-status-red">*</span>
           </label>
           <FormulaEditor
             value={formData.computedExpression || ''}
@@ -182,23 +184,23 @@ export function FieldCreationForm({
             placeholder="例如: #IF(#amount > 100, 'High', 'Low')"
           />
           {errors.computedExpression && (
-            <p className="mt-1 text-sm text-red-600">{errors.computedExpression}</p>
+            <p className="text-status-red mt-1 text-sm">{errors.computedExpression}</p>
           )}
         </div>
       )}
 
       {/* Field Features */}
       <div>
-        <label className="mb-2 block text-sm font-medium text-gray-700">字段特性</label>
+        <label className="text-text-2 mb-2 block text-sm font-medium">字段特性</label>
         <div className="space-y-2">
           <label className="flex items-center">
             <input
               type="checkbox"
               checked={formData.feature?.required || false}
               onChange={(e) => handleFeatureChange('required', e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="border-border-strong text-accent focus-visible:shadow-focus rounded focus:outline-none"
             />
-            <span className="ml-2 text-sm text-gray-700">必填</span>
+            <span className="text-text-2 ml-2 text-sm">必填</span>
           </label>
 
           <label className="flex items-center">
@@ -206,9 +208,9 @@ export function FieldCreationForm({
               type="checkbox"
               checked={formData.feature?.unique || false}
               onChange={(e) => handleFeatureChange('unique', e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="border-border-strong text-accent focus-visible:shadow-focus rounded focus:outline-none"
             />
-            <span className="ml-2 text-sm text-gray-700">唯一</span>
+            <span className="text-text-2 ml-2 text-sm">唯一</span>
           </label>
 
           <label className="flex items-center">
@@ -216,9 +218,9 @@ export function FieldCreationForm({
               type="checkbox"
               checked={formData.feature?.indexed || false}
               onChange={(e) => handleFeatureChange('indexed', e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="border-border-strong text-accent focus-visible:shadow-focus rounded focus:outline-none"
             />
-            <span className="ml-2 text-sm text-gray-700">索引</span>
+            <span className="text-text-2 ml-2 text-sm">索引</span>
           </label>
         </div>
       </div>
@@ -230,18 +232,18 @@ export function FieldCreationForm({
             type="checkbox"
             checked={formData.autoPublish || false}
             onChange={(e) => handleChange('autoPublish', e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus rounded focus:outline-none"
           />
-          <span className="ml-2 text-sm text-gray-700">立即发布</span>
+          <span className="text-text-2 ml-2 text-sm">立即发布</span>
         </label>
-        <p className="mt-1 text-xs text-gray-500">勾选后字段将直接发布，否则保存为草稿状态</p>
+        <p className="text-text-2 mt-1 text-xs">勾选后字段将直接发布，否则保存为草稿状态</p>
       </div>
 
       {/* Info Box */}
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+      <div className="rounded-control bg-accent-weak border border-blue-200 p-3">
         <div className="flex">
           <svg
-            className="mr-2 h-5 w-5 text-blue-400"
+            className="text-accent mr-2 h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

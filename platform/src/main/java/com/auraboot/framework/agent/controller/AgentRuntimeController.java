@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.config.AgentProperties;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.CapabilityEvalCase;
 import com.auraboot.framework.agent.dto.CapabilityView;
+import com.auraboot.framework.agent.eval.AgentOnlineEvalService;
 import com.auraboot.framework.agent.service.AgentApprovalGateService;
 import com.auraboot.framework.agent.service.AgentBpmBridge;
 import com.auraboot.framework.agent.service.AgentCollaborationService;
@@ -54,6 +55,7 @@ public class AgentRuntimeController {
     private final AgentScheduleService scheduleService;
     private final AgentSkillService skillService;
     private final CapabilityEvalService evalService;
+    private final AgentOnlineEvalService onlineEvalService;
     private final CapabilityViewService capabilityViewService;
     private final ToolDryRunService dryRunService;
     private final PluginScaffoldService scaffoldService;
@@ -484,6 +486,21 @@ public class AgentRuntimeController {
         Long tenantId = MetaContext.getCurrentTenantId();
         var cases = evalService.generateEvalCases(tenantId, modelCode, maxCases);
         return ApiResponse.success(evalService.evaluateToolSelection(tenantId, cases));
+    }
+
+    /**
+     * L4 online-eval snapshot: sample recent production turns for the current tenant,
+     * grade each with the configured quality judge, and return the aggregate quality
+     * summary (healthy/fail/cost-flagged rates, avg score, unhealthy turns). Read-only;
+     * backs the agent quality dashboard. The scheduled loop that emits degradation alerts
+     * lives in {@link com.auraboot.framework.agent.eval.ScheduledOnlineEvalJob}.
+     */
+    @GetMapping("/eval/online")
+    public ApiResponse<AgentOnlineEvalService.OnlineEvalSummary> onlineEvalSnapshot(
+            @RequestParam(defaultValue = "24") int sinceHours,
+            @RequestParam(defaultValue = "200") int maxRuns) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        return ApiResponse.success(onlineEvalService.sampleAndJudge(tenantId, sinceHours, maxRuns));
     }
 
     // ==================== Agent Collaboration ====================

@@ -50,7 +50,7 @@ export const FieldBase = React.forwardRef<HTMLDivElement, FieldBaseProps>(
         onClick={onLabelClick}
       >
         {label}
-        {required && <span className="ml-1 text-red-500">*</span>}
+        {required && <span className="text-status-red ml-1">*</span>}
       </Label>
     ) : null;
 

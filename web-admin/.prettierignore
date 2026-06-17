@@ -5,3 +5,5 @@ plugins/
 *.min.js
 *.min.css
 package-lock.json
+# Generated from dsTokens by `pnpm gen:tokens` — exact output is drift-checked, do not reformat.
+app/styles/tokens.theme.css

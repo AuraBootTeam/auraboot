@@ -48,7 +48,7 @@ export function FieldConfigDialog({ field, onSave, onClose }: FieldConfigDialogP
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative flex max-h-[80vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl">
+      <div className="rounded-card bg-panel relative flex max-h-[80vh] w-full max-w-3xl flex-col shadow-xl">
         <div className="border-b px-6 py-4">
           <h2 className="text-lg font-semibold">
             {t('field.dialog.title', { code: fieldCode }, `配置字段 ${fieldCode}`)}
@@ -70,7 +70,7 @@ export function FieldConfigDialog({ field, onSave, onClose }: FieldConfigDialogP
           <button
             onClick={handleSave}
             disabled={saving}
-            className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+            className="bg-accent rounded px-4 py-2 text-white disabled:opacity-50"
           >
             {saving
               ? t('common.saving', undefined, '保存中...')

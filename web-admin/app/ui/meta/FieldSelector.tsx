@@ -200,15 +200,15 @@ export function FieldSelector({
 
       {/* 对话框 */}
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="relative flex max-h-[80vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl">
+        <div className="rounded-card bg-panel relative flex max-h-[80vh] w-full max-w-4xl flex-col shadow-xl">
           {/* 标题栏 */}
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">选择字段</h2>
-            <p className="mt-1 text-sm text-gray-500">从可用字段列表中选择要添加到模型的字段</p>
+          <div className="border-border border-b px-6 py-4">
+            <h2 className="text-text text-lg font-semibold">选择字段</h2>
+            <p className="text-text-2 mt-1 text-sm">从可用字段列表中选择要添加到模型的字段</p>
           </div>
 
           {/* 搜索栏 */}
-          <div className="border-b border-gray-200 px-6 py-4">
+          <div className="border-border border-b px-6 py-4">
             <div className="flex gap-4">
               <div className="flex-1">
                 <input
@@ -216,29 +216,29 @@ export function FieldSelector({
                   value={searchKeyword}
                   onChange={(e) => setSearchKeyword(e.target.value)}
                   placeholder="搜索字段编码、名称或描述..."
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
                 />
               </div>
               <button
                 onClick={toggleSelectAll}
-                className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2"
               >
                 {selectedFields.size === filteredFields.length ? '取消全选' : '全选'}
               </button>
             </div>
-            <div className="mt-2 text-sm text-gray-500">已选择 {selectedFields.size} 个字段</div>
+            <div className="text-text-2 mt-2 text-sm">已选择 {selectedFields.size} 个字段</div>
           </div>
 
           {/* Field列表 */}
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {loading ? (
               <div className="py-12 text-center">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
-                <p className="mt-2 text-sm text-gray-500">加载中...</p>
+                <div className="rounded-pill border-accent inline-block h-8 w-8 animate-spin border-b-2"></div>
+                <p className="text-text-2 mt-2 text-sm">加载中...</p>
               </div>
             ) : filteredFields.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-gray-500">没有找到匹配的字段</p>
+                <p className="text-text-2">没有找到匹配的字段</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -246,10 +246,10 @@ export function FieldSelector({
                   <div
                     key={field.code}
                     onClick={() => toggleFieldSelection(field.code)}
-                    className={`cursor-pointer rounded-lg border p-4 transition-colors ${
+                    className={`rounded-card cursor-pointer border p-4 transition-colors ${
                       selectedFields.has(field.code)
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        ? 'bg-accent-weak border-accent'
+                        : 'border-border hover:border-border-strong hover:bg-subtle'
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -259,26 +259,24 @@ export function FieldSelector({
                           type="checkbox"
                           checked={selectedFields.has(field.code)}
                           onChange={() => {}}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
                         />
                       </div>
 
                       {/* Field信息 */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-medium text-gray-900">{field.name}</h3>
-                          <span className="font-mono text-xs text-gray-500">({field.code})</span>
+                          <h3 className="text-text text-sm font-medium">{field.name}</h3>
+                          <span className="text-text-2 font-mono text-xs">({field.code})</span>
                           {field.required && (
                             <span className="inline-flex rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
                               必填
                             </span>
                           )}
                         </div>
-                        <p className="mt-1 text-sm text-gray-500">
-                          {field.description || '无描述'}
-                        </p>
+                        <p className="text-text-2 mt-1 text-sm">{field.description || '无描述'}</p>
                         <div className="mt-2 flex gap-2">
-                          <span className="inline-flex rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">
+                          <span className="bg-subtle text-text inline-flex rounded px-2 py-0.5 text-xs font-medium">
                             {field.dataType}
                           </span>
                         </div>
@@ -291,17 +289,17 @@ export function FieldSelector({
           </div>
 
           {/* 底部按钮 */}
-          <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+          <div className="border-border flex justify-end gap-3 border-t px-6 py-4">
             <button
               onClick={handleCancel}
-              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2"
             >
               取消
             </button>
             <button
               onClick={handleConfirm}
               disabled={selectedFields.size === 0}
-              className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               确定 ({selectedFields.size})
             </button>

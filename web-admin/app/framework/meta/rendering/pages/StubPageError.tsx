@@ -19,18 +19,16 @@ export interface StubPageErrorProps {
  * pageKey was not synced). Deliberately does not fall back to a default render.
  */
 export const StubPageError: React.FC<StubPageErrorProps> = ({ pageKey, tableName, kind }) => {
-  const id =
-    pageKey || (tableName && kind ? `${tableName}_${kind}` : tableName) || '(unknown)';
+  const id = pageKey || (tableName && kind ? `${tableName}_${kind}` : tableName) || '(unknown)';
 
   return (
     <div
       data-testid="page-stub-error"
-      className="mx-auto mt-8 max-w-2xl rounded-lg border border-red-200 bg-red-50 p-6"
+      className="rounded-card bg-status-red-bg mx-auto mt-8 max-w-2xl border border-red-200 p-6"
     >
       <h3 className="mb-2 text-lg font-medium text-red-800">此页面尚未配置内容</h3>
       <p className="mb-3 text-sm text-red-700">
-        页面{' '}
-        <code className="rounded bg-red-100 px-1 py-0.5 font-mono text-xs">{id}</code>{' '}
+        页面 <code className="rounded bg-red-100 px-1 py-0.5 font-mono text-xs">{id}</code>{' '}
         是平台自动生成的未配置占位页(auto_created stub),没有可展示的内容配置。
       </p>
       <p className="mb-1 text-sm text-red-700">最可能的原因:</p>

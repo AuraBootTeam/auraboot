@@ -61,8 +61,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   if (imageUrls.length === 0) {
     return (
       <div className={`space-y-1 ${className}`}>
-        {label && <label className="block text-sm font-medium text-gray-700">{label}</label>}
-        <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
+        {label && <label className="text-text-2 block text-sm font-medium">{label}</label>}
+        <div className="rounded-control border-border bg-subtle text-text-2 border px-3 py-2 text-sm">
           暂无图片
         </div>
       </div>
@@ -71,7 +71,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
 
   return (
     <div className={`space-y-1 ${className}`}>
-      {label && <label className="block text-sm font-medium text-gray-700">{label}</label>}
+      {label && <label className="text-text-2 block text-sm font-medium">{label}</label>}
 
       <div className="flex flex-wrap gap-2">
         {imageUrls.map((url, index) => (
@@ -83,7 +83,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
             <img
               src={url}
               alt={`图片 ${index + 1}`}
-              className="h-20 w-20 rounded-md border border-gray-200 object-cover transition-colors hover:border-blue-400"
+              className="rounded-control border-border hover:border-accent h-20 w-20 border object-cover transition-colors"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.src =
@@ -91,7 +91,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
               }}
             />
             {preview && (
-              <div className="bg-opacity-0 group-hover:bg-opacity-20 absolute inset-0 flex items-center justify-center rounded-md bg-black transition-all">
+              <div className="bg-opacity-0 group-hover:bg-opacity-20 rounded-control absolute inset-0 flex items-center justify-center bg-black transition-all">
                 <svg
                   className="h-6 w-6 text-white opacity-0 transition-opacity group-hover:opacity-100"
                   fill="none"
@@ -131,7 +131,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
             />
             <button
               onClick={handleClosePreview}
-              className="bg-opacity-50 hover:bg-opacity-75 absolute top-2 right-2 rounded-full bg-black p-2 text-white transition-colors"
+              className="bg-opacity-50 hover:bg-opacity-75 rounded-pill absolute top-2 right-2 bg-black p-2 text-white transition-colors"
             >
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

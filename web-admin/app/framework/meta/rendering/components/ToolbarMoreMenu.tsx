@@ -10,7 +10,10 @@ import { cn } from '~/utils/cn';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { ResultHelper } from '~/utils/type';
-import { reportTemplateService, type ReportTemplateDTO } from '~/shared/services/reportTemplateService';
+import {
+  reportTemplateService,
+  type ReportTemplateDTO,
+} from '~/shared/services/reportTemplateService';
 
 export interface ToolbarMoreMenuProps {
   /** Callback to open import dialog */
@@ -141,15 +144,15 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
         onClick={() => setOpen(!open)}
         disabled={exporting || generatingReport}
         className={cn(
-          'inline-flex items-center justify-center rounded-md border border-gray-300 bg-white p-2 text-gray-500',
-          'hover:bg-gray-50 hover:text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none',
+          'rounded-control border-border-strong bg-panel text-text-2 inline-flex items-center justify-center border p-2',
+          'hover:bg-subtle hover:text-text-2 focus-visible:shadow-focus focus:outline-none',
           'disabled:cursor-not-allowed disabled:opacity-50',
           'transition-colors duration-150',
         )}
         title={t('action.more') || 'More actions'}
       >
         {exporting || generatingReport ? (
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+          <span className="rounded-pill border-border-strong h-4 w-4 animate-spin border-2 border-t-blue-500" />
         ) : (
           <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -158,7 +161,7 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-1 w-48 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+        <div className="rounded-control border-border bg-panel absolute right-0 z-50 mt-1 w-48 border py-1 shadow-lg">
           {/* Print */}
           <button
             type="button"
@@ -167,10 +170,10 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
               setOpen(false);
               window.print();
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+            className="text-text-2 hover:bg-subtle flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm"
           >
             <svg
-              className="h-4 w-4 text-gray-400"
+              className="text-text-3 h-4 w-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -195,10 +198,10 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
               setOpen(false);
               onImport();
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+            className="text-text-2 hover:bg-subtle flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm"
           >
             <svg
-              className="h-4 w-4 text-gray-400"
+              className="text-text-3 h-4 w-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -218,10 +221,10 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
             type="button"
             data-testid="more-menu-export-excel"
             onClick={() => handleExport('xlsx')}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+            className="text-text-2 hover:bg-subtle flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm"
           >
             <svg
-              className="h-4 w-4 text-gray-400"
+              className="text-text-3 h-4 w-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -241,10 +244,10 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
             type="button"
             data-testid="more-menu-export-csv"
             onClick={() => handleExport('csv')}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+            className="text-text-2 hover:bg-subtle flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm"
           >
             <svg
-              className="h-4 w-4 text-gray-400"
+              className="text-text-3 h-4 w-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -264,9 +267,7 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
             <>
               <div className="mx-2 my-1 h-px bg-gray-100" />
               {loadingReports ? (
-                <div className="px-3 py-2 text-center text-xs text-gray-400">
-                  Loading reports...
-                </div>
+                <div className="text-text-3 px-3 py-2 text-center text-xs">Loading reports...</div>
               ) : (
                 reportTemplates.map((tpl) => (
                   <button
@@ -274,10 +275,10 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
                     type="button"
                     data-testid={`more-menu-report-${tpl.code}`}
                     onClick={() => handleGenerateReport(tpl)}
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                    className="text-text-2 hover:bg-subtle flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm"
                   >
                     <svg
-                      className="h-4 w-4 text-gray-400"
+                      className="text-text-3 h-4 w-4"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"

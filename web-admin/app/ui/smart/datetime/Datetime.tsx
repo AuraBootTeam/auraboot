@@ -92,20 +92,20 @@ export const Datetime: React.FC<DatetimeProps> = ({
   return (
     <div className={`space-y-2 ${className}`}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="text-text-2 block text-sm font-medium">
           {label}
-          {required && <span className="ml-1 text-red-500">*</span>}
+          {required && <span className="text-status-red ml-1">*</span>}
         </label>
       )}
 
       <div className="relative">
         {readOnly ? (
-          <div className="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-900">
+          <div className="rounded-control border-border-strong bg-subtle text-text w-full border px-3 py-2">
             <div className="flex items-center space-x-2">
               {showTime ? (
-                <Clock className="h-4 w-4 text-gray-400" />
+                <Clock className="text-text-3 h-4 w-4" />
               ) : (
-                <Calendar className="h-4 w-4 text-gray-400" />
+                <Calendar className="text-text-3 h-4 w-4" />
               )}
               <span>{formatDisplayValue(value) || placeholder}</span>
             </div>
@@ -120,15 +120,15 @@ export const Datetime: React.FC<DatetimeProps> = ({
               disabled={disabled}
               required={required}
               placeholder={placeholder}
-              className={`w-full rounded-md border border-gray-300 px-3 py-2 pl-10 shadow-sm ${disabled ? 'cursor-not-allowed bg-gray-50' : 'bg-white'} focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none ${value ? 'text-gray-900' : 'text-gray-500'} `}
+              className={`rounded-control border-border-strong w-full border px-3 py-2 pl-10 shadow-sm ${disabled ? 'bg-subtle cursor-not-allowed' : 'bg-panel'} focus-visible:shadow-focus focus:outline-none ${value ? 'text-text' : 'text-text-2'} `}
             />
 
             {/* Icon */}
             <div className="absolute top-1/2 left-3 -translate-y-1/2 transform">
               {showTime ? (
-                <Clock className="h-4 w-4 text-gray-400" />
+                <Clock className="text-text-3 h-4 w-4" />
               ) : (
-                <Calendar className="h-4 w-4 text-gray-400" />
+                <Calendar className="text-text-3 h-4 w-4" />
               )}
             </div>
 
@@ -137,7 +137,7 @@ export const Datetime: React.FC<DatetimeProps> = ({
               <button
                 type="button"
                 onClick={handleClear}
-                className="absolute top-1/2 right-3 -translate-y-1/2 transform text-gray-400 hover:text-gray-600"
+                className="text-text-3 hover:text-text-2 absolute top-1/2 right-3 -translate-y-1/2 transform"
               >
                 ×
               </button>
@@ -148,7 +148,7 @@ export const Datetime: React.FC<DatetimeProps> = ({
 
       {/* Format hint */}
       {!readOnly && (
-        <div className="text-xs text-gray-500">
+        <div className="text-text-2 text-xs">
           格式: {showTime ? 'YYYY-MM-DD HH:mm:ss' : 'YYYY-MM-DD'}
         </div>
       )}

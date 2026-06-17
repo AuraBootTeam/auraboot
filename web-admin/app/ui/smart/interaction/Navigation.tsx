@@ -146,7 +146,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       return (
         <span
           className={cn(
-            'h-2 w-2 rounded-full',
+            'rounded-pill h-2 w-2',
             badge.color ? `bg-${badge.color}-500` : 'bg-red-500',
           )}
         />
@@ -157,7 +157,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       return (
         <span
           className={cn(
-            'min-w-[16px] rounded-full px-1.5 py-0.5 text-center text-xs text-white',
+            'rounded-pill min-w-[16px] px-1.5 py-0.5 text-center text-xs text-white',
             badge.color ? `bg-${badge.color}-500` : 'bg-red-500',
           )}
         >
@@ -183,11 +183,11 @@ export const Navigation: React.FC<NavigationProps> = ({
     const isVertical = menuConfig?.mode === 'vertical' || isInline;
 
     const itemClasses = cn(
-      'flex items-center gap-2 px-3 py-2 rounded-md transition-colors cursor-pointer',
+      'flex items-center gap-2 px-3 py-2 rounded-control transition-colors cursor-pointer',
       {
-        'bg-blue-100 text-blue-700': isActive && !isDisabled,
-        'text-gray-400 cursor-not-allowed': isDisabled,
-        'hover:bg-gray-100': !isActive && !isDisabled,
+        'bg-blue-100 text-accent': isActive && !isDisabled,
+        'text-text-3 cursor-not-allowed': isDisabled,
+        'hover:bg-hover': !isActive && !isDisabled,
         'text-white hover:bg-gray-700': menuConfig?.theme === 'dark' && !isActive && !isDisabled,
         'bg-gray-800 text-white': menuConfig?.theme === 'dark' && isActive && !isDisabled,
       },
@@ -228,7 +228,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
         {/* 子菜单 */}
         {hasChildren && (isOpen || !isVertical) && (
-          <div className={cn('ml-4', isVertical && 'mt-1 border-l border-gray-200 pl-4')}>
+          <div className={cn('ml-4', isVertical && 'border-border mt-1 border-l pl-4')}>
             {item.children!.map((child) => renderMenuItem(child, level + 1))}
           </div>
         )}
@@ -248,7 +248,7 @@ export const Navigation: React.FC<NavigationProps> = ({
         'flex flex-row space-x-1': isHorizontal,
         'flex flex-col space-y-1': !isHorizontal,
         'bg-gray-800 text-white': isDark,
-        'bg-white border border-gray-200': !isDark,
+        'bg-panel border border-border': !isDark,
       },
       className,
     );
@@ -261,12 +261,9 @@ export const Navigation: React.FC<NavigationProps> = ({
     return (
       <nav className={menuClasses} style={menuStyle}>
         {menuConfig?.collapsible && (
-          <div className="flex items-center justify-between border-b border-gray-200 p-2">
+          <div className="border-border flex items-center justify-between border-b p-2">
             <span className={cn('font-semibold', collapsed && 'hidden')}>导航菜单</span>
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className="rounded p-1 hover:bg-gray-100"
-            >
+            <button onClick={() => setCollapsed(!collapsed)} className="hover:bg-hover rounded p-1">
               <Menu className="h-4 w-4" />
             </button>
           </div>
@@ -306,13 +303,13 @@ export const Navigation: React.FC<NavigationProps> = ({
       <nav className={cn('breadcrumb flex items-center space-x-2', className)} style={style}>
         {items.map((item, index) => (
           <React.Fragment key={item.key}>
-            {index > 0 && <span className="text-gray-400 select-none">{separator}</span>}
+            {index > 0 && <span className="text-text-3 select-none">{separator}</span>}
             <span
               className={cn('breadcrumb-item', {
-                'cursor-pointer text-blue-600 hover:text-blue-800':
+                'text-accent cursor-pointer hover:text-blue-800':
                   item.path && item.key !== 'ellipsis',
-                'text-gray-500': !item.path || item.key === 'ellipsis',
-                'font-medium text-gray-900': index === items.length - 1,
+                'text-text-2': !item.path || item.key === 'ellipsis',
+                'text-text font-medium': index === items.length - 1,
               })}
               onClick={() => {
                 if (item.path && item.key !== 'ellipsis') {
@@ -340,22 +337,22 @@ export const Navigation: React.FC<NavigationProps> = ({
       {
         'flex flex-col': isVertical,
         'flex flex-row': !isVertical,
-        'border-b border-gray-200': !isBottom && !isVertical,
-        'border-t border-gray-200': isBottom,
-        'border-r border-gray-200': tabConfig?.position === 'left',
-        'border-l border-gray-200': tabConfig?.position === 'right',
+        'border-b border-border': !isBottom && !isVertical,
+        'border-t border-border': isBottom,
+        'border-r border-border': tabConfig?.position === 'left',
+        'border-l border-border': tabConfig?.position === 'right',
       },
       className,
     );
 
     const tabClasses = (item: NavigationItem) =>
       cn('tab-item flex items-center gap-2 px-4 py-2 border-b-2 transition-colors cursor-pointer', {
-        'border-blue-500 text-blue-600': activeKey === item.key,
-        'border-transparent text-gray-600 hover:text-gray-900': activeKey !== item.key,
+        'border-accent text-accent': activeKey === item.key,
+        'border-transparent text-text-2 hover:text-text': activeKey !== item.key,
         'text-sm': tabConfig?.size === 'small',
         'text-lg': tabConfig?.size === 'large',
-        'bg-white border border-gray-200 rounded-t': tabConfig?.type === 'card',
-        'bg-gray-100': tabConfig?.type === 'card' && activeKey !== item.key,
+        'bg-panel border border-border rounded-t': tabConfig?.type === 'card',
+        'bg-hover': tabConfig?.type === 'card' && activeKey !== item.key,
       });
 
     return (
@@ -373,7 +370,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
               {tabConfig?.closable && (
                 <button
-                  className="ml-2 rounded p-0.5 hover:bg-gray-200"
+                  className="hover:bg-hover ml-2 rounded p-0.5"
                   onClick={(e) => {
                     e.stopPropagation();
                     onTabEdit?.(item.key, 'remove');
@@ -387,7 +384,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
           {tabConfig?.addable && (
             <button
-              className="tab-add flex items-center justify-center border-b-2 border-transparent px-3 py-2 text-gray-400 hover:text-gray-600"
+              className="tab-add text-text-3 hover:text-text-2 flex items-center justify-center border-b-2 border-transparent px-3 py-2"
               onClick={() => onTabEdit?.('', 'add')}
             >
               <Plus className="h-4 w-4" />

@@ -44,8 +44,8 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
     if (!block.title) return null;
     const title = getLocalizedText(block.title, locale, t);
     return (
-      <div className="mb-4 border-b border-gray-200 pb-2">
-        <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+      <div className="border-border mb-4 border-b pb-2">
+        <h3 className="text-text text-lg font-medium">{title}</h3>
       </div>
     );
   };

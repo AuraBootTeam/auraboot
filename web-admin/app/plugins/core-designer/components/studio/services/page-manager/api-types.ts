@@ -145,6 +145,28 @@ export interface PageSchemaVersionDTO {
 }
 
 /**
+ * Create-version request DTO
+ * Matches: PageSchemaVersionCreateRequest.java
+ *
+ * All fields are optional: the backend defaults `operation` to "update" and
+ * `description` to "Version created" when omitted. The designer "Create
+ * snapshot" action sends a `snapshot` operation with the operator's reason as
+ * the description.
+ */
+export interface PageSchemaVersionCreateRequest {
+  /** Operation type: CREATE, UPDATE, PUBLISH, ARCHIVE, DELETE, RESTORE, snapshot */
+  operation?: string;
+  /** Version description / change reason */
+  description?: string;
+  /** Change log */
+  changelog?: string;
+  /** Version type: SNAPSHOT, MINOR, MAJOR */
+  type?: string;
+  /** Base version id (create-from-version) */
+  baseVersionId?: string;
+}
+
+/**
  * Version comparison DTO
  * Matches: PageSchemaVersionComparisonDTO.java
  */
@@ -171,10 +193,17 @@ export interface VersionInfo {
 /**
  * Field difference detail
  * Matches: PageSchemaVersionComparisonDTO.FieldDifference
+ *
+ * `type` is the backend `DifferenceType` enum serialized by name — Jackson
+ * writes enums via `name()` (no `@JsonValue` / WRITE_ENUMS_USING_TO_STRING on
+ * the platform mapper), so the wire value is UPPERCASE (`ADDED` / `REMOVED` /
+ * `MODIFIED`). The diff viewer normalizes case defensively all the same.
  */
+export type FieldDifferenceType = 'ADDED' | 'REMOVED' | 'MODIFIED';
+
 export interface FieldDifference {
   fieldPath: string;
-  type: 'added' | 'removed' | 'modified';
+  type: FieldDifferenceType;
   sourceValue?: unknown;
   targetValue?: unknown;
   description?: string;

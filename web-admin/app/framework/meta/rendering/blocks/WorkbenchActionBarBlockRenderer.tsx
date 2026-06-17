@@ -44,7 +44,8 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
     return null;
   }
 
-  const surface = (block as any).surface || ((block as any).detailPlacement === 'header' ? 'bare' : 'card');
+  const surface =
+    (block as any).surface || ((block as any).detailPlacement === 'header' ? 'bare' : 'card');
   const density = (block as any).density || 'default';
   const align = (block as any).align || 'end';
   const alignClass =
@@ -53,7 +54,7 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
   const surfaceClass =
     surface === 'bare'
       ? 'flex flex-wrap items-center gap-2'
-      : 'flex flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-white p-3';
+      : 'flex flex-wrap items-center gap-2 rounded-control border border-border bg-panel p-3';
   const buttonSizeClass = density === 'compact' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm';
 
   const actionButtons = visibleActions.map((actionConfig: any) => {
@@ -82,7 +83,7 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
             })
             .finally(() => setRunningAction(null));
         }}
-        className={`rounded-md font-medium ${
+        className={`rounded-control font-medium ${
           variantClass[variant] || variantClass.secondary
         } ${active ? activeVariantClass[variant] || activeVariantClass.secondary : ''} ${
           buttonSizeClass
@@ -95,21 +96,15 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
 
   if (title) {
     return (
-      <div
-        className={`${surfaceClass} justify-between`}
-        data-testid="workbench-action-bar"
-      >
-        <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+      <div className={`${surfaceClass} justify-between`} data-testid="workbench-action-bar">
+        <h3 className="text-text text-base font-semibold">{title}</h3>
         <div className={`flex flex-wrap items-center gap-2 ${alignClass}`}>{actionButtons}</div>
       </div>
     );
   }
 
   return (
-    <div
-      className={`${surfaceClass} ${alignClass}`}
-      data-testid="workbench-action-bar"
-    >
+    <div className={`${surfaceClass} ${alignClass}`} data-testid="workbench-action-bar">
       {actionButtons}
     </div>
   );

@@ -164,8 +164,7 @@ function parseJsonLike(value: unknown): unknown {
   let current = value;
   for (let depth = 0; depth < 8; depth += 1) {
     if (isJsonEnvelope(current)) {
-      current =
-        typeof current.value === 'string' ? tryParseJsonText(current.value) : current.value;
+      current = typeof current.value === 'string' ? tryParseJsonText(current.value) : current.value;
       continue;
     }
     if (typeof current === 'string') {
@@ -626,7 +625,9 @@ function shouldFetchAuthenticatedBoardImage(sourceUrl: string): boolean {
   if (!/^https?:\/\//i.test(trimmed) || typeof window === 'undefined') return false;
   try {
     const parsed = new URL(trimmed);
-    return parsed.origin === window.location.origin && parsed.pathname.startsWith('/api/file/download/');
+    return (
+      parsed.origin === window.location.origin && parsed.pathname.startsWith('/api/file/download/')
+    );
   } catch {
     return false;
   }
@@ -737,7 +738,7 @@ function Segmented<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white p-1">
+    <div className="rounded-control border-border bg-panel inline-flex items-center gap-1 border p-1">
       {options.map(([optionValue, label]) => (
         <button
           key={optionValue}
@@ -746,8 +747,8 @@ function Segmented<T extends string>({
           onClick={() => onChange(optionValue)}
           className={`min-h-8 rounded px-2.5 text-xs font-medium ${
             value === optionValue
-              ? 'bg-blue-600 text-white'
-              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              ? 'bg-accent text-white'
+              : 'text-text-2 hover:bg-subtle hover:text-text'
           }`}
         >
           {label}
@@ -771,10 +772,10 @@ function Metric({
   return (
     <div
       data-testid={`gerber-metric-${id}`}
-      className={`min-h-16 rounded-lg border bg-white p-3 ${tone || 'border-gray-200'}`}
+      className={`rounded-card bg-panel min-h-16 border p-3 ${tone || 'border-border'}`}
     >
-      <div className="text-xs font-medium text-gray-500">{label}</div>
-      <div className="mt-1 text-lg font-semibold text-gray-900">{value}</div>
+      <div className="text-text-2 text-xs font-medium">{label}</div>
+      <div className="text-text mt-1 text-lg font-semibold">{value}</div>
     </div>
   );
 }
@@ -794,11 +795,7 @@ function gerberPreviewUnavailableState({
   if (message) {
     return {
       kind: 'artifact-error',
-      title: localized(
-        locale,
-        '板图文件暂时无法加载',
-        'Board preview file could not be loaded',
-      ),
+      title: localized(locale, '板图文件暂时无法加载', 'Board preview file could not be loaded'),
       detail: `${message} ${localized(
         locale,
         '不会显示前端生成的替代预览。',
@@ -844,11 +841,7 @@ function gerberPreviewUnavailableState({
   };
 }
 
-function GerberSvgUnavailable({
-  state,
-}: {
-  state: GerberPreviewUnavailableState;
-}) {
+function GerberSvgUnavailable({ state }: { state: GerberPreviewUnavailableState }) {
   const tone =
     state.kind === 'missing-upload'
       ? 'border-gray-200 bg-gray-50 text-gray-700'
@@ -867,7 +860,7 @@ function GerberSvgUnavailable({
         <div className="text-sm font-semibold">{state.title}</div>
         <div className="mt-2 text-xs leading-5 opacity-85">{state.detail}</div>
         {state.evidence ? (
-          <div className="mt-3 rounded-md border border-current/15 bg-white/60 px-3 py-2 text-left text-xs leading-5">
+          <div className="rounded-control mt-3 border border-current/15 bg-white/60 px-3 py-2 text-left text-xs leading-5">
             {state.evidence}
           </div>
         ) : null}
@@ -912,7 +905,7 @@ function ValidationSummary({
     <div
       role={requiresReview ? 'alert' : 'status'}
       data-testid="gerber-validation-summary"
-      className={`rounded-lg border p-3 ${tone}`}
+      className={`rounded-card border p-3 ${tone}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -940,11 +933,11 @@ function GerberSvgLoading() {
     <div
       role="status"
       data-testid="gerber-svg-loading"
-      className="flex h-full min-h-[220px] w-full items-center justify-center bg-gray-50 px-6 py-8 text-center text-gray-700"
+      className="bg-subtle text-text-2 flex h-full min-h-[220px] w-full items-center justify-center px-6 py-8 text-center"
     >
       <div>
         <div className="text-sm font-semibold">Loading real Gerber preview...</div>
-        <div className="mt-2 text-xs leading-5 text-gray-500">
+        <div className="text-text-2 mt-2 text-xs leading-5">
           Fetching the parser artifact with the active session credentials.
         </div>
       </div>
@@ -1066,7 +1059,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
     return (
       <div
         data-testid="gerber-viewer-loading"
-        className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500"
+        className="rounded-control border-border bg-panel text-text-2 border p-4 text-sm"
       >
         Loading Gerber inspection...
       </div>
@@ -1078,7 +1071,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
       <div
         role="alert"
         data-testid="gerber-viewer-error"
-        className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
+        className="rounded-control border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
       >
         {remote.message || 'Failed to load Gerber inspection'}
       </div>
@@ -1094,7 +1087,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
     return (
       <div
         data-testid="gerber-viewer-empty"
-        className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500"
+        className="rounded-control border-border bg-panel text-text-2 border p-4 text-sm"
       >
         {emptyTitle}
       </div>
@@ -1109,7 +1102,8 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
   const projectName = inspection.project?.name || readPath(lineRecord, 'qo_ql_mpn') || '';
   const summary = inspection.summary || {};
   const boardImageError = boardImageRenderError || boardImage.message;
-  const canRenderBoardImage = boardImage.status === 'ready' && Boolean(boardImage.src) && !boardImageError;
+  const canRenderBoardImage =
+    boardImage.status === 'ready' && Boolean(boardImage.src) && !boardImageError;
   const unavailablePreview = gerberPreviewUnavailableState({
     locale,
     line: lineRecord,
@@ -1124,9 +1118,9 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
     <section className="space-y-3" data-testid="gerber-viewer">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-          <div className="mt-1 text-xs text-gray-500">
-            <span className="font-medium text-gray-700">{projectCode}</span>
+          <h3 className="text-text text-sm font-semibold">{title}</h3>
+          <div className="text-text-2 mt-1 text-xs">
+            <span className="text-text-2 font-medium">{projectCode}</span>
             {projectName ? <span> · {projectName}</span> : null}
           </div>
         </div>
@@ -1135,7 +1129,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
           <Segmented value={issueFilter} options={ISSUE_OPTIONS} onChange={setIssueFilter} />
           <input
             aria-label="Gerber viewer search"
-            className="h-9 w-44 rounded-md border border-gray-200 bg-white px-3 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="rounded-control border-border bg-panel focus-visible:shadow-focus h-9 w-44 border px-3 text-xs outline-none focus:outline-none"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="RefDes / footprint"
@@ -1161,8 +1155,9 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
             severityFromValidationStatus(readPath(lineRecord, 'qo_ql_gerber_validation_status')) ===
             'error'
               ? 'border-rose-200'
-              : severityFromValidationStatus(readPath(lineRecord, 'qo_ql_gerber_validation_status')) ===
-                  'warning'
+              : severityFromValidationStatus(
+                    readPath(lineRecord, 'qo_ql_gerber_validation_status'),
+                  ) === 'warning'
                 ? 'border-amber-200 bg-amber-50'
                 : 'border-gray-200'
           }
@@ -1175,7 +1170,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
         <div className="min-w-0">
           <div
             data-testid="gerber-viewer-board"
-            className={`relative overflow-hidden rounded-lg border shadow-sm ${boardShellTone}`}
+            className={`rounded-card relative overflow-hidden border shadow-sm ${boardShellTone}`}
             style={{ aspectRatio: `${board.widthMm} / ${board.heightMm}` }}
           >
             {canRenderBoardImage ? (
@@ -1208,7 +1203,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
                       data-testid={`gerber-marker-${component.refdes}`}
                       title={`${component.refdes} ${component.footprint}`}
                       onClick={() => setSelectedRefdes(component.refdes)}
-                      className={`absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-lg transition ${
+                      className={`rounded-pill absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 border-2 shadow-lg transition ${
                         active ? 'z-10 h-5 w-5 ring-4 ring-white/70' : ''
                       } ${markerTone(component)}`}
                       style={markerStyle(component, board)}
@@ -1227,11 +1222,11 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
           </div>
           <div
             data-testid="gerber-selected-component"
-            className="mt-2 flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600"
+            className="rounded-card border-border bg-panel text-text-2 mt-2 flex min-h-10 flex-wrap items-center gap-2 border px-3 py-2 text-xs"
           >
             {selected ? (
               <>
-                <strong className="text-sm text-gray-900">{selected.refdes}</strong>
+                <strong className="text-text text-sm">{selected.refdes}</strong>
                 <span>{selected.footprint}</span>
                 <span>{selected.bomItem?.materialName || 'Missing BOM'}</span>
                 <span>
@@ -1249,13 +1244,13 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
         </div>
 
         <aside className="min-w-0 space-y-3">
-          <section className="rounded-lg border border-gray-200 bg-white">
-            <div className="border-b border-gray-100 px-3 py-2 text-sm font-semibold text-gray-900">
+          <section className="rounded-card border-border bg-panel border">
+            <div className="text-text border-b border-gray-100 px-3 py-2 text-sm font-semibold">
               {localized(locale, '校验问题', 'Validation Issues')}
             </div>
             <div className="max-h-48 space-y-2 overflow-auto p-3">
               {issues.length === 0 ? (
-                <div data-testid="gerber-issues-empty" className="text-xs text-gray-500">
+                <div data-testid="gerber-issues-empty" className="text-text-2 text-xs">
                   No matching issues
                 </div>
               ) : (
@@ -1263,7 +1258,7 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
                   <div
                     key={`${issue.code}-${issue.refdes || 'global'}-${index}`}
                     data-testid={`gerber-issue-${issue.code}-${issue.refdes || index}`}
-                    className={`rounded-md border px-2.5 py-2 text-xs ${severityClass[issue.severity] || severityClass.info}`}
+                    className={`rounded-control border px-2.5 py-2 text-xs ${severityClass[issue.severity] || severityClass.info}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="font-semibold">{issue.refdes || issue.code}</div>
@@ -1278,8 +1273,8 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
             </div>
           </section>
 
-          <section className="rounded-lg border border-gray-200 bg-white">
-            <div className="border-b border-gray-100 px-3 py-2 text-sm font-semibold text-gray-900">
+          <section className="rounded-card border-border bg-panel border">
+            <div className="text-text border-b border-gray-100 px-3 py-2 text-sm font-semibold">
               Layer Manifest
             </div>
             <div className="max-h-44 overflow-auto p-2">
@@ -1289,8 +1284,8 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
                   data-testid={`gerber-layer-${layer.role}`}
                   className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-xs"
                 >
-                  <span className="truncate text-gray-700">{layer.role}</span>
-                  <span className="font-semibold text-gray-900">{layerCount(layer)}</span>
+                  <span className="text-text-2 truncate">{layer.role}</span>
+                  <span className="text-text font-semibold">{layerCount(layer)}</span>
                 </div>
               ))}
             </div>
@@ -1298,19 +1293,19 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
         </aside>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <div className="rounded-card border-border bg-panel overflow-hidden border">
         <div className="border-b border-gray-100 px-3 py-2">
-          <div className="text-sm font-semibold text-gray-900">
+          <div className="text-text text-sm font-semibold">
             {localized(locale, '当前层器件匹配明细', 'Current Side Component Matches')}
           </div>
-          <div className="mt-1 text-xs text-gray-500">
+          <div className="text-text-2 mt-1 text-xs">
             {localized(locale, '当前层', 'Side')}: {side === 'top' ? 'Top' : 'Bottom'} ·{' '}
             {localized(locale, '匹配器件', 'Components')} {components.length}
           </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs">
-            <thead className="border-b border-gray-100 bg-gray-50 text-gray-500">
+            <thead className="bg-subtle text-text-2 border-b border-gray-100">
               <tr>
                 <th className="px-3 py-2 font-medium">RefDes</th>
                 <th className="px-3 py-2 font-medium">Footprint</th>
@@ -1329,24 +1324,24 @@ export const GerberViewerBlockRenderer: React.FC<GerberViewerBlockRendererProps>
                   <tr
                     key={`${component.refdes}-${index}`}
                     data-testid={`gerber-component-row-${component.refdes}`}
-                    className={`cursor-pointer hover:bg-blue-50/50 ${component.refdes === selectedRefdes ? 'bg-blue-50' : ''}`}
+                    className={`cursor-pointer hover:bg-blue-50/50 ${component.refdes === selectedRefdes ? 'bg-accent-weak' : ''}`}
                     onClick={() => setSelectedRefdes(component.refdes)}
                   >
-                    <td className="px-3 py-2 font-semibold text-gray-900">{component.refdes}</td>
-                    <td className="px-3 py-2 text-gray-700">{component.footprint}</td>
-                    <td className="px-3 py-2 text-gray-700">
+                    <td className="text-text px-3 py-2 font-semibold">{component.refdes}</td>
+                    <td className="text-text-2 px-3 py-2">{component.footprint}</td>
+                    <td className="text-text-2 px-3 py-2">
                       {component.bomItem?.materialName || 'Missing BOM'}
                     </td>
-                    <td className="px-3 py-2 text-gray-700">{component.bomItem?.process || '-'}</td>
-                    <td className="px-3 py-2 text-right text-gray-700">
+                    <td className="text-text-2 px-3 py-2">{component.bomItem?.process || '-'}</td>
+                    <td className="text-text-2 px-3 py-2 text-right">
                       {formatNumber(component.xMm, 3)}
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-700">
+                    <td className="text-text-2 px-3 py-2 text-right">
                       {formatNumber(component.yMm, 3)}
                     </td>
-                    <td className="px-3 py-2 text-gray-700">{component.side}</td>
+                    <td className="text-text-2 px-3 py-2">{component.side}</td>
                     <td className="px-3 py-2">
-                      <span className={`rounded-full border px-2 py-0.5 ${status.className}`}>
+                      <span className={`rounded-pill border px-2 py-0.5 ${status.className}`}>
                         {status.label}
                       </span>
                     </td>

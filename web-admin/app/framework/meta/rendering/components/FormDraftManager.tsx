@@ -106,9 +106,9 @@ export const FormDraftManager: React.FC<FormDraftManagerProps> = ({
   return (
     <>
       {showRecovery && savedDraft && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+        <div className="rounded-card bg-status-amber-bg mb-4 border border-amber-200 p-4">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex-shrink-0 text-amber-500">
+            <div className="text-status-amber mt-0.5 flex-shrink-0">
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -126,13 +126,13 @@ export const FormDraftManager: React.FC<FormDraftManagerProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={handleRestore}
-                className="rounded-md bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-200"
+                className="rounded-control bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-200"
               >
                 Restore
               </button>
               <button
                 onClick={handleDiscard}
-                className="px-3 py-1.5 text-sm text-amber-600 transition-colors hover:text-amber-800"
+                className="text-status-amber px-3 py-1.5 text-sm transition-colors hover:text-amber-800"
               >
                 Discard
               </button>

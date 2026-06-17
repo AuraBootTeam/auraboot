@@ -3,11 +3,15 @@
  * Replaces Unicode arrows with clean small triangles.
  *
  * - No sort: hidden (shown on hover via parent CSS)
- * - Ascending: top arrow blue (#2563eb), bottom arrow gray (#c0c4cc)
- * - Descending: top arrow gray, bottom arrow blue
+ * - Ascending: top arrow accent, bottom arrow muted
+ * - Descending: top arrow muted, bottom arrow accent
  * - Multi-sort: shows priority number badge
  */
 import React from 'react';
+
+// Semantic design-system tokens (SVG fill resolves CSS variables).
+const ACCENT = 'var(--color-accent)';
+const MUTED = 'var(--color-text-3)';
 
 export interface SortIndicatorProps {
   direction?: 'asc' | 'desc';
@@ -16,8 +20,8 @@ export interface SortIndicatorProps {
 
 export function SortIndicator({ direction, priority }: SortIndicatorProps) {
   const isActive = !!direction;
-  const upColor = direction === 'asc' ? '#2563eb' : '#c0c4cc';
-  const downColor = direction === 'desc' ? '#2563eb' : '#c0c4cc';
+  const upColor = direction === 'asc' ? ACCENT : MUTED;
+  const downColor = direction === 'desc' ? ACCENT : MUTED;
 
   return (
     <span className="relative inline-flex items-center">
@@ -26,7 +30,7 @@ export function SortIndicator({ direction, priority }: SortIndicatorProps) {
         <path d="M4 11.5L1 7.5H7Z" fill={downColor} />
       </svg>
       {isActive && priority != null && priority > 0 && (
-        <span className="absolute -top-1.5 -right-2 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
+        <span className="rounded-pill bg-accent absolute -top-1.5 -right-2 flex h-3.5 w-3.5 items-center justify-center text-[9px] font-bold text-white">
           {priority}
         </span>
       )}

@@ -29,10 +29,16 @@ test.beforeAll(async ({ browser }) => {
       // dispatch (merge 5f72469b), list kind routes to ListConfigPanel and the
       // canvas/tab testids this suite asserts no longer exist.
       kind: 'form',
-      modelCode: 'tenant',
+      // ab_announcement is a published meta-model present in every OSS stack;
+      // `tenant` is not always published, which broke fixture creation.
+      modelCode: 'ab_announcement',
+      schemaVersion: 4,
+      // Block ids are required by the page block-structure validator
+      // (/api/pages rejects blank/duplicate ids). The previous id-less fixture
+      // failed creation outright, which the suite's tautology assertion masked.
       blocks: [
-        { blockType: 'form-section', label: 'Main', fields: [] },
-        { blockType: 'form-buttons', label: 'Buttons', actions: [] },
+        { id: 'fp_section_main', blockType: 'form-section', label: 'Main', fields: [] },
+        { id: 'fp_buttons', blockType: 'form-buttons', label: 'Buttons', actions: [] },
       ],
       metaInfo: { componentCount: 1 },
       semver: '0.1.0',
@@ -65,31 +71,33 @@ test.describe('Block Selection', () => {
   });
 
   test('should select block on click and show block properties', async ({ page }) => {
-    // BlocksDesigner for list pages shows area sections (Filter/Toolbar/Main Content).
-    // Click on an area section label to "select" it.
-    const areaSection = page.locator('[data-testid="designer-canvas"] :is(h1,h2,h3,h4,span,div)')
-      .filter({ hasText: /筛选区|主内容|工具栏|Main Content|Filter|Toolbar/i })
-      .first();
-    const hasSection = await areaSection
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!hasSection) {
-      // List pages always have area sections; assert canvas is at least visible.
-      await expect(page.locator('[data-testid="designer-canvas"]')).toBeVisible();
-      return;
-    }
+    // The form fixture seeds a form-section block (id=fp_section_main) and a
+    // form-buttons block. Before any selection the property panel shows its
+    // empty state; after selecting a block the empty state is gone and the
+    // panel renders that block's properties (heading shows the block label).
+    //
+    // (Replaces a previous `expect(hasPropertiesPanel || true).toBe(true)`
+    //  tautology that could never fail — it accepted any outcome.)
+    const propertiesPanel = page.getByTestId('designer-properties-panel');
+    const propertiesEmpty = page.getByTestId('properties-empty');
 
-    await areaSection.click();
+    await expect(propertiesPanel).toBeVisible();
+    await expect(propertiesEmpty, 'panel starts in the empty state').toBeVisible();
 
-    // After selecting an area, the properties panel should show content
-    const hasPropertiesPanel = await page
-      .locator('[data-testid="designer-properties-panel"], aside, [data-testid="block-config-panel"]')
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-    expect(hasPropertiesPanel || true).toBe(true); // Accept either properties visible or area selected
+    const sectionBlock = page.locator(
+      '[data-testid="sortable-block"][data-block-id="fp_section_main"]',
+    );
+    await expect(sectionBlock).toBeVisible({ timeout: 10000 });
+    await sectionBlock.click();
+
+    // Selecting a block dismisses the empty state and renders the block's
+    // property editor (the panel heading shows the form-section label).
+    await expect(propertiesEmpty, 'empty state cleared after selecting a block').toBeHidden();
+    await expect(
+      propertiesPanel.locator('h3').first(),
+      'property panel shows the selected block heading',
+    ).toBeVisible();
+    await expect(propertiesPanel.locator('h3').first()).toHaveText(/表单区段|Form section|Section/i);
   });
 
   test('should show block in canvas area', async () => {

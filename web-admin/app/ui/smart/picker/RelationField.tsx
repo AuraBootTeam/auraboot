@@ -167,20 +167,20 @@ export const RelationField: React.FC<RelationFieldProps> = ({
     if (isMultiple) {
       const values = Array.isArray(normalizedValue) ? normalizedValue : [];
       if (values.length === 0) {
-        return <span className="text-gray-400">{placeholder || 'Select...'}</span>;
+        return <span className="text-text-3">{placeholder || 'Select...'}</span>;
       }
       return (
         <div className="flex flex-wrap gap-1">
           {values.map((val) => (
             <span
               key={val}
-              className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800"
+              className="rounded-pill inline-flex items-center bg-blue-100 px-2 py-0.5 text-xs text-blue-800"
             >
               {getDisplayLabel(val)}
               {!disabled && (
                 <button
                   type="button"
-                  className="ml-1 text-blue-600 hover:text-blue-800"
+                  className="text-accent ml-1 hover:text-blue-800"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleSelect(val);
@@ -195,7 +195,7 @@ export const RelationField: React.FC<RelationFieldProps> = ({
       );
     } else {
       if (!normalizedValue) {
-        return <span className="text-gray-400">{placeholder || 'Select...'}</span>;
+        return <span className="text-text-3">{placeholder || 'Select...'}</span>;
       }
       return <span>{getDisplayLabel(normalizedValue as string)}</span>;
     }
@@ -204,9 +204,9 @@ export const RelationField: React.FC<RelationFieldProps> = ({
   return (
     <div className={cn('space-y-1', className)}>
       {label && (
-        <label htmlFor={name} className="block text-sm font-medium text-gray-700">
+        <label htmlFor={name} className="text-text-2 block text-sm font-medium">
           {label}
-          {required && <span className="ml-1 text-red-500">*</span>}
+          {required && <span className="text-status-red ml-1">*</span>}
         </label>
       )}
 
@@ -215,10 +215,10 @@ export const RelationField: React.FC<RelationFieldProps> = ({
           type="button"
           id={name}
           className={cn(
-            'w-full rounded-md border bg-white px-3 py-2 text-left',
-            'focus:ring-2 focus:ring-blue-500 focus:outline-none',
-            disabled && 'cursor-not-allowed bg-gray-100',
-            error && 'border-red-500',
+            'rounded-control bg-panel w-full border px-3 py-2 text-left',
+            'focus-visible:shadow-focus focus:outline-none',
+            disabled && 'bg-hover cursor-not-allowed',
+            error && 'border-status-red',
           )}
           onClick={() => !disabled && setIsOpen(!isOpen)}
           disabled={disabled}
@@ -229,7 +229,7 @@ export const RelationField: React.FC<RelationFieldProps> = ({
         {!disabled && (isMultiple ? (normalizedValue as string[]).length > 0 : normalizedValue) && (
           <button
             type="button"
-            className="absolute top-1/2 right-8 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="text-text-3 hover:text-text-2 absolute top-1/2 right-8 -translate-y-1/2"
             onClick={(e) => {
               e.stopPropagation();
               handleClear();
@@ -239,14 +239,14 @@ export const RelationField: React.FC<RelationFieldProps> = ({
           </button>
         )}
 
-        <span className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400">
+        <span className="text-text-3 absolute top-1/2 right-3 -translate-y-1/2">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </span>
 
         {isOpen && (
-          <div className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border bg-white shadow-lg">
+          <div className="rounded-control bg-panel absolute z-50 mt-1 max-h-60 w-full overflow-y-auto border shadow-lg">
             <div className="border-b p-2">
               <input
                 type="text"
@@ -259,9 +259,9 @@ export const RelationField: React.FC<RelationFieldProps> = ({
             </div>
 
             {loading ? (
-              <div className="p-4 text-center text-gray-500">Loading...</div>
+              <div className="text-text-2 p-4 text-center">Loading...</div>
             ) : options.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">No options</div>
+              <div className="text-text-2 p-4 text-center">No options</div>
             ) : (
               options.map((option) => {
                 const optValue = String(option[valueField]);
@@ -274,8 +274,8 @@ export const RelationField: React.FC<RelationFieldProps> = ({
                     key={optValue}
                     type="button"
                     className={cn(
-                      'w-full px-3 py-2 text-left text-sm hover:bg-gray-100',
-                      isSelected && 'bg-blue-50 text-blue-600',
+                      'hover:bg-hover w-full px-3 py-2 text-left text-sm',
+                      isSelected && 'bg-accent-weak text-accent',
                     )}
                     onClick={() => handleSelect(optValue)}
                   >
@@ -291,9 +291,9 @@ export const RelationField: React.FC<RelationFieldProps> = ({
         )}
       </div>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-status-red text-sm">{error}</p>}
 
-      <p className="text-xs text-gray-400">
+      <p className="text-text-3 text-xs">
         {relationType.replace('_', ' ')} relation to {targetModelCode}
       </p>
     </div>

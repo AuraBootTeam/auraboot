@@ -13,7 +13,7 @@ export const FormPageSkeleton: React.FC = () => {
       </div>
 
       {/* Form section 1 */}
-      <div className="space-y-4 rounded-lg border border-gray-200 p-6">
+      <div className="rounded-card border-border space-y-4 border p-6">
         <div className={`h-5 w-32 ${shimmer}`} />
         <div className="grid grid-cols-2 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -26,7 +26,7 @@ export const FormPageSkeleton: React.FC = () => {
       </div>
 
       {/* Form section 2 */}
-      <div className="space-y-4 rounded-lg border border-gray-200 p-6">
+      <div className="rounded-card border-border space-y-4 border p-6">
         <div className={`h-5 w-40 ${shimmer}`} />
         <div className="grid grid-cols-2 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (

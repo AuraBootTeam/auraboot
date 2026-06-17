@@ -139,7 +139,9 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
                 "name", "Test List Page",
                 "title", "Test List Page Title",
                 "kind", "list",
-                "blocks", List.of(Map.of("blockType", "table"))
+                // Block must carry a stable id + blockType under the structural
+                // integrity guard (PageSchemaBlockStructureValidator).
+                "blocks", List.of(Map.of("id", "blk_table_1", "blockType", "table"))
         );
 
         mockMvc.perform(post("/api/pages")

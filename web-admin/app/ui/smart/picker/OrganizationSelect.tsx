@@ -217,14 +217,14 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
       <div key={node.id}>
         <div
           data-testid={`organization-select-option-${node.id}`}
-          className={`flex cursor-pointer items-center p-2 hover:bg-gray-50 ${isSelected(node.id) ? 'bg-blue-50 text-blue-900' : 'text-gray-900'} ${!isSelectable(node) ? 'opacity-60' : ''} `}
+          className={`hover:bg-subtle flex cursor-pointer items-center p-2 ${isSelected(node.id) ? 'bg-accent-weak text-blue-900' : 'text-text'} ${!isSelectable(node) ? 'opacity-60' : ''} `}
           style={{ paddingLeft: `${node.level * 20 + 8}px` }}
           onClick={() => isSelectable(node) && handleOrganizationSelect(node)}
         >
           {node.children && node.children.length > 0 && (
             <button
               onClick={(e) => toggleExpanded(node.id, e)}
-              className="mr-1 rounded p-1 hover:bg-gray-200"
+              className="hover:bg-hover mr-1 rounded p-1"
             >
               {expandedNodes.has(node.id) ? (
                 <ChevronDown className="h-3 w-3" />
@@ -238,9 +238,9 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
           <div className="min-w-0 flex-1">
             <div className="flex items-center space-x-2">
               <span className="truncate font-medium">{node.name}</span>
-              {isSelected(node.id) && <span className="text-blue-600">✓</span>}
+              {isSelected(node.id) && <span className="text-accent">✓</span>}
             </div>
-            {node.code && <div className="text-xs text-gray-500">{node.code}</div>}
+            {node.code && <div className="text-text-2 text-xs">{node.code}</div>}
           </div>
         </div>
         {node.children && expandedNodes.has(node.id) && (
@@ -261,25 +261,25 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
       <div className="relative" data-testid={`organization-select-${name}`}>
         <div
           data-testid={`organization-select-trigger-${name}`}
-          className={`w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm ${disabledValue ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer bg-white hover:border-gray-400'} ${selectedOrganizations.length > 0 ? 'text-gray-900' : 'text-gray-500'} focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none`}
+          className={`rounded-control border-border-strong w-full border px-3 py-2 shadow-sm ${disabledValue ? 'bg-subtle cursor-not-allowed' : 'bg-panel hover:border-border-strong cursor-pointer'} ${selectedOrganizations.length > 0 ? 'text-text' : 'text-text-2'} focus-visible:shadow-focus focus:outline-none`}
           onClick={() => !disabledValue && setIsOpen(!isOpen)}
         >
           <div className="flex items-center justify-between">
             <div className="flex min-w-0 flex-1 items-center space-x-2">
-              <Building2 className="h-4 w-4 flex-shrink-0 text-gray-400" />
+              <Building2 className="text-text-3 h-4 w-4 flex-shrink-0" />
               {multiple && selectedOrganizations.length > 0 ? (
                 <div className="flex flex-1 flex-wrap gap-1">
                   {selectedOrganizations.map((org) => (
                     <span
                       key={org.id}
-                      className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800"
+                      className="rounded-pill inline-flex items-center bg-blue-100 px-2 py-1 text-xs text-blue-800"
                     >
                       {org.name}
                       {!disabledValue && (
                         <button
                           type="button"
                           onClick={(e) => handleRemoveOrganization(org.id, e)}
-                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          className="text-accent ml-1 hover:text-blue-800"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -301,18 +301,18 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
 
         {/* Dropdown */}
         {isOpen && !disabledValue && (
-          <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-300 bg-white shadow-lg">
+          <div className="rounded-control border-border-strong bg-panel absolute z-50 mt-1 w-full border shadow-lg">
             {/* Search Input */}
             <div className="border-b p-2">
               <div className="relative">
-                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
+                <Search className="text-text-3 absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
                 <input
                   type="text"
                   data-testid={`organization-select-search-input-${name}`}
                   placeholder={st('搜索组织...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 py-2 pr-4 pl-10 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="rounded-control border-border-strong focus-visible:shadow-focus w-full border py-2 pr-4 pl-10 focus:outline-none"
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -321,12 +321,12 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
             {/* Organization Tree */}
             <div className="max-h-60 overflow-y-auto">
               {loading ? (
-                <div className="p-4 text-center text-gray-500">
-                  <div className="mx-auto h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600"></div>
+                <div className="text-text-2 p-4 text-center">
+                  <div className="rounded-pill border-accent mx-auto h-6 w-6 animate-spin border-b-2"></div>
                   <span className="mt-2 block">{st('加载中...')}</span>
                 </div>
               ) : filteredOrganizations.length === 0 ? (
-                <div className="p-4 text-center text-gray-500">{st('没有找到匹配的组织')}</div>
+                <div className="text-text-2 p-4 text-center">{st('没有找到匹配的组织')}</div>
               ) : (
                 <div>
                   {searchQuery
@@ -335,7 +335,7 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
                         <div
                           key={org.id}
                           data-testid={`organization-select-option-${org.id}`}
-                          className={`cursor-pointer border-b border-gray-100 p-3 last:border-b-0 hover:bg-gray-50 ${isSelected(org.id) ? 'bg-blue-50 text-blue-900' : 'text-gray-900'} ${!isSelectable(org) ? 'opacity-60' : ''} `}
+                          className={`border-border hover:bg-subtle cursor-pointer border-b p-3 last:border-b-0 ${isSelected(org.id) ? 'bg-accent-weak text-blue-900' : 'text-text'} ${!isSelectable(org) ? 'opacity-60' : ''} `}
                           onClick={() => isSelectable(org) && handleOrganizationSelect(org)}
                         >
                           <div className="flex items-center space-x-3">
@@ -343,9 +343,9 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center space-x-2">
                                 <span className="font-medium">{org.name}</span>
-                                {isSelected(org.id) && <span className="text-blue-600">✓</span>}
+                                {isSelected(org.id) && <span className="text-accent">✓</span>}
                               </div>
-                              {org.code && <div className="text-sm text-gray-500">{org.code}</div>}
+                              {org.code && <div className="text-text-2 text-sm">{org.code}</div>}
                             </div>
                           </div>
                         </div>

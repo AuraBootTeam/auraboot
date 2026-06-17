@@ -320,7 +320,16 @@ public class JsonToBpmnConverter {
                     gatewayDefaultFlows.get(nodeId));
             case "callActivity" -> writeCallActivity(writer, nodeId, label, config);
             default -> {
-                log.warn("Unknown node type '{}' for node '{}', skipping", nodeType, nodeId);
+                // Fail loudly instead of silently dropping the node. A designerJson
+                // referencing an unsupported node type would otherwise compile to a
+                // BPMN definition missing that node — a silent data-loss bug that
+                // surfaces only at runtime (or never). Surface it at conversion time
+                // with the offending node id so the user can fix the diagram.
+                throw new BpmnConversionException(
+                        "Unsupported BPMN node type '" + nodeType + "' for node '" + nodeId
+                                + "'. Supported types: startEvent, endEvent, userTask, serviceTask, "
+                                + "rule-task, notification-task, record-update-task, receiveTask, "
+                                + "exclusiveGateway, parallelGateway, inclusiveGateway, callActivity.");
             }
         }
     }

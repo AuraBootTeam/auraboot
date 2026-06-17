@@ -86,7 +86,7 @@ const TimePicker: React.FC<TimePickerProps> = ({
     fieldInputHeightStyles[size],
     fieldVariantStyles[variant],
     className,
-    meta.showError ? `border-red-500 ${fieldErrorFocusStyles}` : '',
+    meta.showError ? `border-status-red ${fieldErrorFocusStyles}` : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -120,7 +120,9 @@ const TimePicker: React.FC<TimePickerProps> = ({
           name={name}
           type="time"
           value={field.value || ''}
-          placeholder={placeholderText || (use12Hours ? 'hh:mm AM/PM' : showSecond ? 'HH:mm:ss' : 'HH:mm')}
+          placeholder={
+            placeholderText || (use12Hours ? 'hh:mm AM/PM' : showSecond ? 'HH:mm:ss' : 'HH:mm')
+          }
           disabled={disabledValue}
           step={showSecond ? secondStep : minuteStep * 60}
           className={`w-full pr-10 ${inputClasses}`}
@@ -132,7 +134,7 @@ const TimePicker: React.FC<TimePickerProps> = ({
         {/* Clock icon */}
         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
           <svg
-            className="h-4 w-4 text-gray-400"
+            className="text-text-3 h-4 w-4"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -150,7 +152,7 @@ const TimePicker: React.FC<TimePickerProps> = ({
           <button
             type="button"
             onClick={handleClear}
-            className="absolute inset-y-0 right-8 flex items-center pr-1 text-gray-400 hover:text-gray-600"
+            className="text-text-3 hover:text-text-2 absolute inset-y-0 right-8 flex items-center pr-1"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path

@@ -23,8 +23,8 @@ export const ListPageSkeleton: React.FC = () => {
       </div>
 
       {/* Table header */}
-      <div className="overflow-hidden rounded-lg border border-gray-200">
-        <div className="flex items-center gap-4 bg-gray-50 px-4 py-3">
+      <div className="rounded-card border-border overflow-hidden border">
+        <div className="bg-subtle flex items-center gap-4 px-4 py-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className={`h-4 flex-1 ${shimmer}`} />
           ))}

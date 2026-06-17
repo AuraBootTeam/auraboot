@@ -181,7 +181,7 @@ export function VersionDetail({ visible, model, onClose, onRollbackSuccess }: Ve
       modified: 'bg-blue-100 text-blue-800',
       removed: 'bg-red-100 text-red-800',
     };
-    return styleMap[type] || 'bg-gray-100 text-gray-800';
+    return styleMap[type] || 'bg-subtle text-text';
   }, []);
 
   /**
@@ -206,20 +206,20 @@ export function VersionDetail({ visible, model, onClose, onRollbackSuccess }: Ve
 
       {/* 对话框 */}
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="relative flex max-h-[90vh] w-full max-w-6xl flex-col rounded-lg bg-white shadow-xl">
+        <div className="rounded-card bg-panel relative flex max-h-[90vh] w-full max-w-6xl flex-col shadow-xl">
           {/* 标题栏 */}
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">版本历史</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              模型 <span className="font-mono text-blue-600">{model.code}</span> 的版本历史记录
+          <div className="border-border border-b px-6 py-4">
+            <h2 className="text-text text-lg font-semibold">版本历史</h2>
+            <p className="text-text-2 mt-1 text-sm">
+              模型 <span className="text-accent font-mono">{model.code}</span> 的版本历史记录
             </p>
           </div>
 
           {/* 工具栏 */}
           {!showDiff && (
-            <div className="border-b border-gray-200 bg-gray-50 px-6 py-3">
+            <div className="border-border bg-subtle border-b px-6 py-3">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">
+                <div className="text-text-2 text-sm">
                   {selectedVersions.length > 0 && (
                     <span>已选择 {selectedVersions.length} 个版本</span>
                   )}
@@ -227,7 +227,7 @@ export function VersionDetail({ visible, model, onClose, onRollbackSuccess }: Ve
                 <button
                   onClick={handleCompareVersions}
                   disabled={selectedVersions.length !== 2 || loading}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   对比版本
                 </button>
@@ -239,14 +239,14 @@ export function VersionDetail({ visible, model, onClose, onRollbackSuccess }: Ve
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
-                <span className="ml-3 text-gray-600">加载中...</span>
+                <div className="rounded-pill border-accent h-8 w-8 animate-spin border-b-2"></div>
+                <span className="text-text-2 ml-3">加载中...</span>
               </div>
             ) : showDiff && versionDiff ? (
               // 版本对比视图
               <div>
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-base font-medium text-gray-900">
+                  <h3 className="text-text text-base font-medium">
                     版本对比: v{versionDiff.fromVersion} → v{versionDiff.toVersion}
                   </h3>
                   <button
@@ -254,52 +254,52 @@ export function VersionDetail({ visible, model, onClose, onRollbackSuccess }: Ve
                       setShowDiff(false);
                       setVersionDiff(null);
                     }}
-                    className="text-sm text-blue-600 hover:text-blue-700"
+                    className="text-accent hover:text-accent text-sm"
                   >
                     返回版本列表
                   </button>
                 </div>
 
                 {versionDiff.changes.length === 0 ? (
-                  <div className="py-12 text-center text-gray-500">两个版本之间没有差异</div>
+                  <div className="text-text-2 py-12 text-center">两个版本之间没有差异</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                    <table className="divide-border min-w-full divide-y">
+                      <thead className="bg-subtle">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="text-text-2 px-6 py-3 text-left text-xs font-medium uppercase">
                             字段
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="text-text-2 px-6 py-3 text-left text-xs font-medium uppercase">
                             变更类型
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="text-text-2 px-6 py-3 text-left text-xs font-medium uppercase">
                             旧值
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="text-text-2 px-6 py-3 text-left text-xs font-medium uppercase">
                             新值
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200 bg-white">
+                      <tbody className="divide-border bg-panel divide-y">
                         {versionDiff.changes.map((change, index) => (
                           <tr key={index}>
-                            <td className="px-6 py-4 text-sm font-medium whitespace-nowrap text-gray-900">
+                            <td className="text-text px-6 py-4 text-sm font-medium whitespace-nowrap">
                               {change.field}
                             </td>
                             <td className="px-6 py-4 text-sm whitespace-nowrap">
                               <span
-                                className={`rounded-full px-2 py-1 text-xs font-medium ${getChangeTypeStyle(change.changeType)}`}
+                                className={`rounded-pill px-2 py-1 text-xs font-medium ${getChangeTypeStyle(change.changeType)}`}
                               >
                                 {formatChangeType(change.changeType)}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-500">
+                            <td className="text-text-2 px-6 py-4 text-sm">
                               <pre className="whitespace-pre-wrap">
                                 {formatValue(change.oldValue)}
                               </pre>
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">
+                            <td className="text-text px-6 py-4 text-sm">
                               <pre className="whitespace-pre-wrap">
                                 {formatValue(change.newValue)}
                               </pre>
@@ -315,16 +315,16 @@ export function VersionDetail({ visible, model, onClose, onRollbackSuccess }: Ve
               // 版本列表视图
               <div>
                 {versions.length === 0 ? (
-                  <div className="py-12 text-center text-gray-500">暂无版本历史</div>
+                  <div className="text-text-2 py-12 text-center">暂无版本历史</div>
                 ) : (
                   <div className="space-y-4">
                     {versions.map((version) => (
                       <div
                         key={version.version}
-                        className={`rounded-lg border p-4 ${
+                        className={`rounded-card border p-4 ${
                           selectedVersions.includes(version.version)
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? 'bg-accent-weak border-accent'
+                            : 'border-border hover:border-border-strong'
                         }`}
                       >
                         <div className="flex items-start justify-between">
@@ -334,27 +334,27 @@ export function VersionDetail({ visible, model, onClose, onRollbackSuccess }: Ve
                               type="checkbox"
                               checked={selectedVersions.includes(version.version)}
                               onChange={() => toggleVersionSelection(version.version)}
-                              className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              className="border-border-strong text-accent focus-visible:shadow-focus mt-1 h-4 w-4 rounded focus:outline-none"
                             />
 
                             {/* 版本信息 */}
                             <div className="flex-1">
                               <div className="flex items-center gap-3">
-                                <h4 className="text-base font-medium text-gray-900">
+                                <h4 className="text-text text-base font-medium">
                                   版本 {version.version}
                                 </h4>
                                 {version.isCurrent && (
-                                  <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                                  <span className="rounded-pill bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
                                     当前版本
                                   </span>
                                 )}
                                 <span
-                                  className={`rounded-full px-2 py-1 text-xs font-medium ${
+                                  className={`rounded-pill px-2 py-1 text-xs font-medium ${
                                     version.status === 'published'
                                       ? 'bg-blue-100 text-blue-800'
                                       : version.status === 'draft'
-                                        ? 'bg-gray-100 text-gray-800'
-                                        : 'bg-yellow-100 text-yellow-800'
+                                        ? 'bg-subtle text-text'
+                                        : 'text-status-amber bg-yellow-100'
                                   }`}
                                 >
                                   {version.status === 'published'
@@ -366,10 +366,10 @@ export function VersionDetail({ visible, model, onClose, onRollbackSuccess }: Ve
                               </div>
 
                               {version.versionNote && (
-                                <p className="mt-2 text-sm text-gray-600">{version.versionNote}</p>
+                                <p className="text-text-2 mt-2 text-sm">{version.versionNote}</p>
                               )}
 
-                              <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                              <div className="text-text-2 mt-2 flex items-center gap-4 text-xs">
                                 <span>
                                   创建时间: {new Date(version.createdAt).toLocaleString('zh-CN')}
                                 </span>
@@ -384,7 +384,7 @@ export function VersionDetail({ visible, model, onClose, onRollbackSuccess }: Ve
                               <button
                                 onClick={() => showRollbackConfirm(version.version)}
                                 disabled={loading}
-                                className="rounded-md px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+                                className="rounded-control text-accent hover:bg-accent-weak hover:text-accent px-3 py-1 text-sm disabled:opacity-50"
                               >
                                 回滚
                               </button>
@@ -400,10 +400,10 @@ export function VersionDetail({ visible, model, onClose, onRollbackSuccess }: Ve
           </div>
 
           {/* 底部按钮 */}
-          <div className="flex justify-end border-t border-gray-200 px-6 py-4">
+          <div className="border-border flex justify-end border-t px-6 py-4">
             <button
               onClick={onClose}
-              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2"
             >
               关闭
             </button>
@@ -416,23 +416,23 @@ export function VersionDetail({ visible, model, onClose, onRollbackSuccess }: Ve
         <div className="fixed inset-0 z-[60] overflow-y-auto">
           <div className="bg-opacity-50 fixed inset-0 bg-black" />
           <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">确认回滚</h3>
-              <p className="mb-6 text-sm text-gray-600">
+            <div className="rounded-card bg-panel relative w-full max-w-md p-6 shadow-xl">
+              <h3 className="text-text mb-4 text-lg font-semibold">确认回滚</h3>
+              <p className="text-text-2 mb-6 text-sm">
                 确认回滚到版本 {rollbackConfirm.version}？此操作将创建一个新版本。
               </p>
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setRollbackConfirm({ show: false, version: 0 })}
                   disabled={loading}
-                  className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2 disabled:opacity-50"
                 >
                   取消
                 </button>
                 <button
                   onClick={handleRollback}
                   disabled={loading}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-white disabled:opacity-50"
                 >
                   {loading ? '处理中...' : '确认回滚'}
                 </button>

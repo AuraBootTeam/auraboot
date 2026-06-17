@@ -25,8 +25,8 @@ export interface ChartBlockRendererProps {
 }
 
 const ChartLoadingFallback: React.FC = () => (
-  <div className="flex h-64 items-center justify-center rounded-lg border border-gray-200 bg-gray-50">
-    <div className="flex items-center gap-2 text-gray-400">
+  <div className="rounded-card border-border bg-subtle flex h-64 items-center justify-center border">
+    <div className="text-text-3 flex items-center gap-2">
       <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24">
         <circle
           className="opacity-25"
@@ -131,7 +131,7 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
 
   if (!ChartComponent) {
     return (
-      <div className="flex h-64 items-center justify-center rounded-lg border border-yellow-200 bg-yellow-50">
+      <div className="rounded-card flex h-64 items-center justify-center border border-yellow-200 bg-yellow-50">
         <div className="text-center">
           <p className="font-medium text-yellow-800">Unsupported chart type</p>
           <p className="mt-1 text-sm text-yellow-600">

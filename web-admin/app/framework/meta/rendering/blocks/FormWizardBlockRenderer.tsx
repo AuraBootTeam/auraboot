@@ -62,8 +62,8 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
 
   if (steps.length === 0) {
     return (
-      <div className="rounded border border-yellow-300 bg-yellow-50 p-4">
-        <p className="text-yellow-800">Form wizard has no steps configured</p>
+      <div className="bg-status-amber-bg rounded border border-yellow-300 p-4">
+        <p className="text-status-amber">Form wizard has no steps configured</p>
       </div>
     );
   }
@@ -128,7 +128,7 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
       {currentStep && (
         <div className="min-h-[200px]">
           {currentStep.description && (
-            <p className="mb-4 text-sm text-gray-500">{currentStep.description}</p>
+            <p className="text-text-2 mb-4 text-sm">{currentStep.description}</p>
           )}
           <div className="space-y-4">
             {currentStep.blocks.map((childBlock, index) => (
@@ -144,27 +144,25 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
       )}
 
       {/* Navigation buttons */}
-      <div className="flex items-center justify-between border-t border-gray-200 pt-4">
+      <div className="border-border flex items-center justify-between border-t pt-4">
         <button
           onClick={handlePrevious}
           disabled={isFirst}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-            isFirst
-              ? 'cursor-not-allowed text-gray-400'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          className={`rounded-control px-4 py-2 text-sm font-medium transition-colors ${
+            isFirst ? 'text-text-3 cursor-not-allowed' : 'bg-hover text-text-2 hover:bg-hover'
           }`}
         >
           Previous
         </button>
 
-        <span className="text-sm text-gray-500">
+        <span className="text-text-2 text-sm">
           Step {currentStepIndex + 1} of {steps.length}
         </span>
 
         {!isLast ? (
           <button
             onClick={handleNext}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white transition-colors"
           >
             Next
           </button>
@@ -174,7 +172,7 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
               // Trigger the runtime's submit handler
               // The actual submit is handled by the form buttons block
             }}
-            className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+            className="rounded-control bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
           >
             Submit
           </button>

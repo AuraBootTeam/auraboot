@@ -6,7 +6,12 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import type { BlockConfig, ColumnConfig, ButtonConfig, TreeConfig } from '~/framework/meta/schemas/types';
+import type {
+  BlockConfig,
+  ColumnConfig,
+  ButtonConfig,
+  TreeConfig,
+} from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
@@ -55,13 +60,16 @@ function resolveLinkHref(column: ColumnConfig, row: any, value: unknown): string
   const derivedFileIdField = column.field.endsWith('_url')
     ? `${column.field.slice(0, -4)}_file_id`
     : '';
-  const fileId = firstNonBlank(row || {}, [
-    String(config.fileIdField || ''),
-    derivedFileIdField,
-    'fileId',
-    'file_id',
-    'qo_qd_file_id',
-  ].filter(Boolean));
+  const fileId = firstNonBlank(
+    row || {},
+    [
+      String(config.fileIdField || ''),
+      derivedFileIdField,
+      'fileId',
+      'file_id',
+      'qo_qd_file_id',
+    ].filter(Boolean),
+  );
   if (fileId && (!url || FILE_PID_URL_PATTERN.test(url))) {
     return `/api/file/download/${encodeURIComponent(String(fileId))}`;
   }
@@ -76,7 +84,7 @@ function renderLinkCell(
   t: (key: string) => string,
 ): React.ReactNode {
   const href = resolveLinkHref(column, row, value);
-  if (!href) return <span className="text-gray-400">-</span>;
+  if (!href) return <span className="text-text-3">-</span>;
   const config = renderConfig(column);
   const label = config.text
     ? getLocalizedText(config.text, locale, t)
@@ -90,7 +98,7 @@ function renderLinkCell(
       target={target}
       rel={target === '_blank' ? 'noreferrer' : undefined}
       onClick={(event) => event.stopPropagation()}
-      className="font-medium text-blue-600 underline decoration-blue-300 underline-offset-2 hover:text-blue-800"
+      className="text-accent font-medium underline decoration-blue-300 underline-offset-2 hover:text-blue-800"
     >
       {label}
     </a>
@@ -202,9 +210,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     ? (runtime.getContext().state as Record<string, any> | undefined)?.[selectionConfig.bind]
     : undefined;
   const selectedRowKey =
-    selectedRow && typeof selectedRow === 'object'
-      ? getRowIdentity(selectedRow)
-      : '';
+    selectedRow && typeof selectedRow === 'object' ? getRowIdentity(selectedRow) : '';
   const effectiveSelectedRowKey = localSelectedRowKey || selectedRowKey;
 
   // Use tree-processed rows when treeConfig is set, otherwise flat data
@@ -232,10 +238,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     const current = (runtime.getContext().state as Record<string, any> | undefined)?.[
       selectionConfig.bind
     ];
-    const currentKey =
-      current && typeof current === 'object' ? getRowIdentity(current) : '';
+    const currentKey = current && typeof current === 'object' ? getRowIdentity(current) : '';
     const currentStillVisible =
-      Boolean(currentKey) && data.some((row: any, index: number) => getRowIdentity(row, index) === currentKey);
+      Boolean(currentKey) &&
+      data.some((row: any, index: number) => getRowIdentity(row, index) === currentKey);
 
     if (data.length > 0 && !currentStillVisible) {
       const firstRow = data[0];
@@ -256,11 +262,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       <th
         key={column.field}
         data-testid={`table-th-${column.field}`}
-        className={`${headerCellClass} text-${column.align || 'left'} text-xs font-medium tracking-wider text-gray-500 uppercase`}
+        className={`${headerCellClass} text-${column.align || 'left'} text-text-2 text-xs font-medium tracking-wider uppercase`}
         style={{ width: column.width }}
       >
         {label}
-        {column.sortable && <span className="ml-1 text-gray-400">⇅</span>}
+        {column.sortable && <span className="text-text-3 ml-1">⇅</span>}
       </th>
     );
   };
@@ -275,7 +281,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
     // Null/undefined 处理
     if (value === null || value === undefined) {
-      return <span className="text-gray-400">-</span>;
+      return <span className="text-text-3">-</span>;
     }
 
     // 如果有 dictCode，尝试翻译值为标签
@@ -300,7 +306,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           };
           const tagCls = tagColorMap[tagColor] || tagColorMap.blue;
           return (
-            <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${tagCls}`}>
+            <span className={`rounded-pill inline-flex px-2 py-1 text-xs font-medium ${tagCls}`}>
               {item.label}
             </span>
           );
@@ -340,15 +346,15 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
       case 'tag':
         return (
-          <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
+          <span className="rounded-pill inline-flex bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
             {value}
           </span>
         );
 
       case 'progress':
         return (
-          <div className="h-2.5 w-full rounded-full bg-gray-200">
-            <div className="h-2.5 rounded-full bg-blue-600" style={{ width: `${value}%` }}></div>
+          <div className="rounded-pill h-2.5 w-full bg-gray-200">
+            <div className="rounded-pill h-2.5 bg-blue-600" style={{ width: `${value}%` }}></div>
           </div>
         );
 
@@ -383,8 +389,8 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
               onClick={() => handleAction(button, row)}
               className={`text-sm ${
                 button.variant === 'danger'
-                  ? 'text-red-600 hover:text-red-800'
-                  : 'text-blue-600 hover:text-blue-800'
+                  ? 'text-status-red hover:text-red-800'
+                  : 'text-accent hover:text-blue-800'
               }`}
             >
               {label}
@@ -430,23 +436,25 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       data-testid="table-block"
       style={tableContainerStyle}
     >
-      <table className="w-max min-w-full divide-y divide-gray-200">
-        <thead className={maxHeight ? 'sticky top-0 z-10 bg-gray-50' : 'bg-gray-50'}>
+      <table className="divide-border w-max min-w-full divide-y">
+        <thead className={maxHeight ? 'bg-subtle sticky top-0 z-10' : 'bg-subtle'}>
           <tr>
             {columns.map(renderColumnHeader)}
             {rowActions.length > 0 && (
-              <th className={`${headerCellClass} text-left text-xs font-medium tracking-wider text-gray-500 uppercase`}>
+              <th
+                className={`${headerCellClass} text-text-2 text-left text-xs font-medium tracking-wider uppercase`}
+              >
                 {t('common.actions') !== 'common.actions' ? t('common.actions') : 'Actions'}
               </th>
             )}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200 bg-white">
+        <tbody className="divide-border bg-panel divide-y">
           {data.length === 0 ? (
             <tr>
               <td
                 colSpan={columns.length + (rowActions.length > 0 ? 1 : 0)}
-                className="px-6 py-4 text-center text-gray-500"
+                className="text-text-2 px-6 py-4 text-center"
               >
                 {t('common.noData') !== 'common.noData' ? t('common.noData') : 'No data'}
               </td>
@@ -462,14 +470,14 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                   key={rowIdentity}
                   data-testid={`table-row-${rowIdentity}`}
                   onClick={() => handleRowClick(row)}
-                  className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''} ${
+                  className={`hover:bg-hover ${isSelected ? 'bg-accent-weak' : ''} ${
                     selectionConfig?.bind ? 'cursor-pointer' : ''
                   }`}
                 >
                   {columns.map((column, colIdx) => (
                     <td
                       key={column.field}
-                      className={`${bodyCellClass} text-sm text-gray-900 ${
+                      className={`${bodyCellClass} text-text text-sm ${
                         column.ellipsis ? 'truncate' : ''
                       }`}
                       style={{
@@ -491,7 +499,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                                 e.stopPropagation();
                                 toggleExpand(row.pid || row.id);
                               }}
-                              className="flex h-4 w-4 items-center justify-center text-gray-400 hover:text-gray-600"
+                              className="text-text-3 hover:text-text-2 flex h-4 w-4 items-center justify-center"
                               data-testid={`tree-toggle-${row.pid || row.id}`}
                             >
                               {row._expanded ? '▼' : '▶'}
@@ -505,7 +513,9 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                     </td>
                   ))}
                   {rowActions.length > 0 && (
-                    <td className={`${bodyCellClass} text-sm text-gray-900`}>{renderRowActions(row)}</td>
+                    <td className={`${bodyCellClass} text-text text-sm`}>
+                      {renderRowActions(row)}
+                    </td>
                   )}
                 </tr>
               );

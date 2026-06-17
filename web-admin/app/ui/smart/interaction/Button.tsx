@@ -9,12 +9,12 @@ const sizeStyles: Record<NonNullable<ButtonProps['size']>, string> = {
 };
 
 const variantStyles: Record<NonNullable<ButtonProps['variant']>, string> = {
-  default: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
-  primary: 'bg-blue-600 text-white hover:bg-blue-700',
+  default: 'bg-panel text-text-2 border border-border-strong hover:bg-subtle',
+  primary: 'bg-accent text-white hover:bg-accent-hover',
   secondary: 'bg-gray-600 text-white hover:bg-gray-700',
   danger: 'bg-red-600 text-white hover:bg-red-700',
-  ghost: 'bg-transparent text-gray-700 hover:bg-gray-100',
-  link: 'bg-transparent text-blue-600 hover:underline',
+  ghost: 'bg-transparent text-text-2 hover:bg-hover',
+  link: 'bg-transparent text-accent hover:underline',
 };
 
 export const Button: React.FC<ButtonProps> = ({
@@ -43,7 +43,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   const sharedProps = {
     className: clsx(
-      'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed',
+      'inline-flex items-center justify-center rounded-control font-medium transition-colors focus:outline-none focus-visible:shadow-focus disabled:opacity-60 disabled:cursor-not-allowed',
       sizeStyles[size],
       variantStyles[variant],
       block && 'w-full',

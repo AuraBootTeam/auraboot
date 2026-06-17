@@ -259,17 +259,17 @@ export function FieldSelectionDialog({
       {/* Dialog */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div
-          className="relative flex max-h-[90vh] w-full max-w-6xl flex-col rounded-lg bg-white shadow-xl"
+          className="rounded-card bg-panel relative flex max-h-[90vh] w-full max-w-6xl flex-col shadow-xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="border-b border-gray-200 px-6 py-4">
+          <div className="border-border border-b px-6 py-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">添加字段到模型: {modelCode}</h2>
+              <h2 className="text-text text-xl font-semibold">添加字段到模型: {modelCode}</h2>
               <button
                 onClick={handleClose}
                 disabled={binding}
-                className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                className="text-text-3 hover:text-text-2 disabled:opacity-50"
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -283,14 +283,14 @@ export function FieldSelectionDialog({
             </div>
 
             {/* Tabs */}
-            <div className="mt-4 flex border-b border-gray-200">
+            <div className="border-border mt-4 flex border-b">
               <button
                 data-testid="field-selection-tab-select"
                 onClick={() => setActiveTab('select')}
                 className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
                   activeTab === 'select'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'text-accent border-accent'
+                    : 'text-text-2 hover:text-text-2 border-transparent'
                 }`}
               >
                 选择已有字段
@@ -300,8 +300,8 @@ export function FieldSelectionDialog({
                 onClick={() => setActiveTab('create')}
                 className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
                   activeTab === 'create'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'text-accent border-accent'
+                    : 'text-text-2 hover:text-text-2 border-transparent'
                 }`}
               >
                 创建新字段
@@ -314,9 +314,9 @@ export function FieldSelectionDialog({
             {activeTab === 'select' ? (
               <div className="flex h-full">
                 {/* Left Panel - Search and List */}
-                <div className="flex flex-1 flex-col border-r border-gray-200">
+                <div className="border-border flex flex-1 flex-col border-r">
                   {/* Search and Filters */}
-                  <div className="space-y-3 border-b border-gray-200 p-4">
+                  <div className="border-border space-y-3 border-b p-4">
                     {/* Search */}
                     <div>
                       <input
@@ -325,7 +325,7 @@ export function FieldSelectionDialog({
                         value={searchKeyword}
                         onChange={(e) => setSearchKeyword(e.target.value)}
                         placeholder="搜索字段..."
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
                       />
                     </div>
 
@@ -334,7 +334,7 @@ export function FieldSelectionDialog({
                       <select
                         value={baseTypeFilter}
                         onChange={(e) => setBaseTypeFilter(e.target.value)}
-                        className="flex-1 rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 focus:outline-none"
                       >
                         <option value="">所有类型</option>
                         {baseTypes.map((type) => (
@@ -346,10 +346,10 @@ export function FieldSelectionDialog({
 
                       <button
                         onClick={() => setBatchMode(!batchMode)}
-                        className={`rounded-md px-4 py-2 text-sm font-medium ${
+                        className={`rounded-control px-4 py-2 text-sm font-medium ${
                           batchMode
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-accent text-white'
+                            : 'bg-subtle text-text-2 hover:bg-hover'
                         }`}
                       >
                         {batchMode ? '批量模式' : '单选模式'}
@@ -357,13 +357,13 @@ export function FieldSelectionDialog({
                     </div>
 
                     {batchMode && selectedFields.size > 0 && (
-                      <div className="flex items-center justify-between rounded-md bg-blue-50 px-3 py-2">
+                      <div className="rounded-control bg-accent-weak flex items-center justify-between px-3 py-2">
                         <span className="text-sm text-blue-800">
                           已选择 {selectedFields.size} 个字段
                         </span>
                         <button
                           onClick={() => setSelectedFields(new Set())}
-                          className="text-sm text-blue-600 hover:text-blue-800"
+                          className="text-accent text-sm hover:text-blue-800"
                         >
                           清空
                         </button>
@@ -373,20 +373,20 @@ export function FieldSelectionDialog({
 
                   {/* Recommendations */}
                   {recommendations.length > 0 && !searchKeyword && (
-                    <div className="border-b border-gray-200 p-4">
-                      <h3 className="mb-2 text-sm font-medium text-gray-700">推荐字段</h3>
+                    <div className="border-border border-b p-4">
+                      <h3 className="text-text-2 mb-2 text-sm font-medium">推荐字段</h3>
                       <div className="space-y-1">
                         {recommendations.slice(0, 5).map((rec) => (
                           <button
                             key={rec.field.pid}
                             onClick={() => handleFieldClick(rec.field)}
-                            className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left hover:bg-gray-50"
+                            className="rounded-control hover:bg-subtle flex w-full items-center justify-between px-3 py-2 text-left"
                           >
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm font-medium text-gray-900">
+                              <div className="text-text truncate text-sm font-medium">
                                 {rec.field.code}
                               </div>
-                              <div className="text-xs text-gray-500">使用 {rec.usageCount} 次</div>
+                              <div className="text-text-2 text-xs">使用 {rec.usageCount} 次</div>
                             </div>
                             <span className="ml-2 inline-flex rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
                               {rec.field.dataType}
@@ -401,33 +401,33 @@ export function FieldSelectionDialog({
                   <div className="flex-1 overflow-y-auto p-4">
                     {loading ? (
                       <div className="flex items-center justify-center py-12">
-                        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+                        <div className="rounded-pill border-accent h-8 w-8 animate-spin border-b-2"></div>
                       </div>
                     ) : !fields || fields.length === 0 ? (
-                      <div className="py-12 text-center text-gray-500">
+                      <div className="text-text-2 py-12 text-center">
                         <p>未找到字段</p>
                       </div>
                     ) : (
                       <div className="space-y-2">
                         {batchMode && (
-                          <label className="flex cursor-pointer items-center rounded-md px-3 py-2 hover:bg-gray-50">
+                          <label className="rounded-control hover:bg-subtle flex cursor-pointer items-center px-3 py-2">
                             <input
                               type="checkbox"
                               checked={fields && selectedFields.size === fields.length}
                               onChange={handleSelectAll}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              className="border-border-strong text-accent focus-visible:shadow-focus rounded focus:outline-none"
                             />
-                            <span className="ml-2 text-sm font-medium text-gray-700">全选</span>
+                            <span className="text-text-2 ml-2 text-sm font-medium">全选</span>
                           </label>
                         )}
                         {fields.map((field) => (
                           <div
                             key={field.pid}
                             onClick={() => handleFieldClick(field)}
-                            className={`cursor-pointer rounded-md px-3 py-3 transition-colors ${
+                            className={`rounded-control cursor-pointer px-3 py-3 transition-colors ${
                               selectedField?.pid === field.pid
-                                ? 'border border-blue-200 bg-blue-50'
-                                : 'border border-transparent hover:bg-gray-50'
+                                ? 'bg-accent-weak border border-blue-200'
+                                : 'hover:bg-subtle border border-transparent'
                             }`}
                           >
                             <div className="flex items-start">
@@ -439,15 +439,15 @@ export function FieldSelectionDialog({
                                     e.stopPropagation();
                                     handleFieldSelect(field);
                                   }}
-                                  className="mt-1 mr-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  className="border-border-strong text-accent focus-visible:shadow-focus mt-1 mr-3 rounded focus:outline-none"
                                 />
                               )}
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-mono text-sm font-medium text-gray-900">
+                                  <span className="text-text font-mono text-sm font-medium">
                                     {field.code}
                                   </span>
-                                  <span className="inline-flex rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">
+                                  <span className="bg-subtle text-text inline-flex rounded px-2 py-0.5 text-xs font-medium">
                                     {field.dataType}
                                   </span>
                                   {field.status === 'published' && (
@@ -457,7 +457,7 @@ export function FieldSelectionDialog({
                                   )}
                                 </div>
                                 {field.remark && (
-                                  <p className="mt-1 truncate text-xs text-gray-500">
+                                  <p className="text-text-2 mt-1 truncate text-xs">
                                     {field.remark}
                                   </p>
                                 )}
@@ -474,12 +474,12 @@ export function FieldSelectionDialog({
                 <div className="flex w-96 flex-col">
                   {showConfig && selectedField ? (
                     <div className="flex-1 overflow-y-auto p-4">
-                      <h3 className="mb-4 text-lg font-medium text-gray-900">配置字段绑定</h3>
-                      <div className="mb-4 rounded-md bg-gray-50 p-3">
-                        <div className="font-mono text-sm font-medium text-gray-900">
+                      <h3 className="text-text mb-4 text-lg font-medium">配置字段绑定</h3>
+                      <div className="rounded-control bg-subtle mb-4 p-3">
+                        <div className="text-text font-mono text-sm font-medium">
                           {selectedField.code}
                         </div>
-                        <div className="mt-1 text-xs text-gray-500">{selectedField.dataType}</div>
+                        <div className="text-text-2 mt-1 text-xs">{selectedField.dataType}</div>
                       </div>
                       <FieldBindingConfigForm
                         field={selectedField}
@@ -509,11 +509,11 @@ export function FieldSelectionDialog({
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+          <div className="border-border flex justify-end gap-3 border-t px-6 py-4">
             <button
               onClick={handleClose}
               disabled={binding || creating}
-              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2 disabled:opacity-50"
             >
               取消
             </button>
@@ -523,10 +523,10 @@ export function FieldSelectionDialog({
                   <button
                     onClick={handleBatchBind}
                     disabled={binding || selectedFields.size === 0}
-                    className="flex items-center rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-control bg-accent hover:bg-accent-hover flex items-center px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {binding && (
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                      <div className="rounded-pill mr-2 h-4 w-4 animate-spin border-b-2 border-white"></div>
                     )}
                     批量绑定 ({selectedFields.size})
                   </button>
@@ -534,10 +534,10 @@ export function FieldSelectionDialog({
                   <button
                     onClick={handleSingleBind}
                     disabled={binding || !selectedField || !showConfig || !isConfigValid}
-                    className="flex items-center rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-control bg-accent hover:bg-accent-hover flex items-center px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {binding && (
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                      <div className="rounded-pill mr-2 h-4 w-4 animate-spin border-b-2 border-white"></div>
                     )}
                     确认绑定
                   </button>
@@ -548,10 +548,10 @@ export function FieldSelectionDialog({
                 data-testid="field-selection-create-bind"
                 onClick={handleCreateField}
                 disabled={creating || !isCreationFormValid}
-                className="flex items-center rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-control flex items-center bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {creating && (
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                  <div className="rounded-pill mr-2 h-4 w-4 animate-spin border-b-2 border-white"></div>
                 )}
                 创建并绑定字段
               </button>

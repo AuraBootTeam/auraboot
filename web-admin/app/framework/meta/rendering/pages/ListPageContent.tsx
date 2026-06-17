@@ -67,7 +67,27 @@ import { ListModals } from './list/ListModals';
 import { ListToolbar } from './list/ListToolbar';
 import { ListTable } from './list/ListTable';
 import { areSortsEqual, encodeSorts, decodeSorts } from './list/useListUrlState';
+import {
+  type QuickFilterPresetKey,
+  buildQuickFilterPreset,
+  isQuickFilterPresetKey,
+} from './list/quickFilterPresets';
 import { resolveListRowClickMode } from './list/rowClickNavigation';
+import { SelectAllMatchingBanner } from './list/SelectAllMatchingBanner';
+import {
+  type SelectionState,
+  createSelectionModel,
+  toggleRow as selectionToggleRow,
+  selectPage as selectionSelectPage,
+  clearPage as selectionClearPage,
+  enterAllMatching as selectionEnterAllMatching,
+  clearSelection as selectionClearSelection,
+  isSelected as selectionIsSelected,
+  selectedCount as selectionSelectedCount,
+  isPageFullySelected as selectionIsPageFullySelected,
+  getExplicitIds as selectionGetExplicitIds,
+  isAllMatching as selectionIsAllMatching,
+} from './list/selectionModel';
 import { savedViewService } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
@@ -111,7 +131,10 @@ export function resolveTableBlockRowActions(tableBlock: any): ButtonConfig[] {
   return rowActions;
 }
 
-function readRefTargetConfig(column: ColumnConfig, meta?: Record<string, any>): Record<string, any> {
+function readRefTargetConfig(
+  column: ColumnConfig,
+  meta?: Record<string, any>,
+): Record<string, any> {
   return {
     ...(meta?.extension?.refTarget || {}),
     ...(meta?.refTarget || {}),
@@ -153,7 +176,11 @@ export function collectListReferenceDisplayConfigs(
     const meta = modelFieldMap.get(column.field);
     const refTarget = readRefTargetConfig(column, meta);
     const dataType = String(
-      (column as any).dataType || column.valueType || meta?.dataType || meta?.extension?.dataType || '',
+      (column as any).dataType ||
+        column.valueType ||
+        meta?.dataType ||
+        meta?.extension?.dataType ||
+        '',
     ).toLowerCase();
     const hasReferenceShape =
       dataType === 'reference' ||
@@ -231,7 +258,9 @@ export function buildToolbarConditionContext(
   return { ...base, recordCount: list.records?.length ?? 0, total: list.total ?? 0 };
 }
 
-export function shouldSkipListData(schema: { blocks?: BlockConfig[]; extension?: Record<string, any> } | null | undefined): boolean {
+export function shouldSkipListData(
+  schema: { blocks?: BlockConfig[]; extension?: Record<string, any> } | null | undefined,
+): boolean {
   if (!schema) return false;
   const extension = schema.extension ?? {};
   if (extension.skipListData === true || extension.customOnly === true) {
@@ -287,8 +316,10 @@ interface TenantMemberImportResult {
   errors: TenantMemberImportError[];
 }
 
-// Quick filter chip definitions
-type QuickFilterKey = 'my_records' | 'created_today' | 'modified_this_week';
+// Quick filter chip definitions — preset views (T8). Keys + filter logic live
+// in ./list/quickFilterPresets so the toolbar and the view switcher share one
+// source of truth.
+type QuickFilterKey = QuickFilterPresetKey;
 
 // List Page Content Component
 function ListPageContentInner(props: PageContentProps) {
@@ -344,7 +375,12 @@ function ListPageContentInner(props: PageContentProps) {
   const [data, setData] = useState<DynamicEntity[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // T9 — cross-page selection model. `selectionState` is the single source of
+  // truth (explicit picked ids, or all-matching mode with an exclusion set);
+  // the page-scoped `selectedIds` Set + counts below are derived from it.
+  const [selectionState, setSelectionState] = useState<SelectionState>(() =>
+    createSelectionModel(),
+  );
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [pageState, setPageState] = useState(() => ({
     filters: { ...urlFilters } as Record<string, any>,
@@ -366,6 +402,11 @@ function ListPageContentInner(props: PageContentProps) {
   const urlSorts = useMemo(() => decodeSorts(searchParams.get('sort')), [searchParams]);
   const urlKeyword = useMemo(() => searchParams.get('keyword') || '', [searchParams]);
   const urlViewPid = useMemo(() => searchParams.get('view') || null, [searchParams]);
+  // Active preset view (?preset=created_today) — persists across reload.
+  const urlPreset = useMemo<QuickFilterKey | null>(() => {
+    const raw = searchParams.get('preset');
+    return isQuickFilterPresetKey(raw) ? raw : null;
+  }, [searchParams]);
 
   // Search keyword for toolbar search input
   const [keyword, _setKeyword] = useState(urlKeyword);
@@ -478,7 +519,46 @@ function ListPageContentInner(props: PageContentProps) {
       (tableBlock as any)?.table?.bulkActions ?? (tableBlock as any)?.bulkActions ?? [];
     return Array.isArray(configured) ? configured : [];
   }, [tableBlock]);
-  const selectedIdList = useMemo(() => Array.from(selectedIds), [selectedIds]);
+  // T9 — ids of the rows currently loaded on this page (cross-page selection
+  // accumulates across these as the user pages).
+  const pageRowIds = useMemo(
+    () => data.map((r) => r.pid || r.id || '').filter(Boolean) as string[],
+    [data],
+  );
+  const allMatchingSelected = selectionIsAllMatching(selectionState);
+  // Page-scoped Set of selected ids — what the table's checkboxes render from
+  // (the table compares against the visible page's row ids).
+  const selectedIds = useMemo(
+    () => new Set(pageRowIds.filter((id) => selectionIsSelected(selectionState, id))),
+    [pageRowIds, selectionState],
+  );
+  // Whether every loaded row on this page is selected (drives the header
+  // checkbox + the "select all N matching" banner offer).
+  const pageFullySelected = useMemo(
+    () => selectionIsPageFullySelected(selectionState, pageRowIds),
+    [selectionState, pageRowIds],
+  );
+  // Effective selected count across all pages (page picks, or total-minus-
+  // exclusions in all-matching mode).
+  const effectiveSelectedCount = selectionSelectedCount(selectionState, pagination.total);
+  // Explicit ids for bulk ops/export. In all-matching mode there is no finite
+  // client-side id list — callers branch on `allMatchingSelected` and export by
+  // the current filter instead.
+  const explicitSelectedIds = useMemo(
+    () => selectionGetExplicitIds(selectionState),
+    [selectionState],
+  );
+  // The concrete ids a bulk op (delete/edit/custom action) should target. In
+  // explicit mode this is the full cross-page pick; in all-matching mode we
+  // fall back to the currently-selected rows on this page (a finite, safe set)
+  // — export is the cross-page path and uses the filter directly.
+  const selectedIdList = allMatchingSelected ? Array.from(selectedIds) : explicitSelectedIds;
+  // Whether row selection (checkbox column + bulk bar + select-all banner) is
+  // active for this page — DSL opt-in via the table block, minus any host-level
+  // override.
+  const selectionEnabled =
+    !!((tableBlock as any)?.table?.selection || (tableBlock as any)?.selection) &&
+    !listExtensions?.disableRowSelection;
 
   // G7 dispatch — list pages hardcode table/filters/toolbar/tabs/form-buttons
   // in the layout above, but any additional block types in the schema
@@ -578,6 +658,9 @@ function ListPageContentInner(props: PageContentProps) {
   );
   const { formats: dateTimeFormats, timezone: effectiveTimezone } = useTimezone();
   const pendingSavedViewFiltersRef = useRef<Record<string, any> | null>(null);
+  // When restoring a preset view from ?preset= on mount, skip the first run of
+  // the debounced sort/filter effect so it doesn't re-fetch with empty filters.
+  const skipFirstSortFilterEffectRef = useRef(false);
   const loadDataRef = useRef<
     | ((params?: { page?: number; size?: number; filters?: Record<string, any> }) => Promise<void>)
     | null
@@ -592,6 +675,10 @@ function ListPageContentInner(props: PageContentProps) {
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
   const hideSavedViews =
     listExtensions?.hideSavedViews ?? Boolean(schemaExtension.hideSavedViews || skipListData);
+  // Quick-filter / preset-view visibility (shared by the header preset bar and
+  // the toolbar quick filters so both stay in sync).
+  const hideQuickFilters =
+    listExtensions?.hideQuickFilters ?? Boolean(schemaExtension.hideQuickFilters);
   const {
     views: savedViews,
     currentView,
@@ -1130,7 +1217,26 @@ function ListPageContentInner(props: PageContentProps) {
   // Pass current filters (which may include URL filter_* params) for the first load
   useEffect(() => {
     if (schema && !skipListData) {
-      loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+      // Restore an active preset view from ?preset= so it survives reload —
+      // a SavedView (?view=) takes precedence and carries its own filters.
+      const initialPreset = urlViewPid ? null : urlPreset;
+      if (initialPreset) {
+        const presetFilters =
+          buildQuickFilterPreset(initialPreset, { userId: user?.id, now: new Date() }) ?? {};
+        setActiveQuickFilter(initialPreset);
+        setFilters(presetFilters);
+        // The debounced sort/filter effect would otherwise re-fetch once on
+        // mount with the still-empty `filters` state and clobber this preset
+        // load — skip exactly that first run so the preset filter wins.
+        skipFirstSortFilterEffectRef.current = true;
+        loadDataRef.current?.({
+          page: pagination.current - 1,
+          size: pagination.pageSize,
+          filters: presetFilters,
+        });
+      } else {
+        loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+      }
     }
     // Intentionally only react to schema changes.
     // Pagination or filter updates are handled by explicit user actions.
@@ -1470,6 +1576,12 @@ function ListPageContentInner(props: PageContentProps) {
 
   useEffect(() => {
     if (!schema || skipListData) return;
+    // Preset restore (?preset=) already issued the filtered load on mount; skip
+    // this first debounced run so it doesn't clobber it with empty filters.
+    if (skipFirstSortFilterEffectRef.current) {
+      skipFirstSortFilterEffectRef.current = false;
+      return;
+    }
     loadData({ page: 0, size: pagination.pageSize, filters });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSortFilterValues, skipListData]);
@@ -1519,28 +1631,36 @@ function ListPageContentInner(props: PageContentProps) {
     loadData({ page: 0, size: pagination.pageSize, filters });
   }, [loadData, pagination.pageSize, filters]);
 
-  // Bulk selection handlers
+  // Bulk selection handlers (T9 — backed by the cross-page selection model).
   const toggleRowSelection = useCallback((recordId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(recordId)) next.delete(recordId);
-      else next.add(recordId);
-      return next;
-    });
+    setSelectionState((prev) => selectionToggleRow(prev, recordId));
   }, []);
 
+  // Header checkbox: toggle whole-page selection. If the page is already fully
+  // selected, un-check it; otherwise select every loaded row on the page.
   const toggleSelectAll = useCallback(() => {
-    setSelectedIds((prev) => {
-      if (prev.size === data.length && data.length > 0) return new Set();
-      return new Set(data.map((r) => r.pid || r.id || '').filter(Boolean));
-    });
-  }, [data]);
+    setSelectionState((prev) =>
+      selectionIsPageFullySelected(prev, pageRowIds)
+        ? selectionClearPage(prev, pageRowIds)
+        : selectionSelectPage(prev, pageRowIds),
+    );
+  }, [pageRowIds]);
+
+  // Banner action: opt into "select all N matching the current filter".
+  const handleSelectAllMatching = useCallback(() => {
+    setSelectionState((prev) => selectionEnterAllMatching(prev));
+  }, []);
+
+  // Banner action: drop back from all-matching to no selection.
+  const clearAllSelection = useCallback(() => {
+    setSelectionState((prev) => selectionClearSelection(prev));
+  }, []);
 
   const handleBulkDelete = useCallback(
     async (ids: string[]) => {
       const mc = schema?.modelCode || tableName;
       await dynamicService.batchDelete(mc, ids);
-      setSelectedIds(new Set());
+      setSelectionState(selectionClearSelection);
       loadData({ page: 0, size: pagination.pageSize, filters });
     },
     [schema?.modelCode, tableName, loadData, pagination.pageSize, filters],
@@ -1632,7 +1752,7 @@ function ListPageContentInner(props: PageContentProps) {
       }
 
       if (successCount > 0) {
-        setSelectedIds(new Set());
+        setSelectionState(selectionClearSelection);
         await loadData({ page: 0, size: pagination.pageSize, filters });
       }
 
@@ -1673,7 +1793,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   const handleBulkEditComplete = useCallback(() => {
     setBulkEditOpen(false);
-    setSelectedIds(new Set());
+    setSelectionState(selectionClearSelection);
     loadData({ page: 0, size: pagination.pageSize, filters });
   }, [loadData, pagination.pageSize, filters]);
 
@@ -1724,7 +1844,8 @@ function ListPageContentInner(props: PageContentProps) {
         : undefined;
       const referenceDisplayValue =
         referenceConfig && value !== null && value !== undefined
-          ? record[referenceConfig.displayKey] || referenceDisplayCache[cacheKey || '']?.[String(value)]
+          ? record[referenceConfig.displayKey] ||
+            referenceDisplayCache[cacheKey || '']?.[String(value)]
           : undefined;
       const recordForRenderer = referenceDisplayValue
         ? { ...record, [referenceConfig!.displayKey]: referenceDisplayValue }
@@ -1738,7 +1859,7 @@ function ListPageContentInner(props: PageContentProps) {
         !((column as any).allowNullRenderer === true) &&
         (value === null || value === undefined)
       ) {
-        return <span className="text-gray-400">-</span>;
+        return <span className="text-text-3">-</span>;
       }
 
       // If dictCode exists, try to translate value to label
@@ -1764,7 +1885,7 @@ function ListPageContentInner(props: PageContentProps) {
             const colorCls = colorMap[tagColor] || colorMap.blue;
             return (
               <span
-                className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${colorCls}`}
+                className={`rounded-pill inline-flex px-2 py-1 text-xs font-medium ${colorCls}`}
               >
                 {item.label}
               </span>
@@ -2483,6 +2604,12 @@ function ListPageContentInner(props: PageContentProps) {
       if (!canUseButton(button)) return false;
       if (!button.visibleWhen) return true;
       const selectedIdsArray = selectedIdList;
+      // In all-matching mode the selection spans every filtered record, so the
+      // visibility count reflects the effective total (minus exclusions), not
+      // just the finite id array.
+      const visibleSelectedCount = allMatchingSelected
+        ? effectiveSelectedCount
+        : selectedIdsArray.length;
       const conditionContext = {
         ...buildToolbarConditionContext(
           { total: pagination.total, records: data },
@@ -2490,16 +2617,25 @@ function ListPageContentInner(props: PageContentProps) {
             state: {
               filters,
               selectedIds: selectedIdsArray,
-              selectedCount: selectedIdsArray.length,
+              selectedCount: visibleSelectedCount,
             },
           }),
         ),
         selectedIds: selectedIdsArray,
-        selectedCount: selectedIdsArray.length,
+        selectedCount: visibleSelectedCount,
       };
       return evaluateCondition(button.visibleWhen, conditionContext as any);
     });
-  }, [canUseButton, data, filters, pagination.total, selectedIdList, tableBulkActions]);
+  }, [
+    canUseButton,
+    data,
+    filters,
+    pagination.total,
+    selectedIdList,
+    allMatchingSelected,
+    effectiveSelectedCount,
+    tableBulkActions,
+  ]);
 
   // Build export filter conditions for toolbar
   const exportFilterConditions = useMemo(() => {
@@ -2528,16 +2664,20 @@ function ListPageContentInner(props: PageContentProps) {
     return conditions.length > 0 ? conditions : undefined;
   }, [filters, getTabFilter]);
 
-  // Handle export from toolbar
-  const handleExport = useCallback(
-    async (format: 'xlsx' | 'csv') => {
+  // Shared export request — posts the given conditions to the export endpoint
+  // and triggers a browser download of the returned file.
+  const runExport = useCallback(
+    async (
+      format: 'xlsx' | 'csv',
+      conditions: Array<{ field: string; operator: string; value: unknown }> | undefined,
+    ) => {
       try {
         const res = await fetch(`/api/dynamic/${modelCode}/export`, {
           method: 'post',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             format: format === 'xlsx' ? 'excel' : 'csv',
-            conditions: exportFilterConditions,
+            conditions,
           }),
         });
         if (!res.ok) throw new Error('Export request failed');
@@ -2556,7 +2696,36 @@ function ListPageContentInner(props: PageContentProps) {
         showErrorToast(err instanceof Error ? err.message : 'Export failed');
       }
     },
-    [modelCode, exportFilterConditions, showErrorToast],
+    [modelCode, showErrorToast],
+  );
+
+  // Handle export from toolbar — exports the full/filtered result set.
+  const handleExport = useCallback(
+    async (format: 'xlsx' | 'csv') => {
+      await runExport(format, exportFilterConditions);
+    },
+    [runExport, exportFilterConditions],
+  );
+
+  // T9 — export ONLY the selected records.
+  //  - explicit mode: the current filter scope plus an `IN pid (...)` condition
+  //    restricting the export to the picked ids (which may span pages).
+  //  - all-matching mode: there is no finite id list — export the whole filtered
+  //    set (the same conditions a normal export would use).
+  const handleExportSelected = useCallback(
+    async (format: 'xlsx' | 'csv' = 'xlsx') => {
+      if (allMatchingSelected) {
+        await runExport(format, exportFilterConditions);
+        return;
+      }
+      if (explicitSelectedIds.length === 0) return;
+      const conditions = [
+        ...(exportFilterConditions ?? []),
+        { field: 'pid', operator: 'IN', value: explicitSelectedIds },
+      ];
+      await runExport(format, conditions);
+    },
+    [allMatchingSelected, runExport, exportFilterConditions, explicitSelectedIds],
   );
 
   // Row height from current view config (with fallback)
@@ -2570,40 +2739,44 @@ function ListPageContentInner(props: PageContentProps) {
     [ensureViewAndUpdateConfig],
   );
 
-  // Quick filter handler — toggle on/off, apply filter and reload
+  // Sync the active preset view to the URL (?preset=created_today) so it
+  // survives reload; pass null to clear it.
+  const syncPresetToUrl = useCallback(
+    (key: QuickFilterKey | null) => {
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (key) {
+            p.set('preset', key);
+          } else {
+            p.delete('preset');
+          }
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  // Quick filter handler — toggle a preset view on/off, apply its filter, reload.
   const handleQuickFilter = useCallback(
     (key: QuickFilterKey) => {
       if (activeQuickFilter === key) {
-        // Toggle off — clear filter and reload
+        // Toggle off — clear preset filter and reload
         setActiveQuickFilter(null);
         setFilters({});
+        syncPresetToUrl(null);
         loadData({ page: 0, size: pagination.pageSize, filters: {} });
         return;
       }
+      const qf = buildQuickFilterPreset(key, { userId: user?.id, now: new Date() }) ?? {};
       setActiveQuickFilter(key);
-      const today = new Date().toISOString().split('T')[0];
-      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
-      let qf: Record<string, any> = {};
-      switch (key) {
-        case 'my_records':
-          if (user?.id) {
-            const createdBy = Number.parseInt(String(user.id), 10);
-            if (!Number.isNaN(createdBy)) {
-              qf = { created_by: createdBy };
-            }
-          }
-          break;
-        case 'created_today':
-          qf = { created_at: { start: today, end: today + 'T23:59:59' } };
-          break;
-        case 'modified_this_week':
-          qf = { updated_at: { start: weekAgo, end: today + 'T23:59:59' } };
-          break;
-      }
       setFilters(qf);
+      syncPresetToUrl(key);
       loadData({ page: 0, size: pagination.pageSize, filters: qf });
     },
-    [activeQuickFilter, user, setFilters, loadData, pagination.pageSize],
+    [activeQuickFilter, user, setFilters, syncPresetToUrl, loadData, pagination.pageSize],
   );
 
   // Save current filters to SavedView
@@ -2788,7 +2961,7 @@ function ListPageContentInner(props: PageContentProps) {
         data-testid="dynamic-list"
         data-ab-testid={deriveTestId('list', modelCode, 'container')}
       >
-        <div className="rounded-lg bg-white shadow-sm">
+        <div className="rounded-card bg-panel shadow-sm">
           {/* Page title, view selector, and action buttons */}
           <ListPageHeader
             title={
@@ -2849,6 +3022,9 @@ function ListPageContentInner(props: PageContentProps) {
             evaluateVisible={evaluateButtonVisible}
             onImport={() => setImportOpen(true)}
             onExport={handleExport}
+            activePreset={activeQuickFilter}
+            onSelectPreset={handleQuickFilter}
+            hidePresetViews={hideQuickFilters}
             exportFilters={exportFilterConditions}
             isTenantMemberPage={isTenantMemberPage}
             onInvite={() => setInviteDialogOpen(true)}
@@ -2860,23 +3036,23 @@ function ListPageContentInner(props: PageContentProps) {
             hideBuiltInImport={
               skipListData
                 ? true
-                : listExtensions?.hideBuiltInImport ??
+                : (listExtensions?.hideBuiltInImport ??
                   (schema as any)?.extension?.hideBuiltInImport ??
-                  (schema as any)?.extension?.hideToolbarMore
+                  (schema as any)?.extension?.hideToolbarMore)
             }
             hideBuiltInExport={
               skipListData
                 ? true
-                : listExtensions?.hideBuiltInExport ??
+                : (listExtensions?.hideBuiltInExport ??
                   (schema as any)?.extension?.hideBuiltInExport ??
-                  (schema as any)?.extension?.hideToolbarMore
+                  (schema as any)?.extension?.hideToolbarMore)
             }
             hideBuiltInPrint={
               skipListData
                 ? true
-                : listExtensions?.hideBuiltInPrint ??
+                : (listExtensions?.hideBuiltInPrint ??
                   (schema as any)?.extension?.hideBuiltInPrint ??
-                  (schema as any)?.extension?.hideToolbarMore
+                  (schema as any)?.extension?.hideToolbarMore)
             }
           />
 
@@ -2887,11 +3063,11 @@ function ListPageContentInner(props: PageContentProps) {
               data-testid="member-import-dialog"
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
             >
-              <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl">
+              <div className="rounded-card bg-panel w-full max-w-2xl p-6 shadow-xl">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">批量导入成员</h3>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <h3 className="text-text text-lg font-semibold">批量导入成员</h3>
+                    <p className="text-text-2 mt-1 text-sm">
                       入口归属 tenant_member。导入的主语义是批量准入，不是直接维护组织树。
                     </p>
                   </div>
@@ -2901,14 +3077,14 @@ function ListPageContentInner(props: PageContentProps) {
                       setMemberImportDialogOpen(false);
                       resetMemberImportState();
                     }}
-                    className="text-sm text-gray-500 hover:text-gray-700"
+                    className="text-text-2 hover:text-text-2 text-sm"
                   >
                     关闭
                   </button>
                 </div>
 
-                <div className="space-y-4 text-sm text-gray-700">
-                  <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                <div className="text-text-2 space-y-4 text-sm">
+                  <div className="rounded-control bg-accent-weak border border-blue-200 p-3">
                     <p className="font-medium text-blue-900">推荐流程</p>
                     <p className="mt-1 text-blue-800">
                       Excel 导入先处理租户成员准入，再按邮箱复用已有 User
@@ -2916,24 +3092,24 @@ function ListPageContentInner(props: PageContentProps) {
                     </p>
                   </div>
 
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
+                  <div className="rounded-control border-border bg-subtle border p-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="font-medium text-gray-900">1. 下载模板</p>
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="text-text font-medium">1. 下载模板</p>
+                        <p className="text-text-2 mt-1 text-xs">
                           支持 `.xlsx`。必填列是姓名、邮箱；部门和职位用于补全组织关系。
                         </p>
                       </div>
                       <a
                         href="/api/tenant/members/import/template"
-                        className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                        className="rounded-control bg-panel text-accent hover:bg-accent-weak inline-flex items-center justify-center border border-blue-200 px-3 py-2 text-sm font-medium"
                       >
                         下载模板
                       </a>
                     </div>
 
                     <div className="mt-4">
-                      <p className="font-medium text-gray-900">2. 选择文件</p>
+                      <p className="text-text font-medium">2. 选择文件</p>
                       <input
                         data-testid="member-import-file-input"
                         type="file"
@@ -2943,17 +3119,15 @@ function ListPageContentInner(props: PageContentProps) {
                           setMemberImportFile(selectedFile);
                           setMemberImportError(null);
                         }}
-                        className="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
+                        className="rounded-control border-border-strong text-text-2 file:rounded-control file:bg-accent hover:file:bg-accent-hover mt-2 block w-full border px-3 py-2 text-sm file:mr-3 file:border-0 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
                       />
                       {memberImportFile && (
-                        <p className="mt-2 text-xs text-gray-500">
-                          已选择: {memberImportFile.name}
-                        </p>
+                        <p className="text-text-2 mt-2 text-xs">已选择: {memberImportFile.name}</p>
                       )}
                     </div>
 
                     {memberImportError && (
-                      <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      <div className="rounded-control bg-status-red-bg mt-3 border border-red-200 px-3 py-2 text-sm text-red-700">
                         {memberImportError}
                       </div>
                     )}
@@ -2965,7 +3139,7 @@ function ListPageContentInner(props: PageContentProps) {
                           setMemberImportDialogOpen(false);
                           resetMemberImportState();
                         }}
-                        className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        className="rounded-control border-border-strong text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
                       >
                         取消
                       </button>
@@ -2974,7 +3148,7 @@ function ListPageContentInner(props: PageContentProps) {
                         data-testid="member-import-submit"
                         disabled={!memberImportFile || memberImportLoading}
                         onClick={() => void handleTenantMemberImport()}
-                        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                        className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-blue-300"
                       >
                         {memberImportLoading ? '导入中...' : '开始导入'}
                       </button>
@@ -2982,7 +3156,7 @@ function ListPageContentInner(props: PageContentProps) {
                   </div>
 
                   <div>
-                    <p className="font-medium text-gray-900">导入结果分三类</p>
+                    <p className="text-text font-medium">导入结果分三类</p>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                       <li>已绑定已有用户：复用现有 User，创建 TenantMember，并建立组织关系</li>
                       <li>待激活成员：创建准入记录，发送邀请，等首次设置密码后启用登录</li>
@@ -2991,17 +3165,17 @@ function ListPageContentInner(props: PageContentProps) {
                   </div>
 
                   <div>
-                    <p className="font-medium text-gray-900">建议模板字段</p>
-                    <div className="mt-2 overflow-hidden rounded-md border border-gray-200">
-                      <table className="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead className="bg-gray-50">
+                    <p className="text-text font-medium">建议模板字段</p>
+                    <div className="rounded-control border-border mt-2 overflow-hidden border">
+                      <table className="divide-border min-w-full divide-y text-sm">
+                        <thead className="bg-subtle">
                           <tr>
-                            <th className="px-3 py-2 text-left font-medium text-gray-600">字段</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-600">必填</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-600">说明</th>
+                            <th className="text-text-2 px-3 py-2 text-left font-medium">字段</th>
+                            <th className="text-text-2 px-3 py-2 text-left font-medium">必填</th>
+                            <th className="text-text-2 px-3 py-2 text-left font-medium">说明</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200 bg-white">
+                        <tbody className="divide-border bg-panel divide-y">
                           <tr>
                             <td className="px-3 py-2">姓名</td>
                             <td className="px-3 py-2">是</td>
@@ -3034,14 +3208,14 @@ function ListPageContentInner(props: PageContentProps) {
                     </div>
                   </div>
 
-                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                  <div className="rounded-control bg-status-amber-bg border border-amber-200 p-3 text-amber-900">
                     第一版实现先固定入口和规则，不默认给新导入人员生成可直接登录的密码。新用户应走邀请激活链路。
                   </div>
 
                   {memberImportResult && (
                     <div
                       data-testid="member-import-result"
-                      className="rounded-md border border-emerald-200 bg-emerald-50 p-4"
+                      className="rounded-card border border-emerald-200 bg-emerald-50 p-4"
                     >
                       <p className="font-medium text-emerald-900">导入结果</p>
                       <div className="mt-2 grid gap-2 text-sm text-emerald-900 md:grid-cols-2">
@@ -3054,9 +3228,9 @@ function ListPageContentInner(props: PageContentProps) {
                       </div>
 
                       {memberImportResult.errors.length > 0 && (
-                        <div className="mt-4 overflow-hidden rounded-md border border-amber-200 bg-white">
+                        <div className="rounded-control bg-panel mt-4 overflow-hidden border border-amber-200">
                           <table className="min-w-full divide-y divide-amber-100 text-sm">
-                            <thead className="bg-amber-50">
+                            <thead className="bg-status-amber-bg">
                               <tr>
                                 <th className="px-3 py-2 text-left font-medium text-amber-900">
                                   行号
@@ -3096,7 +3270,7 @@ function ListPageContentInner(props: PageContentProps) {
                       setMemberImportDialogOpen(false);
                       resetMemberImportState();
                     }}
-                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="rounded-control border-border-strong text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
                   >
                     关闭
                   </button>
@@ -3112,13 +3286,13 @@ function ListPageContentInner(props: PageContentProps) {
               data-testid="invite-dialog"
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
             >
-              <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+              <div className="rounded-card bg-panel w-full max-w-md p-6 shadow-xl">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Member Invite</h3>
+                  <h3 className="text-text text-lg font-semibold">Member Invite</h3>
                   <button
                     type="button"
                     onClick={() => setInviteDialogOpen(false)}
-                    className="text-sm text-gray-500 hover:text-gray-700"
+                    className="text-text-2 hover:text-text-2 text-sm"
                   >
                     Close
                   </button>
@@ -3126,15 +3300,15 @@ function ListPageContentInner(props: PageContentProps) {
                 <div className="space-y-4">
                   {inviteCodeData?.code ? (
                     <>
-                      <div className="rounded-md bg-gray-50 p-3">
-                        <div className="mb-1 text-xs font-medium text-gray-500">
+                      <div className="rounded-control bg-subtle p-3">
+                        <div className="text-text-2 mb-1 text-xs font-medium">
                           Current Invite Code
                         </div>
-                        <div className="font-mono text-lg tracking-wider text-gray-900">
+                        <div className="text-text font-mono text-lg tracking-wider">
                           {inviteCodeData.code}
                         </div>
                         {inviteCodeData.expiredAt && (
-                          <div className="mt-1 text-xs text-gray-500">
+                          <div className="text-text-2 mt-1 text-xs">
                             Expires at {new Date(inviteCodeData.expiredAt).toLocaleString()}
                           </div>
                         )}
@@ -3144,7 +3318,7 @@ function ListPageContentInner(props: PageContentProps) {
                           type="button"
                           onClick={handleGenerateInviteCode}
                           disabled={inviteLoading}
-                          className="flex-1 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                          className="rounded-control bg-accent hover:bg-accent-hover flex-1 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
                         >
                           Refresh
                         </button>
@@ -3152,7 +3326,7 @@ function ListPageContentInner(props: PageContentProps) {
                           type="button"
                           onClick={handleRevokeInviteCode}
                           disabled={inviteLoading}
-                          className="flex-1 rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                          className="rounded-control flex-1 bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
                         >
                           Revoke
                         </button>
@@ -3160,14 +3334,14 @@ function ListPageContentInner(props: PageContentProps) {
                     </>
                   ) : (
                     <div className="space-y-3">
-                      <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+                      <div className="rounded-control bg-status-amber-bg p-3 text-sm text-amber-800">
                         No active invite code. Generate one to invite members into this tenant.
                       </div>
                       <button
                         type="button"
                         onClick={handleGenerateInviteCode}
                         disabled={inviteLoading}
-                        className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                        className="rounded-control bg-accent hover:bg-accent-hover w-full px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
                       >
                         Generate Invite Code
                       </button>
@@ -3197,7 +3371,7 @@ function ListPageContentInner(props: PageContentProps) {
               <div
                 data-testid="search-area"
                 data-ab-testid={deriveTestId('list', modelCode, 'filters')}
-                className="print-hide border-b border-gray-200 bg-gray-50 px-6 py-4"
+                className="print-hide border-border bg-subtle border-b px-6 py-4"
                 data-print="hide"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -3237,7 +3411,7 @@ function ListPageContentInner(props: PageContentProps) {
                         type="button"
                         data-testid="filter-toggle"
                         onClick={() => setFiltersExpanded((prev) => !prev)}
-                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                        className="text-accent flex items-center gap-1 text-sm hover:text-blue-800"
                       >
                         {filtersExpanded ? (
                           <>
@@ -3286,7 +3460,7 @@ function ListPageContentInner(props: PageContentProps) {
                         type="button"
                         data-testid="filter-save"
                         onClick={handleSaveFilters}
-                        className="rounded-md px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                        className="rounded-control text-text-2 hover:bg-hover hover:text-text-2 px-3 py-2 text-sm transition-colors"
                         title="Save filters to current view"
                       >
                         <svg
@@ -3312,12 +3486,12 @@ function ListPageContentInner(props: PageContentProps) {
                           key={button.code}
                           data-testid={`filter-btn-${button.code}`}
                           onClick={() => handleAction(button)}
-                          className={`rounded-md px-4 py-2 ${
+                          className={`rounded-control px-4 py-2 ${
                             button.primary || button.variant === 'primary'
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              ? 'bg-accent hover:bg-accent-hover text-white'
                               : button.variant === 'danger' || button.danger
                                 ? 'bg-red-600 text-white hover:bg-red-700'
-                                : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                                : 'border-border-strong bg-panel text-text-2 hover:bg-hover border'
                           }`}
                         >
                           {resolveButtonLabel(button)}
@@ -3330,7 +3504,7 @@ function ListPageContentInner(props: PageContentProps) {
                           type="button"
                           data-testid="filter-reset"
                           onClick={handleReset}
-                          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-600 hover:bg-gray-50"
+                          className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-4 py-2"
                         >
                           {t('action.reset')}
                         </button>
@@ -3338,7 +3512,7 @@ function ListPageContentInner(props: PageContentProps) {
                           type="button"
                           data-testid="filter-search"
                           onClick={handleSearch}
-                          className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                          className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-white"
                         >
                           {t('action.search')}
                         </button>
@@ -3441,9 +3615,7 @@ function ListPageContentInner(props: PageContentProps) {
                   setChipFilters([]);
                   setActiveSorts([]);
                 }}
-                hideQuickFilters={
-                  listExtensions?.hideQuickFilters ?? Boolean(schemaExtension.hideQuickFilters)
-                }
+                hideQuickFilters={hideQuickFilters}
                 hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
                 hideColumnSettings={
                   listExtensions?.hideColumnSettings ?? Boolean(schemaExtension.hideColumnSettings)
@@ -3454,6 +3626,20 @@ function ListPageContentInner(props: PageContentProps) {
                 hideFilterChips={
                   listExtensions?.hideFilterChips ?? Boolean(schemaExtension.hideFilterChips)
                 }
+              />
+
+              {/* T9 — cross-page select-all banner. Shown once the whole page
+                  is selected and more matching records exist beyond it, or
+                  while in "all N matching" mode. */}
+              <SelectAllMatchingBanner
+                enabled={selectionEnabled}
+                pageFullySelected={pageFullySelected}
+                allMatchingSelected={allMatchingSelected}
+                pageSelectedCount={selectedIds.size}
+                total={pagination.total}
+                onSelectAllMatching={handleSelectAllMatching}
+                onClearSelection={clearAllSelection}
+                t={t}
               />
 
               {/* Table area — extracted to ListTable with DnD column reorder */}
@@ -3493,10 +3679,7 @@ function ListPageContentInner(props: PageContentProps) {
                 t={t}
                 onInlineSave={handleInlineSave}
                 dictDataCache={dictDataCache.current}
-                enableSelection={
-                  !!((tableBlock as any)?.table?.selection || (tableBlock as any)?.selection) &&
-                  !listExtensions?.disableRowSelection
-                }
+                enableSelection={selectionEnabled}
               />
 
               {/* G7 — misc blocks (chart / description / rich-text / divider /
@@ -3523,15 +3706,16 @@ function ListPageContentInner(props: PageContentProps) {
                 onPageChange={handlePageChange}
                 onPageSizeChange={handlePageSizeChange}
                 t={t}
-                selectedCount={selectedIds.size}
+                selectedCount={effectiveSelectedCount}
                 selectedIds={selectedIdList}
                 modelCode={modelCode}
                 onBulkEdit={() => setBulkEditOpen(true)}
                 onBulkDelete={handleBulkDelete}
+                onBulkExport={() => handleExportSelected('xlsx')}
                 bulkActions={visibleBulkActions}
                 onBulkAction={handleBulkAction}
                 resolveBulkActionLabel={resolveButtonLabel}
-                onClearSelection={() => setSelectedIds(new Set())}
+                onClearSelection={clearAllSelection}
               />
             </>
           ) : (
@@ -3561,7 +3745,7 @@ function ListPageContentInner(props: PageContentProps) {
             // BulkEditModal
             bulkEditOpen={bulkEditOpen}
             onBulkEditClose={() => setBulkEditOpen(false)}
-            selectedIds={Array.from(selectedIds)}
+            selectedIds={selectedIdList}
             modelCode={modelCode}
             bulkEditFields={tableColumns
               .filter((c) => !c.isActionColumn && c.field)

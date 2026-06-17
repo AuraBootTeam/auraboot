@@ -142,8 +142,9 @@ describe('ViewModelService', () => {
         { pid: 'p1', code: 'view1', displayName: 'View 1', modelType: 'view' },
         { pid: 'p2', code: 'view2', displayName: 'View 2', modelType: 'view' },
       ];
+      // Real shape: MyBatis-Plus IPage serializes rows under `records`.
       mockGet.mockResolvedValueOnce({
-        data: { data: mockModels, total: 2, page: 1, size: 20 },
+        data: { records: mockModels, total: 2, current: 1, size: 20 },
       } as any);
 
       const result = await service.listViewModels();
@@ -155,6 +156,19 @@ describe('ViewModelService', () => {
       expect(result).toEqual(mockModels);
     });
 
+    it('should NOT read the legacy data.data shape (regression for empty dropdown)', async () => {
+      await loadService();
+      // The old code read result.data.data; the live endpoint has no such key,
+      // so a data.data payload must yield [] (records is the only real source).
+      mockGet.mockResolvedValueOnce({
+        data: { data: [{ pid: 'x', code: 'legacy' }], total: 1 },
+      } as any);
+
+      const result = await service.listViewModels();
+
+      expect(result).toEqual([]);
+    });
+
     it('should return empty array when response has no data', async () => {
       await loadService();
       mockGet.mockResolvedValueOnce({ data: null } as any);
@@ -164,9 +178,9 @@ describe('ViewModelService', () => {
       expect(result).toEqual([]);
     });
 
-    it('should return empty array when data.data is null', async () => {
+    it('should return empty array when data.records is null', async () => {
       await loadService();
-      mockGet.mockResolvedValueOnce({ data: { data: null } } as any);
+      mockGet.mockResolvedValueOnce({ data: { records: null } } as any);
 
       const result = await service.listViewModels();
 

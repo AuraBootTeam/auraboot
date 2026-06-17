@@ -10,17 +10,23 @@ import {
   useNodeMonitorStatus,
   getMonitorStatusClasses,
 } from '~/plugins/core-designer/components/bpmn-designer/hooks/useNodeMonitorStatus';
+import {
+  useNodeValidationStatus,
+  resolveNodeStateClasses,
+} from '~/plugins/core-designer/components/bpmn-designer/hooks/useNodeValidationStatus';
 
 export const ReceiveTaskNode = memo(({ id, data, selected }: NodeProps<BPMNNode>) => {
   const style = BPMN_NODE_STYLES[BPMNNodeType.RECEIVE_TASK];
   const monitorStatus = useNodeMonitorStatus(id);
   const monitorClasses = getMonitorStatusClasses(monitorStatus);
+  const validationStatus = useNodeValidationStatus(id);
+  const stateClasses = resolveNodeStateClasses({ monitorStatus, monitorClasses, validationStatus, selected });
 
   return (
     <div className="relative">
       <div
         className={`flex flex-col items-center justify-center p-2 ${
-          monitorStatus ? monitorClasses : selected ? 'ring-2 ring-blue-500' : ''
+          stateClasses
         }`}
         style={{
           width: style.width,

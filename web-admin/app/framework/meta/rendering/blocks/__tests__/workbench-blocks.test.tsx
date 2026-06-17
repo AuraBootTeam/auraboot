@@ -627,7 +627,7 @@ describe('StatusBannerBlockRenderer', () => {
       'href',
       '/p/crm_account_common/view/01KV1FYEZC514WPMAFHYNMGRQM',
     );
-    expect(customerLink).toHaveClass('text-blue-700', 'underline');
+    expect(customerLink).toHaveClass('text-accent', 'underline');
     expect(screen.getByRole('link', { name: '01KV1FYF0SN7N2H5FVMJNJKGEN' })).toHaveAttribute(
       'href',
       '/p/crm_customer_request_pcba_rfq/view/01KV1FYF1ZMFFAQX08Y7REXAQ0',

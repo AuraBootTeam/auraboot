@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.validator.PageSchemaBlockStructureValidator;
 import com.auraboot.framework.meta.validator.PageSchemaDslI18nValidator;
 import com.auraboot.framework.meta.constant.Status;
 import com.auraboot.framework.meta.converter.PageSchemaConverter;
@@ -677,6 +678,11 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         pageMap.put("description", request.getDescription());
         pageMap.put("blocks", request.getBlocks());
         PageSchemaDslI18nValidator.validatePageSchema(pageMap, request.getPageKey());
+
+        // Structural integrity: every block must have a non-blank id + blockType,
+        // ids globally unique. Unknown blockTypes pass with a warning (custom /
+        // future blocks register their own type — never hard-rejected).
+        PageSchemaBlockStructureValidator.validate(request.getBlocks(), request.getPageKey());
     }
 
     /**
@@ -699,6 +705,11 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         pageMap.put("description", request.getDescription());
         pageMap.put("blocks", request.getBlocks());
         PageSchemaDslI18nValidator.validatePageSchema(pageMap, pageKey);
+
+        // Structural integrity: every block must have a non-blank id + blockType,
+        // ids globally unique. Unknown blockTypes pass with a warning (custom /
+        // future blocks register their own type — never hard-rejected).
+        PageSchemaBlockStructureValidator.validate(request.getBlocks(), pageKey);
     }
 
     private Object normalizeTextFieldForI18nValidation(Object rawValue) {

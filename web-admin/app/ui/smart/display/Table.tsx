@@ -415,7 +415,7 @@ export const Table: React.FC<TableProps> = ({
                   style={{ width: `${percentage}%` }}
                 />
               </div>
-              <span className="w-12 text-right text-xs text-gray-600">{percentage}%</span>
+              <span className="text-text-2 w-12 text-right text-xs">{percentage}%</span>
             </div>
           );
           break;
@@ -440,7 +440,7 @@ export const Table: React.FC<TableProps> = ({
               href={String(value)}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 hover:underline"
+              className="text-accent hover:text-accent-hover hover:underline"
             >
               {String(value)}
             </a>
@@ -449,7 +449,7 @@ export const Table: React.FC<TableProps> = ({
 
         case 'code':
           renderedValue = (
-            <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-sm">
+            <code className="bg-hover rounded px-1.5 py-0.5 font-mono text-sm">
               {String(value)}
             </code>
           );
@@ -463,7 +463,7 @@ export const Table: React.FC<TableProps> = ({
                 ? value.toLowerCase() === 'true'
                 : Boolean(value);
           renderedValue = (
-            <span className={boolVal ? 'text-green-600' : 'text-gray-600'}>
+            <span className={boolVal ? 'text-status-green' : 'text-text-2'}>
               {boolVal ? '是' : '否'}
             </span>
           );
@@ -496,7 +496,7 @@ export const Table: React.FC<TableProps> = ({
               navigator.clipboard.writeText(String(value));
               // TODO: Show toast notification
             }}
-            className="rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-gray-100"
+            className="hover:bg-hover rounded p-1 opacity-0 transition-opacity group-hover:opacity-100"
             title="复制"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -563,9 +563,12 @@ export const Table: React.FC<TableProps> = ({
                 }
               }}
               className={clsx(
-                action.type === 'danger' && 'border-red-300 text-red-600 hover:bg-red-50',
-                action.type === 'success' && 'border-green-300 text-green-600 hover:bg-green-50',
-                action.type === 'warning' && 'border-yellow-300 text-yellow-600 hover:bg-yellow-50',
+                action.type === 'danger' &&
+                  'border-status-red text-status-red hover:bg-status-red-bg',
+                action.type === 'success' &&
+                  'border-status-green text-status-green hover:bg-status-green-bg',
+                action.type === 'warning' &&
+                  'border-status-amber text-status-amber hover:bg-status-amber-bg',
               )}
             >
               {action.label}
@@ -587,25 +590,25 @@ export const Table: React.FC<TableProps> = ({
       <div className="relative">
         <button
           onClick={() => setFilterVisible((prev) => ({ ...prev, [column.key]: !prev[column.key] }))}
-          className="rounded p-1 hover:bg-gray-100"
+          className="hover:bg-hover rounded p-1"
         >
           <FilterIcon className="h-4 w-4" />
         </button>
 
         {isFilterVisible && (
-          <div className="absolute top-full left-0 z-10 min-w-48 rounded-md border border-gray-200 bg-white p-3 shadow-lg">
+          <div className="rounded-control border-border bg-panel absolute top-full left-0 z-10 min-w-48 border p-3 shadow-lg">
             {filter.type === 'input' && (
               <input
                 type="text"
                 placeholder={filter.placeholder}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className="rounded-control border-border-strong w-full border px-3 py-2"
                 onChange={(e) => handleFilter(column.key, e.target.value)}
               />
             )}
 
             {filter.type === 'select' && (
               <select
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className="rounded-control border-border-strong w-full border px-3 py-2"
                 onChange={(e) => handleFilter(column.key, e.target.value)}
               >
                 <option value="">全部</option>
@@ -692,17 +695,17 @@ export const Table: React.FC<TableProps> = ({
     };
 
     return (
-      <div className="flex items-center justify-between border-t border-gray-200 px-6 py-3">
+      <div className="border-border flex items-center justify-between border-t px-6 py-3">
         <div className="flex items-center gap-4">
           {paginationConfig.showTotal && (
-            <span className="text-sm text-gray-700">共 {paginationConfig.total} 条记录</span>
+            <span className="text-text-2 text-sm">共 {paginationConfig.total} 条记录</span>
           )}
 
           {paginationConfig.showSizeChanger && (
             <select
               value={pageSize}
               onChange={(e) => handlePageChange(1, Number(e.target.value))}
-              className="rounded-md border border-gray-300 px-3 py-1 text-sm"
+              className="rounded-control border-border-strong border px-3 py-1 text-sm"
             >
               {(paginationConfig.pageSizeOptions || [10, 20, 50, 100]).map((size: number) => (
                 <option key={size} value={size}>
@@ -717,7 +720,7 @@ export const Table: React.FC<TableProps> = ({
           <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage <= 1}
-            className="rounded-md border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-control border-border-strong border px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             上一页
           </button>
@@ -729,7 +732,7 @@ export const Table: React.FC<TableProps> = ({
           <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage >= totalPages}
-            className="rounded-md border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-control border-border-strong border px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             下一页
           </button>
@@ -741,7 +744,7 @@ export const Table: React.FC<TableProps> = ({
                 type="number"
                 min={1}
                 max={totalPages}
-                className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                className="rounded-control border-border-strong w-16 border px-2 py-1 text-sm"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
                     const page = Number((e.target as HTMLInputElement).value);
@@ -764,7 +767,7 @@ export const Table: React.FC<TableProps> = ({
   return (
     <div
       className={clsx(
-        'smart-table rounded-lg border border-gray-200 bg-white shadow-sm',
+        'smart-table rounded-card border-border bg-panel border shadow-sm',
         className,
       )}
     >
@@ -785,12 +788,12 @@ export const Table: React.FC<TableProps> = ({
             'w-full',
             schema.size === 'small' && 'text-sm',
             schema.size === 'large' && 'text-lg',
-            schema.bordered && 'border-collapse border border-gray-300',
-            schema.striped && '[&_tbody_tr:nth-child(even)]:bg-gray-50',
+            schema.bordered && 'border-border-strong border-collapse border',
+            schema.striped && '[&_tbody_tr:nth-child(even)]:bg-subtle',
           )}
         >
           {/* 表头 */}
-          <thead className="border-b border-gray-200 bg-gray-50">
+          <thead className="border-border bg-subtle border-b">
             <tr>
               {/* 选择列 */}
               {isSelectionEnabled && (
@@ -802,7 +805,7 @@ export const Table: React.FC<TableProps> = ({
                         selectedKeys.length === paginatedData.length && paginatedData.length > 0
                       }
                       onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="rounded border-gray-300"
+                      className="border-border-strong rounded"
                     />
                   )}
                 </th>
@@ -824,12 +827,12 @@ export const Table: React.FC<TableProps> = ({
                   <th
                     key={column.key}
                     className={clsx(
-                      'px-4 py-3 font-medium text-gray-900',
+                      'text-text px-4 py-3 font-medium',
                       column.align === 'center' && 'text-center',
                       column.align === 'right' && 'text-right',
-                      column.sortable && 'cursor-pointer hover:bg-gray-100',
-                      column.fixed === 'left' && 'sticky left-0 z-10 bg-gray-50',
-                      column.fixed === 'right' && 'sticky right-0 z-10 bg-gray-50',
+                      column.sortable && 'hover:bg-hover cursor-pointer',
+                      column.fixed === 'left' && 'bg-subtle sticky left-0 z-10',
+                      column.fixed === 'right' && 'bg-subtle sticky right-0 z-10',
                     )}
                     style={{ width: column.width }}
                     onClick={() => column.sortable && handleSort(column.key)}
@@ -843,16 +846,16 @@ export const Table: React.FC<TableProps> = ({
                             className={clsx(
                               'h-3 w-3',
                               sortConfig?.column === column.key && sortConfig.direction === 'asc'
-                                ? 'text-blue-600'
-                                : 'text-gray-400',
+                                ? 'text-accent'
+                                : 'text-text-3',
                             )}
                           />
                           <ChevronDownIcon
                             className={clsx(
                               '-mt-1 h-3 w-3',
                               sortConfig?.column === column.key && sortConfig.direction === 'desc'
-                                ? 'text-blue-600'
-                                : 'text-gray-400',
+                                ? 'text-accent'
+                                : 'text-text-3',
                             )}
                           />
                         </div>
@@ -882,7 +885,7 @@ export const Table: React.FC<TableProps> = ({
                     (schema.expandable ? 1 : 0) +
                     (schema.actions ? 1 : 0)
                   }
-                  className="px-4 py-8 text-center text-gray-500"
+                  className="text-text-2 px-4 py-8 text-center"
                 >
                   加载中...
                 </td>
@@ -896,7 +899,7 @@ export const Table: React.FC<TableProps> = ({
                     (schema.expandable ? 1 : 0) +
                     (schema.actions ? 1 : 0)
                   }
-                  className="px-4 py-8 text-center text-gray-500"
+                  className="text-text-2 px-4 py-8 text-center"
                 >
                   暂无数据
                 </td>
@@ -911,8 +914,8 @@ export const Table: React.FC<TableProps> = ({
                   <React.Fragment key={rowKey}>
                     <tr
                       className={clsx(
-                        'group border-b border-gray-200 hover:bg-gray-50',
-                        isSelected && 'bg-blue-50',
+                        'group border-border hover:bg-hover border-b',
+                        isSelected && 'bg-accent-weak',
                       )}
                     >
                       {/* 选择列 */}
@@ -925,7 +928,7 @@ export const Table: React.FC<TableProps> = ({
                             }
                             checked={isSelected}
                             onChange={(e) => handleRowSelection(rowKey, e.target.checked)}
-                            className="rounded border-gray-300"
+                            className="border-border-strong rounded"
                           />
                         </td>
                       )}
@@ -940,7 +943,7 @@ export const Table: React.FC<TableProps> = ({
                             }) && (
                               <button
                                 onClick={() => handleRowExpand(record, !isExpanded)}
-                                className="rounded p-1 hover:bg-gray-100"
+                                className="hover:bg-hover rounded p-1"
                               >
                                 {isExpanded ? (
                                   <ChevronDownIcon className="h-4 w-4" />
@@ -952,7 +955,7 @@ export const Table: React.FC<TableProps> = ({
                           ) : (
                             <button
                               onClick={() => handleRowExpand(record, !isExpanded)}
-                              className="rounded p-1 hover:bg-gray-100"
+                              className="hover:bg-hover rounded p-1"
                             >
                               {isExpanded ? (
                                 <ChevronDownIcon className="h-4 w-4" />
@@ -982,8 +985,8 @@ export const Table: React.FC<TableProps> = ({
                               'px-4 py-3',
                               column.align === 'center' && 'text-center',
                               column.align === 'right' && 'text-right',
-                              column.fixed === 'left' && 'sticky left-0 z-10 bg-white',
-                              column.fixed === 'right' && 'sticky right-0 z-10 bg-white',
+                              column.fixed === 'left' && 'bg-panel sticky left-0 z-10',
+                              column.fixed === 'right' && 'bg-panel sticky right-0 z-10',
                               column.ellipsis && 'max-w-0',
                             )}
                           >
@@ -1008,7 +1011,7 @@ export const Table: React.FC<TableProps> = ({
                             (isExpandableEnabled ? 1 : 0) +
                             (schema.actions ? 1 : 0)
                           }
-                          className="bg-gray-50 px-4 py-3"
+                          className="bg-subtle px-4 py-3"
                         >
                           {expandableConfig?.expandedRowRender && (
                             <div>

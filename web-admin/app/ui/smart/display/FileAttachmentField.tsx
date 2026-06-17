@@ -64,7 +64,9 @@ export function FileAttachmentField({
       setUploading(true);
       for (const file of Array.from(fileList)) {
         if (file.size > maxSize * 1024 * 1024) {
-          console.warn(`[FileAttachmentField] File "${file.name}" exceeds ${maxSize}MB limit, skipped.`);
+          console.warn(
+            `[FileAttachmentField] File "${file.name}" exceeds ${maxSize}MB limit, skipped.`,
+          );
           showErrorToast(`${file.name} 超出 ${maxSize}MB 限制`);
           continue;
         }
@@ -97,7 +99,7 @@ export function FileAttachmentField({
   );
 
   if (readOnly) {
-    if (files.length === 0) return <span className="text-sm text-gray-400">—</span>;
+    if (files.length === 0) return <span className="text-text-3 text-sm">—</span>;
     return (
       <div className="space-y-1">
         {files.map((f, i) => (
@@ -106,7 +108,7 @@ export function FileAttachmentField({
             href={f.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+            className="text-accent flex items-center gap-2 text-sm hover:underline"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -138,15 +140,15 @@ export function FileAttachmentField({
           {files.map((f, i) => (
             <div
               key={i}
-              className="flex items-center gap-2 rounded border border-gray-200 px-2 py-1 text-sm"
+              className="border-border flex items-center gap-2 rounded border px-2 py-1 text-sm"
             >
               <span className="flex-1 truncate">{f.name}</span>
-              {f.size && <span className="text-gray-400">{formatSize(f.size)}</span>}
+              {f.size && <span className="text-text-3">{formatSize(f.size)}</span>}
               {!disabled && (
                 <button
                   type="button"
                   onClick={() => handleRemove(i)}
-                  className="text-gray-400 hover:text-red-500"
+                  className="text-text-3 hover:text-status-red"
                 >
                   ×
                 </button>
@@ -159,7 +161,7 @@ export function FileAttachmentField({
         type="button"
         disabled={disabled || uploading}
         onClick={() => inputRef.current?.click()}
-        className="rounded border border-dashed border-gray-300 px-3 py-1.5 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-500 disabled:opacity-50"
+        className="border-border-strong text-text-2 hover:border-accent hover:text-accent rounded border border-dashed px-3 py-1.5 text-sm disabled:opacity-50"
       >
         {uploading ? 'Uploading...' : '+ Add file'}
       </button>

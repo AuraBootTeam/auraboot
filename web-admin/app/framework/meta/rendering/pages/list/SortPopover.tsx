@@ -103,13 +103,10 @@ export function SortPopover({
     setDragIdx(idx);
   }, []);
 
-  const handleDragOver = useCallback(
-    (e: React.DragEvent, idx: number) => {
-      e.preventDefault();
-      dragOverIdx.current = idx;
-    },
-    [],
-  );
+  const handleDragOver = useCallback((e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    dragOverIdx.current = idx;
+  }, []);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -141,18 +138,18 @@ export function SortPopover({
       <Popover.Trigger asChild>{children}</Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          className="z-50 w-80 rounded-lg border border-gray-200 bg-white shadow-lg"
+          className="rounded-card border-border bg-panel z-50 w-80 border shadow-lg"
           sideOffset={4}
           align="start"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
-            <span className="text-sm font-medium text-gray-700">Sort</span>
+            <span className="text-text-2 text-sm font-medium">Sort</span>
             {activeSorts.length > 0 && (
               <button
                 type="button"
                 onClick={handleClearAll}
-                className="text-xs text-gray-400 hover:text-red-500"
+                className="text-text-3 hover:text-status-red text-xs"
               >
                 Clear all
               </button>
@@ -162,7 +159,7 @@ export function SortPopover({
           {/* Sort rules */}
           <div className="max-h-60 overflow-y-auto p-2">
             {activeSorts.length === 0 && (
-              <div className="py-3 text-center text-xs text-gray-400">No sort rules</div>
+              <div className="text-text-3 py-3 text-center text-xs">No sort rules</div>
             )}
             {activeSorts.map((sort, idx) => {
               const colMeta = sortableColumns.find((c) => c.field === sort.fieldCode);
@@ -180,7 +177,7 @@ export function SortPopover({
                   onDragEnd={handleDragEnd}
                 >
                   {/* Drag handle */}
-                  <span className="cursor-grab text-gray-300 hover:text-gray-500" aria-hidden>
+                  <span className="text-text-3 hover:text-text-2 cursor-grab" aria-hidden>
                     &#x2807;
                   </span>
 
@@ -188,7 +185,7 @@ export function SortPopover({
                   <select
                     value={sort.fieldCode}
                     onChange={(e) => handleFieldChange(idx, e.target.value)}
-                    className="min-w-0 flex-1 truncate rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
+                    className="border-border bg-panel text-text-2 focus-visible:shadow-focus min-w-0 flex-1 truncate rounded border px-1.5 py-1 text-xs focus:outline-none"
                   >
                     {sortableColumns
                       .filter((c) => c.field === sort.fieldCode || !usedFields.has(c.field))
@@ -203,7 +200,7 @@ export function SortPopover({
                   <button
                     type="button"
                     onClick={() => handleToggleDirection(idx)}
-                    className="shrink-0 rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                    className="border-border text-text-2 hover:bg-hover shrink-0 rounded border px-2 py-1 text-xs"
                   >
                     {sort.direction === 'asc' ? labels.asc : labels.desc}
                   </button>
@@ -212,11 +209,21 @@ export function SortPopover({
                   <button
                     type="button"
                     onClick={() => handleRemoveRule(idx)}
-                    className="shrink-0 rounded p-0.5 text-gray-300 hover:bg-red-50 hover:text-red-500"
+                    className="text-text-3 hover:bg-status-red-bg hover:text-status-red shrink-0 rounded p-0.5"
                     aria-label="Remove sort rule"
                   >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -230,10 +237,15 @@ export function SortPopover({
               <button
                 type="button"
                 onClick={handleAddRule}
-                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                className="text-accent hover:text-accent flex items-center gap-1 text-xs"
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
                 </svg>
                 Add sort rule
               </button>
