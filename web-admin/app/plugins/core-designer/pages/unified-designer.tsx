@@ -5,7 +5,9 @@ import { sampleModelFieldsByModel } from '../components/unified-designer/fixture
 import { samplePageSchemaV3 } from '../components/unified-designer/fixtures/samplePageSchemaV3';
 import {
   loadPageSchemaV3,
+  publishPageSchemaV3,
   savePageSchemaV3,
+  unpublishPageSchemaV3,
   type PageSchemaV3Source,
 } from '../components/unified-designer/persistence/pageSchemaV3Repository';
 import {
@@ -22,6 +24,7 @@ export default function UnifiedDesignerPage() {
   const pageKey = searchParams.get('pageKey');
   const [document, setDocument] = useState<PageSchemaV3 | null>(null);
   const [source, setSource] = useState<PageSchemaV3Source>({ type: 'local' });
+  const [published, setPublished] = useState(false);
   const [modelFieldsByModel, setModelFieldsByModel] = useState<ModelFieldsByModel>({});
   const [error, setError] = useState<string | null>(null);
   const modelCodeKey = document ? collectModelCodesFromDocument(document).join('|') : '';
@@ -46,6 +49,7 @@ export default function UnifiedDesignerPage() {
         if (!cancelled) {
           setDocument(loaded.document);
           setSource(loaded.source);
+          setPublished(loaded.published);
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -107,6 +111,24 @@ export default function UnifiedDesignerPage() {
     setDocument(nextDocument);
   };
 
+  const handlePublish = async (pid: string): Promise<boolean> => {
+    const result = await publishPageSchemaV3({ pid });
+    if (!result.ok) {
+      throw new Error(result.error || 'Failed to publish page.');
+    }
+    setPublished(result.status === 'published');
+    return result.status === 'published';
+  };
+
+  const handleUnpublish = async (pid: string): Promise<boolean> => {
+    const result = await unpublishPageSchemaV3({ pid });
+    if (!result.ok) {
+      throw new Error(result.error || 'Failed to unpublish page.');
+    }
+    setPublished(false);
+    return true;
+  };
+
   if (error) {
     return (
       <div className="grid min-h-[420px] place-items-center bg-slate-100 p-6 text-sm text-red-700">
@@ -132,6 +154,10 @@ export default function UnifiedDesignerPage() {
       modelFieldsByModel={modelFieldsByModel}
       returnHref={source.type === 'page' ? '/p/page_schema' : undefined}
       onSave={handleSave}
+      pageId={source.type === 'page' ? source.pid : undefined}
+      initialPublished={source.type === 'page' ? published : false}
+      onPublish={source.type === 'page' ? handlePublish : undefined}
+      onUnpublish={source.type === 'page' ? handleUnpublish : undefined}
     />
   );
 }
