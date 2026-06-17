@@ -135,7 +135,7 @@ const Switch: React.FC<SwitchProps> = ({
           onClick={handleToggle}
           onKeyDown={handleKeyDown}
           onBlur={() => field.onBlur()}
-          className={`relative inline-flex items-center rounded-full transition-colors duration-200 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none ${sizeClasses[size]} ${isChecked ? 'bg-blue-600' : 'bg-gray-200'} ${isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} `}
+          className={`rounded-pill focus-visible:shadow-focus relative inline-flex items-center transition-colors duration-200 focus:outline-none ${sizeClasses[size]} ${isChecked ? 'bg-accent' : 'bg-border-strong'} ${isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} `}
         >
           {/* Loading spinner */}
           {loading && (
@@ -146,7 +146,7 @@ const Switch: React.FC<SwitchProps> = ({
 
           {/* Toggle button */}
           <span
-            className={`inline-block transform rounded-full bg-white shadow transition-transform duration-200 ${toggleClasses[size]} ${isChecked ? translateClasses[size] : 'translate-x-0.5'} `}
+            className={`rounded-pill bg-panel inline-block transform shadow transition-transform duration-200 ${toggleClasses[size]} ${isChecked ? translateClasses[size] : 'translate-x-0.5'} `}
           />
 
           {/* Text inside switch (optional) */}
@@ -163,7 +163,7 @@ const Switch: React.FC<SwitchProps> = ({
 
         {/* External label text */}
         {(checkedText || uncheckedText) && (
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-body text-text-2 dark:text-gray-400">
             {isChecked ? checkedText : uncheckedText}
           </span>
         )}

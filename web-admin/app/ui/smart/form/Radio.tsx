@@ -2,7 +2,10 @@ import React, { forwardRef } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
 import type { RadioProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
-import { useDataSource, useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import {
+  useDataSource,
+  useSmartField,
+} from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
@@ -90,8 +93,8 @@ export const Radio = forwardRef<HTMLDivElement, RadioProps>(
       <div className={clsx('space-y-2', inline ? 'flex-1' : 'w-full', className)}>
         {/* 加载状态 */}
         {loading && (
-          <div className="flex items-center space-x-2 text-sm text-gray-500">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+          <div className="text-body text-text-2 flex items-center space-x-2">
+            <div className="rounded-pill border-accent h-4 w-4 animate-spin border-2 border-t-transparent"></div>
             <span>加载选项中...</span>
           </div>
         )}
@@ -108,11 +111,11 @@ export const Radio = forwardRef<HTMLDivElement, RadioProps>(
                 disabled={disabledValue || loading || option.disabled}
                 onChange={() => handleRadioChange(option.value)}
                 onBlur={field.onBlur}
-                className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                className="accent-accent border-border-strong focus-visible:shadow-focus h-4 w-4 focus:outline-none disabled:opacity-50"
               />
               <span
                 className={clsx(
-                  'text-sm text-gray-700 dark:text-gray-300',
+                  'text-body text-text dark:text-gray-300',
                   (disabledValue || loading || option.disabled) && 'opacity-50',
                 )}
               >
@@ -124,7 +127,7 @@ export const Radio = forwardRef<HTMLDivElement, RadioProps>(
 
         {/* 空状态 */}
         {!loading && options.length === 0 && (
-          <div className="text-sm text-gray-500 dark:text-gray-400">暂无选项</div>
+          <div className="text-body text-text-2 dark:text-gray-400">暂无选项</div>
         )}
       </div>
     );
