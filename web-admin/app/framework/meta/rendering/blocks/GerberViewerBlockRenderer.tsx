@@ -750,8 +750,8 @@ function hasFailedGerberStatus(line: Record<string, any> | undefined): boolean {
   return /(fail|error|invalid|exception|rejected)/.test(status);
 }
 
-function firstValidationMessage(issues: ValidationIssue[]): string | undefined {
-  return issues.map((issue) => issue.message.trim()).find(Boolean);
+function firstValidationMessage(issues: ValidationIssue[], locale: string): string | undefined {
+  return issues.map((issue) => formatDiagnostic(issue, locale).trim()).find(Boolean);
 }
 
 function boardSvgUrl(
@@ -948,7 +948,7 @@ function gerberPreviewUnavailableState({
   issues: ValidationIssue[];
   message?: string;
 }): GerberPreviewUnavailableState {
-  const evidence = firstValidationMessage(issues);
+  const evidence = firstValidationMessage(issues, locale);
   if (message) {
     return {
       kind: 'artifact-error',

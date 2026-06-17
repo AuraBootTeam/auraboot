@@ -839,6 +839,53 @@ describe('GerberViewerBlockRenderer', () => {
     );
   });
 
+  it('localizes the preview-unavailable evidence message by code (zh-CN)', () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (key: string) => key,
+        form: {},
+        global: {},
+        state: {
+          selectedLine: {
+            qo_ql_gerber_parse_status: 'parsed',
+            qo_ql_gerber_validation_status: 'failed',
+            qo_ql_board_width_mm: 36,
+            qo_ql_board_height_mm: 36,
+          },
+        },
+      }),
+    });
+    const block: BlockConfig = {
+      id: 'gerber',
+      blockType: 'gerber-viewer',
+      inspection: {
+        project: { code: 'EVIDENCE-I18N', name: 'evidence i18n' },
+        board: { widthMm: 36, heightMm: 36 },
+        summary: {},
+        layerManifest: [],
+        components: [],
+        // No boardSvgUrls -> board preview unavailable -> the evidence line shows.
+        issues: [
+          {
+            severity: 'error',
+            code: 'BOM_REF_WITHOUT_CPL',
+            refdes: 'C265',
+            message: 'C265 exists in BOM placement refs but was not found in CPL.',
+            details: { materialCode: 'X', materialName: 'cap' },
+          },
+        ],
+      },
+      lineContext: '${state.selectedLine}',
+    };
+
+    render(<GerberViewerBlockRenderer block={block} runtime={runtime} />);
+
+    const unavailable = screen.getByTestId('gerber-svg-unavailable');
+    expect(unavailable).toHaveTextContent('在 BOM 贴装清单中存在,但 CPL 坐标文件中未找到');
+    expect(unavailable).not.toHaveTextContent('exists in BOM placement refs');
+  });
+
   it('updates selected component details when a board marker is clicked', async () => {
     const runtime = makeRuntime();
     const block: BlockConfig = {
