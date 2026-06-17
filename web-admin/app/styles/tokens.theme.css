@@ -65,3 +65,30 @@
   --ds-space-8: 32px;
   --ds-disabled-opacity: 0.5;
 }
+
+/* Dark-mode token overrides (T3). */
+.dark {
+  --color-text: #F9FAFB;
+  --color-text-2: #9CA3AF;
+  --color-text-3: #6B7280;
+  --color-border: #374151;
+  --color-border-strong: #4B5563;
+  --color-bg: #111827;
+  --color-panel: #1F2937;
+  --color-subtle: #19212E;
+  --color-hover: #374151;
+  --color-selection: #1E3A5F;
+  --color-accent: #60A5FA;
+  --color-accent-hover: #3B82F6;
+  --color-accent-weak: #1E293B;
+  --color-status-gray: #A1A1AA;
+  --color-status-gray-bg: #27272A;
+  --color-status-blue: #60A5FA;
+  --color-status-blue-bg: #1E293B;
+  --color-status-amber: #FBBF24;
+  --color-status-amber-bg: #2A2113;
+  --color-status-green: #34D399;
+  --color-status-green-bg: #14271C;
+  --color-status-red: #F87171;
+  --color-status-red-bg: #2A1515;
+}
