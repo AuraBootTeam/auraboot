@@ -258,6 +258,25 @@ function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: Runtim
       return <RuntimeMetricStripPreview block={block} />;
     case 'status-banner':
       return <RuntimeStatusBannerPreview block={block} />;
+    case 'workbench-action-bar':
+      return <RuntimeWorkbenchActionBarPreview block={block} />;
+    case 'review-drawer':
+      return <RuntimeReviewDrawerPreview block={block} />;
+    case 'evidence-panel':
+      return <RuntimeEvidencePanelPreview block={block} />;
+    case 'record-inspector':
+      return (
+        <RuntimeRecordInspectorPreview
+          block={block}
+          runtimeServices={runtimeServices}
+          pageContext={pageContext}
+          blockPath={blockPath}
+        />
+      );
+    case 'candidate-list':
+      return <RuntimeCandidateListPreview block={block} />;
+    case 'artifact-timeline':
+      return <RuntimeArtifactTimelinePreview block={block} />;
     default: {
       // Plugin-contributed custom blocks may register a runtime renderer
       // (e.g. AuraQR's scannability-qc live score). When present it fully
@@ -865,6 +884,469 @@ function RuntimeStatusBannerPreview({ block }: { block: DslBlockV3 }) {
       <div
         className="mt-2 text-xs text-slate-400"
         data-testid={`runtime-status-banner-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Workbench-family batch 2 representative previews. Same architecture as the
+// metric-strip / status-banner previews above: read the BARE top-level config
+// the platform renderers read, render a config-driven representative placeholder
+// (labels + scaffold, no live data), an empty state, and the shared workbench
+// preview hint. Live data binding renders on the published /p/ page via the
+// platform renderers (framework/meta/rendering/blocks/*). Token-backed utility
+// classes only — no raw hex.
+// ---------------------------------------------------------------------------
+
+const WORKBENCH_PREVIEW_BUTTON_CLASS: Record<string, string> = {
+  primary: 'border-blue-200 bg-blue-50 text-blue-700',
+  secondary: 'border-slate-200 bg-white text-slate-700',
+  danger: 'border-rose-200 bg-rose-50 text-rose-700',
+  ghost: 'border-transparent bg-slate-50 text-slate-600',
+  default: 'border-slate-200 bg-white text-slate-700',
+};
+
+function getRawArray(block: DslBlockV3, key: string): Array<Record<string, unknown>> {
+  const value = (block as unknown as Record<string, unknown>)[key];
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is Record<string, unknown> => isRecord(item));
+}
+
+function getRawRecord(block: DslBlockV3, key: string): Record<string, unknown> {
+  const value = (block as unknown as Record<string, unknown>)[key];
+  return isRecord(value) ? value : {};
+}
+
+function RuntimeWorkbenchActionBarPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  const actions = getRawArray(block, 'actions');
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-workbench-action-bar-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {actions.length === 0 ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-workbench-action-bar-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.noActionsConfigured)}
+        </div>
+      ) : (
+        <div
+          className="flex flex-wrap gap-2"
+          data-testid={`runtime-workbench-action-bar-actions-${block.id}`}
+        >
+          {actions.map((action, index) => {
+            const key =
+              getStringProp(action.code) || getStringProp(action.id) || String(index);
+            const label = readLocalizedLabel(action.label, locale) || key;
+            const variant = getStringProp(action.variant) || 'secondary';
+            const variantClass =
+              WORKBENCH_PREVIEW_BUTTON_CLASS[variant] || WORKBENCH_PREVIEW_BUTTON_CLASS.default;
+            return (
+              <span
+                key={key}
+                data-testid={`runtime-workbench-action-bar-action-${key}`}
+                className={`inline-flex min-h-8 items-center rounded-md border px-3 py-1.5 text-sm font-medium ${variantClass}`}
+              >
+                {label}
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-workbench-action-bar-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeEvidencePanelPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  const sections = getRawArray(block, 'sections');
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-evidence-panel-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {sections.length === 0 ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-evidence-panel-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.noEvidenceSections)}
+        </div>
+      ) : (
+        <div className="space-y-3" data-testid={`runtime-evidence-panel-sections-${block.id}`}>
+          {sections.map((section, index) => {
+            const key =
+              getStringProp(section.key) || getStringProp(section.field) || String(index);
+            const label = readLocalizedLabel(section.label, locale) || key;
+            const isJson = getStringProp(section.format) === 'json';
+            return (
+              <div key={key} data-testid={`runtime-evidence-panel-section-${key}`}>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  {label}
+                </div>
+                <div
+                  className={`mt-1 rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs ${
+                    isJson ? 'font-mono text-slate-500' : 'text-slate-600'
+                  }`}
+                >
+                  {t(DESIGNER_I18N.unified.runtime.metricPlaceholderValue)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-evidence-panel-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeRecordInspectorPreview({
+  block,
+  runtimeServices,
+  pageContext,
+  blockPath,
+}: RuntimeBlockProps) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  const fields = getRawArray(block, 'fields');
+  const childBlocks = block.blocks ?? [];
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-record-inspector-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {fields.length === 0 && childBlocks.length === 0 ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-record-inspector-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.noInspectorFields)}
+        </div>
+      ) : (
+        <>
+          {fields.length > 0 && (
+            <dl
+              className="grid gap-3 sm:grid-cols-2"
+              data-testid={`runtime-record-inspector-fields-${block.id}`}
+            >
+              {fields.map((field, index) => {
+                const key =
+                  getStringProp(field.field) || getStringProp(field.path) || String(index);
+                const label = readLocalizedLabel(field.label, locale) || key;
+                const fullWidth = field.span === 2;
+                return (
+                  <div
+                    key={key}
+                    className={fullWidth ? 'sm:col-span-2' : undefined}
+                    data-testid={`runtime-record-inspector-field-${key}`}
+                  >
+                    <dt className="text-xs font-medium text-slate-500">{label}</dt>
+                    <dd className="mt-1 min-h-5 text-sm text-slate-700">
+                      {t(DESIGNER_I18N.unified.runtime.metricPlaceholderValue)}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+          )}
+          {childBlocks.length > 0 && (
+            <div className="mt-3 space-y-3">
+              {childBlocks.map((child) => (
+                <RuntimeBlock
+                  key={child.id}
+                  block={child}
+                  runtimeServices={runtimeServices}
+                  pageContext={pageContext}
+                  blockPath={[...blockPath, child.id]}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-record-inspector-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeCandidateListPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  const item = getRawRecord(block, 'item');
+  const detailFields = Array.isArray(item.detailFields)
+    ? (item.detailFields.filter((f): f is Record<string, unknown> => isRecord(f)) as Array<
+        Record<string, unknown>
+      >)
+    : [];
+  const actions = getRawArray(block, 'actions');
+  const titleField = getStringProp(item.titleField);
+  const configured = Boolean(titleField || detailFields.length > 0 || actions.length > 0);
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-candidate-list-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {!configured ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-candidate-list-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.noCandidateFields)}
+        </div>
+      ) : (
+        <div
+          className="rounded-md border border-slate-200 p-3"
+          data-testid={`runtime-candidate-list-sample-${block.id}`}
+        >
+          <div className="font-mono text-sm font-semibold text-slate-700">
+            {titleField || t(DESIGNER_I18N.unified.runtime.candidatesLabel)}
+          </div>
+          {detailFields.length > 0 && (
+            <dl className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+              {detailFields.map((field, index) => {
+                const key =
+                  getStringProp(field.key) || getStringProp(field.field) || String(index);
+                const label = readLocalizedLabel(field.label, locale) || key;
+                return (
+                  <div
+                    key={key}
+                    data-testid={`runtime-candidate-list-field-${key}`}
+                  >
+                    <dt className="text-slate-500">{label}</dt>
+                    <dd className="mt-0.5 text-slate-700">
+                      {t(DESIGNER_I18N.unified.runtime.metricPlaceholderValue)}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+          )}
+          {actions.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+              {actions.map((action, index) => {
+                const key =
+                  getStringProp(action.code) || getStringProp(action.id) || String(index);
+                const label = readLocalizedLabel(action.label, locale) || key;
+                const variant = getStringProp(action.variant) || 'primary';
+                const variantClass =
+                  WORKBENCH_PREVIEW_BUTTON_CLASS[variant] || WORKBENCH_PREVIEW_BUTTON_CLASS.primary;
+                return (
+                  <span
+                    key={key}
+                    data-testid={`runtime-candidate-list-action-${key}`}
+                    className={`inline-flex min-h-8 items-center rounded-md border px-3 py-1.5 text-xs font-medium ${variantClass}`}
+                  >
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-candidate-list-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeArtifactTimelinePreview({ block }: { block: DslBlockV3 }) {
+  const t = useRuntimeText();
+  const item = getRawRecord(block, 'item');
+  const titleField = getStringProp(item.titleField);
+  const revisionField = getStringProp(item.revisionField);
+  const statusField = getStringProp(item.statusField);
+  const fileIdField = getStringProp(item.fileIdField);
+  const configured = Boolean(
+    titleField || revisionField || statusField || fileIdField || getStringProp(item.keyField),
+  );
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-artifact-timeline-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {!configured ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-artifact-timeline-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.noTimelineFields)}
+        </div>
+      ) : (
+        <ol
+          className="space-y-2"
+          data-testid={`runtime-artifact-timeline-sample-${block.id}`}
+        >
+          <li className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
+            <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="font-mono text-sm font-semibold text-slate-700"
+                  data-testid={`runtime-artifact-timeline-title-${block.id}`}
+                >
+                  {titleField || t(DESIGNER_I18N.unified.runtime.metricPlaceholderValue)}
+                </span>
+                {revisionField && (
+                  <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                    {revisionField}
+                  </span>
+                )}
+                {statusField && (
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                    {statusField}
+                  </span>
+                )}
+              </div>
+            </div>
+            {fileIdField && (
+              <span
+                className="self-start rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600"
+                data-testid={`runtime-artifact-timeline-download-${block.id}`}
+              >
+                {fileIdField}
+              </span>
+            )}
+          </li>
+        </ol>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-artifact-timeline-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeReviewDrawerPreview({ block }: { block: DslBlockV3 }) {
+  const t = useRuntimeText();
+  const summaryBadges = getRawArray(block, 'summaryBadges');
+  const compare = getRawRecord(block, 'compare');
+  const candidates = getRawRecord(block, 'candidates');
+  const hasContext =
+    getStringProp((block as unknown as Record<string, unknown>).context).length > 0 ||
+    getStringProp((block as unknown as Record<string, unknown>).contextDataSource).length > 0;
+  const rawFields = Array.isArray(compare.rawFields) ? compare.rawFields.length : 0;
+  const canonicalFields = Array.isArray(compare.canonicalFields)
+    ? compare.canonicalFields.length
+    : 0;
+  const candidateActions = Array.isArray(candidates.actions) ? candidates.actions.length : 0;
+  const configured = hasContext || summaryBadges.length > 0 || rawFields + canonicalFields > 0;
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-review-drawer-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {!configured ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-review-drawer-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.reviewDrawerNotConfigured)}
+        </div>
+      ) : (
+        <div
+          className="rounded-md border border-blue-200 bg-blue-50/40 p-3"
+          data-testid={`runtime-review-drawer-sample-${block.id}`}
+        >
+          <div className="text-sm font-semibold text-slate-700">
+            {t(DESIGNER_I18N.unified.runtime.reviewDrawerPreview)}
+          </div>
+          <div
+            className="mt-2 flex flex-wrap gap-2"
+            data-testid={`runtime-review-drawer-summary-${block.id}`}
+          >
+            {summaryBadges.length > 0 ? (
+              summaryBadges.map((badge, index) => {
+                const key =
+                  getStringProp(badge.key) ||
+                  getStringProp(badge.valueField) ||
+                  String(index);
+                const tone = getStringProp(badge.tone) || 'gray';
+                const toneClass =
+                  WORKBENCH_TONE_CARD_CLASS[tone] || WORKBENCH_TONE_CARD_CLASS.default;
+                return (
+                  <span
+                    key={key}
+                    data-testid={`runtime-review-drawer-badge-${key}`}
+                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${toneClass}`}
+                  >
+                    {key}
+                  </span>
+                );
+              })
+            ) : (
+              <span className="text-xs text-slate-400">
+                {t(DESIGNER_I18N.unified.runtime.metricPlaceholderValue)}
+              </span>
+            )}
+          </div>
+          <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
+            {rawFields + canonicalFields > 0 && (
+              <div data-testid={`runtime-review-drawer-compare-${block.id}`}>
+                {`Raw ${rawFields} / Canonical ${canonicalFields}`}
+              </div>
+            )}
+            <div data-testid={`runtime-review-drawer-candidates-${block.id}`}>
+              {`${t(DESIGNER_I18N.unified.runtime.candidatesLabel)} · ${t(
+                DESIGNER_I18N.unified.runtime.decisionLabel,
+              )}${candidateActions > 0 ? ` (${candidateActions})` : ''}`}
+            </div>
+          </div>
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-review-drawer-hint-${block.id}`}
       >
         {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
       </div>
