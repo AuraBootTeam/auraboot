@@ -254,6 +254,10 @@ function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: Runtim
           blockPath={blockPath}
         />
       );
+    case 'metric-strip':
+      return <RuntimeMetricStripPreview block={block} />;
+    case 'status-banner':
+      return <RuntimeStatusBannerPreview block={block} />;
     default: {
       // Plugin-contributed custom blocks may register a runtime renderer
       // (e.g. AuraQR's scannability-qc live score). When present it fully
@@ -670,6 +674,200 @@ function RuntimeFieldHistory({
           {emptyText}
         </div>
       )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Workbench-block representative previews (metric-strip / status-banner).
+//
+// These blocks are fully data-bound by the platform meta-rendering renderers
+// (framework/meta/rendering/blocks/MetricStripBlockRenderer +
+// StatusBannerBlockRenderer) on the live /p/ page, which read a SchemaRuntime /
+// dataSource / polling. The designer's own runtime (this file) is a separate
+// model (DslBlockV3) without that runtime, so here we render a CONFIG-DRIVEN
+// REPRESENTATIVE PREVIEW only: metric labels + placeholder values, and the tone /
+// title status mapping. The complete data binding renders on the published page.
+// (Deliberately NOT bridging the platform data-binding renderer into the designer
+// runtime — see BlockRegistry / InspectorSchemaRegistry comments.)
+// ---------------------------------------------------------------------------
+
+// Token-backed tone utility classes shared with the platform renderers. No raw
+// hex — these resolve through the Tailwind theme tokens.
+const WORKBENCH_TONE_CARD_CLASS: Record<string, string> = {
+  green: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  amber: 'border-amber-200 bg-amber-50 text-amber-900',
+  red: 'border-rose-200 bg-rose-50 text-rose-900',
+  blue: 'border-blue-200 bg-blue-50 text-blue-900',
+  purple: 'border-violet-200 bg-violet-50 text-violet-900',
+  gray: 'border-slate-200 bg-white text-slate-900',
+  default: 'border-slate-200 bg-white text-slate-900',
+};
+
+const WORKBENCH_TONE_DOT_CLASS: Record<string, string> = {
+  green: 'bg-emerald-500',
+  amber: 'bg-amber-500',
+  red: 'bg-rose-500',
+  blue: 'bg-blue-500',
+  purple: 'bg-violet-500',
+  gray: 'bg-slate-400',
+  default: 'bg-slate-400',
+};
+
+function readLocalizedLabel(value: unknown, locale: string): string {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const map = value as Record<string, string>;
+    return (
+      map[locale] || map['en-US'] || map.en || map['zh-CN'] || Object.values(map)[0] || ''
+    );
+  }
+  return '';
+}
+
+function getMetricStripMetrics(block: DslBlockV3): Array<Record<string, unknown>> {
+  const metrics = (block as unknown as Record<string, unknown>).metrics;
+  if (!Array.isArray(metrics)) return [];
+  return metrics.filter((metric): metric is Record<string, unknown> => isRecord(metric));
+}
+
+function RuntimeMetricStripPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  const metrics = getMetricStripMetrics(block);
+  const variant = getStringProp((block as unknown as Record<string, unknown>).variant) || 'cards';
+  const placeholder = t(DESIGNER_I18N.unified.runtime.metricPlaceholderValue);
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-metric-strip-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {metrics.length === 0 ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-metric-strip-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.noMetricsConfigured)}
+        </div>
+      ) : (
+        <div
+          className={
+            variant === 'chips'
+              ? 'flex flex-wrap gap-2'
+              : 'grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4'
+          }
+          data-testid={`runtime-metric-strip-grid-${block.id}`}
+        >
+          {metrics.map((metric, index) => {
+            const key = getStringProp(metric.key) || getStringProp(metric.valueField) || String(index);
+            const label = readLocalizedLabel(metric.label, locale) || key;
+            const tone = getStringProp(metric.tone) || 'default';
+            const toneClass = WORKBENCH_TONE_CARD_CLASS[tone] || WORKBENCH_TONE_CARD_CLASS.default;
+            if (variant === 'chips') {
+              return (
+                <span
+                  key={key}
+                  data-testid={`runtime-metric-strip-item-${key}`}
+                  className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${toneClass}`}
+                >
+                  <span className="font-medium">{label}</span>
+                  <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-semibold">
+                    {placeholder}
+                  </span>
+                </span>
+              );
+            }
+            return (
+              <div
+                key={key}
+                data-testid={`runtime-metric-strip-item-${key}`}
+                className={`overflow-hidden rounded-md border p-3 text-left shadow-sm ${toneClass}`}
+              >
+                <div className="truncate text-xs font-medium" title={label}>
+                  {label}
+                </div>
+                <div
+                  className="mt-1 truncate text-2xl font-semibold"
+                  data-testid={`runtime-metric-strip-value-${key}`}
+                >
+                  {placeholder}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-metric-strip-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeStatusBannerPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  const raw = block as unknown as Record<string, unknown>;
+  const toneMap = isRecord(raw.toneMap) ? raw.toneMap : {};
+  const titleMap = isRecord(raw.titleMap) ? raw.titleMap : {};
+  // Pick the first configured status to present as a representative banner; if
+  // none configured we show the empty hint. We prefer a status that has a title.
+  const statusKeys = Array.from(
+    new Set([...Object.keys(titleMap), ...Object.keys(toneMap)].filter((key) => key !== '__default')),
+  );
+  const sampleStatus = statusKeys[0];
+  const configured = Boolean(sampleStatus);
+  const tone = configured ? getStringProp(toneMap[sampleStatus]) || 'gray' : 'gray';
+  const toneClass = WORKBENCH_TONE_CARD_CLASS[tone] || WORKBENCH_TONE_CARD_CLASS.gray;
+  const dotClass = WORKBENCH_TONE_DOT_CLASS[tone] || WORKBENCH_TONE_DOT_CLASS.gray;
+  const title = configured
+    ? readLocalizedLabel(titleMap[sampleStatus], locale) || sampleStatus
+    : '';
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-status-banner-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {configured ? (
+        <div
+          className={`flex items-start gap-3 rounded-md border p-3 shadow-sm ${toneClass}`}
+          data-testid={`runtime-status-banner-sample-${block.id}`}
+          data-status={sampleStatus}
+        >
+          <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
+          <div className="min-w-0">
+            <div
+              className="text-sm font-semibold"
+              data-testid={`runtime-status-banner-title-${block.id}`}
+            >
+              {title}
+            </div>
+            <div className="mt-0.5 text-xs opacity-70">{sampleStatus}</div>
+          </div>
+        </div>
+      ) : (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-status-banner-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.statusBannerNotConfigured)}
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-status-banner-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
     </section>
   );
 }

@@ -484,6 +484,22 @@ export const DESIGNER_I18N = {
       loadingRecords: { 'zh-CN': '加载记录中…', 'en-US': 'Loading records...' } as L,
       loadingLiveData: { 'zh-CN': '加载实时数据中…', 'en-US': 'Loading live data...' } as L,
       selectRecord: { 'zh-CN': '选择记录…', 'en-US': 'Select record...' } as L,
+      // Workbench-block (metric-strip / status-banner) representative preview.
+      // The designer canvas shows a config-driven placeholder; the live /p/ page
+      // renders the fully data-bound platform renderer.
+      noMetricsConfigured: {
+        'zh-CN': '未配置指标',
+        'en-US': 'No metrics configured',
+      } as L,
+      statusBannerNotConfigured: {
+        'zh-CN': '未配置状态映射',
+        'en-US': 'No status mapping configured',
+      } as L,
+      workbenchPreviewHint: {
+        'zh-CN': '设计器内为代表性预览,实时数据在已发布页面渲染',
+        'en-US': 'Representative preview — live data renders on the published page',
+      } as L,
+      metricPlaceholderValue: { 'zh-CN': '—', 'en-US': '—' } as L,
     },
 
     // Inspector shell

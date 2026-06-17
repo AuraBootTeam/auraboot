@@ -312,6 +312,60 @@ const fieldHistoryFields: PropertySchema<string>[] = [
   { key: 'layout.span', label: 'Span', type: 'number' },
 ];
 
+// Workbench blocks — metric-strip & status-banner.
+//
+// These are rendered on the live /p/ page by the platform meta-rendering
+// renderers (framework/meta/rendering/blocks/MetricStripBlockRenderer +
+// StatusBannerBlockRenderer), which read their configuration from the BLOCK TOP
+// LEVEL (block.dataSource / block.metrics / block.variant / block.statusField /
+// block.toneMap / …), NOT from block.props. So every field key below is a bare
+// top-level path (e.g. `metrics`, `variant`, `statusField`) rather than
+// `props.*`; setByPath then persists it exactly where the platform renderer
+// reads it. The shapes here mirror the real authored pages (mfg_andon_workbench
+// metric-strip, bom-standardization status-banner) and the renderer source — no
+// invented fields, only props that are actually consumed.
+
+const metricStripFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  // dataSource is a string id on workbench blocks (the named data source the
+  // page binds), so it is a plain text field rather than the model selector.
+  { key: 'dataSource', label: 'Data source', type: 'text' },
+  {
+    key: 'variant',
+    label: 'Variant',
+    type: 'select',
+    options: [
+      { label: 'Cards', value: 'cards' },
+      { label: 'Chips', value: 'chips' },
+    ],
+  },
+  // metrics is an array of { key, label, valueField, value, unit, unitField,
+  // subText, subTextField, tone, valueMap, onClick, visibleWhen, activeWhen }.
+  // Authored as JSON — the renderer iterates this array directly.
+  { key: 'metrics', label: 'Metrics JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+const statusBannerFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'dataSource', label: 'Data source', type: 'text' },
+  // statusField/errorField select which record paths drive the banner.
+  { key: 'statusField', label: 'Status field', type: 'text' },
+  { key: 'errorField', label: 'Error field', type: 'text' },
+  // status -> tone | localized title | localized description template maps.
+  { key: 'toneMap', label: 'Tone map JSON', type: 'json' },
+  { key: 'titleMap', label: 'Title map JSON', type: 'json' },
+  { key: 'descriptionMap', label: 'Description map JSON', type: 'json' },
+  // statuses that hide the banner / mark it failed.
+  { key: 'hideStatuses', label: 'Hide statuses JSON', type: 'json' },
+  { key: 'failedStatuses', label: 'Failed statuses JSON', type: 'json' },
+  // summaryFields: array of { key, label, field, linkField?, linkTo? }.
+  { key: 'summaryFields', label: 'Summary fields JSON', type: 'json' },
+  // poll: { enabledWhenStatuses, reload, intervalMs, refreshPageWhenStatuses }.
+  { key: 'poll', label: 'Polling JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
 const actionTypeField: PropertySchema<string> = {
   key: 'actionType',
   label: 'Action type',
@@ -510,6 +564,8 @@ export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry 
     'bpm-panel': bpmPanelFields,
     'activity-timeline': activityTimelineFields,
     'field-history': fieldHistoryFields,
+    'metric-strip': metricStripFields,
+    'status-banner': statusBannerFields,
     action: [...actionBaseFields, ...actionCommonFeedbackFields],
     widget: widgetFields,
   });
