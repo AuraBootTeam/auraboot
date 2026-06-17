@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.nlmodeling.dto.*;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.constant.DslRegistry;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.auraboot.framework.plugin.service.PluginImportService;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
@@ -404,99 +405,96 @@ public class NlModelingService {
                 - inputFields: list of field codes accepted by this command
                 - DELETE commands typically have no inputFields and use extension.confirmMessage
 
-                ### Page Schema
+                ### Page Schema (DSL v4 — REQUIRED format)
+                Pages MUST be the v4 flat format: top-level `kind` (lower-case), `schemaVersion: 4`,
+                `modelCode`, `title` (locale map), `layout: { "type": "stack" }`, and a FLAT
+                top-level `blocks` array. Each block is a leaf object with `id`, `blockType`, and an
+                `area` ("toolbar"/"main"/"footer"). Do NOT use the legacy `areas`/`areasConfig`
+                wrapper, do NOT nest blocks under `areas.<region>.blocks`, and do NOT capitalize
+                `kind` — the import gate rejects those (S-PAGE-VERSION / S-PAGE-LAYOUT-TYPE / S-PAGE-BLOCKS).
+
                 ```json
                 {
                   "pageKey": "<model_code>_list",
                   "name:zh-CN": "<Chinese name>",
                   "name:en": "<English name>",
-                  "kind": "LIST|FORM|DETAIL",
+                  "kind": "list",
+                  "schemaVersion": 4,
                   "modelCode": "<model_code>",
-                  "blocks": [{
-                    "kind": "List",
-                    "version": "1.0.0",
-                    "id": "list.<model_code>",
-                    "modelCode": "<model_code>",
-                    "layout": {
-                      "areas": ["toolbar", "content"],
-                      "areasConfig": {
-                        "toolbar": { "type": "flex", "direction": "row" },
-                        "content": { "type": "flex", "direction": "column" }
-                      }
+                  "title": { "zh-CN": "<Chinese title>", "en": "<English title>" },
+                  "layout": { "type": "stack" },
+                  "blocks": [
+                    {
+                      "id": "<model_code>_toolbar",
+                      "blockType": "toolbar",
+                      "area": "toolbar",
+                      "buttons": [
+                        { "code": "create", "action": "create", "primary": true, "label": "$i18n:common.button.create" }
+                      ]
                     },
-                    "areas": {
-                      "toolbar": {
-                        "blocks": [{
-                          "id": "toolbar",
-                          "blockType": "toolbar",
-                          "buttons": [{
-                            "code": "create",
-                            "variant": "primary",
-                            "label": "create",
-                            "action": {
-                              "type": "navigate",
-                              "to": "<model_code>_form",
-                              "command": "<namespace>:create_<model_code>"
-                            }
-                          }]
-                        }]
-                      },
-                      "content": {
-                        "blocks": [{
-                          "id": "table",
-                          "blockType": "table",
-                          "columns": [
-                            { "field": "<field_code>", "width": 200, "sortable": true }
-                          ],
-                          "rowActions": [
-                            { "code": "edit", "label": "edit", "action": { "type": "navigate", "to": "<model_code>_form", "command": "<namespace>:update_<model_code>" } },
-                            { "code": "delete", "label": "delete", "variant": "danger", "action": { "type": "command", "command": "<namespace>:delete_<model_code>" } }
+                    {
+                      "id": "<model_code>_table",
+                      "blockType": "table",
+                      "area": "main",
+                      "props": { "rowClickAction": "drawer" },
+                      "columns": [
+                        { "field": "<field_code>", "width": 200, "sortable": true },
+                        {
+                          "field": "actions",
+                          "isActionColumn": true,
+                          "label": "$i18n:common.actions",
+                          "buttons": [
+                            { "code": "edit", "action": "edit", "navigateTo": "<model_code>_form", "label": "$i18n:common.button.edit" },
+                            { "code": "delete", "action": "delete", "danger": true, "commandCode": "<namespace>:delete_<model_code>", "label": "$i18n:common.button.delete" }
                           ]
-                        }]
-                      }
+                        }
+                      ],
+                      "searchFields": ["<field_code>"]
                     }
-                  }]
+                  ]
                 }
                 ```
-                - IMPORTANT: `blocks` is always a JSON array (e.g., `"blocks": [{ ... }]`), never a bare object.
-                - List page: toolbar (create button) + table with columns and row actions
-                - Form page: kind=form, layout with form-section blocks
+                - `blocks` is ALWAYS a flat JSON array of leaf blocks, never nested and never a bare object.
+                - List page: a `toolbar` block (create button) + a `table` block (one column per field +
+                  a trailing action column with edit/delete; `commandCode` = `<namespace>:delete_<model>`).
+                - Column/button labels must be business wording or `$i18n:` keys, never raw field codes.
 
-                ### Form Page Schema
+                ### Form Page Schema (DSL v4)
                 ```json
                 {
                   "pageKey": "<model_code>_form",
                   "name:zh-CN": "<Chinese form name>",
                   "name:en": "<English form name>",
                   "kind": "form",
+                  "schemaVersion": 4,
                   "modelCode": "<model_code>",
-                  "blocks": [{
-                    "kind": "Form",
-                    "version": "1.0.0",
-                    "id": "form.<model_code>",
-                    "modelCode": "<model_code>",
-                    "layout": {
-                      "areas": ["content"],
-                      "areasConfig": {
-                        "content": { "type": "flex", "direction": "column" }
-                      }
+                  "title": { "zh-CN": "<Chinese title>", "en": "<English title>" },
+                  "layout": { "type": "stack" },
+                  "blocks": [
+                    {
+                      "id": "basic",
+                      "blockType": "form-section",
+                      "area": "main",
+                      "title": { "zh-CN": "基本信息", "en-US": "Basic Information" },
+                      "fields": [
+                        { "field": "<field_code>", "colSpan": 6, "required": true }
+                      ]
                     },
-                    "areas": {
-                      "content": {
-                        "blocks": [{
-                          "id": "basic_info",
-                          "blockType": "form-section",
-                          "title": "basic_info",
-                          "columns": 2,
-                          "fields": [
-                            { "field": "<field_code>" }
-                          ]
-                        }]
-                      }
+                    {
+                      "id": "buttons",
+                      "blockType": "form-buttons",
+                      "area": "footer",
+                      "buttons": [
+                        { "code": "submit", "action": "save", "commandCode": "<namespace>:create_<model_code>", "primary": true, "label": "$i18n:common.button.submit" },
+                        { "code": "cancel", "action": "cancel", "label": "$i18n:common.button.cancel" }
+                      ]
                     }
-                  }]
+                  ]
                 }
                 ```
+                - Form page: `kind: "form"`, a `form-section` block listing the editable fields
+                  (mark required model fields `"required": true`) + a `form-buttons` block
+                  (submit → `<namespace>:create_<model>`, cancel).
 
                 ### Menu Definition
                 ```json
@@ -565,8 +563,9 @@ public class NlModelingService {
                    - commands: a create, an update, and a delete command per model (type "create"/"update"/"delete",
                      modelCode set, inputFields listing the model's field codes; delete needs no inputFields).
                      A model with no commands gets no model.<code>.<action> permission, so its CRUD 403s.
-                   - pages: BOTH a list page and a form page per model, in the V2 flat format shown above
-                     (top-level kind/schemaVersion/modelCode/layout/blocks). A model with no pages is an empty shell.
+                   - pages: BOTH a list page and a form page per model, in the v4 flat format shown above
+                     (lower-case kind, schemaVersion:4, modelCode, layout:{type:stack}, flat top-level
+                     blocks[] with blockType+id+area). A model with no pages is an empty shell.
                    - menus: a navigation menu entry per model pointing at /p/<model_code> so the page is reachable.
                    Do NOT return only models+fields — that produces an app with no UI and no operations.
 
@@ -785,6 +784,11 @@ public class NlModelingService {
         manifest.put("commands", lowercaseStringKey(commands, "type"));
         List<Map<String, Object>> pages =
                 synthesizePages(pluginCode, res.getModels(), fields, res.getPages());
+        // Config-as-product provenance (FR-E4): tag every generated block source=ai /
+        // unlocked so a later hand-edit/lock can be preserved across re-generation.
+        for (Map<String, Object> page : pages) {
+            PageConfigProvenance.tagGenerated(page);
+        }
         manifest.put("pages", pages);
         manifest.put("menus", deriveDynamicMenuPageKeys(
                 synthesizeMenus(res.getModels(), res.getMenus())));
@@ -1063,11 +1067,127 @@ public class NlModelingService {
         return models;
     }
 
+    /** v4 page layouts accept only these two layout.type values (mirrors PageSchemaValidator). */
+    private static final Set<String> VALID_PAGE_LAYOUT_TYPES = Set.of("grid", "stack");
+    /** v4 import accepts only these three page kinds (mirrors PageSchemaValidator). */
+    private static final Set<String> VALID_PAGE_KINDS = Set.of("list", "form", "detail");
+
+    /**
+     * Deterministically normalizes a generated page manifest to the strict v4 import
+     * contract enforced by {@code PageSchemaImportGate} / {@code PageSchemaValidator}.
+     * This is the safety net behind the v4-format system prompt: even when the LLM emits
+     * the legacy V2 shape (capitalized {@code kind}, no {@code schemaVersion}, a single
+     * wrapper block whose {@code layout} is {@code areas}/{@code areasConfig} flex with the
+     * real blocks nested under {@code areas.<region>.blocks[]}), the imported page is v4.
+     *
+     * <p>Normalization (idempotent on an already-v4 page):
+     * <ul>
+     *   <li>{@code schemaVersion} → {@code 4} ({@code S-PAGE-VERSION}).</li>
+     *   <li>{@code kind} lower-cased; an unknown kind is left for the validator to reject
+     *       rather than silently coerced.</li>
+     *   <li>{@code layout.type} not in {@code {grid,stack}} (e.g. flex) → {@code stack};
+     *       a missing layout → {@code {type:stack}} ({@code S-PAGE-LAYOUT}/
+     *       {@code S-PAGE-LAYOUT-TYPE}).</li>
+     *   <li>nested {@code areas.<region>.blocks[]} (and any single wrapper block carrying
+     *       {@code areas}) are hoisted into a flat top-level {@code blocks[]}
+     *       ({@code S-PAGE-BLOCKS}).</li>
+     *   <li>every hoisted block without an {@code id} gets a synthesized stable id
+     *       ({@code S-PAGE-BLOCK-ID}).</li>
+     * </ul>
+     *
+     * <p>Mutates and returns the (single-use, per-request) page map; {@code null} in →
+     * {@code null} out. Package-private for unit testing.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> normalizePageToV4(Map<String, Object> page) {
+        if (page == null) {
+            return null;
+        }
+
+        // schemaVersion → 4
+        page.put("schemaVersion", DslRegistry.PAGE_SCHEMA_CURRENT_VERSION);
+
+        // kind lower-cased (List → list); unknown kinds left for the validator.
+        if (page.get("kind") instanceof String kind && !kind.isBlank()) {
+            page.put("kind", kind.toLowerCase(Locale.ROOT));
+        }
+
+        // Hoist nested areas blocks into a flat top-level blocks[].
+        List<Map<String, Object>> flat = hoistAreaBlocks(page.get("blocks"));
+        int idSeq = 0;
+        for (Map<String, Object> block : flat) {
+            if (!(block.get("id") instanceof String id) || id.isBlank()) {
+                String blockType = block.get("blockType") instanceof String bt && !bt.isBlank()
+                        ? bt : "block";
+                block.put("id", blockType + "_" + (++idSeq));
+            }
+        }
+        page.put("blocks", new ArrayList<Object>(flat));
+
+        // layout.type must be grid|stack; default/repair to a vertical stack.
+        Object layoutObj = page.get("layout");
+        Map<String, Object> layout = layoutObj instanceof Map ? (Map<String, Object>) layoutObj
+                : new LinkedHashMap<>();
+        Object layoutType = layout.get("type");
+        if (!(layoutType instanceof String lt) || !VALID_PAGE_LAYOUT_TYPES.contains(lt)) {
+            // Drop the V2 areas/areasConfig wrapper config — v4 layout is just {type}.
+            layout = new LinkedHashMap<>();
+            layout.put("type", "stack");
+        }
+        page.put("layout", layout);
+
+        return page;
+    }
+
+    /**
+     * Flattens a page {@code blocks} value into a flat list of leaf blocks. Handles:
+     * the V2 wrapper block carrying {@code areas: { <region>: { blocks: [...] } }} (its
+     * children are hoisted; the wrapper is dropped), and an already-flat v4 {@code blocks[]}
+     * (returned as a mutable copy). Non-map / null entries are skipped.
+     */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> hoistAreaBlocks(Object blocksObj) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (!(blocksObj instanceof List<?> blocks)) {
+            return out;
+        }
+        for (Object blockObj : blocks) {
+            if (!(blockObj instanceof Map<?, ?> blockRaw)) {
+                continue;
+            }
+            Map<String, Object> block = (Map<String, Object>) blockRaw;
+            Object areas = block.get("areas");
+            if (areas instanceof Map<?, ?> areasMap) {
+                // V2 wrapper: hoist each region's nested blocks, drop the wrapper.
+                for (Object regionObj : areasMap.values()) {
+                    if (regionObj instanceof Map<?, ?> regionRaw) {
+                        Object regionBlocks = ((Map<String, Object>) regionRaw).get("blocks");
+                        out.addAll(hoistAreaBlocks(regionBlocks));
+                    }
+                }
+            } else {
+                // A leaf block: strip any residual V2 area wiring and keep it.
+                block.remove("areas");
+                out.add(block);
+            }
+        }
+        return out;
+    }
+
     static List<Map<String, Object>> synthesizePages(String pluginCode, List<Map<String, Object>> models,
                                                      List<Map<String, Object>> fields,
                                                      List<Map<String, Object>> pages) {
+        // The LLM may emit pages in the legacy V2 areas/areasConfig shape (the older
+        // "Page Schema" reference taught it) which the strict v4 import gate rejects.
+        // Normalize every provided page to v4 in place so the generation never depends
+        // on the model producing perfectly-shaped v4 output (the deterministic safety net
+        // behind the v4 prompt rewrite). Pages synthesized below are already v4.
         if (pages != null && !pages.isEmpty()) {
-            return pages;
+            List<Map<String, Object>> normalized = new ArrayList<>(pages.size());
+            for (Map<String, Object> page : pages) {
+                normalized.add(normalizePageToV4(page));
+            }
+            return normalized;
         }
         if (models == null || models.size() != 1
                 || !(models.get(0).get("code") instanceof String model)) {
