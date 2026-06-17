@@ -1,5 +1,15 @@
-import type { Page } from '@playwright/test';
+import type { Browser, BrowserContext, Page } from '@playwright/test';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { utils as XLSXUtils, write } from 'xlsx';
 import { expect } from '../../fixtures';
+import { loginViaUI } from '../../helpers/wd-fixtures';
+import {
+  clickRowActionByLocator,
+  ensureSidebarExpanded,
+  findRowInPaginatedList,
+  waitForDynamicPageLoad,
+} from '../helpers';
 
 export type CreatedRows = {
   quoteId: string;
@@ -18,6 +28,20 @@ export type BomPriceManualReviewSeed = CreatedRows & {
   mpn: string;
   suggestedEvidenceId: string;
   failedEvidenceId: string;
+};
+
+export type BomWorkbenchSeed = CreatedRows & {
+  projectId: string;
+  taskId: string;
+  standardLineId: string;
+  rawLineId: string;
+  canonicalLineId: string;
+  matchResultId: string;
+  primaryEvidenceId: string;
+  secondaryEvidenceId: string;
+  exportRevisionId: string;
+  candidateCode: string;
+  marker: string;
 };
 
 type QuoteLineSeed = {
@@ -45,6 +69,291 @@ type QuoteLineSeed = {
 
 export const GERBER_RUNTIME_TOP_FILE_ID = '01KV22CQ7PKX3W50Y7MM575ACK';
 export const GERBER_RUNTIME_BOTTOM_FILE_ID = '01KV22CQ7PKX3W50Y7MM575ACM';
+export const QUOTE_ROLE_TEST_PASSWORD = 'Test2026x';
+
+export type QuoteRoleUser = {
+  key: string;
+  email: string;
+  displayName: string;
+  password: string;
+  roleCodes: string[];
+};
+
+export type MenuSnapshotItem = {
+  code: string;
+  path: string;
+  permissionCode: string;
+  name: string;
+};
+
+export type RoleSnapshot = {
+  roleCodes: string[];
+  permissionCodes: string[];
+  menuCodes: string[];
+  menuPaths: string[];
+  menus: MenuSnapshotItem[];
+};
+
+export type CommandProbeResult = {
+  status: number;
+  body: Record<string, unknown>;
+  text: string;
+};
+
+async function clickSidebarPage(page: Page, href: string, label: RegExp): Promise<void> {
+  const nav = page.locator('nav, aside, [role="navigation"]').first();
+  const link = nav.locator(`a[href="${href}"]`).or(nav.getByRole('link', { name: label })).first();
+  await expect(link).toBeVisible({ timeout: 10_000 });
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === href, { timeout: 15_000 }).catch(() => null),
+    link.click(),
+  ]);
+  await waitForDynamicPageLoad(page, 20_000);
+}
+
+export async function openQuoteDetailFromList(page: Page, created: CreatedRows): Promise<void> {
+  expect(created.quoteId, 'quote id is required to open quote detail').toBeTruthy();
+  expect(created.quoteCode, 'quote code is required to find the quote row').toBeTruthy();
+
+  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+  await ensureSidebarExpanded(page);
+  await clickSidebarPage(page, '/p/qo_quote_common', /报价单|Quotes/i);
+
+  const row = await findRowInPaginatedList(page, created.quoteCode, 20_000);
+  await Promise.all([
+    page
+      .waitForURL((url) => url.pathname === `/p/qo_quote_common/view/${created.quoteId}`, {
+        timeout: 20_000,
+      })
+      .catch(() => null),
+    clickRowActionByLocator(page, row, 'view', '查看'),
+  ]);
+  await waitForDynamicPageLoad(page, 20_000);
+}
+
+export async function openQuoteCreateFormFromList(page: Page): Promise<void> {
+  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+  await ensureSidebarExpanded(page);
+  await clickSidebarPage(page, '/p/qo_quote_common', /报价单|Quotes/i);
+
+  const createButton = page
+    .getByTestId('toolbar-btn-create')
+    .or(page.getByRole('button', { name: /新建报价|Create/i }))
+    .first();
+  await expect(createButton).toBeVisible({ timeout: 20_000 });
+  await Promise.all([
+    page
+      .waitForURL((url) => url.pathname === '/p/qo_quote_common/new', { timeout: 20_000 })
+      .catch(() => null),
+    createButton.click(),
+  ]);
+  await waitForDynamicPageLoad(page, 20_000);
+}
+
+const BOM_INTERNAL_FIXTURE_MODELS = [
+  'req_requirement_set_pcba_bom',
+  'bom_conversion_task_pcba',
+  'bom_raw_line_pcba',
+  'bom_standard_line_pcba',
+  'bom_match_result_pcba',
+  'bom_match_evidence',
+  'bom_review_decision',
+  'bom_export_revision',
+];
+
+const MODEL_FIXTURE_ACTIONS = ['read', 'create', 'update', 'delete', 'export', 'import'];
+
+export function makeQuoteRoleUser(
+  key: string,
+  uid: string,
+  roleCodes: string[],
+): QuoteRoleUser {
+  const normalized = key.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  return {
+    key,
+    email: `e2e-${normalized}-${uid}@e2e.local`,
+    displayName: `E2E ${key} ${uid.slice(-8)}`.slice(0, 50),
+    password: QUOTE_ROLE_TEST_PASSWORD,
+    roleCodes,
+  };
+}
+
+export async function ensureQuoteRoleUser(page: Page, user: QuoteRoleUser): Promise<void> {
+  const resp = await page.request.post('/api/admin/users', {
+    data: {
+      email: user.email,
+      displayName: user.displayName,
+      initialPassword: user.password,
+      roleCodes: user.roleCodes,
+      sendInviteEmail: false,
+    },
+    timeout: 20_000,
+  });
+  const body = await resp.json().catch(() => ({}));
+  expect(
+    resp.ok(),
+    `create role user ${user.key} (${user.email}) HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 800)}`,
+  ).toBe(true);
+
+  const assignedRoles = Array.isArray((body as any).data?.assignedRoles)
+    ? (body as any).data.assignedRoles.map(String)
+    : [];
+  for (const roleCode of user.roleCodes) {
+    expect(
+      assignedRoles,
+      `create role user ${user.key} should assign role ${roleCode}; response=${JSON.stringify(body).slice(0, 800)}`,
+    ).toContain(roleCode);
+  }
+}
+
+export async function openQuoteRolePage(
+  browser: Browser,
+  user: QuoteRoleUser,
+): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await loginViaUI(page, user.email, user.password);
+  return { context, page };
+}
+
+function extractPermissionCodes(permissions: Record<string, unknown>): string[] {
+  const permissionCodes = permissions.permissionCodes;
+  if (Array.isArray(permissionCodes)) {
+    return permissionCodes.map(String).sort();
+  }
+  const permissionObjects = permissions.permissions;
+  if (Array.isArray(permissionObjects)) {
+    return permissionObjects
+      .map((permission) => String((permission as Record<string, unknown>).code ?? ''))
+      .filter(Boolean)
+      .sort();
+  }
+  return [];
+}
+
+function flattenMenuData(items: unknown[]): MenuSnapshotItem[] {
+  const result: MenuSnapshotItem[] = [];
+  const visit = (menuItems: unknown[]) => {
+    for (const item of menuItems) {
+      const menu = item as Record<string, unknown>;
+      result.push({
+        code: String(menu.code ?? ''),
+        path: String(menu.path ?? ''),
+        permissionCode: String(menu.permissionCode ?? menu.permission_code ?? ''),
+        name: String(menu.name ?? ''),
+      });
+      const children = menu.children ?? menu.submenu;
+      if (Array.isArray(children)) {
+        visit(children);
+      }
+    }
+  };
+  visit(items);
+  return result;
+}
+
+export async function fetchRoleSnapshot(page: Page): Promise<RoleSnapshot> {
+  const meResp = await page.request.get('/api/auth/me', { timeout: 15_000 });
+  const meBody = await meResp.json().catch(() => ({}));
+  expect(
+    meResp.ok(),
+    `/api/auth/me HTTP ${meResp.status()}: ${JSON.stringify(meBody).slice(0, 800)}`,
+  ).toBe(true);
+
+  const permissions = ((meBody as any).data?.permissions ?? {}) as Record<string, unknown>;
+  const roles = Array.isArray(permissions.roles) ? permissions.roles : [];
+  const roleCodes = roles
+    .map((role) => String((role as Record<string, unknown>).code ?? ''))
+    .filter(Boolean)
+    .sort();
+  const permissionCodes = extractPermissionCodes(permissions);
+
+  const menuResp = await page.request.get('/api/menu/user', { timeout: 15_000 });
+  const menuBody = await menuResp.json().catch(() => ({}));
+  expect(
+    menuResp.ok(),
+    `/api/menu/user HTTP ${menuResp.status()}: ${JSON.stringify(menuBody).slice(0, 800)}`,
+  ).toBe(true);
+  const menuRoot = Array.isArray((menuBody as any).data) ? (menuBody as any).data : [];
+  const menus = flattenMenuData(menuRoot);
+
+  return {
+    roleCodes,
+    permissionCodes,
+    menus,
+    menuCodes: menus.map((menu) => menu.code).filter(Boolean).sort(),
+    menuPaths: menus.map((menu) => menu.path).filter(Boolean).sort(),
+  };
+}
+
+function parseJsonObject(text: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function probeCommand(
+  page: Page,
+  commandCode: string,
+  payload: Record<string, unknown> = {},
+  targetRecordId?: string,
+  operationType?: string,
+): Promise<CommandProbeResult> {
+  const data: Record<string, unknown> = { payload };
+  if (targetRecordId) data.targetRecordId = targetRecordId;
+  if (operationType) data.operationType = operationType;
+  const resp = await page.request.post(
+    `/api/meta/commands/execute/${encodeURIComponent(commandCode)}`,
+    {
+      data,
+      timeout: 20_000,
+    },
+  );
+  const text = await resp.text();
+  return { status: resp.status(), text, body: parseJsonObject(text) };
+}
+
+export function isPermissionDeniedResult(result: CommandProbeResult): boolean {
+  const code = String((result.body as any).code ?? (result.body as any).status ?? '');
+  if (result.status === 403 || code === '403' || code === '10403') {
+    return true;
+  }
+  return /Access forbidden|Access denied|Forbidden|required permission|permission denied|缺少权限|无权限|没有权限|not authorized/i.test(
+    result.text,
+  );
+}
+
+export async function expectCommandDenied(
+  page: Page,
+  commandCode: string,
+  payload: Record<string, unknown> = {},
+  targetRecordId?: string,
+  operationType?: string,
+): Promise<void> {
+  const result = await probeCommand(page, commandCode, payload, targetRecordId, operationType);
+  expect(
+    isPermissionDeniedResult(result),
+    `${commandCode} should be denied, got HTTP ${result.status}: ${result.text.slice(0, 800)}`,
+  ).toBe(true);
+}
+
+export async function expectCommandNotDenied(
+  page: Page,
+  commandCode: string,
+  payload: Record<string, unknown> = {},
+  targetRecordId?: string,
+  operationType?: string,
+): Promise<CommandProbeResult> {
+  const result = await probeCommand(page, commandCode, payload, targetRecordId, operationType);
+  expect(
+    isPermissionDeniedResult(result),
+    `${commandCode} should pass permission gate, got HTTP ${result.status}: ${result.text.slice(0, 800)}`,
+  ).toBe(false);
+  return result;
+}
 
 async function pollAsyncTaskResult(page: Page, taskCode: string): Promise<Record<string, unknown>> {
   const terminal = new Set(['completed', 'failed', 'cancelled']);
@@ -220,6 +529,140 @@ export async function cleanupRows(page: Page, created: CreatedRows): Promise<voi
   }
 }
 
+async function fetchTenantAdminRole(page: Page): Promise<Record<string, unknown>> {
+  const resp = await page.request.get('/api/roles?keyword=tenant_admin&pageNum=1&pageSize=50', {
+    timeout: 15_000,
+  });
+  const body = await resp.json().catch(() => ({}));
+  expect(resp.ok(), `tenant_admin role lookup HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`).toBe(true);
+  const roles = Array.isArray((body as any).data?.records) ? (body as any).data.records : [];
+  const role = roles.find((item: Record<string, unknown>) => item.code === 'tenant_admin');
+  expect(role, `tenant_admin role should exist: ${JSON.stringify(body).slice(0, 800)}`).toBeTruthy();
+  return role as Record<string, unknown>;
+}
+
+async function fetchModelPermissionPids(page: Page, modelCodes: string[]): Promise<string[]> {
+  const permissions: Array<Record<string, unknown>> = [];
+  for (const resourceType of ['model', 'MODEL']) {
+    const permissionsResp = await page.request.get(
+      `/api/permissions/resource-type/${resourceType}`,
+      { timeout: 15_000 },
+    );
+    const permissionsBody = await permissionsResp.json().catch(() => ({}));
+    expect(
+      permissionsResp.ok(),
+      `${resourceType} permission list HTTP ${permissionsResp.status()}: ${JSON.stringify(permissionsBody).slice(0, 500)}`,
+    ).toBe(true);
+    if (Array.isArray((permissionsBody as any).data)) {
+      permissions.push(...((permissionsBody as any).data as Array<Record<string, unknown>>));
+    }
+  }
+  const byCode = new Map(
+    permissions
+      .map((permission) => [
+        String(permission.code ?? ''),
+        String(permission.pid ?? ''),
+      ] as const)
+      .filter(([code, pid]) => code && pid),
+  );
+
+  const out = new Set<string>();
+  for (const modelCode of modelCodes) {
+    for (const action of MODEL_FIXTURE_ACTIONS) {
+      const code = `model.${modelCode}.${action}`;
+      let pid = byCode.get(code);
+      if (!pid) {
+        const createResp = await page.request.post('/api/permissions', {
+          data: {
+            code,
+            name: `E2E ${modelCode} ${action}`,
+            description: `E2E fixture permission for ${modelCode}.${action}`,
+            resourceType: 'model',
+            resourceCode: modelCode,
+            action,
+            source: 'e2e',
+            sourceRef: 'quoteops-bom-workbench-golden',
+          },
+          timeout: 15_000,
+        });
+        const createBody = await createResp.json().catch(() => ({}));
+        expect(
+          createResp.ok(),
+          `${code} permission create HTTP ${createResp.status()}: ${JSON.stringify(createBody).slice(0, 500)}`,
+        ).toBe(true);
+        pid = String((createBody as any).data?.pid ?? '');
+        expect(pid, `${code} created permission should expose pid`).toBeTruthy();
+        byCode.set(code, pid);
+      }
+      out.add(pid);
+    }
+  }
+  return [...out];
+}
+
+export async function ensureTenantAdminModelPermissions(
+  page: Page,
+  modelCodes: string[] = BOM_INTERNAL_FIXTURE_MODELS,
+): Promise<void> {
+  const role = await fetchTenantAdminRole(page);
+  const rolePid = String(role.pid ?? '');
+  expect(rolePid, 'tenant_admin role should expose pid').toBeTruthy();
+
+  const currentResp = await page.request.get(`/api/roles/${encodeURIComponent(rolePid)}/permissions`, {
+    timeout: 15_000,
+  });
+  const currentBody = await currentResp.json().catch(() => ({}));
+  expect(
+    currentResp.ok(),
+    `tenant_admin permission lookup HTTP ${currentResp.status()}: ${JSON.stringify(currentBody).slice(0, 500)}`,
+  ).toBe(true);
+  const currentPids = Array.isArray((currentBody as any).data)
+    ? (currentBody as any).data.map(String)
+    : [];
+  const currentSet = new Set(currentPids);
+  const neededPids = await fetchModelPermissionPids(page, modelCodes);
+  const missing = neededPids.filter((pid) => !currentSet.has(pid));
+  if (missing.length === 0) return;
+
+  const assignResp = await page.request.post(`/api/roles/${encodeURIComponent(rolePid)}/permissions`, {
+    data: [...currentPids, ...missing],
+    timeout: 20_000,
+  });
+  const assignBody = await assignResp.json().catch(() => ({}));
+  expect(
+    assignResp.ok(),
+    `tenant_admin permission assignment HTTP ${assignResp.status()}: ${JSON.stringify(assignBody).slice(0, 500)}`,
+  ).toBe(true);
+}
+
+export function createCorrectedBomWorkbook(filePath: string): string {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  const workbook = XLSXUtils.book_new();
+  const worksheet = XLSXUtils.aoa_to_sheet([
+    [
+      'MPN',
+      'Description',
+      'RefDes',
+      'Qty',
+      'Unit',
+      'Package',
+      'SMT Points',
+      'THT Points',
+      'Pin Count',
+      'Hole Count',
+      'Positioning Pin Count',
+      'Function Pin Count',
+    ],
+    ['RC0603FR-0710KL', '10K resistor', 'R1,R2', 7600, 'pcs', '0603', 2, 0, 2, 0, 0, 2],
+    ['STM32F103C8T6', 'MCU', 'U1', 200, 'pcs', 'LQFP48', 48, 0, 48, 0, 0, 48],
+    ['', 'missing mpn row', 'C1', 10, 'pcs', '0603', 1, 0, 2, 0, 0, 2],
+  ]);
+  XLSXUtils.book_append_sheet(workbook, worksheet, 'Corrected BOM');
+  const bytes = write(workbook, { bookType: 'xlsx', type: 'buffer' });
+  writeFileSync(filePath, bytes);
+  return filePath;
+}
+
 async function seedQuoteScaffold(
   page: Page,
   marker: string,
@@ -359,6 +802,255 @@ async function seedQuoteScaffold(
         created.rows,
       );
     }
+
+    return created;
+  } catch (error) {
+    await cleanupRows(page, created);
+    throw error;
+  }
+}
+
+export async function seedQuoteForCorrectedBomUpload(page: Page): Promise<CreatedRows> {
+  return seedQuoteScaffold(page, 'CBOM', [], 'consumer');
+}
+
+export async function seedBomWorkbench(page: Page): Promise<BomWorkbenchSeed> {
+  await ensureTenantAdminModelPermissions(page);
+  const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
+  const marker = `E2E-BOM-${suffix}`;
+  const created = {
+    quoteId: '',
+    quoteCode: '',
+    rows: [],
+    projectId: '',
+    taskId: '',
+    standardLineId: '',
+    rawLineId: '',
+    canonicalLineId: '',
+    matchResultId: '',
+    primaryEvidenceId: '',
+    secondaryEvidenceId: '',
+    exportRevisionId: '',
+    candidateCode: `E2E-R-10K-A-${suffix}`,
+    marker,
+  } as BomWorkbenchSeed;
+
+  try {
+    created.projectId = await dynamicCreate(
+      page,
+      'req_requirement_set_pcba_bom',
+      {
+        bom_pcba_code: `PCBA-${suffix}`,
+        bom_project_name: `${marker} project`,
+        bom_product_name: `${marker} product`,
+        bom_project_library_source: 'excel_current_library',
+        bom_project_remark: 'Seeded by QuoteOps BOM workbench golden E2E',
+      },
+      created.rows,
+    );
+
+    created.taskId = await dynamicCreate(
+      page,
+      'bom_conversion_task_pcba',
+      {
+        bom_task_no: `TASK-${suffix}`,
+        bom_task_project_id: created.projectId,
+        bom_task_source_package: 'quoteops-e2e',
+        bom_task_source_model: 'req_requirement_set_pcba_bom',
+        bom_task_source_id: created.projectId,
+        bom_task_raw_file_id: `raw-${suffix}`,
+        bom_task_raw_filename: `${marker}-raw.xlsx`,
+        bom_task_status: 'completed',
+        bom_task_completed_at: new Date().toISOString(),
+        bom_task_total_rows: 2,
+        bom_task_valid_rows: 2,
+        bom_task_green_count: 1,
+        bom_task_yellow_count: 1,
+        bom_task_red_count: 0,
+        bom_task_reason_breakdown: JSON.stringify({ match_multi_candidate: 1 }),
+        bom_task_export_file_id: `export-${suffix}-r1`,
+        bom_task_export_filename: `${marker}-standard-bom-r1.xlsx`,
+        bom_task_edited_after_completion: false,
+        bom_task_edit_count: 0,
+      },
+      created.rows,
+    );
+
+    created.rawLineId = await dynamicCreate(
+      page,
+      'bom_raw_line_pcba',
+      {
+        bom_raw_task_id: created.taskId,
+        bom_raw_row_no: 1,
+        bom_raw_material_name: '10K resistor raw',
+        bom_raw_spec: '10K 1% 0603',
+        bom_raw_package: '0603',
+        bom_raw_mpn: 'RC0603FR-0710KL',
+        bom_raw_refdes: 'R1,R2',
+        bom_raw_qty: '2',
+        bom_raw_extra_columns_json: JSON.stringify({
+          __parse_evidence: {
+            profileCode: 'E2E_PROFILE',
+            composition: { matchRule: 'mpn+spec' },
+            llm: { confidence: 0, decision: { reason: 'not invoked in deterministic E2E' } },
+          },
+        }),
+      },
+      created.rows,
+    );
+
+    created.standardLineId = await dynamicCreate(
+      page,
+      'bom_standard_line_pcba',
+      {
+        bom_std_task_id: created.taskId,
+        bom_std_row_no: 1,
+        bom_std_raw_row_no: 1,
+        bom_std_category: 'resistor',
+        bom_std_material_code: '',
+        bom_std_material_name: '10K resistor canonical',
+        bom_std_spec: '10K 1% 0603',
+        bom_std_package: '0603',
+        bom_std_brand: 'Yageo',
+        bom_std_mpn: 'RC0603FR-0710KL',
+        bom_std_refdes: 'R1,R2',
+        bom_std_qty: 2,
+        bom_std_unit: 'PCS',
+        bom_std_reason_code: 'match_multi_candidate',
+        bom_std_candidate_codes: `${created.candidateCode},E2E-R-10K-B-${suffix}`,
+        bom_std_manual_confirmed: false,
+        bom_std_raw_hash: `raw-hash-${suffix}-1`,
+      },
+      created.rows,
+    );
+
+    const directLineId = await dynamicCreate(
+      page,
+      'bom_standard_line_pcba',
+      {
+        bom_std_task_id: created.taskId,
+        bom_std_row_no: 2,
+        bom_std_raw_row_no: 2,
+        bom_std_category: 'ic',
+        bom_std_material_code: `E2E-U1-${suffix}`,
+        bom_std_material_name: 'MCU direct copy',
+        bom_std_spec: 'LQFP48',
+        bom_std_package: 'LQFP48',
+        bom_std_mpn: 'STM32F103C8T6',
+        bom_std_refdes: 'U1',
+        bom_std_qty: 1,
+        bom_std_unit: 'PCS',
+        bom_std_reason_code: 'direct_copy',
+        bom_std_manual_confirmed: false,
+        bom_std_raw_hash: `raw-hash-${suffix}-2`,
+      },
+      created.rows,
+    );
+
+    created.matchResultId = await dynamicCreate(
+      page,
+      'bom_match_result_pcba',
+      {
+        bom_mr_task_id: created.taskId,
+        bom_mr_std_item_id: created.standardLineId,
+        bom_mr_status_color: 'yellow',
+        bom_mr_reason: '同规格存在多个候选物料，需人工确认',
+        bom_mr_match_source: 'item_master',
+      },
+      created.rows,
+    );
+
+    await dynamicCreate(
+      page,
+      'bom_match_result_pcba',
+      {
+        bom_mr_task_id: created.taskId,
+        bom_mr_std_item_id: directLineId,
+        bom_mr_status_color: 'green',
+        bom_mr_reason: '100% 直接复制',
+        bom_mr_match_source: 'direct_copy',
+      },
+      created.rows,
+    );
+
+    created.primaryEvidenceId = await dynamicCreate(
+      page,
+      'bom_match_evidence',
+      {
+        bom_me_task_id: created.taskId,
+        bom_me_canonical_line_id: created.standardLineId,
+        bom_me_material_code: created.candidateCode,
+        bom_me_candidate_source: 'item_master',
+        bom_me_status_color: 'yellow',
+        bom_me_score: 0.96,
+        bom_me_rank: 1,
+        bom_me_reason_code: 'match_multi_candidate',
+        bom_me_evidence_json: JSON.stringify({
+          source: 'item_master',
+          matchSource: 'mpn+spec',
+          spec: '10K 1% 0603',
+        }),
+        bom_me_conflict_json: JSON.stringify({ brand: 'multi-brand same spec' }),
+        bom_me_candidate_snapshot_json: JSON.stringify({
+          materialName: '10K resistor candidate A',
+          specModel: '10K 1% 0603',
+          packageCode: '0603',
+          brand: 'Yageo',
+          mpn: 'RC0603FR-0710KL',
+          attributes: { resistance: '10K', tolerance_pct: 0.01 },
+        }),
+      },
+      created.rows,
+    );
+
+    created.secondaryEvidenceId = await dynamicCreate(
+      page,
+      'bom_match_evidence',
+      {
+        bom_me_task_id: created.taskId,
+        bom_me_canonical_line_id: created.standardLineId,
+        bom_me_material_code: `E2E-R-10K-B-${suffix}`,
+        bom_me_candidate_source: 'item_master',
+        bom_me_status_color: 'yellow',
+        bom_me_score: 0.91,
+        bom_me_rank: 2,
+        bom_me_reason_code: 'match_multi_candidate',
+        bom_me_evidence_json: JSON.stringify({
+          source: 'item_master',
+          matchSource: 'spec',
+          spec: '10K 1% 0603',
+        }),
+        bom_me_candidate_snapshot_json: JSON.stringify({
+          materialName: '10K resistor candidate B',
+          specModel: '10K 1% 0603',
+          packageCode: '0603',
+          brand: 'UniOhm',
+          mpn: '0603WAF1002T5E',
+          attributes: { resistance: '10K', tolerance_pct: 0.01 },
+        }),
+      },
+      created.rows,
+    );
+
+    created.exportRevisionId = await dynamicCreate(
+      page,
+      'bom_export_revision',
+      {
+        bom_er_task_id: created.taskId,
+        bom_er_revision_no: 1,
+        bom_er_source_state_hash: `state-${suffix}-r1`,
+        bom_er_source_decision_version: 0,
+        bom_er_file_id: `export-${suffix}-r1`,
+        bom_er_filename: `${marker}-standard-bom-r1.xlsx`,
+        bom_er_generated_by: 'e2e',
+        bom_er_generated_at: new Date().toISOString(),
+        bom_er_green_count: 1,
+        bom_er_yellow_count: 1,
+        bom_er_red_count: 0,
+        bom_er_status: 'current',
+      },
+      created.rows,
+    );
 
     return created;
   } catch (error) {

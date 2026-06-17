@@ -648,6 +648,12 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               operationType,
             );
             if ((commandResult as any)?.__asyncFailed) {
+              if (context.loadData) {
+                await context.loadData();
+              }
+              if (refreshIds && dataSourceManager?.reload) {
+                await dataSourceManager.reload(refreshIds);
+              }
               return;
             }
             if (context.loadData) {

@@ -30,6 +30,7 @@ import { fetchResult } from '~/shared/services/http-client';
 export interface SchemaRuntimeConfig {
   schema: UnifiedSchema;
   globalState: GlobalState;
+  initialContext?: Partial<ExpressionContext>;
   scopeId?: string;
   navigate?: (path: string) => void;
   showToast?: (message: string, level?: 'success' | 'error' | 'info' | 'warning') => void;
@@ -65,7 +66,15 @@ export class SchemaRuntime {
 
     // 创建作用域
     this.stateManager.createScope(this.scopeId, {
-      state: config.schema.state || {},
+      state: {
+        ...(config.schema.state || {}),
+        ...((config.initialContext?.state as Record<string, any> | undefined) || {}),
+      },
+      form: config.initialContext?.form || {},
+      record: (config.initialContext as any)?.record,
+      row: config.initialContext?.row,
+      args: config.initialContext?.args,
+      $page: (config.initialContext as any)?.$page,
     });
 
     // P0-3: 强制使用外部传入的 DataSourceManager (单例模式)
@@ -332,6 +341,26 @@ export class SchemaRuntime {
    */
   getShowToast(): SchemaRuntimeConfig['showToast'] {
     return this.showToast;
+  }
+
+  /**
+   * Synchronize page-owned context such as the current detail record into the
+   * runtime scope. Data sources already receive this context from page hooks;
+   * block actions need the same values for templates like `${form.pid}`.
+   */
+  syncContext(context?: Partial<ExpressionContext>): void {
+    if (!context) return;
+    const current = this.stateManager.getScope(this.scopeId) || {};
+    this.stateManager.updateScope(this.scopeId, {
+      ...(context.form !== undefined ? { form: context.form || {} } : {}),
+      ...(context.row !== undefined ? { row: context.row } : {}),
+      ...(context.args !== undefined ? { args: context.args } : {}),
+      ...((context as any).record !== undefined ? { record: (context as any).record } : {}),
+      ...((context as any).$page !== undefined ? { $page: (context as any).$page } : {}),
+      ...(context.state
+        ? { state: { ...((current.state as Record<string, any> | undefined) || {}), ...context.state } }
+        : {}),
+    });
   }
 
   /**

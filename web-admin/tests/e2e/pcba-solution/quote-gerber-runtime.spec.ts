@@ -3,6 +3,7 @@ import {
   cleanupRows,
   GERBER_RUNTIME_BOTTOM_FILE_ID,
   GERBER_RUNTIME_TOP_FILE_ID,
+  openQuoteDetailFromList,
   seedGerberRuntimeQuote,
 } from './quote-e2e-helpers';
 
@@ -51,9 +52,8 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
     );
 
     try {
-      await page.goto(`/p/qo_quote_common/view/${created.quoteId}#spec_process`, {
-        waitUntil: 'domcontentloaded',
-      });
+      await openQuoteDetailFromList(page, created);
+      await page.getByRole('tab', { name: /Gerber校验|Gerber Check/i }).click();
 
       const viewer = page.getByTestId('gerber-viewer');
       await expect(viewer).toContainText('E2E Gerber runtime board', { timeout: 30_000 });

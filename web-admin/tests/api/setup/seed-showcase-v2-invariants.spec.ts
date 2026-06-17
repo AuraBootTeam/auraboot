@@ -6,8 +6,8 @@
  */
 
 import { expect, test, type APIRequestContext } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import * as path from 'node:path';
 
 type ListBody = {
   code?: string | number;
@@ -21,12 +21,36 @@ type SeedMenu = {
   expectedSearchValue: string;
 };
 
-const ENTERPRISE_ROOT =
-  process.env.AURABOOT_ENTERPRISE_ROOT || '/Users/ghj/work/auraboot/auraboot-enterprise';
-const PCBA_SEED_FILE = path.join(
-  ENTERPRISE_ROOT,
-  'plugins/pcba-solution/config/demo-data/pcba-demo-20260426.json',
-);
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function resolvePcbaSeedFile(): string {
+  const relativeSeed = 'pcba-solution/config/demo-data/pcba-demo-20260426.json';
+  const candidates = unique([
+    process.env.AURA_PCBA_DEMO_SEED_FILE || '',
+    process.env.AURA_ENTERPRISE_PLUGIN_ROOT
+      ? path.join(process.env.AURA_ENTERPRISE_PLUGIN_ROOT, relativeSeed)
+      : '',
+    process.env.AURA_ENTERPRISE_PROJECT_ROOT
+      ? path.join(process.env.AURA_ENTERPRISE_PROJECT_ROOT, 'plugins', relativeSeed)
+      : '',
+    process.env.AURABOOT_ENTERPRISE_ROOT
+      ? path.join(process.env.AURABOOT_ENTERPRISE_ROOT, 'plugins', relativeSeed)
+      : '',
+    path.resolve(process.cwd(), '../../plugins', relativeSeed),
+    path.resolve(process.cwd(), '../../../plugins', relativeSeed),
+    '/Users/ghj/work/auraboot/plugins/pcba-solution/config/demo-data/pcba-demo-20260426.json',
+    '/Users/ghj/work/auraboot/auraboot-enterprise/plugins/pcba-solution/config/demo-data/pcba-demo-20260426.json',
+  ]);
+  const selected = candidates.find((candidate) => existsSync(candidate));
+  if (!selected) {
+    throw new Error(`Cannot resolve PCBA demo seed file. Checked: ${candidates.join(', ')}`);
+  }
+  return selected;
+}
+
+const PCBA_SEED_FILE = resolvePcbaSeedFile();
 
 const MOBILE_FAVORITES = [
   '宁波鑫越汽车电子',

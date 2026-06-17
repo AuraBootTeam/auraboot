@@ -2,7 +2,9 @@ package com.auraboot.framework.menu.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.application.annotation.CurrentUserId;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.service.MenuService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -164,8 +166,17 @@ public class MenuController {
      */
     @GetMapping("/by-path")
     @ResponseBody
-    public ApiResponse<Menu> getMenuByPath(@RequestParam("path") String path) {
-        Menu menu = menuService.getByPath(MetaContext.getCurrentTenantId(), path);
+    public ApiResponse<Menu> getMenuByPath(
+            @CurrentUserId Long userId,
+            @RequestParam("path") String path) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Menu menu = menuService.getByPath(tenantId, path);
+        if (menu != null
+                && menu.getPermissionCode() != null
+                && !menu.getPermissionCode().isBlank()
+                && !menuService.hasMenuPermission(userId, menu.getPermissionCode(), tenantId)) {
+            throw new RootUnCheckedException(ResponseCode.FORBIDDEN, "Access denied for menu path: " + path);
+        }
         return ApiResponse.success(menu);
     }
 

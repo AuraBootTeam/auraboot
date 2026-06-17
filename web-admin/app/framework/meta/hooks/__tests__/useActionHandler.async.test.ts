@@ -126,6 +126,59 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect(result.current.activeTask?.errorMessage).toContain('source_file_id is required');
   });
 
+  it('refreshes detail data sources when an async task fails so status banners can surface the failure', async () => {
+    fetchResultMock
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          commandCode: 'c',
+          phaseReached: 'completed',
+          data: { async: true, taskCode: 'T-FAILED' },
+        },
+      })
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          status: 'failed',
+          errorMessage: 'Corrected BOM missing required header row',
+        },
+      });
+
+    const loadData = vi.fn().mockResolvedValue(undefined);
+    const reload = vi.fn().mockResolvedValue(undefined);
+    const runtime = makeRuntime({ form: { pid: 'QUOTE-123' } });
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime,
+        navigate: vi.fn() as any,
+        tableName: 'qo_quote_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        dataSourceManager: { reload } as any,
+        context: { loadData } as any,
+      }),
+    );
+
+    const button = {
+      code: 'upload_corrected_bom',
+      label: 'Upload Corrected BOM',
+      action: {
+        type: 'command',
+        command: 'qo_quote_common:import_corrected_bom',
+        targetRecordId: '${form.pid}',
+        refresh: ['quoteRecomputeStatus', 'lines', 'quoteBomImports'],
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button);
+    });
+
+    expect(result.current.activeTask?.status).toBe('failed');
+    expect(loadData).toHaveBeenCalled();
+    expect(reload).toHaveBeenCalledWith(['quoteRecomputeStatus', 'lines', 'quoteBomImports']);
+  });
+
   it('prefers command context.detail over generic HTTP error text', async () => {
     fetchResultMock.mockResolvedValueOnce({
       code: '35000',

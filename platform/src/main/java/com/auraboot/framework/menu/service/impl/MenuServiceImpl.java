@@ -6,6 +6,7 @@ import com.auraboot.framework.menu.service.MenuService;
 import com.auraboot.framework.menu.constant.MenuStatus;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.SubjectPermissionService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
@@ -23,6 +24,9 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
     @Resource
     private SubjectPermissionService subjectPermissionService;
+
+    @Resource
+    private UserPermissionService userPermissionService;
 
     @Resource
     private com.auraboot.framework.permission.service.AutoPermissionAssignmentService autoPermissionAssignmentService;
@@ -54,14 +58,17 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         
         Map<Long, Boolean> visibilityMap = subjectPermissionService
             .batchEvaluateVisibility("menu", menuIds, userId);
+
+        Set<String> userPermissionCodes = userPermissionService.getUserPermissionCodes(userId);
         
-        // 3. 过滤出可见的菜单
+        // 3. 过滤出可见且满足 permission_code 的菜单
         List<Menu> visibleMenus = allMenus.stream()
-            .filter(menu -> visibilityMap.getOrDefault(menu.getId(), true))  // 默认可见
+            .filter(menu -> visibilityMap.getOrDefault(menu.getId(), true))  // subject rules default visible
+            .filter(menu -> isAllowedByPermissionCode(menu, userPermissionCodes))
             .collect(Collectors.toList());
         
-        // 4. 构建树结构
-        return buildMenuTree(visibleMenus);
+        // 4. 构建树结构，并移除权限过滤后没有任何可见子项的空目录
+        return pruneEmptyDirectories(buildMenuTree(visibleMenus));
     }
     
     @Override
@@ -142,6 +149,32 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         
         return rootMenus;
     }
+
+    private boolean isAllowedByPermissionCode(Menu menu, Set<String> userPermissionCodes) {
+        String permissionCode = menu.getPermissionCode();
+        if (permissionCode == null || permissionCode.isBlank()) {
+            return true;
+        }
+        return userPermissionCodes != null && userPermissionCodes.contains(permissionCode);
+    }
+
+    private List<Menu> pruneEmptyDirectories(List<Menu> menuList) {
+        if (menuList == null || menuList.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Menu> pruned = new ArrayList<>();
+        for (Menu menu : menuList) {
+            if (menu.getChildren() != null && !menu.getChildren().isEmpty()) {
+                menu.setChildren(pruneEmptyDirectories(menu.getChildren()));
+            }
+            boolean isDirectory = Integer.valueOf(0).equals(menu.getType());
+            boolean hasChildren = menu.getChildren() != null && !menu.getChildren().isEmpty();
+            if (!isDirectory || hasChildren) {
+                pruned.add(menu);
+            }
+        }
+        return pruned;
+    }
     
     @Override
     public boolean hasMenuPermission(Long userId, String permissionCode, Long tenantId) {
@@ -152,7 +185,10 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
             return false;
         }
 
-        // 2. 评估菜单可见性
+        // 2. permission_code 是菜单路由的硬边界，subject visibility 是附加条件
+        if (!userPermissionService.hasPermission(userId, permissionCode)) {
+            return false;
+        }
         return subjectPermissionService.evaluateVisibility("menu", menu.getId(), userId);
     }
 
@@ -241,12 +277,15 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
         Map<Long, Boolean> visibilityMap = subjectPermissionService
             .batchEvaluateVisibility("menu", buttonIds, userId);
+        Set<String> userPermissionCodes = userPermissionService.getUserPermissionCodes(userId);
 
-        // 3. 返回可见按钮的permission_code
+        // 3. 返回用户真正拥有且可见的按钮 permission_code
         return allButtons.stream()
             .filter(button -> visibilityMap.getOrDefault(button.getId(), true))  // 默认可见
             .map(Menu::getPermissionCode)
             .filter(Objects::nonNull)
+            .filter(permissionCode -> !permissionCode.isBlank())
+            .filter(userPermissionCodes::contains)
             .collect(Collectors.toList());
     }
 
