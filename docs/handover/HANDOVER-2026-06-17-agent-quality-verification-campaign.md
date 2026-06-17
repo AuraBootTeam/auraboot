@@ -1,3 +1,9 @@
+---
+type: handover
+status: active
+created: 2026-06-17
+---
+
 # Session Handover - 2026-06-17
 
 ## Session Summary
