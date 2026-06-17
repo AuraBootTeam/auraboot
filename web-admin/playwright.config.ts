@@ -65,7 +65,6 @@ const quoteOpsCurrentSpecNames = [
 const quoteOpsCurrentGatePattern = new RegExp(
   String.raw`.*\/pcba-solution\/(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$`,
 );
-const pcbaLegacySpecPattern = /.*\/pcba-legacy\/.*\.spec\.ts$/;
 
 const enterpriseScopeDirs = [
   'annual-plan',
@@ -238,7 +237,7 @@ export default defineConfig({
             testDir: './tests/e2e',
             // Exclude resource-intensive deep designer tests — they get their own project (chromium-deep)
             // with workers:1 to prevent browser OOM crashes from concurrent heavy DOM operations.
-            testIgnore: [deepSpecPattern, pcbaLegacySpecPattern],
+            testIgnore: deepSpecPattern,
             dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
@@ -249,7 +248,6 @@ export default defineConfig({
             name: 'chromium-deep',
             testDir: './tests/e2e',
             testMatch: deepSpecPattern,
-            testIgnore: pcbaLegacySpecPattern,
             // Run AFTER chromium completes — ensures deep designer tests don't compete
             // for browser resources with the main test suite (prevents OOM crashes).
             dependencies: ['chromium'],
@@ -268,12 +266,7 @@ export default defineConfig({
           {
             name: 'oss',
             testDir: './tests/e2e',
-            testIgnore: [
-              deepSpecPattern,
-              pcbaLegacySpecPattern,
-              ...enterpriseScopeRegexes,
-              contractScopeRegex,
-            ],
+            testIgnore: [deepSpecPattern, ...enterpriseScopeRegexes, contractScopeRegex],
             dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
@@ -284,7 +277,7 @@ export default defineConfig({
             name: 'oss-deep',
             testDir: './tests/e2e',
             testMatch: deepSpecPattern,
-            testIgnore: [pcbaLegacySpecPattern, ...enterpriseScopeRegexes, contractScopeRegex],
+            testIgnore: [...enterpriseScopeRegexes, contractScopeRegex],
             dependencies: ['oss'],
             timeout: 120_000,
             use: {
@@ -354,26 +347,11 @@ export default defineConfig({
           },
         ]
       : []),
-    ...(runProfile === 'pcba-legacy'
-      ? [
-          {
-            name: 'pcba-legacy',
-            testDir: './tests/e2e',
-            testMatch: pcbaLegacySpecPattern,
-            dependencies: ['auth'],
-            use: {
-              ...devices['Desktop Chrome'],
-              storageState: adminStorageState,
-            },
-          },
-        ]
-      : []),
     ...(runProfile === 'smoke'
       ? [
           {
             name: 'smoke',
             testDir: './tests/e2e',
-            testIgnore: pcbaLegacySpecPattern,
             grep: /@smoke/,
             dependencies: ['auth'],
             use: {
@@ -388,7 +366,6 @@ export default defineConfig({
           {
             name: 'critical',
             testDir: './tests/e2e',
-            testIgnore: pcbaLegacySpecPattern,
             grep: /@critical|@smoke/,
             dependencies: ['auth'],
             use: {
