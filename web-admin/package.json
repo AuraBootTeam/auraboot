@@ -17,6 +17,7 @@
     "check": "pnpm typecheck && pnpm verify:plugin-routes && pnpm check:datetime-display",
     "verify:plugin-routes": "node scripts/verify-plugin-routes.mjs",
     "check:datetime-display": "node scripts/check-datetime-display.mjs",
+    "gen:tokens": "tsx scripts/gen-tokens-css.mts",
     "lint": "eslint \"app/**/*.{ts,tsx,js,jsx}\"",
     "test:env-lint": "node scripts/test-env-lint.mjs",
     "format": "prettier --write \"app/**/*.{ts,tsx,js,jsx,css,json}\"",

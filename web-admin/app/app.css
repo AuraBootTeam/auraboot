@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* UX Design System tokens — generated from dsTokens (pnpm gen:tokens). */
+@import './styles/tokens.theme.css';
 @source './plugins/**/*.tsx';
 @source './plugins/**/*.ts';
 @source './plugins/**/*.css';
