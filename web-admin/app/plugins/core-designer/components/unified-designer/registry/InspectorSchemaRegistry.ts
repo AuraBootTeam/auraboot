@@ -465,6 +465,66 @@ const artifactTimelineFields: PropertySchema<string>[] = [
   { key: 'layout.span', label: 'Span', type: 'number' },
 ];
 
+// ---------------------------------------------------------------------------
+// Display / data blocks (non workbench-family). Same bare-path contract as the
+// workbench family: every key below is the EXACT path the platform renderer reads
+// (verified against each renderer source under framework/meta/rendering/blocks/).
+// No invented fields — only props the live renderer actually consumes.
+// ---------------------------------------------------------------------------
+
+// StatCardBlockRenderer builds `cfg = { ...block.props, ...block.statCard }`, so
+// the metric object lives at block.statCard (bare) with value / unit / trend /
+// trendDirection / valueField inside it. block.dataSource is a bare STRING id
+// (the named data source whose first row supplies the live value); block.title is
+// the card heading. statCard is authored as JSON (a small object editor).
+const statCardFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  // dataSource is a string id on display blocks (the named data source the page
+  // binds), so it is a plain text field rather than the model selector.
+  { key: 'dataSource', label: 'Data source', type: 'text' },
+  // statCard: { value, unit, trend, trendDirection: up|down|flat, valueField }.
+  // Authored as JSON — the renderer spreads this object over props.
+  { key: 'statCard', label: 'Stat card JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// DescriptionBlockRenderer reads `block.content ?? props.content ?? props.text`.
+// The BARE `content` path wins, so the inspector exposes it directly (LocalizedText
+// or string; HTML is sanitized before render). No other authorable props.
+const descriptionFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'content', label: 'Content', type: 'text' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// RecordComments (dispatched by DetailPageContent) derives modelCode + recordPid
+// from the SURROUNDING detail page + current record — it reads NO block-level data
+// config. So the only authorable surface is the designer title (the canvas label)
+// plus the universal AI-lock appended by getFieldsForBlock. Deliberately no data
+// fields: surfacing modelCode/recordPid here would be invented (the live renderer
+// ignores them).
+const recordCommentsFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// EmbeddedListBlockRenderer reads bare top-level block.modelCode (or childModel),
+// block.parentField (or foreignKey), block.columns (or table.columns),
+// block.title, block.pageSize, block.searchable, block.filterable. The parent
+// record id is resolved from the detail route, so this is a DETAIL-only block.
+const embeddedListFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'modelCode', label: 'Model code', type: 'text' },
+  { key: 'parentField', label: 'Parent field (foreign key)', type: 'text' },
+  // columns: array of { field, label, dataType?, dictCode?, width?, align? }.
+  // Authored as JSON — the renderer iterates this array directly.
+  { key: 'columns', label: 'Columns JSON', type: 'json' },
+  { key: 'pageSize', label: 'Page size', type: 'number' },
+  { key: 'searchable', label: 'Searchable', type: 'boolean' },
+  { key: 'filterable', label: 'Filterable', type: 'boolean' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
 // ReviewDrawerBlockRenderer is the row-level review overlay (the most complex
 // workbench block). It reads many top-level keys: context / contextDataSource /
 // contextKeyField / titleTemplate / summaryBadges / compare / candidates /
@@ -699,6 +759,10 @@ export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry 
     'record-inspector': recordInspectorFields,
     'candidate-list': candidateListFields,
     'artifact-timeline': artifactTimelineFields,
+    'stat-card': statCardFields,
+    description: descriptionFields,
+    'record-comments': recordCommentsFields,
+    'embedded-list': embeddedListFields,
     action: [...actionBaseFields, ...actionCommonFeedbackFields],
     widget: widgetFields,
   });

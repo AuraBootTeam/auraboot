@@ -56,6 +56,18 @@ const SHARED_WORKBENCH_BLOCKS = [
   'artifact-timeline',
 ] as const;
 
+// Display / data blocks (non workbench-family). stat-card + description are
+// generic display blocks usable on both detail and dashboard cockpits;
+// record-comments + embedded-list are DETAIL-only (they resolve the surrounding
+// record from the detail route, so they have no meaning on a dashboard).
+const SHARED_DETAIL_DISPLAY_BLOCKS = [
+  'stat-card',
+  'description',
+  'record-comments',
+  'embedded-list',
+] as const;
+const SHARED_DASHBOARD_DISPLAY_BLOCKS = ['stat-card', 'description'] as const;
+
 const POLICIES: Record<PageSchemaV3Kind, KindPolicy> = {
   form: {
     rootBlockType: 'form',
@@ -89,11 +101,17 @@ const POLICIES: Record<PageSchemaV3Kind, KindPolicy> = {
       ...SHARED_ACTION_BLOCKS,
       ...SHARED_WORKFLOW_BLOCKS,
       ...SHARED_WORKBENCH_BLOCKS,
+      ...SHARED_DETAIL_DISPLAY_BLOCKS,
     ]),
   },
   dashboard: {
     rootBlockType: 'dashboard',
-    allowedBlockTypes: new Set<string>(['dashboard', 'widget', ...SHARED_WORKBENCH_BLOCKS]),
+    allowedBlockTypes: new Set<string>([
+      'dashboard',
+      'widget',
+      ...SHARED_WORKBENCH_BLOCKS,
+      ...SHARED_DASHBOARD_DISPLAY_BLOCKS,
+    ]),
   },
   composite: {
     rootBlockType: null,
