@@ -56,7 +56,7 @@ export const ProgressField: React.FC<ProgressFieldProps> = ({
   if (readOnly) {
     return (
       <div className={cn('flex items-center gap-2', className)}>
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-200">
+        <div className="rounded-pill h-2 flex-1 overflow-hidden bg-gray-200">
           <div
             className={cn(
               'h-full rounded-full transition-all duration-300',
@@ -96,9 +96,9 @@ export const ProgressField: React.FC<ProgressFieldProps> = ({
         onChange={handleChange}
         min={0}
         max={100}
-        className="w-14 rounded border border-gray-300 px-1.5 py-0.5 text-right text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+        className="border-border-strong focus-visible:shadow-focus w-14 rounded border px-1.5 py-0.5 text-right text-xs focus:outline-none"
       />
-      <span className="text-xs text-gray-500">%</span>
+      <span className="text-text-2 text-xs">%</span>
     </div>
   );
 };

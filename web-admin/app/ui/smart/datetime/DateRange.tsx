@@ -274,7 +274,7 @@ export const DateRange = forwardRef<HTMLDivElement, DateRangeProps>(
                 'min-w-0 flex-1',
               )}
             />
-            <span className="flex-shrink-0 text-gray-400">—</span>
+            <span className="text-text-3 flex-shrink-0">—</span>
             <input
               type="date"
               id={`${name}_end`}
