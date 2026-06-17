@@ -310,7 +310,10 @@ public class TaskService {
             throw new IllegalArgumentException("User not authorized to rollback this task: " + taskId);
         }
 
-        smartEngine.getTaskCommandService().rollbackTask(taskId, targetActivityId, reason, tenantId);
+        // Pass the real operator (current user) so the engine records
+        // se_process_rollback_record.operator_user_id (NOT NULL) — the task may
+        // be assigned-but-not-claimed, in which case claimUserId is null (G-B5).
+        smartEngine.getTaskCommandService().rollbackTask(taskId, targetActivityId, reason, userId, tenantId);
 
         bpmAuditService.auditTaskOperation("task_rollback", taskId, task.getProcessInstanceId(),
                 userId, null, reason, Map.of("targetActivityId", targetActivityId));
@@ -338,7 +341,9 @@ public class TaskService {
         candidate.setAssigneeId(targetUserId);
         candidate.setAssigneeType("user");
 
-        smartEngine.getTaskCommandService().addTaskAssigneeCandidateWithReason(taskId, tenantId, candidate, reason);
+        // Pass the real operator (current user) so the engine records
+        // se_assignee_operation_record.operator_user_id (NOT NULL) — see G-B5.
+        smartEngine.getTaskCommandService().addTaskAssigneeCandidateWithReason(taskId, tenantId, candidate, reason, userId);
 
         bpmAuditService.auditTaskOperation("task_add_sign", taskId, task.getProcessInstanceId(),
                 userId, targetUserId, reason, null);
@@ -365,7 +370,9 @@ public class TaskService {
         candidate.setAssigneeId(targetUserId);
         candidate.setAssigneeType("user");
 
-        smartEngine.getTaskCommandService().removeTaskAssigneeCandidateWithReason(taskId, tenantId, candidate, reason);
+        // Pass the real operator (current user) so the engine records
+        // se_assignee_operation_record.operator_user_id (NOT NULL) — see G-B5.
+        smartEngine.getTaskCommandService().removeTaskAssigneeCandidateWithReason(taskId, tenantId, candidate, reason, userId);
 
         bpmAuditService.auditTaskOperation("task_remove_sign", taskId, task.getProcessInstanceId(),
                 userId, targetUserId, reason, null);
