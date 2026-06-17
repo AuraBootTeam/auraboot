@@ -294,6 +294,11 @@ export const DESIGNER_I18N = {
     deleteBlock: { 'zh-CN': '删除', 'en-US': 'Delete' } as L,
     aiLockBadge: { 'zh-CN': 'AI 锁定', 'en-US': 'AI locked' } as L,
 
+    // Multi-select batch bar (shift / cmd / ctrl + click on the canvas)
+    multiSelectCount: { 'zh-CN': '已选 {count} 项', 'en-US': '{count} selected' } as L,
+    multiSelectDelete: { 'zh-CN': '删除所选', 'en-US': 'Delete selected' } as L,
+    multiSelectClear: { 'zh-CN': '清除选择', 'en-US': 'Clear selection' } as L,
+
     // Palette category headers
     category: {
       page: { 'zh-CN': '页面', 'en-US': 'Page' } as L,

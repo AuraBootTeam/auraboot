@@ -198,11 +198,17 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 | E1(部分)widget +3 chart 类型 pie/area/progress 端到端 | ✅ DONE | inspector widgetType +3 选项 + **真 runtime mini-renderer**(`RuntimePieChart` SVG 扇形 / `RuntimeAreaChart` SVG 填充 path / `RuntimeProgressWidget` 阈值带百分比条)+ `WIDGET_BODY_TYPES` guard(progress 读 props.value 跳过 number-card 框);`widget-chart-types-golden.spec.ts` 3/3 真栈(save readback widgetType+props + runtime 真渲染非空 DOM:扇形/填充/进度条 + 截图复核);advanced-props 5/5 无回归 |
 | §15 修正 | 📌 记录 | 派发前取证发现 widget runtime 是手写 5 种 mini-renderer **非 SharedChartFactory** → 加新 type 必须配真渲染器(非单纯加选项,否则假选项 §2.2)。本切片加 3 type;**全 24 type parity = widget runtime 统一到 SharedChartFactory,是更大 follow-up** |
 
+### ✅ Slice 8 C5 画布多选 + 批量删除(commit `2b0f91ef`,4 E2E + 216 单测独立重跑 0 fail,host-first 隔离 slot 48)
+| 项 | 状态 | 证据 |
+|----|------|------|
+| C5 画布多选 + 批量删除 | ✅ DONE | 独立 `multiSelectedIds: Set`(**不动 selectedBlockId 拖放上下文**,仅 5 行删除纯增量);shift/cmd-click 多选 + `multi-select-bar`(N selected + 批量删除 + 清除)+ 批量删除(跳过不可删 root,单次 undo)+ `data-multi-selected` 视觉;`canvas-multiselect-golden.spec.ts` 4/4 真栈(多选→批量删→**PUT save→GET readback 持久化删除**→undo 恢复;edge 普通click收起/重复 modifier 取消;sad clear 不删);顺手修 CanvasHost BlockContent pass-through 漏传(破坏嵌套 block)。inspector-authoring 6/6 无回归 |
+| C5 box-select 几何框选 | ⏸ defer | 最易 flake(类 A7),显式 follow-up |
+
 ### ⏸ NOT-MET(roadmap,**未完成,不假报**)
 - **A7** mid-drag drop-indicator/ghost 视觉断言(@dnd-kit 中途手势最易 flake,ROI 最低)→ defer。
 - **A11/A12** chart 类型广度 / input·layout 广度 → defer。
 - **E1(剩余)/E2** widget 全 24 chart parity(runtime 统一 SharedChartFactory)、19 workbench block palette 可视化 authoring → 大特性(多周),未做。
-- **C4/C5** kind 切换、多选/批量 → 大特性,未做(C3 三件套 list+rollback+diff 已全交付)。
+- **C4 / C5-box-select** kind 切换、几何框选 → 未做(C5 shift/cmd 多选+批量删除已交付)。
 - **D2/D4** 富属性控件全接入(dict/namedQuery/command/permission 选择器)、字段级校验反馈;**B3** REST diff blocks 下钻 → 未做。
 - **🧪 测试鲁棒性 follow-up**:`inspector-model-select-golden.spec.ts:146` 依赖特定 published model 在 seed 中(`option[value=SELECT_MODEL]` toHaveCount 1),bootstrap-only/leaner seed 栈(如 15 model 的 slot)会 fail —— seed 敏感非代码 bug;应改断言"select 存在 + ≥1 真 model option"而非锁定具体 model。
 - **🐛 ViewModelService latent bug** — ✅ 已由 #725 闭环(读 `data.records`),本行历史保留。

@@ -151,6 +151,12 @@ export function UnifiedDesignerWorkbench({
   const [mode, setMode] = useState<WorkbenchMode>('edit');
   const [previewDeviceId, setPreviewDeviceId] = useState<string>(DEFAULT_DEVICE_PREVIEW_ID);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  // Multi-selection is intentionally a separate set from `selectedBlockId`.
+  // `selectedBlockId` is dual-purpose: it is both the inspector target AND the
+  // drop-placement context (palette drops land inside / before it). Multi-select
+  // must not perturb that context, so it tracks its own ids and leaves the
+  // primary selection (and therefore the drop context) intact.
+  const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(() => new Set());
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
@@ -301,6 +307,67 @@ export function UnifiedDesignerWorkbench({
       blocks: removeBlockById(current.blocks, blockId),
     }));
     setSelectedBlockId((current) => (current === blockId ? null : current));
+    setMultiSelectedIds((current) => {
+      if (!current.has(blockId)) return current;
+      const next = new Set(current);
+      next.delete(blockId);
+      return next;
+    });
+  };
+
+  // Canvas selection with modifier support. A plain click is single-select
+  // (clears multi-selection, current behaviour); a shift / cmd / ctrl click
+  // toggles the block in/out of the multi-selection AND makes it the primary
+  // selection (so the inspector + drop context still point at it).
+  //
+  // When the first additive click happens while only a single block is selected
+  // (multi-set empty), the existing primary block is folded into the set first
+  // so that "click A, shift+click B" yields the intuitive {A, B} selection.
+  const handleCanvasSelect = (blockId: string, modifiers?: { additive?: boolean }) => {
+    if (!modifiers?.additive) {
+      setMultiSelectedIds((current) => (current.size === 0 ? current : new Set()));
+      setSelectedBlockId(blockId);
+      return;
+    }
+    const primaryId = selectedBlockId;
+    setMultiSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.size === 0 && primaryId && primaryId !== blockId) {
+        next.add(primaryId);
+      }
+      if (next.has(blockId)) {
+        next.delete(blockId);
+      } else {
+        next.add(blockId);
+      }
+      return next;
+    });
+    setSelectedBlockId(blockId);
+  };
+
+  const clearMultiSelection = () => {
+    setMultiSelectedIds((current) => (current.size === 0 ? current : new Set()));
+  };
+
+  // Batch-delete every deletable block in the multi-selection in a single
+  // history step (one updateDocument → one undo). Undeletable blocks (the root
+  // kind container) are silently skipped. Selection is cleared afterwards.
+  const handleDeleteMultiSelected = () => {
+    const deletableIds = [...multiSelectedIds].filter((id) => canDeleteBlock(id));
+    if (deletableIds.length === 0) {
+      clearMultiSelection();
+      return;
+    }
+    updateDocument((current) => {
+      let nextBlocks = current.blocks;
+      for (const id of deletableIds) {
+        nextBlocks = removeBlockById(nextBlocks, id);
+      }
+      return { ...current, blocks: nextBlocks };
+    });
+    const deleted = new Set(deletableIds);
+    setSelectedBlockId((current) => (current && deleted.has(current) ? null : current));
+    setMultiSelectedIds(new Set());
   };
 
   const canAddBlock = (blockType: string) => {
@@ -983,6 +1050,34 @@ export function UnifiedDesignerWorkbench({
               </select>
             </div>
           ) : null}
+          {multiSelectedIds.size >= 2 ? (
+            <div
+              className="flex items-center gap-3 border-b border-blue-200 bg-blue-50 px-4 py-2"
+              data-testid="multi-select-bar"
+            >
+              <span className="text-sm font-medium text-blue-800" data-testid="multi-select-count">
+                {resolveDesignerText(DESIGNER_I18N.unified.multiSelectCount, locale, {
+                  count: multiSelectedIds.size,
+                })}
+              </span>
+              <button
+                type="button"
+                data-testid="multi-select-delete"
+                onClick={handleDeleteMultiSelected}
+                className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+              >
+                {resolveDesignerText(DESIGNER_I18N.unified.multiSelectDelete, locale)}
+              </button>
+              <button
+                type="button"
+                data-testid="multi-select-clear"
+                onClick={clearMultiSelection}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+              >
+                {resolveDesignerText(DESIGNER_I18N.unified.multiSelectClear, locale)}
+              </button>
+            </div>
+          ) : null}
           <div
             className="flex min-h-0 flex-1 flex-col overflow-auto xl:flex-row xl:overflow-hidden"
             data-testid="unified-workbench-body"
@@ -1005,10 +1100,11 @@ export function UnifiedDesignerWorkbench({
               document={document}
               mode={mode}
               selectedBlockId={selectedBlockId}
+              multiSelectedIds={multiSelectedIds}
               activeDrag={activeDrag}
               activeDropIntent={activeDropIntent}
               rootAccepts={Boolean(rootAccepts)}
-              onSelect={setSelectedBlockId}
+              onSelect={handleCanvasSelect}
               onMoveBefore={handleMoveBefore}
               onPatchBlock={patchBlock}
               canDeleteBlock={canDeleteBlock}
