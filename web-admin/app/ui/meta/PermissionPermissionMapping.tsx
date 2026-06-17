@@ -351,13 +351,13 @@ export function PermissionPermissionMapping({
    */
   const getActionColor = useCallback((action: string): string => {
     const colorMap: Record<string, string> = {
-      read: 'text-blue-600 bg-blue-50',
-      create: 'text-green-600 bg-green-50',
-      update: 'text-yellow-600 bg-yellow-50',
-      delete: 'text-red-600 bg-red-50',
+      read: 'text-accent bg-accent-weak',
+      create: 'text-status-green bg-status-green-bg',
+      update: 'text-status-amber bg-status-amber-bg',
+      delete: 'text-status-red bg-status-red-bg',
       export: 'text-purple-600 bg-purple-50',
     };
-    return colorMap[action] || 'text-gray-600 bg-gray-50';
+    return colorMap[action] || 'text-text-2 bg-subtle';
   }, []);
 
   if (!visible || !modelCode) return null;
@@ -369,13 +369,12 @@ export function PermissionPermissionMapping({
 
       {/* 对话框 */}
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl">
+        <div className="rounded-card bg-panel relative flex max-h-[90vh] w-full max-w-4xl flex-col shadow-xl">
           {/* 标题栏 */}
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">权限点权限映射</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              管理模型 <span className="font-mono text-blue-600">{modelCode}</span>{' '}
-              的权限点与角色绑定
+          <div className="border-border border-b px-6 py-4">
+            <h2 className="text-text text-lg font-semibold">权限点权限映射</h2>
+            <p className="text-text-2 mt-1 text-sm">
+              管理模型 <span className="text-accent font-mono">{modelCode}</span> 的权限点与角色绑定
             </p>
           </div>
 
@@ -383,36 +382,36 @@ export function PermissionPermissionMapping({
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {loading && permissions.length === 0 ? (
               <div className="flex items-center justify-center py-12">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
-                <span className="ml-3 text-gray-600">加载中...</span>
+                <div className="rounded-pill border-accent h-8 w-8 animate-spin border-b-2"></div>
+                <span className="text-text-2 ml-3">加载中...</span>
               </div>
             ) : permissions.length === 0 ? (
-              <div className="py-12 text-center text-gray-500">该模型还没有权限点</div>
+              <div className="text-text-2 py-12 text-center">该模型还没有权限点</div>
             ) : (
               <div className="space-y-3">
                 {permissions.map((permission) => (
                   <div
                     key={permission.id}
-                    className="rounded-lg border border-gray-200 p-4 transition-colors hover:border-gray-300"
+                    className="rounded-card border-border hover:border-border-strong border p-4 transition-colors"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex flex-1 items-start gap-3">
                         {/* 操作图标 */}
                         <div
-                          className={`flex h-10 w-10 items-center justify-center rounded-lg ${getActionColor(permission.action)}`}
+                          className={`rounded-card flex h-10 w-10 items-center justify-center ${getActionColor(permission.action)}`}
                         >
                           {getActionIcon(permission.action)}
                         </div>
 
                         {/* 权限点信息 */}
                         <div className="flex-1">
-                          <h4 className="text-base font-medium text-gray-900">
+                          <h4 className="text-text text-base font-medium">
                             {permission.displayName}
                           </h4>
                           {permission.description && (
-                            <p className="mt-1 text-sm text-gray-600">{permission.description}</p>
+                            <p className="text-text-2 mt-1 text-sm">{permission.description}</p>
                           )}
-                          <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                          <div className="text-text-2 mt-2 flex items-center gap-4 text-xs">
                             <span>类型: {permission.type}</span>
                             <span>操作: {permission.action}</span>
                           </div>
@@ -424,14 +423,14 @@ export function PermissionPermissionMapping({
                         <button
                           onClick={() => handleViewReferences(permission)}
                           disabled={loading}
-                          className="rounded-md px-3 py-1 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50"
+                          className="rounded-control text-text-2 hover:bg-subtle hover:text-text-2 px-3 py-1 text-sm disabled:opacity-50"
                         >
                           查看引用
                         </button>
                         <button
                           onClick={() => handleOpenBindDialog(permission)}
                           disabled={loading}
-                          className="rounded-md px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+                          className="rounded-control text-accent hover:bg-accent-weak hover:text-accent px-3 py-1 text-sm disabled:opacity-50"
                         >
                           绑定角色
                         </button>
@@ -444,10 +443,10 @@ export function PermissionPermissionMapping({
           </div>
 
           {/* 底部按钮 */}
-          <div className="flex justify-end border-t border-gray-200 px-6 py-4">
+          <div className="border-border flex justify-end border-t px-6 py-4">
             <button
               onClick={onClose}
-              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2"
             >
               关闭
             </button>
@@ -463,27 +462,25 @@ export function PermissionPermissionMapping({
             onClick={() => setShowReferences(false)}
           />
           <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="relative w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">权限点引用情况</h3>
-              <p className="mb-4 text-sm text-gray-600">
+            <div className="rounded-card bg-panel relative w-full max-w-2xl p-6 shadow-xl">
+              <h3 className="text-text mb-4 text-lg font-semibold">权限点引用情况</h3>
+              <p className="text-text-2 mb-4 text-sm">
                 权限点 <span className="font-medium">{selectedPermission.displayName}</span>{' '}
                 的引用情况
               </p>
 
               {references.length === 0 ? (
-                <div className="py-8 text-center text-gray-500">暂无引用</div>
+                <div className="text-text-2 py-8 text-center">暂无引用</div>
               ) : (
                 <div className="space-y-2">
                   {references.map((ref) => (
                     <div
                       key={ref.id}
-                      className="flex items-center justify-between rounded-lg bg-gray-50 p-3"
+                      className="rounded-card bg-subtle flex items-center justify-between p-3"
                     >
                       <div>
-                        <span className="text-sm font-medium text-gray-900">
-                          {ref.referenceName}
-                        </span>
-                        <span className="ml-2 text-xs text-gray-500">({ref.referenceType})</span>
+                        <span className="text-text text-sm font-medium">{ref.referenceName}</span>
+                        <span className="text-text-2 ml-2 text-xs">({ref.referenceType})</span>
                       </div>
                     </div>
                   ))}
@@ -493,7 +490,7 @@ export function PermissionPermissionMapping({
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={() => setShowReferences(false)}
-                  className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                  className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2"
                 >
                   关闭
                 </button>
@@ -511,9 +508,9 @@ export function PermissionPermissionMapping({
             onClick={() => setBindDialog({ show: false, permission: null, selectedRoles: [] })}
           />
           <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="relative w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">绑定角色</h3>
-              <p className="mb-4 text-sm text-gray-600">
+            <div className="rounded-card bg-panel relative w-full max-w-2xl p-6 shadow-xl">
+              <h3 className="text-text mb-4 text-lg font-semibold">绑定角色</h3>
+              <p className="text-text-2 mb-4 text-sm">
                 为权限点 <span className="font-medium">{bindDialog.permission.displayName}</span>{' '}
                 选择角色
               </p>
@@ -523,10 +520,10 @@ export function PermissionPermissionMapping({
                   <div
                     key={role.id}
                     onClick={() => toggleRoleSelection(role.id)}
-                    className={`cursor-pointer rounded-lg border p-3 transition-colors ${
+                    className={`rounded-card cursor-pointer border p-3 transition-colors ${
                       bindDialog.selectedRoles.includes(role.id)
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'bg-accent-weak border-accent'
+                        : 'border-border hover:border-border-strong'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -534,12 +531,12 @@ export function PermissionPermissionMapping({
                         type="checkbox"
                         checked={bindDialog.selectedRoles.includes(role.id)}
                         onChange={() => {}}
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-900">{role.name}</div>
+                        <div className="text-text text-sm font-medium">{role.name}</div>
                         {role.description && (
-                          <div className="text-xs text-gray-500">{role.description}</div>
+                          <div className="text-text-2 text-xs">{role.description}</div>
                         )}
                       </div>
                     </div>
@@ -553,14 +550,14 @@ export function PermissionPermissionMapping({
                     setBindDialog({ show: false, permission: null, selectedRoles: [] })
                   }
                   disabled={loading}
-                  className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2 disabled:opacity-50"
                 >
                   取消
                 </button>
                 <button
                   onClick={handleSaveBinding}
                   disabled={loading}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-white disabled:opacity-50"
                 >
                   {loading ? '保存中...' : '保存'}
                 </button>

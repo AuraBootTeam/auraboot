@@ -328,17 +328,17 @@ export function FormPreview({ visible, model, fieldBindings, onClose }: FormPrev
       if (binding.dictCode && dictOptions[binding.dictCode]) {
         return (
           <div key={binding.fieldCode} className="mb-4">
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="text-text-2 mb-1 block text-sm font-medium">
               {binding.fieldName}
-              {binding.required && <span className="ml-1 text-red-500">*</span>}
+              {binding.required && <span className="text-status-red ml-1">*</span>}
             </label>
             <select
               value={value || ''}
               onChange={(e) => updateFieldValue(binding.fieldCode, e.target.value)}
-              className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none ${
+              className={`rounded-control w-full border px-3 py-2 focus:ring-2 focus:outline-none ${
                 hasError
-                  ? 'border-red-300 focus:ring-red-500'
-                  : 'border-gray-300 focus:ring-blue-500'
+                  ? 'border-status-red focus-visible:shadow-focus focus:outline-none'
+                  : 'border-border-strong focus-visible:shadow-focus focus:outline-none'
               }`}
             >
               <option value="">请选择</option>
@@ -348,7 +348,7 @@ export function FormPreview({ visible, model, fieldBindings, onClose }: FormPrev
                 </option>
               ))}
             </select>
-            {hasError && <p className="mt-1 text-sm text-red-600">{error}</p>}
+            {hasError && <p className="text-status-red mt-1 text-sm">{error}</p>}
           </div>
         );
       }
@@ -359,21 +359,21 @@ export function FormPreview({ visible, model, fieldBindings, onClose }: FormPrev
       if (dataType === 'text' || dataType === 'longtext') {
         return (
           <div key={binding.fieldCode} className="mb-4">
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="text-text-2 mb-1 block text-sm font-medium">
               {binding.fieldName}
-              {binding.required && <span className="ml-1 text-red-500">*</span>}
+              {binding.required && <span className="text-status-red ml-1">*</span>}
             </label>
             <textarea
               value={value || ''}
               onChange={(e) => updateFieldValue(binding.fieldCode, e.target.value)}
               rows={dataType === 'longtext' ? 6 : 3}
-              className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none ${
+              className={`rounded-control w-full border px-3 py-2 focus:ring-2 focus:outline-none ${
                 hasError
-                  ? 'border-red-300 focus:ring-red-500'
-                  : 'border-gray-300 focus:ring-blue-500'
+                  ? 'border-status-red focus-visible:shadow-focus focus:outline-none'
+                  : 'border-border-strong focus-visible:shadow-focus focus:outline-none'
               }`}
             />
-            {hasError && <p className="mt-1 text-sm text-red-600">{error}</p>}
+            {hasError && <p className="text-status-red mt-1 text-sm">{error}</p>}
           </div>
         );
       }
@@ -386,14 +386,14 @@ export function FormPreview({ visible, model, fieldBindings, onClose }: FormPrev
                 type="checkbox"
                 checked={value || false}
                 onChange={(e) => updateFieldValue(binding.fieldCode, e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
               />
-              <label className="ml-2 text-sm text-gray-700">
+              <label className="text-text-2 ml-2 text-sm">
                 {binding.fieldName}
-                {binding.required && <span className="ml-1 text-red-500">*</span>}
+                {binding.required && <span className="text-status-red ml-1">*</span>}
               </label>
             </div>
-            {hasError && <p className="mt-1 text-sm text-red-600">{error}</p>}
+            {hasError && <p className="text-status-red mt-1 text-sm">{error}</p>}
           </div>
         );
       }
@@ -403,19 +403,21 @@ export function FormPreview({ visible, model, fieldBindings, onClose }: FormPrev
 
       return (
         <div key={binding.fieldCode} className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="text-text-2 mb-1 block text-sm font-medium">
             {binding.fieldName}
-            {binding.required && <span className="ml-1 text-red-500">*</span>}
+            {binding.required && <span className="text-status-red ml-1">*</span>}
           </label>
           <input
             type={inputType}
             value={value || ''}
             onChange={(e) => updateFieldValue(binding.fieldCode, e.target.value)}
-            className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none ${
-              hasError ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+            className={`rounded-control w-full border px-3 py-2 focus:ring-2 focus:outline-none ${
+              hasError
+                ? 'border-status-red focus-visible:shadow-focus focus:outline-none'
+                : 'border-border-strong focus-visible:shadow-focus focus:outline-none'
             }`}
           />
-          {hasError && <p className="mt-1 text-sm text-red-600">{error}</p>}
+          {hasError && <p className="text-status-red mt-1 text-sm">{error}</p>}
         </div>
       );
     },
@@ -434,12 +436,12 @@ export function FormPreview({ visible, model, fieldBindings, onClose }: FormPrev
 
       {/* 对话框 */}
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl">
+        <div className="rounded-card bg-panel relative flex max-h-[90vh] w-full max-w-4xl flex-col shadow-xl">
           {/* 标题栏 */}
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">表单预览</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              预览模型 <span className="font-mono text-blue-600">{model.code}</span> 生成的动态表单
+          <div className="border-border border-b px-6 py-4">
+            <h2 className="text-text text-lg font-semibold">表单预览</h2>
+            <p className="text-text-2 mt-1 text-sm">
+              预览模型 <span className="text-accent font-mono">{model.code}</span> 生成的动态表单
             </p>
           </div>
 
@@ -447,20 +449,20 @@ export function FormPreview({ visible, model, fieldBindings, onClose }: FormPrev
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
-                <span className="ml-3 text-gray-600">加载中...</span>
+                <div className="rounded-pill border-accent h-8 w-8 animate-spin border-b-2"></div>
+                <span className="text-text-2 ml-3">加载中...</span>
               </div>
             ) : sortedBindings.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-gray-500">该模型还没有关联任何字段</p>
-                <p className="mt-2 text-sm text-gray-400">请先添加字段后再预览表单</p>
+                <p className="text-text-2">该模型还没有关联任何字段</p>
+                <p className="text-text-3 mt-2 text-sm">请先添加字段后再预览表单</p>
               </div>
             ) : (
               <div className="mx-auto max-w-2xl">
-                <div className="rounded-lg bg-gray-50 p-6">
-                  <h3 className="mb-4 text-base font-medium text-gray-900">{model.displayName}</h3>
+                <div className="rounded-card bg-subtle p-6">
+                  <h3 className="text-text mb-4 text-base font-medium">{model.displayName}</h3>
                   {model.description && (
-                    <p className="mb-6 text-sm text-gray-600">{model.description}</p>
+                    <p className="text-text-2 mb-6 text-sm">{model.description}</p>
                   )}
 
                   <form
@@ -472,18 +474,18 @@ export function FormPreview({ visible, model, fieldBindings, onClose }: FormPrev
                     {sortedBindings.map((binding) => renderField(binding))}
 
                     {/* 表单按钮 */}
-                    <div className="mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4">
+                    <div className="border-border mt-6 flex justify-end gap-3 border-t pt-4">
                       <button
                         type="button"
                         onClick={handleReset}
-                        className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                        className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2"
                       >
                         重置
                       </button>
                       <button
                         type="submit"
                         disabled={submitting}
-                        className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {submitting ? '提交中...' : '测试提交'}
                       </button>
@@ -495,10 +497,10 @@ export function FormPreview({ visible, model, fieldBindings, onClose }: FormPrev
           </div>
 
           {/* 底部按钮 */}
-          <div className="flex justify-end border-t border-gray-200 px-6 py-4">
+          <div className="border-border flex justify-end border-t px-6 py-4">
             <button
               onClick={onClose}
-              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              className="rounded-control border-border-strong text-text-2 hover:bg-subtle border px-4 py-2"
             >
               关闭
             </button>
