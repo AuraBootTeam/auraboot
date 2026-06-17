@@ -41,6 +41,8 @@ import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/der
 import { useModelCapabilities } from '~/shared/hooks/useModelCapabilities';
 import { checkKindCompatibility } from '~/shared/utils/kindCapability';
 import type { ComputedFieldDef } from '~/framework/meta/runtime/computed/types';
+import { useFormDraft } from '~/framework/meta/rendering/pages/form/useFormDraft';
+import { RestoreDraftBanner } from '~/framework/meta/rendering/pages/form/RestoreDraftBanner';
 
 /**
  * Map field dataType to Smart component name.
@@ -658,6 +660,9 @@ export function FormPageContent(props: PageContentProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [summaryErrors, setSummaryErrors] = useState<string[]>([]);
   const dirtyFieldsRef = useRef<Set<string>>(new Set());
+  // T10: holds the latest draft-clear fn so submit handlers (defined before the
+  // draft hook) can clear the persisted local draft on success.
+  const clearFormDraftRef = useRef<() => void>(() => {});
 
   // Read URL params:
   // - commandCode: explicit submit command provided by navigation actions
@@ -1320,6 +1325,15 @@ export function FormPageContent(props: PageContentProps) {
         setFieldErrors({});
         setSummaryErrors([]);
         setError(null);
+        // T10: an explicit cancel/back/close abandons the form — drop the draft
+        // so it doesn't resurrect on the next create. (refresh/reload keep it.)
+        const leaveActions = ['cancel', 'back', 'close'];
+        if (
+          leaveActions.includes(String(effectiveActionType).toLowerCase()) ||
+          leaveActions.includes(String((button as any)?.code || '').toLowerCase())
+        ) {
+          clearFormDraftRef.current();
+        }
         return handleAction(effectiveButton as any, actionRecord as any);
       }
       // When action is an object like {type: "command", command: "xx:update_xx"},
@@ -1422,6 +1436,7 @@ export function FormPageContent(props: PageContentProps) {
             setFieldErrors({});
             setSummaryErrors([]);
             dirtyFieldsRef.current.clear();
+            clearFormDraftRef.current();
             navigate(resolveAfterSubmitRedirect(schema, tableName, responseData, recordId));
           })
           .catch((err) => {
@@ -1495,6 +1510,7 @@ export function FormPageContent(props: PageContentProps) {
           }
           showSuccessToast(t('common.saveSuccess') || 'Saved successfully');
           dirtyFieldsRef.current.clear();
+          clearFormDraftRef.current();
           navigate(resolveAfterSubmitRedirect(schema, targetModelCode, result.data, recordId));
         });
       }
@@ -1764,6 +1780,48 @@ export function FormPageContent(props: PageContentProps) {
     ],
   );
 
+  // --- T10: local draft autosave (create-form focused) -----------------------
+  // Persist in-progress create-form input to localStorage so an accidental
+  // reload/navigation doesn't lose work, with restore-on-reopen + clear-on-submit.
+  // Scoped to create mode: edit forms hydrate from the server record and we don't
+  // want a stale local draft to silently shadow loaded values. (The store key
+  // still scopes by recordId, so enabling edit later is a one-line change.)
+  const draftModelCode = (schema as any)?.modelCode || tableName;
+  const draftPageKey = (schema as any)?.pageKey;
+  const draftEnabled = !isEditMode && !onSubmitOverride;
+  const {
+    restorable: restorableDraft,
+    restore: restoreDraft,
+    discard: discardDraft,
+    clearDraft: clearFormDraft,
+  } = useFormDraft({
+    enabled: draftEnabled,
+    modelCode: draftModelCode,
+    pageKey: draftPageKey,
+    recordId,
+    values: formData,
+    initialValues: useMemo(
+      () => ({ ...schemaDefaultValues, ...urlDefaultValues }),
+      [schemaDefaultValues, urlDefaultValues],
+    ),
+  });
+
+  const handleRestoreDraft = useCallback(() => {
+    const values = restoreDraft();
+    if (!values) return;
+    setFormData((prev) => {
+      const next = { ...prev, ...values };
+      for (const fieldCode of Object.keys(values)) {
+        dirtyFieldsRef.current.add(fieldCode);
+      }
+      return next;
+    });
+  }, [restoreDraft]);
+
+  // `handleFormAction` (declared above) clears the draft on a successful submit
+  // via this ref, since the hook's `clearFormDraft` is defined after it.
+  clearFormDraftRef.current = clearFormDraft;
+
   // Null schema guard
   if (!schema) {
     return null;
@@ -1829,6 +1887,18 @@ export function FormPageContent(props: PageContentProps) {
               <p className="text-status-red">{error}</p>
             </div>
           ) : null}
+
+          {/* T10: restore-draft prompt — offered when a non-expired local draft
+              differs from the initial create-form values. */}
+          {restorableDraft && (
+            <RestoreDraftBanner
+              savedAt={restorableDraft.savedAt}
+              locale={locale}
+              t={t}
+              onRestore={handleRestoreDraft}
+              onDiscard={discardDraft}
+            />
+          )}
 
           {/* URL-prefill hint: shown when modelCode was seeded from ?modelCode=xxx */}
           {urlSeededModelCode && !isEditMode && (
