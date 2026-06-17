@@ -2,7 +2,7 @@ import { test, expect } from '../../fixtures';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as XLSX from 'xlsx';
-import { cleanupRows, seedDownloadableQuote } from './quote-e2e-helpers';
+import { cleanupRows, openQuoteDetailFromList, seedDownloadableQuote } from './quote-e2e-helpers';
 
 function formulasOf(sheet: XLSX.WorkSheet): string[] {
   return Object.values(sheet)
@@ -55,7 +55,7 @@ test.describe('PCBA quote Excel download', () => {
       consoleMessages.push(`[${message.type()}] ${message.text()}`);
     });
     try {
-      await page.goto(`/p/qo_quote_common/view/${created.quoteId}`, { waitUntil: 'domcontentloaded' });
+      await openQuoteDetailFromList(page, created);
       await expect(page.getByRole('tab', { name: /报价Excel|Quote Excel/ })).toBeVisible({ timeout: 20_000 });
       await page.getByRole('tab', { name: /报价Excel|Quote Excel/ }).click();
       await expect(page.getByTestId('workbench-action-generate_quote_excel')).toBeVisible({ timeout: 10_000 });

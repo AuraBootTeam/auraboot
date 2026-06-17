@@ -1,5 +1,5 @@
 import { test, expect } from '../../fixtures';
-import { cleanupRows, seedProcessFeeReviewQuote } from './quote-e2e-helpers';
+import { cleanupRows, openQuoteDetailFromList, seedProcessFeeReviewQuote } from './quote-e2e-helpers';
 
 test.describe('PCBA quote process fee review', () => {
   test.describe.configure({ timeout: 90_000 });
@@ -7,7 +7,7 @@ test.describe('PCBA quote process fee review', () => {
   test('filters manual-required and unmatched process fee hits with structured metering evidence', async ({ page }) => {
     const created = await seedProcessFeeReviewQuote(page);
     try {
-      await page.goto(`/p/qo_quote_common/view/${created.quoteId}`, { waitUntil: 'domcontentloaded' });
+      await openQuoteDetailFromList(page, created);
       const processPointsTab = page.getByRole('tab', { name: /加工点数|Process Points/ });
       await expect(processPointsTab).toBeVisible({ timeout: 20_000 });
       await processPointsTab.click();

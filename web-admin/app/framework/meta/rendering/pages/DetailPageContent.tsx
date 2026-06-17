@@ -31,6 +31,10 @@ import { ResultHelper } from '~/utils/type';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useToastContext } from '~/contexts/ToastContext';
+import {
+  AsyncTaskModalProvider,
+  AsyncTaskModalHost,
+} from '~/framework/meta/rendering/components/AsyncTaskModalContext';
 import { ReportGenerateButton } from '~/framework/smart/components/report/ReportGenerateButton';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { InlineApprovalPanel } from '~/framework/smart/components/approval/InlineApprovalPanel';
@@ -394,7 +398,7 @@ export function resolveActiveDetailTab(
  * Unlike the route version that loads record data server-side via loader,
  * this component loads record data client-side using fetchResult in a useEffect.
  */
-export function DetailPageContent(props: PageContentProps) {
+function DetailPageContentInner(props: PageContentProps) {
   const { schema, tableName, recordId, token } = props;
   const location = useLocation();
   const routerNavigate = useRouterNavigate();
@@ -1108,8 +1112,17 @@ export function DetailPageContent(props: PageContentProps) {
         />
       )}
 
+      <AsyncTaskModalHost />
       <FormDialog />
     </div>
+  );
+}
+
+export function DetailPageContent(props: PageContentProps) {
+  return (
+    <AsyncTaskModalProvider>
+      <DetailPageContentInner {...props} />
+    </AsyncTaskModalProvider>
   );
 }
 
