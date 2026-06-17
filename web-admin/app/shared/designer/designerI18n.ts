@@ -357,6 +357,25 @@ export const DESIGNER_I18N = {
     stay: { 'zh-CN': '留下', 'en-US': 'Stay' } as L,
     leave: { 'zh-CN': '离开', 'en-US': 'Leave' } as L,
 
+    // Publish / unpublish (POST /api/pages/{pid}/publish — page.page.manage)
+    publish: { 'zh-CN': '发布', 'en-US': 'Publish' } as L,
+    publishing: { 'zh-CN': '发布中', 'en-US': 'Publishing' } as L,
+    published: { 'zh-CN': '已发布', 'en-US': 'Published' } as L,
+    unpublish: { 'zh-CN': '取消发布', 'en-US': 'Unpublish' } as L,
+    unpublishing: { 'zh-CN': '取消发布中', 'en-US': 'Unpublishing' } as L,
+    publishSaveFirst: {
+      'zh-CN': '请先保存页面再发布',
+      'en-US': 'Save the page before publishing',
+    } as L,
+
+    // Export / import (pure client-side JSON download / upload)
+    exportPage: { 'zh-CN': '导出', 'en-US': 'Export' } as L,
+    importPage: { 'zh-CN': '导入', 'en-US': 'Import' } as L,
+    importInvalid: {
+      'zh-CN': '导入失败：不是有效的页面 JSON（需 schemaVersion 3）',
+      'en-US': 'Import failed: not a valid page JSON (schemaVersion 3 required)',
+    } as L,
+
     // Runtime preview (RecursiveBlockRenderer)
     runtime: {
       aiReviewHint: {

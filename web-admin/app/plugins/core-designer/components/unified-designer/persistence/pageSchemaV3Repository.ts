@@ -1,5 +1,13 @@
-import { createPage, getPageByPageKey, getPageByPid, updatePage } from '../../studio/services/page-manager/pageApi';
+import {
+  createPage,
+  getPageByPageKey,
+  getPageByPid,
+  publishPage,
+  unpublishPage,
+  updatePage,
+} from '../../studio/services/page-manager/pageApi';
 import type {
+  ApiPageStatus,
   ApiPageType,
   PageSchemaCreateRequest,
   PageSchemaDTO,
@@ -18,6 +26,10 @@ export interface PageSchemaV3Api {
   getPageByPageKey: (pageKey: string) => Promise<ResultLike<PageSchemaDTO>>;
   updatePage: (pid: string, request: PageSchemaUpdateRequest) => Promise<ResultLike<PageSchemaDTO>>;
   createPage: (request: PageSchemaCreateRequest) => Promise<ResultLike<PageSchemaDTO>>;
+  // Optional so load/save unit tests can supply a minimal api without the
+  // lifecycle methods; the publish/unpublish helpers below assert their presence.
+  publishPage?: (pid: string) => Promise<ResultLike<PageSchemaDTO>>;
+  unpublishPage?: (pid: string) => Promise<ResultLike<PageSchemaDTO>>;
 }
 
 export interface ResultLike<T> {
@@ -36,6 +48,8 @@ export interface PageSchemaV3Source {
 export interface LoadedPageSchemaV3 {
   document: PageSchemaV3;
   source: PageSchemaV3Source;
+  /** True when the loaded page is currently published (status === 'published'). */
+  published: boolean;
 }
 
 export interface LoadPageSchemaV3Options {
@@ -58,6 +72,18 @@ export interface SavePageSchemaV3Result {
   validation?: PageSchemaV3ValidationResult;
 }
 
+export interface PublishPageSchemaV3Options {
+  pid: string;
+  api?: PageSchemaV3Api;
+}
+
+export interface PublishPageSchemaV3Result {
+  ok: boolean;
+  status?: ApiPageStatus;
+  publishedAt?: string;
+  error?: string;
+}
+
 const defaultApi: PageSchemaV3Api = {
   getPageByPid: getPageByPid as (pid: string) => Promise<ResultLike<PageSchemaDTO>>,
   getPageByPageKey: getPageByPageKey as (pageKey: string) => Promise<ResultLike<PageSchemaDTO>>,
@@ -66,6 +92,8 @@ const defaultApi: PageSchemaV3Api = {
     request: PageSchemaUpdateRequest,
   ) => Promise<Result<PageSchemaDTO>>,
   createPage: createPage as (request: PageSchemaCreateRequest) => Promise<Result<PageSchemaDTO>>,
+  publishPage: publishPage as (pid: string) => Promise<Result<PageSchemaDTO>>,
+  unpublishPage: unpublishPage as (pid: string) => Promise<Result<PageSchemaDTO>>,
 };
 
 export async function loadPageSchemaV3({
@@ -90,6 +118,7 @@ export async function loadPageSchemaV3({
       pid: dto.pid,
       pageKey: dto.pageKey,
     },
+    published: dto.status === 'published' || dto.isPublished === true,
   };
 }
 
@@ -134,6 +163,57 @@ export async function savePageSchemaV3({
       pid: result.data?.pid,
       pageKey: result.data?.pageKey ?? request.pageKey,
     },
+  };
+}
+
+/**
+ * Publish a saved page (POST /api/pages/{pid}/publish).
+ *
+ * The backend transitions the page to the `published` status and stamps
+ * `publishedAt`; the returned DTO carries the live status so the toolbar can
+ * reflect the published state without a separate read. A non-'0' code is
+ * surfaced as an error string (e.g. a 403 from missing page.page.manage) rather
+ * than throwing, matching the save path so the toolbar can render inline
+ * feedback instead of crashing the workbench.
+ */
+export async function publishPageSchemaV3({
+  pid,
+  api = defaultApi,
+}: PublishPageSchemaV3Options): Promise<PublishPageSchemaV3Result> {
+  if (!api.publishPage) {
+    return { ok: false, error: 'Publish API is not available.' };
+  }
+  const result = await api.publishPage(pid);
+  if (result.code !== '0') {
+    return { ok: false, error: result.message || result.desc || 'Failed to publish page.' };
+  }
+  return {
+    ok: true,
+    status: result.data?.status ?? 'published',
+    publishedAt: result.data?.publishedAt,
+  };
+}
+
+/**
+ * Unpublish a published page (POST /api/pages/{pid}/unpublish), returning the
+ * page to draft. Mirrors {@link publishPageSchemaV3}: non-'0' codes become an
+ * error string for inline toolbar feedback.
+ */
+export async function unpublishPageSchemaV3({
+  pid,
+  api = defaultApi,
+}: PublishPageSchemaV3Options): Promise<PublishPageSchemaV3Result> {
+  if (!api.unpublishPage) {
+    return { ok: false, error: 'Unpublish API is not available.' };
+  }
+  const result = await api.unpublishPage(pid);
+  if (result.code !== '0') {
+    return { ok: false, error: result.message || result.desc || 'Failed to unpublish page.' };
+  }
+  return {
+    ok: true,
+    status: result.data?.status ?? 'draft',
+    publishedAt: result.data?.publishedAt,
   };
 }
 
