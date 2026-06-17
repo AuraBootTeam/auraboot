@@ -1,4 +1,5 @@
 import {
+  compareVersions,
   createPage,
   createVersion,
   getPageByPageKey,
@@ -15,6 +16,7 @@ import type {
   PageSchemaCreateRequest,
   PageSchemaDTO,
   PageSchemaUpdateRequest,
+  PageSchemaVersionComparisonDTO,
   PageSchemaVersionCreateRequest,
   PageSchemaVersionDTO,
 } from '../../studio/services/page-manager/api-types';
@@ -48,6 +50,14 @@ export interface PageSchemaV3Api {
     historyId: number,
     reason: string,
   ) => Promise<ResultLike<PageSchemaVersionDTO>>;
+  // Diff/compare two history versions. Optional for the same reason — the compare
+  // helper below asserts its presence and surfaces a clear error when a minimal
+  // api omits it.
+  compareVersions?: (
+    pid: string,
+    fromHistoryId: number,
+    toHistoryId: number,
+  ) => Promise<ResultLike<PageSchemaVersionComparisonDTO>>;
 }
 
 export interface ResultLike<T> {
@@ -124,6 +134,11 @@ const defaultApi: PageSchemaV3Api = {
     historyId: number,
     reason: string,
   ) => Promise<Result<PageSchemaVersionDTO>>,
+  compareVersions: compareVersions as (
+    pid: string,
+    fromHistoryId: number,
+    toHistoryId: number,
+  ) => Promise<Result<PageSchemaVersionComparisonDTO>>,
 };
 
 export async function loadPageSchemaV3({
@@ -320,6 +335,35 @@ export async function rollbackPageToVersion(
   const result = await api.rollbackToVersion(pid, historyId, reason);
   if (result.code !== '0') {
     return { ok: false, error: result.message || result.desc || 'Failed to roll back.' };
+  }
+  return { ok: true, data: result.data ?? undefined };
+}
+
+/**
+ * Compare two history versions of a saved page
+ * (GET /api/pages/{pid}/versions/{fromHistoryId}/compare/{toHistoryId}).
+ *
+ * Returns the backend's {@link PageSchemaVersionComparisonDTO} verbatim — the
+ * panel renders the differences exactly as the server computes them. The compare
+ * is coarse-grained (top-level key diff: `blocks` is compared as one JSON blob,
+ * not drilled into per-block), so the UI surfaces whatever the server returns
+ * without re-deriving a finer diff client-side. A non-'0' code (e.g. a 403 from
+ * missing page.page.read, or a 404 when a history id is unknown) is surfaced as
+ * an error string rather than thrown, matching the other version helpers so the
+ * panel can render inline feedback instead of crashing the workbench.
+ */
+export async function comparePageVersions(
+  pid: string,
+  fromHistoryId: number,
+  toHistoryId: number,
+  api: PageSchemaV3Api = defaultApi,
+): Promise<PageVersionResult<PageSchemaVersionComparisonDTO>> {
+  if (!api.compareVersions) {
+    return { ok: false, error: 'Compare-versions API is not available.' };
+  }
+  const result = await api.compareVersions(pid, fromHistoryId, toHistoryId);
+  if (result.code !== '0') {
+    return { ok: false, error: result.message || result.desc || 'Failed to compare versions.' };
   }
   return { ok: true, data: result.data ?? undefined };
 }

@@ -411,6 +411,40 @@ export const DESIGNER_I18N = {
     versionOperationRestore: { 'zh-CN': '回滚', 'en-US': 'Rollback' } as L,
     versionOperationSnapshot: { 'zh-CN': '快照', 'en-US': 'Snapshot' } as L,
 
+    // Version compare / diff viewer
+    // (GET /api/pages/{pid}/versions/{from}/compare/{to})
+    versionCompareEnter: { 'zh-CN': '对比版本', 'en-US': 'Compare versions' } as L,
+    versionCompareExit: { 'zh-CN': '退出对比', 'en-US': 'Exit compare' } as L,
+    versionCompareHint: {
+      'zh-CN': '选择两个版本进行对比',
+      'en-US': 'Select two versions to compare',
+    } as L,
+    versionCompareRun: { 'zh-CN': '对比所选版本', 'en-US': 'Compare selected' } as L,
+    versionCompareComputing: { 'zh-CN': '对比中…', 'en-US': 'Comparing…' } as L,
+    versionCompareBack: { 'zh-CN': '返回版本列表', 'en-US': 'Back to versions' } as L,
+    versionCompareSelectedCount: {
+      'zh-CN': '已选 {n} / 2',
+      'en-US': '{n} of 2 selected',
+    } as L,
+    versionDiffSource: { 'zh-CN': '源版本', 'en-US': 'Source' } as L,
+    versionDiffTarget: { 'zh-CN': '目标版本', 'en-US': 'Target' } as L,
+    versionDiffAdded: { 'zh-CN': '新增', 'en-US': 'Added' } as L,
+    versionDiffRemoved: { 'zh-CN': '删除', 'en-US': 'Removed' } as L,
+    versionDiffModified: { 'zh-CN': '修改', 'en-US': 'Modified' } as L,
+    versionDiffSummary: {
+      'zh-CN': '{added} 新增 / {removed} 删除 / {modified} 修改',
+      'en-US': '{added} added / {removed} removed / {modified} modified',
+    } as L,
+    versionDiffNoChanges: {
+      'zh-CN': '两个版本之间没有差异',
+      'en-US': 'No differences between the two versions',
+    } as L,
+    versionDiffSourceValue: { 'zh-CN': '源值', 'en-US': 'Source value' } as L,
+    versionDiffTargetValue: { 'zh-CN': '目标值', 'en-US': 'Target value' } as L,
+    versionDiffExpand: { 'zh-CN': '展开', 'en-US': 'Expand' } as L,
+    versionDiffCollapse: { 'zh-CN': '收起', 'en-US': 'Collapse' } as L,
+    versionDiffEmptyValue: { 'zh-CN': '（空）', 'en-US': '(empty)' } as L,
+
     // Runtime preview (RecursiveBlockRenderer)
     runtime: {
       aiReviewHint: {
