@@ -207,8 +207,8 @@ export const Layout: React.FC<LayoutProps> = ({
 
       // 默认渲染文本内容
       return (
-        <div className="rounded border border-gray-200 bg-gray-100 p-4">
-          <span className="text-sm text-gray-600">Layout Item: {item.key}</span>
+        <div className="border-border bg-hover rounded border p-4">
+          <span className="text-text-2 text-sm">Layout Item: {item.key}</span>
         </div>
       );
     };
@@ -219,7 +219,7 @@ export const Layout: React.FC<LayoutProps> = ({
         className={cn(
           'layout-item',
           item.className,
-          onItemClick && 'cursor-pointer hover:bg-gray-50',
+          onItemClick && 'hover:bg-subtle cursor-pointer',
         )}
         style={itemStyle}
         onClick={handleItemClick}
@@ -273,7 +273,7 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   const containerClasses = {
-    'border border-gray-200': schema.border,
+    'border border-border': schema.border,
     'shadow-md': schema.shadow,
   };
 

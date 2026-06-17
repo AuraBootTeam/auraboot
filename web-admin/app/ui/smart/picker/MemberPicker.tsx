@@ -191,44 +191,45 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   );
 
   // Compute hidden input value: JSON array for multiple, plain string for single
-  const hiddenValue = multiple
-    ? JSON.stringify(selectedIds)
-    : selectedIds[0] ?? '';
+  const hiddenValue = multiple ? JSON.stringify(selectedIds) : (selectedIds[0] ?? '');
 
   // Read-only display
   if (readOnly) {
     return (
       <div>
         {label && (
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="text-text-2 mb-1 block text-sm font-medium">
             {label}
             {required && <span className="ml-0.5 text-red-500">*</span>}
           </label>
         )}
         {name && <input type="hidden" name={name} value={hiddenValue} />}
-      <div data-testid="member-picker-readonly" className={cn('flex flex-wrap gap-1.5', className)}>
-        {selectedMembers.length > 0 ? (
-          selectedMembers.map((m) => (
-            <span
-              key={m.id}
-              data-testid={`member-picker-selected-${m.id}`}
-              className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 py-0.5 pr-2.5 pl-1 text-sm text-gray-700"
-            >
+        <div
+          data-testid="member-picker-readonly"
+          className={cn('flex flex-wrap gap-1.5', className)}
+        >
+          {selectedMembers.length > 0 ? (
+            selectedMembers.map((m) => (
               <span
-                className={cn(
-                  'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white',
-                  getAvatarColor(m.name),
-                )}
+                key={m.id}
+                data-testid={`member-picker-selected-${m.id}`}
+                className="rounded-pill bg-subtle text-text-2 inline-flex items-center gap-1.5 py-0.5 pr-2.5 pl-1 text-sm"
               >
-                {getInitials(m.name)}
+                <span
+                  className={cn(
+                    'rounded-pill flex h-5 w-5 flex-shrink-0 items-center justify-center text-[10px] font-semibold text-white',
+                    getAvatarColor(m.name),
+                  )}
+                >
+                  {getInitials(m.name)}
+                </span>
+                {m.name}
               </span>
-              {m.name}
-            </span>
-          ))
-        ) : (
-          <span className="text-sm text-gray-400">-</span>
-        )}
-      </div>
+            ))
+          ) : (
+            <span className="text-text-3 text-sm">-</span>
+          )}
+        </div>
       </div>
     );
   }
@@ -236,170 +237,170 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   return (
     <div>
       {label && (
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="text-text-2 mb-1 block text-sm font-medium">
           {label}
           {required && <span className="ml-0.5 text-red-500">*</span>}
         </label>
       )}
       {name && <input type="hidden" name={name} value={hiddenValue} />}
       <div ref={dropdownRef} data-testid="member-picker" className={cn('relative', className)}>
-      {/* Selected members display + Add button */}
-      <div
-        data-testid="member-picker-trigger"
-        className={cn(
-          'min-h-[38px] rounded-lg border px-2 py-1.5 transition-all',
-          disabled
-            ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
-            : open
-              ? 'border-blue-500 bg-white ring-2 ring-blue-100'
-              : 'border-gray-300 bg-white hover:border-gray-400',
-        )}
-      >
-        <div className="flex flex-wrap items-center gap-1.5">
-          {/* Selected member chips */}
-          {selectedMembers.map((m) => (
-            <span
-              key={m.id}
-              data-testid={`member-picker-selected-${m.id}`}
-              className="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pr-1 pl-0.5 text-sm text-gray-800 transition-colors hover:bg-gray-200"
-            >
+        {/* Selected members display + Add button */}
+        <div
+          data-testid="member-picker-trigger"
+          className={cn(
+            'rounded-card min-h-[38px] border px-2 py-1.5 transition-all',
+            disabled
+              ? 'border-border bg-subtle cursor-not-allowed opacity-60'
+              : open
+                ? 'border-accent bg-panel ring-2 ring-blue-100'
+                : 'border-border-strong bg-panel hover:border-border-strong',
+          )}
+        >
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Selected member chips */}
+            {selectedMembers.map((m) => (
               <span
+                key={m.id}
+                data-testid={`member-picker-selected-${m.id}`}
+                className="rounded-pill bg-hover text-text inline-flex items-center gap-1 py-0.5 pr-1 pl-0.5 text-sm transition-colors hover:bg-gray-200"
+              >
+                <span
+                  className={cn(
+                    'rounded-pill flex h-5 w-5 flex-shrink-0 items-center justify-center text-[10px] font-semibold text-white',
+                    getAvatarColor(m.name),
+                  )}
+                >
+                  {getInitials(m.name)}
+                </span>
+                <span className="max-w-[100px] truncate text-xs font-medium">{m.name}</span>
+                {!disabled && (
+                  <button
+                    type="button"
+                    data-testid={`member-picker-remove-${m.id}`}
+                    onClick={(e) => handleRemove(m.id, e)}
+                    className="rounded-pill text-text-3 hover:text-text-2 flex h-4 w-4 items-center justify-center transition-colors hover:bg-gray-300"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                )}
+              </span>
+            ))}
+
+            {/* Add member button */}
+            {!disabled && (
+              <button
+                type="button"
+                data-testid="member-picker-add"
+                onClick={() => setOpen(!open)}
                 className={cn(
-                  'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white',
-                  getAvatarColor(m.name),
+                  'rounded-pill inline-flex items-center gap-1 border border-dashed px-2 py-0.5 text-xs transition-colors',
+                  selectedMembers.length === 0
+                    ? 'border-border-strong text-text-3 hover:border-border-strong hover:text-text-2'
+                    : 'border-border-strong text-text-3 hover:border-blue-400 hover:text-blue-500',
                 )}
               >
-                {getInitials(m.name)}
-              </span>
-              <span className="max-w-[100px] truncate text-xs font-medium">{m.name}</span>
-              {!disabled && (
-                <button
-                  type="button"
-                  data-testid={`member-picker-remove-${m.id}`}
-                  onClick={(e) => handleRemove(m.id, e)}
-                  className="flex h-4 w-4 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-300 hover:text-gray-600"
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
-              )}
-            </span>
-          ))}
-
-          {/* Add member button */}
-          {!disabled && (
-            <button
-              type="button"
-              data-testid="member-picker-add"
-              onClick={() => setOpen(!open)}
-              className={cn(
-                'inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-xs transition-colors',
-                selectedMembers.length === 0
-                  ? 'border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-500'
-                  : 'border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500',
-              )}
-            >
-              <Plus className="h-3 w-3" />
-              <span>{selectedMembers.length === 0 ? placeholder : 'Add'}</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Search popup dropdown */}
-      {open && !disabled && (
-        <div
-          data-testid="member-picker-popup"
-          className="absolute top-full right-0 left-0 z-50 mt-1.5 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
-        >
-          {/* Search input */}
-          <div className="border-b border-gray-100 p-2">
-            <div className="relative">
-              <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                ref={searchRef}
-                type="text"
-                data-testid="member-picker-search-input"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search members..."
-                className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pr-3 pl-9 text-sm transition-colors focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-100 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Results */}
-          <div className="max-h-56 overflow-y-auto py-1">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-                <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-                <span className="mt-2 text-xs">Searching...</span>
-              </div>
-            ) : options.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-                <Users className="h-7 w-7 text-gray-300" />
-                <span className="mt-2 text-xs">No members found</span>
-              </div>
-            ) : (
-              options.map((opt) => {
-                const isSelected = selectedIds.includes(opt.id);
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    data-testid={`member-picker-option-${opt.id}`}
-                    onClick={() => handleSelect(opt)}
-                    className={cn(
-                      'mx-1 flex w-[calc(100%-8px)] items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors',
-                      isSelected ? 'bg-blue-50' : 'hover:bg-gray-50',
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white',
-                        getAvatarColor(opt.name),
-                      )}
-                    >
-                      {getInitials(opt.name)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={cn(
-                            'truncate text-sm font-medium',
-                            isSelected ? 'text-blue-700' : 'text-gray-700',
-                          )}
-                        >
-                          {opt.name}
-                        </span>
-                        {isSelected && (
-                          <svg
-                            className="h-4 w-4 flex-shrink-0 text-blue-500"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                        {opt.email && <span className="truncate">{opt.email}</span>}
-                        {opt.email && opt.department && <span>&middot;</span>}
-                        {opt.department && (
-                          <span className="truncate text-gray-500">{opt.department}</span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })
+                <Plus className="h-3 w-3" />
+                <span>{selectedMembers.length === 0 ? placeholder : 'Add'}</span>
+              </button>
             )}
           </div>
         </div>
-      )}
+
+        {/* Search popup dropdown */}
+        {open && !disabled && (
+          <div
+            data-testid="member-picker-popup"
+            className="rounded-card border-border bg-panel absolute top-full right-0 left-0 z-50 mt-1.5 overflow-hidden border shadow-lg"
+          >
+            {/* Search input */}
+            <div className="border-border border-b p-2">
+              <div className="relative">
+                <Search className="text-text-3 absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  data-testid="member-picker-search-input"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search members..."
+                  className="rounded-control border-border bg-subtle focus:bg-panel w-full border py-2 pr-3 pl-9 text-sm transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-100 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Results */}
+            <div className="max-h-56 overflow-y-auto py-1">
+              {loading ? (
+                <div className="text-text-3 flex flex-col items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                  <span className="mt-2 text-xs">Searching...</span>
+                </div>
+              ) : options.length === 0 ? (
+                <div className="text-text-3 flex flex-col items-center justify-center py-8">
+                  <Users className="text-text-3 h-7 w-7" />
+                  <span className="mt-2 text-xs">No members found</span>
+                </div>
+              ) : (
+                options.map((opt) => {
+                  const isSelected = selectedIds.includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      data-testid={`member-picker-option-${opt.id}`}
+                      onClick={() => handleSelect(opt)}
+                      className={cn(
+                        'rounded-control mx-1 flex w-[calc(100%-8px)] items-center gap-2.5 px-2 py-2 text-left transition-colors',
+                        isSelected ? 'bg-accent-weak' : 'hover:bg-subtle',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'rounded-pill flex h-8 w-8 flex-shrink-0 items-center justify-center text-xs font-semibold text-white',
+                          getAvatarColor(opt.name),
+                        )}
+                      >
+                        {getInitials(opt.name)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={cn(
+                              'truncate text-sm font-medium',
+                              isSelected ? 'text-accent' : 'text-text-2',
+                            )}
+                          >
+                            {opt.name}
+                          </span>
+                          {isSelected && (
+                            <svg
+                              className="h-4 w-4 flex-shrink-0 text-blue-500"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </div>
+                        <div className="text-text-3 flex items-center gap-1.5 text-xs">
+                          {opt.email && <span className="truncate">{opt.email}</span>}
+                          {opt.email && opt.department && <span>&middot;</span>}
+                          {opt.department && (
+                            <span className="text-text-2 truncate">{opt.department}</span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
