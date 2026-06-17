@@ -4,6 +4,7 @@ import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandle
 import com.auraboot.framework.environment.annotation.EnvScoped;
 import com.auraboot.framework.meta.entity.common.AbstractMultiVersionEntity;
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -73,7 +74,13 @@ public class PageSchema extends AbstractMultiVersionEntity {
     @TableField("sort_weight")
     private Integer sortWeight;
 
-    @TableField("published_at")
+    /**
+     * Publish timestamp. {@code updateStrategy = ALWAYS} so {@code unpublish}
+     * (which sets this to {@code null}) actually clears the column — the default
+     * NOT_NULL update strategy skips null fields on {@code updateById}, leaving a
+     * stale published_at after unpublish.
+     */
+    @TableField(value = "published_at", updateStrategy = FieldStrategy.ALWAYS)
     private Instant publishedAt;
 
     @TableField(value = "tags", typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)

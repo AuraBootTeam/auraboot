@@ -1,3 +1,9 @@
+---
+type: retro
+status: active
+created: 2026-06-14
+---
+
 # Gerber Viewer Admin Main Merge Record
 
 日期: 2026-06-14
