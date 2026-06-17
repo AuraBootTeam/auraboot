@@ -29,11 +29,12 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WEB_ADMIN = resolve(__dirname, '..');
-const SCAN = resolve(WEB_ADMIN, 'app/ui');
+// Scanned design-system surfaces: the component library + the DSL renderer layer.
+const SCAN_ROOTS = ['app/ui', 'app/framework/meta/rendering'].map((r) => resolve(WEB_ADMIN, r));
 
-// Ratchet baselines — current counts in app/ui. LOWER as sweeps land; never raise.
-const PALETTE_BASELINE = 742; // G1: palette utilities bypassing semantic tokens
-const I18N_BASELINE = 97; // G2: hardcoded user-facing placeholder/title/aria-label strings
+// Ratchet baselines — current combined counts. LOWER as sweeps land; never raise.
+const PALETTE_BASELINE = 1278; // G1: palette utilities bypassing semantic tokens
+const I18N_BASELINE = 111; // G2: hardcoded user-facing placeholder/title/aria-label strings
 
 const EXT = new Set(['.ts', '.tsx']);
 const IGNORE_DIR = new Set(['node_modules', 'build', 'dist', '.git']);
@@ -67,7 +68,7 @@ function walk(p, out) {
 }
 
 const files = [];
-walk(SCAN, files);
+for (const root of SCAN_ROOTS) walk(root, files);
 
 const violations = [];
 let paletteCount = 0;
