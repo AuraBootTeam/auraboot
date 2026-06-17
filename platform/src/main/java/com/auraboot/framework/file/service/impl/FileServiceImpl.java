@@ -67,7 +67,7 @@ public class FileServiceImpl implements FileService {
             "text/plain", "text/csv", "text/markdown", "text/html",
             "application/json", "application/xml",
             "application/x-yaml", "application/yaml", "text/yaml",
-            "application/zip", "application/gzip",
+            "application/zip", "application/x-zip", "application/x-zip-compressed", "application/gzip",
             "application/vnd.rar", "application/x-rar-compressed", "application/x-7z-compressed"
     );
 
@@ -76,7 +76,7 @@ public class FileServiceImpl implements FileService {
      * browser MIME type. Keep the octet-stream fallback extension-scoped.
      */
     private static final Set<String> OCTET_STREAM_ALLOWED_EXTENSIONS = Set.of(
-            "rar", "7z", "pcb",
+            "zip", "rar", "7z", "pcb",
             "gbr", "gtl", "gbl", "gto", "gbo", "gts", "gbs", "gko",
             "gm", "gm1", "gbp", "gdd", "gd1", "g1", "g2",
             "pho", "art", "drl", "xln", "drr", "rep", "extrep",
