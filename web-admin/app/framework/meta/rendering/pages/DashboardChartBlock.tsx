@@ -35,19 +35,29 @@ interface DashboardChartBlockProps {
 
 /** Lazy-loaded chart components */
 const SmartBarChart = React.lazy(() =>
-  import('~/framework/smart/components/charts/SmartBarChart').then((m) => ({ default: m.SmartBarChart })),
+  import('~/framework/smart/components/charts/SmartBarChart').then((m) => ({
+    default: m.SmartBarChart,
+  })),
 );
 const SmartLineChart = React.lazy(() =>
-  import('~/framework/smart/components/charts/SmartLineChart').then((m) => ({ default: m.SmartLineChart })),
+  import('~/framework/smart/components/charts/SmartLineChart').then((m) => ({
+    default: m.SmartLineChart,
+  })),
 );
 const SmartNumberCard = React.lazy(() =>
-  import('~/framework/smart/components/charts/SmartNumberCard').then((m) => ({ default: m.SmartNumberCard })),
+  import('~/framework/smart/components/charts/SmartNumberCard').then((m) => ({
+    default: m.SmartNumberCard,
+  })),
 );
 const SmartPieChart = React.lazy(() =>
-  import('~/framework/smart/components/charts/SmartPieChart').then((m) => ({ default: m.SmartPieChart })),
+  import('~/framework/smart/components/charts/SmartPieChart').then((m) => ({
+    default: m.SmartPieChart,
+  })),
 );
 const SmartAreaChart = React.lazy(() =>
-  import('~/framework/smart/components/charts/SmartAreaChart').then((m) => ({ default: m.SmartAreaChart })),
+  import('~/framework/smart/components/charts/SmartAreaChart').then((m) => ({
+    default: m.SmartAreaChart,
+  })),
 );
 
 function getLocalizedTitle(
@@ -60,9 +70,9 @@ function getLocalizedTitle(
 }
 
 const ChartFallback: React.FC = () => (
-  <div className="flex h-64 items-center justify-center rounded-lg border border-gray-200 bg-gray-50">
-    <div className="flex items-center gap-2 text-gray-400">
-      <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+  <div className="rounded-card border-border bg-subtle flex h-64 items-center justify-center border">
+    <div className="text-text-3 flex items-center gap-2">
+      <div className="rounded-pill border-accent h-5 w-5 animate-spin border-2 border-t-transparent" />
       <span className="text-sm">Loading chart...</span>
     </div>
   </div>
@@ -158,10 +168,10 @@ export const DashboardChartBlock: React.FC<DashboardChartBlockProps> = ({
 
   // Unsupported chart type
   return (
-    <div className="flex h-64 items-center justify-center rounded-lg border border-yellow-200 bg-yellow-50">
+    <div className="rounded-card bg-status-amber-bg flex h-64 items-center justify-center border border-yellow-200">
       <div className="text-center">
         <p className="font-medium text-yellow-800">Unsupported chart type</p>
-        <p className="mt-1 text-sm text-yellow-600">
+        <p className="text-status-amber mt-1 text-sm">
           <code className="rounded bg-yellow-100 px-1 py-0.5">{chartType}</code>
         </p>
       </div>

@@ -19,11 +19,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  horizontalListSortingStrategy,
-  arrayMove,
-} from '@dnd-kit/sortable';
+import { SortableContext, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import type { ColumnConfig, ButtonConfig } from '~/framework/meta/schemas/types';
 import {
   ROW_HEIGHT_CONFIG,
@@ -133,9 +129,7 @@ export const ListTable = React.memo(function ListTable({
     (column: ColumnConfig) => {
       const configuredWidth = columnWidths[column.field] ?? column.width;
       const numericWidth =
-        typeof configuredWidth === 'number'
-          ? configuredWidth
-          : Number(configuredWidth);
+        typeof configuredWidth === 'number' ? configuredWidth : Number(configuredWidth);
       return Number.isFinite(numericWidth) && numericWidth > 0
         ? numericWidth
         : DEFAULT_COLUMN_WIDTH;
@@ -147,11 +141,9 @@ export const ListTable = React.memo(function ListTable({
     (record: Record<string, any>, column: ColumnConfig, rowIndex: number) => {
       const rawValue = record[column.field];
       const title =
-        typeof rawValue === 'string' || typeof rawValue === 'number'
-          ? String(rawValue)
-          : undefined;
+        typeof rawValue === 'string' || typeof rawValue === 'number' ? String(rawValue) : undefined;
       return (
-        <div className="min-w-0 max-w-full truncate" title={title}>
+        <div className="max-w-full min-w-0 truncate" title={title}>
           {renderCellContent(record, column, rowIndex)}
         </div>
       );
@@ -189,10 +181,7 @@ export const ListTable = React.memo(function ListTable({
 
   const baseTableWidth = useMemo(() => {
     const selectionWidth = enableSelection ? SELECTION_COLUMN_WIDTH : 0;
-    const dataWidth = orderedDataColumns.reduce(
-      (sum, column) => sum + getColumnWidth(column),
-      0,
-    );
+    const dataWidth = orderedDataColumns.reduce((sum, column) => sum + getColumnWidth(column), 0);
     return selectionWidth + dataWidth + actionColumnWidth;
   }, [actionColumnWidth, enableSelection, getColumnWidth, orderedDataColumns]);
 
@@ -290,9 +279,7 @@ export const ListTable = React.memo(function ListTable({
   // Visible data when grouping is active (exclude collapsed groups)
   const visibleData = useMemo(() => {
     if (!groupedData || !groupByField) return data;
-    return data.filter(
-      (r) => !collapsedGroups.has(String(r[groupByField] ?? '(empty)')),
-    );
+    return data.filter((r) => !collapsedGroups.has(String(r[groupByField] ?? '(empty)')));
   }, [data, groupedData, groupByField, collapsedGroups]);
 
   // Virtual scrolling threshold — only virtualize when we have many rows
@@ -314,27 +301,20 @@ export const ListTable = React.memo(function ListTable({
       style={enableVirtualization ? { maxHeight: 'calc(100vh - 280px)' } : undefined}
       data-testid={deriveTestId('list', modelCode, 'table')}
     >
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
           <table
-            className="min-w-full table-fixed divide-y divide-gray-200"
+            className="divide-border min-w-full table-fixed divide-y"
             style={{ minWidth: `${renderedTableWidth}px` }}
           >
             <colgroup>
               {enableSelection && <col style={{ width: `${SELECTION_COLUMN_WIDTH}px` }} />}
               {orderedDataColumns.map((column) => (
-                <col
-                  key={column.field}
-                  style={{ width: `${getRenderedColumnWidth(column)}px` }}
-                />
+                <col key={column.field} style={{ width: `${getRenderedColumnWidth(column)}px` }} />
               ))}
               {actionColumn && <col style={{ width: `${actionColumnWidth}px` }} />}
             </colgroup>
-            <thead className={`bg-gray-50 ${enableVirtualization ? 'sticky top-0 z-20' : ''}`}>
+            <thead className={`bg-subtle ${enableVirtualization ? 'sticky top-0 z-20' : ''}`}>
               <tr>
                 {enableSelection && (
                   <th className="print-hide w-10 px-3 py-3" data-print="hide">
@@ -345,7 +325,7 @@ export const ListTable = React.memo(function ListTable({
                         if (el) el.indeterminate = someSelected;
                       }}
                       onChange={() => onSelectAll(!allSelected)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
                       data-testid="select-all-checkbox"
                     />
                   </th>
@@ -369,8 +349,8 @@ export const ListTable = React.memo(function ListTable({
                               direction: sortInfo.direction,
                               priority:
                                 activeSorts.length > 1
-                                  ? (activeSorts.findIndex((s) => s.fieldCode === column.field) + 1) ||
-                                    undefined
+                                  ? activeSorts.findIndex((s) => s.fieldCode === column.field) +
+                                      1 || undefined
                                   : undefined,
                             }
                           : undefined
@@ -399,7 +379,7 @@ export const ListTable = React.memo(function ListTable({
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody className="bg-panel divide-y divide-gray-100">
               {/* Loading state */}
               {loading ? (
                 <tr>
@@ -418,7 +398,7 @@ export const ListTable = React.memo(function ListTable({
                 <tr>
                   <td
                     colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
-                    className="px-6 py-4 text-center text-gray-500"
+                    className="text-text-2 px-6 py-4 text-center"
                     data-testid="empty-state"
                   >
                     {t('table.noData') || 'No data'}
@@ -434,22 +414,20 @@ export const ListTable = React.memo(function ListTable({
                       rowElements.push(
                         <tr
                           key={`group-${group.key}`}
-                          className="cursor-pointer bg-gray-50 hover:bg-gray-100"
+                          className="bg-subtle hover:bg-hover cursor-pointer"
                           onClick={() => onToggleGroupCollapse(group.key)}
                         >
                           <td
                             colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
-                            className="px-6 py-2 text-sm font-medium text-gray-700"
+                            className="text-text-2 px-6 py-2 text-sm font-medium"
                           >
-                            <span className="mr-2 text-xs text-gray-400">
+                            <span className="text-text-3 mr-2 text-xs">
                               {isCollapsed ? '\u25B6' : '\u25BC'}
                             </span>
                             <span className="font-semibold">{groupByField}</span>
                             <span className="mx-1">:</span>
                             <span>{group.key}</span>
-                            <span className="ml-2 text-xs text-gray-400">
-                              ({group.count})
-                            </span>
+                            <span className="text-text-3 ml-2 text-xs">({group.count})</span>
                           </td>
                         </tr>,
                       );
@@ -466,7 +444,11 @@ export const ListTable = React.memo(function ListTable({
                   {rowVirtualizer.getVirtualItems().length > 0 && (
                     <tr>
                       <td
-                        style={{ height: `${rowVirtualizer.getVirtualItems()[0]?.start ?? 0}px`, padding: 0, border: 'none' }}
+                        style={{
+                          height: `${rowVirtualizer.getVirtualItems()[0]?.start ?? 0}px`,
+                          padding: 0,
+                          border: 'none',
+                        }}
                         colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
                       />
                     </tr>
@@ -481,7 +463,7 @@ export const ListTable = React.memo(function ListTable({
                         key={rowId || index}
                         data-testid={`table-row-${index}`}
                         data-index={virtualRow.index}
-                        className={`group cursor-pointer hover:bg-gray-50${selectedIds.has(rowId) ? ' bg-blue-50' : ''}${previewRecordId === rowId ? ' bg-blue-50/50' : ''}`}
+                        className={`group cursor-pointer hover:bg-hover${selectedIds.has(rowId) ? 'bg-accent-weak' : ''}${previewRecordId === rowId ? 'bg-accent-weak/50' : ''}`}
                         style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
                         onClick={() => onRowClick(record)}
                       >
@@ -495,7 +477,7 @@ export const ListTable = React.memo(function ListTable({
                               type="checkbox"
                               checked={selectedIds.has(rowId)}
                               onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
-                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
                               data-testid={`row-checkbox-${index}`}
                             />
                           </td>
@@ -506,10 +488,10 @@ export const ListTable = React.memo(function ListTable({
                           const tdFrozenRight = tdFrozenPos === 'right';
                           return (
                             <td
-                      key={column.field}
-                      style={getCellStyle(column)}
-                      data-testid={`table-cell-${index}-${column.field}`}
-                              className={`px-6 ${rowHeightCfg.pyClass} text-sm whitespace-nowrap text-gray-700 ${
+                              key={column.field}
+                              style={getCellStyle(column)}
+                              data-testid={`table-cell-${index}-${column.field}`}
+                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap ${
                                 column.align === 'right'
                                   ? 'text-right'
                                   : column.align === 'center'
@@ -517,9 +499,9 @@ export const ListTable = React.memo(function ListTable({
                                     : ''
                               } ${
                                 tdFrozenRight
-                                  ? 'sticky right-0 z-10 border-l border-gray-200 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)] group-hover:bg-gray-50'
+                                  ? 'border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]'
                                   : tdFrozenLeft
-                                    ? 'sticky left-0 z-10 border-r border-gray-200 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] group-hover:bg-gray-50'
+                                    ? 'border-border bg-panel group-hover:bg-hover sticky left-0 z-10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]'
                                     : ''
                               }`}
                             >
@@ -547,7 +529,7 @@ export const ListTable = React.memo(function ListTable({
                         {actionColumn && (
                           <td
                             data-testid={`table-cell-${index}-actions`}
-                            className={`px-2 ${rowHeightCfg.pyClass} sticky right-0 z-10 border-l border-gray-200 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)] group-hover:bg-gray-50`}
+                            className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
                             style={{
                               width: `${actionColumnWidth}px`,
                               maxWidth: `${actionColumnWidth}px`,
@@ -585,105 +567,105 @@ export const ListTable = React.memo(function ListTable({
               ) : (
                 /* Non-virtualized data rows (small datasets or grouped data) */
                 !loading &&
-                  data.length > 0 &&
-                  visibleData.map((record, index) => {
-                    const rowId = record.pid || record.id || '';
-                    const cfInline = getRowStyle?.(record);
-                    return (
-                      <tr
-                        key={rowId || index}
-                        data-testid={`table-row-${index}`}
-                        className={`group cursor-pointer hover:bg-gray-50${selectedIds.has(rowId) ? ' bg-blue-50' : ''}${previewRecordId === rowId ? ' bg-blue-50/50' : ''}`}
-                        style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
-                        onClick={() => onRowClick(record)}
-                      >
-                        {enableSelection && (
-                          <td
-                            className={`px-3 ${rowHeightCfg.pyClass} print-hide w-10`}
-                            data-print="hide"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.has(rowId)}
-                              onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
-                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              data-testid={`row-checkbox-${index}`}
-                            />
-                          </td>
-                        )}
+                data.length > 0 &&
+                visibleData.map((record, index) => {
+                  const rowId = record.pid || record.id || '';
+                  const cfInline = getRowStyle?.(record);
+                  return (
+                    <tr
+                      key={rowId || index}
+                      data-testid={`table-row-${index}`}
+                      className={`group cursor-pointer hover:bg-hover${selectedIds.has(rowId) ? 'bg-accent-weak' : ''}${previewRecordId === rowId ? 'bg-accent-weak/50' : ''}`}
+                      style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
+                      onClick={() => onRowClick(record)}
+                    >
+                      {enableSelection && (
+                        <td
+                          className={`px-3 ${rowHeightCfg.pyClass} print-hide w-10`}
+                          data-print="hide"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(rowId)}
+                            onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
+                            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
+                            data-testid={`row-checkbox-${index}`}
+                          />
+                        </td>
+                      )}
 
-                        {/* Data cells — ordered */}
-                        {orderedDataColumns.map((column) => {
-                          const tdFrozenPos = column.fixed || (column as any).frozenPosition;
-                          const tdFrozenLeft = tdFrozenPos === 'left';
-                          const tdFrozenRight = tdFrozenPos === 'right';
-                          return (
-                            <td
-                              key={column.field}
-                              style={getCellStyle(column)}
-                              data-testid={`table-cell-${index}-${column.field}`}
-                              className={`px-6 ${rowHeightCfg.pyClass} text-sm whitespace-nowrap text-gray-700 ${
-                                column.align === 'right'
-                                  ? 'text-right'
-                                  : column.align === 'center'
-                                    ? 'text-center'
-                                    : ''
-                              } ${
-                                tdFrozenRight
-                                  ? 'sticky right-0 z-10 border-l border-gray-200 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)] group-hover:bg-gray-50'
-                                  : tdFrozenLeft
-                                    ? 'sticky left-0 z-10 border-r border-gray-200 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] group-hover:bg-gray-50'
-                                    : ''
-                              }`}
-                            >
-                              {column.editable && onInlineSave ? (
-                                <InlineEditCell
-                                  column={column}
-                                  value={record[column.field]}
-                                  record={record}
-                                  onSave={onInlineSave}
-                                  editable
-                                  dictItems={
-                                    column.dictCode && dictDataCache
-                                      ? (dictDataCache.get(column.dictCode) ?? [])
-                                      : undefined
-                                  }
-                                >
-                                  {renderCellContent(record, column, index)}
-                                </InlineEditCell>
-                              ) : (
-                                renderReadOnlyCellContent(record, column, index)
-                              )}
-                            </td>
-                          );
-                        })}
-
-                        {/* Action column cell */}
-                        {actionColumn && (
+                      {/* Data cells — ordered */}
+                      {orderedDataColumns.map((column) => {
+                        const tdFrozenPos = column.fixed || (column as any).frozenPosition;
+                        const tdFrozenLeft = tdFrozenPos === 'left';
+                        const tdFrozenRight = tdFrozenPos === 'right';
+                        return (
                           <td
-                            data-testid={`table-cell-${index}-actions`}
-                            className={`px-2 ${rowHeightCfg.pyClass} sticky right-0 z-10 border-l border-gray-200 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)] group-hover:bg-gray-50`}
-                            style={{
-                              width: `${actionColumnWidth}px`,
-                              maxWidth: `${actionColumnWidth}px`,
-                            }}
+                            key={column.field}
+                            style={getCellStyle(column)}
+                            data-testid={`table-cell-${index}-${column.field}`}
+                            className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap ${
+                              column.align === 'right'
+                                ? 'text-right'
+                                : column.align === 'center'
+                                  ? 'text-center'
+                                  : ''
+                            } ${
+                              tdFrozenRight
+                                ? 'border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]'
+                                : tdFrozenLeft
+                                  ? 'border-border bg-panel group-hover:bg-hover sticky left-0 z-10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]'
+                                  : ''
+                            }`}
                           >
-                            <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
-                              <RowActionButtons
-                                buttons={actionColumn.buttons || []}
+                            {column.editable && onInlineSave ? (
+                              <InlineEditCell
+                                column={column}
+                                value={record[column.field]}
                                 record={record}
-                                evaluateVisibleWhen={evaluateVisibleWhen}
-                                canUseButton={canUseButton}
-                                resolveButtonLabel={resolveButtonLabel}
-                                handleAction={handleAction}
-                              />
-                            </div>
+                                onSave={onInlineSave}
+                                editable
+                                dictItems={
+                                  column.dictCode && dictDataCache
+                                    ? (dictDataCache.get(column.dictCode) ?? [])
+                                    : undefined
+                                }
+                              >
+                                {renderCellContent(record, column, index)}
+                              </InlineEditCell>
+                            ) : (
+                              renderReadOnlyCellContent(record, column, index)
+                            )}
                           </td>
-                        )}
-                      </tr>
-                    );
-                  })
+                        );
+                      })}
+
+                      {/* Action column cell */}
+                      {actionColumn && (
+                        <td
+                          data-testid={`table-cell-${index}-actions`}
+                          className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
+                          style={{
+                            width: `${actionColumnWidth}px`,
+                            maxWidth: `${actionColumnWidth}px`,
+                          }}
+                        >
+                          <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
+                            <RowActionButtons
+                              buttons={actionColumn.buttons || []}
+                              record={record}
+                              evaluateVisibleWhen={evaluateVisibleWhen}
+                              canUseButton={canUseButton}
+                              resolveButtonLabel={resolveButtonLabel}
+                              handleAction={handleAction}
+                            />
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

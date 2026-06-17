@@ -218,11 +218,7 @@ function getMetaExtension(meta?: { extension?: Record<string, any> }): Record<st
   return meta?.extension && typeof meta.extension === 'object' ? meta.extension : {};
 }
 
-function resolveTextFallback(
-  t: (key: string) => string,
-  key: string,
-  fallback: string,
-): string {
+function resolveTextFallback(t: (key: string) => string, key: string, fallback: string): string {
   const resolved = t(key);
   return resolved && resolved !== key ? resolved : fallback;
 }
@@ -682,8 +678,7 @@ export function DetailPageContent(props: PageContentProps) {
   );
 
   // System tabs are injected by backend into dsl_schema. Filter out system tabs when no recordId (new record).
-  const tabsBlockVisible =
-    !tabsBlock?.visibleWhen || evaluateVisibleWhen(tabsBlock.visibleWhen);
+  const tabsBlockVisible = !tabsBlock?.visibleWhen || evaluateVisibleWhen(tabsBlock.visibleWhen);
   const allTabs = tabsBlockVisible ? ((tabsBlock?.tabs || []) as DetailTabConfig[]) : [];
   const tabs = resolveVisibleDetailTabs(allTabs, recordId, schema);
   const [activeTab, setActiveTab] = useState(0);
@@ -752,12 +747,12 @@ export function DetailPageContent(props: PageContentProps) {
       className="mx-auto w-full px-2 py-3"
       data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'container')}
     >
-      <div className="rounded-lg bg-white shadow-sm">
+      <div className="rounded-card bg-panel shadow-sm">
         {/* Page Header with title + toolbar buttons (hidden in print) */}
-        <div className="print-hide border-b border-gray-200 px-6 py-4" data-print="hide">
+        <div className="print-hide border-border border-b px-6 py-4" data-print="hide">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Link to={`/p/${tableName}`} className="text-gray-400 hover:text-gray-600">
+              <Link to={`/p/${tableName}`} className="text-text-3 hover:text-text-2">
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -767,7 +762,7 @@ export function DetailPageContent(props: PageContentProps) {
                   />
                 </svg>
               </Link>
-              <h2 className="text-lg font-medium text-gray-900">
+              <h2 className="text-text text-lg font-medium">
                 {getLocalizedText(schema.title, locale, t)}
               </h2>
             </div>
@@ -777,7 +772,7 @@ export function DetailPageContent(props: PageContentProps) {
               {schema.extension?.showShare !== false && (
                 <button
                   onClick={() => setShareDialogOpen(true)}
-                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-3 py-1.5 text-sm font-medium"
                   data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'share-btn')}
                 >
                   {t('action.share') || 'Share'}
@@ -807,12 +802,12 @@ export function DetailPageContent(props: PageContentProps) {
                         )}
                         onClick={() => handleAction(button, recordData)}
                         disabled={actionLoading}
-                        className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                        className={`rounded-control px-3 py-1.5 text-sm font-medium ${
                           button.primary
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            ? 'bg-accent hover:bg-accent-hover text-white'
                             : button.danger
                               ? 'bg-red-600 text-white hover:bg-red-700'
-                              : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                              : 'border-border-strong bg-panel text-text-2 hover:bg-hover border'
                         } disabled:cursor-not-allowed disabled:opacity-50`}
                       >
                         {resolveButtonLabel(button)}
@@ -836,7 +831,7 @@ export function DetailPageContent(props: PageContentProps) {
 
         {actionError && (
           <div
-            className="print-hide mx-6 mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            className="print-hide rounded-control bg-status-red-bg mx-6 mt-4 border border-red-200 px-4 py-3 text-sm text-red-700"
             role="alert"
             data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'action-error')}
             data-print="hide"
@@ -885,7 +880,7 @@ export function DetailPageContent(props: PageContentProps) {
             )}
 
             {/* Tab headers (hidden in print — only active tab content shows) */}
-            <div className="print-hide border-b border-gray-200 px-6" data-print="hide">
+            <div className="print-hide border-border border-b px-6" data-print="hide">
               <nav className="-mb-px flex space-x-8" role="tablist" aria-label="Tabs">
                 {tabs.map((tab, index) => (
                   <button
@@ -901,8 +896,8 @@ export function DetailPageContent(props: PageContentProps) {
                     onClick={() => handleTabChange(index)}
                     className={`border-b-2 px-1 py-3 text-sm font-medium ${
                       activeTab === index
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                        ? 'border-accent text-accent'
+                        : 'text-text-2 hover:border-border-strong hover:text-text-2 border-transparent'
                     }`}
                   >
                     {getLocalizedText(tab.label, locale, t)}
@@ -952,7 +947,10 @@ export function DetailPageContent(props: PageContentProps) {
                 unchanged (rendered last), so existing pages are unaffected. */}
             {runtime &&
               directMiscBlocks
-                .filter((b: BlockConfig) => (b as { detailPlacement?: string }).detailPlacement === 'header')
+                .filter(
+                  (b: BlockConfig) =>
+                    (b as { detailPlacement?: string }).detailPlacement === 'header',
+                )
                 .map((block: BlockConfig, blockIndex: number) => (
                   <BlockRenderer
                     key={block.id || `misc-header-${blockIndex}`}
@@ -1049,7 +1047,10 @@ export function DetailPageContent(props: PageContentProps) {
                 a visible placeholder + console.warn (not silently dropped). */}
             {runtime &&
               directMiscBlocks
-                .filter((b: BlockConfig) => (b as { detailPlacement?: string }).detailPlacement !== 'header')
+                .filter(
+                  (b: BlockConfig) =>
+                    (b as { detailPlacement?: string }).detailPlacement !== 'header',
+                )
                 .map((block: BlockConfig, blockIndex: number) => (
                   <BlockRenderer
                     key={block.id || `misc-${blockIndex}`}
@@ -1075,19 +1076,19 @@ export function DetailPageContent(props: PageContentProps) {
             {/* Default back/edit buttons (hidden in print) */}
             {!effectiveHeaderToolbar && (
               <div
-                className="print-hide flex justify-end space-x-3 border-t border-gray-200 pt-6"
+                className="print-hide border-border flex justify-end space-x-3 border-t pt-6"
                 data-print="hide"
               >
                 <Link
                   to={`/p/${tableName}`}
-                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
                 >
                   {t('action.back')}
                 </Link>
                 {showDefaultEditAction && (
                   <Link
                     to={`/p/${tableName}/edit/${recordId}`}
-                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white"
                   >
                     {t('action.update')}
                   </Link>
@@ -1166,17 +1167,14 @@ function DataPathTable({
     code: string,
   ) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
 }) {
-  const renderCell = (
-    col: { field: string; renderType?: string; dictCode?: string },
-    row: any,
-  ) => {
+  const renderCell = (col: { field: string; renderType?: string; dictCode?: string }, row: any) => {
     const raw = row?.[col.field];
-    if (raw == null || raw === '') return <span className="text-gray-400">—</span>;
+    if (raw == null || raw === '') return <span className="text-text-3">—</span>;
     if (col.renderType === 'tag' && col.dictCode && getDictItems) {
       const items = getDictItems(col.dictCode) || [];
       const match = items.find((i) => String(i.value) === String(raw));
       return (
-        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+        <span className="rounded-pill text-text-2 inline-flex items-center bg-gray-100 px-2 py-0.5 text-xs font-medium">
           {match?.label ?? String(raw)}
         </span>
       );
@@ -1191,21 +1189,21 @@ function DataPathTable({
   return (
     <div className="sub-table-section">
       {title && (
-        <h3 className="mb-5 text-sm font-semibold tracking-wider text-gray-500 uppercase">
+        <h3 className="text-text-2 mb-5 text-sm font-semibold tracking-wider uppercase">
           {getLocalizedText(title, locale, t)}
         </h3>
       )}
-      <div className="overflow-x-auto rounded border border-gray-200">
+      <div className="border-border overflow-x-auto rounded border">
         <table
-          className="min-w-full divide-y divide-gray-200 text-sm"
+          className="divide-border min-w-full divide-y text-sm"
           data-testid="detail-datapath-table"
         >
-          <thead className="bg-gray-50">
+          <thead className="bg-subtle">
             <tr>
               {columns.map((col) => (
                 <th
                   key={col.field}
-                  className="px-3 py-2 text-left font-medium text-gray-500"
+                  className="text-text-2 px-3 py-2 text-left font-medium"
                   style={col.width ? { minWidth: col.width } : undefined}
                 >
                   {getLocalizedText(col.label, locale, t) || col.field}
@@ -1213,10 +1211,10 @@ function DataPathTable({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 bg-white">
+          <tbody className="bg-panel divide-y divide-gray-100">
             {rows.length === 0 ? (
               <tr>
-                <td className="px-3 py-4 text-center text-gray-400" colSpan={columns.length || 1}>
+                <td className="text-text-3 px-3 py-4 text-center" colSpan={columns.length || 1}>
                   {t('common.noData') || '暂无数据'}
                 </td>
               </tr>
@@ -1224,7 +1222,7 @@ function DataPathTable({
               rows.map((row, idx) => (
                 <tr key={row?.id ?? idx} data-testid="detail-datapath-row">
                   {columns.map((col) => (
-                    <td key={col.field} className="px-3 py-2 text-gray-700">
+                    <td key={col.field} className="text-text-2 px-3 py-2">
                       {renderCell(col, row)}
                     </td>
                   ))}
@@ -1308,7 +1306,7 @@ function DetailBlockRenderer({
     return (
       <div className="form-section">
         {block.title && (
-          <h3 className="mb-5 text-sm font-semibold tracking-wider text-gray-500 uppercase">
+          <h3 className="text-text-2 mb-5 text-sm font-semibold tracking-wider uppercase">
             {getLocalizedText(block.title, locale, t)}
           </h3>
         )}
@@ -1393,7 +1391,7 @@ function DetailBlockRenderer({
       return (
         <div className="sub-table-section">
           {block.title && (
-            <h3 className="mb-5 text-sm font-semibold tracking-wider text-gray-500 uppercase">
+            <h3 className="text-text-2 mb-5 text-sm font-semibold tracking-wider uppercase">
               {getLocalizedText(block.title, locale, t)}
             </h3>
           )}
@@ -1473,7 +1471,7 @@ function DetailBlockRenderer({
     return (
       <div className="monthly-grid-section">
         {block.title && (
-          <h3 className="mb-5 text-sm font-semibold tracking-wider text-gray-500 uppercase">
+          <h3 className="text-text-2 mb-5 text-sm font-semibold tracking-wider uppercase">
             {getLocalizedText(block.title, locale, t)}
           </h3>
         )}
@@ -1506,7 +1504,7 @@ function DetailBlockRenderer({
   );
   return (
     <div
-      className="rounded border border-yellow-300 bg-yellow-50 p-4"
+      className="bg-status-amber-bg rounded border border-yellow-300 p-4"
       data-testid="detail-block-unknown"
     >
       <p className="text-yellow-800">
