@@ -80,7 +80,11 @@ export const AddressField: React.FC<AddressFieldProps> = ({
   loadRegions,
   className = '',
 }) => {
-  const { labelText, required: requiredValue, disabled: disabledValue } = useSmartFieldContract({
+  const {
+    labelText,
+    required: requiredValue,
+    disabled: disabledValue,
+  } = useSmartFieldContract({
     label,
     placeholder,
     required,
@@ -102,7 +106,7 @@ export const AddressField: React.FC<AddressFieldProps> = ({
 
   // Controlled / uncontrolled address state
   const [localState, setLocalState] = useState<AddressValue>(() =>
-    parseValue(value ?? defaultValue)
+    parseValue(value ?? defaultValue),
   );
 
   const controlled = value !== undefined;
@@ -111,14 +115,14 @@ export const AddressField: React.FC<AddressFieldProps> = ({
   // Derived city and district options
   const provinceNode = useMemo(
     () => regions.find((p) => p.name === state.province),
-    [regions, state.province]
+    [regions, state.province],
   );
 
   const cityNodes: RegionNode[] = provinceNode?.children ?? [];
 
   const cityNode = useMemo(
     () => cityNodes.find((c) => c.name === state.city),
-    [cityNodes, state.city]
+    [cityNodes, state.city],
   );
 
   const districtNodes: RegionNode[] = cityNode?.children ?? [];
@@ -156,18 +160,17 @@ export const AddressField: React.FC<AddressFieldProps> = ({
   // ── Styles ───────────────────────────────────────────────────────────────
 
   const selectBase =
-    'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm ' +
-    'focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none ' +
-    'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500';
+    'w-full rounded-control border border-border-strong bg-panel px-3 py-2 text-sm shadow-sm ' +
+    'focus:outline-none focus-visible:shadow-focus ' +
+    'disabled:cursor-not-allowed disabled:bg-subtle disabled:text-text-2';
 
   const textareaBase =
-    'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm resize-none ' +
-    'focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none ' +
-    'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500';
+    'w-full rounded-control border border-border-strong bg-panel px-3 py-2 text-sm shadow-sm resize-none ' +
+    'focus:outline-none focus-visible:shadow-focus ' +
+    'disabled:cursor-not-allowed disabled:bg-subtle disabled:text-text-2';
 
   // Hidden form value - only serialize non-empty state
-  const hasValue =
-    state.province || state.city || state.district || state.detail;
+  const hasValue = state.province || state.city || state.district || state.detail;
   const hiddenValue = hasValue ? JSON.stringify(state) : '';
 
   return (
@@ -233,7 +236,7 @@ export const AddressField: React.FC<AddressFieldProps> = ({
       </div>
 
       {state.province && state.city && state.district && (
-        <div className="text-xs text-gray-500">
+        <div className="text-text-2 text-xs">
           {[state.province, state.city, state.district].join(' / ')}
         </div>
       )}

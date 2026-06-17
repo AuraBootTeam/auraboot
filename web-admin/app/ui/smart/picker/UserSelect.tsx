@@ -223,12 +223,12 @@ export const UserSelect: React.FC<UserSelectProps> = ({
         {/* Trigger */}
         <div
           data-testid={`user-select-trigger-${name}`}
-          className={`min-h-[38px] w-full rounded-lg border px-3 py-1.5 shadow-sm transition-all ${
+          className={`rounded-card min-h-[38px] w-full border px-3 py-1.5 shadow-sm transition-all ${
             disabledValue
-              ? 'cursor-not-allowed border-gray-200 bg-gray-50'
+              ? 'border-border bg-subtle cursor-not-allowed'
               : isOpen
-                ? 'cursor-pointer border-blue-500 bg-white ring-2 ring-blue-100'
-                : 'cursor-pointer border-gray-300 bg-white hover:border-gray-400'
+                ? 'border-accent bg-panel cursor-pointer ring-2 ring-blue-100'
+                : 'border-border-strong bg-panel hover:border-border-strong cursor-pointer'
           }`}
           onClick={() => !disabledValue && setIsOpen(!isOpen)}
         >
@@ -238,10 +238,10 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                 selectedUsers.map((user) => (
                   <span
                     key={user.id}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 py-0.5 pr-1.5 pl-0.5 text-sm text-gray-800 transition-colors hover:bg-gray-200"
+                    className="rounded-pill bg-hover text-text inline-flex items-center gap-1.5 py-0.5 pr-1.5 pl-0.5 text-sm transition-colors hover:bg-gray-200"
                   >
                     <span
-                      className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white ${getAvatarColor(user.name)}`}
+                      className={`rounded-pill flex h-5 w-5 flex-shrink-0 items-center justify-center text-[10px] font-semibold text-white ${getAvatarColor(user.name)}`}
                     >
                       {getInitials(user.name)}
                     </span>
@@ -250,7 +250,7 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                       <button
                         type="button"
                         onClick={(e) => handleRemoveUser(user.id, e)}
-                        className="flex h-4 w-4 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-300 hover:text-gray-600"
+                        className="rounded-pill text-text-3 hover:text-text-2 flex h-4 w-4 items-center justify-center transition-colors hover:bg-gray-300"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -258,7 +258,7 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                   </span>
                 ))
               ) : (
-                <span className="py-0.5 text-sm text-gray-400">{placeholderText}</span>
+                <span className="text-text-3 py-0.5 text-sm">{placeholderText}</span>
               )}
             </div>
             <div className="flex flex-shrink-0 items-center gap-1">
@@ -266,23 +266,23 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="flex h-5 w-5 items-center justify-center rounded-full text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-500"
+                  className="rounded-pill text-text-3 hover:bg-hover hover:text-text-2 flex h-5 w-5 items-center justify-center transition-colors"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
-              <User className="h-4 w-4 text-gray-400" />
+              <User className="text-text-3 h-4 w-4" />
             </div>
           </div>
         </div>
 
         {/* Dropdown */}
         {isOpen && !disabledValue && (
-          <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+          <div className="rounded-card border-border bg-panel absolute z-50 mt-1.5 w-full overflow-hidden border shadow-lg">
             {/* Search Input */}
-            <div className="border-b border-gray-100 p-2">
+            <div className="border-border border-b p-2">
               <div className="relative">
-                <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="text-text-3 absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -290,7 +290,7 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                   placeholder={st('搜索用户...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pr-3 pl-9 text-sm transition-colors focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-100 focus:outline-none"
+                  className="rounded-control border-border bg-subtle focus:bg-panel w-full border py-2 pr-3 pl-9 text-sm transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-100 focus:outline-none"
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -299,13 +299,13 @@ export const UserSelect: React.FC<UserSelectProps> = ({
             {/* User List */}
             <div className="max-h-60 overflow-y-auto py-1">
               {loading ? (
-                <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                <div className="text-text-3 flex flex-col items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                   <span className="mt-2 text-sm">{st('加载中...')}</span>
                 </div>
               ) : users.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-                  <UserX className="h-8 w-8 text-gray-300" />
+                <div className="text-text-3 flex flex-col items-center justify-center py-8">
+                  <UserX className="text-text-3 h-8 w-8" />
                   <span className="mt-2 text-sm">{st('没有找到匹配的用户')}</span>
                 </div>
               ) : (
@@ -315,16 +315,14 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                     <div
                       key={user.id}
                       data-testid={`user-select-option-${name}-${user.id}`}
-                      className={`mx-1 cursor-pointer rounded-md px-2 py-2 transition-colors ${
-                        selected
-                          ? 'bg-blue-50 text-blue-900'
-                          : 'text-gray-700 hover:bg-gray-50'
+                      className={`rounded-control mx-1 cursor-pointer px-2 py-2 transition-colors ${
+                        selected ? 'bg-accent-weak text-blue-900' : 'text-text-2 hover:bg-subtle'
                       }`}
                       onClick={() => handleUserSelect(user)}
                     >
                       <div className="flex items-center gap-3">
                         <span
-                          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${getAvatarColor(user.name)}`}
+                          className={`rounded-pill flex h-8 w-8 flex-shrink-0 items-center justify-center text-xs font-semibold text-white ${getAvatarColor(user.name)}`}
                         >
                           {getInitials(user.name)}
                         </span>
@@ -346,7 +344,7 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                             )}
                           </div>
                           {user.email && (
-                            <div className="truncate text-xs text-gray-400">{user.email}</div>
+                            <div className="text-text-3 truncate text-xs">{user.email}</div>
                           )}
                         </div>
                       </div>

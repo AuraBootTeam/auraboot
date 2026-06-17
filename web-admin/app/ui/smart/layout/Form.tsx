@@ -355,9 +355,9 @@ export const Form: React.FC<FormProps> = ({
       {/* 表单标题 */}
       {schema.title && (
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">{st(schema.title as any)}</h2>
+          <h2 className="text-text text-xl font-semibold">{st(schema.title as any)}</h2>
           {schema.description && (
-            <p className="mt-1 text-sm text-gray-600">{st(schema.description as any)}</p>
+            <p className="text-text-2 mt-1 text-sm">{st(schema.description as any)}</p>
           )}
         </div>
       )}
@@ -377,7 +377,7 @@ export const Form: React.FC<FormProps> = ({
       {schema.actions && (
         <div
           className={cn(
-            'mt-8 border-t border-gray-200 pt-6',
+            'border-border mt-8 border-t pt-6',
             schema.layout === 'inline' && 'mt-4 pt-4',
           )}
         >

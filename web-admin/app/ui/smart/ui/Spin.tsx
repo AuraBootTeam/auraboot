@@ -19,7 +19,7 @@ export const Spin: React.FC<SpinProps> = ({ spinning, size = 'medium', className
   }
 
   const classes = clsx(
-    'inline-block rounded-full border-gray-200 border-t-blue-500 animate-spin',
+    'inline-block rounded-pill border-border border-t-blue-500 animate-spin',
     sizeMap[size],
     className,
   );
