@@ -13,7 +13,8 @@
 
 import { test, expect, type APIRequestContext, type Page } from '../../fixtures';
 import type { Locator } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import * as path from 'node:path';
 import {
   ensureSidebarExpanded,
   findRowInPaginatedList,
@@ -44,13 +45,33 @@ type DemoEntry = SeedMenu & {
 };
 
 const NAV_TIMEOUT = 15_000;
-const ENTERPRISE_ROOT =
-  process.env.AURABOOT_ENTERPRISE_ROOT ||
-  process.env.AURA_ENTERPRISE_PROJECT_ROOT ||
-  '/Users/ghj/work/auraboot/auraboot-enterprise';
-const ENTERPRISE_PLUGIN_ROOT = `${ENTERPRISE_ROOT}/plugins`;
-const SEED_FILE = `${ENTERPRISE_PLUGIN_ROOT}/pcba-solution/config/demo-data/pcba-demo-20260426.json`;
-const MENU_FILE = `${ENTERPRISE_PLUGIN_ROOT}/pcba-solution/config/menus.json`;
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function resolveEnterprisePluginRoot(): string {
+  const candidates = unique([
+    process.env.AURA_ENTERPRISE_PLUGIN_ROOT || '',
+    process.env.AURA_ENTERPRISE_PROJECT_ROOT ? path.join(process.env.AURA_ENTERPRISE_PROJECT_ROOT, 'plugins') : '',
+    process.env.AURABOOT_ENTERPRISE_ROOT ? path.join(process.env.AURABOOT_ENTERPRISE_ROOT, 'plugins') : '',
+    path.resolve(process.cwd(), '../../plugins'),
+    path.resolve(process.cwd(), '../../../plugins'),
+    '/Users/ghj/work/auraboot/plugins',
+    '/Users/ghj/work/auraboot/auraboot-enterprise/plugins',
+  ]);
+  const selected = candidates.find((candidate) =>
+    existsSync(path.join(candidate, 'pcba-solution/config/demo-data/pcba-demo-20260426.json')),
+  );
+  if (!selected) {
+    throw new Error(`Cannot resolve PCBA demo plugin root. Checked: ${candidates.join(', ')}`);
+  }
+  return selected;
+}
+
+const ENTERPRISE_PLUGIN_ROOT = resolveEnterprisePluginRoot();
+const SEED_FILE = path.join(ENTERPRISE_PLUGIN_ROOT, 'pcba-solution/config/demo-data/pcba-demo-20260426.json');
+const MENU_FILE = path.join(ENTERPRISE_PLUGIN_ROOT, 'pcba-solution/config/menus.json');
 
 const REQUIRED_PLUGINS = [
   'product-catalog',
