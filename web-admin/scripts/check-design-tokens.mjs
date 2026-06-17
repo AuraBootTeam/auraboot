@@ -32,7 +32,7 @@ const WEB_ADMIN = resolve(__dirname, '..');
 const SCAN = resolve(WEB_ADMIN, 'app/ui');
 
 // Ratchet baselines — current counts in app/ui. LOWER as sweeps land; never raise.
-const PALETTE_BASELINE = 783; // G1: palette utilities bypassing semantic tokens
+const PALETTE_BASELINE = 742; // G1: palette utilities bypassing semantic tokens
 const I18N_BASELINE = 97; // G2: hardcoded user-facing placeholder/title/aria-label strings
 
 const EXT = new Set(['.ts', '.tsx']);
@@ -86,9 +86,13 @@ for (const file of files) {
       violations.push(`${rel}:${i + 1}  arbitrary tailwind color — use a semantic color utility`);
     }
     // Count palette utilities outside dark: variants (the burn-down surface).
+    // Walk back to the start of the utility token so we catch dark: anywhere in
+    // a stacked variant chain (dark:hover:bg-gray-700, not just immediate dark:).
     for (const m of line.matchAll(PALETTE)) {
-      const before = line.slice(Math.max(0, m.index - 5), m.index);
-      if (!before.endsWith('dark:')) paletteCount += 1;
+      let s = m.index;
+      while (s > 0 && !/[\s"'`={]/.test(line[s - 1])) s -= 1;
+      const token = line.slice(s, m.index + m[0].length);
+      if (!token.includes('dark:')) paletteCount += 1;
     }
     for (const _ of line.matchAll(I18N_HARDCODE)) i18nCount += 1;
   });
