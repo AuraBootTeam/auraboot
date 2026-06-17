@@ -324,6 +324,32 @@ export function serializeDesignerJson(
   return JSON.stringify(buildDesignerJsonPayload(definition));
 }
 
+/** Result of the server-side designerJson pre-deploy validation (G-B1). */
+export interface DesignerJsonValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+/**
+ * Server-side pre-deploy validation (G-B1): POST /validate compiles the
+ * designerJson to BPMN XML on the backend WITHOUT persisting or deploying,
+ * returning converter-level errors the client-side validator cannot catch —
+ * unsupported node types, exclusive-gateway flows missing a condition,
+ * malformed designerJson, raw-'>' name corruption. Lets the designer surface
+ * deploy-blocking errors before the user clicks Deploy.
+ */
+export async function validateDesignerJson(
+  designerJson: string,
+  processKey: string,
+  processName: string,
+): Promise<DesignerJsonValidationResult> {
+  const result = await fetchResult<DesignerJsonValidationResult>(`${BASE_PATH}/validate`, {
+    method: 'post',
+    params: { designerJson, processKey, processName },
+  });
+  return result.data ?? { valid: false, errors: ['Server validation request failed'] };
+}
+
 /**
  * Map backend DTO to frontend BPMNProcessDefinition type.
  * Parses designerJson from the backend extension field to restore nodes/edges.

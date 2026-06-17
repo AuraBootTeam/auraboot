@@ -25,6 +25,8 @@ import {
   createProcessDefinition,
   updateProcessDefinition,
   getProcessDefinitionById,
+  serializeDesignerJson,
+  validateDesignerJson,
 } from '~/plugins/core-designer/components/bpmn-designer/services/bpmnService';
 
 /**
@@ -270,15 +272,35 @@ export function BPMNDesigner() {
     }
   };
 
-  const handleValidate = () => {
+  const handleValidate = async () => {
+    // 1) client-side structural validation — sets validationResult so the
+    //    canvas highlights offending nodes (G-U1) and the banner lists errors.
     const result = validate();
-    if (result.valid) {
-      showSuccessToast(t('bpmn.validate.passed'));
-    } else {
+    if (!result.valid) {
       const errorMsg = result.errors
         .map((e) => `[${e.type.toUpperCase()}] ${t(e.message, e.messageParams)}`)
         .join('; ');
       showErrorToast(`${t('bpmn.validate.result')}: ${errorMsg}`);
+      return;
+    }
+
+    // 2) server-side pre-deploy validation (G-B1) — catches converter-level
+    //    errors the client cannot (unsupported node types, exclusive-gateway
+    //    flows missing a condition, raw-'>' name corruption) BEFORE Deploy,
+    //    where the SmartEngine root cause is easily swallowed.
+    try {
+      const designerJson = serializeDesignerJson({ nodes, edges, aura: processAura });
+      const server = await validateDesignerJson(designerJson, processKey, processName);
+      if (server.valid) {
+        showSuccessToast(t('bpmn.validate.passed'));
+      } else {
+        showErrorToast(`${t('bpmn.validate.result')}: ${server.errors.join('; ')}`);
+      }
+    } catch (e) {
+      // Network/endpoint failure must not be silently swallowed; surface it.
+      showErrorToast(
+        `${t('bpmn.validate.result')}: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   };
 
