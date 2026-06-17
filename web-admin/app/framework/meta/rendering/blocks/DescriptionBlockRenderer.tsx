@@ -26,9 +26,9 @@ export const DescriptionBlockRenderer: React.FC<DescriptionBlockRendererProps> =
   const content = contentSource ? getLocalizedText(contentSource, locale, t) : '';
 
   return (
-    <div className="description-block rounded-md border border-blue-200 bg-blue-50 p-4">
+    <div className="description-block rounded-control bg-accent-weak border border-blue-200 p-4">
       <div
-        className="text-sm text-gray-700"
+        className="text-text-2 text-sm"
         dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
       />
     </div>

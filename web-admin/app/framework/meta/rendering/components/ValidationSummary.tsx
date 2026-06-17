@@ -36,9 +36,9 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ errors, cl
   if (errors.length === 0) return null;
 
   return (
-    <div className={`rounded-lg border border-red-200 bg-red-50 p-4 ${className}`}>
+    <div className={`rounded-card bg-status-red-bg border border-red-200 p-4 ${className}`}>
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex-shrink-0 text-red-500">
+        <div className="text-status-red mt-0.5 flex-shrink-0">
           <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
             <path
               fillRule="evenodd"

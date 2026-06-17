@@ -7,27 +7,27 @@ describe('SortIndicator', () => {
     const { container } = render(<SortIndicator />);
     const paths = container.querySelectorAll('path');
     expect(paths).toHaveLength(2);
-    // Both arrows should be gray (#c0c4cc) when no direction
-    expect(paths[0].getAttribute('fill')).toBe('#c0c4cc');
-    expect(paths[1].getAttribute('fill')).toBe('#c0c4cc');
+    // Both arrows should be muted (var token) when no direction
+    expect(paths[0].getAttribute('fill')).toBe('var(--color-text-3)');
+    expect(paths[1].getAttribute('fill')).toBe('var(--color-text-3)');
   });
 
-  it('renders with direction="asc" (top arrow blue #2563eb)', () => {
+  it('renders with direction="asc" (top arrow accent (var token))', () => {
     const { container } = render(<SortIndicator direction="asc" />);
     const paths = container.querySelectorAll('path');
     // Top arrow (ascending) should be blue
-    expect(paths[0].getAttribute('fill')).toBe('#2563eb');
+    expect(paths[0].getAttribute('fill')).toBe('var(--color-accent)');
     // Bottom arrow should be gray
-    expect(paths[1].getAttribute('fill')).toBe('#c0c4cc');
+    expect(paths[1].getAttribute('fill')).toBe('var(--color-text-3)');
   });
 
-  it('renders with direction="desc" (bottom arrow blue #2563eb)', () => {
+  it('renders with direction="desc" (bottom arrow accent (var token))', () => {
     const { container } = render(<SortIndicator direction="desc" />);
     const paths = container.querySelectorAll('path');
     // Top arrow should be gray
-    expect(paths[0].getAttribute('fill')).toBe('#c0c4cc');
+    expect(paths[0].getAttribute('fill')).toBe('var(--color-text-3)');
     // Bottom arrow (descending) should be blue
-    expect(paths[1].getAttribute('fill')).toBe('#2563eb');
+    expect(paths[1].getAttribute('fill')).toBe('var(--color-accent)');
   });
 
   it('renders priority badge when priority > 0', () => {

@@ -901,22 +901,25 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   if (loading) {
     return (
-      <div className="py-8 text-center text-sm text-gray-400">
+      <div className="text-text-3 py-8 text-center text-sm">
         {t('common.loading') || 'Loading...'}
       </div>
     );
   }
 
   if (error) {
-    return <div className="py-4 text-center text-sm text-red-500">{error}</div>;
+    return <div className="text-status-red py-4 text-center text-sm">{error}</div>;
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200" data-testid="subtable-viewer">
+    <div
+      className="rounded-card border-border overflow-hidden border"
+      data-testid="subtable-viewer"
+    >
       {/* Cross-row validation errors banner */}
       {crossRowErrors.length > 0 && (
         <div
-          className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700"
+          className="bg-status-red-bg text-status-red border-b border-red-200 px-4 py-2 text-sm"
           data-testid="subtable-cross-row-errors"
           role="alert"
         >
@@ -931,9 +934,9 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           className="flex flex-col items-center justify-center px-6 py-10 text-center"
           data-testid="subtable-empty-state"
         >
-          <div className="text-sm font-medium text-gray-700">{emptyStateTitle}</div>
+          <div className="text-text-2 text-sm font-medium">{emptyStateTitle}</div>
           {emptyStateDescription ? (
-            <div className="mt-2 max-w-md text-sm leading-6 text-gray-500">
+            <div className="text-text-2 mt-2 max-w-md text-sm leading-6">
               {emptyStateDescription}
             </div>
           ) : null}
@@ -941,46 +944,48 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             <button
               onClick={() => setIsAdding(true)}
               data-testid="subtable-empty-action"
-              className="mt-5 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100"
+              className="rounded-control bg-accent-weak text-accent mt-5 border border-blue-200 px-4 py-2 text-sm font-medium transition-colors hover:border-blue-300 hover:bg-blue-100"
             >
               {emptyStateActionLabel}
             </button>
           ) : null}
         </div>
       ) : (
-      <table className="min-w-full divide-y divide-gray-200" data-testid="subtable-table">
-        <thead className="bg-gray-50">
-          <tr>
-            {isSortable && <th className="w-10 px-1 py-2.5 text-xs font-medium text-gray-400"></th>}
-            {config.columns.map((col: ColumnConfig) => (
-              <th
-                key={col.field}
-                className={`px-4 py-2.5 text-xs font-medium tracking-wider text-gray-500 uppercase ${
-                  col.align === 'right'
-                    ? 'text-right'
-                    : col.align === 'center'
-                      ? 'text-center'
-                      : 'text-left'
-                }`}
-                style={
-                  col.width
-                    ? { width: typeof col.width === 'number' ? `${col.width}px` : col.width }
-                    : undefined
-                }
-              >
-                {col.label ? getLocalizedText(col.label, locale, t) : resolveColumnLabel(col.field)}
-                {col.required && <span className="ml-0.5 text-red-500">*</span>}
-              </th>
-            ))}
-            {hasActions && (
-              <th className="w-28 px-4 py-2.5 text-center text-xs font-medium text-gray-500">
-                {t('common.actions') !== 'common.actions' ? t('common.actions') : 'Actions'}
-              </th>
-            )}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 bg-white">
-          <DndSubTableWrapper
+        <table className="divide-border min-w-full divide-y" data-testid="subtable-table">
+          <thead className="bg-subtle">
+            <tr>
+              {isSortable && <th className="text-text-3 w-10 px-1 py-2.5 text-xs font-medium"></th>}
+              {config.columns.map((col: ColumnConfig) => (
+                <th
+                  key={col.field}
+                  className={`text-text-2 px-4 py-2.5 text-xs font-medium tracking-wider uppercase ${
+                    col.align === 'right'
+                      ? 'text-right'
+                      : col.align === 'center'
+                        ? 'text-center'
+                        : 'text-left'
+                  }`}
+                  style={
+                    col.width
+                      ? { width: typeof col.width === 'number' ? `${col.width}px` : col.width }
+                      : undefined
+                  }
+                >
+                  {col.label
+                    ? getLocalizedText(col.label, locale, t)
+                    : resolveColumnLabel(col.field)}
+                  {col.required && <span className="text-status-red ml-0.5">*</span>}
+                </th>
+              ))}
+              {hasActions && (
+                <th className="text-text-2 w-28 px-4 py-2.5 text-center text-xs font-medium">
+                  {t('common.actions') !== 'common.actions' ? t('common.actions') : 'Actions'}
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody className="bg-panel divide-y divide-gray-100">
+            <DndSubTableWrapper
               items={dndItems}
               onDragEnd={handleDragEnd}
               disabled={!isSortable || !!editingRowId}
@@ -989,15 +994,15 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                 const rowId = row.pid || String(rowIndex);
                 const isEditingThis = editingRowId === rowId;
                 return (
-                <SortableSubTableRow
-                  key={rowId}
-                  id={rowId}
-                  depth={row._depth || 0}
-                  hasChildren={row._hasChildren || false}
-                  expanded={row._expanded || false}
-                  onToggleExpand={() => toggleExpand(rowId)}
-                  sortable={!!isSortable && !editingRowId}
-                >
+                  <SortableSubTableRow
+                    key={rowId}
+                    id={rowId}
+                    depth={row._depth || 0}
+                    hasChildren={row._hasChildren || false}
+                    expanded={row._expanded || false}
+                    onToggleExpand={() => toggleExpand(rowId)}
+                    sortable={!!isSortable && !editingRowId}
+                  >
                     {config.columns.map((col: ColumnConfig) => {
                       const cellAlign =
                         col.align === 'right'
@@ -1023,7 +1028,13 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                             <InlineEditableCell
                               col={col}
                               value={editable ? editingValues[col.field] : row[col.field]}
-                              displayValue={formatCellValue(row[col.field], col, getDictLabel, timezone, formats)}
+                              displayValue={formatCellValue(
+                                row[col.field],
+                                col,
+                                getDictLabel,
+                                timezone,
+                                formats,
+                              )}
                               isEditing={editable}
                               error={editErrors[col.field]}
                               onChange={(val) => {
@@ -1049,7 +1060,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                       return (
                         <td
                           key={col.field}
-                          className={`px-4 py-2 text-sm text-gray-700 ${cellAlign}${
+                          className={`text-text-2 px-4 py-2 text-sm ${cellAlign}${
                             canInlineEdit ? 'cursor-pointer hover:bg-gray-50/50' : ''
                           }`}
                           onDoubleClick={canInlineEdit ? () => handleStartEdit(row) : undefined}
@@ -1066,7 +1077,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                               onClick={handleSaveEdit}
                               disabled={editSaving}
                               data-testid={`subtable-edit-save-${rowIndex}`}
-                              className="mr-2 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                              className="text-accent mr-2 text-xs hover:text-blue-800 disabled:opacity-50"
                             >
                               {editSaving
                                 ? '...'
@@ -1077,7 +1088,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                             <button
                               onClick={handleCancelEdit}
                               data-testid={`subtable-edit-cancel-${rowIndex}`}
-                              className="text-xs text-gray-500 hover:text-gray-700"
+                              className="text-text-2 hover:text-text-2 text-xs"
                             >
                               {t('common.cancel') !== 'common.cancel'
                                 ? t('common.cancel')
@@ -1104,8 +1115,8 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                                     data-testid={`subtable-row-action-${button.code}-${rowIndex}`}
                                     className={`text-xs disabled:cursor-not-allowed disabled:opacity-40 ${
                                       button.danger || button.variant === 'danger'
-                                        ? 'text-red-500 hover:text-red-700'
-                                        : 'text-blue-500 hover:text-blue-700'
+                                        ? 'text-status-red hover:text-red-700'
+                                        : 'text-accent hover:text-blue-700'
                                     }`}
                                     title={resolveButtonLabel(button)}
                                   >
@@ -1118,7 +1129,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                                 onClick={() => handleStartEdit(row)}
                                 disabled={!!editingRowId}
                                 data-testid={`subtable-edit-${rowIndex}`}
-                                className="text-xs text-blue-500 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30"
+                                className="text-accent text-xs hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30"
                                 title={
                                   t('common.edit') !== 'common.edit' ? t('common.edit') : 'Edit'
                                 }
@@ -1143,7 +1154,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                                 onClick={() => handleDeleteRow(row.pid)}
                                 disabled={deletingId === row.pid || !!editingRowId}
                                 data-testid={`subtable-delete-${rowIndex}`}
-                                className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                                className="text-status-red text-xs hover:text-red-700 disabled:opacity-50"
                               >
                                 {deletingId === row.pid
                                   ? '...'
@@ -1161,141 +1172,148 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
               })}
             </DndSubTableWrapper>
 
-          {/* Inline add form row */}
-          {isEditable && isAdding && (
-            <tr className="border-t border-blue-100 bg-blue-50/30" data-testid="subtable-add-form">
-              {config.columns.map((col: ColumnConfig) => (
-                <td
-                  key={col.field}
-                  className={`px-4 py-2 ${col.align === 'right' ? 'text-right' : 'text-left'}`}
-                >
-                  {col.editable === false ? (
-                    <span className="text-xs text-gray-400">-</span>
-                  ) : (
-                    <div>
-                      <input
-                        type={isNumericField(col) ? 'number' : 'text'}
-                        value={newRowData[col.field] ?? ''}
-                        onChange={(e) => {
-                          const val =
-                            isNumericField(col) && e.target.value
-                              ? Number(e.target.value)
-                              : e.target.value;
-                          setNewRowData((prev) => ({ ...prev, [col.field]: val }));
-                          if (addErrors[col.field]) {
-                            setAddErrors((prev) => {
-                              const next = { ...prev };
-                              delete next[col.field];
-                              return next;
-                            });
+            {/* Inline add form row */}
+            {isEditable && isAdding && (
+              <tr
+                className="border-t border-blue-100 bg-blue-50/30"
+                data-testid="subtable-add-form"
+              >
+                {config.columns.map((col: ColumnConfig) => (
+                  <td
+                    key={col.field}
+                    className={`px-4 py-2 ${col.align === 'right' ? 'text-right' : 'text-left'}`}
+                  >
+                    {col.editable === false ? (
+                      <span className="text-text-3 text-xs">-</span>
+                    ) : (
+                      <div>
+                        <input
+                          type={isNumericField(col) ? 'number' : 'text'}
+                          value={newRowData[col.field] ?? ''}
+                          onChange={(e) => {
+                            const val =
+                              isNumericField(col) && e.target.value
+                                ? Number(e.target.value)
+                                : e.target.value;
+                            setNewRowData((prev) => ({ ...prev, [col.field]: val }));
+                            if (addErrors[col.field]) {
+                              setAddErrors((prev) => {
+                                const next = { ...prev };
+                                delete next[col.field];
+                                return next;
+                              });
+                            }
+                          }}
+                          placeholder={
+                            col.required
+                              ? `${resolveColumnLabel(col.field)} *`
+                              : resolveColumnLabel(col.field)
                           }
-                        }}
-                        placeholder={
-                          col.required
-                            ? `${resolveColumnLabel(col.field)} *`
-                            : resolveColumnLabel(col.field)
-                        }
-                        data-testid={`subtable-add-${col.field}`}
-                        className={`w-full rounded border px-2 py-1 text-sm focus:ring-1 focus:outline-none ${
-                          addErrors[col.field]
-                            ? 'border-red-300 focus:ring-red-400'
-                            : 'border-gray-300 focus:ring-blue-400'
-                        }`}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleAddRow();
-                          if (e.key === 'Escape') {
-                            setIsAdding(false);
-                            setNewRowData({});
-                            setAddErrors({});
-                          }
-                        }}
-                      />
-                      {addErrors[col.field] && (
-                        <p
-                          className="mt-0.5 text-xs text-red-500"
-                          data-testid={`subtable-error-${col.field}`}
-                        >
-                          {addErrors[col.field]}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                          data-testid={`subtable-add-${col.field}`}
+                          className={`w-full rounded border px-2 py-1 text-sm focus:ring-1 focus:outline-none ${
+                            addErrors[col.field]
+                              ? 'border-status-red focus:ring-red-400'
+                              : 'border-border-strong focus:ring-blue-400'
+                          }`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleAddRow();
+                            if (e.key === 'Escape') {
+                              setIsAdding(false);
+                              setNewRowData({});
+                              setAddErrors({});
+                            }
+                          }}
+                        />
+                        {addErrors[col.field] && (
+                          <p
+                            className="text-status-red mt-0.5 text-xs"
+                            data-testid={`subtable-error-${col.field}`}
+                          >
+                            {addErrors[col.field]}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                ))}
+                <td className="px-4 py-2 text-center whitespace-nowrap">
+                  <button
+                    onClick={handleAddRow}
+                    disabled={saving}
+                    data-testid="subtable-save-btn"
+                    className="text-accent mr-2 text-xs hover:text-blue-800 disabled:opacity-50"
+                  >
+                    {saving
+                      ? '...'
+                      : t('common.save') !== 'common.save'
+                        ? t('common.save')
+                        : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAdding(false);
+                      setNewRowData({});
+                      setAddErrors({});
+                    }}
+                    data-testid="subtable-cancel-btn"
+                    className="text-text-2 hover:text-text-2 text-xs"
+                  >
+                    {t('common.cancel') !== 'common.cancel' ? t('common.cancel') : 'Cancel'}
+                  </button>
                 </td>
-              ))}
-              <td className="px-4 py-2 text-center whitespace-nowrap">
-                <button
-                  onClick={handleAddRow}
-                  disabled={saving}
-                  data-testid="subtable-save-btn"
-                  className="mr-2 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
+              </tr>
+            )}
+            {addErrors._form && (
+              <tr>
+                <td
+                  colSpan={totalCols}
+                  className="text-status-red px-4 py-2 text-sm"
+                  data-testid="subtable-form-error"
                 >
-                  {saving ? '...' : t('common.save') !== 'common.save' ? t('common.save') : 'Save'}
-                </button>
-                <button
-                  onClick={() => {
-                    setIsAdding(false);
-                    setNewRowData({});
-                    setAddErrors({});
-                  }}
-                  data-testid="subtable-cancel-btn"
-                  className="text-xs text-gray-500 hover:text-gray-700"
+                  {addErrors._form}
+                </td>
+              </tr>
+            )}
+            {editErrors._form && (
+              <tr>
+                <td
+                  colSpan={totalCols}
+                  className="text-status-red px-4 py-2 text-sm"
+                  data-testid="subtable-edit-form-error"
                 >
-                  {t('common.cancel') !== 'common.cancel' ? t('common.cancel') : 'Cancel'}
-                </button>
-              </td>
-            </tr>
-          )}
-          {addErrors._form && (
-            <tr>
-              <td
-                colSpan={totalCols}
-                className="px-4 py-2 text-sm text-red-500"
-                data-testid="subtable-form-error"
-              >
-                {addErrors._form}
-              </td>
-            </tr>
-          )}
-          {editErrors._form && (
-            <tr>
-              <td
-                colSpan={totalCols}
-                className="px-4 py-2 text-sm text-red-500"
-                data-testid="subtable-edit-form-error"
-              >
-                {editErrors._form}
-              </td>
-            </tr>
-          )}
-        </tbody>
+                  {editErrors._form}
+                </td>
+              </tr>
+            )}
+          </tbody>
 
-        {/* Summary row — reactive during inline editing */}
-        {config.summary && (
-          <SubTableSummaryRow
-            columns={config.columns}
-            rows={
-              editingRowId
-                ? rows.map((r) =>
-                    (r.pid || String(r.id)) === editingRowId ? { ...r, ...editingValues } : r,
-                  )
-                : rows
-            }
-            summary={config.summary}
-            locale={locale}
-            t={t}
-            extraColCount={extraColCount}
-          />
-        )}
-      </table>
+          {/* Summary row — reactive during inline editing */}
+          {config.summary && (
+            <SubTableSummaryRow
+              columns={config.columns}
+              rows={
+                editingRowId
+                  ? rows.map((r) =>
+                      (r.pid || String(r.id)) === editingRowId ? { ...r, ...editingValues } : r,
+                    )
+                  : rows
+              }
+              summary={config.summary}
+              locale={locale}
+              t={t}
+              extraColCount={extraColCount}
+            />
+          )}
+        </table>
       )}
 
       {/* Add Line button */}
       {isEditable && config.commands?.create && !isAdding && displayRows.length > 0 && (
-        <div className="border-t border-gray-200">
+        <div className="border-border border-t">
           <button
             onClick={() => setIsAdding(true)}
             data-testid="subtable-add-row"
-            className="w-full py-2 text-xs text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-500"
+            className="text-text-3 hover:bg-hover hover:text-accent w-full py-2 text-xs transition-colors"
           >
             + {emptyStateActionLabel}
           </button>

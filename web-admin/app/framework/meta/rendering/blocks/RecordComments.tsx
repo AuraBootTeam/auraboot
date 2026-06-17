@@ -129,7 +129,7 @@ export function RecordComments({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-sm text-gray-400">
+      <div className="text-text-3 flex items-center justify-center py-12 text-sm">
         {t('comment.loading', 'Loading comments...')}
       </div>
     );
@@ -138,13 +138,13 @@ export function RecordComments({
   return (
     <div className="space-y-4 p-4">
       {/* New comment input */}
-      <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+      <div className="rounded-card border-border bg-panel border p-3 dark:border-gray-700 dark:bg-gray-800">
         <textarea
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           placeholder={t('comment.placeholder', 'Write a comment...')}
           rows={3}
-          className="w-full resize-none rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+          className="rounded-control border-border bg-subtle text-text w-full resize-none border px-3 py-2 text-sm placeholder-gray-400 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
           data-testid="comment-input"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -154,13 +154,13 @@ export function RecordComments({
           }}
         />
         <div className="mt-2 flex items-center justify-between">
-          <span className="text-xs text-gray-400">
+          <span className="text-text-3 text-xs">
             {locale === 'zh-CN' ? 'Ctrl+Enter 发送' : 'Ctrl+Enter to send'}
           </span>
           <button
             onClick={handleSubmit}
             disabled={!newComment.trim() || submitting}
-            className="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-control bg-accent hover:bg-accent-hover px-4 py-1.5 text-sm text-white transition-colors disabled:opacity-50"
             data-testid="comment-submit"
           >
             {submitting ? t('comment.submitting', 'Sending...') : t('comment.submit', 'Comment')}
@@ -170,7 +170,7 @@ export function RecordComments({
 
       {/* Comment list */}
       {comments.length === 0 ? (
-        <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+        <div className="text-text-3 py-8 text-center text-sm dark:text-gray-500">
           {t('comment.empty', 'No comments yet. Be the first to comment.')}
         </div>
       ) : (
@@ -178,23 +178,23 @@ export function RecordComments({
           {comments.map((comment) => (
             <div
               key={comment.id}
-              className="rounded-lg border border-gray-100 bg-white p-3 dark:border-gray-700 dark:bg-gray-800"
+              className="rounded-card bg-panel border border-gray-100 p-3 dark:border-gray-700 dark:bg-gray-800"
               data-testid={`comment-${comment.id}`}
             >
               {/* Header: user + time */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-600 dark:bg-blue-900 dark:text-blue-300">
+                  <div className="rounded-pill flex h-7 w-7 items-center justify-center bg-blue-100 text-xs font-medium text-blue-600 dark:bg-blue-900 dark:text-blue-300">
                     {(comment.actor_name || 'U').charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  <span className="text-text text-sm font-medium dark:text-gray-200">
                     {comment.actor_name || `User #${comment.created_by}`}
                   </span>
-                  <span className="text-xs text-gray-400" title={comment.created_at}>
+                  <span className="text-text-3 text-xs" title={comment.created_at}>
                     {dayjs(comment.created_at).fromNow()}
                   </span>
                   {comment.is_edited && (
-                    <span className="text-xs text-gray-400 italic">
+                    <span className="text-text-3 text-xs italic">
                       ({t('comment.edited', 'edited')})
                     </span>
                   )}
@@ -202,7 +202,7 @@ export function RecordComments({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => startEdit(comment)}
-                    className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700"
+                    className="text-text-3 hover:bg-hover hover:text-text-2 rounded p-1 transition-colors dark:hover:bg-gray-700"
                     title={t('comment.edit', 'Edit')}
                   >
                     <svg
@@ -221,7 +221,7 @@ export function RecordComments({
                   </button>
                   <button
                     onClick={() => handleDelete(comment.id)}
-                    className="rounded p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+                    className="text-text-3 hover:bg-status-red-bg hover:text-status-red rounded p-1 transition-colors dark:hover:bg-red-900/20"
                     title={t('comment.delete', 'Delete')}
                   >
                     <svg
@@ -248,13 +248,13 @@ export function RecordComments({
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     rows={2}
-                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    className="rounded-control border-border w-full border px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                     data-testid="comment-edit-input"
                   />
                   <div className="mt-1 flex gap-2">
                     <button
                       onClick={() => handleEdit(comment.id)}
-                      className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
+                      className="bg-accent hover:bg-accent-hover rounded px-3 py-1 text-xs text-white"
                     >
                       {t('comment.save', 'Save')}
                     </button>
@@ -263,14 +263,14 @@ export function RecordComments({
                         setEditingId(null);
                         setEditContent('');
                       }}
-                      className="rounded px-3 py-1 text-xs text-gray-500 hover:text-gray-700"
+                      className="text-text-2 hover:text-text-2 rounded px-3 py-1 text-xs"
                     >
                       {t('comment.cancel', 'Cancel')}
                     </button>
                   </div>
                 </div>
               ) : (
-                <p className="mt-2 text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                <p className="text-text-2 mt-2 text-sm whitespace-pre-wrap dark:text-gray-300">
                   {comment.content}
                 </p>
               )}

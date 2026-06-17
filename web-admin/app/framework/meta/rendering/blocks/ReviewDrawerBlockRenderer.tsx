@@ -154,13 +154,18 @@ function actionFormFields(actionConfig: any): any[] {
   return Array.isArray(actionConfig?.form?.fields) ? actionConfig.form.fields : [];
 }
 
-function initialActionFormValues(actionConfig: any, runtime: SchemaRuntime): Record<string, string> {
+function initialActionFormValues(
+  actionConfig: any,
+  runtime: SchemaRuntime,
+): Record<string, string> {
   return Object.fromEntries(
-    actionFormFields(actionConfig).map((field) => {
-      const name = String(field.name || field.field || '');
-      const value = resolveRuntimeValue(runtime, field.defaultValue ?? '');
-      return [name, value === undefined || value === null ? '' : String(value)];
-    }).filter(([name]) => name),
+    actionFormFields(actionConfig)
+      .map((field) => {
+        const name = String(field.name || field.field || '');
+        const value = resolveRuntimeValue(runtime, field.defaultValue ?? '');
+        return [name, value === undefined || value === null ? '' : String(value)];
+      })
+      .filter(([name]) => name),
   );
 }
 
@@ -201,7 +206,7 @@ function Badge({
     <span
       data-testid={`review-drawer-badge-${key}`}
       title={text}
-      className={`inline-flex max-w-full truncate rounded-full border px-2.5 py-1 text-xs font-semibold ${
+      className={`rounded-pill inline-flex max-w-full truncate border px-2.5 py-1 text-xs font-semibold ${
         toneClass[tone] || toneClass.gray
       }`}
     >
@@ -234,9 +239,9 @@ function FieldRows({
         const isMultiline = value.includes('\n') || value.length > 86;
         return (
           <div key={key} className="grid grid-cols-[118px_minmax(0,1fr)] gap-3 px-3 py-2.5 text-sm">
-            <dt className="text-xs text-gray-500">{label}</dt>
+            <dt className="text-text-2 text-xs">{label}</dt>
             <dd
-              className={`min-w-0 overflow-x-auto [overflow-wrap:anywhere] break-words text-gray-900 ${
+              className={`text-text min-w-0 overflow-x-auto [overflow-wrap:anywhere] break-words ${
                 isMultiline ? 'whitespace-pre-wrap' : ''
               }`}
             >
@@ -353,7 +358,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     const emptyTitle = getLocalizedText((block as any).empty?.title || 'Select a row', locale, t);
     return (
       <div
-        className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500"
+        className="rounded-control border-border bg-panel text-text-2 border p-4 text-sm"
         data-testid="review-drawer-empty"
       >
         {emptyTitle}
@@ -473,7 +478,11 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
       });
       return;
     }
-    await runAction(activeActionForm.actionConfig, activeActionForm.source, activeActionForm.values);
+    await runAction(
+      activeActionForm.actionConfig,
+      activeActionForm.source,
+      activeActionForm.values,
+    );
     setActiveActionForm(null);
   };
 
@@ -495,7 +504,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
         data-testid="review-drawer-minimized"
         aria-label={localized(locale, t, '展开复核浮层', 'Expand review drawer')}
         onClick={() => setIsMinimized(false)}
-        className="fixed right-6 bottom-6 z-50 rounded-full border border-blue-300 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-xl hover:bg-blue-700"
+        className="rounded-pill bg-accent hover:bg-accent-hover fixed right-6 bottom-6 z-50 border border-blue-300 px-4 py-2 text-sm font-semibold text-white shadow-xl"
       >
         {localized(locale, t, '展开行级复核', 'Open row review')}
       </button>
@@ -524,10 +533,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     <section
       data-testid="review-drawer"
       style={drawerStyle}
-      className="fixed z-50 grid min-h-[500px] max-w-[calc(100vw-24px)] grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-blue-300 bg-white shadow-2xl"
+      className="rounded-card bg-panel fixed z-50 grid min-h-[500px] max-w-[calc(100vw-24px)] grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden border border-blue-300 shadow-2xl"
     >
       <div
-        className="flex min-h-12 cursor-move items-center justify-between gap-3 overflow-hidden bg-blue-600 px-4 text-white"
+        className="bg-accent flex min-h-12 cursor-move items-center justify-between gap-3 overflow-hidden px-4 text-white"
         onMouseDown={(event) => {
           if ((event.target as HTMLElement).closest('button') || isMaximized) return;
           dragRef.current = {
@@ -547,7 +556,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             type="button"
             aria-label={localized(locale, t, '上一行', 'Previous row')}
             onClick={() => jumpRow(-1)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-sm text-white hover:bg-white/15"
+            className="rounded-control inline-flex h-7 w-7 items-center justify-center text-sm text-white hover:bg-white/15"
           >
             ↑
           </button>
@@ -555,7 +564,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             type="button"
             aria-label={localized(locale, t, '下一行', 'Next row')}
             onClick={() => jumpRow(1)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-sm text-white hover:bg-white/15"
+            className="rounded-control inline-flex h-7 w-7 items-center justify-center text-sm text-white hover:bg-white/15"
           >
             ↓
           </button>
@@ -563,7 +572,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             type="button"
             aria-label={localized(locale, t, '收起复核浮层', 'Minimize review drawer')}
             onClick={() => setIsMinimized(true)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-lg leading-none text-white hover:bg-white/15"
+            className="rounded-control inline-flex h-7 w-7 items-center justify-center text-lg leading-none text-white hover:bg-white/15"
           >
             -
           </button>
@@ -571,7 +580,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             type="button"
             aria-label={localized(locale, t, '切换最大化', 'Toggle maximize')}
             onClick={() => setIsMaximized((value) => !value)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-sm text-white hover:bg-white/15"
+            className="rounded-control inline-flex h-7 w-7 items-center justify-center text-sm text-white hover:bg-white/15"
           >
             □
           </button>
@@ -579,14 +588,14 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             type="button"
             aria-label={localized(locale, t, '关闭复核浮层', 'Close review drawer')}
             onClick={() => setIsMinimized(true)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-sm text-white hover:bg-white/15"
+            className="rounded-control inline-flex h-7 w-7 items-center justify-center text-sm text-white hover:bg-white/15"
           >
             ×
           </button>
         </div>
       </div>
 
-      <div className="flex max-w-full flex-wrap items-center gap-2 overflow-x-auto border-b border-gray-200 bg-white px-4 py-3">
+      <div className="border-border bg-panel flex max-w-full flex-wrap items-center gap-2 overflow-x-auto border-b px-4 py-3">
         {summaryBadges.map((badge: any) => (
           <Badge
             key={String(badge.key || badge.valueField || badge.label)}
@@ -598,7 +607,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
         ))}
       </div>
 
-      <div className="min-h-0 max-w-full overflow-hidden bg-gray-50 p-4">
+      <div className="bg-subtle min-h-0 max-w-full overflow-hidden p-4">
         <div
           className={`grid h-full min-h-0 min-w-0 gap-3 ${
             hasLeftRail ? 'xl:grid-cols-[minmax(0,1fr)_380px]' : 'grid-cols-1'
@@ -612,15 +621,15 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   className="grid min-w-0 gap-3 lg:grid-cols-2"
                 >
                   {rawFields.length > 0 && (
-                    <section className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-                      <header className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700">
+                    <section className="rounded-card border-border bg-panel overflow-hidden border">
+                      <header className="border-border bg-panel text-text-2 flex items-center justify-between gap-3 border-b px-3 py-2 text-sm font-semibold">
                         {sectionLabel(
                           compareConfig.rawTitle ? { title: compareConfig.rawTitle } : null,
                           locale,
                           t,
                           'Raw',
                         )}
-                        <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                        <span className="rounded-pill border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
                           {localized(locale, t, '只读证据', 'Read-only evidence')}
                         </span>
                       </header>
@@ -628,8 +637,8 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                     </section>
                   )}
                   {canonicalFields.length > 0 && (
-                    <section className="overflow-hidden rounded-lg border border-blue-100 bg-blue-50/40">
-                      <header className="flex items-center justify-between gap-3 border-b border-blue-100 bg-white/75 px-3 py-2 text-sm font-semibold text-gray-700">
+                    <section className="rounded-card overflow-hidden border border-blue-100 bg-blue-50/40">
+                      <header className="text-text-2 flex items-center justify-between gap-3 border-b border-blue-100 bg-white/75 px-3 py-2 text-sm font-semibold">
                         {sectionLabel(
                           compareConfig.canonicalTitle
                             ? { title: compareConfig.canonicalTitle }
@@ -638,7 +647,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           t,
                           'Canonical',
                         )}
-                        <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">
+                        <span className="rounded-pill border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">
                           {localized(locale, t, '转换结果', 'Canonical result')}
                         </span>
                       </header>
@@ -654,205 +663,218 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                 </div>
               )}
 
-            {sourceSummaryItems.length > 0 && (
-              <section className="rounded-lg border border-gray-200 bg-white p-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    {getLocalizedText(
-                      sourceConfig.summary?.title || {
-                        'zh-CN': '解析状态摘要',
-                        en: 'Parse status summary',
-                      },
-                      locale,
-                      t,
-                    )}
-                  </h3>
-                  {sourceConfig.summary?.description && (
-                    <span className="max-w-full min-w-0 truncate text-xs text-gray-500">
-                      {getLocalizedText(sourceConfig.summary.description, locale, t)}
-                    </span>
-                  )}
-                </div>
-                <div
-                  data-testid="review-drawer-parse-summary"
-                  className="mt-3 flex flex-wrap gap-2"
-                >
-                  {sourceSummaryItems.map((item: any) => {
-                    const key = String(item.key || item.field || item.label);
-                    const label = getLocalizedText(item.label || key, locale, t);
-                    const value = formatConfiguredValue(
-                      readFieldValue(sourceRecord, item),
-                      item,
-                      locale,
-                      t,
-                    );
-                    return (
-                      <span
-                        key={key}
-                        className="inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-md border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs text-gray-700"
-                      >
-                        <span className="shrink-0 font-medium text-gray-500">{label}</span>
-                        <span
-                          className="max-w-[260px] min-w-0 truncate font-semibold text-gray-900"
-                          title={value}
-                        >
-                          {value}
-                        </span>
-                      </span>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            {hasSourceDetails && (
-              <details
-                open={sourceConfig.openByDefault === true}
-                data-testid="review-drawer-tab-source"
-                className="overflow-hidden rounded-lg border border-gray-200 bg-white"
-              >
-                <summary className="cursor-pointer bg-white px-3 py-2 text-sm font-semibold text-gray-900">
-                  {localized(
-                    locale,
-                    t,
-                    '解析证据与 Profile / LLM Policy',
-                    'Parse evidence and Profile / LLM policy',
-                  )}
-                </summary>
-                <div className="space-y-3 border-t border-gray-100 p-3">
-                  {sourceCards.length > 0 && (
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      {sourceCards.map((card: any) => {
-                        const key = String(card.key || card.title || card.valueField);
-                        const value = `${formatValue(readFieldValue(sourceRecord, card), card.emptyText)}${
-                          card.unit ? String(card.unit) : ''
-                        }`;
-                        return (
-                          <section
-                            key={key}
-                            className="rounded-lg border border-gray-200 bg-gray-50 p-3"
-                          >
-                            <h3 className="text-xs font-medium text-gray-500">
-                              {getLocalizedText(card.title || key, locale, t)}
-                            </h3>
-                            <div className="mt-2 text-sm font-semibold break-words text-gray-900">
-                              {value}
-                            </div>
-                            {card.description && (
-                              <p className="mt-1 text-xs text-gray-500">
-                                {getLocalizedText(card.description, locale, t)}
-                              </p>
-                            )}
-                          </section>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {sourcePolicies.length > 0 && (
-                    <section className="rounded-lg border border-gray-200 bg-white p-3">
-                      <h3 className="mb-3 text-sm font-semibold text-gray-900">
-                        {getLocalizedText(
-                          sourceConfig.policyTitle || {
-                            'zh-CN': 'LLM 行为由 Profile Policy 控制',
-                            en: 'LLM behavior is controlled by Profile Policy',
-                          },
-                          locale,
-                          t,
-                        )}
-                      </h3>
-                      <div className="grid gap-3 md:grid-cols-3">
-                        {sourcePolicies.map((policy: any) => (
-                          <div
-                            key={String(policy.key || policy.title)}
-                            className="rounded-md border border-gray-200 bg-gray-50 p-3"
-                          >
-                            <h4 className="text-sm font-medium text-gray-900">
-                              {getLocalizedText(policy.title || policy.key, locale, t)}
-                            </h4>
-                            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-600">
-                              {(policy.items || []).map((item: any) => (
-                                <li key={String(item)}>{String(item)}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-                  {sourceConfig.jsonField && (
-                    <pre
-                      data-testid="review-drawer-source-json"
-                      className="max-h-64 overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-3 text-xs text-blue-100"
-                    >
-                      {JSON.stringify(
-                        parseJsonValue(readPath(sourceRecord, sourceConfig.jsonField)),
-                        null,
-                        2,
+              {sourceSummaryItems.length > 0 && (
+                <section className="rounded-card border-border bg-panel border p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-text text-sm font-semibold">
+                      {getLocalizedText(
+                        sourceConfig.summary?.title || {
+                          'zh-CN': '解析状态摘要',
+                          en: 'Parse status summary',
+                        },
+                        locale,
+                        t,
                       )}
-                    </pre>
-                  )}
-                </div>
-              </details>
-            )}
-
-            {hasExportDetails && (
-              <details
-                data-testid="review-drawer-tab-export"
-                className="overflow-hidden rounded-lg border border-gray-200 bg-white"
-              >
-                <summary className="cursor-pointer bg-white px-3 py-2 text-sm font-semibold text-gray-900">
-                  {localized(locale, t, '决策历史与导出影响', 'Decision history and export impact')}
-                </summary>
-                <div className="space-y-3 border-t border-gray-100 p-3">
-                  {exportFields.length > 0 && (
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      {exportFields.map((field: any) => {
-                        const key = String(field.key || field.field || field.label);
-                        return (
-                          <section
-                            key={key}
-                            className="rounded-lg border border-gray-200 bg-gray-50 p-3"
-                          >
-                            <div className="text-xs text-gray-500">
-                              {getLocalizedText(field.label || key, locale, t)}
-                            </div>
-                            <div className="mt-1 text-sm font-semibold break-words text-gray-900">
-                              {formatConfiguredValue(readFieldValue(record, field), field, locale, t)}
-                            </div>
-                          </section>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {exportRows.length > 0 && (
-                    <ol className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
-                      {exportRows.map((row: any, index: number) => (
-                        <li
-                          key={String(row.pid ?? row.id ?? index)}
-                          className="px-3 py-2 text-sm text-gray-700"
+                    </h3>
+                    {sourceConfig.summary?.description && (
+                      <span className="text-text-2 max-w-full min-w-0 truncate text-xs">
+                        {getLocalizedText(sourceConfig.summary.description, locale, t)}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    data-testid="review-drawer-parse-summary"
+                    className="mt-3 flex flex-wrap gap-2"
+                  >
+                    {sourceSummaryItems.map((item: any) => {
+                      const key = String(item.key || item.field || item.label);
+                      const label = getLocalizedText(item.label || key, locale, t);
+                      const value = formatConfiguredValue(
+                        readFieldValue(sourceRecord, item),
+                        item,
+                        locale,
+                        t,
+                      );
+                      return (
+                        <span
+                          key={key}
+                          className="rounded-control text-text-2 inline-flex min-h-8 max-w-full items-center gap-1.5 border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs"
                         >
-                          <span className="font-mono font-semibold">
-                            {formatValue(readPath(row, 'bom_er_filename'), String(row.pid ?? index))}
+                          <span className="text-text-2 shrink-0 font-medium">{label}</span>
+                          <span
+                            className="text-text max-w-[260px] min-w-0 truncate font-semibold"
+                            title={value}
+                          >
+                            {value}
                           </span>
-                          <span className="ml-2 text-xs text-gray-500">
-                            Rev {formatValue(readPath(row, 'bom_er_revision_no'))}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </div>
-              </details>
-            )}
-          </div>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {hasSourceDetails && (
+                <details
+                  open={sourceConfig.openByDefault === true}
+                  data-testid="review-drawer-tab-source"
+                  className="rounded-card border-border bg-panel overflow-hidden border"
+                >
+                  <summary className="bg-panel text-text cursor-pointer px-3 py-2 text-sm font-semibold">
+                    {localized(
+                      locale,
+                      t,
+                      '解析证据与 Profile / LLM Policy',
+                      'Parse evidence and Profile / LLM policy',
+                    )}
+                  </summary>
+                  <div className="space-y-3 border-t border-gray-100 p-3">
+                    {sourceCards.length > 0 && (
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        {sourceCards.map((card: any) => {
+                          const key = String(card.key || card.title || card.valueField);
+                          const value = `${formatValue(readFieldValue(sourceRecord, card), card.emptyText)}${
+                            card.unit ? String(card.unit) : ''
+                          }`;
+                          return (
+                            <section
+                              key={key}
+                              className="rounded-card border-border bg-subtle border p-3"
+                            >
+                              <h3 className="text-text-2 text-xs font-medium">
+                                {getLocalizedText(card.title || key, locale, t)}
+                              </h3>
+                              <div className="text-text mt-2 text-sm font-semibold break-words">
+                                {value}
+                              </div>
+                              {card.description && (
+                                <p className="text-text-2 mt-1 text-xs">
+                                  {getLocalizedText(card.description, locale, t)}
+                                </p>
+                              )}
+                            </section>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {sourcePolicies.length > 0 && (
+                      <section className="rounded-card border-border bg-panel border p-3">
+                        <h3 className="text-text mb-3 text-sm font-semibold">
+                          {getLocalizedText(
+                            sourceConfig.policyTitle || {
+                              'zh-CN': 'LLM 行为由 Profile Policy 控制',
+                              en: 'LLM behavior is controlled by Profile Policy',
+                            },
+                            locale,
+                            t,
+                          )}
+                        </h3>
+                        <div className="grid gap-3 md:grid-cols-3">
+                          {sourcePolicies.map((policy: any) => (
+                            <div
+                              key={String(policy.key || policy.title)}
+                              className="rounded-control border-border bg-subtle border p-3"
+                            >
+                              <h4 className="text-text text-sm font-medium">
+                                {getLocalizedText(policy.title || policy.key, locale, t)}
+                              </h4>
+                              <ul className="text-text-2 mt-2 list-disc space-y-1 pl-5 text-xs">
+                                {(policy.items || []).map((item: any) => (
+                                  <li key={String(item)}>{String(item)}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+                    {sourceConfig.jsonField && (
+                      <pre
+                        data-testid="review-drawer-source-json"
+                        className="rounded-card max-h-64 overflow-auto border border-slate-700 bg-slate-950 p-3 text-xs text-blue-100"
+                      >
+                        {JSON.stringify(
+                          parseJsonValue(readPath(sourceRecord, sourceConfig.jsonField)),
+                          null,
+                          2,
+                        )}
+                      </pre>
+                    )}
+                  </div>
+                </details>
+              )}
+
+              {hasExportDetails && (
+                <details
+                  data-testid="review-drawer-tab-export"
+                  className="rounded-card border-border bg-panel overflow-hidden border"
+                >
+                  <summary className="bg-panel text-text cursor-pointer px-3 py-2 text-sm font-semibold">
+                    {localized(
+                      locale,
+                      t,
+                      '决策历史与导出影响',
+                      'Decision history and export impact',
+                    )}
+                  </summary>
+                  <div className="space-y-3 border-t border-gray-100 p-3">
+                    {exportFields.length > 0 && (
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        {exportFields.map((field: any) => {
+                          const key = String(field.key || field.field || field.label);
+                          return (
+                            <section
+                              key={key}
+                              className="rounded-card border-border bg-subtle border p-3"
+                            >
+                              <div className="text-text-2 text-xs">
+                                {getLocalizedText(field.label || key, locale, t)}
+                              </div>
+                              <div className="text-text mt-1 text-sm font-semibold break-words">
+                                {formatConfiguredValue(
+                                  readFieldValue(record, field),
+                                  field,
+                                  locale,
+                                  t,
+                                )}
+                              </div>
+                            </section>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {exportRows.length > 0 && (
+                      <ol className="rounded-card border-border bg-panel divide-y divide-gray-100 border">
+                        {exportRows.map((row: any, index: number) => (
+                          <li
+                            key={String(row.pid ?? row.id ?? index)}
+                            className="text-text-2 px-3 py-2 text-sm"
+                          >
+                            <span className="font-mono font-semibold">
+                              {formatValue(
+                                readPath(row, 'bom_er_filename'),
+                                String(row.pid ?? index),
+                              )}
+                            </span>
+                            <span className="text-text-2 ml-2 text-xs">
+                              Rev {formatValue(readPath(row, 'bom_er_revision_no'))}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
+                </details>
+              )}
+            </div>
           )}
 
           <aside
             data-testid="review-drawer-tab-candidates"
-            className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white"
+            className="rounded-card border-border bg-panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden border"
           >
             <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-3 py-2">
-              <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">
+              <h3 className="text-text min-w-0 flex-1 truncate text-sm font-semibold">
                 {getLocalizedText(
                   candidatesConfig.title || {
                     'zh-CN': '候选物料与用户决策',
@@ -879,7 +901,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           if (actionConfig.form) openActionForm(actionConfig, 'export');
                           else void runAction(actionConfig, 'export');
                         }}
-                        className={`rounded-md px-3 py-2 text-sm font-medium ${
+                        className={`rounded-control px-3 py-2 text-sm font-medium ${
                           buttonClass[actionConfig.variant || 'secondary'] || buttonClass.secondary
                         } disabled:cursor-not-allowed disabled:opacity-50`}
                       >
@@ -899,7 +921,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               {candidates.length === 0 ? (
                 <div
                   data-testid="review-drawer-candidates-empty"
-                  className="rounded-md border border-dashed border-gray-300 p-3 text-sm text-gray-500"
+                  className="rounded-control border-border-strong text-text-2 border border-dashed p-3 text-sm"
                 >
                   {getLocalizedText(
                     candidatesConfig.empty?.title || { 'zh-CN': '暂无候选', en: 'No candidates' },
@@ -925,16 +947,16 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           writeRuntimeState(runtime, candidatesConfig.selection.bind, candidate);
                         }
                       }}
-                      className={`block w-full rounded-lg border p-2 text-left ${
+                      className={`rounded-card block w-full border p-2 text-left ${
                         active
-                          ? 'border-blue-400 bg-blue-50'
-                          : 'border-gray-200 bg-white hover:bg-gray-50'
+                          ? 'bg-accent-weak border-blue-400'
+                          : 'border-border bg-panel hover:bg-hover'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <div
-                            className="truncate font-mono text-xs font-semibold text-gray-900"
+                            className="text-text truncate font-mono text-xs font-semibold"
                             title={titleText}
                           >
                             {titleText}
@@ -953,10 +975,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                                     field.span === 2 ? 'sm:col-span-2' : ''
                                   } grid grid-cols-[48px_minmax(0,1fr)] items-baseline gap-1.5`}
                                 >
-                                  <dt className="truncate text-gray-500" title={label}>
+                                  <dt className="text-text-2 truncate" title={label}>
                                     {label}
                                   </dt>
-                                  <dd className="min-w-0 truncate text-gray-800" title={value}>
+                                  <dd className="text-text min-w-0 truncate" title={value}>
                                     {value}
                                   </dd>
                                 </div>
@@ -965,7 +987,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           </dl>
                         </div>
                         {score !== undefined && (
-                          <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
+                          <span className="rounded-pill bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
                             {String(score)}
                           </span>
                         )}
@@ -975,8 +997,8 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                 })
               )}
             </div>
-            <section className="shrink-0 border-t border-gray-100 bg-gray-50 p-2.5">
-              <h3 className="text-sm font-semibold text-gray-900">
+            <section className="bg-subtle shrink-0 border-t border-gray-100 p-2.5">
+              <h3 className="text-text text-sm font-semibold">
                 {getLocalizedText(
                   candidatesConfig.decisionTitle || { 'zh-CN': '当前决策状态', en: 'Decision' },
                   locale,
@@ -992,22 +1014,19 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                     if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
                     const value = formatConfiguredValue(rawValue, field, locale, t);
                     return (
-                      <div
-                        key={key}
-                        className="grid grid-cols-[96px_minmax(0,1fr)] gap-2"
-                      >
-                        <dt className="text-xs text-gray-500">{label}</dt>
-                        <dd className="break-words text-gray-900">{value}</dd>
+                      <div key={key} className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
+                        <dt className="text-text-2 text-xs">{label}</dt>
+                        <dd className="text-text break-words">{value}</dd>
                       </div>
                     );
                   })
                 ) : (
                   <>
                     <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
-                      <dt className="text-xs text-gray-500">
+                      <dt className="text-text-2 text-xs">
                         {localized(locale, t, '标准编码', 'Standard Code')}
                       </dt>
-                      <dd className="font-mono text-gray-900">
+                      <dd className="text-text font-mono">
                         {formatValue(
                           readPath(record, 'bom_std_material_code'),
                           localized(locale, t, '确认候选后写入', 'Pending confirmation'),
@@ -1015,10 +1034,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       </dd>
                     </div>
                     <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
-                      <dt className="text-xs text-gray-500">
+                      <dt className="text-text-2 text-xs">
                         {localized(locale, t, '当前状态', 'Reason')}
                       </dt>
-                      <dd className="break-words text-gray-900">
+                      <dd className="text-text break-words">
                         {formatConfiguredValue(
                           readPath(record, 'bom_std_reason_code'),
                           candidatesConfig.reasonField || {},
@@ -1031,8 +1050,8 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                 )}
               </dl>
               {selectedCandidate && (candidatesConfig.selectedFields || []).length > 0 && (
-                <section className="mt-3 rounded-md border border-gray-200 bg-white">
-                  <header className="border-b border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700">
+                <section className="rounded-control border-border bg-panel mt-3 border">
+                  <header className="border-border text-text-2 border-b px-3 py-1.5 text-xs font-semibold">
                     {getLocalizedText(
                       candidatesConfig.selectedTitle || {
                         'zh-CN': '匹配证据',
@@ -1072,7 +1091,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           if (actionConfig.form) openActionForm(actionConfig, 'candidate');
                           else void runAction(actionConfig, 'candidate');
                         }}
-                        className={`rounded-md px-3 py-2 text-sm font-medium ${
+                        className={`rounded-control px-3 py-2 text-sm font-medium ${
                           buttonClass[actionConfig.variant || 'primary'] || buttonClass.primary
                         } disabled:cursor-not-allowed disabled:opacity-50`}
                       >
@@ -1098,13 +1117,13 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             role="dialog"
             aria-modal="true"
             data-testid="review-drawer-action-form"
-            className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-4 shadow-2xl"
+            className="rounded-card border-border bg-panel w-full max-w-md border p-4 shadow-2xl"
             onSubmit={(event) => {
               event.preventDefault();
               void submitActionForm();
             }}
           >
-            <h3 className="text-base font-semibold text-gray-900">
+            <h3 className="text-text text-base font-semibold">
               {getLocalizedText(
                 activeActionForm.actionConfig.form?.title ||
                   activeActionForm.actionConfig.label ||
@@ -1127,14 +1146,16 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   required: field.required === true,
                   placeholder: getLocalizedText(field.placeholder || '', locale, t),
                   onChange: (
-                    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+                    event: React.ChangeEvent<
+                      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+                    >,
                   ) => updateActionFormValue(name, event.target.value),
                   className:
-                    'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
+                    'mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-sm text-text shadow-sm focus:outline-none focus-visible:shadow-focus',
                   'data-testid': `review-drawer-action-form-field-${name}`,
                 };
                 return (
-                  <label key={name} className="block text-sm font-medium text-gray-700">
+                  <label key={name} className="text-text-2 block text-sm font-medium">
                     {label}
                     {field.type === 'textarea' ? (
                       <textarea {...commonProps} rows={field.rows || 3} />
@@ -1158,9 +1179,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                         step={field.step}
                       />
                     )}
-                    {error && (
-                      <span className="mt-1 block text-xs text-rose-600">{error}</span>
-                    )}
+                    {error && <span className="mt-1 block text-xs text-rose-600">{error}</span>}
                   </label>
                 );
               })}
@@ -1168,7 +1187,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-3 py-2 text-sm font-medium"
                 onClick={() => setActiveActionForm(null)}
               >
                 {localized(locale, t, '取消', 'Cancel')}
@@ -1177,7 +1196,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                 type="submit"
                 data-testid="review-drawer-action-form-submit"
                 disabled={Boolean(runningAction)}
-                className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-control bg-accent hover:bg-accent-hover px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {runningAction
                   ? t('common.loading')

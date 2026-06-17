@@ -88,8 +88,8 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
     ...(isDragging
       ? {
           opacity: 0.6,
-          backgroundColor: '#dbeafe',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          backgroundColor: 'var(--color-accent-weak)',
+          boxShadow: 'var(--shadow-pop)',
           zIndex: 50,
         }
       : {}),

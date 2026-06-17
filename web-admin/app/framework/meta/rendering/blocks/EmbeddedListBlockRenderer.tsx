@@ -48,15 +48,19 @@ export function EmbeddedListBlockRenderer({
   // back to the runtime context for generic composite pages.
   const ctx = runtime?.getContext?.() as any;
   const recordId =
-    parentRecordId ?? ctx?.$page?.recordId ?? parentRecordData?.pid ?? ctx?.record?.pid ?? ctx?.record?.id;
+    parentRecordId ??
+    ctx?.$page?.recordId ??
+    parentRecordData?.pid ??
+    ctx?.record?.pid ??
+    ctx?.record?.id;
 
   const fixedFilters =
     parentField && recordId != null ? { [parentField]: String(recordId) } : undefined;
 
   if (!modelCode) {
     return (
-      <div className="rounded border border-yellow-300 bg-yellow-50 p-4">
-        <p className="text-yellow-800">
+      <div className="bg-status-amber-bg rounded border border-yellow-300 p-4">
+        <p className="text-status-amber">
           embedded-list block "{block.id}" is missing modelCode/childModel
         </p>
       </div>
@@ -68,7 +72,7 @@ export function EmbeddedListBlockRenderer({
   return (
     <div className="embedded-list-section" data-testid={`embedded-list-${block.id}`}>
       {title && (
-        <h3 className="mb-3 text-sm font-semibold tracking-wider text-gray-500 uppercase">{title}</h3>
+        <h3 className="text-text-2 mb-3 text-sm font-semibold tracking-wider uppercase">{title}</h3>
       )}
       <RecordListView
         modelCode={modelCode}

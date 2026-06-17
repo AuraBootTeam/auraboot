@@ -76,7 +76,7 @@ export function NbaSuggestionBar({ modelCode, recordPid, token }: NbaSuggestionB
   return (
     <div className="border-b border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-3">
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700">
+        <div className="text-accent flex items-center gap-1.5 text-xs font-medium">
           <svg
             className="h-3.5 w-3.5"
             fill="none"
@@ -90,7 +90,7 @@ export function NbaSuggestionBar({ modelCode, recordPid, token }: NbaSuggestionB
         </div>
         <button
           onClick={() => setDismissed(true)}
-          className="p-0.5 text-gray-400 hover:text-gray-600"
+          className="text-text-3 hover:text-text-2 p-0.5"
           title="Dismiss"
         >
           <svg
@@ -108,15 +108,15 @@ export function NbaSuggestionBar({ modelCode, recordPid, token }: NbaSuggestionB
         {suggestions.map((s, i) => (
           <div
             key={i}
-            className={`max-w-[340px] min-w-[200px] flex-1 rounded-md border-l-3 px-3 py-2 ${
+            className={`rounded-control max-w-[340px] min-w-[200px] flex-1 border-l-3 px-3 py-2 ${
               PRIORITY_STYLES[s.priority] || PRIORITY_STYLES.MEDIUM
             }`}
           >
-            <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800">
+            <div className="text-text flex items-center gap-1.5 text-sm font-medium">
               <span>{CATEGORY_ICONS[s.category] || '\u{1F4A1}'}</span>
               {s.title}
             </div>
-            <p className="mt-0.5 line-clamp-2 text-xs text-gray-600">{s.description}</p>
+            <p className="text-text-2 mt-0.5 line-clamp-2 text-xs">{s.description}</p>
           </div>
         ))}
       </div>

@@ -101,7 +101,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
 
   if (loading) {
     return (
-      <div className="py-8 text-center text-sm text-gray-400" data-testid="monthly-grid-viewer">
+      <div className="text-text-3 py-8 text-center text-sm" data-testid="monthly-grid-viewer">
         {t('common.loading') || 'Loading...'}
       </div>
     );
@@ -109,7 +109,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
 
   if (error) {
     return (
-      <div className="py-4 text-center text-sm text-red-500" data-testid="monthly-grid-viewer">
+      <div className="text-status-red py-4 text-center text-sm" data-testid="monthly-grid-viewer">
         {error}
       </div>
     );
@@ -117,7 +117,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
 
   if (parentRows.length === 0) {
     return (
-      <div className="py-6 text-center text-sm text-gray-400" data-testid="monthly-grid-viewer">
+      <div className="text-text-3 py-6 text-center text-sm" data-testid="monthly-grid-viewer">
         {t('common.noData') || 'No data'}
       </div>
     );
@@ -125,15 +125,15 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
 
   return (
     <div
-      className="overflow-auto rounded-lg border border-gray-200"
+      className="rounded-card border-border overflow-auto border"
       data-testid="monthly-grid-viewer"
     >
-      <table className="w-full min-w-[1400px] divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+      <table className="divide-border w-full min-w-[1400px] divide-y">
+        <thead className="bg-subtle">
           <tr>
             <th
               rowSpan={2}
-              className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase"
+              className="text-text-2 px-3 py-2 text-left text-xs font-medium uppercase"
             >
               {t('annualPlan.workPackage') || '工作包'}
             </th>
@@ -141,14 +141,14 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
               <th
                 key={`month-${m}`}
                 colSpan={Math.max(metrics.length, 1)}
-                className="border-l border-gray-200 px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase"
+                className="border-border text-text-2 border-l px-2 py-2 text-center text-xs font-medium uppercase"
               >
                 {m}月
               </th>
             ))}
             <th
               colSpan={Math.max(metrics.length, 1)}
-              className="border-l border-gray-200 px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase"
+              className="border-border text-text-2 border-l px-2 py-2 text-center text-xs font-medium uppercase"
             >
               {t('common.total') || '合计'}
             </th>
@@ -158,7 +158,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
               metrics.map((metric) => (
                 <th
                   key={`metric-${m}-${metric.field}`}
-                  className="border-l border-gray-100 px-2 py-2 text-right text-xs font-medium text-gray-500"
+                  className="text-text-2 border-l border-gray-100 px-2 py-2 text-right text-xs font-medium"
                 >
                   {metric.label ? getLocalizedText(metric.label as any, locale, t) : metric.field}
                 </th>
@@ -167,14 +167,14 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
             {metrics.map((metric) => (
               <th
                 key={`total-${metric.field}`}
-                className="border-l border-gray-100 px-2 py-2 text-right text-xs font-medium text-gray-500"
+                className="text-text-2 border-l border-gray-100 px-2 py-2 text-right text-xs font-medium"
               >
                 {metric.label ? getLocalizedText(metric.label as any, locale, t) : metric.field}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100 bg-white">
+        <tbody className="bg-panel divide-y divide-gray-100">
           {parentRows.map((parent, index) => {
             const parentPid = String(parent.pid || parent.id || '');
             const monthMap = monthlyByParent[parentPid] || {};
@@ -185,7 +185,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
 
             return (
               <tr key={parentPid || index} data-testid={`monthly-grid-row-${index}`}>
-                <td className="px-3 py-2 text-sm whitespace-nowrap text-gray-700">
+                <td className="text-text-2 px-3 py-2 text-sm whitespace-nowrap">
                   {parent[displayField] ?? parentPid}
                 </td>
                 {MONTHS.map((month) =>
@@ -195,7 +195,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
                     return (
                       <td
                         key={`${parentPid}-${month}-${metric.field}`}
-                        className="border-l border-gray-100 px-2 py-2 text-right text-sm text-gray-700"
+                        className="text-text-2 border-l border-gray-100 px-2 py-2 text-right text-sm"
                       >
                         {formatNumber(value)}
                       </td>
@@ -205,7 +205,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
                 {metrics.map((metric) => (
                   <td
                     key={`${parentPid}-total-${metric.field}`}
-                    className="border-l border-gray-200 bg-gray-50 px-2 py-2 text-right text-sm font-semibold text-gray-900"
+                    className="border-border bg-subtle text-text border-l px-2 py-2 text-right text-sm font-semibold"
                   >
                     {formatNumber(rowTotals[metric.field])}
                   </td>
@@ -214,9 +214,9 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
             );
           })}
         </tbody>
-        <tfoot className="border-t border-gray-200 bg-gray-50">
+        <tfoot className="border-border bg-subtle border-t">
           <tr>
-            <td className="px-3 py-2 text-sm font-semibold text-gray-600">
+            <td className="text-text-2 px-3 py-2 text-sm font-semibold">
               {t('common.total') || '合计'}
             </td>
             {MONTHS.map((month) =>
@@ -230,7 +230,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
                 return (
                   <td
                     key={`summary-${month}-${metric.field}`}
-                    className="border-l border-gray-100 px-2 py-2 text-right text-sm font-semibold text-gray-900"
+                    className="text-text border-l border-gray-100 px-2 py-2 text-right text-sm font-semibold"
                   >
                     {formatNumber(monthTotal)}
                   </td>
@@ -240,7 +240,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
             {metrics.map((metric) => (
               <td
                 key={`overall-${metric.field}`}
-                className="border-l border-gray-200 px-2 py-2 text-right text-sm font-semibold text-gray-900"
+                className="border-border text-text border-l px-2 py-2 text-right text-sm font-semibold"
               >
                 {formatNumber(overallTotals[metric.field] || 0)}
               </td>

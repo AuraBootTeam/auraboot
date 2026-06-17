@@ -429,7 +429,7 @@ describe('TableBlockRenderer', () => {
     fireEvent.click(tableRow);
 
     expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', row);
-    expect(tableRow.className).toContain('bg-blue-50');
+    expect(tableRow.className).toContain('bg-accent-weak');
   });
 
   it('constrains table overflow when maxHeight is configured', () => {

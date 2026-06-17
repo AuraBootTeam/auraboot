@@ -55,16 +55,12 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
     readDataSourceRecord(runtime, dataSourceId);
   const sections = Array.isArray((block as any).sections) ? (block as any).sections : [];
   const title = getLocalizedText(block.title || (block as any).label || 'Evidence', locale, t);
-  const emptyTitle = getLocalizedText(
-    (block as any).empty?.title || 'Select evidence',
-    locale,
-    t,
-  );
+  const emptyTitle = getLocalizedText((block as any).empty?.title || 'Select evidence', locale, t);
 
   if (!record || Object.keys(record).length === 0) {
     return (
       <div
-        className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500"
+        className="rounded-control border-border bg-panel text-text-2 border p-4 text-sm"
         data-testid="evidence-panel-empty"
       >
         {emptyTitle}
@@ -73,9 +69,9 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
   }
 
   return (
-    <section className="rounded-lg border border-gray-200 bg-white" data-testid="evidence-panel">
+    <section className="rounded-card border-border bg-panel border" data-testid="evidence-panel">
       <div className="border-b border-gray-100 px-4 py-3">
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+        <h3 className="text-text text-sm font-semibold">{title}</h3>
       </div>
       <div className="space-y-3 p-4">
         {sections.map((section: any, index: number) => {
@@ -86,13 +82,13 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
 
           return (
             <div key={key} data-testid={`evidence-panel-section-${key}`}>
-              <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</div>
+              <div className="text-text-2 text-xs font-medium tracking-wide uppercase">{label}</div>
               {isJson ? (
-                <pre className="mt-1 max-h-48 overflow-auto rounded-md bg-gray-50 p-3 text-xs text-gray-700">
+                <pre className="rounded-control bg-subtle text-text-2 mt-1 max-h-48 overflow-auto p-3 text-xs">
                   {value}
                 </pre>
               ) : (
-                <div className="mt-1 break-words text-sm text-gray-800">{value}</div>
+                <div className="text-text mt-1 text-sm break-words">{value}</div>
               )}
             </div>
           );

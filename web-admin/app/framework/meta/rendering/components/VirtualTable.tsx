@@ -54,9 +54,9 @@ export const VirtualTable: React.FC<VirtualTableProps> = ({
     // Regular rendering for small datasets
     return (
       <div className={className}>
-        <table className="min-w-full divide-y divide-gray-200">
+        <table className="divide-border min-w-full divide-y">
           {header}
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-border bg-panel divide-y">
             {rows.map((row, index) => renderRow(row, index))}
           </tbody>
         </table>
@@ -70,7 +70,7 @@ export const VirtualTable: React.FC<VirtualTableProps> = ({
 
   return (
     <div className={className}>
-      <table className="min-w-full divide-y divide-gray-200">{header}</table>
+      <table className="divide-border min-w-full divide-y">{header}</table>
       <div ref={parentRef} className="overflow-auto" style={{ height: containerHeight }}>
         <div style={{ height: totalSize, position: 'relative' }}>
           {virtualItems.map((virtualItem) => {

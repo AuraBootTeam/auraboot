@@ -32,9 +32,7 @@ export const DividerBlockRenderer: React.FC<DividerBlockRendererProps> = ({ bloc
         role="separator"
       >
         <span className="h-px flex-1 bg-gray-200" />
-        <span className="text-xs font-medium tracking-wider text-gray-500 uppercase">
-          {label}
-        </span>
+        <span className="text-text-2 text-xs font-medium tracking-wider uppercase">{label}</span>
         <span className="h-px flex-1 bg-gray-200" />
       </div>
     );
@@ -42,7 +40,7 @@ export const DividerBlockRenderer: React.FC<DividerBlockRendererProps> = ({ bloc
 
   return (
     <hr
-      className={`divider-block my-4 border-t border-gray-200 ${block.className || ''}`}
+      className={`divider-block border-border my-4 border-t ${block.className || ''}`}
       data-testid="divider-block"
       data-block-type="divider"
       role="separator"
