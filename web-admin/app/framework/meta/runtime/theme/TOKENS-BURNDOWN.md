@@ -114,25 +114,41 @@ arbitrary tailwind color in `app/ui`; **palette-utility ratchet** + **i18n
 hardcode ratchet** (no-regression). This now _guards_ the burn-down — any new
 palette/hardcoded-string regression fails CI.
 
-### T3 — smart sweep (`app/ui/smart`, ~55 files) — IN PROGRESS
+### T3 — smart + meta + loose sweep — DONE (PRs #709/710/712/713/720/721/724) + dark mode (PR #726)
 
-- batch 1 (PR #709): Switch / Checkbox / Radio runtime → tokens.
-- **Palette ratchet: 2943 (baseline) → 2444 (current `G1` baseline).** Lower it as
-  each batch lands (`node scripts/check-design-tokens.mjs --update-baseline`).
+7 sweep batches across `app/ui/smart` (form/display/datetime/picker/decision/ui/
+layout/interaction/quoteops), `app/ui/meta` (15 designer dialogs), `app/ui/*.tsx`,
+and `base-fields`. **G1 palette ratchet 2943 → 742** (honest light-only count after
+a gate fix that excludes `dark:`-stacked variants). The residual **742** are
+documented exceptions: decorative/categorical badge maps, brand gradients, `slate-*`
+neutrals, status `-100/-800`/`-900` shade pairs, rating stars, progress hues,
+modal overlays — all genuinely not the design-system's semantic palette.
 
-## Remaining work (resumable map — `/goal` 完成ux backlog 全部需求)
+**Dark mode (PR #726):** dsTokens gained a dark palette (grounded in app.css `.dark`
+conventions); `buildThemeCss` emits a `.dark { --color-*: … }` override block. Since
+v4 `@theme` utilities reference `var(--color-*)`, the semantic tokens auto-switch —
+no `@theme inline` refactor needed; light `@theme` unchanged.
 
-| Item               | Scope                                                                          | Status      | Notes                                                                                                                                 |
-| ------------------ | ------------------------------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| T3 smart sweep     | `app/ui/smart` (~50 files left) + `app/ui/meta` + `base-fields`                | in progress | mechanical; cheat-sheet above; lower G1 baseline per batch. RadioSideBar + the meta/\* designer dialogs are the big remaining counts. |
-| T3 dark mode       | generator → `@theme inline` + `:root`/`.dark`; drop redundant `dark:` variants | not started | needs a dark palette (derive from app.css `.dark`; record as a DDR). Light-only shipped so far.                                       |
-| T4 list renderer   | `ListPageContent` / `list/ListTable`                                           | not started | needs host-first golden stack (§2.1 Phase-0 infra gate: backend + Vite/BFF + seed).                                                   |
-| T5 form renderer   | `FormPageContent` / `FormDialog` (+ Upload interactive golden)                 | not started | host-first golden stack.                                                                                                              |
-| T6 detail renderer | `DetailPageContent`                                                            | not started | host-first golden stack.                                                                                                              |
-| T8–T10             | saved-view presets / cross-page select / aggregation·tree·import·autosave      | not started | ROI-ordered, non-blocking.                                                                                                            |
+## Session status (2026-06-17, `/goal` 完成ux backlog)
 
-> `app.app.css` `.decisionops-*` block (367 raw hex) is a self-contained migration,
-> tackle with T4.
+**DONE + MERGED:** T1 (tokens), T2 (base controls), **T3** (smart/meta/loose sweep +
+dark mode), T7 (Upload), G1+G2 (gates). 10 PRs (#707/708/709/710/712/713/720/721/724/726).
+The G1 gate now CI-enforces no-regression on both the palette and i18n burn-downs.
+
+## Remaining work (resumable — needs a fresh session + host-first golden stack)
+
+| Item               | Scope                                                                                                                             | Status      | Notes                                                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| T4 list renderer   | `ListPageContent` / `list/ListTable` (compact rows, status dots, batch bar, conditional format, saved-to-view hint)               | not started | **needs host-first golden stack** (§2.1 Phase-0: backend bootRun + Vite/BFF + seed). Real-page browser golden required. |
+| T5 form renderer   | `FormPageContent` / `FormDialog` (validation presentation, reference picker, sub-table, visibleWhen; + Upload interactive golden) | not started | host-first golden stack.                                                                                                |
+| T6 detail renderer | `DetailPageContent` (read-only/tabs/sub-table totals/timeline/state toolbar)                                                      | not started | host-first golden stack.                                                                                                |
+| T8–T10             | saved-view presets (`ListPageContent:2584`) / cross-page select / aggregation·tree·import·autosave                                | not started | ROI-ordered, non-blocking.                                                                                              |
+| T3 sweep tail      | residual 742 decorative/slate/shade-pair colors + `app.css` `.decisionops-*` (367 hex)                                            | optional    | mostly documented exceptions; tackle the slate/decisionops with T4. Gate holds the line.                                |
+
+> T4–T6 are renderer **redesigns** verified by real-browser golden against the mockup
+> (§2.2) — they require the host stack and are a multi-session effort, not a token sweep.
+> Resume: `node scripts/check-design-tokens.mjs --update-baseline` for current counts;
+> cheat-sheet above; standard `docs/standards/core/ux-design-system.md` §3/§4/§5.
 
 ## Notes / decisions
 
