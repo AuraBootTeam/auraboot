@@ -67,6 +67,11 @@ import { ListModals } from './list/ListModals';
 import { ListToolbar } from './list/ListToolbar';
 import { ListTable } from './list/ListTable';
 import { areSortsEqual, encodeSorts, decodeSorts } from './list/useListUrlState';
+import {
+  type QuickFilterPresetKey,
+  buildQuickFilterPreset,
+  isQuickFilterPresetKey,
+} from './list/quickFilterPresets';
 import { resolveListRowClickMode } from './list/rowClickNavigation';
 import { savedViewService } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
@@ -296,8 +301,10 @@ interface TenantMemberImportResult {
   errors: TenantMemberImportError[];
 }
 
-// Quick filter chip definitions
-type QuickFilterKey = 'my_records' | 'created_today' | 'modified_this_week';
+// Quick filter chip definitions — preset views (T8). Keys + filter logic live
+// in ./list/quickFilterPresets so the toolbar and the view switcher share one
+// source of truth.
+type QuickFilterKey = QuickFilterPresetKey;
 
 // List Page Content Component
 function ListPageContentInner(props: PageContentProps) {
@@ -375,6 +382,11 @@ function ListPageContentInner(props: PageContentProps) {
   const urlSorts = useMemo(() => decodeSorts(searchParams.get('sort')), [searchParams]);
   const urlKeyword = useMemo(() => searchParams.get('keyword') || '', [searchParams]);
   const urlViewPid = useMemo(() => searchParams.get('view') || null, [searchParams]);
+  // Active preset view (?preset=created_today) — persists across reload.
+  const urlPreset = useMemo<QuickFilterKey | null>(() => {
+    const raw = searchParams.get('preset');
+    return isQuickFilterPresetKey(raw) ? raw : null;
+  }, [searchParams]);
 
   // Search keyword for toolbar search input
   const [keyword, _setKeyword] = useState(urlKeyword);
@@ -587,6 +599,9 @@ function ListPageContentInner(props: PageContentProps) {
   );
   const { formats: dateTimeFormats, timezone: effectiveTimezone } = useTimezone();
   const pendingSavedViewFiltersRef = useRef<Record<string, any> | null>(null);
+  // When restoring a preset view from ?preset= on mount, skip the first run of
+  // the debounced sort/filter effect so it doesn't re-fetch with empty filters.
+  const skipFirstSortFilterEffectRef = useRef(false);
   const loadDataRef = useRef<
     | ((params?: { page?: number; size?: number; filters?: Record<string, any> }) => Promise<void>)
     | null
@@ -601,6 +616,10 @@ function ListPageContentInner(props: PageContentProps) {
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
   const hideSavedViews =
     listExtensions?.hideSavedViews ?? Boolean(schemaExtension.hideSavedViews || skipListData);
+  // Quick-filter / preset-view visibility (shared by the header preset bar and
+  // the toolbar quick filters so both stay in sync).
+  const hideQuickFilters =
+    listExtensions?.hideQuickFilters ?? Boolean(schemaExtension.hideQuickFilters);
   const {
     views: savedViews,
     currentView,
@@ -1139,7 +1158,26 @@ function ListPageContentInner(props: PageContentProps) {
   // Pass current filters (which may include URL filter_* params) for the first load
   useEffect(() => {
     if (schema && !skipListData) {
-      loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+      // Restore an active preset view from ?preset= so it survives reload —
+      // a SavedView (?view=) takes precedence and carries its own filters.
+      const initialPreset = urlViewPid ? null : urlPreset;
+      if (initialPreset) {
+        const presetFilters =
+          buildQuickFilterPreset(initialPreset, { userId: user?.id, now: new Date() }) ?? {};
+        setActiveQuickFilter(initialPreset);
+        setFilters(presetFilters);
+        // The debounced sort/filter effect would otherwise re-fetch once on
+        // mount with the still-empty `filters` state and clobber this preset
+        // load — skip exactly that first run so the preset filter wins.
+        skipFirstSortFilterEffectRef.current = true;
+        loadDataRef.current?.({
+          page: pagination.current - 1,
+          size: pagination.pageSize,
+          filters: presetFilters,
+        });
+      } else {
+        loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+      }
     }
     // Intentionally only react to schema changes.
     // Pagination or filter updates are handled by explicit user actions.
@@ -1479,6 +1517,12 @@ function ListPageContentInner(props: PageContentProps) {
 
   useEffect(() => {
     if (!schema || skipListData) return;
+    // Preset restore (?preset=) already issued the filtered load on mount; skip
+    // this first debounced run so it doesn't clobber it with empty filters.
+    if (skipFirstSortFilterEffectRef.current) {
+      skipFirstSortFilterEffectRef.current = false;
+      return;
+    }
     loadData({ page: 0, size: pagination.pageSize, filters });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSortFilterValues, skipListData]);
@@ -2580,40 +2624,44 @@ function ListPageContentInner(props: PageContentProps) {
     [ensureViewAndUpdateConfig],
   );
 
-  // Quick filter handler — toggle on/off, apply filter and reload
+  // Sync the active preset view to the URL (?preset=created_today) so it
+  // survives reload; pass null to clear it.
+  const syncPresetToUrl = useCallback(
+    (key: QuickFilterKey | null) => {
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (key) {
+            p.set('preset', key);
+          } else {
+            p.delete('preset');
+          }
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  // Quick filter handler — toggle a preset view on/off, apply its filter, reload.
   const handleQuickFilter = useCallback(
     (key: QuickFilterKey) => {
       if (activeQuickFilter === key) {
-        // Toggle off — clear filter and reload
+        // Toggle off — clear preset filter and reload
         setActiveQuickFilter(null);
         setFilters({});
+        syncPresetToUrl(null);
         loadData({ page: 0, size: pagination.pageSize, filters: {} });
         return;
       }
+      const qf = buildQuickFilterPreset(key, { userId: user?.id, now: new Date() }) ?? {};
       setActiveQuickFilter(key);
-      const today = new Date().toISOString().split('T')[0];
-      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
-      let qf: Record<string, any> = {};
-      switch (key) {
-        case 'my_records':
-          if (user?.id) {
-            const createdBy = Number.parseInt(String(user.id), 10);
-            if (!Number.isNaN(createdBy)) {
-              qf = { created_by: createdBy };
-            }
-          }
-          break;
-        case 'created_today':
-          qf = { created_at: { start: today, end: today + 'T23:59:59' } };
-          break;
-        case 'modified_this_week':
-          qf = { updated_at: { start: weekAgo, end: today + 'T23:59:59' } };
-          break;
-      }
       setFilters(qf);
+      syncPresetToUrl(key);
       loadData({ page: 0, size: pagination.pageSize, filters: qf });
     },
-    [activeQuickFilter, user, setFilters, loadData, pagination.pageSize],
+    [activeQuickFilter, user, setFilters, syncPresetToUrl, loadData, pagination.pageSize],
   );
 
   // Save current filters to SavedView
@@ -2859,6 +2907,9 @@ function ListPageContentInner(props: PageContentProps) {
             evaluateVisible={evaluateButtonVisible}
             onImport={() => setImportOpen(true)}
             onExport={handleExport}
+            activePreset={activeQuickFilter}
+            onSelectPreset={handleQuickFilter}
+            hidePresetViews={hideQuickFilters}
             exportFilters={exportFilterConditions}
             isTenantMemberPage={isTenantMemberPage}
             onInvite={() => setInviteDialogOpen(true)}
@@ -3449,9 +3500,7 @@ function ListPageContentInner(props: PageContentProps) {
                   setChipFilters([]);
                   setActiveSorts([]);
                 }}
-                hideQuickFilters={
-                  listExtensions?.hideQuickFilters ?? Boolean(schemaExtension.hideQuickFilters)
-                }
+                hideQuickFilters={hideQuickFilters}
                 hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
                 hideColumnSettings={
                   listExtensions?.hideColumnSettings ?? Boolean(schemaExtension.hideColumnSettings)
