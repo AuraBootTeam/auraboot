@@ -1,0 +1,163 @@
+---
+type: backlog
+status: active
+created: 2026-06-17
+---
+
+# BPMN 流程设计器 + 后端 SmartEngine 联动 — 完整方案与 Gap(黄金交付)
+
+> 目标(用户 goal):针对 BPMN 设计器与后端 SmartEngine 联动,分析现有**测试覆盖度**与**页面 UX 交互性**(每个组件 / 每个属性 / 每个行动点 / 每个视觉反馈),输出完整方案与 gap,然后修复全部 gap 到黄金交付。
+>
+> 工作区:`auraboot/.worktrees/bpmn-designer-golden`(分支 `feat/bpmn-designer-golden`,基于 `origin/main` `a46566055`)。
+> 本文件是 `/aura-endgame` 流水线的 P1(终局)+ P2(gap)+ P3(一致性)+ P4(覆盖矩阵)合并交付物 + 长存 tracker。
+
+---
+
+## 0. 终局态(P1)
+
+BPMN 流程设计器是 production-ready 的可视化流程编排器,**已具备完整功能纵深**(非 MVP)。终局态 = 在现有功能基础上达到:
+
+1. **每个组件 / 属性 / 行动点 / 视觉反馈都有黄金级测试覆盖**:真浏览器驱动真实交互(palette 拖拽、属性面板表单编辑、toolbar 每个按钮),断言状态变化 + 保存 payload + reload 回显 + 后端部署/运行时,截图复核。
+2. **后端真栈测试无假通过**:消除 `assumeTrue(false)` 静默 skip、注释掉的核心服务测试,集成测试 ≥80% 真栈 happy-path。
+3. **UX 视觉反馈闭环**:校验错误在画布上节点级高亮;空/加载/错误态、二级入口完整。
+4. **设计器↔后端 seam 成对验证**:保存 → 部署 → 运行时每个行动点都有 browser evidence + backend evidence。
+
+### 系统架构终局(已实测确认,见 §1)
+
+- 前端:`web-admin/app/plugins/core-designer/components/bpmn-designer/`(ReactFlow/@xyflow legacy 内核)+ 共享 `flow-designer-sdk` store(经 `useBpmFlowStore` adapter)。
+- 后端:SmartEngine 4.0.0 AuraBoot fork 真引擎直连;`ProcessEngineService`(运行时)/ `ProcessDeploymentService`(部署)/ `TaskService`(任务)。
+- 契约:设计器存 **JSON DSL(designerJson)**,后端 `JsonToBpmnConverter` 编译成 BPMN 2.0 XML;回显靠存储的 designerJson(非 XML 反解,`BpmnToJsonConverter` 是 test-only 孤儿)。
+- 持久化:`ab_bpm_*`(定义/钩子/审计/规则)+ SmartEngine `se_*`(实例/任务/执行/变量,**非** Activiti `act_`)。
+
+---
+
+## 1. 现状穷举清单(P1 盘自家底 — 取证)
+
+### 1.1 前端组件树
+| 组件 | 职责 | 文件 |
+|------|------|------|
+| BPMNDesigner | 入口 `/bpmn-designer` | `bpmn-designer/BPMNDesigner.tsx:43` |
+| BPMNToolbar | name/key + 状态徽章 + 11 行动点 | `components/BPMNToolbar.tsx:30` |
+| BPMNPalette | 9 节点拖入,3 分组 | `components/BPMNPalette.tsx:29` |
+| BPMNCanvas | @xyflow 画布,HTML5 DnD | `components/BPMNCanvas.tsx:69` |
+| BPMNPropertyPanel | 属性面板 dispatcher | `components/BPMNPropertyPanel.tsx:56` |
+| SaveDialog | 保存对话框 + 字段校验 | `components/SaveDialog.tsx:42` |
+| ProcessStatusBadge | draft/published/suspended 徽章 | `components/ProcessStatusBadge.tsx:43` |
+| ProcessMetadataPanel | 流程级元数据(withdraw/cc policy) | `property-editors/ProcessMetadataPanel.tsx:16` |
+| ProcessStatusViewer | 独立运行态查看器 | `components/ProcessStatusViewer.tsx:68` |
+
+### 1.2 节点类型(canvas 注册 12 type / 9 组件)
+palette 9 项:startEvent / endEvent / userTask / serviceTask / receiveTask / exclusiveGateway / parallelGateway / inclusiveGateway / callActivity。
+import-only 3 委派 type(无 palette、无专属 editor,复用 ServiceTaskNode):rule-task / notification-task / record-update-task。
+边:`conditional`(ConditionalEdge)。
+
+### 1.3 属性编辑器(每节点每属性)
+- ProcessMetadataPanel:name / processKey / description / category(datalist)/ withdrawPolicy / ccPolicy
+- StartEventEditor:description / initiator / formKey
+- EndEventEditor:description / terminateAll
+- UserTaskEditor(最复杂):description / assignee.type(user/role/dept/starter/expression)+ AssigneePicker(远程多选)/ assigneeMode / assignmentRuleBinding(RuleCenterBindingSection)/ priority / skipable / dueDate / MultiInstanceSection / FormBindingSection / HookConfigSection / requiredPermissions / ccPolicyOverride
+- ServiceTaskEditor:serviceType(http/java/script/command)条件字段 + async + HookConfigSection
+- ReceiveTaskEditor:description + messageRef/messageType(**🔒 GAP-252 disabled readOnly**)
+- ExclusiveGatewayEditor:defaultFlow + 出边条件汇总 + RuleCenterBindingSection
+- InclusiveGatewayEditor:defaultFlow + completionCondition(**🔒 GAP-252 disabled readOnly**)+ RuleCenterBindingSection
+- ParallelGatewayEditor:description only
+- EdgeEditor:label + ConditionExpressionEditor(simple 9 操作符 + AND/OR / advanced MVEL/JUEL/script)+ isDefault
+- CallActivityEditor:calledProcessKey(ProcessPicker)+ version + 变量映射
+- 折叠 section:MultiInstanceSection / FormBindingSection(PagePicker + VariableMapping + FieldPermission)/ HookConfigSection(http/script/command 三子配置)
+
+### 1.4 Toolbar 行动点(11)
+name / key 输入 · Undo · Redo · Save(→ 校验 → SaveDialog)· Validate · Import(file → JSON)· Export(Blob 下载,纯前端)· Version History · Deploy · Monitor 切换。键盘:Ctrl+Z/Y/S;Canvas Delete/Backspace。
+
+### 1.5 视觉反馈
+ProcessStatusBadge · dirty/saving 标 · 校验红 banner(前 3 条 error)· 历史版本黄 banner · 监控 indigo 条 · 节点监控高亮(active 蓝 pulse / completed 绿 ✓ / idle opacity-50)· 空/加载/错误态 · 拖放 ring 反馈。
+
+### 1.6 后端 seam 端点(全 ✅,`bpmnService.ts` + `ProcessDefinitionController`/`ProcessInstanceController`/`TaskController`)
+列表/读取/创建/更新/删除/部署/挂起/恢复/取 BPMN XML/实例状态/任务全套。
+
+---
+
+## 2. Gap 清单(P2 — 优先级 + 验收方式)
+
+> 图例:🔴 HIGH / 🟡 MED / ⚪ LOW · [FE]前端 [BE]后端 [E2E]测试 [SEAM]联动
+
+### A. 测试覆盖 gap(用户核心 ask)
+
+| ID | 优先级 | 域 | gap | 证据 | 验收 |
+|----|--------|----|-----|------|------|
+| G-T1 | 🔴 | [E2E] | `bpm-designer/` golden 全走 `__bpmDesigner` 钩子构图,绕过**真实 palette 拖拽 + 真实属性面板表单编辑**(仅 BD-005/BD-020 smoke) | `helpers/designer-dsl.ts:162-203` | 新增真 UI 交互 golden:真拖拽 9 节点 + 真属性面板编辑 → 保存 payload 含配置 → reload 回显;截图 |
+| G-T2 | 🔴 | [E2E] | Import / Export 按钮**前后端零测试** | toolbar 有按钮,无 spec | golden:Export 下载文件名 `<key>.json` + 内容含 nodes/edges;Import 回填画布 |
+| G-T3 | 🔴 | [BE] | **40 处 `assumeTrue(false, "SmartEngine not available")` catch-块静默 skip** + 2 个核心服务测试整文件注释 | `BpmTaskOperationTest`(18)/`ProcessOrchestrationServiceExtTest`(9)/`TriggerServiceTest`/`CallbackServiceTest`/`BpmTaskActionsFallbackTest`;`ProcessEngineServiceTest.java`、`TenantAwareProcessEngineServiceTest.java` 整文件注释 | 移除静默 skip → 真栈断言;恢复 2 个服务测试或说明替代覆盖 |
+| G-T4 | 🟡 | [E2E] | Validate / Undo / Redo / Monitor **无真 UI E2E** | 仅 store 单测 + BD-010 smoke | golden:非法图 → Validate → 红 banner + error 数;Undo/Redo 状态回退;Monitor 切换 |
+| G-T5 | 🟡 | [E2E] | 每属性编辑器真表单编辑 → 保存 payload → reload 回显(目前仅 node-property-matrix 部分真 fill) | `designer-node-property-matrix.spec.ts` | 扩展属性面板真 fill 矩阵 |
+| G-T6 | ⚪ | [BE] | 顺序多实例真 happy-path `@Disabled`(上游 fork 缺陷) | `BpmMultiInstanceSequentialTest:133,220` | BLOCKED-UPSTREAM,记录;不阻断 |
+
+### B. UX 交互 / 视觉反馈 gap
+
+| ID | 优先级 | 域 | gap | 证据 | 验收 |
+|----|--------|----|-----|------|------|
+| G-U1 | 🟡 | [FE] | **校验错误无画布节点级高亮**(error 携带 nodeId 但仅红 banner + toast) | `BPMNDesigner.tsx:469`;`runBpmnValidation` error 带 nodeId | 校验失败时画布对应节点描红/高亮 + 单测 + golden 截图 |
+| G-U2 | ⚪ | [FE] | service-delegate 节点(rule/notification/record-update)无 palette 入口 + 无专属 editor | canvas 注册了 type 但无 UI 路径 | 决策:补 palette+editor 或文档化"仅 import" |
+| G-U3 | ⚪ | [FE] | 版本回滚 no-op(VersionHistoryPanel 回滚对 BPMN 无效) | `BPMNDesigner.tsx:80` | UX:回滚按钮对 BPMN 禁用/隐藏 + 说明,或实现 |
+| G-U4 | ⚪ | [FE] | 校验 error/warning 区分不足;无"跳到错误节点" | 红 banner 仅文字 | banner error 可点击定位节点(配合 G-U1) |
+
+### C. 后端联动 gap
+
+| ID | 优先级 | 域 | gap | 证据 | 验收 |
+|----|--------|----|-----|------|------|
+| G-B1 | 🟡 | [SEAM] | **无服务端 designerJson 预校验/preview 端点**;校验只在 deploy 时隐式发生,root cause 易被引擎吞 | grep 确认无 `/validate`(BPMN);`ProcessDeploymentService:491` 包 BusinessException | 加 `POST /api/bpm/process-definitions/validate`:编译 designerJson 返结构化错误(不部署)+ 前端 Validate 接它 |
+| G-B2 | 🟡 | [BE] | `JsonToBpmnConverter` 未知节点类型**静默 skip + log.warn** → designerJson 含不支持节点被默默丢弃 | `JsonToBpmnConverter.java:322-324` | 未知 type 抛 `BpmnConversionException`(带 nodeId)+ 单测 |
+| G-B3 | ⚪ | [BE] | deploy 失败 root cause 被 SmartEngine 吞,`BusinessException` 仅透传 message | `ProcessDeploymentService:491` | 部署失败时记录注入后 BPMN + cause 链到日志 |
+| G-B4 | ⚪ | [BE] | `BpmAttachmentController` 是 stub | 类注释 stub | 文档化/backlog,不阻断 |
+
+---
+
+## 3. 覆盖矩阵(P4 — 行动点 → 当前覆盖 → 目标)
+
+| 能力维度 | 当前 | 目标(本轮) | 实现路线 |
+|---------|------|-----------|---------|
+| Palette 真拖拽(9 节点) | smoke only | 真 UI golden 每类型 | E2E real drag |
+| 属性面板真表单编辑(每编辑器) | 部分真 fill | 真 fill 矩阵 + 回显 | E2E real fill |
+| Save 按钮 | 真 + IT | 保持 | — |
+| Deploy 按钮 | 真 + IT | 保持 | — |
+| Validate 按钮 | smoke | golden(非法/合法)+ 节点高亮 + 服务端端点 | FE+BE+E2E |
+| Import / Export | ❌ 零测试 | golden(文件名+内容+回填) | E2E |
+| Undo / Redo | store 单测 | 真 UI golden | E2E |
+| Monitor 模式 | hook 单测 | 真实例监控 golden | E2E |
+| 校验视觉反馈(节点高亮) | ❌ | 实现 + 单测 + 截图 | FE |
+| 后端任务流转真栈 | 40 处假 skip | 真断言无静默 skip | BE |
+| 未知节点处理 | 静默丢弃 | 抛错 + 单测 | BE |
+| 服务端预校验 | ❌ | `/validate` 端点 + IT | BE+SEAM |
+
+---
+
+## 4. 执行计划(P5 — slice 化,TDD + golden)
+
+- **S0 infra Phase 0 gate**:host-first 起 OSS backend(dev.sh runtime,独立 slot)+ Vite/BFF + Playwright(零 docker)。验证 `/actuator/health`、seed JWT、`/bpmn-designer` 可达。
+- **S1 [BE] 假通过清理(G-T3)**:消除 40 处 `assumeTrue(false)` 静默 skip → 真断言;恢复/说明 2 个注释服务测试。跑真栈验证。
+- **S2 [BE] 转换器健壮性(G-B2)+ 服务端预校验端点(G-B1)**:未知节点抛错 + `/validate` 端点。单测 + IT。
+- **S3 [FE] 校验视觉反馈(G-U1/G-U4)**:画布节点级高亮 + banner 可点击定位 + 前端 Validate 接 `/validate` 端点。vitest + golden 截图。
+- **S4 [E2E] 真 UI golden(G-T1/G-T2/G-T4/G-T5)**:palette 真拖拽 + 属性面板真表单 + Import/Export + Validate/Undo/Redo/Monitor。截图复核。
+- **S5 决策项(G-U2/G-U3)**:service-delegate 节点 palette/editor 或文档化;版本回滚 UX。
+- **RV 完成前全量复核**:`/e2e-feature-coverage` + `/e2e-truth` + 五项证据 + 截图。
+
+### 已知 BLOCKED(记录,不阻断流水线)
+- G-T6 顺序多实例:上游 SmartEngine fork 缺陷(`@Disabled` SEQ-MI-GAP-1/2),标 BLOCKED-UPSTREAM。
+- GAP-252 receiveTask message / inclusiveGateway completionCondition:SmartEngine 无 parser,UI 已 disabled readOnly + 文案,保持。
+
+---
+
+## 进度
+
+- [x] P0 上下文校准 + worktree 隔离
+- [x] P1 终局对齐 + 盘自家底(本文件 §0/§1)
+- [x] P2 gap 分析(本文件 §2)
+- [x] P3 一致性核对(终局/UX/gap 自洽,无悬空引用)
+- [x] P4 覆盖矩阵(本文件 §3)
+- [ ] S0 infra Phase 0 gate
+- [ ] S1 BE 假通过清理(G-T3)
+- [ ] S2 BE 转换器健壮 + 预校验端点(G-B1/G-B2)
+- [ ] S3 FE 校验视觉反馈(G-U1/G-U4)
+- [ ] S4 E2E 真 UI golden(G-T1/T2/T4/T5)
+- [ ] S5 决策项(G-U2/G-U3)
+- [ ] RV 完成前全量复核 + 复核文档
+- [ ] P6 复盘固化 + 收口 merge
