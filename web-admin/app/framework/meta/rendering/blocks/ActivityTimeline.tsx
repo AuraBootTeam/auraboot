@@ -103,10 +103,10 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   if (loading) {
     return (
       <div
-        className="flex items-center justify-center py-12 text-gray-400"
+        className="text-text-3 flex items-center justify-center py-12"
         data-testid="activity-timeline-loading"
       >
-        <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+        <div className="rounded-pill border-border-strong mr-2 h-5 w-5 animate-spin border-2 border-t-blue-500" />
         {locale === 'zh-CN' ? '加载活动记录...' : 'Loading activities...'}
       </div>
     );
@@ -114,7 +114,10 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
   if (error) {
     return (
-      <div className="py-8 text-center text-sm text-red-500" data-testid="activity-timeline-error">
+      <div
+        className="text-status-red py-8 text-center text-sm"
+        data-testid="activity-timeline-error"
+      >
         {error}
       </div>
     );
@@ -122,7 +125,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
   if (activities.length === 0) {
     return (
-      <div className="py-12 text-center text-sm text-gray-400" data-testid="activity-timeline-empty">
+      <div className="text-text-3 py-12 text-center text-sm" data-testid="activity-timeline-empty">
         {locale === 'zh-CN' ? '暂无活动记录' : 'No activities yet'}
       </div>
     );
@@ -141,8 +144,8 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
           <div key={group.date}>
             {/* Date header */}
             <div className="relative mb-3">
-              <div className="absolute top-0.5 -left-10 h-3 w-3 rounded-full border-2 border-gray-300 bg-white" />
-              <span className="text-xs font-medium tracking-wide text-gray-400 uppercase">
+              <div className="rounded-pill border-border-strong bg-panel absolute top-0.5 -left-10 h-3 w-3 border-2" />
+              <span className="text-text-3 text-xs font-medium tracking-wide uppercase">
                 {formatDateHeader(group.date, locale)}
               </span>
             </div>
@@ -168,29 +171,29 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                     {/* Timeline dot */}
                     <div className={`absolute top-1.5 -left-10 h-3 w-3 rounded-full ${dotColor}`} />
 
-                    <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                    <div className="rounded-card bg-subtle border border-gray-100 px-4 py-3">
                       {/* Header: icon + type badge + actor + time */}
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="flex-shrink-0 text-gray-400">{icon}</span>
+                        <span className="text-text-3 flex-shrink-0">{icon}</span>
                         <ActivityTypeBadge type={activityType} locale={locale} />
-                        <span className="font-medium text-gray-700">{actorLabel}</span>
+                        <span className="text-text-2 font-medium">{actorLabel}</span>
                         {actorType === 'agent' && (
                           <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
                             AI
                           </span>
                         )}
-                        <span className="text-gray-300">&middot;</span>
-                        <time className="text-xs text-gray-400" title={activity.occurredAt}>
+                        <span className="text-text-3">&middot;</span>
+                        <time className="text-text-3 text-xs" title={activity.occurredAt}>
                           {formatTime(activity.occurredAt)}
                         </time>
                       </div>
 
                       {/* Subject */}
-                      {subject && <p className="mt-1.5 text-sm text-gray-800">{subject}</p>}
+                      {subject && <p className="text-text mt-1.5 text-sm">{subject}</p>}
 
                       {/* Content */}
                       {content && (
-                        <p className="mt-1 text-xs whitespace-pre-wrap text-gray-500">{content}</p>
+                        <p className="text-text-2 mt-1 text-xs whitespace-pre-wrap">{content}</p>
                       )}
 
                       {/* Metadata (state transitions) */}
@@ -245,7 +248,9 @@ function normalizeActivityType(type: string | null | undefined): string {
 }
 
 function normalizeActorType(type: string | null | undefined): string {
-  return String(type ?? '').trim().toLowerCase();
+  return String(type ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function resolveActorLabel(activity: ActivityRecord, locale: string): string {
@@ -295,7 +300,7 @@ function MetadataDisplay({ metadata, locale }: { metadata: string; locale: strin
         <div className="mt-1.5 flex items-center gap-1.5 text-xs">
           <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">{fromState}</span>
           <svg
-            className="h-3 w-3 flex-shrink-0 text-gray-400"
+            className="text-text-3 h-3 w-3 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             strokeWidth={2}
@@ -314,7 +319,7 @@ function MetadataDisplay({ metadata, locale }: { metadata: string; locale: strin
       parsed.changedFields.length > 0
     ) {
       return (
-        <div className="mt-1 text-xs text-gray-400">
+        <div className="text-text-3 mt-1 text-xs">
           {locale === 'zh-CN'
             ? `${parsed.changedFields.length} 个字段变更`
             : `${parsed.changedFields.length} field(s) changed`}

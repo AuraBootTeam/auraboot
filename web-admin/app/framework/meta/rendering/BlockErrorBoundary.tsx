@@ -36,11 +36,11 @@ export class BlockErrorBoundary extends Component<
     if (this.state.hasError) {
       return (
         <div
-          className="rounded-lg border border-red-200 bg-red-50 p-4"
+          className="rounded-card bg-status-red-bg border border-red-200 p-4"
           data-testid="block-error-boundary"
         >
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 text-red-500">
+            <div className="text-status-red flex-shrink-0">
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -56,18 +56,18 @@ export class BlockErrorBoundary extends Component<
                   {this.props.blockType}
                 </code>
                 {this.props.blockId && (
-                  <span className="ml-1 text-red-500">({this.props.blockId})</span>
+                  <span className="text-status-red ml-1">({this.props.blockId})</span>
                 )}
               </p>
               {this.state.error && (
-                <p className="mt-1 truncate font-mono text-xs text-red-600">
+                <p className="text-status-red mt-1 truncate font-mono text-xs">
                   {this.state.error.message}
                 </p>
               )}
             </div>
             <button
               onClick={this.handleRetry}
-              className="flex-shrink-0 rounded-md bg-red-100 px-3 py-1.5 text-sm font-medium text-red-800 transition-colors hover:bg-red-200"
+              className="rounded-control flex-shrink-0 bg-red-100 px-3 py-1.5 text-sm font-medium text-red-800 transition-colors hover:bg-red-200"
             >
               Retry
             </button>

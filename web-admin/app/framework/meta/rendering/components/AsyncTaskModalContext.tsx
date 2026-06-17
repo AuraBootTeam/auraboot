@@ -52,9 +52,7 @@ export function AsyncTaskModalProvider({ children }: { children: React.ReactNode
     () => ({ activeTask, setActiveTask, clearActiveTask, minimized, setMinimized }),
     [activeTask, setActiveTask, clearActiveTask, minimized],
   );
-  return (
-    <AsyncTaskModalContext.Provider value={value}>{children}</AsyncTaskModalContext.Provider>
-  );
+  return <AsyncTaskModalContext.Provider value={value}>{children}</AsyncTaskModalContext.Provider>;
 }
 
 /** Renders the modal, or a compact chip when minimized, from the shared sink. */
@@ -63,7 +61,8 @@ export function AsyncTaskModalHost() {
   if (!sink || !sink.activeTask) return null;
   const task = sink.activeTask;
   if (sink.minimized) {
-    const terminal = task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled';
+    const terminal =
+      task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled';
     const live = parseProgressMessage(task.progressMessage);
     const label = terminal
       ? task.status === 'completed'
@@ -77,9 +76,11 @@ export function AsyncTaskModalHost() {
         type="button"
         data-testid="async-task-chip"
         onClick={() => sink.setMinimized(false)}
-        className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 shadow-lg hover:bg-blue-50"
+        className="rounded-pill bg-panel text-accent hover:bg-accent-weak fixed right-4 bottom-4 z-50 flex items-center gap-2 border border-blue-200 px-4 py-2 text-sm font-medium shadow-lg"
       >
-        <span className={`inline-block h-2 w-2 rounded-full ${terminal ? 'bg-green-500' : 'animate-pulse bg-blue-500'}`} />
+        <span
+          className={`inline-block h-2 w-2 rounded-full ${terminal ? 'bg-green-500' : 'animate-pulse bg-blue-500'}`}
+        />
         {label}
       </button>
     );

@@ -35,7 +35,7 @@ export const FormBlockRenderer: React.FC<FormBlockRendererProps> = ({ block, run
     const title = getLocalizedText(block.title, locale, t);
     return (
       <div className="mb-4">
-        <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+        <h3 className="text-text text-lg font-medium">{title}</h3>
       </div>
     );
   };

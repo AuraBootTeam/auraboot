@@ -40,7 +40,7 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
   };
 
   return (
-    <div className="filters-block border-b border-gray-200 bg-gray-50 px-6 py-4">
+    <div className="filters-block border-border bg-subtle border-b px-6 py-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {fields.map((field) => (
           <FieldRenderer key={field.field} field={field} runtime={runtime} />
@@ -50,14 +50,14 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
         <button
           onClick={handleReset}
           data-testid="filter-btn-reset"
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-600 hover:bg-gray-50"
+          className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-subtle border px-4 py-2"
         >
           {t('action.reset') !== 'action.reset' ? t('action.reset') : 'Reset'}
         </button>
         <button
           onClick={handleSearch}
           data-testid="filter-btn-search"
-          className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+          className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-white"
         >
           {t('action.search') !== 'action.search' ? t('action.search') : 'Search'}
         </button>

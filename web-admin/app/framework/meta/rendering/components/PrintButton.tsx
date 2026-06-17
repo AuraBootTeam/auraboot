@@ -21,7 +21,7 @@ export function PrintButton({ title }: PrintButtonProps) {
     <button
       type="button"
       onClick={() => window.print()}
-      className="print-hide inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none"
+      className="print-hide rounded-control border-border-strong bg-panel text-text-2 hover:bg-subtle focus-visible:shadow-focus inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-medium focus:outline-none"
       data-print="hide"
       title={title ? `${label}: ${title}` : label}
     >

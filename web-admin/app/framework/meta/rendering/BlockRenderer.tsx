@@ -22,7 +22,11 @@ export interface BlockRendererProps {
   areaId: string;
 }
 
-export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, runtime, areaId: _areaId }) => {
+export const BlockRenderer: React.FC<BlockRendererProps> = ({
+  block,
+  runtime,
+  areaId: _areaId,
+}) => {
   const context = runtime.getContext();
   const profile = useProfileSafe();
 
@@ -45,7 +49,7 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, runtime, ar
     'filter-form': 'filters',
     'list-tabs': 'tabs',
     'toolbar-buttons': 'toolbar',
-    'action': 'custom',
+    action: 'custom',
   };
   if (blockType in DEPRECATED_BLOCK_TYPE_ALIASES) {
     throw new Error(
@@ -78,7 +82,7 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, runtime, ar
     if (!block.component) {
       return (
         <BlockErrorBoundary blockType={blockType} blockId={block.id}>
-          <div className="rounded border border-red-300 bg-red-50 p-4">
+          <div className="border-status-red bg-status-red-bg rounded border p-4">
             <p className="text-red-800">Custom block missing component</p>
           </div>
         </BlockErrorBoundary>
@@ -105,7 +109,7 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, runtime, ar
     // feedback_g1_init_registry_bootstrap).
     console.warn(`[BlockRenderer] Unknown block type: ${blockType}`);
     return (
-      <div className="rounded border border-yellow-300 bg-yellow-50 p-4">
+      <div className="bg-status-amber-bg rounded border border-yellow-300 p-4">
         <p className="text-yellow-800">Unknown block type: {blockType}</p>
       </div>
     );

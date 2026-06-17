@@ -54,7 +54,7 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
   if (rows.length === 0) {
     return (
       <div
-        className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-500"
+        className="rounded-control border-border bg-panel text-text-2 border p-4 text-sm"
         data-testid="candidate-list-empty"
       >
         {t('common.noData') !== 'common.noData' ? t('common.noData') : 'No data'}
@@ -86,14 +86,14 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
                 setSelectedKey(rowKey);
                 if (bindKey) writeRuntimeState(runtime, bindKey, row);
               }}
-              className={`w-full rounded-lg border p-3 text-left ${
-                active ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+              className={`rounded-card w-full border p-3 text-left ${
+                active ? 'bg-accent-weak border-blue-400' : 'border-border bg-panel hover:bg-subtle'
               }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-mono text-sm font-semibold text-gray-900">{String(title)}</div>
-                  {subtitle && <div className="mt-1 text-sm text-gray-700">{String(subtitle)}</div>}
+                  <div className="text-text font-mono text-sm font-semibold">{String(title)}</div>
+                  {subtitle && <div className="text-text-2 mt-1 text-sm">{String(subtitle)}</div>}
                 </div>
                 {score !== undefined && (
                   <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
@@ -114,14 +114,16 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
                         className={fullWidth ? 'sm:col-span-2' : undefined}
                         data-testid={`candidate-list-item-${rowKey}-field-${fieldKey}`}
                       >
-                        <dt className="text-gray-500">{label}</dt>
-                        <dd className="mt-0.5 break-words text-gray-800">{value}</dd>
+                        <dt className="text-text-2">{label}</dt>
+                        <dd className="text-text mt-0.5 break-words">{value}</dd>
                       </div>
                     );
                   })}
                 </dl>
               ) : (
-                description && <div className="mt-2 break-words text-sm text-gray-600">{String(description)}</div>
+                description && (
+                  <div className="text-text-2 mt-2 text-sm break-words">{String(description)}</div>
+                )
               )}
             </button>
           );
@@ -148,14 +150,16 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
                 data-testid={`candidate-list-action-${actionConfig.code}`}
                 disabled={disabled}
                 onClick={() => {
-                  void executeSimpleWorkbenchAction(runtime, actionConfig.onClick).catch((error) => {
-                    console.error('[CandidateListBlockRenderer] action failed:', error);
-                  });
+                  void executeSimpleWorkbenchAction(runtime, actionConfig.onClick).catch(
+                    (error) => {
+                      console.error('[CandidateListBlockRenderer] action failed:', error);
+                    },
+                  );
                 }}
-                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                className={`rounded-control px-3 py-2 text-sm font-medium ${
                   actionConfig.variant === 'secondary'
-                    ? 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                    ? 'border-border-strong bg-panel text-text-2 hover:bg-subtle border'
+                    : 'bg-accent hover:bg-accent-hover text-white'
                 } disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {label}

@@ -36,7 +36,7 @@ export interface InlineEditCellProps {
 }
 
 const inputClass =
-  'w-full px-2 py-1 text-sm border border-blue-400 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white';
+  'w-full px-2 py-1 text-sm border border-blue-400 rounded focus:outline-none focus-visible:shadow-focus bg-panel';
 
 export const InlineEditCell: React.FC<InlineEditCellProps> = ({
   column,
@@ -225,7 +225,7 @@ export const InlineEditCell: React.FC<InlineEditCellProps> = ({
         handleDoubleClick();
       }}
       onClick={(e) => e.stopPropagation()}
-      className="-mx-1 min-h-[24px] cursor-text rounded px-1 transition-colors hover:bg-blue-50"
+      className="hover:bg-accent-weak -mx-1 min-h-[24px] cursor-text rounded px-1 transition-colors"
       title="Double-click to edit"
       data-testid={`inline-edit-cell-${column.field}`}
     >

@@ -4,7 +4,10 @@
  */
 
 import React, { useState, useEffect, type ComponentType } from 'react';
-import { componentRegistry, initializeComponentRegistry } from '~/framework/meta/registry/components';
+import {
+  componentRegistry,
+  initializeComponentRegistry,
+} from '~/framework/meta/registry/components';
 import { getRuntimeComponentEntry } from '~/framework/meta/rendering/components/runtime-component-loaders';
 import Input from '~/ui/smart/form/Input';
 import NumberInput from '~/ui/smart/form/NumberInput';
@@ -171,7 +174,7 @@ export const ComponentLoader: React.FC<ComponentLoaderProps> = ({
       fallback || (
         <div className="flex items-center justify-center p-4">
           <span className="loading loading-spinner loading-sm"></span>
-          <span className="ml-2 text-sm text-gray-500">Loading {componentName}...</span>
+          <span className="text-text-2 ml-2 text-sm">Loading {componentName}...</span>
         </div>
       )
     );
