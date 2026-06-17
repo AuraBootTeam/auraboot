@@ -10,12 +10,18 @@ import {
   useNodeMonitorStatus,
   getMonitorStatusClasses,
 } from '~/plugins/core-designer/components/bpmn-designer/hooks/useNodeMonitorStatus';
+import {
+  useNodeValidationStatus,
+  resolveNodeStateClasses,
+} from '~/plugins/core-designer/components/bpmn-designer/hooks/useNodeValidationStatus';
 import { useBpmFlowStore } from '~/plugins/core-designer/components/bpm-designer-sdk/store/useBpmFlowStore';
 
 export const UserTaskNode = memo(({ id, data, selected }: NodeProps<BPMNNode>) => {
   const style = BPMN_NODE_STYLES[BPMNNodeType.USER_TASK];
   const monitorStatus = useNodeMonitorStatus(id);
   const monitorClasses = getMonitorStatusClasses(monitorStatus);
+  const validationStatus = useNodeValidationStatus(id);
+  const stateClasses = resolveNodeStateClasses({ monitorStatus, monitorClasses, validationStatus, selected });
 
   // Resolve the assignee label when the node is active in monitor mode
   const instanceStatus = useBpmFlowStore((s) => s.instanceStatus);
@@ -26,7 +32,7 @@ export const UserTaskNode = memo(({ id, data, selected }: NodeProps<BPMNNode>) =
     <div className="relative">
       <div
         className={`flex flex-col items-center justify-center p-2 ${
-          monitorStatus ? monitorClasses : selected ? 'ring-2 ring-blue-500' : ''
+          stateClasses
         }`}
         style={{
           width: style.width,
