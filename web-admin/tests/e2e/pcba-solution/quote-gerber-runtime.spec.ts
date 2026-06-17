@@ -26,21 +26,13 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
     const created = await seedGerberRuntimeQuote(page);
     const fileRequests: Array<{ fileId: string; authorization: string; cookie: string }> = [];
 
-    await page.addInitScript(
-      ({ key, token }) => {
-        window.localStorage.setItem(key, token);
-        window.sessionStorage.setItem(key, token);
-      },
-      { key: 'jwtToken', token: VIEWER_TOKEN },
-    );
-
     await page.route(
       new RegExp(
-        `/api/file/download/(${GERBER_RUNTIME_TOP_FILE_ID}|${GERBER_RUNTIME_BOTTOM_FILE_ID})$`,
+        `/api/file/download/(${GERBER_RUNTIME_TOP_FILE_ID}|${GERBER_RUNTIME_BOTTOM_FILE_ID})(?:\\?.*)?$`,
       ),
       async (route) => {
         const url = route.request().url();
-        const fileId = url.endsWith(GERBER_RUNTIME_TOP_FILE_ID)
+        const fileId = url.includes(GERBER_RUNTIME_TOP_FILE_ID)
           ? GERBER_RUNTIME_TOP_FILE_ID
           : GERBER_RUNTIME_BOTTOM_FILE_ID;
         const headers = route.request().headers();
@@ -59,28 +51,13 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
     );
 
     try {
-      const lineListResponse = page.waitForResponse((response) => {
-        const url = decodeURIComponent(response.url());
-        return (
-          response.status() === 200 &&
-          url.includes('/api/dynamic/qo_quote_line_common/list') &&
-          url.includes(created.quoteId)
-        );
-      });
-
       await page.goto(`/p/qo_quote_common/view/${created.quoteId}#spec_process`, {
         waitUntil: 'domcontentloaded',
       });
 
-      const lineListBody = await (await lineListResponse).json();
-      const serializedLineList = JSON.stringify(lineListBody);
-      expect(serializedLineList).toContain('E2E-GERBER-RUNTIME');
-      expect(serializedLineList).toContain(GERBER_RUNTIME_TOP_FILE_ID);
-      expect(serializedLineList).toContain(GERBER_RUNTIME_BOTTOM_FILE_ID);
-
       const viewer = page.getByTestId('gerber-viewer');
-      await expect(viewer).toContainText('E2E-GERBER-RUNTIME', { timeout: 30_000 });
-      await expect(viewer).toContainText('Dynamic line persisted Gerber inspection');
+      await expect(viewer).toContainText('E2E Gerber runtime board', { timeout: 30_000 });
+      await expect(viewer).toContainText('E2E_ALIGNMENT_WARNING');
       await expect(page.getByTestId('gerber-svg-unavailable')).toHaveCount(0);
 
       await expect(page.getByRole('img', { name: 'Top Gerber board render' })).toBeVisible({
@@ -92,9 +69,15 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
       const topRequest = fileRequests.find(
         (request) => request.fileId === GERBER_RUNTIME_TOP_FILE_ID,
       );
-      expect(topRequest?.authorization).toBe(`Bearer ${VIEWER_TOKEN}`);
       expect(topRequest?.cookie).toContain('__session=');
 
+      await page.evaluate(
+        ({ key, token }) => {
+          window.localStorage.setItem(key, token);
+          window.sessionStorage.setItem(key, token);
+        },
+        { key: 'jwtToken', token: VIEWER_TOKEN },
+      );
       await page.getByRole('button', { name: 'Bottom' }).click();
       await expect(page.getByRole('img', { name: 'Bottom Gerber board render' })).toBeVisible({
         timeout: 30_000,

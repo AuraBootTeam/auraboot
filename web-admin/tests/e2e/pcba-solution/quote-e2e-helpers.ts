@@ -46,6 +46,42 @@ type QuoteLineSeed = {
 export const GERBER_RUNTIME_TOP_FILE_ID = '01KV22CQ7PKX3W50Y7MM575ACK';
 export const GERBER_RUNTIME_BOTTOM_FILE_ID = '01KV22CQ7PKX3W50Y7MM575ACM';
 
+async function pollAsyncTaskResult(page: Page, taskCode: string): Promise<Record<string, unknown>> {
+  const terminal = new Set(['completed', 'failed', 'cancelled']);
+  let resultData: Record<string, unknown> = {};
+
+  await expect
+    .poll(
+      async () => {
+        const resp = await page.request.get(`/api/async-tasks/${encodeURIComponent(taskCode)}`, {
+          timeout: 15_000,
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok()) {
+          return `http:${resp.status()}:${JSON.stringify(body).slice(0, 500)}`;
+        }
+        const task = ((body as any).data ?? {}) as Record<string, unknown>;
+        const status = String(task.status ?? '').toLowerCase();
+        if (terminal.has(status)) {
+          if (status === 'completed') {
+            resultData = ((task as any).resultData ?? {}) as Record<string, unknown>;
+            return 'completed';
+          }
+          return `terminal:${status}:${JSON.stringify(task).slice(0, 800)}`;
+        }
+        return status || 'pending';
+      },
+      {
+        timeout: 180_000,
+        intervals: [1000, 1500, 2000, 3000],
+        message: `async task ${taskCode} should complete`,
+      },
+    )
+    .toBe('completed');
+
+  return resultData;
+}
+
 export async function executeCommand(
   page: Page,
   commandCode: string,
@@ -66,7 +102,11 @@ export async function executeCommand(
     `${commandCode} HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`,
   ).toBe(true);
   expect(String((body as any).code), `${commandCode} should return code=0`).toBe('0');
-  return ((body as any).data?.data ?? {}) as Record<string, unknown>;
+  const commandData = ((body as any).data?.data ?? {}) as Record<string, unknown>;
+  if (commandData.async === true && typeof commandData.taskCode === 'string') {
+    return pollAsyncTaskResult(page, commandData.taskCode);
+  }
+  return commandData;
 }
 
 export async function dynamicCreate(
@@ -204,7 +244,7 @@ async function seedQuoteScaffold(
       },
       created.rows,
     );
-    const pcbaRfqId = await dynamicCreate(
+    let pcbaRfqId = await dynamicCreate(
       page,
       'crm_customer_request_pcba_rfq',
       {
@@ -221,22 +261,33 @@ async function seedQuoteScaffold(
       },
       created.rows,
     );
-    const quoteId = await dynamicCreate(
+    const quoteResult = await executeCommand(
       page,
-      'qo_quote_common',
+      'qo_quote_common:create',
       {
         qo_quote_customer: `E2E ${marker} Customer ${suffix}`,
         qo_quote_code: quoteCode,
-        qo_quote_status: 'draft',
-        qo_quote_version_no: 1,
         qo_quote_customer_request_id: customerRequestId,
         qo_quote_tax_rate: 0.13,
         qo_quote_factory_class: factoryClass,
-        qo_quote_industry: 'pcba',
       },
-      created.rows,
+      undefined,
+      'create',
     );
+    const quoteId = String(
+      quoteResult.recordId ??
+        quoteResult.quoteId ??
+        quoteResult.pid ??
+        ((quoteResult.quote as Record<string, unknown> | undefined)?.pid ?? ''),
+    );
+    expect(quoteId, 'qo_quote_common:create should return quote id').toBeTruthy();
+    created.rows.push({ model: 'qo_quote_common', pid: quoteId });
     created.quoteId = quoteId;
+    const returnedPcbaRfqId = String(quoteResult.pcbaRfqId ?? '');
+    if (returnedPcbaRfqId && returnedPcbaRfqId !== pcbaRfqId) {
+      pcbaRfqId = returnedPcbaRfqId;
+      created.rows.push({ model: 'crm_customer_request_pcba_rfq', pid: pcbaRfqId });
+    }
 
     await dynamicCreate(
       page,
