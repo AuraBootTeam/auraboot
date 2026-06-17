@@ -102,9 +102,37 @@ host-first static control gallery (Playwright chromium, no backend) screenshot
 confirms accent buttons, 3px focus ring, control heights, semantic status pills,
 quiet field chrome — matches mockup §组件库 intent.
 
-> Remaining big surface is `app/ui/meta` + `app/ui/smart` + `app/ui/base-fields`
-> (T3): the ~2900 palette utils / ~440 radius utils counted above are mostly
-> there. Migrate using the cheat-sheet, then re-run the baseline greps.
+### T7 — Upload (`app/ui/smart/form/Upload.tsx`) — DONE (PR #708)
+
+i18n red line cleared (extracted unit-tested `validateUploadFile`); inline
+validation (was silent `console.warn`), always-on hints, retry, full token-ify.
+
+### G1 + G2 — lint gates — DONE (PR #708)
+
+`scripts/check-design-tokens.mjs` (wired into `pnpm check`): hard-fail on raw hex /
+arbitrary tailwind color in `app/ui`; **palette-utility ratchet** + **i18n
+hardcode ratchet** (no-regression). This now _guards_ the burn-down — any new
+palette/hardcoded-string regression fails CI.
+
+### T3 — smart sweep (`app/ui/smart`, ~55 files) — IN PROGRESS
+
+- batch 1 (PR #709): Switch / Checkbox / Radio runtime → tokens.
+- **Palette ratchet: 2943 (baseline) → 2444 (current `G1` baseline).** Lower it as
+  each batch lands (`node scripts/check-design-tokens.mjs --update-baseline`).
+
+## Remaining work (resumable map — `/goal` 完成ux backlog 全部需求)
+
+| Item               | Scope                                                                          | Status      | Notes                                                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| T3 smart sweep     | `app/ui/smart` (~50 files left) + `app/ui/meta` + `base-fields`                | in progress | mechanical; cheat-sheet above; lower G1 baseline per batch. RadioSideBar + the meta/\* designer dialogs are the big remaining counts. |
+| T3 dark mode       | generator → `@theme inline` + `:root`/`.dark`; drop redundant `dark:` variants | not started | needs a dark palette (derive from app.css `.dark`; record as a DDR). Light-only shipped so far.                                       |
+| T4 list renderer   | `ListPageContent` / `list/ListTable`                                           | not started | needs host-first golden stack (§2.1 Phase-0 infra gate: backend + Vite/BFF + seed).                                                   |
+| T5 form renderer   | `FormPageContent` / `FormDialog` (+ Upload interactive golden)                 | not started | host-first golden stack.                                                                                                              |
+| T6 detail renderer | `DetailPageContent`                                                            | not started | host-first golden stack.                                                                                                              |
+| T8–T10             | saved-view presets / cross-page select / aggregation·tree·import·autosave      | not started | ROI-ordered, non-blocking.                                                                                                            |
+
+> `app.app.css` `.decisionops-*` block (367 raw hex) is a self-contained migration,
+> tackle with T4.
 
 ## Notes / decisions
 
