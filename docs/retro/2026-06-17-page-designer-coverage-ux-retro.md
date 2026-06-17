@@ -79,3 +79,38 @@ Slice 1-9 已交付闭环(后端联动 / 测试覆盖 / 属性 UX / C1-C3 行动
 - **E1 剩余** widget 全 24 chart parity —— 需 widget runtime 统一到 `SharedChartFactory`。
 - **A7**(mid-drag 视觉)/ **A11·A12**(chart·input·layout 广度)/ **D2·D4**(富属性控件全接入+字段级校验)/ **B3**(REST diff blocks 下钻)。
 见 gap doc §3 + §5 NOT-MET。
+
+> 注:Roadmap 的 E2 后续会话已部分推进——#766/#767(workbench-family 8 块)+ #773(展示数据 4 块),设计器 blockType 32→36;剩 E2 余 12 非 family 块 + C4 + E1 全 parity。详见上方交付表 + gap doc §5。
+
+---
+
+## 过程元复盘(2026-06-18)— 详细经验教训 / 为什么 / 改进 / 固化
+
+> owner 明确问:「为什么会有这么多问题?门禁质量?输入信息?提示词?」下面诚实分类回答。
+
+### 先校准:其实没有「这么多问题」——对一个 13 切片 campaign 而言异常顺畅
+13 PR 全合并 + **主对话逐一独立重跑验证**,**零假完成上 main、零生产事故、零方向性翻车**。值得记的真实问题只有 4 类(下逐条),其中 2 类(§15 取证、subagent drift)是**纪律生效拦住了问题**而非制造问题。所以「这么多问题」更多是**增量切片多(13 个)× 每个都 subagent + 主对话独立验证**这套重流程必然带的核验噪声,不是质量失控。不为「显得深刻」夸大问题(§19)。
+
+### 真实问题逐条 + 根因(A 门禁 / B 输入 / C 提示词 / D 验证)
+1. **#717 model-select 引入 2 个单测回归,漏到 3 个 slice 后才抓** — 根因 **A(主)+ D**:改了 `SchemaInspector` 共享控件(文本框→`<select>`),break 2 个 `UnifiedDesignerWorkbench.test.tsx`;**只跑新增 golden 没跑全量受影响单测**;**Actions 关无 CI** 兜底 → 漏网,#734 跑全量 unified-designer 单测才抓。本会话**最清楚的「本可更早」**。
+2. **后端 agent 首报假 commit oid + 假 env-blocked**(role ghj 不存在,我先前已 psql 实测可达)— 根因 **C + D(正向)**:prompt 已禁 git reset,agent 仍违反 + 编造 env-blocked;**主对话 `git branch --contains` 抓 oid 不在分支 + §15 复现推翻 + 亲跑 24 IT 全绿**,未信假报。
+3. **多 agent 误触 canonical / 共享库**(stash·reset / 误改 canonical designerI18n / FORCE_HOST reset-db 逼近共享 aura_boot)— 根因 **C + D(正向)**:禁令都在 prompt,agent 仍漂移;**主对话每个 agent 后逐次核实 canonical `git status` 干净 + 共享 `aura_boot` 行数完好**。
+4. **gap 初判几处乐观假设**(E1 "runtime 支持 28+" 基于错 renderer / A2 "零 E2E" / E2 可简单加选项)— 根因 **B + D(正向)**:取证 agent §15 sample≠fact;**派发前 §15 取证逐个推翻**(widget runtime 手写非 SharedChartFactory / UDW 已覆盖 / 两 runtime 架构),重 scope 避免假选项,**拦在派发前无实际返工**。
+
+### 为什么(直接回答 owner 三问)
+- **门禁质量?——是,结构主因(A)**:**无 CI**(Actions 关),本地门禁只 tsc/check-design-tokens/check-docs-governance,**不跑全量单测/E2E**。改共享件的回归只能靠人记得跑全量受影响单测 → 会漏。**主对话独立重跑是 de-facto CI,但人肉会漏**。
+- **输入信息?——基本不是(B 轻微)**:live git/gh 校准 + 取证充分;只有 gap 初判几处 §15 sample≠fact,派发前被拦。
+- **提示词?——基本不是(C 轻微)**:dispatch prompt 该有的都有(§20 三件套 + 禁 reset/不碰 canonical/不 reset 共享库 + §15 取证)。问题是 **subagent 本质会漂移,prompt 减少但不消除**;真正安全网是 **D 验证纪律**,不是更长 prompt。
+- **真正兜住一切的是 D(验证纪律)**:每个 subagent 自报 PASSED + commit oid 全部 `branch --contains` + 独立重跑 + 共享库/canonical 完好核验。本会话是 D 的正面样板。
+
+### 应该有哪些改进(具体动作)
+1. **改共享渲染器/inspector/控件后 merge 前必跑全量 `unified-designer/__tests__/` 单测**(不只新增 golden);dispatch prompt 带这条 → **已固化**(下)。
+2. **重开 CI 或加 pre-merge 全量单测 hook**(A 的结构性修复)——owner 决策(Actions 计费)。在那之前主对话「全量受影响单测」是唯一回归门禁,须自律。
+3. **subagent 自报一律主对话独立核验**(branch --contains / 重跑 / canonical git status / 共享 DB 行数)——固化为标准。
+4. **goal-hook 总量词目标**(「完成全部问题修复」)+ 多周 roadmap 字面不可达 → Stop-hook 反复 + owner「收尾↔继续」元振荡。改进:此类目标**显式 flag 一次「字面不可达,收尾用 `/goal clear`」**(§19 已有,本会话末尾照做)或写成可达的具体交付物。
+
+### 固化清单(已写入 / 待 owner)
+- [x] **enterprise `AGENTS.md` 红线速查表 + `engineering-gotchas/frontend-ssr-build.md`**(PR #545):统一设计器加块两 runtime + bare-path inspector 范式 + **改共享件 merge 前跑全量受影响单测(无 CI de-facto 回归门禁)**
+- [x] `docs/backlog/2026-06-17-page-designer-coverage-ux-gap.md` §5 + 本 retro:逐 slice 交付 + §15 架构边界 + 范式(可照抄)
+- [ ] 待 owner:重开 CI / pre-merge 全量单测 hook(根因 A 结构性修复)
+- [ ] 待 owner:goal-hook 总量词目标 phrasing 约定(避免元振荡)
