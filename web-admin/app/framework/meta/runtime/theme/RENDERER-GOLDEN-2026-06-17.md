@@ -54,3 +54,35 @@ the rest by the golden subagent.)
 
 These are coverage/config items for a deeper golden pass, not blockers — the
 renderers support the features; this seed simply didn't exercise all of them.
+
+## T9 golden — cross-page select-all + export-selected (2026-06-17)
+
+> Follow-up to the "batch/multi-select bar not exercised" item above.
+
+Host-first isolated stack: prebuilt boot jar on **port 6543** → isolated DB
+`aura_ux_t9` (schema.sql + 44 migrations applied, 307 tables) + Redis DB 7;
+worktree `pnpm dev:full` (Vite 5175 / BFF 3502) with `SPRING_BOOT_URL` +
+`PROXY_TARGET` → 6543. Seeded **25 `crm_account`** records via the real command
+pipeline (`POST /api/meta/commands/execute/crm:create_account`), with selection
+enabled on the imported `crm_account_list` page. Playwright + bundled chromium,
+authed via the BFF `/login` form POST (session cookie).
+
+Asserted (all PASS — see `/tmp/t9-0*.png`):
+
+| Step | Assertion |
+| ---- | --------- |
+| List loads | 20 of 25 rows shown → pagination active |
+| Before selection | no `select-all-matching-banner` |
+| Header select-all | banner appears: **"20 on this page selected · Select all 25 matching"** |
+| Click "Select all 25 matching" | banner → **"All 25 records selected · Clear selection"**; bulk bar count = **25** |
+| De-select one row (all-matching) | bulk bar count → **24** (exclusion set), header checkbox indeterminate |
+| Export-selected (explicit pick of 2) | export POST carries `conditions:[{field:"pid",operator:"IN",value:[<2 ids>]}]` — exports ONLY the selected records |
+
+**Pre-existing seed gap (NOT a T9 defect):** the export endpoint is
+`@RequirePermission("model.{pageKey}.export")`, but `crm-starter` registers only
+`create/read/update/delete` perms for `crm_account` — no `export`. So the export
+*response* is 403 for **both** export-all and export-selected (identical 403,
+proven by direct API call). T9 builds + sends the correct request payload; the
+file-generation step is blocked by this plugin permission gap that equally
+blocks the existing export feature. Fix = register `model.<model>.export` in the
+plugin's permissions (out of T9 scope).
