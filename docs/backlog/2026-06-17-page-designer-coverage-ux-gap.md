@@ -202,15 +202,15 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 | 项 | 状态 | 证据 |
 |----|------|------|
 | C5 画布多选 + 批量删除 | ✅ DONE | 独立 `multiSelectedIds: Set`(**不动 selectedBlockId 拖放上下文**,仅 5 行删除纯增量);shift/cmd-click 多选 + `multi-select-bar`(N selected + 批量删除 + 清除)+ 批量删除(跳过不可删 root,单次 undo)+ `data-multi-selected` 视觉;`canvas-multiselect-golden.spec.ts` 4/4 真栈(多选→批量删→**PUT save→GET readback 持久化删除**→undo 恢复;edge 普通click收起/重复 modifier 取消;sad clear 不删);顺手修 CanvasHost BlockContent pass-through 漏传(破坏嵌套 block)。inspector-authoring 6/6 无回归 |
-| C5 box-select 几何框选 | ⏸ defer | 最易 flake(类 A7),显式 follow-up |
+| C5 box-select 几何框选(commit `3dac2092`,Slice 9)| ✅ DONE | 空白 canvas 拖拽画 marquee(`marquee-rect`)选中相交 block 进 C5 `multiSelectedIds`;**命中逻辑抽纯函数 `marqueeHitTest`(rectFromPoints + blocksWithinMarquee)+ 单测**(相交/包含/部分/不交/顺序);`onHostPointerDown` 只在空白区起(`isOnBlockOrInteractive` 跳过 block/交互元素 + 6px 阈值)→ 不破坏 block 选择/widget move/拖放;`canvas-box-select-golden.spec.ts` 3/3 **连跑 3 次稳定**(marquee 选 2/全 3 + sad 阈值下不选);multiselect 回归 4/4。**C5 多选+批量+框选全闭环** |
 
 ### ⏸ NOT-MET(roadmap,**未完成,不假报**)
 - **A7** mid-drag drop-indicator/ghost 视觉断言(@dnd-kit 中途手势最易 flake,ROI 最低)→ defer。
 - **A11/A12** chart 类型广度 / input·layout 广度 → defer。
 - **E1(剩余)/E2** widget 全 24 chart parity(runtime 统一 SharedChartFactory)、19 workbench block palette 可视化 authoring → 大特性(多周),未做。
-- **C4 / C5-box-select** kind 切换、几何框选 → 未做(C5 shift/cmd 多选+批量删除已交付)。
+- **C4** kind 切换 → 未做(C5 多选+批量+框选已全交付)。
 - **D2/D4** 富属性控件全接入(dict/namedQuery/command/permission 选择器)、字段级校验反馈;**B3** REST diff blocks 下钻 → 未做。
-- **🧪 测试鲁棒性 follow-up**:`inspector-model-select-golden.spec.ts:146` 依赖特定 published model 在 seed 中(`option[value=SELECT_MODEL]` toHaveCount 1),bootstrap-only/leaner seed 栈(如 15 model 的 slot)会 fail —— seed 敏感非代码 bug;应改断言"select 存在 + ≥1 真 model option"而非锁定具体 model。
+- **🧪 测试鲁棒性 follow-up** — ✅ 已由 Slice 9(`3dac2092`)闭环:`inspector-model-select-golden:152` 改 seed-agnostic 断言(SELECT + option ≥2),不再锁定具体 model;leaner seed 栈也过。本行历史保留。
 - **🐛 ViewModelService latent bug** — ✅ 已由 #725 闭环(读 `data.records`),本行历史保留。
 
 ### 复核五项结论(P5)
