@@ -199,7 +199,7 @@ ext {
     jwtVersion = '0.13.0'
     mybatisPlusVersion = '3.5.16'
     lombokVersion = '1.18.40'
-    aspectjVersion = '1.9.22'
+    aspectjVersion = '1.9.25.1'
     reflectasmVersion = '1.11.3'
     validationApiVersion = '2.0.1.Final'
     // PF4J Plugin Framework
