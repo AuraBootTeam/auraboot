@@ -58,7 +58,7 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 | # | Gap | 维度 | 严重度 | 证据 | 修复路线 |
 |---|-----|------|--------|------|----------|
 | A1 | **伪断言 tautology**:`field-properties.spec.ts:92` `expect(hasPropertiesPanel \|\| true).toBe(true)` 恒真,选中态/属性面板出现未真断言 | 视觉反馈-选中 | **P0** | `field-properties.spec.ts:92` | 改成真断言:选中 block → 属性面板出现 + selection ring(`data-selected`)|
-| A2 | **helper blocks inspector 属性零 E2E**:bpm-panel(status/assignee/dueAt/actions)、activity-timeline(items)、field-history(entries)属性编辑→保存→回显未测 | 属性 | **P1** | E2E grep `bpm-panel\|activity-timeline\|field-history` 属性 0 命中 | 新增 helper-blocks-inspector authoring spec |
+| A2 | helper blocks inspector 属性覆盖。⚠️**初判"零 E2E"高估**(§15 实测纠正):UDW `unified-designer-workbench.spec.ts:5570+` **已编辑** bpm-panel/activity-timeline/field-history inspector;真缺口是**隔离确定性 readback 覆盖** + helper block 在 detail 下须嵌 columns/tab(canContain 限制)的 gate-gap | 属性 | P1→P2 | UDW:5570+ 已覆盖编辑 | 新增隔离确定性 readback spec(已交付)|
 | A3 | **widget 高级图表属性零断言**:thresholds/series/drillDownTo/refreshInterval/markdown | 属性 | **P1** | UDW-010/043 不覆盖这些字段 | 新增 widget-advanced-props authoring spec |
 | A4 | **form-section 属性零断言**:collapsible/visibleWhen/columns | 属性 | **P1** | E2E 0 命中 | 并入 inspector authoring spec |
 | A5 | **AI lock inspector 全链路无 E2E**:勾选 aiLocked→保存→徽标→AI 重生成跳过 | 属性+视觉 | **P1** | E2E 0;仅 unit | 新增 ai-lock authoring spec |
@@ -145,3 +145,44 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 - `/e2e-feature-coverage` 矩阵对补测维度清零 + `/e2e-truth` 过。
 - Roadmap 项如实标 NOT-MET + 进 backlog,**不计入"已完成"**。
 - 复盘固化教训进 AGENTS/canonical。
+
+---
+
+## 5. 交付状态(P5 复核 + P6,2026-06-17,已独立重跑验证)
+
+> **诚实分层(§2.4):本会话交付 = Slice 1(测试覆盖)+ Slice 2(后端联动),均真栈/真浏览器独立重跑绿。Slice 3 + Roadmap(C/D/E 大特性 + A7)如实标 NOT-MET,不计入"已完成"。**
+
+### ✅ Slice 2 后端联动(commit `17652e7c8`,24 IT 独立重跑 0 fail)
+| 项 | 状态 | 证据 |
+|----|------|------|
+| B1 在线保存结构守卫(硬拒 缺id/blank blockType/重复id;未知类型仅 warn,前向兼容 custom) | ✅ DONE | `PageSchemaBlockStructureValidator` + 12 单测 + IT 三态(合法v4/缺陷拒/未知前向兼容) |
+| B2 publish/unpublish/version/rollback/compare 真栈 IT | ✅ DONE | `PageSchemaPublishVersionIntegrationTest` 8 IT 真 DB round-trip |
+| B5 i18n 真链路 IT(不 mock service) | ✅ DONE | `PageSchemaI18nValidationFullStackIntegrationTest` 4 IT |
+| B6 catch(Exception) 吞异常移除 | ✅ DONE | `canRollbackToVersion` 改 |
+| B7 `page.page.manage` → MetaPermission 常量 | ✅ DONE | 7 处 inline 替换,permission 门禁 0 drift |
+| **真栈 IT 揪出并修 5 个生产 bug**(版本/回滚链路,mocked 测试长期掩盖) | ✅ FIXED | @CurrentUserId Long/String 错配 500 / PageSchemaHistory.snapshot 错 typeHandler ClassCastException / pid 列名映射错 / op varchar(20) 溢出 / unpublish null-skip(updateById NOT_NULL) |
+
+### ✅ Slice 1 测试覆盖(commit `d5fd98a7e`,17 E2E 独立重跑 0 flake,host-first 隔离 slot 38)
+| 项 | 状态 | 证据 |
+|----|------|------|
+| A1 tautology 修 → 真选中态断言(并暴露+修 fixture 早坏) | ✅ DONE | `field-properties.spec.ts` 11/11 |
+| A2 helper blocks inspector 隔离确定性 readback(bpm-panel/activity-timeline/field-history) | ✅ DONE | `inspector-authoring-golden.spec.ts` |
+| A4 form-section(collapsible/visibleWhen/columns) | ✅ DONE | 同上 |
+| A5 AI lock toggle→徽标→persisted aiLocked | ✅ DONE | 同上 |
+| A6 Advanced JSON tab(valid persist + invalid 错误态不写回 sad-path) | ✅ DONE | 同上 |
+| A8 dirty pill + leave-warning(**真零先验**) | ✅ DONE | 同上 |
+
+### ⏸ NOT-MET(roadmap,**未完成,不假报**)
+- **A7** mid-drag drop-indicator/ghost 视觉断言(@dnd-kit 中途手势最易 flake,ROI 最低)→ defer。
+- **A3/A11/A12** widget 高级图表属性 / chart 类型广度 / input·layout 广度 → defer。
+- **Slice 3 D3/D1/C1/C2**(tabs/action-bar 专属 inspector、model 选择器、Publish/Export/Import 行动点)→ 中等工作量,未做。
+- **E1/E2** widget 全 24 chart 配置、19 workbench block palette 可视化 authoring → 大特性(多周),未做。
+- **C3/C4/C5** Version/Diff/Rollback UI、kind 切换、多选 → 大特性,未做。
+- **D2/D4** 富属性控件全接入、字段级校验反馈;**B3** REST diff blocks 下钻 → 未做。
+
+### 复核五项结论(P5)
+1. **方向** ✅ 对齐:增量硬化"测试覆盖+后端联动",未漂移;大特性如实划入 roadmap。
+2. **进度** ✅ Slice 1+2 逐项 DONE(commit/IT/E2E 证据);NOT-MET 清单完整无"标 DONE 实际没做"。
+3. **gap** ✅ 复扫发现 A2 高估(已纠)+ 新记 gate-gap(unified designer 须 schemaVersion 3 / detail 不能直含 helper block 须嵌 columns·tab,错 seed 则 save 静默不触发)+ showcase 模型依赖。
+4. **UX 截图** ✅ E2E 每步截图存 `web-admin/test-results`;断言为 PUT save + GET readback `toMatchObject` + 视觉态(徽标/错误态/dirty pill)真断言。
+5. **测试完备性** ✅ 后端 24 IT + 前端 17 E2E,均**主对话独立重跑**绿(非仅信 subagent 自报);targeted 维度 feature 覆盖清零,NOT-MET 显式列出。
