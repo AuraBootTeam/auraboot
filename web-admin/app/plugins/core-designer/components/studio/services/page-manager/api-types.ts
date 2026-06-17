@@ -145,6 +145,28 @@ export interface PageSchemaVersionDTO {
 }
 
 /**
+ * Create-version request DTO
+ * Matches: PageSchemaVersionCreateRequest.java
+ *
+ * All fields are optional: the backend defaults `operation` to "update" and
+ * `description` to "Version created" when omitted. The designer "Create
+ * snapshot" action sends a `snapshot` operation with the operator's reason as
+ * the description.
+ */
+export interface PageSchemaVersionCreateRequest {
+  /** Operation type: CREATE, UPDATE, PUBLISH, ARCHIVE, DELETE, RESTORE, snapshot */
+  operation?: string;
+  /** Version description / change reason */
+  description?: string;
+  /** Change log */
+  changelog?: string;
+  /** Version type: SNAPSHOT, MINOR, MAJOR */
+  type?: string;
+  /** Base version id (create-from-version) */
+  baseVersionId?: string;
+}
+
+/**
  * Version comparison DTO
  * Matches: PageSchemaVersionComparisonDTO.java
  */

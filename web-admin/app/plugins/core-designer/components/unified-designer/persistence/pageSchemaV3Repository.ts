@@ -1,8 +1,11 @@
 import {
   createPage,
+  createVersion,
   getPageByPageKey,
   getPageByPid,
+  getVersionHistory,
   publishPage,
+  rollbackToVersion,
   unpublishPage,
   updatePage,
 } from '../../studio/services/page-manager/pageApi';
@@ -12,6 +15,8 @@ import type {
   PageSchemaCreateRequest,
   PageSchemaDTO,
   PageSchemaUpdateRequest,
+  PageSchemaVersionCreateRequest,
+  PageSchemaVersionDTO,
 } from '../../studio/services/page-manager/api-types';
 import type { Result } from '~/shared/services/http-client';
 import type { LegacyPageSchemaV2, PageSchemaV3, PageSchemaV3Kind } from '../types';
@@ -30,6 +35,19 @@ export interface PageSchemaV3Api {
   // lifecycle methods; the publish/unpublish helpers below assert their presence.
   publishPage?: (pid: string) => Promise<ResultLike<PageSchemaDTO>>;
   unpublishPage?: (pid: string) => Promise<ResultLike<PageSchemaDTO>>;
+  // Version history / snapshot / rollback. Optional for the same reason — the
+  // version helpers below assert their presence and surface a clear error when a
+  // minimal api omits them.
+  getVersionHistory?: (pid: string) => Promise<ResultLike<PageSchemaVersionDTO[]>>;
+  createVersion?: (
+    pid: string,
+    request: PageSchemaVersionCreateRequest,
+  ) => Promise<ResultLike<PageSchemaVersionDTO>>;
+  rollbackToVersion?: (
+    pid: string,
+    historyId: number,
+    reason: string,
+  ) => Promise<ResultLike<PageSchemaVersionDTO>>;
 }
 
 export interface ResultLike<T> {
@@ -94,6 +112,18 @@ const defaultApi: PageSchemaV3Api = {
   createPage: createPage as (request: PageSchemaCreateRequest) => Promise<Result<PageSchemaDTO>>,
   publishPage: publishPage as (pid: string) => Promise<Result<PageSchemaDTO>>,
   unpublishPage: unpublishPage as (pid: string) => Promise<Result<PageSchemaDTO>>,
+  getVersionHistory: getVersionHistory as (
+    pid: string,
+  ) => Promise<Result<PageSchemaVersionDTO[]>>,
+  createVersion: createVersion as (
+    pid: string,
+    request: PageSchemaVersionCreateRequest,
+  ) => Promise<Result<PageSchemaVersionDTO>>,
+  rollbackToVersion: rollbackToVersion as (
+    pid: string,
+    historyId: number,
+    reason: string,
+  ) => Promise<Result<PageSchemaVersionDTO>>,
 };
 
 export async function loadPageSchemaV3({
@@ -215,6 +245,83 @@ export async function unpublishPageSchemaV3({
     status: result.data?.status ?? 'draft',
     publishedAt: result.data?.publishedAt,
   };
+}
+
+export interface PageVersionResult<T> {
+  ok: boolean;
+  data?: T;
+  error?: string;
+}
+
+/**
+ * List the version history of a saved page (GET /api/pages/{pid}/versions).
+ *
+ * Returns the raw PageSchemaVersionDTO[] newest-first as the backend orders
+ * them. A non-'0' code (e.g. a 403 from missing page.page.read) is surfaced as
+ * an error string rather than thrown, matching the publish helpers so the panel
+ * can render inline feedback instead of crashing the workbench.
+ */
+export async function getPageVersions(
+  pid: string,
+  api: PageSchemaV3Api = defaultApi,
+): Promise<PageVersionResult<PageSchemaVersionDTO[]>> {
+  if (!api.getVersionHistory) {
+    return { ok: false, error: 'Version history API is not available.' };
+  }
+  const result = await api.getVersionHistory(pid);
+  if (result.code !== '0') {
+    return { ok: false, error: result.message || result.desc || 'Failed to load versions.' };
+  }
+  return { ok: true, data: result.data ?? [] };
+}
+
+/**
+ * Create a version snapshot of the saved page (POST /api/pages/{pid}/versions).
+ *
+ * The reason is sent as the version description; the backend defaults the
+ * operation to "snapshot" here so the entry is distinguishable from publish /
+ * rollback history rows.
+ */
+export async function createPageVersion(
+  pid: string,
+  reason: string,
+  api: PageSchemaV3Api = defaultApi,
+): Promise<PageVersionResult<PageSchemaVersionDTO>> {
+  if (!api.createVersion) {
+    return { ok: false, error: 'Create-version API is not available.' };
+  }
+  const result = await api.createVersion(pid, {
+    operation: 'snapshot',
+    description: reason,
+  });
+  if (result.code !== '0') {
+    return { ok: false, error: result.message || result.desc || 'Failed to create version.' };
+  }
+  return { ok: true, data: result.data ?? undefined };
+}
+
+/**
+ * Roll the saved page back to a history version
+ * (POST /api/pages/{pid}/rollback/{historyId}?reason=...).
+ *
+ * The backend restores the target snapshot's blocks onto the live page and
+ * bumps its version; callers should reload the page document afterwards to
+ * reflect the restored canvas. A non-'0' code becomes an error string.
+ */
+export async function rollbackPageToVersion(
+  pid: string,
+  historyId: number,
+  reason: string,
+  api: PageSchemaV3Api = defaultApi,
+): Promise<PageVersionResult<PageSchemaVersionDTO>> {
+  if (!api.rollbackToVersion) {
+    return { ok: false, error: 'Rollback API is not available.' };
+  }
+  const result = await api.rollbackToVersion(pid, historyId, reason);
+  if (result.code !== '0') {
+    return { ok: false, error: result.message || result.desc || 'Failed to roll back.' };
+  }
+  return { ok: true, data: result.data ?? undefined };
 }
 
 function toPageSchemaV3(dto: PageSchemaDTO): PageSchemaV3 {

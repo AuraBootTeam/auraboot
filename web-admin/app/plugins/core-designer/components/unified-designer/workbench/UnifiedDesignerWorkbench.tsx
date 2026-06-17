@@ -64,6 +64,7 @@ import {
   type DesignerPublishStatus,
   type DesignerSaveStatus,
 } from './WorkbenchToolbar';
+import { VersionHistoryPanel } from './VersionHistoryPanel';
 import { ResourcePanel } from './ResourcePanel';
 import { CanvasHost, type ActiveDropIntent } from '../canvas/CanvasHost';
 import { InspectorHost } from './InspectorHost';
@@ -102,6 +103,14 @@ export interface UnifiedDesignerWorkbenchProps {
   /** Unpublish the saved page, returning it to draft. */
   onUnpublish?: (pid: string) => Promise<boolean> | boolean;
   /**
+   * Reload the page document from the backend (e.g. after a version rollback,
+   * which restores the target snapshot's blocks onto the live page). Resolves
+   * the freshly-loaded document so the workbench can reset its canvas + undo
+   * history to the restored state. When omitted, the version-history rollback
+   * action point is not wired.
+   */
+  onReloadDocument?: (pid: string) => Promise<PageSchemaV3 | null>;
+  /**
    * Enable the in-designer AI copilot (tools-off /generate-page). Pass `true` for
    * defaults, or an object with `domainGuidance` to flavor the system prompt for a
    * specific surface (e.g. a QR scan-landing page).
@@ -120,6 +129,7 @@ export function UnifiedDesignerWorkbench({
   initialPublished = false,
   onPublish,
   onUnpublish,
+  onReloadDocument,
   aiCopilot,
 }: UnifiedDesignerWorkbenchProps) {
   const { locale } = useI18n();
@@ -142,6 +152,7 @@ export function UnifiedDesignerWorkbench({
   const [previewDeviceId, setPreviewDeviceId] = useState<string>(DEFAULT_DEVICE_PREVIEW_ID);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
   const [activeDropIntent, setActiveDropIntent] = useState<ActiveDropIntent>(null);
   const document = documentHistory.document;
@@ -736,6 +747,37 @@ export function UnifiedDesignerWorkbench({
     }
   };
 
+  // Reset the canvas + undo history to a freshly-loaded document. Used after a
+  // version rollback: the backend has restored the target snapshot's blocks onto
+  // the live page, so we replace local state with the reloaded document and mark
+  // it clean/saved (it now matches the backend exactly).
+  const resetToDocument = (nextDocument: PageSchemaV3) => {
+    const snapshot = serializeDocument(nextDocument);
+    setDocumentHistory({
+      document: nextDocument,
+      history: [snapshot],
+      historyIndex: 0,
+    });
+    savedSnapshotRef.current = snapshot;
+    setSavedSnapshot(snapshot);
+    setSaveStatus('saved');
+    setSaveError(null);
+    setValidationErrorCount(0);
+    setSelectedBlockId(null);
+  };
+
+  // After a successful rollback: reload the restored page document, reset the
+  // canvas to it, and close the version panel. If the reload yields nothing
+  // (e.g. the page was concurrently deleted) we leave the canvas as-is and just
+  // close the panel — the rollback itself already succeeded on the backend.
+  const handleVersionRolledBack = async () => {
+    if (pageId && onReloadDocument) {
+      const reloaded = await onReloadDocument(pageId);
+      if (reloaded) resetToDocument(reloaded);
+    }
+    setVersionPanelOpen(false);
+  };
+
   // Export — serialize the current document to a downloadable .page.json file.
   // Pure client-side: no backend call, exports exactly what is on the canvas
   // (including unsaved edits) so the artifact is a faithful snapshot.
@@ -851,7 +893,16 @@ export function UnifiedDesignerWorkbench({
         onExport={handleExport}
         onImportFile={handleImportFile}
         onOpenAiCopilot={() => setAiDialogOpen(true)}
+        onOpenVersions={pageId ? () => setVersionPanelOpen(true) : undefined}
       />
+      {pageId ? (
+        <VersionHistoryPanel
+          pid={pageId}
+          open={versionPanelOpen}
+          onClose={() => setVersionPanelOpen(false)}
+          onRolledBack={handleVersionRolledBack}
+        />
+      ) : null}
       {aiCopilotEnabled ? (
         <AiDesignDialog
           open={aiDialogOpen}
