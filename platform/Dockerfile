@@ -55,8 +55,9 @@ RUN addgroup -g 1000 appuser && \
 RUN mkdir -p /app/data/files /app/data/git-repos /app/data/artifacts && \
     chown -R appuser:appuser /app
 
-# Copy built JAR from builder
-COPY --from=builder --chown=appuser:appuser /app/build/libs/*.jar app.jar
+# Copy built executable boot JAR from builder (bootJar carries the 'boot' classifier;
+# the plain library jar also lands in build/libs, so glob the boot jar explicitly)
+COPY --from=builder --chown=appuser:appuser /app/build/libs/*-boot.jar app.jar
 
 USER appuser
 
