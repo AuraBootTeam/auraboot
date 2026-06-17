@@ -18,12 +18,12 @@ export interface LocalizedText {
 // Layout 配置
 export interface LayoutConfig {
   type?: 'grid' | 'stack'; // Layout mode: 'grid' (12-col) or 'stack' (vertical). Default: 'stack'
-  cols?: number;            // Grid column count (default 12, only for type='grid')
-  columnTemplate?: string;   // Optional CSS grid-template-columns override
+  cols?: number; // Grid column count (default 12, only for type='grid')
+  columnTemplate?: string; // Optional CSS grid-template-columns override
   gridTemplateColumns?: string; // Alias for columnTemplate
-  colGap?: number;          // Column gap in px (default 16)
-  rowGap?: number;          // Row gap in px (default 16)
-  gap?: number;             // Stack gap in px (only for type='stack')
+  colGap?: number; // Column gap in px (default 16)
+  rowGap?: number; // Row gap in px (default 16)
+  gap?: number; // Stack gap in px (only for type='stack')
 }
 
 // Block 配置 (新 DSL)
@@ -67,16 +67,15 @@ export interface BlockConfig {
 }
 
 export interface BlockLayoutConfig {
-  col?: number;       // Start column (0-based, 0..cols-1)
-  colSpan?: number;   // Number of columns (1..cols, default 12)
-  rowSpan?: number;   // Number of rows (>= 1, default 1)
-  order?: number;     // Stable flow order for auto-layout
-  row?: number;       // Locked row position (optional, advanced)
-  columns?: number;   // Internal sub-column count (for form-section grids)
+  col?: number; // Start column (0-based, 0..cols-1)
+  colSpan?: number; // Number of columns (1..cols, default 12)
+  rowSpan?: number; // Number of rows (>= 1, default 1)
+  order?: number; // Stable flow order for auto-layout
+  row?: number; // Locked row position (optional, advanced)
+  columns?: number; // Internal sub-column count (for form-section grids)
   colGap?: number;
   rowGap?: number;
 }
-
 
 // DataSource 配置
 export interface DataSourceConfig {
@@ -200,6 +199,17 @@ export interface ColumnConfig {
   // Format
   format?: string; // 'currency' | 'percent' | 'number'
   readOnly?: boolean;
+
+  /**
+   * Column summary/footer aggregate (T10). When set, the list table renders a
+   * footer row showing this column's aggregate over the current page's rows:
+   * - 'sum' / 'avg' / 'min' / 'max' operate on numeric/currency values
+   * - 'count' counts non-null values (any type)
+   * NOTE: aggregates cover the CURRENT page only; cross-page totals would need a
+   * backend aggregation endpoint (out of scope). Setting this on any column
+   * implicitly enables the summary footer (see TableConfig.showSummaryRow).
+   */
+  aggregate?: 'sum' | 'avg' | 'count' | 'min' | 'max';
 
   // 排序
   sortable?: boolean;
@@ -356,6 +366,13 @@ export interface TableConfig {
   rowActions?: ButtonConfig[];
   /** Tree configuration — enables hierarchical expandable rows */
   treeConfig?: TreeConfig;
+  /**
+   * Show the column summary/footer row (T10). Defaults to showing the footer
+   * automatically when any column declares an `aggregate`; set explicitly to
+   * `false` to suppress it, or `true` to force it. The footer aggregates the
+   * current page's rows only (see ColumnConfig.aggregate).
+   */
+  showSummaryRow?: boolean;
 }
 
 export interface PaginationConfig {
