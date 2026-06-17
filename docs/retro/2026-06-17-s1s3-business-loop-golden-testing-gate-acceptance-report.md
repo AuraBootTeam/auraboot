@@ -8,7 +8,7 @@ created: 2026-06-17
 
 > testing-gate §7 验收报告。本轨道的最终测试声明以本报告为准(非聊天总结/通过计数)。逐切片更新。
 
-`allowed_claim`: **S3-1(自动 CAPA 链核心)= golden tested(真栈,2/2,0 fail);其余切片 did-not-run / planned。整轨道未完成。**
+`allowed_claim`: **S3-1(自动 CAPA 命令链)+ S3-2(automation→BPMN→SLA→升级)= golden tested(真栈,各 2/2,0 fail);S3-3 + S1-* did-not-run / planned。整轨道未完成。**
 
 ## SOT
 - 轨道 SOT:`docs/backlog/2026-06-17-s1s3-business-loop-golden-gap-and-plan.md`(取证纠正 + 切片计划 + findings F1/F2/F3)。
@@ -32,8 +32,18 @@ created: 2026-06-17
 - commit:`a2a3f0f20`(分支 `feat/agent-eval-s1s3-business-golden`)。
 - product bug:**无**(引擎组装正确,正向验证)。
 
-### S3-2 — automation → BPMN startProcess + userTask → SLA 激活 + 升级  🔄 next(已 ground-truth 可行)
-### S3-3 — 全链组装(defect → automation → BPMN approve → create_capa)  ⬜ planned
+### S3-2 — automation → BPMN startProcess + userTask → SLA 激活 + 升级  ✅ tested
+- 测试:`platform/src/test/java/com/auraboot/framework/automation/QualityCapaBpmnSlaChainGoldenIT.java`
+- 真凭据(JUnit XML):`tests="2" skipped="0" failures="0" errors="0"`;BUILD SUCCESSFUL in 42s。
+- 断言(真栈):
+  - automation(真 SmartEngine 流程)→ `start_process` action → `StartProcessActionExecutor` → **真部署 BPMN 进程启动**(run_status=success)。
+  - userTask 创建 → `AuraTaskEventPublisher` **同步**发 `task_assigned` → `SlaActivationListener`(同步 @EventListener)→ `ab_sla_record` 激活(node_id 唯一,exactly 1;FIXED PT2H deadline ≈ 120min)。
+  - 业务关联:`taskService.getTasksByProcessInstance` 在 review 节点找到真 userTask。
+  - 升级:伪造过期 deadline → `scanSlaRecords()` → status=overdue + currentWarningLevel=1 + warningHistory[0].action=escalate + `ab_bpm_notify_record` 通知收件人(content 含 "SLA ESCALATION")。
+  - **关键正向发现**:真流程起 userTask **自动**发 task_assigned 激活 SLA(此前 SLA 引擎 IT 是手动 publish 事件;此处证明真链路自动连通),无产品 bug。
+- product bug:**无**。
+
+### S3-3 — 全链组装(defect → automation → BPMN approve → create_capa)  🔄 next
 ### S1-1 — crm:create_complaint 真栈命令 golden + F2 drift 记录  ⬜ planned
 ### S1-2 — 投诉 create → automation 自动指派 + log  ⬜ planned
 ### S1-3 — 邮件 → 投诉字段抽取 live IT(真 DeepSeek)  ⬜ planned
@@ -45,7 +55,7 @@ acceptance_report: docs/retro/2026-06-17-s1s3-business-loop-golden-testing-gate-
 claim_level: golden-candidate (S3-1 closed; track in progress)
 current_sot: docs/backlog/2026-06-17-s1s3-business-loop-golden-gap-and-plan.md; docs/backlog/2026-06-17-platform-capability-map-and-test-scenario-design.md
 business_scope: S1 CS complaint loop; S3 quality auto-CAPA. Non-goals: S6 browser golden, dashboard build, real-plugin import materialization.
-integration_tests: QualityAutoCapaChainGoldenIT (2 tests, real-stack)
+integration_tests: QualityAutoCapaChainGoldenIT (2) + QualityCapaBpmnSlaChainGoldenIT (2), all real-stack, 0 fail
 integration_coverage: coverage_not_measured (targeted IT slice, not a module coverage run)
 e2e_specs: n/a (backend business-chain golden, not browser E2E)
 feature_action_matrix: track gap-and-plan §3 (6 slices; S3-1 closed)
@@ -55,7 +65,7 @@ artifact_evidence: n/a
 permission_negative: n/a (self-contained synthetic models, no command permissions; permission gates covered by separate gate slice)
 visual_feedback: n/a
 skip_fixme_threshold_retry_audit: clean — no skip/fixme/threshold/retry; no waitForTimeout; deterministic synchronous entry (no @Async polling)
-did_not_run: S3-2, S3-3, S1-1, S1-2, S1-3; real-plugin import-materialization reachability (host-first runtime follow-up)
+did_not_run: S3-3, S1-1, S1-2, S1-3; real-plugin import-materialization reachability (host-first runtime follow-up)
 remaining_blockers: none for S3-1; track continues
 allowed_claim: "S3-1 auto-CAPA chain golden: tested (real-stack 2/2). Remaining S1/S3 slices did not run."
 ```

@@ -53,8 +53,8 @@ related:
 | 切片 | 证明什么 | 类型 | 状态 |
 |---|---|---|---|
 | **S3-1** | defect.create → automation(SmartEngine)→ `execute_command` → create_capa 真命令管道 → CAPA 行(字段从 defect 映射 + AutoSet code/status)+ `ab_automation_log` success;SpEL 条件负向 gating | T4+T6 | ✅ tested(`QualityAutoCapaChainGoldenIT` 2/2,commit `a2a3f0f20`;验收报告 `docs/retro/2026-06-17-s1s3-business-loop-golden-testing-gate-acceptance-report.md`) |
-| **S3-2** | defect → automation → BPMN startProcess + userTask(task_assigned)→ SLA 激活(deadline)+ scheduler 标 overdue + 升级通知 | T6 | 🔄 next(已 ground-truth:`deploymentService.create/deploy` + `processEngineService.startProcess`;`StartProcessActionExecutor` 真实可用;`AuraTaskEventPublisher` 预期自动发 task_assigned) |
-| **S3-3** | 全链组装:defect → automation → BPMN approve → create_capa(把 S3-1/S3-2 串成一条) | T4+T6 | ⬜ 计划 |
+| **S3-2** | defect → automation → BPMN startProcess + userTask(task_assigned)→ SLA 激活(deadline)+ scheduler 标 overdue + 升级通知 | T6 | ✅ tested(`QualityCapaBpmnSlaChainGoldenIT` 2/2;**实测确认真流程起 userTask 自动发 task_assigned → SLA 同步激活**,无产品 bug) |
+| **S3-3** | 全链组装:defect → automation → BPMN approve(task complete → on_bpm_event)→ create_capa | T4+T6 | 🔄 next |
 | **S1-1** | `crm:create_complaint` 真栈命令 golden(用真 CRM 模型形状)+ 记录 F2 drift | T4 | ⬜ 计划 |
 | **S1-2** | 投诉 create → automation 自动指派 + `ab_automation_log` | T6 | ⬜ 计划 |
 | **S1-3** | 邮件 → 投诉字段抽取 live IT(真 DeepSeek,沿用 `AgentFormFillLiveIT` 模板) | T3 | ⬜ 计划 |
