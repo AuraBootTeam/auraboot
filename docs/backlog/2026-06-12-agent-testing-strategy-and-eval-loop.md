@@ -135,9 +135,9 @@ harness/打分/持久化全在,缺的只是 **回归门 + 定时/触发 + key + 
 (`crm:create_complaint` / `qc:create_capa` / `dsl.query` + 各自「不许删/不许 release/不许越权动作」),
 并经结构 + 可评分一致性单测守护(expected/forbidden 不重叠、读路由 forbid 变更工具、perfect 选择评 correct+safe)。
 已**接进 `ScheduledCapabilityEvalJob`**(`include-archetype-cases` 默认 true,与自动生成用例合并跑)。
-🔑 **block 点(LLM key)**:用真模型跑这些用例量化质量(`evaluateToolSelection(tenant,"llm",AgentArchetypeEvalCases.all())`
-以及每 agent 非-`stubToolUse` nightly smoke)需 LLM key —— 拿到 key 后补真栈 quality 跑;CI 内确定性价值 = 用例契约 + 一致性守护。
-后续刀:扩充每 agent 用例量(各 10-20 条)+ expectedInputKeys 的参数级评分。
+✅ **真模型量化已落地(2026-06-17,首测)**:`AgentArchetypeLiveQualityIT`(`@Tag("agent-eval-live")`,`DEEPSEEK_API_KEY` gated)用真 DeepSeek(`deepseek-chat`)对 5 个原型任务跑 `LlmToolSelectionService.selectTools`,自包含 7 工具 catalog(不依赖 crm/qc 插件加载,隔离"模型判断"与"插件是否加载"两个变量)。**首测结果:toolCorrect 5/5(100%)/ safe 5/5(100%)/ precise 5/5(100%)/ hallucinated 0**——真模型在生产 agent 的真实任务上选对工具、不越禁用边界、不幻觉。同环境 `CapabilityEvalLiveIT` 3/3(受控 catalog + 持久化 eval_mode=llm)。⚠️ **口径**:单样本、5 任务、单工具选择(未测多步/参数抽取质量/`discoverTools` 真插件 catalog),是正向信号非综合 benchmark。
+🔑 **仍 key-gated**:每 agent 非-`stubToolUse` nightly smoke + `evaluateToolSelection(tenant,"llm",all())` 走真 `discoverTools` 路径(需 crm/qc 插件 host 栈)。
+后续刀:扩充每 agent 用例量(各 10-20 条)+ `expectedInputKeys` 参数级评分 + k-of-n 抗噪重采样 + 接进 `ScheduledCapabilityEvalJob` 的真模型 nightly。
 
 **④ 闭 L4 在线 eval —— ✅ 骨架+确定性判官已落地(`AgentOnlineEvalService` + `AgentTurnQualityJudge` + `HeuristicTurnQualityJudge`)**
 `AgentOnlineEvalService.sampleAndJudge(tenant, sinceHours, maxRuns)` 采样 `ab_agent_observation` 真回合
