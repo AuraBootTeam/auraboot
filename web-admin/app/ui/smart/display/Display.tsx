@@ -68,15 +68,15 @@ const Display: React.FC<DisplayProps> = ({
     const colorType = statusColor[val];
     switch (colorType) {
       case 'success':
-        return 'text-green-600 bg-green-50 border-green-200';
+        return 'text-status-green bg-status-green-bg border-status-green';
       case 'error':
-        return 'text-red-600 bg-red-50 border-red-200';
+        return 'text-status-red bg-status-red-bg border-status-red';
       case 'warning':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+        return 'text-status-amber bg-status-amber-bg border-status-amber';
       case 'processing':
-        return 'text-blue-600 bg-blue-50 border-blue-200';
+        return 'text-accent bg-accent-weak border-accent';
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
+        return 'text-text-2 bg-subtle border-border';
     }
   };
 
@@ -85,10 +85,10 @@ const Display: React.FC<DisplayProps> = ({
 
   return (
     <div className={`space-y-1 ${className}`}>
-      {label && <label className="block text-sm font-medium text-gray-700">{label}</label>}
+      {label && <label className="text-text-2 block text-sm font-medium">{label}</label>}
       <div
-        className={`rounded-md border px-3 py-2 text-sm ${
-          statusClass || 'border-gray-200 bg-gray-50 text-gray-900'
+        className={`rounded-control border px-3 py-2 text-sm ${
+          statusClass || 'border-border bg-subtle text-text'
         }`}
       >
         {displayValue}

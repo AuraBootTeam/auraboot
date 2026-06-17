@@ -55,7 +55,7 @@ const I18nText: React.FC<I18nTextProps> = ({
   const value = resolveI18nValue(record, fieldCode, activeLocale);
 
   if (value === null || value === undefined || value.trim() === '') {
-    return <span className={className ?? 'text-gray-400'}>{fallback}</span>;
+    return <span className={className ?? 'text-text-3'}>{fallback}</span>;
   }
 
   return <span className={className}>{value}</span>;

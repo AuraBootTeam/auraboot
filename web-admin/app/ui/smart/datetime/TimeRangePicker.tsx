@@ -173,12 +173,12 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({
         }
       >
         <div
-          className={`w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm ${disabledValue ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer bg-white hover:border-gray-400'} ${value && value.start && value.end ? 'text-gray-900' : 'text-gray-500'} ${value && !isValidRange(value) ? 'border-red-300' : ''} focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none`}
+          className={`rounded-control border-border-strong w-full border px-3 py-2 shadow-sm ${disabledValue ? 'bg-subtle cursor-not-allowed' : 'bg-panel hover:border-border-strong cursor-pointer'} ${value && value.start && value.end ? 'text-text' : 'text-text-2'} ${value && !isValidRange(value) ? 'border-status-red' : ''} focus-visible:shadow-focus focus:outline-none`}
           onClick={() => !disabledValue && setIsOpen(!isOpen)}
         >
           <div className="flex items-center justify-between">
             <div className="flex min-w-0 flex-1 items-center space-x-2">
-              <Clock className="h-4 w-4 flex-shrink-0 text-gray-400" />
+              <Clock className="text-text-3 h-4 w-4 flex-shrink-0" />
               <span className="truncate">{displayText()}</span>
             </div>
           </div>
@@ -186,27 +186,27 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({
 
         {/* Validation Error */}
         {value && !isValidRange(value) && (
-          <div className="mt-1 text-sm text-red-600">{st('结束时间不能早于开始时间')}</div>
+          <div className="text-status-red mt-1 text-sm">{st('结束时间不能早于开始时间')}</div>
         )}
 
         {/* Dropdown */}
         {isOpen && !disabledValue && (
-          <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-300 bg-white shadow-lg">
+          <div className="rounded-control border-border-strong bg-panel absolute z-50 mt-1 w-full border shadow-lg">
             <div className="flex">
               {/* Preset Ranges */}
-              <div className="w-1/3 border-r border-gray-200">
-                <div className="border-b border-gray-200 p-3">
-                  <h4 className="text-sm font-medium text-gray-700">{st('预设范围')}</h4>
+              <div className="border-border w-1/3 border-r">
+                <div className="border-border border-b p-3">
+                  <h4 className="text-text-2 text-sm font-medium">{st('预设范围')}</h4>
                 </div>
                 <div className="max-h-60 overflow-y-auto">
                   {presetRanges.map((preset, index) => (
                     <div
                       key={index}
-                      className="cursor-pointer p-2 text-sm hover:bg-gray-50"
+                      className="hover:bg-hover cursor-pointer p-2 text-sm"
                       onClick={() => handlePresetSelect(preset.value)}
                     >
                       <div className="font-medium">{st(preset.label)}</div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-text-2 text-xs">
                         {formatDisplayTime(preset.value.start)} -{' '}
                         {formatDisplayTime(preset.value.end)}
                       </div>
@@ -217,23 +217,23 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({
 
               {/* Time Selection */}
               <div className="flex-1">
-                <div className="border-b border-gray-200 p-3">
+                <div className="border-border border-b p-3">
                   <div className="flex space-x-2">
                     <button
-                      className={`rounded px-3 py-1 text-sm ${activeField === 'start' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'} `}
+                      className={`rounded px-3 py-1 text-sm ${activeField === 'start' ? 'bg-accent-weak text-accent' : 'text-text-2 hover:bg-hover'} `}
                       onClick={() => setActiveField('start')}
                     >
                       {st('开始时间')}
                     </button>
                     <button
-                      className={`rounded px-3 py-1 text-sm ${activeField === 'end' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'} `}
+                      className={`rounded px-3 py-1 text-sm ${activeField === 'end' ? 'bg-accent-weak text-accent' : 'text-text-2 hover:bg-hover'} `}
                       onClick={() => setActiveField('end')}
                     >
                       {st('结束时间')}
                     </button>
                   </div>
                   {value && (
-                    <div className="mt-2 text-sm text-gray-600">
+                    <div className="text-text-2 mt-2 text-sm">
                       {st('当前选择')}:{' '}
                       {value.start && value.end ? displayText() : st('请选择时间')}
                     </div>
@@ -250,7 +250,7 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({
                       return (
                         <button
                           key={index}
-                          className={`rounded p-2 text-xs hover:bg-gray-100 ${isSelected ? 'bg-blue-100 text-blue-700' : 'text-gray-700'} `}
+                          className={`hover:bg-hover rounded p-2 text-xs ${isSelected ? 'bg-accent-weak text-accent' : 'text-text-2'} `}
                           onClick={() => handleTimeSelect(time)}
                         >
                           {time}
@@ -263,19 +263,19 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between border-t border-gray-200 p-3">
-              <div className="text-sm text-gray-500">
+            <div className="border-border flex items-center justify-between border-t p-3">
+              <div className="text-text-2 text-sm">
                 {activeField === 'start' ? st('选择开始时间') : st('选择结束时间')}
               </div>
               <div className="space-x-2">
                 <button
-                  className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                  className="text-text-2 hover:text-text px-3 py-1 text-sm"
                   onClick={() => setIsOpen(false)}
                 >
                   {st('取消')}
                 </button>
                 <button
-                  className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
+                  className="bg-accent hover:bg-accent-hover rounded px-3 py-1 text-sm text-white"
                   onClick={() => setIsOpen(false)}
                   disabled={!value || !value.start || !value.end || !isValidRange(value)}
                 >
