@@ -28,6 +28,7 @@ import type { NavigateFunction } from 'react-router';
 import { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
+import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { useToastContext } from '~/contexts/ToastContext';
 
 type RuntimeToastLevel = 'success' | 'error' | 'info' | 'warning';
@@ -68,6 +69,9 @@ export interface UseSchemaRuntimeOptions {
 
   /** Optional toast bridge. Uses ToastContext when omitted. */
   showToast?: (message: string, level?: RuntimeToastLevel) => void;
+
+  /** Page-owned expression context, e.g. detail record/form/$page values. */
+  initialContext?: Partial<ExpressionContext>;
 }
 
 // createToastHandler removed — replaced by useToastContext in useSchemaRuntime
@@ -171,6 +175,7 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
       dataSourceManager, // P0-3: 必需参数
       disableAutoFetch,
       skipDataSourceRegistration,
+      initialContext: options.initialContext,
     });
 
     setRuntime(rt);
@@ -182,6 +187,10 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
     // 只依赖 schema 和 dataSourceManager，避免不必要的重建
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schema?.id, dataSourceManager]);
+
+  useEffect(() => {
+    runtime?.syncContext(options.initialContext);
+  }, [runtime, options.initialContext]);
 
   return runtime;
 }

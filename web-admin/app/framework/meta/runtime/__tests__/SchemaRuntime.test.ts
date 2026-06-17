@@ -98,6 +98,50 @@ describe('SchemaRuntime', () => {
     runtime.destroy();
   });
 
+  it('exposes and refreshes page-owned context for block actions', () => {
+    const manager = createManager();
+    const runtime = new SchemaRuntime({
+      schema: {
+        ...minimalSchema,
+        state: { source: 'schema', keep: true },
+      } as UnifiedSchema,
+      globalState: createGlobalState(),
+      dataSourceManager: manager,
+      disableAutoFetch: true,
+      initialContext: {
+        form: { pid: 'quote-1', status: 'draft' },
+        row: { pid: 'quote-1' },
+        record: { pid: 'quote-1', status: 'draft' },
+        state: { selectedTab: 'bom' },
+        $page: { pageKey: 'quote_detail', recordId: 'quote-1' },
+      },
+    });
+
+    let context = runtime.getContext() as any;
+    expect(context.form.pid).toBe('quote-1');
+    expect(context.row.pid).toBe('quote-1');
+    expect(context.record.pid).toBe('quote-1');
+    expect(context.$page.recordId).toBe('quote-1');
+    expect(context.state).toMatchObject({ source: 'schema', keep: true, selectedTab: 'bom' });
+
+    runtime.syncContext({
+      form: { pid: 'quote-2', status: 'review' },
+      row: { pid: 'quote-2' },
+      record: { pid: 'quote-2', status: 'review' },
+      state: { selectedTab: 'excel' },
+      $page: { pageKey: 'quote_detail', recordId: 'quote-2' },
+    });
+
+    context = runtime.getContext() as any;
+    expect(context.form.pid).toBe('quote-2');
+    expect(context.row.pid).toBe('quote-2');
+    expect(context.record.status).toBe('review');
+    expect(context.$page.recordId).toBe('quote-2');
+    expect(context.state).toMatchObject({ source: 'schema', keep: true, selectedTab: 'excel' });
+
+    runtime.destroy();
+  });
+
   it('delegates flow actions to the ActionRegistry', async () => {
     const manager = createManager();
     const actionName = '__test.action__';
