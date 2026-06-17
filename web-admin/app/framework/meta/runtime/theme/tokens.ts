@@ -204,6 +204,35 @@ export const dsTokens = {
   // mockup currently renders 2px — flagged for sync).
   focusRing: '0 0 0 3px #EFF4FF',
   disabledOpacity: '0.5',
+  // Dark-mode overrides for the semantic color tokens (T3 "补 dark mode").
+  // Derived from the app's existing `.dark` conventions (gray-900 bg /
+  // gray-50 text / blue-400 accent — see app/app.css). The `@theme`-generated
+  // utilities reference `var(--color-*)`, so overriding those under `.dark`
+  // makes bg-panel / text-text / bg-accent / status colors auto-switch.
+  dark: {
+    color: {
+      text: '#F9FAFB',
+      text2: '#9CA3AF',
+      text3: '#6B7280',
+      border: '#374151',
+      borderStrong: '#4B5563',
+      bg: '#111827',
+      panel: '#1F2937',
+      subtle: '#19212E',
+      hover: '#374151',
+      selection: '#1E3A5F',
+      accent: '#60A5FA',
+      accentHover: '#3B82F6',
+      accentWeak: '#1E293B',
+    },
+    status: {
+      gray: { fg: '#A1A1AA', bg: '#27272A' },
+      blue: { fg: '#60A5FA', bg: '#1E293B' },
+      amber: { fg: '#FBBF24', bg: '#2A2113' },
+      green: { fg: '#34D399', bg: '#14271C' },
+      red: { fg: '#F87171', bg: '#2A1515' },
+    },
+  },
 } as const;
 
 /**
@@ -285,6 +314,32 @@ export function buildThemeCss(tokens: DsTokens = dsTokens): string {
     lines.push(`  --ds-space-${step}: ${value};`);
   }
   lines.push(`  --ds-disabled-opacity: ${tokens.disabledOpacity};`);
+  lines.push('}');
+  lines.push('');
+
+  // Dark-mode overrides. The @theme utilities reference var(--color-*), so
+  // overriding those variables under `.dark` switches bg-panel / text-text /
+  // bg-accent / status colors automatically (darkMode: 'class').
+  const d = tokens.dark.color;
+  lines.push('/* Dark-mode token overrides (T3). */');
+  lines.push('.dark {');
+  lines.push(`  --color-text: ${d.text};`);
+  lines.push(`  --color-text-2: ${d.text2};`);
+  lines.push(`  --color-text-3: ${d.text3};`);
+  lines.push(`  --color-border: ${d.border};`);
+  lines.push(`  --color-border-strong: ${d.borderStrong};`);
+  lines.push(`  --color-bg: ${d.bg};`);
+  lines.push(`  --color-panel: ${d.panel};`);
+  lines.push(`  --color-subtle: ${d.subtle};`);
+  lines.push(`  --color-hover: ${d.hover};`);
+  lines.push(`  --color-selection: ${d.selection};`);
+  lines.push(`  --color-accent: ${d.accent};`);
+  lines.push(`  --color-accent-hover: ${d.accentHover};`);
+  lines.push(`  --color-accent-weak: ${d.accentWeak};`);
+  for (const [name, pair] of Object.entries(tokens.dark.status)) {
+    lines.push(`  --color-status-${name}: ${pair.fg};`);
+    lines.push(`  --color-status-${name}-bg: ${pair.bg};`);
+  }
   lines.push('}');
   lines.push('');
 
