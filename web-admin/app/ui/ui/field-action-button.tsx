@@ -11,22 +11,22 @@ export const FieldActionButton = React.forwardRef<HTMLButtonElement, FieldAction
   ({ size = 'sm', variant = 'ghost', iconOnly = false, className, ...props }, ref) => {
     const sizeClass = iconOnly
       ? size === 'md'
-        ? 'h-8 w-8'
-        : 'h-7 w-7'
+        ? 'h-[var(--ds-control-md)] w-[var(--ds-control-md)]'
+        : 'h-[var(--ds-control-sm)] w-[var(--ds-control-sm)]'
       : size === 'md'
-        ? 'px-2 py-1 text-sm'
+        ? 'px-2 py-1 text-body'
         : 'p-1';
     const iconOnlyClass = iconOnly ? 'p-0 inline-flex items-center justify-center' : '';
     const variantClass =
       variant === 'solid'
-        ? 'bg-blue-500 text-white hover:bg-blue-600'
-        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-700';
+        ? 'bg-accent text-white hover:bg-accent-hover'
+        : 'text-text-3 hover:text-text-2 hover:bg-hover dark:hover:text-gray-300 dark:hover:bg-gray-700';
 
     return (
       <button
         ref={ref}
         className={cn(
-          'rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+          'rounded-control focus-visible:shadow-focus transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
           sizeClass,
           iconOnlyClass,
           variantClass,

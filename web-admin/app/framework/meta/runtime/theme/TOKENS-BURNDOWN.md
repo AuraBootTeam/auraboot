@@ -23,14 +23,14 @@ grep -rnoE '\brounded(-[a-z]+)?-(sm|md|lg|xl|2xl|3xl|full)\b' app/ui --include='
 
 ## Baseline counts — scope `app/ui` (156 component files: 19 base in `ui/ui`, 55 smart in `ui/smart`, rest in `ui/meta` etc.)
 
-| # | Category | Occurrences | Target |
-|---|----------|------------:|--------|
-| A | Raw hex literals (`#rrggbb`) | 23 (4 files) | semantic token / `var(--color-*)` |
-| B | Arbitrary tailwind color `text-[#…]` | 1 | semantic utility |
-| B | Arbitrary px sizes `…-[NNpx]` | 38 | spacing / control tokens |
-| C | **Palette utilities `*-gray/blue/red…-NNN`** | **2943** | semantic color utilities |
-| D | **Radius utilities `rounded-sm/md/lg/…`** | **457** | `rounded-control/card/card-lg/pill` |
-| E | Inline-style `NNpx` (approx) | 59 | spacing / control tokens |
+| #   | Category                                     |  Occurrences | Target                              |
+| --- | -------------------------------------------- | -----------: | ----------------------------------- |
+| A   | Raw hex literals (`#rrggbb`)                 | 23 (4 files) | semantic token / `var(--color-*)`   |
+| B   | Arbitrary tailwind color `text-[#…]`         |            1 | semantic utility                    |
+| B   | Arbitrary px sizes `…-[NNpx]`                |           38 | spacing / control tokens            |
+| C   | **Palette utilities `*-gray/blue/red…-NNN`** |     **2943** | semantic color utilities            |
+| D   | **Radius utilities `rounded-sm/md/lg/…`**    |      **457** | `rounded-control/card/card-lg/pill` |
+| E   | Inline-style `NNpx` (approx)                 |           59 | spacing / control tokens            |
 
 Separately, `app/app.css` carries **367 raw hex** (the legacy `.decisionops-*` block) — a self-contained migration, tackle alongside T4 (list renderer) or as its own slice.
 
@@ -53,32 +53,58 @@ Separately, `app/app.css` carries **367 raw hex** (the legacy `.decisionops-*` b
 
 Utilities/vars now available from `tokens.theme.css` (generated from `dsTokens`):
 
-| Legacy tailwind / hex | Semantic token utility | CSS var |
-|---|---|---|
-| `text-gray-900` `#111827`/`#1f2937` | `text-text` | `--color-text` `#1A1A1E` |
-| `text-gray-500` `#6b7280` | `text-text-2` | `--color-text-2` `#5A5E66` |
-| `text-gray-400` `#9ca3af` | `text-text-3` | `--color-text-3` `#9A9DA5` |
-| `border-gray-200` `#e5e7eb` | `border-border` | `--color-border` `#ECEDEF` |
-| `border-gray-300` `#d1d5db` | `border-border-strong` | `--color-border-strong` `#E2E3E6` |
-| `bg-white` | `bg-panel` | `--color-panel` `#FFFFFF` |
-| `bg-gray-50` `#f9fafb` | `bg-subtle` | `--color-subtle` `#FAFAFB` |
-| `bg-gray-100` `#f3f4f6` | `bg-hover` | `--color-hover` `#F3F4F6` |
-| `bg-blue-600`/`text-blue-600` `#2563eb`/`#3b82f6` | `bg-accent`/`text-accent` | `--color-accent` `#2563EB` |
-| `bg-blue-700` `#1d4ed8` (hover) | `bg-accent-hover` | `--color-accent-hover` `#1D4ED8` |
-| `bg-blue-50` `#eff6ff` | `bg-accent-weak` | `--color-accent-weak` `#EFF4FF` |
-| status gray/blue/amber/green/red | `text-status-{name}` + `bg-status-{name}-bg` | `--color-status-{name}` / `-bg` |
-| `rounded-sm` / `rounded` / `rounded-md` | `rounded-control` (6px) | `--radius-control` |
-| `rounded-lg` | `rounded-card` (8px) | `--radius-card` |
-| `rounded-xl` | `rounded-card-lg` (10px) | `--radius-card-lg` |
-| `rounded-full` | `rounded-pill` | `--radius-pill` |
-| focus ring | `focus-visible:shadow-focus` | `--shadow-focus` (= `0 0 0 3px accent-weak`) |
-| disabled | `disabled:opacity-50` | `--ds-disabled-opacity` |
-| control heights | `h-[var(--ds-control-md)]` etc. | `--ds-control-sm/md/lg/field` |
+| Legacy tailwind / hex                             | Semantic token utility                       | CSS var                                      |
+| ------------------------------------------------- | -------------------------------------------- | -------------------------------------------- |
+| `text-gray-900` `#111827`/`#1f2937`               | `text-text`                                  | `--color-text` `#1A1A1E`                     |
+| `text-gray-500` `#6b7280`                         | `text-text-2`                                | `--color-text-2` `#5A5E66`                   |
+| `text-gray-400` `#9ca3af`                         | `text-text-3`                                | `--color-text-3` `#9A9DA5`                   |
+| `border-gray-200` `#e5e7eb`                       | `border-border`                              | `--color-border` `#ECEDEF`                   |
+| `border-gray-300` `#d1d5db`                       | `border-border-strong`                       | `--color-border-strong` `#E2E3E6`            |
+| `bg-white`                                        | `bg-panel`                                   | `--color-panel` `#FFFFFF`                    |
+| `bg-gray-50` `#f9fafb`                            | `bg-subtle`                                  | `--color-subtle` `#FAFAFB`                   |
+| `bg-gray-100` `#f3f4f6`                           | `bg-hover`                                   | `--color-hover` `#F3F4F6`                    |
+| `bg-blue-600`/`text-blue-600` `#2563eb`/`#3b82f6` | `bg-accent`/`text-accent`                    | `--color-accent` `#2563EB`                   |
+| `bg-blue-700` `#1d4ed8` (hover)                   | `bg-accent-hover`                            | `--color-accent-hover` `#1D4ED8`             |
+| `bg-blue-50` `#eff6ff`                            | `bg-accent-weak`                             | `--color-accent-weak` `#EFF4FF`              |
+| status gray/blue/amber/green/red                  | `text-status-{name}` + `bg-status-{name}-bg` | `--color-status-{name}` / `-bg`              |
+| `rounded-sm` / `rounded` / `rounded-md`           | `rounded-control` (6px)                      | `--radius-control`                           |
+| `rounded-lg`                                      | `rounded-card` (8px)                         | `--radius-card`                              |
+| `rounded-xl`                                      | `rounded-card-lg` (10px)                     | `--radius-card-lg`                           |
+| `rounded-full`                                    | `rounded-pill`                               | `--radius-pill`                              |
+| focus ring                                        | `focus-visible:shadow-focus`                 | `--shadow-focus` (= `0 0 0 3px accent-weak`) |
+| disabled                                          | `disabled:opacity-50`                        | `--ds-disabled-opacity`                      |
+| control heights                                   | `h-[var(--ds-control-md)]` etc.              | `--ds-control-sm/md/lg/field`                |
 
 > Status colors map by **semantic**, not by raw palette — pick from the 5 in
 > standard §1.3 (gray=draft/closed, blue=in-progress, amber=pending/warning,
 > green=done/normal, red=error/overdue). Don't 1:1 translate every `green-500`;
 > confirm the semantic first.
+
+## Progress
+
+### T2 — base components (`app/ui/ui`, ~19 + shared `field-styles`) — DONE
+
+Single-sourced control chrome into `field-styles.tsx` (token-referenced heights
+`var(--ds-control-*)`, `rounded-control`, unified `shadow-focus` ring,
+`disabled:opacity-50`, semantic `bg-panel`/`border-border-strong`/`text-text`/
+`border-status-red`). Swept button / input / textarea / select / checkbox /
+switch / dialog / popover / tooltip / separator / label / help-text / error-text
+/ field-action-button / field-base. The `field-styles` value change ripples into
+~10 smart form controls that import it.
+
+Post-T2 `app/ui/ui` light-mode residuals: **palette 1** (`hover:bg-red-700` —
+destructive-button hover, no status-red-hover token; accepted) · **radius 0**.
+Dark-mode (`dark:`) classes intentionally left for T3.
+
+Verified: 19 new unit tests (field-styles contract + control render assertions);
+85 app/ui tests green (no field-styles ripple regression); typecheck clean; a
+host-first static control gallery (Playwright chromium, no backend) screenshot
+confirms accent buttons, 3px focus ring, control heights, semantic status pills,
+quiet field chrome — matches mockup §组件库 intent.
+
+> Remaining big surface is `app/ui/meta` + `app/ui/smart` + `app/ui/base-fields`
+> (T3): the ~2900 palette utils / ~440 radius utils counted above are mostly
+> there. Migrate using the cheat-sheet, then re-run the baseline greps.
 
 ## Notes / decisions
 
