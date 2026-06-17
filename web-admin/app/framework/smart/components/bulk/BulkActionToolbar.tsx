@@ -33,6 +33,8 @@ export interface BulkActionToolbarProps {
   onClearSelection?: () => void;
   /** Custom CSS class */
   className?: string;
+  /** i18n translator (key, params, fallback). Defaults to the fallback. */
+  t?: (key: string, params?: Record<string, any>, fallback?: string) => string;
 }
 
 /**
@@ -49,15 +51,24 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
   resolveActionLabel,
   onClearSelection,
   className,
+  t,
 }) => {
   const [deleting, setDeleting] = useState(false);
   const [runningActionCode, setRunningActionCode] = useState<string | null>(null);
+  const tr = useCallback(
+    (key: string, fallback: string, params?: Record<string, any>) =>
+      t ? t(key, params, fallback) : fallback,
+    [t],
+  );
 
   const handleBulkDelete = useCallback(async () => {
     if (!onBulkDelete || selectedIds.length === 0) return;
 
     const confirmed = await confirmDialog({
-      content: `Are you sure you want to delete ${selectedIds.length} selected records? This action cannot be undone.`,
+      content: tr(
+        'list.bulk.deleteConfirm',
+        `Are you sure you want to delete ${selectedIds.length} selected records? This action cannot be undone.`,
+      ),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -68,7 +79,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
     } finally {
       setDeleting(false);
     }
-  }, [onBulkDelete, selectedIds]);
+  }, [onBulkDelete, selectedIds, tr]);
 
   const handleCustomBulkAction = useCallback(
     async (button: ButtonConfig) => {
@@ -100,7 +111,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold">
           {selectedCount}
         </div>
-        <span className="text-gray-300">selected</span>
+        <span className="text-gray-300">{tr('list.bulk.selected', 'selected')}</span>
       </div>
 
       {/* Divider */}
@@ -110,7 +121,9 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
       <div className="flex items-center gap-2">
         {/* DSL-configured business bulk actions */}
         {bulkActions.map((button) => {
-          const label = resolveActionLabel ? resolveActionLabel(button) : String(button.label ?? button.code);
+          const label = resolveActionLabel
+            ? resolveActionLabel(button)
+            : String(button.label ?? button.code);
           const isRunning = runningActionCode === button.code;
           const isDanger = button.danger || button.variant === 'danger';
           return (
@@ -139,6 +152,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
             type="button"
             onClick={onBulkEdit}
             className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-gray-700"
+            data-testid="bulk-edit-btn"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -148,7 +162,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
               />
             </svg>
-            Edit
+            {tr('common.edit', 'Edit')}
           </button>
         )}
 
@@ -163,6 +177,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               'text-red-400 hover:bg-red-900/50',
               'disabled:cursor-not-allowed disabled:opacity-50',
             )}
+            data-testid="bulk-delete-btn"
           >
             {deleting ? (
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-400/30 border-t-red-400" />
@@ -176,16 +191,17 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
                 />
               </svg>
             )}
-            Delete
+            {tr('common.delete', 'Delete')}
           </button>
         )}
 
-        {/* Bulk Export */}
+        {/* Bulk Export — exports only the selected records (T9). */}
         {onBulkExport && (
           <button
             type="button"
             onClick={() => onBulkExport(selectedIds)}
             className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-gray-700"
+            data-testid="bulk-export-selected-btn"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -195,7 +211,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            Export
+            {tr('list.bulk.exportSelected', 'Export selected')}
           </button>
         )}
       </div>
@@ -208,7 +224,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
         type="button"
         onClick={onClearSelection}
         className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white"
-        title="Clear selection"
+        title={tr('list.bulk.clearSelection', 'Clear selection')}
+        data-testid="bulk-clear-selection-btn"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
