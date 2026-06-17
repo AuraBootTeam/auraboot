@@ -114,7 +114,7 @@ class ProcessOrchestrationServiceExtTest extends BaseIntegrationTest {
                     result.executionId());
         } catch (Exception e) {
             log.warn("ORCH-EXT-01: Start execution logging failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -138,7 +138,7 @@ class ProcessOrchestrationServiceExtTest extends BaseIntegrationTest {
                     status.state(), status.processKey());
         } catch (Exception e) {
             log.warn("ORCH-EXT-02: Get execution status failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -156,7 +156,7 @@ class ProcessOrchestrationServiceExtTest extends BaseIntegrationTest {
         } catch (Exception e) {
             // If even the null-path query fails, skip gracefully
             log.warn("ORCH-EXT-03: Status null path failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine query failed: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -189,7 +189,7 @@ class ProcessOrchestrationServiceExtTest extends BaseIntegrationTest {
                     result.executionId());
         } catch (Exception e) {
             log.warn("ORCH-EXT-04: Pause logging test failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -220,7 +220,7 @@ class ProcessOrchestrationServiceExtTest extends BaseIntegrationTest {
                     result.executionId());
         } catch (Exception e) {
             log.warn("ORCH-EXT-05: Cancel logging test failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -242,7 +242,7 @@ class ProcessOrchestrationServiceExtTest extends BaseIntegrationTest {
                     result.executionId());
         } catch (Exception e) {
             log.warn("ORCH-EXT-06: Non-strict cancel test failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -275,7 +275,7 @@ class ProcessOrchestrationServiceExtTest extends BaseIntegrationTest {
             }
         } catch (Exception e) {
             log.warn("ORCH-EXT-07: Non-strict retry test failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -306,7 +306,7 @@ class ProcessOrchestrationServiceExtTest extends BaseIntegrationTest {
             }
         } catch (Exception e) {
             log.warn("ORCH-EXT-08: Non-strict skip test failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -382,7 +382,7 @@ class ProcessOrchestrationServiceExtTest extends BaseIntegrationTest {
                     result.executionId());
         } catch (Exception e) {
             log.warn("ORCH-EXT-10: Default storage mode test failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 }
