@@ -148,6 +148,8 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
         'subform',
         'action-bar',
         'widget',
+        'metric-strip',
+        'status-banner',
       ],
       inspector: toInspectorSchema('detail'),
       layoutCapability: 'span',
@@ -166,7 +168,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
       label: { 'en-US': 'Dashboard', 'zh-CN': '仪表盘' },
       icon: 'layout-dashboard',
       category: 'page',
-      allowedChildren: ['widget'],
+      allowedChildren: ['widget', 'metric-strip', 'status-banner'],
       inspector: toInspectorSchema('dashboard'),
       layoutCapability: 'span',
     },
@@ -207,6 +209,8 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
         'bpm-panel',
         'activity-timeline',
         'field-history',
+        'metric-strip',
+        'status-banner',
       ],
       inspector: toInspectorSchema('columns'),
       layoutCapability: 'span',
@@ -231,6 +235,8 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
         'bpm-panel',
         'activity-timeline',
         'field-history',
+        'metric-strip',
+        'status-banner',
       ],
       inspector: toInspectorSchema('tab'),
       layoutCapability: 'span',
@@ -292,6 +298,33 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
       icon: 'list-tree',
       category: 'workflow',
       inspector: toInspectorSchema('field-history'),
+      layoutCapability: 'span',
+    },
+    // Workbench blocks (metric-strip / status-banner). These are backed by the
+    // platform meta-rendering renderers (framework/meta/rendering/blocks/
+    // MetricStripBlockRenderer + StatusBannerBlockRenderer) on the live /p/ page;
+    // the designer adds palette + inspector + a config-driven representative
+    // preview here (RecursiveBlockRenderer.RuntimeMetricStripPreview /
+    // RuntimeStatusBannerPreview). The full data-bound rendering happens on the
+    // live page, not inside the designer canvas. The authored props live at the
+    // block top level (dataSource / metrics / variant / statusField / toneMap …)
+    // exactly where the platform renderers read them — see InspectorSchemaRegistry
+    // (bare-key inspector fields) and the real authored pages (mfg_andon_workbench
+    // metric-strip, bom-standardization status-banner).
+    {
+      blockType: 'metric-strip',
+      label: { 'en-US': 'Metric strip', 'zh-CN': '指标条' },
+      icon: 'layout-grid',
+      category: 'workbench',
+      inspector: toInspectorSchema('metric-strip'),
+      layoutCapability: 'span',
+    },
+    {
+      blockType: 'status-banner',
+      label: { 'en-US': 'Status banner', 'zh-CN': '状态横幅' },
+      icon: 'badge-info',
+      category: 'workbench',
+      inspector: toInspectorSchema('status-banner'),
       layoutCapability: 'span',
     },
   ]);

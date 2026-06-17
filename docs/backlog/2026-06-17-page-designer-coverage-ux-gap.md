@@ -204,10 +204,16 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 | C5 画布多选 + 批量删除 | ✅ DONE | 独立 `multiSelectedIds: Set`(**不动 selectedBlockId 拖放上下文**,仅 5 行删除纯增量);shift/cmd-click 多选 + `multi-select-bar`(N selected + 批量删除 + 清除)+ 批量删除(跳过不可删 root,单次 undo)+ `data-multi-selected` 视觉;`canvas-multiselect-golden.spec.ts` 4/4 真栈(多选→批量删→**PUT save→GET readback 持久化删除**→undo 恢复;edge 普通click收起/重复 modifier 取消;sad clear 不删);顺手修 CanvasHost BlockContent pass-through 漏传(破坏嵌套 block)。inspector-authoring 6/6 无回归 |
 | C5 box-select 几何框选(commit `3dac2092`,Slice 9)| ✅ DONE | 空白 canvas 拖拽画 marquee(`marquee-rect`)选中相交 block 进 C5 `multiSelectedIds`;**命中逻辑抽纯函数 `marqueeHitTest`(rectFromPoints + blocksWithinMarquee)+ 单测**(相交/包含/部分/不交/顺序);`onHostPointerDown` 只在空白区起(`isOnBlockOrInteractive` 跳过 block/交互元素 + 6px 阈值)→ 不破坏 block 选择/widget move/拖放;`canvas-box-select-golden.spec.ts` 3/3 **连跑 3 次稳定**(marquee 选 2/全 3 + sad 阈值下不选);multiselect 回归 4/4。**C5 多选+批量+框选全闭环** |
 
+### ✅ Slice 10 E2 workbench 块 palette 首切片(commit `51cb40f8`,4 E2E + 242 单测独立重跑 0 fail,host-first 隔离 slot 48)
+| 项 | 状态 | 证据 |
+|----|------|------|
+| E2(部分)metric-strip + status-banner 可视化 authoring | ✅ DONE | BlockRegistry 注册 2 块(+allowedChildren+kindPolicy)+ inspector(**bare-path key** `metrics`/`toneMap`/`statusField` 非 props.*,匹配平台渲染器 `block.metrics` 顶层读,已对真实页 mfg_andon/bom-std 取证)+ `RecursiveBlockRenderer` 代表性预览(`RuntimeMetricStripPreview`/`StatusBannerPreview`,config-driven 占位);`workbench-blocks-authoring-golden.spec.ts` 4/4:A1 metric-strip/A2 status-banner authoring+readback+预览、A3 非法 JSON sad、**L1 live `/p/c/{key}` 真平台渲染器显绑定数据(Pending=7/Ready=3)证明端到端可用**;widget 5/5 无回归 |
+| §15 架构边界 | 📌 记录 | 设计器自有 runtime(DslBlockV3)≠ 平台 meta rendering(BlockConfig)两套;**按 §15 取证未做完整两 runtime 桥接** → 设计器内代表性预览,完整数据绑定渲染由 live `/p/` 平台 runtime 负责。bounded 不冒架构险 |
+
 ### ⏸ NOT-MET(roadmap,**未完成,不假报**)
 - **A7** mid-drag drop-indicator/ghost 视觉断言(@dnd-kit 中途手势最易 flake,ROI 最低)→ defer。
 - **A11/A12** chart 类型广度 / input·layout 广度 → defer。
-- **E1(剩余)/E2** widget 全 24 chart parity(runtime 统一 SharedChartFactory)、19 workbench block palette 可视化 authoring → 大特性(多周),未做。
+- **E1(剩余)/E2(剩余)** widget 全 24 chart parity(runtime 统一 SharedChartFactory)、其余 17 个 workbench block(record-inspector/candidate-list/workbench-action-bar/evidence-panel/artifact-timeline/review-drawer 等)palette + 完整数据绑定设计器渲染 → 大特性(多周),未做(E2 已交付 metric-strip+status-banner 2 块 + 代表性预览范式)。
 - **C4** kind 切换 → 未做(C5 多选+批量+框选已全交付)。
 - **D2/D4** 富属性控件全接入(dict/namedQuery/command/permission 选择器)、字段级校验反馈;**B3** REST diff blocks 下钻 → 未做。
 - **🧪 测试鲁棒性 follow-up** — ✅ 已由 Slice 9(`3dac2092`)闭环:`inspector-model-select-golden:152` 改 seed-agnostic 断言(SELECT + option ≥2),不再锁定具体 model;leaner seed 栈也过。本行历史保留。
