@@ -14,18 +14,18 @@ test.describe('PCBA quote process fee review', () => {
 
       const manualRequiredChip = page.getByTestId('metric-strip-item-partial');
       const unmatchedChip = page.getByTestId('metric-strip-item-unmatched');
-      await expect(manualRequiredChip).toContainText('2', { timeout: 20_000 });
-      await expect(unmatchedChip).toContainText('0');
+      await expect(manualRequiredChip).toContainText('1', { timeout: 20_000 });
+      await expect(unmatchedChip).toContainText('1');
 
-      await manualRequiredChip.click();
+      await unmatchedChip.click();
       const unmatchedRow = page.locator('[data-testid^="table-row-"]').filter({ hasText: 'E2E-UNMATCHED' });
       await expect(unmatchedRow).toHaveCount(1, { timeout: 20_000 });
-      await expect(unmatchedRow).toContainText(/需人工复核|Needs Review|manual_required/i);
+      await expect(unmatchedRow).toContainText(/规则未命中|Unmatched|unmatched/i);
       await unmatchedRow.click();
 
       const reviewDrawer = page.getByTestId('review-drawer');
       await expect(reviewDrawer).toBeVisible({ timeout: 10_000 });
-      await expect(page.getByTestId('review-drawer-badge-status')).toContainText(/需人工复核|Needs Review/);
+      await expect(page.getByTestId('review-drawer-badge-status')).toContainText(/规则未命中|Unmatched/i);
       await expect(reviewDrawer).toContainText('NO_RULE_PKG');
       await expect(reviewDrawer).toContainText('quote_line_points');
       await expect(reviewDrawer).toContainText(/单件点数|Unit Points/);
@@ -35,6 +35,8 @@ test.describe('PCBA quote process fee review', () => {
 
       await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
       await expect(reviewDrawer).toHaveCount(0);
+
+      await manualRequiredChip.click();
       const manualRequiredRow = page.locator('[data-testid^="table-row-"]').filter({ hasText: 'E2E-MIXED' });
       await expect(manualRequiredRow).toHaveCount(1, { timeout: 20_000 });
       await expect(manualRequiredRow).toContainText(/需人工复核|Needs Review|manual_required/i);
