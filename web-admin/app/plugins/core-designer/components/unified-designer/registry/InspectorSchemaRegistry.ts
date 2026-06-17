@@ -366,6 +366,133 @@ const statusBannerFields: PropertySchema<string>[] = [
   { key: 'layout.span', label: 'Span', type: 'number' },
 ];
 
+// Workbench-family batch 2 inspector schemas. Same contract as metric-strip /
+// status-banner: every key below is a BARE top-level path (no props.*) because
+// the live platform renderers read them at the block top level. Each schema lists
+// only props the renderer actually consumes — no invented fields. Verified
+// against the renderer source under framework/meta/rendering/blocks/.
+
+// WorkbenchActionBarBlockRenderer reads block.actions / block.surface /
+// block.detailPlacement / block.density / block.align / block.title. Each action
+// is { code|id, label, variant, visibleWhen, activeWhen, disabledWhen, onClick }.
+const workbenchActionBarFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  {
+    key: 'surface',
+    label: 'Surface',
+    type: 'select',
+    options: [
+      { label: 'Card', value: 'card' },
+      { label: 'Bare', value: 'bare' },
+    ],
+  },
+  {
+    key: 'density',
+    label: 'Density',
+    type: 'select',
+    options: [
+      { label: 'Default', value: 'default' },
+      { label: 'Compact', value: 'compact' },
+    ],
+  },
+  {
+    key: 'align',
+    label: 'Align',
+    type: 'select',
+    options: [
+      { label: 'Start', value: 'start' },
+      { label: 'Center', value: 'center' },
+      { label: 'End', value: 'end' },
+    ],
+  },
+  // actions: array of { code, label, variant, visibleWhen, activeWhen,
+  // disabledWhen, onClick }. Authored as JSON — the renderer iterates it.
+  { key: 'actions', label: 'Actions JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// EvidencePanelBlockRenderer reads block.dataSource (string id) / block.context /
+// block.sections / block.title / block.empty. Section: { key, field, label,
+// format }.
+const evidencePanelFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'dataSource', label: 'Data source', type: 'text' },
+  { key: 'context', label: 'Context expression', type: 'text' },
+  // sections: array of { key, field, label, format } — the renderer iterates it.
+  { key: 'sections', label: 'Sections JSON', type: 'json' },
+  { key: 'empty', label: 'Empty state JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// RecordInspectorBlockRenderer reads block.context / block.fields / block.empty
+// and renders block.blocks (child blocks) below the field grid. Field: { field,
+// path, label, span }.
+const recordInspectorFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'context', label: 'Context expression', type: 'text' },
+  // fields: array of { field, path, label, span } — the renderer iterates it.
+  { key: 'fields', label: 'Fields JSON', type: 'json' },
+  { key: 'empty', label: 'Empty state JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// CandidateListBlockRenderer reads block.dataSource (string id) / block.item /
+// block.selection / block.actions / block.maxHeight. item: { titleField,
+// subtitleField, descriptionField, scoreField, detailFields[], maxHeight }.
+const candidateListFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'dataSource', label: 'Data source', type: 'text' },
+  // item: { titleField, subtitleField, descriptionField, scoreField,
+  // detailFields }. Authored as JSON.
+  { key: 'item', label: 'Item config JSON', type: 'json' },
+  // selection: { bind } — the runtime state key the selected row is written to.
+  { key: 'selection', label: 'Selection JSON', type: 'json' },
+  { key: 'actions', label: 'Actions JSON', type: 'json' },
+  { key: 'maxHeight', label: 'Max height', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// ArtifactTimelineBlockRenderer reads block.dataSource (string id) / block.item /
+// block.title / block.empty. item: { keyField, titleField, subtitleField,
+// revisionField, statusField, hashField, fileIdField }.
+const artifactTimelineFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'dataSource', label: 'Data source', type: 'text' },
+  // item: { keyField, titleField, subtitleField, revisionField, statusField,
+  // hashField, fileIdField }. Authored as JSON.
+  { key: 'item', label: 'Item config JSON', type: 'json' },
+  { key: 'empty', label: 'Empty state JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// ReviewDrawerBlockRenderer is the row-level review overlay (the most complex
+// workbench block). It reads many top-level keys: context / contextDataSource /
+// contextKeyField / titleTemplate / summaryBadges / compare / candidates /
+// exportImpact / source / empty / title. Nested objects (compare, candidates,
+// exportImpact, source) are authored as JSON.
+const reviewDrawerFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'titleTemplate', label: 'Title template', type: 'text' },
+  // context expression resolves the selected record (e.g. ${state.selectedRow}).
+  { key: 'context', label: 'Context expression', type: 'text' },
+  { key: 'contextDataSource', label: 'Context data source', type: 'text' },
+  { key: 'contextKeyField', label: 'Context key field', type: 'text' },
+  // summaryBadges: array of { key, label, valueField, tone, unit }.
+  { key: 'summaryBadges', label: 'Summary badges JSON', type: 'json' },
+  // compare: { rawRecord, canonicalRecord, rawFields, canonicalFields, rawTitle,
+  // canonicalTitle }.
+  { key: 'compare', label: 'Compare panel JSON', type: 'json' },
+  // candidates: { dataSource, title, item, decisionFields, actions, selection,
+  // selectedFields, reasonField, … }.
+  { key: 'candidates', label: 'Candidates JSON', type: 'json' },
+  // exportImpact: { dataSource, fields, actions }.
+  { key: 'exportImpact', label: 'Export impact JSON', type: 'json' },
+  // source: { record, summary, cards, policies, jsonField, … }.
+  { key: 'source', label: 'Source evidence JSON', type: 'json' },
+  { key: 'empty', label: 'Empty state JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
 const actionTypeField: PropertySchema<string> = {
   key: 'actionType',
   label: 'Action type',
@@ -566,6 +693,12 @@ export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry 
     'field-history': fieldHistoryFields,
     'metric-strip': metricStripFields,
     'status-banner': statusBannerFields,
+    'workbench-action-bar': workbenchActionBarFields,
+    'review-drawer': reviewDrawerFields,
+    'evidence-panel': evidencePanelFields,
+    'record-inspector': recordInspectorFields,
+    'candidate-list': candidateListFields,
+    'artifact-timeline': artifactTimelineFields,
     action: [...actionBaseFields, ...actionCommonFeedbackFields],
     widget: widgetFields,
   });
