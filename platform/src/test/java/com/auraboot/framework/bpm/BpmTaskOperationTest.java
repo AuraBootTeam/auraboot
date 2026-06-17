@@ -372,12 +372,6 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
 
     @Test
     @Order(11)
-    @Disabled("BLOCKED-UPSTREAM (G-B5): SmartEngine rollback does not populate "
-            + "se_process_rollback_record.operator_user_id (NOT NULL) and exposes no operator "
-            + "parameter — same root cause as add/remove-sign (se_assignee_operation_record). "
-            + "Any real rollback fails with a constraint violation. Tracked in "
-            + "docs/backlog/2026-06-17-bpmn-designer-golden-gap.md. Previously hidden by "
-            + "Assumptions.assumeTrue(false) (false-pass — G-T3).")
     @DisplayName("D2-11: Rollback task - back to specified node")
     void d2_11_rollbackTask() {
         try {
@@ -402,12 +396,6 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
 
     @Test
     @Order(12)
-    @Disabled("BLOCKED-UPSTREAM (G-B5): SmartEngine addTaskAssigneeCandidateWithReason "
-            + "does not populate se_assignee_operation_record.operator_user_id (NOT NULL), and "
-            + "the engine API/candidate model expose no operator parameter — any real add-sign "
-            + "fails with a constraint violation. Tracked in docs/backlog/2026-06-17-bpmn-designer-golden-gap.md. "
-            + "Re-enable once the engine fork accepts an operator. Previously this real failure was "
-            + "hidden by Assumptions.assumeTrue(false) (false-pass — G-T3).")
     @DisplayName("D2-12: Add sign - add additional approver to task")
     void d2_12_addSign() {
         try {
@@ -432,9 +420,6 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
 
     @Test
     @Order(13)
-    @Disabled("BLOCKED-UPSTREAM (G-B5): depends on add-sign, which hits the same "
-            + "se_assignee_operation_record.operator_user_id NOT NULL upstream gap. See D2-12. "
-            + "Tracked in docs/backlog/2026-06-17-bpmn-designer-golden-gap.md.")
     @DisplayName("D2-13: Remove sign - remove approver from task")
     void d2_13_removeSign() {
         try {
