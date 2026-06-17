@@ -219,7 +219,7 @@ class TriggerServiceTest extends BaseIntegrationTest {
                     result.executionId(), result.state());
         } catch (Exception e) {
             log.warn("TRIGGER-08: Fire trigger failed (SmartEngine may not be available): {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -249,7 +249,7 @@ class TriggerServiceTest extends BaseIntegrationTest {
                     result.executionId());
         } catch (Exception e) {
             log.warn("TRIGGER-09: Fire trigger with payload failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -275,7 +275,7 @@ class TriggerServiceTest extends BaseIntegrationTest {
             log.info("TRIGGER-10 PASSED: lastFiredAt updated to {}", afterFire.getLastFiredAt());
         } catch (Exception e) {
             log.warn("TRIGGER-10: Fire trigger lastFiredAt test failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 

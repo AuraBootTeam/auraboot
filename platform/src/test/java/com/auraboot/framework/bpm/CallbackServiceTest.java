@@ -69,7 +69,7 @@ class CallbackServiceTest extends BaseIntegrationTest {
             log.info("CALLBACK-01 PASSED: Success callback with no execution logged NODE_FAILURE, msg={}", ex.getMessage());
         } catch (Exception e) {
             if (!(e instanceof BusinessException)) {
-                Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+                throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
             } else {
                 throw e;
             }
@@ -184,8 +184,7 @@ class CallbackServiceTest extends BaseIntegrationTest {
             log.info("CALLBACK-05 PASSED: getPendingCallbacks returned empty list for nonexistent execution");
         } catch (Exception e) {
             // SmartEngine may not be fully initialized in test context
-            Assumptions.assumeTrue(false,
-                    "SmartEngine not available for getPendingCallbacks: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -211,8 +210,7 @@ class CallbackServiceTest extends BaseIntegrationTest {
             log.info("CALLBACK-06 PASSED: Signal failure correctly wrapped in BusinessException, msg={}", ex.getMessage());
         } catch (Exception e) {
             if (!(e instanceof BusinessException)) {
-                Assumptions.assumeTrue(false,
-                        "SmartEngine not available: " + e.getMessage());
+                throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
             } else {
                 throw e;
             }

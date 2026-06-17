@@ -98,7 +98,7 @@ class ProcessOrchestrationServiceTest extends BaseIntegrationTest {
             log.info("ORCH-01 PASSED: Retry from node completed, instanceId={}", instance.getInstanceId());
         } catch (Exception e) {
             log.warn("ORCH-01: Retry from node failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -124,7 +124,7 @@ class ProcessOrchestrationServiceTest extends BaseIntegrationTest {
             log.info("ORCH-02 PASSED: Skip node completed, instanceId={}", instance.getInstanceId());
         } catch (Exception e) {
             log.warn("ORCH-02: Skip node failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -167,7 +167,7 @@ class ProcessOrchestrationServiceTest extends BaseIntegrationTest {
             log.info("ORCH-03 PASSED: Pause/resume lifecycle, executionId={}", result.executionId());
         } catch (Exception e) {
             log.warn("ORCH-03: Pause/resume lifecycle failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 
@@ -199,7 +199,7 @@ class ProcessOrchestrationServiceTest extends BaseIntegrationTest {
             log.info("ORCH-04 PASSED: Execution cancelled, executionId={}", result.executionId());
         } catch (Exception e) {
             log.warn("ORCH-04: Cancel execution failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+            throw new AssertionError("BPM real-stack op failed (previously silently skipped -- G-T3): " + e.getMessage(), e);
         }
     }
 }
