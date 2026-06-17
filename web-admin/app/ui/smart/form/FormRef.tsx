@@ -45,11 +45,11 @@ const OverlayContainer: React.FC<OverlayProps> = ({
     width: variant === 'page' ? '90vw' : measuredWidth,
     height: variant === 'drawer' ? '100%' : variant === 'page' ? '90vh' : undefined,
     maxHeight: variant === 'modal' ? '90vh' : undefined,
-    borderRadius: variant === 'drawer' ? '0' : '0.75rem',
-    backgroundColor: '#fff',
+    borderRadius: variant === 'drawer' ? '0' : 'var(--radius-card-lg)',
+    backgroundColor: 'var(--color-panel)',
     display: 'flex',
     flexDirection: 'column',
-    boxShadow: '0 20px 40px rgba(15, 23, 42, 0.2)',
+    boxShadow: 'var(--shadow-pop)',
   };
 
   return (
