@@ -71,8 +71,10 @@ export function buildQuickFilterPreset(
   switch (key) {
     case 'my_records': {
       if (ctx.userId == null) return {};
-      const createdBy = Number.parseInt(String(ctx.userId), 10);
-      return Number.isNaN(createdBy) ? {} : { created_by: createdBy };
+      // Keep the full-precision string id — user ids are snowflakes (>2^53), so
+      // Number()/parseInt would silently corrupt them (AGENTS.md snowflake red line).
+      const userId = String(ctx.userId).trim();
+      return userId ? { created_by: userId } : {};
     }
     case 'created_today':
       return { created_at: { start: today, end: `${today}T23:59:59` } };

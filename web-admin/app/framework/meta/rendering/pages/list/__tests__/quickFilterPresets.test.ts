@@ -19,15 +19,18 @@ const NOW = new Date(2026, 5, 17, 14, 32, 10);
 
 describe('buildQuickFilterPreset', () => {
   describe('my_records', () => {
-    it('filters by created_by when a numeric userId is present', () => {
+    it('filters by created_by as a full-precision string id', () => {
       expect(buildQuickFilterPreset('my_records', { userId: 42, now: NOW })).toEqual({
-        created_by: 42,
+        created_by: '42',
       });
     });
 
-    it('coerces a numeric-string userId to an integer', () => {
-      expect(buildQuickFilterPreset('my_records', { userId: '42', now: NOW })).toEqual({
-        created_by: 42,
+    it('preserves a snowflake id without precision loss (no Number()/parseInt)', () => {
+      // > 2^53 — parseInt/Number would corrupt this; the string must survive intact.
+      expect(
+        buildQuickFilterPreset('my_records', { userId: '1850000000000000123', now: NOW }),
+      ).toEqual({
+        created_by: '1850000000000000123',
       });
     });
 
@@ -35,8 +38,8 @@ describe('buildQuickFilterPreset', () => {
       expect(buildQuickFilterPreset('my_records', { userId: undefined, now: NOW })).toEqual({});
     });
 
-    it('returns an empty filter when userId is non-numeric', () => {
-      expect(buildQuickFilterPreset('my_records', { userId: 'abc', now: NOW })).toEqual({});
+    it('returns an empty filter when userId is an empty string', () => {
+      expect(buildQuickFilterPreset('my_records', { userId: '  ', now: NOW })).toEqual({});
     });
   });
 
