@@ -1,15 +1,16 @@
 ---
 type: backlog
-status: closed
+status: shipped
 created: 2026-06-18
 ---
 
-# 多元素顺序会签(sequential multi-instance)分析与待决
+# 多元素顺序会签(sequential multi-instance)分析与实现
 
-<!-- no-precipitation: 本文是一次性 niche 引擎特性(SmartEngine 多元素顺序会签)的根因分析 + 完整修复方案,owner 已决定 defer;其 durable 价值即本文档本身(日后真做时照 §6 实现),无可上升 canonical 的复发型规则。-->
+<!-- no-precipitation: 本文是一次性 niche 引擎特性(SmartEngine 多元素顺序会签)的根因分析 + 修复方案 + 落地记录;durable 价值即本文档本身,无可上升 canonical 的复发型规则。 -->
 
-> 状态:**决策已闭环(2026-06-18 owner 选保持现状,见 §决策)**;仅分析未改代码(引擎留 4.0.1)。本文作为长存记录保留,日后真有需要按 §6 方案实现。
-> 关联:`docs/backlog/2026-06-17-bpmn-designer-golden-gap.md` G-T6;`BpmMultiInstanceSequentialTest`(SEQ-01 `@Disabled`,SEQ-02/03 已启用通过);SmartEngine fork = `AuraBootTeam/SmartEngine` v4.0.1。
+> 状态:**已实现并验证(2026-06-18,SmartEngine 4.0.2)**。owner 改变决定从"保持现状"→"完成全部 gap";已按 §6 方案在引擎实现候选缓存 + 全量 nrOfInstances,SEQ-01 解禁并真栈通过。
+> **实现摘要**:`UserTaskBehavior.enter` 顺序分支缓存全候选列表(String 变量,scope=activityInstanceId);`handleMultiInstance` 顺序时 `nrOfInstances` 取缓存全量;`queryTaskAssigneeCandidateInstance` 从缓存读(回退 dispatcher)。非持久化变量存储(storage-custom)自动回退旧行为,storage-custom 回归 56/0/0;auraboot 真栈 `BpmMultiInstanceSequentialTest` SEQ-01/02/03 **3/3 通过 @ auraboot_50 4.0.2**。
+> 关联:`docs/backlog/2026-06-17-bpmn-designer-golden-gap.md` G-T6;SmartEngine fork = `AuraBootTeam/SmartEngine` **v4.0.2**(branch `feat/bpm-seq-mi-and-message`,commit `3e2d102`)。
 
 ## 1. 业务能力定义
 

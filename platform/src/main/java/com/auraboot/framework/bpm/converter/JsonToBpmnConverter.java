@@ -971,6 +971,16 @@ public class JsonToBpmnConverter {
         if (name != null) {
             writer.writeAttribute("name", name);
         }
+        // GAP-252: carry the message name on the receiveTask so it is self-documenting in
+        // the BPMN. SmartEngine's parser ignores unknown attributes; AuraBoot correlates a
+        // delivered message to a parked receiveTask via the designerJson messageRef
+        // (see BpmMessageService) and resumes it through ExecutionCommandService.signal().
+        if (config != null && config.hasNonNull("messageRef")) {
+            String messageRef = config.path("messageRef").asText("");
+            if (!messageRef.isBlank()) {
+                writer.writeAttribute("messageRef", messageRef);
+            }
+        }
         writer.writeCharacters("\n");
     }
 
