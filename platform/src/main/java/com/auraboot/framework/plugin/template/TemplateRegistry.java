@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 
 /**
  * Registry of application templates discovered from plugin directories.
@@ -30,17 +31,27 @@ public class TemplateRegistry {
     private static final String PLUGIN_JSON = "plugin.json";
     private static final String TEMPLATE_CATALOG_TYPE = "template";
 
+    private static final BooleanSupplier DEFAULT_TEST_ENV = () ->
+            "test".equalsIgnoreCase(System.getenv("AURA_ENV"))
+                    || "true".equalsIgnoreCase(System.getenv("IMPORT_TEST_FIXTURES"));
+
     private final ObjectMapper objectMapper;
     private final List<Path> searchRoots;
+    private final BooleanSupplier testEnv;
 
     @Autowired
     public TemplateRegistry(ObjectMapper objectMapper) {
-        this(objectMapper, defaultSearchRoots(Paths.get(System.getProperty("user.dir"))));
+        this(objectMapper, defaultSearchRoots(Paths.get(System.getProperty("user.dir"))), DEFAULT_TEST_ENV);
     }
 
     TemplateRegistry(ObjectMapper objectMapper, List<Path> searchRoots) {
+        this(objectMapper, searchRoots, DEFAULT_TEST_ENV);
+    }
+
+    TemplateRegistry(ObjectMapper objectMapper, List<Path> searchRoots, BooleanSupplier testEnv) {
         this.objectMapper = objectMapper;
         this.searchRoots = List.copyOf(searchRoots);
+        this.testEnv = testEnv;
     }
 
     /**
@@ -81,6 +92,16 @@ public class TemplateRegistry {
         return templates;
     }
 
+    /**
+     * Package-private test seam: runs discovery against a single root and returns the result map.
+     * Allows unit tests to point at a temp directory without going through the full multi-root logic.
+     */
+    Map<String, TemplateDef> discoverForTest(Path root) {
+        LinkedHashMap<String, TemplateDef> templates = new LinkedHashMap<>();
+        discoverUnderRoot(root, templates);
+        return templates;
+    }
+
     private void discoverUnderRoot(Path root, Map<String, TemplateDef> templates) {
         Path pluginsDir = root.resolve("plugins");
         if (!Files.isDirectory(pluginsDir)) {
@@ -92,6 +113,15 @@ public class TemplateRegistry {
         Path legacyTemplatesDir = pluginsDir.resolve("templates");
         if (Files.isDirectory(legacyTemplatesDir)) {
             discoverPluginChildren(root, legacyTemplatesDir, true, templates);
+        }
+
+        if (testEnv.getAsBoolean()) {
+            Path testFixturesDir = pluginsDir.resolve("test-fixtures");
+            if (Files.isDirectory(testFixturesDir)) {
+                // each plugins/test-fixtures/<x>/plugin.json is a candidate; legacy=false so it
+                // is only treated as a template when its manifest has catalogType/pluginType=template
+                discoverPluginChildren(root, testFixturesDir, false, templates);
+            }
         }
     }
 
@@ -127,7 +157,15 @@ public class TemplateRegistry {
         String namespace = textValue(manifest, "namespace", "");
         String relativePath = toRelativePath(root, pluginDir);
 
-        return new TemplateDef(id, name, relativePath, namespace, pluginDir.normalize().toString());
+        String description = textValue(manifest, "description", null);
+        description = (description == null || description.isBlank()) ? null : description;
+        String category = textValue(manifest, "category", null);
+        category = (category == null || category.isBlank()) ? null : category;
+        String icon = textValue(manifest, "icon", null);
+        icon = (icon == null || icon.isBlank()) ? null : icon;
+
+        return new TemplateDef(id, name, relativePath, namespace, pluginDir.normalize().toString(),
+                description, category, icon);
     }
 
     private boolean isTemplateManifest(JsonNode manifest, boolean legacyTemplateDir) {
@@ -225,6 +263,9 @@ public class TemplateRegistry {
      * @param relativePath relative path from repository root to the template directory
      * @param namespace    plugin namespace prefix
      * @param absolutePath absolute directory path on disk
+     * @param description  optional short description (null if absent in manifest)
+     * @param category     optional category label (null if absent in manifest)
+     * @param icon         optional lucide icon name, e.g. {@code "package"} (null if absent)
      */
     public record TemplateDef(
             String id,
@@ -232,7 +273,10 @@ public class TemplateRegistry {
             String relativePath,
             String namespace,
             @JsonIgnore
-            String absolutePath
+            String absolutePath,
+            String description,
+            String category,
+            String icon
     ) {
         public TemplateDef {
             Objects.requireNonNull(id, "id");
@@ -240,6 +284,7 @@ public class TemplateRegistry {
             Objects.requireNonNull(relativePath, "relativePath");
             Objects.requireNonNull(namespace, "namespace");
             Objects.requireNonNull(absolutePath, "absolutePath");
+            // description, category, icon are intentionally nullable
         }
     }
 }

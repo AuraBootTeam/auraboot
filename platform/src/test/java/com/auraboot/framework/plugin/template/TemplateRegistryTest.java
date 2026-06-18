@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -110,6 +111,101 @@ class TemplateRegistryTest {
         assertThat(template.namespace()).isEqualTo("tpm");
         assertThat(template.relativePath()).isEqualTo("plugins/project-management");
     }
+
+    // ---- A1: nullable description/category/icon ----
+
+    @Test
+    @DisplayName("readTemplate reads description/category/icon and falls back to null when absent")
+    void readTemplate_readsDescriptionCategoryIcon_andFallsBackToNull() throws IOException {
+        // Manifest WITH all three fields
+        createPlugin(
+                tempDir.resolve("plugins/rich-tpl"),
+                """
+                {
+                  "catalogType": "template",
+                  "displayName": "Rich Template",
+                  "namespace": "rtpl",
+                  "description": "A helpful template",
+                  "category": "CRM",
+                  "icon": "package"
+                }
+                """
+        );
+        // Manifest WITHOUT description/category/icon
+        createPlugin(
+                tempDir.resolve("plugins/bare-tpl"),
+                """
+                {
+                  "catalogType": "template",
+                  "displayName": "Bare Template",
+                  "namespace": "btpl"
+                }
+                """
+        );
+
+        TemplateRegistry registry = new TemplateRegistry(objectMapper, List.of(tempDir));
+
+        TemplateRegistry.TemplateDef rich = registry.getTemplate("rich-tpl");
+        assertThat(rich).isNotNull();
+        assertThat(rich.name()).isEqualTo("Rich Template");
+        assertThat(rich.description()).isEqualTo("A helpful template");
+        assertThat(rich.category()).isEqualTo("CRM");
+        assertThat(rich.icon()).isEqualTo("package");
+
+        TemplateRegistry.TemplateDef bare = registry.getTemplate("bare-tpl");
+        assertThat(bare).isNotNull();
+        assertThat(bare.description()).isNull();
+        assertThat(bare.category()).isNull();
+        assertThat(bare.icon()).isNull();
+    }
+
+    // ---- A4: env-gated test-fixtures discovery ----
+
+    @Test
+    @DisplayName("discoversTestFixtureTemplate only when testEnv supplier returns true")
+    void discoversTestFixtureTemplate_onlyWhenTestEnv() throws IOException {
+        createPlugin(
+                tempDir.resolve("plugins/test-fixtures/oss-tpl-smoke"),
+                """
+                {
+                  "catalogType": "template",
+                  "displayName": "OSS Smoke Fixture",
+                  "namespace": "smoke"
+                }
+                """
+        );
+
+        // testEnv = true: should discover the fixture
+        TemplateRegistry testRegistry = new TemplateRegistry(objectMapper, List.of(tempDir), () -> true);
+        Map<String, TemplateRegistry.TemplateDef> testResult = testRegistry.discoverForTest(tempDir);
+        assertThat(testResult).containsKey("oss-tpl-smoke");
+
+        // testEnv = false: must NOT discover the fixture
+        TemplateRegistry prodRegistry = new TemplateRegistry(objectMapper, List.of(tempDir), () -> false);
+        Map<String, TemplateRegistry.TemplateDef> prodResult = prodRegistry.discoverForTest(tempDir);
+        assertThat(prodResult).doesNotContainKey("oss-tpl-smoke");
+    }
+
+    @Test
+    @DisplayName("legacyTemplatesDirStillDiscovered regardless of testEnv")
+    void legacyTemplatesDirStillDiscovered() throws IOException {
+        createPlugin(
+                tempDir.resolve("plugins/templates/legacy-x"),
+                """
+                {
+                  "displayName": "Legacy X",
+                  "namespace": "lx"
+                }
+                """
+        );
+
+        // testEnv=false: legacy templates are always discovered
+        TemplateRegistry prodRegistry = new TemplateRegistry(objectMapper, List.of(tempDir), () -> false);
+        Map<String, TemplateRegistry.TemplateDef> result = prodRegistry.discoverForTest(tempDir);
+        assertThat(result).containsKey("legacy-x");
+    }
+
+    // ---- helpers ----
 
     private static void createPlugin(Path pluginDir, String pluginJson) throws IOException {
         Files.createDirectories(pluginDir);
