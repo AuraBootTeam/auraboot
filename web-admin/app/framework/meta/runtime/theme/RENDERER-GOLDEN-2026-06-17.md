@@ -537,3 +537,87 @@ now calls `scrollToFormField(firstFieldCode)` via `requestAnimationFrame` in
 - Both fixes from `556c55533` that the prior golden caught as FAIL/PARTIAL now WORK
   on real pages (shape + behavior). The only residual is the cosmetic dot-color
   semantics (hex-not-handled), a distinct, smaller gap from the original pill bug.
+
+## Status-dot color confirmation golden (2026-06-18)
+
+> Real-browser **confirmation** that the residual flagged at the end of the
+> "Final confirmation golden" above — *dots render with the right shape but all
+> `bg-status-gray` because `resolveStatusTone` only mapped color NAMES, not the
+> hex values the dicts carry* — is now resolved by the hex→tone fix (commit
+> `a201fb973`, folded into branch HEAD `530708b89` / `#812`,
+> `statusTone.tsx` now has `hexToTone(...)`; `grep -c hexToTone statusTone.tsx` = 2).
+> Branch `feat/ux-status-dot-color-golden` (= origin/main with the hex fix).
+> **Verify-only: no source modified** (only this doc appended).
+
+### Stack (host-first, isolated, zero docker)
+
+- **Backend**: prebuilt `platform/build/libs/AuraBoot-1.0.0-SNAPSHOT-boot.jar`
+  (canonical-main build, mtime Jun 16 23:40) via `java -jar` on a **free port 6560**
+  (6543/6554/6556/6557 all held by concurrent sessions — left untouched), pointed at
+  **isolated DB `aura_ux_color`** (`database/schema.sql` applied directly — 307
+  tables, 0 errors) + **Redis DB 7**, `SPRING_PROFILES_ACTIVE=dev`, explicit
+  `JWT_SECRET`. Same OTel autoconfigure-exclude launch flags +
+  `MANAGEMENT_TRACING_ENABLED=false` as the prior runs (the bundled OTel skew still
+  applies to this Jun-16 jar). The shared `aura_boot` DB and other sessions' DBs
+  (`aura_ux_t10*`, `aura_ux_s3a`) were never touched (§20).
+- **Frontend (THIS worktree)**: `pnpm dev:full` — Vite **5193** / BFF **3523**, both
+  with `SPRING_BOOT_URL` + `PROXY_TARGET` → 6560. **Served code confirmed NEW, not
+  stale**: `curl :5193/app/.../statusTone.tsx` → **2 `hexToTone` refs**;
+  `.../ListPageContent.tsx` → **2 `StatusDot` + 2 `resolveStatusTone`** (the live
+  `/p/<model>` list renderer); `.../dynamic-route-utils.tsx` → 2 `StatusDot` (detail
+  path) — i.e. the served renderers genuinely carry the hex fix.
+- **Seed**: `POST /api/bootstrap/setup` (`admin@auraboot.com`, tenant
+  `325910279982551040`) + `import-directory-sync` of `crm-starter` (`success:true`).
+  **6 `crm_account`** via the **real command pipeline**
+  (`POST /api/meta/commands/execute/crm:create_account`, ratings A/A/B/B/C/C);
+  `crm:create_account` force-sets `crm_acc_status=active`, so **2 rows flipped to
+  `inactive` via the real `crm:update_account` command** → final **4 active / 2
+  inactive** (so the 状态 column carries BOTH active AND inactive).
+- **Dict colors confirmed live** (`/api/meta/dict/by-code/<code>/data`):
+  `crm_account_status` active=`#10b981` / inactive=`#9ca3af`;
+  `crm_account_rating` A=`#ef4444` / B=`#f59e0b` / C=`#3b82f6` / D=`#9ca3af`.
+- **Driver**: Playwright 1.60 (`@playwright/test`) + bundled chromium
+  (`chromium.launch({headless:true})`); auth via the BFF `/login` form POST →
+  `__session` cookie. Standalone script, removed after the run (no source added).
+
+### Result — PASS ✅ : dots now show DISTINCT semantic colors (was "all gray / 1 color")
+
+On `/p/crm_account` (6 rows × 状态 + 评级 = 12 dots), DOM-inspected via
+`getComputedStyle().backgroundColor` on each `span.rounded-pill.h-2.w-2`:
+**`dotCount=12`, `filledPillCount=0`, `distinctBg = 5 colors`** (the prior golden's
+failure was 1 color / all gray). Per-status → dot class → computed color mapping:
+
+| Status / Rating value | Dict hex | Dot class | Computed background | Tone |
+| --------------------- | -------- | --------- | ------------------- | ---- |
+| 活跃 (active)         | `#10b981` | `bg-status-green` | `rgb(21, 163, 74)`  | **GREEN** ✅ |
+| 停用 (inactive)       | `#9ca3af` | `bg-status-gray`  | `rgb(113, 113, 122)`| **GRAY** ✅ |
+| A - 重点客户          | `#ef4444` | `bg-status-red`   | `rgb(220, 38, 38)`  | **RED** ✅ |
+| B - 重要客户          | `#f59e0b` | `bg-status-amber` | `rgb(194, 117, 10)` | **AMBER** ✅ |
+| C - 一般客户          | `#3b82f6` | `bg-status-blue`  | `rgb(37, 99, 235)`  | **BLUE** ✅ |
+
+- **active → GREEN** dot (`bg-status-green`, computed `rgb(21,163,74)`) ✅ —
+  exactly the task's required assertion.
+- **inactive → GRAY** dot (`bg-status-gray`, `rgb(113,113,122)`) ✅.
+- **ratings show 3 distinct non-gray colors** (A=red, B=amber, C=blue) matching
+  their hex ✅ — well above the "≥2 distinct non-gray" bar.
+- **≥2 distinct dot colors on the page**: 5 distinct (green/gray/red/amber/blue),
+  resolving the prior golden's "all gray / 1 color" failure.
+
+Visual eyeball of `/tmp/color-list.png` confirms: the 状态 column shows green dots
+(活跃) and gray dots (停用), and the 评级 column shows red (A), amber (B), blue (C)
+dots — visually distinct colored dots, not uniform gray.
+
+**Trace of WHY it now works (vs the prior gray failure):** the dict items carry
+**hex** color values in `item.extension.color` (e.g. `active → #10b981`).
+`ListPageContent.tsx:1890` calls `resolveStatusTone(item.extension?.color)`. Before
+the fix, `resolveStatusTone` (`statusTone.tsx:104-109`) only matched color NAMES via
+`TONE_BY_NAME`, so a hex string fell through to `?? 'gray'` → all dots gray. The fix
+(`a201fb973`) added `hexToTone(...)` (`statusTone.tsx:77-103`): a hue/saturation
+mapper that the resolver now tries between the name lookup and the gray default
+(`TONE_BY_NAME[key] ?? hexToTone(key) ?? 'gray'`). The hex→tone math was verified
+independently to map these exact dict hexes to the observed tones
+(`#10b981→green`, `#9ca3af→gray`, `#ef4444→red`, `#f59e0b→amber`, `#3b82f6→blue`),
+and the live page confirms each dot renders that tone.
+
+**Verdict: PASS** — the dict-coded status/rating dots render in the CORRECT semantic
+colors (5 distinct, no longer all gray). Screenshot: `/tmp/color-list.png`.
