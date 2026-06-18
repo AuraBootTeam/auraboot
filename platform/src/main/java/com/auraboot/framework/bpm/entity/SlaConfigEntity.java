@@ -40,7 +40,9 @@ public class SlaConfigEntity {
     private String name;
 
     /**
-     * Target type: PROCESS | NODE | TASK.
+     * Target type: PROCESS | NODE | TASK | RECORD.
+     * RECORD (F3): SLA activates on dynamic-record create via SlaActivationListener#onRecordCreate;
+     * targetKey = the modelCode.
      */
     private String targetType;
 
