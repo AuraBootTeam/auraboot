@@ -46,7 +46,9 @@ const defaultFields: PropertySchema<string>[] = [
 const permissionCodeField: PropertySchema<string> = {
   key: 'props.permissionCode',
   label: 'Permission code',
-  type: 'text',
+  // D2 — rich control: a selector over the live permission registry (with a
+  // manual-entry fallback) instead of a free-text box.
+  type: 'permission-select',
 };
 
 // MD-2 — block-level AI lock. Lifts D5's field-level lock to a universal inspector
@@ -127,7 +129,7 @@ const fieldFields: PropertySchema<string>[] = [
     ],
   },
   { key: 'props.dataType', label: 'Data type', type: 'text' },
-  { key: 'props.dictCode', label: 'Dict code', type: 'text' },
+  { key: 'props.dictCode', label: 'Dict code', type: 'dict-select' },
   { key: 'props.required', label: 'Required', type: 'boolean' },
   { key: 'props.readOnly', label: 'Read only', type: 'boolean' },
   aiLockField,
@@ -194,7 +196,7 @@ const columnFields: PropertySchema<string>[] = [
   { key: 'field', label: 'Field', type: 'field-select' },
   permissionCodeField,
   { key: 'props.dataType', label: 'Data type', type: 'text' },
-  { key: 'props.dictCode', label: 'Dict code', type: 'text' },
+  { key: 'props.dictCode', label: 'Dict code', type: 'dict-select' },
   { key: 'layout.width', label: 'Width', type: 'number' },
   {
     key: 'props.align',
@@ -257,7 +259,7 @@ const helperDataSourceFields: PropertySchema<string>[] = [
     ],
   },
   { key: 'dataSource.query', label: 'Query builder JSON', type: 'json' },
-  { key: 'dataSource.queryCode', label: 'Named query code', type: 'text' },
+  { key: 'dataSource.queryCode', label: 'Named query code', type: 'namedQuery' },
   { key: 'dataSource.parameters', label: 'Named query params JSON', type: 'json' },
   { key: 'dataSource.page', label: 'Page', type: 'number' },
   { key: 'dataSource.size', label: 'Page size', type: 'number' },
@@ -600,7 +602,7 @@ const actionValidateFormField: PropertySchema<string> = {
 };
 
 const commandActionFields: PropertySchema<string>[] = [
-  { key: 'props.command', label: 'Command', type: 'text' },
+  { key: 'props.command', label: 'Command', type: 'command-select' },
   { key: 'props.payload', label: 'Payload JSON', type: 'json' },
   actionValidateFormField,
   actionExecutionModeField,
@@ -699,7 +701,7 @@ const widgetFields: PropertySchema<string>[] = [
     ],
   },
   { key: 'dataSource.query', label: 'Query builder JSON', type: 'json' },
-  { key: 'dataSource.queryCode', label: 'Named query code', type: 'text' },
+  { key: 'dataSource.queryCode', label: 'Named query code', type: 'namedQuery' },
   { key: 'dataSource.parameters', label: 'Named query params JSON', type: 'json' },
   { key: 'dataSource.page', label: 'Page', type: 'number' },
   { key: 'dataSource.size', label: 'Page size', type: 'number' },
