@@ -7,7 +7,7 @@ created: 2026-06-18
 # Session Handover - 2026-06-18 agent-quality gap resolution
 
 ## Session Summary
-续 S1/S3 业务金标 → owner 要求**全面解决所有场景 gap;平台 gap 先设计方案确认再建,测试/基建 gap 直接执行,F2 暂忽略**。本会话交付 S3 自动 CAPA 整链 + S1 客服环全部金标,并**取证分类 + 确认后实装两个真平台 gap(F3 record 级 SLA、S5 NL→dashboard skill)**,沿途修 2 个真 bug。剩余=纯测试/基建 gap(4 moderate 后端 + 3 heavy 浏览器 golden/真插件)。
+续 S1/S3 业务金标 → owner 要求**全面解决所有场景 gap;平台 gap 先设计方案确认再建,测试/基建 gap 直接执行,F2 暂忽略**。本会话交付 S3 自动 CAPA 整链 + S1 客服环全部金标,**取证分类 + 确认后实装两个真平台 gap(F3 record 级 SLA、S5 NL→dashboard skill)**,并**收口全部干净可测的后端 gap**(ApprovalGate 超时真栈 IT 新建;S4/RuntimeAuth 取证已 covered/已实装),沿途修 2 个真 bug。**8 PR 全 merged**。剩余=全部 heavy/不同模式(S7 live 收敛 + S6/S5 浏览器 golden + quality 真插件)。
 
 ## Tasks Completed(全部 merged 到 origin/main)
 - [x] **S3 自动 CAPA 整链 golden**(#775 S3-1 命令链+负向 gating / S3-2 BPMN→SLA→升级 / #778 S3-3 approve→on_bpm_event→create_capa 异步)— 5 测真栈
@@ -16,17 +16,16 @@ created: 2026-06-18
 - [x] **平台 gap ③S5 — dashboard:create 生成 skill**(#784):`DashboardGeneratorSkill`(schema 约束 + 12 列自动布局 + persist);确定性 IT 1/1 RED→GREEN + live IT 1/1(真 DeepSeek NL→4-widget 看板端到端持久)
 - [x] **S1-2 投诉闭环 golden**(#785):create→自动指派 automation(异步)+ 响应 SLA(F3 同步),`ComplaintLoopGoldenIT` 1/1
 - [x] **取证分类 + 设计方案**:3 agent 并行取证证伪「S4 部署编排」「RuntimeAuth」已存在;确认 F3/S5 为真平台 gap
+- [x] **ApprovalGate 超时真栈 IT**(#791):`AgentApprovalTimeoutEnforcementIT` 1/1 — pending past-deadline → `enforceApprovalTimeouts()` → expired + reason(此前仅 mock 单测)
+- [x] **会话 handover**(#786):本文件(后被本次 final update 续写)
+- [x] **取证收口 S4 / RuntimeAuth**:S4 create_model 已有 `ModelCreateSkillIntegrationTest` covered(+#782);RuntimeAuth 已实装(`ToolLoopService` 拦截 + 审计),deny 是 contract-only 设计 → 均无需新建
 
-## Tasks In Progress / 剩余 gap(全部纯测试/基建,无需再设计)
+## Tasks In Progress / 剩余 gap(全部 heavy / 不同模式,建议 fresh focused session)
 > SOT 真源:`docs/backlog/2026-06-18-platform-and-test-gaps-resolution.md`(每项 recipe + 依赖)
-
-**Moderate 后端 IT(快,有模板)**
-- [ ] **S7 多 agent 真模型收敛测** — `AgentCollaborationService` 已验三模式分发+子任务,缺「真模型多步收敛不空转/死循环」独立测。模板:agent-eval live IT(真 DeepSeek)
-- [ ] **ApprovalGate 超时真栈 IT** — 现仅 `AgentApprovalGateServiceConcurrencyTest`(mock 超时)。补真栈:建 pending approval→过期→scheduled expire→run fail。入口 `ApprovalGate*Service`
-- [ ] **S4 `platform.create_model` 端到端验证** — agent 部署路径已存在(`PlatformToolProvider.createModel` 串 generate+apply,L3)。补 IT 验 NL→model→table 物化(并发 #782 也在收 nl-modeling apply)
-- [ ] **RuntimeAuth enforcement 测** — 已实装(`ToolLoopService` 每调用 `authorizeIncremental`)。补 IT 验 forbidden effect→deny(默认 DefaultRuntimeAuthorizationService grant-all,需 stub 一个 deny 或验 incremental 拒绝路径)
+> **干净可测的后端 gap 已全部收口**(ApprovalGate 超时新建 #791;S4/RuntimeAuth 取证 covered/已实装)。下方仅剩 heavy/live。
 
 **Heavy(不同模式,建议 fresh focused session)**
+- [ ] **S7 多 agent 真模型收敛测** — `AgentCollaborationService` 已验三模式分发+子任务(`AgentCollaborationServiceTest`),缺「真模型多步收敛不空转/死循环」**live 多步**独立测(real DeepSeek,属 live 重型,不是 quick backend IT)
 - [ ] **S6 工作台浏览器 golden** + **S5 图表渲染浏览器 golden** — host-first Vite+Playwright 零 docker(`auraboot/scripts/oss-test.sh`,Playwright 自带 chromium + host Vite/BFF + auth.setup)。KPI 出数/metric-strip 筛选/review-drawer/0 console exprError;S5 验生成的 dashboard 真渲染
 - [ ] **quality 真插件可达 host-first golden** — 起隔离 runtime + import 真 crm/quality 插件 + 端到端,抓 green-but-broken。**CRM-complaint 部分被 F2(owner 暂忽略)阻塞**;quality/CAPA 部分可做(`mt_qc_capa` 现未物化)
 
@@ -46,6 +45,7 @@ created: 2026-06-18
 - `platform/.../aurabot/skill/builtin/DashboardGeneratorSkill.java` — 新 skill(S5)
 ### 测试(真栈 + live)
 - `RecordLevelSlaActivationIT` / `QualityAutoCapaChainGoldenIT` / `QualityCapaBpmnSlaChainGoldenIT` / `QualityCapaFullAssemblyGoldenIT` / `ComplaintLoopGoldenIT`(framework/automation+bpm)
+- `AgentApprovalTimeoutEnforcementIT`(framework/agent,#791)
 - `CsComplaintEmailExtractionLiveIT`(framework/agent)/ `DashboardGeneratorSkillIT` + `DashboardGenerationLiveIT`(aurabot/skill/builtin)
 ### 文档
 - `docs/backlog/2026-06-18-platform-and-test-gaps-resolution.md`(SOT)/ `docs/backlog/2026-06-17-s1s3-business-loop-golden-gap-and-plan.md` / `docs/retro/2026-06-17-...-acceptance-report.md`
@@ -82,7 +82,7 @@ created: 2026-06-18
 ### 分支 / Worktree / PR
 - **当前分支**:canonical `/Users/ghj/work/auraboot/auraboot` 在 `main` @ `6946e5bfc`(本会话全 merge,无未提交)。
 - **本会话 worktree**:`/Users/ghj/work/auraboot/auraboot-gaps`(现在 `docs/agent-quality-gaps-handover`,接手可复用:`git checkout -b <new> origin/main`)。其它 worktree(bom-followups / bpm-remaining-gaps / pd-e2-blocks / ux-design-tokens / sqlpath-21-gate)= **并发会话,勿动**。
-- **PR**:全 MERGED_AND_DELETED — #775 #778 #781 #783 #784 #785。
+- **PR**:全 MERGED — #775 #778 #781 #783 #784 #785(业务/平台)+ #786(本 handover)+ #791(ApprovalGate 超时)。分支 MERGED_AND_DELETED。
 - **未提交改动**:无(本会话)。
 
 ### Runtime / 端口
@@ -93,10 +93,11 @@ created: 2026-06-18
 ### Database / Seed
 - 共享 `aura_boot` 由别的流程维护;本会话 IT 非破坏。接手不需 reset。
 
-## Next Steps(按 ROI)
-1. **Moderate 后端 4 测**(快):S4 create_model 端到端验证 / RuntimeAuth enforcement / ApprovalGate 超时真栈 IT / S7 收敛 —— 模板齐,每个 1 IT。
-2. **Heavy(fresh focused session)**:S6 工作台 + S5 图表渲染浏览器 golden(host-first Vite+Playwright);quality 真插件 host-first golden(CRM 部分待 F2 解禁)。
-3. **owner 决策**:2 条待固化 engineering-gotchas(redact / dashboard scope);F2 是否解禁(解禁后 CRM 真插件 golden 才能做)。
+## Next Steps(按 ROI;干净后端 gap 已全收口,剩全 heavy)
+1. **S6 工作台 + S5 图表渲染浏览器 golden**(host-first **Vite+Playwright** 零 docker,`auraboot/scripts/oss-test.sh`)—— 不同重型模式,fresh focused session。S5 验本会话新建的 `dashboard:create` skill 生成的看板真渲染。
+2. **S7 多 agent 真模型收敛**(live 多步 real DeepSeek)。
+3. **quality 真插件 host-first golden**(隔离 runtime + 真插件 import;CRM 部分待 F2 解禁)。
+4. **owner 决策**:2 条待固化 engineering-gotchas(redact / dashboard scope);F2 是否解禁。
 
 ## Context for Next Session
 - **SOT**:`docs/backlog/2026-06-18-platform-and-test-gaps-resolution.md`(剩余 gap + recipe)+ 上游 `2026-06-17-platform-capability-map-and-test-scenario-design.md`(S1-S8 场景)。
