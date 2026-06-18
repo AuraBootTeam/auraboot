@@ -28,7 +28,7 @@ related:
 ### 🔧 纯测试/基建 gap(直接执行)
 | gap | 内容 | 依赖 | 状态 |
 |---|---|---|---|
-| S1-2 投诉自动指派 + 响应 SLA | automation update_record on create + RECORD SLA | 用 ②F3 | ⬜ |
+| S1-2 投诉自动指派 + 响应 SLA | automation update_record on create + RECORD SLA | 用 ②F3 | ✅ DONE(`ComplaintLoopGoldenIT` 1/1:create→自动指派〔异步〕+响应 SLA〔F3 同步〕+log success)|
 | S6 工作台浏览器 golden | host-first Vite+Playwright,KPI/筛选/抽屉/0 exprError | — | ⬜ |
 | S5 图表渲染浏览器 golden | ChatBI 渲染 + 新 dashboard 生成 golden | 用 ③S5 | ⬜ |
 | S7 多 agent 真模型收敛测 | 不空转/不死循环 | — | ⬜ |
