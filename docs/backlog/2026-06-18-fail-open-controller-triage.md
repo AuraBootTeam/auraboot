@@ -73,8 +73,27 @@ PluginPackageController / PluginTransactionalImportController(`plugin.plugin.man
 - ❌ **很可能误报**:`EmailAccountController` 跨租户 —— `ab_email_account` 同样被 tenant 拦截器覆盖,`selectById` 自动加 `tenant_id`;`requireAccount` 缺显式 tenant 检查是冗余非漏洞(除非该表被 ignoreTable,实测不在)。
 - 🟡 **待确认 intent**:`AsyncTaskController.listTasks` —— `ab_async_task` **确在** ignoreTable(line 143,线程池无 MetaContext),故 list **不自动加 tenant/userId**,须手动 scope。是真潜在跨租户/跨用户 leak,但取决于「async task 列表是 admin 全量还是 user 自有」的产品意图 → 留 owner 定。
 
-## 落地建议
+## 默认 deny 迁移机制(✅ 已实现 shadow — secure-by-default 根因修复)
+
+逐个守护是治标(下一个新 controller 仍默认敞开)。治本 = 把 `PermissionInterceptor` 默认从 fail-open 翻成 **default-deny**。安全翻转的业界标准是「shadow 先行」(类比 WAF detection→block / IAM Access Analyzer)。已落地的机制(PR #820):
+
+- **配置** `aura.security.authz.unannotated-mode`(env `AURA_AUTHZ_UNANNOTATED_MODE`,默认 `shadow`):
+  - `allow` — 旧 fail-open(静默放行)
+  - `shadow` — **放行 + 每个未注解端点首次命中记一条 `[authz-shadow]` 日志**(method/uri/handler/userId/tenantId,去重防刷屏)→ 用真实流量回答「哪个角色实际在调哪个未注解端点」,**替代逐个猜角色**
+  - `deny` — fail-closed:未注解端点直接拒绝(403)
+- **`@AuthenticatedAccess` 标记注解**:声明「此端点有意只需认证、无 RBAC 码」(self-scoped/pre-membership)。shadow 不记它、deny 放行它 → 迁移时把 self-scoped 端点标它、把 tenant-shared 端点标 `@RequirePermission`,两类都标完即可安全翻 `deny`。
+- 验证:`PermissionInterceptorUnannotatedModeTest`(allow/shadow/deny/authenticated-access 四态)+ 现有 PermissionInterceptorTest 无回归。
+
+### 迁移路径(剩余 ~37 NEEDS-GUARD 的正确收口方式)
+1. **(ops)** staging/prod 跑 `shadow` 一两周,grep `[authz-shadow]` 出「端点 × 调用方角色」真实覆盖表。
+2. **(产品/安全)** 用本 triage + shadow 日志敲定角色矩阵(每操作该哪个角色)。
+3. **(eng)** 按矩阵给每端点标 `@RequirePermission(码)` 或 `@AuthenticatedAccess`;新码批量注册(MetaPermission + default-bootstrap)+ 按职责授 operator/viewer。
+4. **(ops)** 全覆盖后翻 `AURA_AUTHZ_UNANNOTATED_MODE=deny`(shadow 日志清零即证覆盖完整);从此 secure-by-default。
+
+## 落地建议(逐个守护,作为迁移的补充)
 1. 按上表逐 controller 走方法级守护(写方法),码按「目标角色 × 已持码」选;needs-new-code 的批量注册(MetaPermission + default-bootstrap）。
 2. operator/viewer 应保留的操作:把对应码加进其 bootstrap binding。
 3. 每批配 `DeepReviewControllerGuardTest` 风格单测 + 守护后 `node scripts/check-controller-authz.mjs --write-baseline` 收缩 baseline。
 4. 独立 bug 单独 PR 修(含 IT)。
+5. query 端点(PivotQuery/Formula/ChartData/QueryBuilder)走 model-level ABAC(`DataPermissionEngine`),不做粗粒度 controller 守护。
+6. 外部 webhook(Callback/Trigger/InboundEmail)走签名/密钥校验(同 Stripe/Airflow 范式),不用用户 RBAC。
