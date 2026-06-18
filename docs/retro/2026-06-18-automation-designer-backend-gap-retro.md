@@ -2,13 +2,14 @@
 type: retro
 status: closed
 created: 2026-06-18
+distilled_to:
+  - auraboot-enterprise/docs/agent-rules/engineering-gotchas/frontend-ssr-build.md
+  - auraboot-enterprise/docs/agent-rules/engineering-gotchas/backend-spring-db.md
 ---
-<!-- no-precipitation: the two durable lessons are recorded inline in §Durable lessons →
-     (1) the FlowDesigner SDK now seeds undo history on mount even for an empty canvas; (2) a flow
-     step-debugger must derive its step list from flowConfig, not the flat actions[]. Both are now
-     enforced by code + golden tests in THIS repo. Cross-repo precipitation into the enterprise
-     engineering-gotchas canonical (a different repo, not writable from this OSS worktree) is a
-     tracked follow-up, not part of this OSS delivery. -->
+<!-- The two durable lessons (1: FlowDesigner SDK seeds undo history on mount even for an empty
+     canvas; 2: a flow step-debugger must derive its step list from flowConfig, not the flat
+     actions[]) are precipitated into the enterprise engineering-gotchas canonical (see distilled_to)
+     and recorded inline in §Durable lessons. -->
 
 # Automation Designer ↔ Backend gap-closure — completion review + retro (2026-06-18)
 

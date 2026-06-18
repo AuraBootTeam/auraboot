@@ -5,7 +5,7 @@ created: 2026-06-18
 distilled_to:
   - auraboot-enterprise/docs/agent-rules/engineering-gotchas/e2e-playwright.md (OSS host-first golden bring-up runbook)
   - auraboot-enterprise/docs/agent-rules/engineering-gotchas/backend-spring-db.md (BusinessException no-cause-chain)
-  - auraboot-enterprise AGENTS.md §15 (BLOCKED-UPSTREAM 自估悲观重判 — already codified this lineage)
+  - auraboot-enterprise/AGENTS.md (§15 BLOCKED-UPSTREAM 自估悲观重判 — already codified this lineage)
 ---
 
 # 复盘 — BPMN 设计器剩余 gap 完成 + 真栈全量回归会话(2026-06-18)
