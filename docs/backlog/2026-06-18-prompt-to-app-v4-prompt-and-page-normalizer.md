@@ -86,24 +86,38 @@ Command (run from `platform/`):
   source/lock, isValidSource, locked-survives-regen, manual-not-overwritten, unlocked-ai-replaced,
   null-existing pass-through, ordering).
 
-## 🟡 LLM-key block point (DID-NOT-RUN — live NL→app end-to-end)
+## ✅ LLM-key block point — RAN & PASSED (2026-06-18, DeepSeek live)
 
-The end-to-end live path — real NL description → `generate` (real LLM) → `buildPluginManifestJson` →
-`executeFromManifest` → platform v4 validator `success:true` with a v4-shaped LLM page — **cannot be
-proven without a real LLM key**, and is NOT faked here. The deterministic post-processor (#1) is the
-safety net so even imperfect/V2-shaped LLM output normalizes to v4 before the gate, and the prompt (#4)
-biases the model toward v4 directly. The deterministic core (#1/#2/#3) is fully unit-verified above.
+**DID-NOT-RUN closed.** With `DEEPSEEK_API_KEY` in env (owner standing auth), the end-to-end live
+chain — real NL description → `generate` (real DeepSeek) → `buildPluginManifestJson` →
+`executeFromManifest` → strict v4 page import validator — **ran and passed**, proven by the new
+`NlModelingApplyV4LiveIT` (`@Tag("agent-eval-live")`, key-gated). Full acceptance report +
+Final Evidence Pack: [`docs/retro/2026-06-18-prompt-to-app-live-apply-testing-gate-acceptance-report.md`](../retro/2026-06-18-prompt-to-app-live-apply-testing-gate-acceptance-report.md).
 
-**To verify once keyed (host-first, zero docker — per the prior conformance doc's runbook):**
-1. Provision a key (e.g. `DEEPSEEK_API_KEY` env → `CloudConfigSeeder`), host-first stack
-   (backend ← BFF ← Vite, DB `aura_boot_<runtime>`).
-2. `POST /api/agent/nl-modeling/generate` with a description whose capable model emits V2-shaped pages
-   (the v4 prompt should now make it emit v4 directly; if it still emits V2, the normalizer fixes it).
-3. `POST /api/agent/nl-modeling/apply` → expect **200 `success:true` status:SUCCESS** with
-   `PAGE:2` in resourceCounts (no `S-PAGE-VERSION` / `S-PAGE-LAYOUT-TYPE` / `S-PAGE-BLOCKS` blocking).
-4. Confirm the persisted page is v4 (`/api/pages/key/<model>_list` assembles toolbar+table) and a
-   re-generate-then-`apply` with a hand-locked block preserves the hand-edit (FR-E4 provenance).
-5. Rotate any chat-exposed key and scrub `ab_cloud_config` after (per prior doc).
+Live result: generate `models=1 pages=3 serviceValidationErrors=0`; apply
+`success=true status=SUCCESS` with `PAGE.CREATE=3` through the v4 gate (+ `PERMISSION.CREATE=4`,
+`MODEL=1`, `FIELD=5`, `COMMAND=3`, `MENU=2`). Wire-verified: reactor-netty POST
+`{uri=https://api.deepseek.com/v1/chat/completions}` → `HTTP/1.1 200 OK` (`x-ds-trace-id` present).
+
+**Two live-surfaced gaps the unit-tested deterministic core could not catch — fixed deterministically
+(TDD), see the same PR:**
+1. **Menu → permission referential failure.** Generated child menus gate on `dynamic.<model>.read`
+   while emitting `permissions: []` (dynamic CRUD perms are not auto-created on model publish), so
+   `validateManifest` rejected the menu. Fix: `synthesizePermissions()` declares the per-model dynamic
+   CRUD perm set (idempotent UPSERT under OVERWRITE), preserving any explicit perms.
+2. **Unknown blockType.** The few-shot only shows list/form pages → the model invents
+   `blockType:"detail"` (not a registered `DslRegistry.BlockType`) → `S-PAGE-BLOCK-TYPE`. Fix:
+   `coerceBlockType()` in `normalizePageToV4` maps an unknown blockType to a valid one (alias table,
+   else kind default: detail→`description`, list→`table`, form→`form-section`).
+
+**Open follow-ups (separate items, not blockers to this closure):**
+- Frontend designer / browser golden of the generated DSL pages — incl. verifying the detail-page
+  `description`-block field-render contract from renderer source before any few-shot detail example
+  (§16 "don't guess DSL renderer contracts"; the normalizer guarantees gate-passing, not render quality).
+- FR-E4 re-generate-then-`apply` hand-lock preservation: unit-verified (`PageConfigProvenanceTest`),
+  not yet live round-tripped.
+- The integration-test profile logs MyBatis SQL params → a live-seeded key lands in test stdout;
+  redact retained logs.
 
 ## Residual / non-goals
 - Live generation quality (weak model richness) = prompt/model tuning, independent item (per prior docs).
