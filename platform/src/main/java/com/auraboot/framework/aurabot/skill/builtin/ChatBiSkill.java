@@ -93,12 +93,14 @@ public class ChatBiSkill implements AuraBotSkill {
 
     @Override
     public String name() {
-        return "chat_bi";
+        // Must match AuraBotSkillRegistry.NAME_PATTERN (^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*)?$) —
+        // no underscores; hyphen form mirrors the historical /api/ai/chat-bi naming.
+        return "chat-bi";
     }
 
     @Override
     public String displayName() {
-        return "aurabot.skill.chat_bi.displayName";
+        return "aurabot.skill.chat-bi.displayName";
     }
 
     @Override
