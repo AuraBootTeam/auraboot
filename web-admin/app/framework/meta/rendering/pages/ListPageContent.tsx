@@ -42,6 +42,7 @@ import { ErrorAlert } from '~/ui/ErrorAlert';
 import { useAuth } from '~/contexts/AuthContext';
 import { ListPageHeader } from './list/ListPageHeader';
 import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
+import { useTransientFlag } from '~/hooks/useTransientFlag';
 import { useAutoSaveView } from '~/framework/smart/hooks/useAutoSaveView';
 import {
   DEFAULT_ROW_HEIGHT,
@@ -2500,6 +2501,10 @@ function ListPageContentInner(props: PageContentProps) {
   }, [tableBlock, locale, t, tableName, schema?.modelCode]);
 
   // Auto-save view config — delegates upsert logic to backend
+  // §3: after sort/filter/column/row-height changes auto-save to the current
+  // view, surface a quiet "已保存到当前视图" hint so the persistence is visible.
+  const [viewSavedHintOn, flashViewSavedHint] = useTransientFlag(2200);
+
   const ensureViewAndUpdateConfig = useCallback(
     async (
       config: Partial<import('~/framework/smart/types/savedView').ViewConfig>,
@@ -2520,6 +2525,9 @@ function ListPageContentInner(props: PageContentProps) {
             selectView(view.pid);
           }
         }
+        if (!options?.isStale?.()) {
+          flashViewSavedHint();
+        }
       } catch (err) {
         if (options?.isStale?.()) {
           return;
@@ -2530,7 +2538,7 @@ function ListPageContentInner(props: PageContentProps) {
         }
       }
     },
-    [currentView, updateViewConfig, modelCode, pageKey, selectView],
+    [currentView, updateViewConfig, modelCode, pageKey, selectView, flashViewSavedHint],
   );
 
   const autoSaveMountedRef = useRef(true);
@@ -2977,7 +2985,19 @@ function ListPageContentInner(props: PageContentProps) {
         data-testid="dynamic-list"
         data-ab-testid={deriveTestId('list', modelCode, 'container')}
       >
-        <div className="rounded-card bg-panel shadow-sm">
+        <div className="rounded-card bg-panel relative shadow-sm">
+          {/* §3: quiet auto-save confirmation — appears briefly after a
+              sort/filter/column/row-height change is persisted to the view. */}
+          {viewSavedHintOn && (
+            <div
+              className="bg-accent-weak text-accent rounded-pill text-aux pointer-events-none absolute top-2 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1 shadow-sm transition-opacity"
+              role="status"
+              data-testid="view-saved-hint"
+            >
+              <span className="bg-status-green rounded-pill h-1.5 w-1.5" aria-hidden="true" />
+              {t('common.view_saved') || 'Saved to current view'}
+            </div>
+          )}
           {/* Page title, view selector, and action buttons */}
           <ListPageHeader
             title={
