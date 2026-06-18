@@ -674,6 +674,17 @@ const widgetFields: PropertySchema<string>[] = [
       { label: 'Line chart', value: 'line-chart' },
       { label: 'Pie chart', value: 'pie-chart' },
       { label: 'Area chart', value: 'area-chart' },
+      // E1 — full SharedChartFactory chart parity (the live WidgetRenderer renders
+      // these via getChartComponent; the designer shows a representative preview).
+      { label: 'Radar chart', value: 'radar' },
+      { label: 'Scatter chart', value: 'scatter' },
+      { label: 'Gauge', value: 'gauge' },
+      { label: 'Funnel chart', value: 'funnel' },
+      { label: 'Heatmap', value: 'heatmap' },
+      { label: 'Treemap', value: 'treemap' },
+      { label: 'Gantt', value: 'gantt' },
+      { label: 'Pareto', value: 'pareto' },
+      { label: 'Combo chart', value: 'combo' },
       { label: 'Progress', value: 'progress' },
       { label: 'Table', value: 'table' },
       { label: 'Markdown', value: 'markdown' },
