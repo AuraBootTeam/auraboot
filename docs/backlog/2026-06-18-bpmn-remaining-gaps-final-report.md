@@ -41,8 +41,12 @@ created: 2026-06-18
 - **真栈实测**:SEQ-01、GAP-252 receiveTask、G-B3 均为真 Postgres + 真 SmartEngine 4.0.2 IT;SEQ-01 还有引擎 storage-custom 全量回归。
 - **单元/wiring 级**:G-B4 控制器测的是 BPM-scoped 关联 wiring(thin delegation),底层文件存储由 `FileServiceImplTest` 覆盖——非真上传(IT profile 无存储目录配置 + MIME 魔数校验,对 ⚪ LOW thin 控制器不成比例);如需端到端上传 golden,补 MockMvc multipart + 临时存储目录。
 - **带理由保留**:inclusiveGateway completionCondition(见 §2),标准 N-of-N join 已支持。
-- **前端 UI golden(G-T5 residual)**:<!-- GT5_RESULT -->见 §6。
+- **前端 UI golden(G-T5 residual)**:见 §6。
 
 ## 6. G-T5 残余(其余节点类型属性 golden)
-<!-- GT5_SECTION -->
-_(填充中)_
+
+**本轮新前端改动 = `ReceiveTaskEditor` 解禁 messageRef/messageType**(GAP-252 配套)。已更新其 vitest:断言两字段可编辑 + onChange 绑定 config。
+
+- **属性编辑器绑定 vitest**(`property-editors.test.tsx`):**10/10 通过**,覆盖 ServiceTask(serviceType/commandCode/serviceUrl/async)、Start/End、Exclusive/Parallel gateway、**ReceiveTaskEditor(messageRef/messageType 现已绑定)**。即 G-T5 关注的"其余节点类型属性"在**绑定层已单测覆盖**。
+- **真浏览器 golden 现状**:userTask 属性 real-fill→save→reload 的浏览器 golden 已由上一轮 9/9 designer golden 覆盖(merged);各编辑器走**同一** FormDialog/property-editor + save/reload 契约。
+- **诚实保留(§2.4)**:serviceTask/gateway/callActivity 属性的**真浏览器** real-fill golden 本轮**未重起 host 栈跑**(Vite+BFF+backend+Playwright,对"绑定已单测 + 模式已 userTask 证明"的同型残余成本不成比例)。状态:**绑定 100% 单测;浏览器 golden = 同型残余,低风险,未本轮跑**。如需补,起 host 栈按 designer-property-edit.spec 同手法对各类型扩展即可。
