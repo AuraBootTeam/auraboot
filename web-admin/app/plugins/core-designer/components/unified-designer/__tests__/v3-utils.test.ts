@@ -1655,10 +1655,17 @@ describe('Inspector schema registry', () => {
     expect(bpmSchema.find((field) => field.key === 'props.actions')?.type).toBe('json');
     expect(bpmSchema.find((field) => field.key === 'dataSource.parameters')?.type).toBe('json');
     expect(timelineSchema.find((field) => field.key === 'props.items')?.type).toBe('json');
-    expect(timelineSchema.find((field) => field.key === 'props.permissionCode')?.type).toBe('text');
-    expect(timelineSchema.find((field) => field.key === 'dataSource.queryCode')?.type).toBe('text');
+    // D2 — permissionCode / queryCode are now rich selectors (was plain text).
+    expect(timelineSchema.find((field) => field.key === 'props.permissionCode')?.type).toBe(
+      'permission-select',
+    );
+    expect(timelineSchema.find((field) => field.key === 'dataSource.queryCode')?.type).toBe(
+      'namedQuery',
+    );
     expect(historySchema.find((field) => field.key === 'props.entries')?.type).toBe('json');
-    expect(historySchema.find((field) => field.key === 'props.permissionCode')?.type).toBe('text');
+    expect(historySchema.find((field) => field.key === 'props.permissionCode')?.type).toBe(
+      'permission-select',
+    );
     expect(historySchema.find((field) => field.key === 'dataSource.executionMode')?.type).toBe(
       'select',
     );
