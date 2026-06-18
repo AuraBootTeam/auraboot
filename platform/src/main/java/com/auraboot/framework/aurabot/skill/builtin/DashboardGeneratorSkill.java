@@ -57,7 +57,10 @@ public class DashboardGeneratorSkill implements AuraBotSkill {
             + "      \"title\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":100},"
             + "      \"dataSourceType\":{\"type\":\"string\",\"enum\":[\"namedQuery\",\"model\",\"static\"],"
             + "        \"description\":\"Where the widget's data comes from (omit for rich-text).\"},"
-            + "      \"dataSourceCode\":{\"type\":\"string\",\"description\":\"The named-query code or model code to read.\"}"
+            + "      \"dataSourceCode\":{\"type\":\"string\",\"description\":\"The named-query code or model code to read.\"},"
+            + "      \"dimension\":{\"type\":\"string\",\"description\":\"For bar/line/pie charts over a model: the field to group by (x-axis / pie slices).\"},"
+            + "      \"metricField\":{\"type\":\"string\",\"description\":\"The numeric field to aggregate for a model chart/number-card (defaults to a row count).\"},"
+            + "      \"aggregation\":{\"type\":\"string\",\"enum\":[\"count\",\"sum\",\"avg\",\"min\",\"max\"],\"description\":\"Aggregation for the model metric (default count).\"}"
             + "    },\"required\":[\"type\",\"title\"]}}"
             + "},"
             + "\"required\":[\"code\",\"title\",\"widgets\"]"
@@ -197,10 +200,38 @@ public class DashboardGeneratorSkill implements AuraBotSkill {
             String dsType = text(spec, "dataSourceType");
             String dsCode = text(spec, "dataSourceCode");
             if (dsType != null && !dsType.isBlank()) {
+                // Emit the ChartDataSource shape the widget renderers actually read
+                // (web-admin .../hooks/useChartData.ts): namedQuery -> queryCode,
+                // model -> aggregate(modelCode + metrics[, dimensions]). The earlier
+                // {type, code} shape never satisfied isDataSourceComplete(), so a
+                // generated dashboard rendered empty charts ("No data yet").
                 ObjectNode ds = config.putObject("dataSource");
-                ds.put("type", dsType);
-                if (dsCode != null && !dsCode.isBlank()) {
-                    ds.put("code", dsCode);
+                if ("namedQuery".equals(dsType)) {
+                    ds.put("type", "namedQuery");
+                    if (dsCode != null && !dsCode.isBlank()) {
+                        ds.put("queryCode", dsCode);
+                    }
+                } else if ("model".equals(dsType)) {
+                    ds.put("type", "aggregate");
+                    if (dsCode != null && !dsCode.isBlank()) {
+                        ds.put("modelCode", dsCode);
+                    }
+                    String dimension = text(spec, "dimension");
+                    if (dimension != null && !dimension.isBlank()) {
+                        ds.putArray("dimensions").add(dimension);
+                    }
+                    ObjectNode metric = ds.putArray("metrics").addObject();
+                    String metricField = text(spec, "metricField");
+                    String aggregation = text(spec, "aggregation");
+                    metric.put("field", metricField != null && !metricField.isBlank() ? metricField : "pid");
+                    metric.put("aggregation", aggregation != null && !aggregation.isBlank() ? aggregation : "count");
+                    metric.put("alias", "value");
+                } else {
+                    // static (or any future kind) — carry through verbatim.
+                    ds.put("type", dsType);
+                    if (dsCode != null && !dsCode.isBlank()) {
+                        ds.put("code", dsCode);
+                    }
                 }
             }
             widgets.add(w);

@@ -1,0 +1,292 @@
+{
+  "pageKey": "crm_lead_workbench",
+  "name:zh-CN": "线索对账台",
+  "name:en": "Lead Console",
+  "modelCode": "crm_lead",
+  "description": "Lead console: KPI by lifecycle status, click a metric to filter the lead table, select a row to inspect evidence in the review drawer, and advance the lead status (contact/qualify/convert/lose) inline.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "extension": {
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showEdit": false
+  },
+  "dataSources": {
+    "leadStats": {
+      "type": "namedQuery",
+      "params": {},
+      "queryCode": "crm_lead_status_stats",
+      "adaptor": "table",
+      "format": "records"
+    },
+    "leadList": {
+      "type": "api",
+      "method": "get",
+      "endpoint": "/api/dynamic/crm_lead_list/list",
+      "adaptor": "table",
+      "params": {
+        "pageNum": 1,
+        "pageSize": 50,
+        "filters": [
+          {
+            "fieldName": "crm_lead_status",
+            "operator": "IN",
+            "value": "${state.statusFilter}"
+          }
+        ],
+        "keyword": "${state.searchKeyword}",
+        "sortField": "crm_lead_score",
+        "sortOrder": "desc"
+      },
+      "dependOn": [
+        "state.statusFilter",
+        "state.searchKeyword"
+      ]
+    },
+    "selectedLeadDetail": {
+      "type": "api",
+      "method": "get",
+      "endpoint": "/api/dynamic/crm_lead_list/list",
+      "adaptor": "table",
+      "params": {
+        "pageNum": 1,
+        "pageSize": 1,
+        "filters": [
+          {
+            "fieldName": "pid",
+            "operator": "EQ",
+            "value": "${state.selectedLead.pid}"
+          }
+        ]
+      },
+      "dependOn": [
+        "state.selectedLead.pid"
+      ]
+    }
+  },
+  "blocks": [
+    {
+      "id": "crm_lead_kpi_strip",
+      "blockType": "metric-strip",
+      "dataSource": "leadStats",
+      "variant": "cards",
+      "metrics": [
+        {
+          "key": "total",
+          "label": { "zh-CN": "全部线索", "en": "All Leads" },
+          "valueField": "total_count",
+          "tone": "blue",
+          "onClick": { "action": "state.set", "args": { "statusFilter": [] } }
+        },
+        {
+          "key": "new",
+          "label": { "zh-CN": "新建", "en": "New" },
+          "valueField": "new_count",
+          "tone": "purple",
+          "onClick": { "action": "state.set", "args": { "statusFilter": ["new"] } }
+        },
+        {
+          "key": "contacted",
+          "label": { "zh-CN": "已联系", "en": "Contacted" },
+          "valueField": "contacted_count",
+          "tone": "amber",
+          "onClick": { "action": "state.set", "args": { "statusFilter": ["contacted"] } }
+        },
+        {
+          "key": "qualified",
+          "label": { "zh-CN": "已合格", "en": "Qualified" },
+          "valueField": "qualified_count",
+          "tone": "green",
+          "onClick": { "action": "state.set", "args": { "statusFilter": ["qualified"] } }
+        },
+        {
+          "key": "converted",
+          "label": { "zh-CN": "已转化", "en": "Converted" },
+          "valueField": "converted_count",
+          "tone": "green",
+          "onClick": { "action": "state.set", "args": { "statusFilter": ["converted"] } }
+        },
+        {
+          "key": "lost",
+          "label": { "zh-CN": "已流失", "en": "Lost" },
+          "valueField": "lost_count",
+          "tone": "default",
+          "onClick": { "action": "state.set", "args": { "statusFilter": ["lost"] } }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "crm_lead_company",
+          "component": "SmartInput",
+          "bindState": "searchKeyword"
+        },
+        {
+          "field": "crm_lead_status",
+          "component": "SmartSelect",
+          "dictCode": "crm_lead_status",
+          "bindState": "statusFilter"
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_action_bar",
+      "blockType": "workbench-action-bar",
+      "surface": "bare",
+      "density": "compact",
+      "actions": [
+        {
+          "code": "filter_all",
+          "label": { "zh-CN": "全部", "en": "All" },
+          "variant": "ghost",
+          "activeWhen": "state.statusFilter == null || state.statusFilter.length == 0",
+          "onClick": { "action": "state.set", "args": { "statusFilter": [] } }
+        },
+        {
+          "code": "filter_new",
+          "label": { "zh-CN": "仅新建", "en": "New Only" },
+          "variant": "ghost",
+          "activeWhen": "state.statusFilter != null && state.statusFilter.length == 1 && state.statusFilter.includes('new')",
+          "onClick": { "action": "state.set", "args": { "statusFilter": ["new"] } }
+        },
+        {
+          "code": "filter_qualified",
+          "label": { "zh-CN": "仅合格", "en": "Qualified Only" },
+          "variant": "ghost",
+          "activeWhen": "state.statusFilter != null && state.statusFilter.length == 1 && state.statusFilter.includes('qualified')",
+          "onClick": { "action": "state.set", "args": { "statusFilter": ["qualified"] } }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_table",
+      "blockType": "table",
+      "dataSource": "leadList",
+      "selection": { "mode": "single", "bind": "selectedLead" },
+      "columns": [
+        {
+          "field": "crm_lead_company",
+          "width": 200,
+          "label": { "zh-CN": "公司", "en": "Company" }
+        },
+        {
+          "field": "crm_lead_contact_name",
+          "width": 140,
+          "label": { "zh-CN": "联系人", "en": "Contact" }
+        },
+        {
+          "field": "crm_lead_status",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_lead_status",
+          "label": { "zh-CN": "状态", "en": "Status" }
+        },
+        {
+          "field": "crm_lead_score",
+          "width": 100,
+          "label": { "zh-CN": "评分", "en": "Score" }
+        },
+        {
+          "field": "crm_lead_source",
+          "width": 140,
+          "label": { "zh-CN": "来源", "en": "Source" }
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "contact",
+          "icon": "Phone",
+          "permissionCode": "crm.lead.manage",
+          "primary": true,
+          "visibleWhen": "row.crm_lead_status == 'new'",
+          "label": { "zh-CN": "标记已联系", "en": "Mark Contacted" },
+          "action": { "type": "command", "command": "crm:contact_lead" }
+        },
+        {
+          "code": "qualify",
+          "icon": "CheckCircle",
+          "permissionCode": "crm.lead.manage",
+          "visibleWhen": "row.crm_lead_status == 'new' || row.crm_lead_status == 'contacted'",
+          "label": { "zh-CN": "标记合格", "en": "Qualify" },
+          "action": { "type": "command", "command": "crm:qualify_lead" }
+        },
+        {
+          "code": "convert",
+          "icon": "ArrowRight",
+          "permissionCode": "crm.lead.manage",
+          "visibleWhen": "row.crm_lead_status == 'qualified'",
+          "label": { "zh-CN": "转化", "en": "Convert" },
+          "action": { "type": "command", "command": "crm:convert_lead" }
+        },
+        {
+          "code": "lose",
+          "icon": "XCircle",
+          "permissionCode": "crm.lead.manage",
+          "visibleWhen": "row.crm_lead_status == 'new' || row.crm_lead_status == 'contacted' || row.crm_lead_status == 'qualified'",
+          "label": { "zh-CN": "标记流失", "en": "Mark Lost" },
+          "action": { "type": "command", "command": "crm:lose_lead" }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_evidence_drawer",
+      "blockType": "review-drawer",
+      "context": "${state.selectedLead}",
+      "contextDataSource": "selectedLeadDetail",
+      "contextKeyField": "pid",
+      "titleTemplate": "${record.crm_lead_company} · ${record.crm_lead_status}",
+      "empty": {
+        "title": { "zh-CN": "请选择一条线索查看详情", "en": "Select a lead to view details" }
+      },
+      "summaryBadges": [
+        {
+          "key": "status",
+          "label": { "zh-CN": "状态", "en": "Status" },
+          "valueField": "crm_lead_status",
+          "valueMap": {
+            "new": { "zh-CN": "新建", "en": "New" },
+            "contacted": { "zh-CN": "已联系", "en": "Contacted" },
+            "qualified": { "zh-CN": "已合格", "en": "Qualified" },
+            "converted": { "zh-CN": "已转化", "en": "Converted" },
+            "lost": { "zh-CN": "已流失", "en": "Lost" },
+            "__empty": { "zh-CN": "未知", "en": "Unknown" }
+          },
+          "tone": "blue"
+        },
+        {
+          "key": "score",
+          "label": { "zh-CN": "评分", "en": "Score" },
+          "valueField": "crm_lead_score",
+          "tone": "purple"
+        }
+      ],
+      "source": {
+        "record": {
+          "dataSource": "selectedLeadDetail",
+          "recordField": "rows[0]",
+          "matchField": "pid"
+        },
+        "summary": {
+          "title": { "zh-CN": "线索信息", "en": "Lead Info" },
+          "description": "",
+          "items": [
+            { "key": "company", "label": { "zh-CN": "公司", "en": "Company" }, "field": "crm_lead_company" },
+            { "key": "contact", "label": { "zh-CN": "联系人", "en": "Contact" }, "field": "crm_lead_contact_name" },
+            { "key": "source", "label": { "zh-CN": "来源", "en": "Source" }, "field": "crm_lead_source" },
+            { "key": "score", "label": { "zh-CN": "评分", "en": "Score" }, "field": "crm_lead_score" },
+            { "key": "status", "label": { "zh-CN": "状态", "en": "Status" }, "field": "crm_lead_status" }
+          ]
+        }
+      }
+    }
+  ],
+  "title": {
+    "zh-CN": "线索对账台",
+    "en": "Lead Console"
+  }
+}

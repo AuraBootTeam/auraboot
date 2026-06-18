@@ -1,0 +1,72 @@
+{
+  "code": "crm_lead_analytics",
+  "title": "线索分析",
+  "title:zh-CN": "线索分析",
+  "title:en": "Lead Analytics",
+  "description": "Lead analytics dashboard: chart widgets (bar by status, pie by source, total KPI) aggregated from the seeded crm_lead model. Exercises the chart render path (bar/pie/number-card) end-to-end.",
+  "scope": "global",
+  "status": "published",
+  "isDefault": false,
+  "sortOrder": 1,
+  "layoutConfig": {
+    "columns": 12,
+    "rowHeight": 100,
+    "gap": 16,
+    "compactType": "vertical"
+  },
+  "widgets": [
+    {
+      "id": "lead_total_card",
+      "type": "smart-number-card",
+      "x": 0,
+      "y": 0,
+      "w": 3,
+      "h": 2,
+      "title": "线索总数",
+      "config": {
+        "title": { "zh-CN": "线索总数", "en": "Total Leads" },
+        "dataSource": {
+          "type": "aggregate",
+          "modelCode": "crm_lead",
+          "metrics": [{ "field": "pid", "aggregation": "count", "alias": "count" }]
+        }
+      }
+    },
+    {
+      "id": "leads_by_status_bar",
+      "type": "smart-bar-chart",
+      "x": 3,
+      "y": 0,
+      "w": 5,
+      "h": 4,
+      "title": "按状态分布",
+      "config": {
+        "title": { "zh-CN": "按状态分布", "en": "Leads by Status" },
+        "dataSource": {
+          "type": "aggregate",
+          "modelCode": "crm_lead",
+          "dimensions": ["crm_lead_status"],
+          "metrics": [{ "field": "pid", "aggregation": "count", "alias": "count" }]
+        }
+      }
+    },
+    {
+      "id": "leads_by_source_pie",
+      "type": "smart-pie-chart",
+      "x": 8,
+      "y": 0,
+      "w": 4,
+      "h": 4,
+      "title": "按来源分布",
+      "config": {
+        "title": { "zh-CN": "按来源分布", "en": "Leads by Source" },
+        "dataSource": {
+          "type": "aggregate",
+          "modelCode": "crm_lead",
+          "dimensions": ["crm_lead_source"],
+          "metrics": [{ "field": "pid", "aggregation": "count", "alias": "count" }]
+        }
+      }
+    }
+  ]
+}
