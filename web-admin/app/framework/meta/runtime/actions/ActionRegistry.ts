@@ -605,9 +605,12 @@ actionRegistry.register('toast.error', ({ args, showToast }) => {
  * dialog.confirm - 确认对话框
  */
 actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) => {
-  const message = args?.message || args?.content || 'Are you sure you want to proceed?';
+  let message: any = args?.message || args?.content || 'Are you sure you want to proceed?';
+  if (message && typeof message === 'object') {
+    message = (message as any)['zh-CN'] || (message as any)['en-US'] || 'Are you sure you want to proceed?';
+  }
   const doConfirm = ctxConfirm ?? confirmDialog;
-  const confirmed = await doConfirm({ content: message });
+  const confirmed = await doConfirm({ content: message as string });
   if (!confirmed) {
     throw new Error('User cancelled');
   }

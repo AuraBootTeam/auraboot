@@ -127,7 +127,15 @@ public class TemplateRegistry {
         String namespace = textValue(manifest, "namespace", "");
         String relativePath = toRelativePath(root, pluginDir);
 
-        return new TemplateDef(id, name, relativePath, namespace, pluginDir.normalize().toString());
+        String description = textValue(manifest, "description", null);
+        description = (description == null || description.isBlank()) ? null : description;
+        String category = textValue(manifest, "category", null);
+        category = (category == null || category.isBlank()) ? null : category;
+        String icon = textValue(manifest, "icon", null);
+        icon = (icon == null || icon.isBlank()) ? null : icon;
+
+        return new TemplateDef(id, name, relativePath, namespace, pluginDir.normalize().toString(),
+                description, category, icon);
     }
 
     private boolean isTemplateManifest(JsonNode manifest, boolean legacyTemplateDir) {
@@ -225,6 +233,9 @@ public class TemplateRegistry {
      * @param relativePath relative path from repository root to the template directory
      * @param namespace    plugin namespace prefix
      * @param absolutePath absolute directory path on disk
+     * @param description  optional short description (null if absent in manifest)
+     * @param category     optional category label (null if absent in manifest)
+     * @param icon         optional lucide icon name, e.g. {@code "package"} (null if absent)
      */
     public record TemplateDef(
             String id,
@@ -232,7 +243,10 @@ public class TemplateRegistry {
             String relativePath,
             String namespace,
             @JsonIgnore
-            String absolutePath
+            String absolutePath,
+            String description,
+            String category,
+            String icon
     ) {
         public TemplateDef {
             Objects.requireNonNull(id, "id");
@@ -240,6 +254,7 @@ public class TemplateRegistry {
             Objects.requireNonNull(relativePath, "relativePath");
             Objects.requireNonNull(namespace, "namespace");
             Objects.requireNonNull(absolutePath, "absolutePath");
+            // description, category, icon are intentionally nullable
         }
     }
 }
