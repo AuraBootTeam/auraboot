@@ -55,8 +55,17 @@
     "code": "crm_acc_owner",
     "displayName:zh-CN": "负责人",
     "displayName:en": "Owner",
-    "dataType": "string",
-    "constraints": { "maxLength": 100 }
+    "dataType": "reference",
+    "description": "Reference to sys_user — the account owner (resolves to a user name + picker instead of a raw id).",
+    "refTarget": {
+      "targetModel": "sys_user",
+      "targetField": "username"
+    },
+    "feature": { "searchable": true },
+    "extension": {
+      "placeholder:zh-CN": "请选择负责人",
+      "placeholder:en": "Select owner"
+    }
   },
   {
     "code": "crm_acc_status",
