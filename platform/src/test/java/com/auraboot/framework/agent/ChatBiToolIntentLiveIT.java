@@ -31,11 +31,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Live-LLM quality measurement for the NEW {@code chat_bi} agent-tool intent path — the coverage
- * migration that lets the legacy {@code ChatBiLlmParser} / {@link ChatBiIntentLiveIT} retire
+ * migration that lets the legacy {@code ChatBiLlmParser} / {@code ChatBiIntentLiveIT} (now retired) retire
  * (convergence endgame §7,
  * docs/backlog/2026-06-18-aurabot-conversational-viz-convergence-endgame.md).
  *
- * <p>{@link ChatBiIntentLiveIT} measured the v1 question parser (NL → aggregation/group-by/field).
+ * <p>{@code ChatBiIntentLiveIT} (now retired) measured the v1 question parser (NL → aggregation/group-by/field).
  * The endgame moves that capability onto the agent's <strong>native tool-use</strong>: given the
  * {@code chat_bi} tool schema + a model field catalog, does a real model fill {@code modelCode /
  * dimensions / metrics} correctly and grounded in the schema (no hallucinated fields)? This pins
