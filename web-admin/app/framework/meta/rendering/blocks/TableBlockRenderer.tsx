@@ -306,6 +306,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
         const rendered = evaluator.evaluateTemplate(column.render, {
           ...context,
           row,
+          // Alias the current row as `record` to match the list-page / sub-table
+          // convention (ListPageContent / SubTableViewer set record = row), so a
+          // table block's `record.<field>` resolves to the row, not the page record.
+          record: row,
         });
         return <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(rendered) }} />;
       } catch (err) {
@@ -360,6 +364,9 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
             const visible = evaluator.evaluateCondition(button.visibleWhen, {
               ...context,
               row,
+              // `record` aliases the row — matches the list-page / sub-table
+              // row-action convention so `record.<field>` gates per-row here too.
+              record: row,
             });
             if (!visible) return null;
           }
