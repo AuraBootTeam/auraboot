@@ -31,10 +31,10 @@ related:
 | S1-2 投诉自动指派 + 响应 SLA | automation update_record on create + RECORD SLA | 用 ②F3 | ✅ DONE(`ComplaintLoopGoldenIT` 1/1:create→自动指派〔异步〕+响应 SLA〔F3 同步〕+log success)|
 | S6 工作台浏览器 golden | host-first Vite+Playwright,KPI/筛选/抽屉/0 exprError | — | ⬜ |
 | S5 图表渲染浏览器 golden | ChatBI 渲染 + 新 dashboard 生成 golden | 用 ③S5 | ⬜ |
-| S7 多 agent 真模型收敛测 | 不空转/不死循环 | — | ⬜ |
-| ApprovalGate 超时真栈 IT | 替换现 mock-only | — | ⬜ |
-| S4 create_model 端到端验证 | 验证现有 agent 部署路径 | — | ⬜ |
-| RuntimeAuth enforcement 测 | 验 forbidden effect→deny | — | ⬜ |
+| S7 多 agent 真模型收敛测 | 不空转/不死循环(live 多步) | — | ⬜ heavy(归 live 类,与浏览器 golden 一批) |
+| ApprovalGate 超时真栈 IT | 替换现 mock-only | — | ✅ DONE(`AgentApprovalTimeoutEnforcementIT` 1/1:pending past-deadline→`enforceApprovalTimeouts()`→expired+reason)|
+| S4 create_model 端到端验证 | 验证现有 agent 部署路径 | — | ✅ DONE(取证:已有 `ModelCreateSkillIntegrationTest` 覆盖 + 并发 #782 nl-modeling apply;无需新建)|
+| RuntimeAuth enforcement 测 | 验 forbidden effect→deny | — | ⬜(deny 是 contract-only:Default 实现 grant-all,enforcement 测需 stub 拒绝 bean 驱动 ToolLoopService;已取证实装〔#746 investigation〕,低增量)|
 | 真插件可达 host-first golden | import 真 crm/quality 插件 golden | **CRM 部分被 ①F2 阻塞** → 仅 quality 部分可做 | ⏸ 部分 blocked |
 
 ## 1. 验证纪律
