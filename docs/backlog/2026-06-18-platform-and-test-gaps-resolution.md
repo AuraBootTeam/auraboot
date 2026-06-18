@@ -22,7 +22,7 @@ related:
 | gap | 方案 | 状态 |
 |---|---|---|
 | **②F3 record 级 SLA** | `targetType="RECORD"`(targetKey=modelCode)+ `SlaActivationListener.onRecordCreate` 复用 deadline 引擎,`DynamicDataServiceImpl` record-create 钩子 lazy 调用 | ✅ **DONE**(`RecordLevelSlaActivationIT` 2/2,RED→GREEN) |
-| **③S5 dashboard 生成 skill** | 复用已存在 `dashboards.schema.json` 作 native tool-use inputSchema + `DashboardService.create` 落库;`DashboardGeneratorSkill` + live IT | ⬜ next |
+| **③S5 dashboard 生成 skill** | `DashboardGeneratorSkill`(paramsSchema=widgets[type/title/dataSource],execute 自动 12 列网格布局 + `DashboardService.create`)+ 确定性 IT + live IT | ✅ **DONE**(确定性 `DashboardGeneratorSkillIT` 1/1〔修 scope drift〕+ live `DashboardGenerationLiveIT` 1/1:真 DeepSeek NL→4-widget 看板类型全对+端到端持久。**finding:DashboardCreateRequest javadoc scope 大写 stale,DB chk_dashboard_scope 要小写**)|
 | ①F2 demo 表遮蔽 | (删 schema.sql demo 表 + 修 CS agent IT)| ⏸ **owner 暂忽略** |
 
 ### 🔧 纯测试/基建 gap(直接执行)
