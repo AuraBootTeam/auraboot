@@ -222,13 +222,22 @@ extended with `importData` (CSV/JSON/field-map/file-not-found/per-row-error),
 no-relations-defined reject path — all **previously 0% covered** (grep-verified zero test
 callers), all green on a current-schema DB. Behavioral finding F4: `importData` does not
 auto-generate the PK (unlike `create()`), so imports of new records without an explicit
-`pid` fail every row — low-priority backlog. **The BUNDLE floor stays 0.73 (still NOT
-bumped):** a clean consolidated measurement needs a DB that is BOTH at the current Flyway
-baseline AND reset+bootstrapped. The shared dev `aura_boot` is mid Flyway-baseline transition
-(stale billing schema → 51 billing failures on a snapshot); a fresh baseline DB lacks
-bootstrap seed (→ 75 scattered 403/404/MetaServiceException failures); and jacoco
-under-records in a fresh worktree. The bump remains queued for the next clean reset+bootstrap
-consolidation. Full evidence:
+`pid` fail every row — low-priority backlog.
+
+**(3) BUNDLE floor BUMPED 0.73 → 0.75 (second pass — done).** A clean consolidated
+measurement needs a DB that is BOTH at the current Flyway baseline AND reset+bootstrapped.
+Built it (path B): snapshot the bootstrapped shared `aura_boot`, drop the 32 old-gen billing
+tables, recreate the 11 current ones from `aura_boot_base`'s DDL + apply the
+`2026-06-10-billing-resource-catalog.sql` seed → bootstrap seed + current schema (billing
+13/13 green). Separately, the full-suite jacoco read a bogus ~5% because the runtime CGLIB
+**classdump mis-attributes coverage across the suite's many `@SpringBootTest` contexts**
+(proxy class IDs diverge per evicted/recreated context) — fixed by switching to JaCoCo
+**offline instrumentation** (instrument `build/classes` at build time → coverage on stable
+on-disk IDs; the slice that read 0.25% under classdump now reads 50.3%, behavior-neutral).
+Clean full run then measured **BUNDLE LINE 0.7735** (51452/66519); security service packages
+0.85–0.99 (all > 0.84). Floor raised 0.73→0.75 (~2.3pt margin); `jacocoTestCoverageVerification`
+passes. (Earlier intermediate states for the record: snapshot=stale billing→51 fails;
+fresh baseline=no seed→75 fails — neither was used for the bump.) Full evidence:
 `docs/retro/2026-06-18-oss-coverage-gate-consolidation-testing-gate-acceptance-report.md`.
 
 **Frontend** — wired in `web-admin/vitest.config.ts` `coverage.thresholds` (lines 19 /

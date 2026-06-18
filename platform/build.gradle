@@ -237,6 +237,8 @@ dependencyManagement {
 
 configurations {
     mockitoAgent
+    jacocoAnt
+    jacocoRuntime
 
     // Exclude conflicting logging implementations globally
     all {
@@ -384,6 +386,13 @@ dependencies {
     mockitoAgent('org.mockito:mockito-core') {
         transitive = false
     }
+    // JaCoCo offline instrumentation: instrument build/classes at build time so coverage
+    // records against stable on-disk class IDs. Replaces the fragile runtime classdump
+    // approach for CGLIB-proxied Spring beans, which mis-attributes coverage across the many
+    // @SpringBootTest contexts in the full suite (proxy class IDs differ per evicted/recreated
+    // context, so the dumped proxy no longer matches the exec — the bundle then reads ~5%).
+    jacocoAnt 'org.jacoco:org.jacoco.ant:0.8.12'
+    jacocoRuntime 'org.jacoco:org.jacoco.agent:0.8.12:runtime'
 
     // PostgreSQL 数据库用于测试
     testImplementation 'org.postgresql:postgresql:42.7.11'
@@ -470,6 +479,32 @@ tasks.withType(Test).configureEach {
     jvmArgs '-Djdk.httpclient.allowRestrictedHeaders=host'
 }
 
+// ─── JaCoCo offline instrumentation of main classes ───
+// Instrument build/classes/java/main at build time into a separate dir. The test task loads
+// these (stable IDs) ahead of the originals so coverage attributes to on-disk classes, which
+// is robust across the suite's many CGLIB-proxied Spring contexts (the runtime classdump was
+// not — proxy class IDs diverge per evicted/recreated context, mis-attributing to ~5%).
+def jacocoInstrumentedMain = file("${buildDir}/classes-instrumented-main")
+tasks.register('instrumentMainOffline') {
+    dependsOn 'classes'
+    inputs.dir(layout.buildDirectory.dir('classes/java/main'))
+    outputs.dir(jacocoInstrumentedMain)
+    doLast {
+        delete jacocoInstrumentedMain
+        ant.taskdef(name: 'jacocoInstrument',
+                    classname: 'org.jacoco.ant.InstrumentTask',
+                    classpath: configurations.jacocoAnt.asPath)
+        // CCJSqlParserTokenManager exceeds the JVM method-size limit after instrumentation
+        // (same reason the on-the-fly agent excluded it); leave it un-instrumented so the
+        // original loads from build/classes, which stays later on the test classpath.
+        ant.jacocoInstrument(destdir: jacocoInstrumentedMain) {
+            fileset(dir: "${buildDir}/classes/java/main") {
+                exclude(name: 'net/sf/jsqlparser/parser/CCJSqlParserTokenManager.class')
+            }
+        }
+    }
+}
+
 // 配置测试任务使用JUnit Platform
 test {
     useJUnitPlatform()
@@ -517,18 +552,20 @@ test {
     testLogging {
         events "passed", "skipped", "failed"
     }
-    // classDumpDir is append-only across invocations; stale Spring CGLIB proxy
-    // dumps can share one internal class name and break JaCoCo report creation.
-    doFirst {
-        delete file("${buildDir}/jacoco-classdump")
-    }
     finalizedBy jacocoTestReport
-    // Exclude CCJSqlParserTokenManager from JaCoCo instrumentation:
-    // The class exceeds JVM method size limits after instrumentation, causing
-    // Spring context initialization failures (IllegalStateException) in tests.
+    // ─── JaCoCo offline instrumentation (replaces the fragile runtime CGLIB classdump) ───
+    // Load offline-instrumented main classes first (stable on-disk IDs), then the original
+    // build/classes (provides the un-instrumented CCJSqlParserTokenManager), plus the jacoco
+    // runtime so instrumented classes resolve org.jacoco.agent.rt.* at load. The on-the-fly
+    // agent is disabled — offline records coverage on the original classes a proxy delegates
+    // to, which is stable across the many @SpringBootTest contexts (unlike per-context proxy IDs).
+    dependsOn 'instrumentMainOffline'
+    doFirst {
+        classpath = files(jacocoInstrumentedMain) + classpath + configurations.jacocoRuntime
+    }
+    systemProperty 'jacoco-agent.destfile', file("${buildDir}/jacoco/test.exec").absolutePath
     jacoco {
-        excludes = ['net.sf.jsqlparser.parser.CCJSqlParserTokenManager']
-        classDumpDir = file("${buildDir}/jacoco-classdump")
+        enabled = false
     }
 
     jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
@@ -681,22 +718,13 @@ def jacocoExcludes = [
 
 jacocoTestReport {
     dependsOn test
+    // Offline instrumentation writes here (jacoco-agent.destfile on the test task); the report
+    // reads the ORIGINAL on-disk classes (build/classes) — coverage was recorded against their
+    // stable IDs, so no runtime classdump of CGLIB proxies is needed.
+    executionData.setFrom(files("${buildDir}/jacoco/test.exec"))
     afterEvaluate {
-        // Include both compiled classes AND JaCoCo classdump (runtime-generated CGLIB proxies).
-        // Spring Boot uses CGLIB proxies for @Transactional/@Async beans. JaCoCo probes fire
-        // on the proxy class, not the original. Without the classdump, coverage for all
-        // Spring-managed service beans shows as 0%.
-        def classDumpDir = file("${buildDir}/jacoco-classdump")
         def allClassDirs = classDirectories.files.collect {
             fileTree(dir: it, exclude: jacocoExcludes)
-        }
-        if (classDumpDir.exists()) {
-            // Only include CGLIB proxy classes from classdump — these are runtime-generated
-            // and have no .class on disk. Original classes are already in build/classes.
-            // Including both would cause "Can't add different class with same name" errors.
-            allClassDirs.add(fileTree(dir: classDumpDir,
-                include: 'com/auraboot/**/*$$SpringCGLIB$$0.*.class',
-                exclude: jacocoExcludes + ['**/*FastClass*']))
         }
         classDirectories.setFrom(files(allClassDirs))
     }
@@ -709,10 +737,11 @@ jacocoTestReport {
 
 jacocoTestCoverageVerification {
     dependsOn jacocoTestReport
+    // Read the offline-instrumentation exec (same file the report uses).
+    executionData.setFrom(files("${buildDir}/jacoco/test.exec"))
     afterEvaluate {
-        // Use only compiled classes for verification (not classdump).
-        // The jacocoTestReport includes CGLIB classdump for accurate XML reporting,
-        // but verification uses the simpler set to avoid class ID conflicts.
+        // Verify against the original compiled classes — offline instrumentation records
+        // coverage on their stable on-disk IDs, so no runtime CGLIB classdump is involved.
         classDirectories.setFrom(files(classDirectories.files.collect {
             fileTree(dir: it, exclude: jacocoExcludes)
         }))
@@ -740,13 +769,22 @@ jacocoTestCoverageVerification {
         // (same ~2pt flaky margin). Two of the six surfaced live jsonb-persistence
         // bugs (fixed in-band); behavioral findings are in
         // docs/backlog/2026-06-11-meta-impl-coverage-product-findings.md.
+        // 2026-06-18 wave 4 (gate consolidation): coverage moved to JaCoCo OFFLINE
+        // instrumentation. The prior runtime CGLIB classdump mis-attributed coverage across the
+        // suite's many @SpringBootTest contexts (proxy class IDs diverge per evicted/recreated
+        // context), so a full run read a bogus ~5% bundle. Offline instruments build/classes at
+        // build time -> coverage records on stable on-disk IDs. A clean full suite (bootstrap
+        // seed + current Flyway-baseline schema incl. billing) now measures the bundle at 77.35%
+        // (51452/66519); security service packages 0.85-0.99. Floor raised 0.73->0.75 (same ~2pt
+        // flaky margin; conservative — 73 pre-existing/env failures still undercount coverage).
+        // Evidence: docs/retro/2026-06-18-oss-coverage-gate-consolidation-testing-gate-acceptance-report.md.
         rule {
             enabled = true
             element = 'BUNDLE'
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.73
+                minimum = 0.75
             }
         }
         // Lock the already-strong security/identity domains so they cannot rot.
