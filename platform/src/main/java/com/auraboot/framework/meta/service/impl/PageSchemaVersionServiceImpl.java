@@ -631,14 +631,161 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         for (String field : allFields) {
             Object sourceValue = sourceSnapshot.get(field);
             Object targetValue = targetSnapshot.get(field);
-            
+
+            // B3 — diff the page block tree at BLOCK level (by stable block id)
+            // rather than as one opaque blob, so the version-compare UI shows
+            // exactly which blocks were added / removed / modified (and which prop
+            // within a block changed). The DTO already carries per-path
+            // FieldDifference entries; the UI renders them unchanged (it only shows
+            // the real REST response — no client-side drill-down, per C3).
+            if ("blocks".equals(field)) {
+                diffBlockTrees(sourceValue, targetValue, "blocks", differences);
+                continue;
+            }
+
             PageSchemaVersionComparisonDTO.FieldDifference diff = compareFieldValues(field, sourceValue, targetValue);
             if (diff != null) {
                 differences.add(diff);
             }
         }
-        
+
         return differences;
+    }
+
+    /**
+     * B3 — recursive, id-keyed diff of two block trees. Emits a FieldDifference per
+     * added / removed block (path {@code blocks[<id>]}), per changed top-level block
+     * prop (path {@code blocks[<id>].<prop>}), and recurses into nested child blocks
+     * ({@code blocks[<id>].blocks[<childId>]}). Blocks are matched by their stable
+     * {@code id}; entries without an id fall back to their positional index. A whole
+     * blocks value that fails to parse degrades to a single coarse MODIFIED entry
+     * (never throws — the compare must not break version history).
+     */
+    private void diffBlockTrees(Object sourceBlocks, Object targetBlocks, String pathPrefix,
+            List<PageSchemaVersionComparisonDTO.FieldDifference> out) {
+        List<Map<String, Object>> source;
+        List<Map<String, Object>> target;
+        try {
+            source = asBlockList(sourceBlocks);
+            target = asBlockList(targetBlocks);
+        } catch (Exception e) {
+            // Unparseable blocks — fall back to the coarse blob comparison.
+            PageSchemaVersionComparisonDTO.FieldDifference coarse =
+                    compareFieldValues(pathPrefix, sourceBlocks, targetBlocks);
+            if (coarse != null) {
+                out.add(coarse);
+            }
+            return;
+        }
+
+        Map<String, Map<String, Object>> sourceById = indexBlocks(source);
+        Map<String, Map<String, Object>> targetById = indexBlocks(target);
+
+        Set<String> allIds = new LinkedHashSet<>();
+        allIds.addAll(sourceById.keySet());
+        allIds.addAll(targetById.keySet());
+
+        for (String id : allIds) {
+            Map<String, Object> sourceBlock = sourceById.get(id);
+            Map<String, Object> targetBlock = targetById.get(id);
+            String blockPath = pathPrefix + "[" + id + "]";
+
+            if (sourceBlock == null) {
+                out.add(buildBlockDiff(blockPath, PageSchemaVersionComparisonDTO.DifferenceType.ADDED,
+                        null, blockSummary(targetBlock), "新增块: " + blockLabel(targetBlock)));
+                continue;
+            }
+            if (targetBlock == null) {
+                out.add(buildBlockDiff(blockPath, PageSchemaVersionComparisonDTO.DifferenceType.REMOVED,
+                        blockSummary(sourceBlock), null, "删除块: " + blockLabel(sourceBlock)));
+                continue;
+            }
+
+            // Both present — diff the block's own top-level props (excluding the
+            // nested `blocks`, which is recursed separately).
+            Set<String> propKeys = new LinkedHashSet<>();
+            propKeys.addAll(sourceBlock.keySet());
+            propKeys.addAll(targetBlock.keySet());
+            for (String prop : propKeys) {
+                if ("blocks".equals(prop)) {
+                    continue;
+                }
+                PageSchemaVersionComparisonDTO.FieldDifference propDiff = compareFieldValues(
+                        blockPath + "." + prop, sourceBlock.get(prop), targetBlock.get(prop));
+                if (propDiff != null) {
+                    out.add(propDiff);
+                }
+            }
+
+            // Recurse into child blocks.
+            diffBlockTrees(sourceBlock.get("blocks"), targetBlock.get("blocks"),
+                    blockPath + ".blocks", out);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> asBlockList(Object blocks) throws Exception {
+        if (blocks == null) {
+            return new ArrayList<>();
+        }
+        if (blocks instanceof String) {
+            String text = ((String) blocks).trim();
+            if (text.isEmpty()) {
+                return new ArrayList<>();
+            }
+            return objectMapper.readValue(text,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+        }
+        if (blocks instanceof List) {
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (Object item : (List<Object>) blocks) {
+                if (item instanceof Map) {
+                    result.add((Map<String, Object>) item);
+                }
+            }
+            return result;
+        }
+        // Some other JSON node — let Jackson normalize it to a list of maps.
+        return objectMapper.convertValue(blocks,
+                objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+    }
+
+    /** Index blocks by their stable id; entries without an id fall back to their index. */
+    private Map<String, Map<String, Object>> indexBlocks(List<Map<String, Object>> blocks) {
+        Map<String, Map<String, Object>> byId = new LinkedHashMap<>();
+        for (int i = 0; i < blocks.size(); i++) {
+            Map<String, Object> block = blocks.get(i);
+            Object id = block.get("id");
+            String key = (id instanceof String && !((String) id).isBlank()) ? (String) id : ("#" + i);
+            byId.put(key, block);
+        }
+        return byId;
+    }
+
+    /** A small, readable summary of a block ({id, blockType}) for the diff value. */
+    private Map<String, Object> blockSummary(Map<String, Object> block) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("id", block.get("id"));
+        summary.put("blockType", block.get("blockType"));
+        return summary;
+    }
+
+    private String blockLabel(Map<String, Object> block) {
+        Object blockType = block.get("blockType");
+        Object id = block.get("id");
+        return (blockType == null ? "block" : blockType) + " (" + id + ")";
+    }
+
+    private PageSchemaVersionComparisonDTO.FieldDifference buildBlockDiff(String path,
+            PageSchemaVersionComparisonDTO.DifferenceType type, Object sourceValue, Object targetValue,
+            String description) {
+        PageSchemaVersionComparisonDTO.FieldDifference diff = new PageSchemaVersionComparisonDTO.FieldDifference();
+        diff.setFieldPath(path);
+        diff.setType(type);
+        diff.setSourceValue(sourceValue);
+        diff.setTargetValue(targetValue);
+        diff.setDescription(description);
+        return diff;
     }
 
     /**
@@ -733,9 +880,17 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
      */
     private boolean hasMajorChanges(List<PageSchemaVersionComparisonDTO.FieldDifference> differences) {
         String[] majorFields = {"name", "kind", "blocks"};
-        
+
         return differences.stream()
-                .anyMatch(diff -> Arrays.asList(majorFields).contains(diff.getFieldPath()));
+                .anyMatch(diff -> {
+                    String path = diff.getFieldPath();
+                    if (path == null) {
+                        return false;
+                    }
+                    // B3 — block changes now surface as block-level paths (blocks[<id>]…)
+                    // rather than a single "blocks" entry; both count as major.
+                    return Arrays.asList(majorFields).contains(path) || path.startsWith("blocks[");
+                });
     }
 
     /**
