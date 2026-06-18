@@ -1,6 +1,6 @@
 ---
 type: backlog
-status: in-progress
+status: active
 created: 2026-06-18
 owner: diqi
 related: 2026-06-18-oss-deep-review-plan.md
