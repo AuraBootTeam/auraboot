@@ -1,0 +1,69 @@
+# Flyway schema gate (OSS core): validate + fresh migrate + snapshot drift on
+# PostgreSQL + pgvector. End-state spec §3.6 / P3 CI.
+#
+# NOTE: GitHub Actions is currently DISABLED for this org (billing). This
+# workflow is the end-state gate, ready for when CI is re-enabled. It has NOT
+# been run in CI — verified locally instead via:
+#   scripts/db/flyway-validate.sh --edition oss
+#   scripts/db/check-schema-drift.sh --edition oss
+name: schema-flyway
+
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'platform/src/main/resources/db/migration/**'
+      - 'platform/src/main/resources/db/snapshots/**'
+      - 'scripts/db/**'
+      - '.github/workflows/schema-flyway.yml'
+  pull_request:
+    paths:
+      - 'platform/src/main/resources/db/migration/**'
+      - 'platform/src/main/resources/db/snapshots/**'
+      - 'scripts/db/**'
+
+jobs:
+  flyway-core:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: auraboot
+          POSTGRES_PASSWORD: auraboot
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U auraboot"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PG_HOST: localhost
+      PG_PORT: "5432"
+      PG_USER: auraboot
+      PG_PASSWORD: auraboot
+      FLYWAY_VERSION: "11.10.1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Flyway CLI
+        run: |
+          set -euo pipefail
+          url="https://repo1.maven.org/maven2/org/flywaydb/flyway/flyway-commandline/${FLYWAY_VERSION}/flyway-commandline-${FLYWAY_VERSION}-linux-x64.tar.gz"
+          curl -fsSL "$url" -o /tmp/flyway.tgz
+          sudo mkdir -p /opt/flyway
+          sudo tar -xzf /tmp/flyway.tgz -C /opt/flyway --strip-components=1
+          echo "/opt/flyway" >> "$GITHUB_PATH"
+
+      - name: Fresh database
+        run: |
+          PGPASSWORD=auraboot psql -h localhost -U auraboot -d postgres -c "CREATE DATABASE aura_ci_core;"
+
+      - name: Flyway migrate (core, fresh DB)
+        run: PG_DB=aura_ci_core scripts/db/flyway-migrate.sh --edition oss
+
+      - name: Flyway validate
+        run: PG_DB=aura_ci_core scripts/db/flyway-validate.sh --edition oss
+
+      - name: Schema snapshot drift
+        run: PG_DB=aura_ci_core scripts/db/check-schema-drift.sh --edition oss
