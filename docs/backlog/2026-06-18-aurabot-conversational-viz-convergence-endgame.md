@@ -163,6 +163,6 @@ related:
 
 **剩余 = 前端 + 浏览器(需重拉 OOM 掉的栈,前端切片,单独一轮)**:
 1. **Slice D**(真前端重构):`ChatBiResultCard`(records-driven)与 dashboard chart 组件(`SharedChartFactory` 注册的 23 类,**fetch/dataSource-driven**)是**两种抽象**——收口需给 chart 组件加"接 pre-fetched records"模式(或抽一个纯 echarts 渲染内核),**动 live dashboard 底座**,必须配 S5 dashboard golden + AuraBot chat 渲染 golden 回归。不是快改。
-2. **chat-bi 浏览器 live golden**(= 先前误判的"ChatBI UI golden"正解):AuraBot 聊天问 NL → 断言 `ChatBiResultCard` 真渲 ECharts。需 agent loop + DeepSeek + 浏览器(flaky,要重拉栈)。
+2. **chat-bi 浏览器 golden — 已建 + 抓到真 gap(2026-06-19,B1)**:重拉栈(java -jar bootJar + host Vite/BFF)+ 写 `chat-bi-render-golden.spec.ts`(stub-mode marker tool_use → ChatBiResultCard,加了 `data-testid="chatbi-result-card"`)。**golden 干了它该干的——抓到一个真 Slice C wiring gap**:**chat-bi 工具注册了但默认 AuraBot 聊天够不着**。根因(§15 实证,backend log):默认聊天的工具集走 **LLM grounding 发现**(`ChatToolResolver`→`GroundingPort`→`ToolDiscoveryPort`),只有 `fill_form`/`execute_sql` 永远在(`ensurePlatformTools`);chat-bi 不在常驻集 → 默认轮次不 offer → `AuraBotChatToolRuntimeAdapter` 拒「unavailable tool aurabot:chat-bi」。named-agent 能跑是因为带显式工具,绕过 grounding。**修法(未做,跨切面需先设计)**:把 chat-bi 加进 `ChatToolResolver` 常驻工具(它 read-only/LOW,与查询工具同档)或做成 data/chart 意图的 grounding candidate;注意修后 marker 名须匹配 sanitize 后的 `aurabot_chat-bi`。golden 当前 `test.fixme`(留可跑 repro)。backbone 仍齐:ChatBiSkillTest + ChatBiToolIntentLiveIT + S5 aggregate golden + 本轮 live 验过 data path(crm_lead 90 行)。
 3. **Slice E**:即席→沉淀桥(即席图"存为看板" → `dashboard:create`)。additive。
 4. (可选)v2 进阶路径:meta-model→semantic 自动派生 + v2 接 chat-bi 的"复杂多轮/治理 metric"档位。
