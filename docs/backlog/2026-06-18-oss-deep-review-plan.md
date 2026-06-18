@@ -64,6 +64,7 @@ owner: diqi
 | DR-20260618-D3-jsonb-001 | P1 | `rbac/mapper/RolePermissionMapper.java` | `batchInsert` 写 jsonb `conditions`:自定义 @Insert 未用 @TableField 的 JacksonTypeHandler(Map→hstore 报错)+ 无 `::jsonb` cast(stringtype 非 unspecified) | `#{binding.conditions,typeHandler=...JacksonTypeHandler}::jsonb` | RolePermissionMapperJsonbBatchInsertTest PASS(真栈,非平凡值) |
 | DR-20260618-D1-bootstrap-001 | P1 | `notification/service/NotificationRuleService.java` | `@PostConstruct initSchema()` 启动期 CREATE TABLE+索引+swallow catch(§4.1) | 删除整个 @PostConstruct(表已由 schema.sql:5283 拥有)+ 连带清理 dataSource 字段/import | compile + reset-init-contracts gate ✅;schema.sql:5283 已含同表 |
 | DR-20260618-D2-gate-001 | P1 | `scripts/oss-golden-stack.sh` | PR #816 引入注释含 `auraboot-enterprise` 路径 → **origin/main 当前 check-oss-boundary 失败**(近期 PR 破坏本地门禁) | 注释去掉字面路径前缀 | check-oss-boundary ✅ |
+| DR-20260618-D4-dx-001 | P2 | `plugin/validation/ExtensionValidator.java` | inline bindingRules 仅 log.warn 不进 validator result(import 仍 success:true,规则静默 drop,§6 footgun) | 加 `S-EXT-INLINE-BINDING` validation warning | ExtensionValidatorInlineBindingTest PASS(emit + no-emit) |
 
 **真栈验证反哺(两处比 reviewer 静态判断更深,印证「jsonb/IDOR 必真栈 IT」红线):**
 1. jsonb 不止「缺 ::jsonb cast」——根因是自定义 @Insert 不继承 @TableField typeHandler,Map 落到默认 handler 当 hstore;只有真 insert 非 null 值才暴露。
@@ -81,7 +82,6 @@ owner: diqi
 | DR-20260618-D5-frontend-001 | P1 | R5 P1-007 | `routes/project-management/` TSX 调幽灵 model `pm_*`(实际 `tpm_*`)→ 运行时 404 死路由 + 配置优先违规 | 需评估 DSL 页(tpm_*)功能完整性能否替代 Gantt/Board,删/迁是独立决策 |
 | DR-20260618-D3-obs-001 | P2 | R4 F-04 | AutomationTriggerServiceImpl.evaluateCondition swallow SpEL 异常静默 false 无 AutomationLog | 观测性增强,需补 AutomationLog 失败路径 + IT |
 | DR-20260618-D3-spi-001 | P2 | R4 F-05 | RestRoute.of() readOnlyTx=false 默认,GET 路由可写库 | SPI 默认值改动影响所有插件,需 registry 校验 + 文档 |
-| DR-20260618-D4-dx-001 | P2 | R3 F-L4-01 | inline bindingRules 仅 log.warn 不进 validator result(import 仍 success:true,规则静默 drop) | 加 validation warning,additive 但需配 validator 测试 |
 | DR-20260618-D5-test-* | P1/P2 | R6 | 17 后端 new-surface Service/Controller + 4 前端组件完全无测(~42h) | 大补测 sweep,独立排期 |
 
 ## 统计

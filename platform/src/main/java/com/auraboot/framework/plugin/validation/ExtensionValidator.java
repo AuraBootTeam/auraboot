@@ -44,10 +44,33 @@ public class ExtensionValidator implements PluginValidator {
         PluginManifestExtended manifest = ctx.getManifest();
 
         validateCommandHandlers(manifest, messages);
+        validateInlineBindingRules(manifest, messages);
         validateSideEffectActions(manifest, messages);
         validateRenderComponents(manifest, messages);
 
         return messages;
+    }
+
+    /**
+     * Warn about inline {@code bindingRules} in commands.json. The importer silently ignores them
+     * (binding rules must live in a separate bindingRules.json registered in
+     * plugin.json resourceDirs.bindingRules), so without this the rules are dropped and the import
+     * still reports success — a documented footgun (red line §6). Surface it as a validation
+     * warning so import-directory-sync / page-golden-audit callers see it.
+     */
+    private void validateInlineBindingRules(PluginManifestExtended manifest, List<PluginValidationMessage> messages) {
+        if (manifest.getCommands() == null) return;
+
+        for (int i = 0; i < manifest.getCommands().size(); i++) {
+            CommandDefinitionDTO cmd = manifest.getCommands().get(i);
+            if (cmd == null || cmd.getBindingRules() == null || cmd.getBindingRules().isEmpty()) continue;
+
+            messages.add(warning("S-EXT-INLINE-BINDING", category(),
+                    "commands[" + i + "].bindingRules",
+                    "Command '" + cmd.getCode() + "' has inline 'bindingRules' in commands.json — "
+                            + "this is ignored during import. Move the rules to a separate "
+                            + "bindingRules.json registered in plugin.json resourceDirs.bindingRules."));
+        }
     }
 
     /**
