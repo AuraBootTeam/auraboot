@@ -12,14 +12,18 @@ import com.auraboot.framework.bpm.enums.StorageMode;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.smart.framework.engine.persister.custom.session.PersisterSession;
 import com.auraboot.smart.framework.engine.storage.StorageModeHolder;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -38,6 +42,104 @@ public class ProcessOrchestrationService {
     private final ExecutionLogService executionLogService;
 
     private static final String EXTENSION_KEY_EXECUTION_MODE = "executionMode";
+    private static final String EXTENSION_KEY_DESIGNER_JSON = "designerJson";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    // ==================== Message delivery (GAP-252) ====================
+
+    /**
+     * GAP-252: deliver a named message to a running process instance, resuming any
+     * {@code receiveTask} parked and waiting for it. Correlation is by the receiveTask's
+     * {@code messageRef} in the stored designerJson: a parked execution whose activity is a
+     * receiveTask with {@code messageRef == messageName} is resumed via
+     * {@link com.auraboot.smart.framework.engine.service.command.ExecutionCommandService#signal}.
+     * When {@code messageName} is blank, every parked receiveTask is resumed.
+     *
+     * <p>This is the runtime counterpart of the BPMN message-catch semantic. SmartEngine's
+     * receiveTask already parks at {@code enter} (returns needPause) and resumes on signal;
+     * the missing piece was name→execution correlation, which lives here (the engine has no
+     * message parser, so the message name is read from the designerJson, not the BPMN).
+     *
+     * @return the number of receiveTask executions resumed (0 if none were waiting).
+     */
+    public int deliverMessage(String processInstanceId, String messageName, Map<String, Object> variables) {
+        String tenantId = MetaContext.getCurrentTenantIdAsString();
+
+        ProcessInstance instance = processEngineService.getProcessInstance(processInstanceId);
+        if (instance == null) {
+            throw new IllegalArgumentException("Process instance not found: " + processInstanceId);
+        }
+
+        String processKey = instance.getProcessDefinitionId();
+        Set<String> targetActivityIds = resolveReceiveTaskActivityIds(processKey, messageName);
+        if (targetActivityIds.isEmpty()) {
+            log.info("Message '{}' delivered to process instance {} but no matching receiveTask exists in the definition",
+                    messageName, processInstanceId);
+            return 0;
+        }
+
+        return executeWithStorageMode(processKey, () -> {
+            List<ExecutionInstance> activeExecutions = smartEngine.getExecutionQueryService()
+                    .findActiveExecutionList(processInstanceId, tenantId);
+            if (activeExecutions == null) {
+                return 0;
+            }
+            int signaled = 0;
+            for (ExecutionInstance exec : activeExecutions) {
+                if (!targetActivityIds.contains(exec.getProcessDefinitionActivityId())) {
+                    continue;
+                }
+                Map<String, Object> signalVars = variables != null ? new HashMap<>(variables) : new HashMap<>();
+                signalVars.put(RequestMapSpecialKeyConstant.TENANT_ID, tenantId);
+                if (messageName != null && !messageName.isBlank()) {
+                    signalVars.put("_message", messageName);
+                }
+                smartEngine.getExecutionCommandService().signal(exec.getInstanceId(), signalVars);
+                executionLogService.logNodeComplete(processInstanceId, exec.getProcessDefinitionActivityId(),
+                        Map.of("message", messageName == null ? "" : messageName), 0);
+                signaled++;
+            }
+            log.info("Delivered message '{}' to process instance {}: {} receiveTask(s) resumed",
+                    messageName, processInstanceId, signaled);
+            return signaled;
+        });
+    }
+
+    /**
+     * Resolve the activity ids of receiveTask nodes in a process definition's designerJson that
+     * match the given message name (blank = all receiveTasks).
+     */
+    private Set<String> resolveReceiveTaskActivityIds(String processKey, String messageName) {
+        Set<String> ids = new HashSet<>();
+        BpmProcessDefinition definition = deploymentService.getByProcessKey(processKey);
+        if (definition == null || definition.getExtension() == null) {
+            return ids;
+        }
+        Object designerJson = definition.getExtension().get(EXTENSION_KEY_DESIGNER_JSON);
+        if (designerJson == null) {
+            return ids;
+        }
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(designerJson.toString());
+            for (JsonNode node : root.path("nodes")) {
+                String type = node.path("type").asText(null);
+                if (type == null) {
+                    type = node.path("data").path("type").asText("");
+                }
+                if (!"receiveTask".equals(type)) {
+                    continue;
+                }
+                String ref = node.path("data").path("config").path("messageRef").asText("");
+                if (messageName == null || messageName.isBlank() || messageName.equals(ref)) {
+                    ids.add(node.path("id").asText());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse designerJson for receiveTask correlation (processKey={}): {}",
+                    processKey, e.getMessage());
+        }
+        return ids;
+    }
 
     // ==================== Execution Management ====================
 

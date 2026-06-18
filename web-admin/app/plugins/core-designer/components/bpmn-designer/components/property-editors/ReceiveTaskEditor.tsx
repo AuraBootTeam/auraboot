@@ -30,28 +30,25 @@ export function ReceiveTaskEditor({
       </div>
 
       {/*
-        GAP-252: messageRef / messageType on receiveTask are unsupported end-to-end:
-        - Runtime: SmartEngine ReceiveTaskParser only reads id/name/properties
-          (core/.../bpmn/assembly/task/parser/ReceiveTaskParser.java) and
-          ReceiveTaskBehavior is a pure wait-for-signal() activity. There is no
-          <bpmn:message>/<messageEventDefinition> parser and no message correlation.
-        - Converter: JsonToBpmnConverter.writeReceiveTask emits only id+name.
-        Fields disabled with concrete reason; re-enable requires adding a Message
-        model + parser + correlation layer in SmartEngine, not just a UI flip.
+        GAP-252 (resolved): a receiveTask parks the process until a named message is
+        delivered. messageRef is the message name; the backend correlates a delivered
+        message (POST /api/bpm/process-instances/{id}/messages) to the parked receiveTask
+        by this messageRef and resumes it via ExecutionCommandService.signal(). The
+        message name is also emitted onto the <receiveTask messageRef="..."> in the BPMN.
       */}
       <div className="mb-4">
         <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.receivetask.messageRef')}</label>
         <input
           type="text"
           value={config?.messageRef || ''}
-          disabled
-          readOnly
+          onChange={(e) => handleChange('messageRef', e.target.value)}
+          placeholder="e.g. orderApproved"
           data-testid="receivetask-messageRef"
-          className="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-500"
+          className="w-full rounded-md border border-gray-300 px-3 py-2"
         />
-        <p className="mt-1 text-xs text-amber-600">
-          {t('bpmn.prop.receivetask.messageUnsupported') ||
-            'Unsupported: SmartEngine has no <bpmn:message> parser/correlation. ReceiveTask only advances via signal() API. Needs runtime support, not just UI enable.'}
+        <p className="mt-1 text-xs text-gray-500">
+          {t('bpmn.prop.receivetask.messageRefHint') ||
+            'Message name this task waits for. Deliver it via POST /api/bpm/process-instances/{id}/messages to resume.'}
         </p>
       </div>
 
@@ -60,15 +57,11 @@ export function ReceiveTaskEditor({
         <input
           type="text"
           value={config?.messageType || ''}
-          disabled
-          readOnly
+          onChange={(e) => handleChange('messageType', e.target.value)}
+          placeholder="optional"
           data-testid="receivetask-messageType"
-          className="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-500"
+          className="w-full rounded-md border border-gray-300 px-3 py-2"
         />
-        <p className="mt-1 text-xs text-amber-600">
-          {t('bpmn.prop.receivetask.messageUnsupported') ||
-            'Unsupported: SmartEngine has no <bpmn:message> parser/correlation. ReceiveTask only advances via signal() API. Needs runtime support, not just UI enable.'}
-        </p>
       </div>
     </>
   );

@@ -451,13 +451,17 @@ public class ProcessDeploymentService {
             }
         }
 
+        // Hoisted so the failure handler can dump the exact BPMN that was sent to the
+        // engine (G-B3): SmartEngine swallows the converter/parser root cause, so the
+        // injected BPMN is the only way to diagnose a deploy failure.
+        String bpmnContent = null;
         try {
             // Ensure BPMN process element has a version attribute (SmartEngine requires it).
             // Insert it as the first <process> attribute so a raw '>' in a later attribute
             // value (e.g. an unescaped name) cannot corrupt the injection — see
             // BpmnProcessVersionUtil.
             String versionStr = String.valueOf(definition.getVersion());
-            String bpmnContent = BpmnProcessVersionUtil.ensureProcessVersion(
+            bpmnContent = BpmnProcessVersionUtil.ensureProcessVersion(
                     definition.getBpmnContent(), versionStr + ".0.0");
 
             // Deploy to SmartEngine - second arg is tenantId, NOT filename
@@ -488,7 +492,25 @@ public class ProcessDeploymentService {
             return definition;
 
         } catch (Exception e) {
-            log.error("Failed to deploy process: processKey={}", definition.getProcessKey(), e);
+            // G-B3: dump the injected BPMN + the full cause chain. SmartEngine deploy
+            // failures otherwise surface only e.getMessage() with the root cause swallowed,
+            // making converter/parser bugs (unsupported node, malformed injection) very hard
+            // to diagnose from logs alone.
+            log.error("Failed to deploy process: processKey={}, version={}. Injected BPMN follows:\n{}",
+                    definition.getProcessKey(), definition.getVersion(), bpmnContent, e);
+            StringBuilder causeChain = new StringBuilder();
+            for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+                if (causeChain.length() > 0) {
+                    causeChain.append(" -> ");
+                }
+                causeChain.append(cause.getClass().getSimpleName())
+                        .append(": ").append(cause.getMessage());
+                if (cause.getCause() == cause) {
+                    break;
+                }
+            }
+            log.error("Deploy failure cause chain (processKey={}): {}",
+                    definition.getProcessKey(), causeChain);
             throw new BusinessException("Failed to deploy process: " + e.getMessage(), e);
         }
     }
