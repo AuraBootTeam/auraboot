@@ -100,7 +100,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
     <div
       className={cn(
         'fixed bottom-6 left-1/2 z-40 -translate-x-1/2',
-        'rounded-lg bg-gray-900 px-4 py-3 text-white shadow-xl',
+        'rounded-card bg-inverse text-inverse-text px-4 py-3 shadow-xl',
         'flex items-center gap-4',
         'animate-in slide-in-from-bottom duration-200',
         className,
@@ -108,14 +108,14 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
     >
       {/* Selected count */}
       <div className="flex items-center gap-2 text-sm">
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold">
+        <div className="bg-accent flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold">
           {selectedCount}
         </div>
-        <span className="text-gray-300">{tr('list.bulk.selected', 'selected')}</span>
+        <span className="text-inverse-muted">{tr('list.bulk.selected', 'selected')}</span>
       </div>
 
       {/* Divider */}
-      <div className="h-6 w-px bg-gray-700" />
+      <div className="bg-inverse-border h-6 w-px" />
 
       {/* Actions */}
       <div className="flex items-center gap-2">
@@ -133,8 +133,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               onClick={() => handleCustomBulkAction(button)}
               disabled={isRunning}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
-                isDanger ? 'text-red-400 hover:bg-red-900/50' : 'hover:bg-gray-700',
+                'rounded-control inline-flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors',
+                isDanger ? 'text-status-red hover:bg-inverse-hover' : 'hover:bg-inverse-hover',
                 'disabled:cursor-not-allowed disabled:opacity-50',
               )}
             >
@@ -151,7 +151,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           <button
             type="button"
             onClick={onBulkEdit}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-gray-700"
+            className="rounded-control hover:bg-inverse-hover inline-flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors"
             data-testid="bulk-edit-btn"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -173,8 +173,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
             onClick={handleBulkDelete}
             disabled={deleting}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
-              'text-red-400 hover:bg-red-900/50',
+              'rounded-control inline-flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors',
+              'text-status-red hover:bg-inverse-hover',
               'disabled:cursor-not-allowed disabled:opacity-50',
             )}
             data-testid="bulk-delete-btn"
@@ -200,7 +200,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           <button
             type="button"
             onClick={() => onBulkExport(selectedIds)}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-gray-700"
+            className="rounded-control hover:bg-inverse-hover inline-flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors"
             data-testid="bulk-export-selected-btn"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,13 +217,13 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
       </div>
 
       {/* Divider */}
-      <div className="h-6 w-px bg-gray-700" />
+      <div className="bg-inverse-border h-6 w-px" />
 
       {/* Clear Selection */}
       <button
         type="button"
         onClick={onClearSelection}
-        className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white"
+        className="rounded-control text-inverse-muted hover:bg-inverse-hover hover:text-inverse-text p-1.5 transition-colors"
         title={tr('list.bulk.clearSelection', 'Clear selection')}
         data-testid="bulk-clear-selection-btn"
       >

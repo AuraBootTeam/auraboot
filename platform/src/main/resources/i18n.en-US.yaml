@@ -784,6 +784,7 @@ common:
   created_today: Created Today
   modified_this_week: Modified This Week
   preset_views: Preset Views
+  view_saved: Saved to current view
   options_load_failed: Failed to load options
   retry: Retry
 admin:

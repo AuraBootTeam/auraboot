@@ -21,6 +21,7 @@ import type { ViewFilterConfig, SortConfig } from '~/framework/smart/types/saved
 import { useListData } from '~/framework/meta/rendering/pages/hooks/useListData';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
 import { ListTable } from '~/framework/meta/rendering/pages/list/ListTable';
+import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { Pagination } from '~/ui/Pagination';
 import { FilterChipBar } from '~/framework/smart/components/view/FilterChipBar';
 import { FilterFieldPicker } from '~/framework/smart/components/view/FilterFieldPicker';
@@ -72,19 +73,6 @@ function inferValueType(
   if (typeof value === 'boolean' || value === 'true' || value === 'false') return 'boolean';
   return undefined;
 }
-
-const DICT_COLOR_MAP: Record<string, string> = {
-  gray: 'bg-gray-100 text-gray-800',
-  red: 'bg-red-100 text-red-800',
-  orange: 'bg-orange-100 text-orange-800',
-  yellow: 'bg-yellow-100 text-yellow-800',
-  green: 'bg-green-100 text-green-800',
-  blue: 'bg-blue-100 text-blue-800',
-  indigo: 'bg-indigo-100 text-indigo-800',
-  purple: 'bg-purple-100 text-purple-800',
-  pink: 'bg-pink-100 text-pink-800',
-  cyan: 'bg-cyan-100 text-cyan-800',
-};
 
 export function RecordListView({
   modelCode,
@@ -246,12 +234,8 @@ export function RecordListView({
         const items = getDictItems(dictCode);
         const item = items.find((i) => String(i.value) === String(value));
         if (item) {
-          const colorCls = DICT_COLOR_MAP[item.extension?.color || 'blue'] || DICT_COLOR_MAP.blue;
-          return (
-            <span className={`rounded-pill inline-flex px-2 py-1 text-xs font-medium ${colorCls}`}>
-              {item.label}
-            </span>
-          );
+          // §3 / §1.3: dict-coded status renders as 色点 + 文字, not a filled pill.
+          return <StatusDot tone={resolveStatusTone(item.extension?.color)} label={item.label} />;
         }
         return String(value);
       }
