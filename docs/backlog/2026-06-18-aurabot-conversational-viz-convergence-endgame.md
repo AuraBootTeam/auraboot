@@ -100,17 +100,28 @@ related:
 **即席 ↔ 沉淀的桥**:AuraBot 里看到一张满意的即席图,一键"存成 dashboard widget"
 (即席 records/intent → `dashboard:create`),把两条路径在用户体验上接成一条增长漏斗。
 
-## 4. 迁移路径(有序 · 含第一块多米诺)
+## 4. 决策(已锁定 · 2026-06-18 · dev 阶段无兼容)
 
-> 全是 cleanup / 收敛,**不是新功能**;每步可独立 ship + 真栈/真浏览器 golden 验。
+> dev 阶段:破坏性变更优先,**禁 deprecated alias / forwarding stub**;无活消费方的直接删,不做渐进退役。
 
-| 步 | 动作 | 风险 | 验证 |
-|----|------|------|------|
-| **0(第一块多米诺 · 需 owner 决策)** | **定 ChatBI 引擎 canonical:v1 `ai/chatbi`(简单 stateless)vs v2 `chatbi/v2`(语义层有状态)。** 推荐:v2 为"复杂 BI"引擎,简单即席继续走 agent `dsl_query`;v1 退役。 | 决策性,无代码风险 | —— |
-| 1 | 退役死代码 `ChatBIPanel.tsx` + `AIChartRenderer.tsx` + barrel 导出 | 低(已无引用) | tsc + grep 0 引用 |
-| 2 | 退役 / 合并 v1 `ai/chatbi`(若步 0 选 v2);`chat-bi.spec.ts` 改测活路径 | 中(spec 迁移) | 改后 spec 绿 |
-| 3 | 图渲染收一个契约:ChatBiResultCard 改走 `ChartDataSource` + SharedChartFactory 内核(或反向),三处共用 | 中(渲染回归) | dashboard + 即席 双浏览器 golden(本 campaign 的 S5 dashboard golden 是基线) |
-| 4 | 即席→沉淀桥:AuraBot 即席图卡片加"存为看板"动作 → `dashboard:create` | 低(加能力) | 浏览器 golden:即席图 → 存 → /dashboards/view 渲染 |
+**锁定的终局选型**:
+- **唯一查询契约** = `AggregateQueryService` / `AggregateQueryRequest` / 前端 `ChartDataSource` —— 已是最多消费方的底座(dashboard 图 / kanban / grouped-table / `ChartDataController` / `SemanticAggregateAdapter` 全走它,实测)。
+- **唯一治理引擎** = `framework/semantic`(`SemanticQueryService`),经 `SemanticAggregateAdapter` 接到上面的聚合契约。
+- **NL→数据引擎** = `chatbi/v2`(NL→token→`TokenCompiler`→`SemanticQueryRequest`),**包装成 AuraBot 的 agent `chat_bi` 工具**(不再前端直连 `/api/chatbi/v2`)。
+- **v1 `ai/chatbi`** = **删**(裸 NL→SQL 旁路 · 不接语义层 · 直连 API 绕过 agent 治理 · 前端零活消费方,实测)。
+
+**实测纠正(§15)**:v1 **不能整删** —— `chatbi/v2` 的 lexer 复用了 v1 的 `ChatBiLlmParser`(`chatbi/v2/lexer/DefaultTokenLexer` import 它)。所以 v1 是"**吸收再删**":先把 `ChatBiLlmParser` 迁进 v2 own(或共享 nl-parse 模块),再删 v1 HTTP 面。
+
+**执行清单(无兼容 · 排序为不丢功能,不是为兼容)**:
+| 步 | 动作 | 性质 |
+|----|------|------|
+| 1 | 删纯死代码:`ChatBIPanel.tsx` + `AIChartRenderer.tsx` + barrel 导出 + `chat-bi.spec.ts` | 零活消费方 → 直接删 |
+| 2 | `ChatBiLlmParser` 迁入 v2(v2 lexer 依赖);随后删 v1 HTTP 面 `ChatBIController` + `/api/ai/chat-bi` + `ChatBIService` + `ChatBIRequest/Response` DTO | 吸收再删 |
+| 3 | `chat_bi` agent 工具:v2 NL→数据包装成工具,走 AuraBot + agent 治理(RuntimeAuth/ACL/approval/trace),退掉前端直连 | 加工具、退直连 |
+| 4 | 渲染收一个契约:`ChatBiResultCard`(即席)与 dashboard widget 都收到 `ChartDataSource`/`SharedChartFactory`,即席卡片成薄适配器 | 根治 shape 漂移类 bug |
+| 5 | 即席→沉淀桥:即席图卡片加"存为看板" → `dashboard:create` | 加能力 |
+
+**落地前唯一要先验的**:v2 能否对一个**普通 model 零配置**派生 baseline 语义模型(`SemanticAggregateAdapter` 的存在强烈暗示能)。能 → v1 的 zero-setup 优点被彻底抵消,按上表删;还要手工建语义模型 → 先补"从 `ab_meta_model`+fields+reference+dict 自动派生 baseline 语义模型",再删 v1。
 
 ## 5. 对测试 / golden 的影响(含一处诚实更正)
 
@@ -121,8 +132,10 @@ related:
   本文留作该 golden 的 SOT;真做时归到 core-aurabot 的浏览器 golden。
 - 收敛后这条 golden 自然并入"AuraBot agent → dsl_query → 图卡片"的链路,不再是孤立的 ChatBI 测试。
 
-## 6. 待 owner 决策
+## 6. 决策状态 + 剩余执行排序
 
-1. **步 0 第一块多米诺**:ChatBI 引擎 v1 退役、v2 为复杂 BI 引擎、简单即席走 agent dsl_query —— 确认这个方向?
-2. 收敛优先级:是先清死代码(步 1,几乎零风险、立刻减表面),还是先统一渲染契约(步 3,根治 shape 漂移类 bug)?
-3. 是否要现在补"AuraBot 聊天 ChatBI golden"(§5),把误判的洞补上 —— 还是连同步 3 渲染收敛一起做。
+**引擎选型已锁定(§4,dev 阶段无兼容)**:`AggregateQueryService`/`ChartDataSource` 契约 + `framework/semantic` 引擎 + `chatbi/v2` 作 agent `chat_bi` 工具,**删 v1**(吸收 `ChatBiLlmParser` 后)。剩下的只是执行排序:
+
+1. 先清纯死代码(§4 步 1,零风险、立刻减面),还是先做渲染契约统一(步 4,根治 shape 漂移)?
+2. 是否现在补"AuraBot 聊天 ChatBI golden"(§5 误判闭环),还是连同步 4 一起做?
+3. **落地第一步**:验 v2 能否从 meta-model 零配置派生 baseline 语义模型(决定 v1 是直接删,还是先补派生)。
