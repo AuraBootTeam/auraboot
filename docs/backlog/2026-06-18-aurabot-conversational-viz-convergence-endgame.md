@@ -155,9 +155,14 @@ related:
 
 **Slice C — DONE(本次,verified)**:`ChatBiSkill`(`aurabot/skill/builtin/ChatBiSkill.java`)—— agent LLM 用 native tool-use 填 `{modelCode, dimensions, metrics, filters}` → 走 raw `AggregateQueryService` → 返 `{records, columns, chartType}` payload → AuraBot 聊天 `AuraBotChat.tsx:178` 自动渲 `ChatBiResultCard`(ECharts)。**零配置 · 受治理(走 agent tool,非直连 API) · 复用底座**。`ChatBiSkillTest` 5/5(请求映射强制 raw 路径〔偷传 semanticModelCode/queryCode 被剥〕+ 响应映射 + chartType 推断 + 校验)。@Component 自动注册。
 
-**剩余真工作(按依赖序)**:
-1. **chat_bi live golden**(= 我先前误判的"ChatBI UI golden"正解):起 agent 栈,AuraBot 聊天问 NL 数据问题 → 断言 `ChatBiResultCard` 真渲 ECharts + records 真出。**需 agent loop + DeepSeek + 浏览器**(heavy,要把 OOM 掉的 backend 重新拉起)。
-2. **完整退役 v1 service**(`ChatBIService` + `ChatBiLlmParser` + DTO + `ChatBiIntentLiveIT` + `ChatBIServiceLlmTest`)——**依赖 1**:live golden 把"NL→intent 正确"的覆盖从 `ChatBiLlmParser`(旧)迁到 chat_bi 工具(agent tool-use)后,才删,不丢覆盖。
-3. **Slice D**:渲染收一个 `ChartDataSource` / `SharedChartFactory` 内核(`ChatBiResultCard` 改走它);独立于 v1/v2,但动 live dashboard 底座,须配 S5 dashboard golden 回归。
-4. **Slice E**:即席→沉淀桥(即席图"存为看板" → `dashboard:create`)。
-5. (可选)v2 进阶路径:meta-model→semantic 自动派生 + v2 接 chat_bi 的"复杂多轮/治理 metric"档位。
+**后端收敛 = DONE(本轮全 merged + verified)**:
+- `chat-bi` skill 命名 hotfix(#832):`name()="chat_bi"` 撞 `AuraBotSkillRegistry.NAME_PATTERN`(禁下划线)→ 破后端 startup + 所有 IT context load;改 `chat-bi`。**教训(§1)**:单测无 Spring context 抓不到注册期错,薄组件也得真 context 测。
+- **coverage 迁移 live IT**(#832):`ChatBiToolIntentLiveIT` —— 真 DeepSeek 用 chat-bi 工具 schema 填 `modelCode/dimensions/metrics`,正确 + grounded(零幻觉),floor 全过。把"NL→intent 正确"覆盖从旧 `ChatBiLlmParser` 迁到 agent-tool 层。
+- **v1 完整退役**(#833):删整个 `ai/chatbi` 包(`ChatBIService`/`ChatBiLlmParser`/DTO)+ 3 个 v1 测;compileJava+compileTestJava 绿,无丢覆盖。
+- **结果**:单一入口(AuraBot)+ 单一查询底座(`AggregateQueryService`/`ChartDataSource`)+ chat-bi 受治理 agent 工具 + v1 旁路/死代码全清。**终局的后端骨架已落地。**
+
+**剩余 = 前端 + 浏览器(需重拉 OOM 掉的栈,前端切片,单独一轮)**:
+1. **Slice D**(真前端重构):`ChatBiResultCard`(records-driven)与 dashboard chart 组件(`SharedChartFactory` 注册的 23 类,**fetch/dataSource-driven**)是**两种抽象**——收口需给 chart 组件加"接 pre-fetched records"模式(或抽一个纯 echarts 渲染内核),**动 live dashboard 底座**,必须配 S5 dashboard golden + AuraBot chat 渲染 golden 回归。不是快改。
+2. **chat-bi 浏览器 live golden**(= 先前误判的"ChatBI UI golden"正解):AuraBot 聊天问 NL → 断言 `ChatBiResultCard` 真渲 ECharts。需 agent loop + DeepSeek + 浏览器(flaky,要重拉栈)。
+3. **Slice E**:即席→沉淀桥(即席图"存为看板" → `dashboard:create`)。additive。
+4. (可选)v2 进阶路径:meta-model→semantic 自动派生 + v2 接 chat-bi 的"复杂多轮/治理 metric"档位。
