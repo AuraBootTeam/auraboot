@@ -793,7 +793,7 @@ public class NlModelingService {
         manifest.put("menus", deriveDynamicMenuPageKeys(
                 synthesizeMenus(res.getModels(), res.getMenus())));
         manifest.put("i18nResources", res.getI18n() != null ? res.getI18n() : List.of());
-        manifest.put("permissions", res.getPermissions() != null ? res.getPermissions() : List.of());
+        manifest.put("permissions", synthesizePermissions(res.getModels(), res.getPermissions()));
         manifest.put("dicts", res.getDicts() != null ? res.getDicts() : List.of());
 
         return objectMapper.writeValueAsString(manifest);
@@ -841,6 +841,66 @@ public class NlModelingService {
             }
         }
         return menus;
+    }
+
+    /**
+     * Synthesizes the standard dynamic CRUD permissions ({@code dynamic.<model>.{read,create,update,
+     * delete}}) for every generated model, preserving any explicit permissions the LLM already emitted
+     * and never duplicating an existing code.
+     *
+     * <p>The system prompt biases the model to gate a child menu on {@code dynamic.<model>.read} (and a
+     * role/command may reference the sibling actions) while emitting an empty {@code permissions} list,
+     * because {@code dynamic.*} permissions are <em>not</em> auto-created on model publish. Without this,
+     * the menu&rarr;permission referential check in {@code PluginImportService.validateManifest} rejects
+     * the menu ("references missing permission: dynamic.&lt;model&gt;.read") and {@code apply()} fails
+     * before the page gate. Declaring the permissions in the manifest makes them exist at import time —
+     * an idempotent UPSERT under {@code ConflictStrategy.OVERWRITE} — so the references resolve.
+     *
+     * @param models       generated models (each a map with a {@code code} key); may be null
+     * @param permissions  explicit permissions the LLM emitted (preserved as-is); may be null
+     * @return the merged permission list: explicit permissions first, then synthesized dynamic perms
+     */
+    static List<Map<String, Object>> synthesizePermissions(List<Map<String, Object>> models,
+                                                           List<Map<String, Object>> permissions) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        if (permissions != null) {
+            for (Map<String, Object> p : permissions) {
+                if (p == null) {
+                    continue;
+                }
+                result.add(p);
+                if (p.get("code") instanceof String code && !code.isBlank()) {
+                    seen.add(code);
+                }
+            }
+        }
+        if (models == null) {
+            return result;
+        }
+        String[] actions = {"read", "create", "update", "delete"};
+        for (Map<String, Object> model : models) {
+            if (model == null || !(model.get("code") instanceof String rawCode) || rawCode.isBlank()) {
+                continue;
+            }
+            String modelCode = rawCode.toLowerCase(Locale.ROOT);
+            String label = model.get("displayName:zh-CN") instanceof String zh && !zh.isBlank()
+                    ? zh : rawCode;
+            for (String action : actions) {
+                String permCode = "dynamic." + modelCode + "." + action;
+                if (!seen.add(permCode)) {
+                    continue;
+                }
+                Map<String, Object> perm = new LinkedHashMap<>();
+                perm.put("code", permCode);
+                perm.put("name:zh-CN", label + " - " + action);
+                perm.put("resourceType", "dynamic");
+                perm.put("resourceCode", modelCode);
+                perm.put("action", action);
+                result.add(perm);
+            }
+        }
+        return result;
     }
 
     /**
@@ -1111,11 +1171,15 @@ public class NlModelingService {
         if (page.get("kind") instanceof String kind && !kind.isBlank()) {
             page.put("kind", kind.toLowerCase(Locale.ROOT));
         }
+        String pageKind = page.get("kind") instanceof String pk ? pk.toLowerCase(Locale.ROOT) : "";
 
         // Hoist nested areas blocks into a flat top-level blocks[].
         List<Map<String, Object>> flat = hoistAreaBlocks(page.get("blocks"));
         int idSeq = 0;
         for (Map<String, Object> block : flat) {
+            // Coerce an unknown blockType to a valid one (the LLM confuses page kind with blockType,
+            // e.g. emits blockType:"detail") so the page passes S-PAGE-BLOCK-TYPE.
+            coerceBlockType(block, pageKind);
             if (!(block.get("id") instanceof String id) || id.isBlank()) {
                 String blockType = block.get("blockType") instanceof String bt && !bt.isBlank()
                         ? bt : "block";
@@ -1137,6 +1201,48 @@ public class NlModelingService {
         page.put("layout", layout);
 
         return page;
+    }
+
+    /** Common LLM blockType confusions → the registered {@link DslRegistry.BlockType} code. */
+    private static final Map<String, String> BLOCK_TYPE_ALIASES = Map.of(
+            "detail", "description",
+            "details", "description",
+            "info", "description",
+            "list", "table",
+            "grid", "table",
+            "form-fields", "form-section",
+            "fieldset", "form-section");
+
+    /**
+     * Coerces a block whose {@code blockType} is not a registered {@link DslRegistry.BlockType} to a
+     * valid one: a known alias when available, otherwise a default keyed off the page kind
+     * (detail→{@code description}, list→{@code table}, form→{@code form-section}). A registered
+     * blockType is left untouched (only its casing is normalized). This is the deterministic safety
+     * net behind the v4 system prompt for the {@code [S-PAGE-BLOCK-TYPE] unknown blockType} rejection
+     * — the prompt teaches the right types, this catches imperfect model output. Mutates the block.
+     */
+    private static void coerceBlockType(Map<String, Object> block, String pageKind) {
+        if (block == null) {
+            return;
+        }
+        Set<String> valid = DslRegistry.BlockType.codes();
+        String bt = block.get("blockType") instanceof String s ? s.toLowerCase(Locale.ROOT) : "";
+        if (!bt.isBlank() && valid.contains(bt)) {
+            block.put("blockType", bt);
+            return;
+        }
+        String alias = BLOCK_TYPE_ALIASES.get(bt);
+        block.put("blockType",
+                alias != null && valid.contains(alias) ? alias : defaultBlockTypeForKind(pageKind));
+    }
+
+    /** The default leaf blockType for a page kind, used when an LLM block type can't be salvaged. */
+    private static String defaultBlockTypeForKind(String pageKind) {
+        return switch (pageKind) {
+            case "list" -> "table";
+            case "form" -> "form-section";
+            default -> "description";
+        };
     }
 
     /**
