@@ -18,6 +18,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Link, useLocation, useNavigate as useRouterNavigate } from 'react-router';
 import { PrintButton } from '~/framework/meta/rendering/components/PrintButton';
+import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { RecordShareDialog } from '~/ui/shared/RecordShareDialog';
 import type { PageContentProps } from '~/framework/meta/profiles/types';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
@@ -1191,10 +1192,12 @@ function DataPathTable({
     if (col.renderType === 'tag' && col.dictCode && getDictItems) {
       const items = getDictItems(col.dictCode) || [];
       const match = items.find((i) => String(i.value) === String(raw));
+      // §3 / §1.3: dict-coded status renders as 色点 + 文字, not a filled pill.
       return (
-        <span className="rounded-pill text-text-2 inline-flex items-center bg-gray-100 px-2 py-0.5 text-xs font-medium">
-          {match?.label ?? String(raw)}
-        </span>
+        <StatusDot
+          tone={resolveStatusTone(match?.extension?.color)}
+          label={match?.label ?? String(raw)}
+        />
       );
     }
     if (col.renderType === 'datetime') {
