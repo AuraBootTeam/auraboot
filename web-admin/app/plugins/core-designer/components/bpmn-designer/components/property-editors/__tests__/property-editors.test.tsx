@@ -94,14 +94,20 @@ describe('ParallelGatewayEditor — property binding', () => {
   });
 });
 
-describe('ReceiveTaskEditor — GAP-252 readonly visual feedback', () => {
-  it('messageRef / messageType are disabled+readOnly (unsupported, surfaced not silently dropped)', () => {
+describe('ReceiveTaskEditor — GAP-252 message binding (now supported)', () => {
+  it('messageRef / messageType are editable and bind to config', () => {
     const onChange = vi.fn();
     render(<ReceiveTaskEditor config={{} as any} onChange={onChange} />);
     const messageRef = screen.getByTestId('receivetask-messageRef') as HTMLInputElement;
     const messageType = screen.getByTestId('receivetask-messageType') as HTMLInputElement;
-    expect(messageRef).toBeDisabled();
-    expect(messageType).toBeDisabled();
+    expect(messageRef).not.toBeDisabled();
+    expect(messageType).not.toBeDisabled();
+
+    fireEvent.change(messageRef, { target: { value: 'orderApproved' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ messageRef: 'orderApproved' }));
+
+    fireEvent.change(messageType, { target: { value: 'signal' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ messageType: 'signal' }));
   });
 
   it('description still binds', () => {
