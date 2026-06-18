@@ -3,6 +3,8 @@ package com.auraboot.framework.agent.nlmodeling.controller;
 import com.auraboot.framework.agent.nlmodeling.NlModelingService;
 import com.auraboot.framework.agent.nlmodeling.dto.*;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.plugin.dto.imports.ImportExecuteResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +27,10 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/agent/nl-modeling")
 @RequiredArgsConstructor
 @Tag(name = "NL Modeling", description = "AI Natural Language Modeling — generate DSL from text")
+// NL modeling generates and applies model/page/command schema into the tenant (apply imports a
+// plugin with autoPublish + OVERWRITE). This is a designer/admin capability — guard it with the
+// meta model-management permission rather than the PermissionInterceptor fail-open default.
+@RequirePermission(MetaPermission.MODEL_MANAGE)
 public class NlModelingController {
 
     private final NlModelingService nlModelingService;
