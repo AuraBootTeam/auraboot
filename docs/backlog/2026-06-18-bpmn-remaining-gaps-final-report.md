@@ -49,7 +49,15 @@ created: 2026-06-18
 
 - **属性编辑器绑定 vitest**(`property-editors.test.tsx`):**10/10 通过**,覆盖 ServiceTask(serviceType/commandCode/serviceUrl/async)、Start/End、Exclusive/Parallel gateway、**ReceiveTaskEditor(messageRef/messageType 现已绑定)**。即 G-T5 关注的"其余节点类型属性"在**绑定层已单测覆盖**。
 - **真浏览器 golden 现状**:userTask 属性 real-fill→save→reload 的浏览器 golden 已由上一轮 9/9 designer golden 覆盖(merged);各编辑器走**同一** FormDialog/property-editor + save/reload 契约。
-- **诚实保留(§2.4)**:serviceTask/gateway/callActivity 属性的**真浏览器** real-fill golden 本轮**未重起 host 栈跑**(Vite+BFF+backend+Playwright,对"绑定已单测 + 模式已 userTask 证明"的同型残余成本不成比例)。状态:**绑定 100% 单测;浏览器 golden = 同型残余,低风险,未本轮跑**。如需补,起 host 栈按 designer-property-edit.spec 同手法对各类型扩展即可。
+- **真浏览器 golden 本轮已补跑(owner 要求,2026-06-18)**:起 host-first 隔离栈(`auraboot_51`:bootJar backend 6451 + Vite 5151 + BFF 6151 + Playwright chromium @ SmartEngine 4.0.2),新增 `designer-property-edit-extra.spec.ts` 用**真属性面板表单**编辑 → 断言绑定 store config:
+  - **serviceTask**(serviceType=command + commandCode `sl:approve` + async)real-form ✓
+  - **serviceTask**(serviceType=http + serviceUrl)real-form ✓
+  - **callActivity**(description)real-form ✓
+  - **3/3 通过 @ live chromium**,截图 `gt5-servicetask-property-edit.png`(可见 服务类型=Aura命令 / 命令编码=sl:approve / 异步✓)+ `gt5-callactivity-property-edit.png`;加既有 `designer-property-edit.spec`(userTask)real-form 同栈 PASS。配套薄配置 `playwright.gt5.config.ts`(setup 仅 00/01,跳过与 BPM 无关的 02-test-pages 看板 seed)。
+- **同栈跑全 bpm-designer 套件**:**L1/L2 + real-form 24 specs PASS**;**21 个 L3-runtime specs 失败 = env-limited 非代码**——它们经真命令管道执行需完整 showcase seed(models/commands),而 `oss-reset-and-init.sh` 的 seed 被**共享 host dormancy 守卫**拦下(同时 7 个并发 worktree 活跃,§20「守卫拦你就是信号」——不 `FORCE_HOST` 以免打断其他会话)。L3 运行时本就由后端真栈 IT 覆盖(§3 / tracker BPMN验证#3),非 G-T5(属性表单)范畴。
+- **gateway 真表单**:`gateway-default-flow` 依赖出边填充,由 `designer-gateway-condition.spec`(带边)覆盖。
+- **绑定层 vitest**(`property-editors.test.tsx`)**10/10**,与浏览器 golden 互补。
+- **结论**:G-T5 残余(serviceTask/callActivity 真浏览器属性表单 golden)**已本轮 host 栈跑通 + 截图**;唯一未跑 = L3-runtime(需 showcase seed,被并发 dormancy 守卫正确拦下,后端 IT 已覆盖)。
 
 ## 7. 真栈全量平台回归(owner 要求,2026-06-18)
 
