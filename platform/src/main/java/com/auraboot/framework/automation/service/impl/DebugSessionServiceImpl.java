@@ -103,7 +103,7 @@ public class DebugSessionServiceImpl implements DebugSessionService {
 
         log.info("Debug session created: pid={}, automationId={}", session.getPid(), automationId);
 
-        int totalActions = automation.getActions() != null ? automation.getActions().size() : 0;
+        int totalActions = getEffectiveActions(automation).size();
         return toDTO(session, totalActions);
     }
 
@@ -111,7 +111,7 @@ public class DebugSessionServiceImpl implements DebugSessionService {
     public DebugSessionDTO getSession(String sessionId) {
         DebugSession session = findSession(sessionId);
         Automation automation = automationMapper.findByPid(session.getAutomationId());
-        int totalActions = automation != null && automation.getActions() != null ? automation.getActions().size() : 0;
+        int totalActions = getEffectiveActions(automation).size();
         return toDTO(session, totalActions);
     }
 
@@ -291,7 +291,7 @@ public class DebugSessionServiceImpl implements DebugSessionService {
         eventPublisher.closeSession(sessionId);
 
         Automation automation = automationMapper.findByPid(session.getAutomationId());
-        int totalActions = automation != null && automation.getActions() != null ? automation.getActions().size() : 0;
+        int totalActions = getEffectiveActions(automation).size();
         return toDTO(session, totalActions);
     }
 
@@ -323,7 +323,7 @@ public class DebugSessionServiceImpl implements DebugSessionService {
         publishEvent(session, "session_paused", null, null);
 
         Automation automation = automationMapper.findByPid(session.getAutomationId());
-        int totalActions = automation != null && automation.getActions() != null ? automation.getActions().size() : 0;
+        int totalActions = getEffectiveActions(automation).size();
 
         log.info("Debug session restarted: pid={}", sessionId);
         return toDTO(session, totalActions);
@@ -343,7 +343,7 @@ public class DebugSessionServiceImpl implements DebugSessionService {
         debugSessionMapper.updateSession(session);
 
         Automation automation = automationMapper.findByPid(session.getAutomationId());
-        int totalActions = automation != null && automation.getActions() != null ? automation.getActions().size() : 0;
+        int totalActions = getEffectiveActions(automation).size();
         return toDTO(session, totalActions);
     }
 
@@ -365,13 +365,122 @@ public class DebugSessionServiceImpl implements DebugSessionService {
     }
 
     private List<AutomationAction> getSortedActions(Automation automation) {
-        List<AutomationAction> actions = automation.getActions();
+        List<AutomationAction> actions = getEffectiveActions(automation);
         if (actions == null || actions.isEmpty()) {
             return List.of();
         }
         List<AutomationAction> sorted = new ArrayList<>(actions);
         sorted.sort(Comparator.comparingInt(a -> a.getSequence() != null ? a.getSequence() : 0));
         return sorted;
+    }
+
+    /**
+     * The action list the step-debugger walks. A legacy/flat automation carries its
+     * steps in the {@code actions[]} column. A <b>designer-built</b> automation POSTs
+     * only {@code flowConfig} — its flat {@code actions[]} is intentionally empty
+     * (flowConfig is the source of truth, compiled to BPMN at enable time). Without
+     * this fallback the debugger would show "0 actions" for every designer flow
+     * (the Debug button in the designer would do nothing). So when {@code actions[]}
+     * is empty we derive an ordered, linear action list from the flow graph.
+     */
+    private List<AutomationAction> getEffectiveActions(Automation automation) {
+        if (automation == null) {
+            return List.of();
+        }
+        List<AutomationAction> flat = automation.getActions();
+        if (flat != null && !flat.isEmpty()) {
+            return flat;
+        }
+        return deriveActionsFromFlow(automation.getFlowConfig());
+    }
+
+    /**
+     * Derive an ordered linear action list from a designer {@code flowConfig} by
+     * walking outgoing edges from the trigger node (BFS topological order) and
+     * collecting the {@code action-*} / {@code control-delay} nodes. Control gateways
+     * (condition/loop) are not linear-steppable and are skipped — the debugger steps
+     * through the configured action nodes in graph order, executing each via the same
+     * {@link com.auraboot.framework.automation.executor.CompositeActionExecutor} the
+     * runtime uses. Returns an empty list for an empty / trigger-only / actions-only flow.
+     */
+    @SuppressWarnings("unchecked")
+    private List<AutomationAction> deriveActionsFromFlow(Map<String, Object> flowConfig) {
+        if (flowConfig == null || !(flowConfig.get("nodes") instanceof List<?> rawNodes) || rawNodes.isEmpty()) {
+            return List.of();
+        }
+        Map<String, Map<String, Object>> nodeById = new LinkedHashMap<>();
+        String triggerId = null;
+        for (Object o : rawNodes) {
+            if (!(o instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> node = (Map<String, Object>) o;
+            String id = String.valueOf(node.get("id"));
+            nodeById.put(id, node);
+            if (node.get("type") instanceof String type && type.startsWith("trigger") && triggerId == null) {
+                triggerId = id;
+            }
+        }
+        // Adjacency from edges (source -> [targets], preserving declared order).
+        Map<String, List<String>> adjacency = new LinkedHashMap<>();
+        if (flowConfig.get("edges") instanceof List<?> rawEdges) {
+            for (Object o : rawEdges) {
+                if (!(o instanceof Map)) {
+                    continue;
+                }
+                Map<String, Object> edge = (Map<String, Object>) o;
+                adjacency
+                        .computeIfAbsent(String.valueOf(edge.get("source")), k -> new ArrayList<>())
+                        .add(String.valueOf(edge.get("target")));
+            }
+        }
+        // BFS from the trigger (fallback: declared node order when no trigger / no edges).
+        Deque<String> queue = new ArrayDeque<>();
+        if (triggerId != null) {
+            queue.add(triggerId);
+        } else {
+            queue.addAll(nodeById.keySet());
+        }
+        Set<String> visited = new HashSet<>();
+        List<AutomationAction> ordered = new ArrayList<>();
+        while (!queue.isEmpty()) {
+            String id = queue.poll();
+            if (!visited.add(id)) {
+                continue;
+            }
+            AutomationAction action = toAction(nodeById.get(id), ordered.size());
+            if (action != null) {
+                ordered.add(action);
+            }
+            for (String next : adjacency.getOrDefault(id, List.of())) {
+                if (!visited.contains(next)) {
+                    queue.add(next);
+                }
+            }
+        }
+        return ordered;
+    }
+
+    @SuppressWarnings("unchecked")
+    private AutomationAction toAction(Map<String, Object> node, int sequence) {
+        if (node == null || !(node.get("type") instanceof String type)) {
+            return null;
+        }
+        if (!type.startsWith("action") && !"control-delay".equals(type)) {
+            return null; // skip trigger + control gateways (condition/loop) — not linear-steppable
+        }
+        Map<String, Object> data = node.get("data") instanceof Map ? (Map<String, Object>) node.get("data") : Map.of();
+        Map<String, Object> config = data.get("config") instanceof Map ? (Map<String, Object>) data.get("config") : Map.of();
+        String actionType = config.get("actionType") instanceof String s && !s.isBlank()
+                ? s
+                : type.startsWith("action-") ? type.substring("action-".length()).replace('-', '_') : type;
+        AutomationAction action = new AutomationAction();
+        action.setType(actionType);
+        action.setConfig(new HashMap<>(config));
+        action.setSequence(sequence);
+        Object label = data.get("label");
+        action.setLabel(label != null ? String.valueOf(label) : actionType);
+        return action;
     }
 
     private ActionResult executeAction(AutomationAction action, Map<String, Object> context) {

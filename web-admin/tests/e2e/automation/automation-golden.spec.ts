@@ -1387,8 +1387,13 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
   // fire path resolves the automation by pid (AutomationWebhookController), not by
   // model_code. validationMode:'none' = no signature/token check (those reject paths
   // are unit-covered; #415).
-  test('trigger-webhook: an inbound webhook POST fires the automation', async ({ page }) => {
+  test('trigger-webhook: an inbound webhook POST (token-validated) fires the automation', async ({ page }) => {
     const t = 'trig', a = 'notify';
+    // The webhook endpoint is fail-closed (PR #557): a `validationMode:'none'`
+    // automation is REFUSED ("validation not configured"). Configure token
+    // validation + a secret and present it as X-Webhook-Token (validateToken does a
+    // constant-time equality of the header against the secret).
+    const secret = `p3wh_${uniqueId()}`;
     const create = await postAutomation(page, {
       name: `P3-WH ${uniqueId()}`,
       flowConfig: {
@@ -1397,7 +1402,7 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
             id: t,
             type: 'trigger-webhook',
             position: { x: 100, y: 100 },
-            data: { type: 'trigger-webhook', label: 'on_webhook', config: { triggerType: 'webhook', validationMode: 'none' } },
+            data: { type: 'trigger-webhook', label: 'on_webhook', config: { triggerType: 'webhook', validationMode: 'token', secret } },
           },
           notifyNode(a, 'webhook received'),
         ],
@@ -1412,11 +1417,12 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
 
     const firedAt = Date.now();
     const resp = await page.request.post(`/api/automations/webhooks/${create.pid}`, {
+      headers: { 'X-Webhook-Token': secret },
       data: { event: 'order.shipped', orderRef: `P3-WH ${uniqueId()}` },
     });
     expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
     const body = await resp.json().catch(() => null);
-    expect(String(body?.code), `webhook POST should be accepted: ${JSON.stringify(body)}`).toBe('0');
+    expect(String(body?.code), `token-validated webhook POST should be accepted: ${JSON.stringify(body)}`).toBe('0');
     const { log } = await pollUntilLogCompletes(page, create.pid!, firedAt);
     expect(String(log.status).toLowerCase(), `webhook trigger should run to success: ${JSON.stringify(log)}`).toBe('success');
   });
@@ -1430,12 +1436,12 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
       data: { type: 'action-call-api', label: 'CallApi', config: { actionType: 'call_api', url, method } },
     };
   }
-  function sendWebhookNode(id: string, eventType: string, payload: Record<string, unknown>, x = 400, y = 300) {
+  function sendWebhookNode(id: string, config: Record<string, unknown>, x = 400, y = 300) {
     return {
       id,
       type: 'action-send-webhook',
       position: { x, y },
-      data: { type: 'action-send-webhook', label: 'SendWebhook', config: { actionType: 'send_webhook', eventType, payload } },
+      data: { type: 'action-send-webhook', label: 'SendWebhook', config: { actionType: 'send_webhook', ...config } },
     };
   }
   // ── action-call-api — makes a real outbound HTTP call ─────────────────────────
@@ -1474,21 +1480,25 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     expect(statuses.find((s) => s.nodeId === a)?.status, `call-api node completed: ${JSON.stringify(statuses)}`).toBe('completed');
   });
 
-  // ── action-send-webhook — dispatches an event to webhook subscriptions ────────
-  // SendWebhookExecutor calls WebhookDispatcher.dispatch(eventType, payload, tenantId).
-  // With no subscription registered for the eventType the dispatch is a harmless no-op
-  // that still completes (the action's side effect is "dispatched"). We assert the node
-  // completes — the executor ran the dispatch path end-to-end. (Asserting an outbound
-  // POST landed would need a registered subscription + a host receiver; the dispatch
-  // itself is exercised here.)
-  test('action-send-webhook: the action dispatches a webhook event and the node completes', async ({ page }) => {
+  // ── action-send-webhook — the executor requires a `url` (FINDING-10 contract) ──
+  // SendWebhookExecutor was rewritten (FINDING-10, PR #438) from the old
+  // eventType→WebhookDispatcher fan-out to a direct SSRF-validated POST to the
+  // node's configured `url`. A node built with the LEGACY {eventType,payload} shape
+  // (no url) is now invalid and the run FAILS fast with "requires url". This asserts
+  // that contract — the previous test here asserted a STALE "completed" against the
+  // removed eventType path (flagged in docs/backlog/2026-06-08-automation-e2e-
+  // stabilization.md). The real outbound URL-POST happy + sad paths (a host receiver
+  // actually receives the POST / a 500 fails the node) are covered by
+  // automation-designer-golden's N-SEND-WEBHOOK-OUTBOUND / N-SEND-WEBHOOK-SAD.
+  test('action-send-webhook: a node without a url is rejected at runtime — the node fails (FINDING-10 contract)', async ({ page }) => {
     const t = 'trig', a = 'webhook';
     const create = await postAutomation(page, {
       name: `P3-SWH ${uniqueId()}`,
       flowConfig: {
         nodes: [
           triggerCreateNode(t, MODEL_CODE),
-          sendWebhookNode(a, 'e2e.test.order.created', { source: 'P3-SWH', orderRef: `${uniqueId()}` }),
+          // Legacy {payload} with no url — the FINDING-10 executor rejects this.
+          sendWebhookNode(a, { payload: { source: 'P3-SWH', orderRef: `${uniqueId()}` } }),
         ],
         edges: [flowEdge(t, a)],
       },
@@ -1502,8 +1512,9 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     const firedAt = Date.now();
     expect((await createOrderRecordViaCommand(page, `P3-SWH-order ${uniqueId()}`)).ok).toBe(true);
     const { log, statuses } = await pollUntilLogCompletes(page, create.pid!, firedAt);
-    expect(String(log.status).toLowerCase(), `P3-SWH run: ${JSON.stringify({ log, statuses })}`).toBe('success');
-    expect(statuses.find((s) => s.nodeId === a)?.status, `send-webhook node completed: ${JSON.stringify(statuses)}`).toBe('completed');
+    // The url-less send-webhook node fails at runtime; the run is NOT a success.
+    expect(String(log.status).toLowerCase(), `P3-SWH run (expect failure, requires url): ${JSON.stringify({ log, statuses })}`).not.toBe('success');
+    expect(statuses.find((s) => s.nodeId === a)?.status, `send-webhook node failed (requires url): ${JSON.stringify(statuses)}`).toBe('failed');
   });
 
   // action-llm-call and action-start-process were retired from this legacy

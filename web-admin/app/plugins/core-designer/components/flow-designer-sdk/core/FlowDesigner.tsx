@@ -107,18 +107,22 @@ export function FlowDesigner({
     };
   }, []);
 
-  // Load initial data
+  // Load initial data. Always import on mount — even when there is no
+  // initialData (a fresh "new" canvas). importData seeds the undo history with
+  // the initial snapshot (history:[snapshot], historyIndex:0), so the FIRST
+  // edit (e.g. the first dragged node) is undoable; without it the store starts
+  // at historyIndex:-1 and canUndo() stays false after the first edit. Importing
+  // the empty default also guarantees a clean slate rather than inheriting stale
+  // nodes from a previously-mounted designer instance (the store is a singleton).
   useEffect(() => {
-    if (initialData) {
-      isImportingRef.current = true;
-      importData(initialData);
-      // Reset the flag on the next microtask so that the onChange effect
-      // (which runs synchronously in the same render cycle) sees it as false
-      // only after this import batch has settled.
-      Promise.resolve().then(() => {
-        isImportingRef.current = false;
-      });
-    }
+    isImportingRef.current = true;
+    importData(initialData ?? { nodes: [], edges: [] });
+    // Reset the flag on the next microtask so that the onChange effect
+    // (which runs synchronously in the same render cycle) sees it as false
+    // only after this import batch has settled.
+    Promise.resolve().then(() => {
+      isImportingRef.current = false;
+    });
   }, [initialData, importData]);
 
   // Notify onChange — skip while an importData call is in progress to prevent
