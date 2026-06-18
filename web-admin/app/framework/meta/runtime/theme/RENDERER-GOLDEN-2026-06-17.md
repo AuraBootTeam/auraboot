@@ -399,3 +399,141 @@ perm gap.
 - **Check 6 (secondary):** detail status/rating also render as pills not dots
   (same §3-A family, detail value path) — fix alongside check 1.
 - **Checks 3, 4, 5, 7: PASS** with the DOM/network/DB evidence above.
+
+## Final confirmation golden (2026-06-18)
+
+> Real-browser **confirmation** that the two fixes in commit `556c55533`
+> (`fix(web-admin): status dots on the LIVE list/detail renderers + form
+> first-error scroll`) — which the "Comprehensive interaction golden" above caught
+> as Check 1 FAIL (§3-A bypassed) and Check 2 PARTIAL (§4 scroll not wired) — now
+> actually run on real pages. Branch `feat/ux-t4-t6-golden-closeout`, HEAD
+> `556c55533`. **Verify-only: no source modified** (only this doc appended).
+>
+> The fix patched the THREE live renderers the prior golden traced as untouched:
+> `ListPageContent.tsx:1890` (the live `/p/<model>` admin list), the shared
+> `DynamicField` at `routes/_shared/dynamic-route-utils.tsx:550` (the live detail
+> field value), and `DetailPageContent.tsx` `DataPathTable` (detail sub-table cell)
+> — all three now route their dict-coded status/rating branch through
+> `StatusDot(resolveStatusTone(item.extension?.color))`, dropping the inline
+> `colorMap` pill. §4 adds `scrollToFormField.ts` + calls it from
+> `FormPageContent.notifyValidationFailure`.
+
+### Stack (host-first, isolated, zero docker)
+
+- **Backend**: prebuilt `platform/build/libs/AuraBoot-1.0.0-SNAPSHOT-boot.jar`
+  (canonical-main build, mtime Jun 16 23:40) via `java -jar` on **free port 6557**
+  (6543 held by a concurrent session — left untouched), pointed at **isolated DB
+  `aura_ux_final`** (`database/schema.sql` applied directly — 307 tables, 0 errors)
+  + **Redis DB 6**, `SPRING_PROFILES_ACTIVE=dev`. Same OTel autoconfigure-exclude
+  launch flags + `MANAGEMENT_TRACING_ENABLED=false` as the prior runs (the bundled
+  OTel skew still applies to this jar).
+- **Frontend (THIS worktree)**: `pnpm dev:full` — Vite **5191** / BFF **3521**, both
+  with `SPRING_BOOT_URL` + `PROXY_TARGET` → 6557. **Served code confirmed NEW, not
+  stale**: `curl :5191/app/.../ListPageContent.tsx` → **2 `StatusDot` refs, 0
+  `colorMap`/`bg-blue-100`**; `.../dynamic-route-utils.tsx` → 2 `StatusDot`;
+  `.../FormPageContent.tsx` → 2 `scrollToFormField` — i.e. the served renderers
+  genuinely carry the fix (the prior golden's served code had the bypass).
+- **Seed**: `POST /api/bootstrap/setup` (`admin@auraboot.com`, tenant
+  `325904696441180160`) + `import-directory-sync` of `crm-starter` (`success:true`;
+  6 models / 19 pages / 41 commands / 54 fields / 9 dicts). **6 `crm_account`** via
+  the **real command pipeline** (`POST /api/meta/commands/execute/crm:create_account`,
+  varied ratings A/A/B/B/C/C); **2 flipped to `inactive` via `crm:update_account`**
+  → final **4 active / 2 inactive** (so ≥2 distinct statuses present).
+- **Driver**: Playwright 1.60 (`@playwright/test`) + bundled chromium
+  (`chromium.launch({headless:true})`); auth via the in-browser `/login` form (real
+  cookie session) → lands `/home`. Standalone scripts, removed after.
+
+### Results
+
+| # | Check | Verdict | Evidence |
+| - | ----- | ------- | -------- |
+| 1 | §3-A list status as 色点+文字 (dot, not filled pill) | **PASS (primary)** — but dots are NOT semantically colored (secondary gap) | `/tmp/final-1-list.png` |
+| 2 | §3-A detail status field as dot+text (not pill) | **PASS** — same secondary color gap | `/tmp/final-2-detail.png` |
+| 3 | §4 required-empty submit → first-error scroll + focus + field error | **PASS** | `/tmp/final-3b-after-submit.png` |
+
+#### Check 1 — PASS (primary): live list status/rating are dots+text, 0 filled pills ✅
+
+On `/p/crm_account` (6 rows), DOM-inspected:
+`dotCount=12` (6 rows × 状态 + 评级), `filledPillCount=0`, `dotWrapperCount=12`.
+Each dot is `span.rounded-pill.h-2.w-2.shrink-0.bg-status-<tone>` inside a wrapper
+`span.inline-flex.items-center.gap-1.5` carrying the label text (活跃 / 停用 /
+A-重点客户 / B-重要客户 / C-一般客户). **No `px-2 py-1 bg-blue-100` filled pill anywhere.**
+The screenshot shows the 状态 column with • 活跃 (4 rows) / • 停用 (2 rows: Globex,
+Acme) and 评级 with • A/B/C — all dot-prefixed, not pills. This is exactly the
+§3-A `StatusDot` route at `ListPageContent.tsx:1890`, live. **The prior golden's
+Check-1 FAIL (filled pills via the old inline `colorMap`) is resolved.**
+
+🟡 **Secondary gap found (NOT the §3-A requirement, but it fails the task's
+"≥2 statuses → ≥2 dot colors" sub-assertion):** every dot — both statuses AND
+ratings — renders `bg-status-gray` (`rgb(113,113,122)`); `distinctBg = 1 color`.
+Root cause traced (served-code + live-API confirmed):
+
+- The dict items carry **hex color values** in `item.extension.color`, not tone
+  names — `/api/meta/dict/by-code/crm_account_status/data` returns
+  `active → {"color":"#10b981"}`, `inactive → {"color":"#9ca3af"}` (and
+  rating A→`#ef4444`, B→`#f59e0b`, C→`#3b82f6`).
+- `ListPageContent.tsx:1890` calls `resolveStatusTone(item.extension?.color)` i.e.
+  `resolveStatusTone("#10b981")`.
+- `statusTone.tsx:104-107` `resolveStatusTone` only matches **color NAMES** via
+  `TONE_BY_NAME` (`'green'`, `'success'`, `'active'`, …). A hex string is not a key
+  → falls through to the `?? 'gray'` default. So **all hex-colored dicts collapse to
+  gray.**
+
+**Fix scope (out of this verify-only pass):** make `resolveStatusTone` also map hex
+values (e.g. parse `#10b981`/`#9ca3af`/`#ef4444`/`#f59e0b`/`#3b82f6` to the nearest
+canonical tone, or seed `TONE_BY_NAME` by the dict's `value` like `active`/`inactive`
+in addition to its color). File:line = `web-admin/app/framework/meta/runtime/renderers/statusTone.tsx:104-107`.
+The §3-A *shape* (dot+text, no pill) is fully delivered; the *semantic color* is the
+remaining piece.
+
+#### Check 2 — PASS: detail status field is a dot+text, not a pill ✅
+
+On `/p/crm_account/view/01KVCVAN8RGN1GCF9GQ2H6FVEM` (Stark Industries): the 状态
+field value renders **• 活跃** and 评级 renders **• C - 一般客户** as
+`StatusDot` (`dotCount=2`, `filledPillCount=0`, dot wrapper `inline-flex
+items-center gap-1.5` with the label). Screenshot `/tmp/final-2-detail.png` shows
+both as dot+text, NOT the prior `bg-gray-100` filled pill. This is the shared
+`DynamicField` at `dynamic-route-utils.tsx:550` (the live detail field-value path),
+live. (Same gray-dot color caveat as Check 1 — the detail dict path uses the same
+`resolveStatusTone`.) **The prior golden's Check-6 secondary "detail renders pills
+not dots" is resolved (shape-wise).**
+
+#### Check 3 — PASS: empty-required submit scrolls to + focuses the first invalid field ✅
+
+On `/p/crm_account/new`, the form has 8 `[data-testid="form-field-<code>"]` wrappers;
+first = `form-field-crm_acc_name`. After clicking 保存 with all fields empty, DOM-probed:
+- ✅ **Field-level red error** `请填写客户名称` renders under the 客户名称 input
+  (`text-status-red`, `errorCount` includes the `*` marker + the message), plus a
+  top toast — NOT a generic-only toast. Screenshot `/tmp/final-3b-after-submit.png`
+  shows the first input with a **focus ring** + the inline red error directly beneath.
+- ✅ **`document.activeElement` is the INPUT inside `form-field-crm_acc_name`**
+  (`activeTag=INPUT`, `activeTestId=form-field-crm_acc_name`,
+  `activeInFirstWrapper=true`) — i.e. `scrollToFormField(firstFieldCode)` from
+  `FormPageContent.notifyValidationFailure` ran and focused the first invalid field.
+- ✅ First field **in view** (`firstInView=true`, `firstRectTop=202px`).
+  (`scrollY` stayed 0 because the whole crm_account form fits the 900px viewport, so
+  there was nothing to scroll; the load-bearing proof is the real `.focus()` landing
+  on the first invalid input — on a long form the same `scrollIntoView({block:'center'})`
+  would bring it into view, as the unit tests cover.)
+
+**The prior golden's Check-2 PARTIAL (scroll/focus-to-first-invalid NOT wired,
+`FormPageContent` had 0 scroll/focus) is resolved:** `FormPageContent.tsx:1270`
+now calls `scrollToFormField(firstFieldCode)` via `requestAnimationFrame` in
+`notifyValidationFailure`, and it demonstrably focuses the first invalid field.
+
+### Summary
+
+- **§3-A list (Check 1): PASS for the requirement** (色点+文字, 0 filled pills, live
+  on `ListPageContent.tsx:1890`). 🟡 Separate secondary gap: dots are all gray
+  because `resolveStatusTone` (`statusTone.tsx:104-107`) doesn't handle the **hex**
+  color values the dicts carry — so the task's "≥2 statuses → ≥2 dot colors"
+  sub-assertion fails (1 color). Fix = teach `resolveStatusTone` hex→tone (or seed by
+  dict value). Out of the fix-commit's scope (it was a shape fix); flagged for follow-up.
+- **§3-A detail (Check 2): PASS** — detail status/rating now dot+text (live
+  `DynamicField` `dynamic-route-utils.tsx:550`), not pills. Same gray caveat.
+- **§4 form scroll (Check 3): PASS** — empty submit focuses + brings into view the
+  first invalid field with a field-level red error (`FormPageContent.tsx:1270` →
+  `scrollToFormField`).
+- Both fixes from `556c55533` that the prior golden caught as FAIL/PARTIAL now WORK
+  on real pages (shape + behavior). The only residual is the cosmetic dot-color
+  semantics (hex-not-handled), a distinct, smaller gap from the original pill bug.
