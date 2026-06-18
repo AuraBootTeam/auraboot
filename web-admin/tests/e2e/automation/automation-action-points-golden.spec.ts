@@ -13,6 +13,7 @@
  * These cases neither enable nor fire any record-triggered automation, so they do
  * NOT take the e2et_order serialization lock and are safe to run in parallel.
  */
+import fs from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 import {
@@ -181,5 +182,77 @@ test.describe('Automation designer — Undo / Redo action points @golden', () =>
     await expect
       .poll(async () => (await currentNodeIds(page)).length, { timeout: 5_000 })
       .toBe(0);
+  });
+});
+
+// ───────────────────────── G9 — list Export / Import action points ─────────────────────────
+
+test.describe('Automation list — Export / Import action points @golden', () => {
+  const createdPids: string[] = [];
+
+  test.afterAll(async ({ browser }) => {
+    if (!createdPids.length) return;
+    const ctx = await browser.newContext({
+      storageState:
+        process.env.PW_ADMIN_STORAGE_STATE ||
+        (process.env.PW_STORAGE_DIR ? `${process.env.PW_STORAGE_DIR}/admin.json` : 'tests/storage/admin.json'),
+    });
+    const page = await ctx.newPage();
+    for (const pid of createdPids) await deleteViaApi(page, pid);
+    await page.close();
+    await ctx.close();
+  });
+
+  test('export downloads the automation JSON; importing it creates an equivalent clone (round-trip) @golden', async ({ page }, testInfo) => {
+    const name = `IOEXP-SRC ${uniqueId()}`;
+    const src = await postAutomation(page, {
+      name,
+      description: 'export source',
+      flowConfig: {
+        nodes: [triggerCreateNode('t', MODEL_CODE), createRecordNode('a', MODEL_CODE)],
+        edges: [{ id: 'e1', source: 't', target: 'a' }],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(src.ok, `create source: ${JSON.stringify(src.raw)}`).toBe(true);
+    createdPids.push(src.pid!);
+
+    await page.goto('/automations');
+    const exportBtn = page.locator(`[data-testid="btn-export-${src.pid}"]`);
+    await exportBtn.waitFor({ state: 'visible', timeout: 15_000 });
+    await expect(exportBtn).toBeEnabled({ timeout: 10_000 });
+
+    // Export → a real file download whose JSON carries the name + flow.
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 15_000 }),
+      exportBtn.click(),
+    ]);
+    const exportPath = testInfo.outputPath('exported-automation.json');
+    await download.saveAs(exportPath);
+    const exported = JSON.parse(fs.readFileSync(exportPath, 'utf8'));
+    expect(exported.name, 'exported JSON carries the automation name').toBe(name);
+    expect(exported.flowConfig?.nodes?.length, 'exported JSON carries the 2-node flow').toBe(2);
+
+    // Import the exported JSON (renamed) via the real hidden file input → new automation.
+    const importName = `IOEXP-IMPORTED ${uniqueId()}`;
+    const importPath = testInfo.outputPath('to-import.json');
+    fs.writeFileSync(importPath, JSON.stringify({ ...exported, name: importName }));
+    await page.locator('[data-testid="input-import-automation"]').setInputFiles(importPath);
+
+    // Import POSTs + revalidates → a new row with the imported name appears.
+    await expect(
+      page.getByRole('link', { name: importName }),
+      'imported automation row appears in the list',
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Verify (API) the imported automation is an independent record with the same flow.
+    const list = await (await page.request.get('/api/automations', { params: { limit: 100 } })).json();
+    const records: any[] = list?.data?.records ?? list?.data ?? [];
+    const imported = records.find((r) => r.name === importName);
+    expect(imported, 'imported automation persisted').toBeTruthy();
+    createdPids.push(imported.pid);
+    const full = await (await page.request.get(`/api/automations/${imported.pid}`)).json();
+    expect(full?.data?.flowConfig?.nodes?.length, 'imported flow carries the 2 nodes').toBe(2);
   });
 });

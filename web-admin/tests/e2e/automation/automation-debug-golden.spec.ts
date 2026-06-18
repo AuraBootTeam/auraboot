@@ -167,4 +167,62 @@ test.describe('Automation debugger — step/continue/restart/stop golden @golden
     await expect(status, 'debugger toolbar gone after Stop (exited debug mode)').toBeHidden({ timeout: 10_000 });
     await expect(debugBtn, 'editor restored after Stop').toBeVisible({ timeout: 10_000 });
   });
+
+  test('set a breakpoint via the gutter toggle → Continue pauses at it (breakpoint action point) @golden', async ({ page }) => {
+    const create = await postAutomation(page, {
+      name: `DEBUG-BP ${uniqueId()}`,
+      flowConfig: {
+        nodes: [
+          { id: 't', type: 'trigger-record-create', position: { x: 120, y: 200 },
+            data: { type: 'trigger-record-create', label: 'OnCreate', config: { triggerType: 'on_record_create', modelCode: MODEL_CODE } } },
+          createRecordNode('a0', `bp-child-0 ${uniqueId()}`, 380),
+          createRecordNode('a1', `bp-child-1 ${uniqueId()}`, 640),
+        ],
+        edges: [
+          { id: 'e0', source: 't', target: 'a0' },
+          { id: 'e1', source: 'a0', target: 'a1' },
+        ],
+      },
+      actions: [],
+      enabled: false,
+    });
+    expect(create.ok, `create: ${JSON.stringify(create.raw)}`).toBe(true);
+    createdPids.push(create.pid!);
+
+    await page.goto(`/automation/${create.pid}`);
+    await expect(page.locator('[data-testid="automation-editor-name-input"]'))
+      .toHaveValue(/DEBUG-BP/, { timeout: 30_000 });
+
+    const status = page.locator('[data-testid="automation-debug-status"]');
+    const progress = page.locator('[data-testid="automation-debug-progress"]');
+    const continueBtn = page.locator('[data-testid="automation-debug-continue"]');
+    const stepBtn = page.locator('[data-testid="automation-debug-step"]');
+    const debugBtn = page.locator('[data-testid="btn-debug-automation"]');
+    await debugBtn.waitFor({ state: 'visible', timeout: 30_000 });
+    await expect(async () => {
+      if (await debugBtn.isVisible().catch(() => false)) await debugBtn.click().catch(() => {});
+      await expect(status).toBeVisible({ timeout: 3_000 });
+    }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] });
+    await expect(progress).toHaveText('0/2', { timeout: 10_000 });
+
+    // Set a breakpoint on action index 1 via the gutter toggle (the G8 affordance —
+    // previously updateBreakpoints had no UI caller, so breakpoints were unreachable).
+    const bp1 = page.locator('[data-testid="automation-debug-breakpoint-toggle"][data-action-index="1"]');
+    await bp1.click();
+    await expect(bp1, 'breakpoint toggled ON (aria-pressed)').toHaveAttribute('aria-pressed', 'true', { timeout: 10_000 });
+
+    // Continue from index 0 → runs action 0 → PAUSES at the breakpoint on index 1
+    // (NOT run to completion). Proves set-breakpoint + continue-until-breakpoint wiring.
+    await continueBtn.click();
+    await expect(progress, 'continue paused at the breakpoint (1/2), not 2/2').toHaveText('1/2', { timeout: 20_000 });
+    await expect(status, 'still paused at the breakpoint').toContainText(/Paused|已暂停|paused/i, { timeout: 10_000 });
+    await expect(stepBtn, 'step re-enabled at the breakpoint pause').toBeEnabled({ timeout: 10_000 });
+
+    // Clear the breakpoint + Continue → now runs to completion.
+    await bp1.click();
+    await expect(bp1, 'breakpoint cleared (aria-pressed=false)').toHaveAttribute('aria-pressed', 'false', { timeout: 10_000 });
+    await continueBtn.click();
+    await expect(progress, 'after clearing the bp, continue runs to 2/2').toHaveText('2/2', { timeout: 20_000 });
+    await expect(status, 'completed').toContainText(/Completed|已完成|completed/i, { timeout: 10_000 });
+  });
 });
