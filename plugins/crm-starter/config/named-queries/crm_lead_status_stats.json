@@ -1,0 +1,16 @@
+{
+  "code": "crm_lead_status_stats",
+  "title:zh-CN": "线索状态统计",
+  "title:en": "Lead Status Stats",
+  "description": "Lead workbench KPI: lead counts by lifecycle status (new/contacted/qualified/converted/lost) plus the overall total, tenant-scoped. Feeds the metric-strip on the crm_lead_workbench console.",
+  "fromSql": "SELECT COUNT(*) AS total_count, COUNT(*) FILTER (WHERE crm_lead_status = 'new') AS new_count, COUNT(*) FILTER (WHERE crm_lead_status = 'contacted') AS contacted_count, COUNT(*) FILTER (WHERE crm_lead_status = 'qualified') AS qualified_count, COUNT(*) FILTER (WHERE crm_lead_status = 'converted') AS converted_count, COUNT(*) FILTER (WHERE crm_lead_status = 'lost') AS lost_count FROM mt_crm_lead WHERE tenant_id = #{params.tenantId}",
+  "fields": [
+    { "fieldCode": "total_count", "columnExpr": "total_count", "dataType": "number", "sortable": false, "searchable": false },
+    { "fieldCode": "new_count", "columnExpr": "new_count", "dataType": "number", "sortable": false, "searchable": false },
+    { "fieldCode": "contacted_count", "columnExpr": "contacted_count", "dataType": "number", "sortable": false, "searchable": false },
+    { "fieldCode": "qualified_count", "columnExpr": "qualified_count", "dataType": "number", "sortable": false, "searchable": false },
+    { "fieldCode": "converted_count", "columnExpr": "converted_count", "dataType": "number", "sortable": false, "searchable": false },
+    { "fieldCode": "lost_count", "columnExpr": "lost_count", "dataType": "number", "sortable": false, "searchable": false }
+  ],
+  "status": "published"
+}

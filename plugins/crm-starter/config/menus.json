@@ -27,6 +27,34 @@
     "visible": true
   },
   {
+    "code": "crm_lead_workbench",
+    "parentCode": "crm_root",
+    "name:zh-CN": "线索对账台",
+    "name:en": "Lead Console",
+    "path": "/p/c/crm_lead_workbench",
+    "pageKey": "crm_lead_workbench",
+    "component": null,
+    "icon": "IconRadar",
+    "type": 1,
+    "permissionCode": "crm.lead.read",
+    "orderNo": 4,
+    "visible": true
+  },
+  {
+    "code": "crm_lead_analytics",
+    "parentCode": "crm_root",
+    "name:zh-CN": "线索分析",
+    "name:en": "Lead Analytics",
+    "path": "/dashboards/view/crm_lead_analytics",
+    "pageKey": "crm_lead_analytics",
+    "component": null,
+    "icon": "IconChartBar",
+    "type": 1,
+    "permissionCode": "crm.lead.read",
+    "orderNo": 5,
+    "visible": true
+  },
+  {
     "code": "crm_accounts",
     "parentCode": "crm_root",
     "name:zh-CN": "客户",
