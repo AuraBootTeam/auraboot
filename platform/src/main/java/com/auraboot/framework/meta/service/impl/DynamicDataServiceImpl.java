@@ -133,6 +133,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return applicationContext.getBean(AutomationTriggerService.class);
     }
 
+    // Lazy lookup (mirrors getAutomationTriggerService) for F3 record-level SLA activation.
+    private com.auraboot.framework.bpm.listener.SlaActivationListener getSlaActivationListener() {
+        return applicationContext.getBean(com.auraboot.framework.bpm.listener.SlaActivationListener.class);
+    }
+
     @Override
     @Observed(name = "dynamic_data.list", contextualName = "dynamic-data-list")
     public PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request) {
@@ -909,6 +914,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             getAutomationTriggerService().onRecordCreate(modelCode, recordIdValue, createdRecord);
         } catch (Exception e) {
             log.error("Failed to trigger automations for create: model={}, id={}: {}",
+                    logSafe(modelCode), logSafe(recordIdValue), logSafe(e.getMessage()), e);
+        }
+
+        // F3: activate record-level SLA (targetType=RECORD) for this model, if any.
+        try {
+            getSlaActivationListener().onRecordCreate(modelCode, recordIdValue, createdRecord);
+        } catch (Exception e) {
+            log.error("Failed to activate record-level SLA for create: model={}, id={}: {}",
                     logSafe(modelCode), logSafe(recordIdValue), logSafe(e.getMessage()), e);
         }
 

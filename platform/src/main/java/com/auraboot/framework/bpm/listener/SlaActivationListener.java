@@ -121,6 +121,43 @@ public class SlaActivationListener {
         }
     }
 
+    /**
+     * F3 — record-level SLA activation. When a dynamic record is created, activate any SLA config
+     * targeting that model via {@code targetType="RECORD"} + {@code targetKey=<modelCode>}. Mirrors the
+     * BPM-node path but keyed on the record instead of a process node, reusing the same
+     * FIXED/RULE/decision deadline engine ({@link #computeDeadline}). The created SLA record carries
+     * the record pid in {@code processInstanceId} and the modelCode in {@code nodeId}, so the existing
+     * scheduler / overdue / escalation logic works unchanged.
+     *
+     * <p>Called directly from {@code DynamicDataServiceImpl} (the record-create hook), so it runs in the
+     * caller's MetaContext + transaction. Non-blocking: an SLA failure must never fail the record create.
+     */
+    public void onRecordCreate(String modelCode, String recordPid, Map<String, Object> recordData) {
+        if (modelCode == null || recordPid == null) {
+            return;
+        }
+        List<SlaConfigEntity> configs = slaConfigService.findByTargetAnyCase("RECORD", modelCode);
+        if (configs.isEmpty()) {
+            log.debug("No RECORD-level SLA config found for model {} — skipping SLA record creation", modelCode);
+            return;
+        }
+        for (SlaConfigEntity config : configs) {
+            if (!Boolean.TRUE.equals(config.getEnabled())) {
+                continue;
+            }
+            try {
+                Instant deadline = computeDeadline(config);
+                slaRecordService.createRecord(config, recordPid, null, modelCode, deadline);
+                log.info("SLA record created at record creation: modelCode={}, recordPid={}, configPid={}, deadline={}",
+                        modelCode, recordPid, config.getPid(), deadline);
+            } catch (Exception e) {
+                // CATCH: non-critical — record-level SLA activation must not block the record create
+                log.error("Failed to create record-level SLA record for config={}, model={}: {}",
+                        config.getPid(), modelCode, e.getMessage(), e);
+            }
+        }
+    }
+
     private String extractTaskId(BpmEvent event) {
         if (event.getPayload() == null) return null;
         Object v = event.getPayload().get("taskInstanceId");
