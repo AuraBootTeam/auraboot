@@ -149,13 +149,15 @@ related:
 - **Slice B(收窄为安全版)**:删 v1 **HTTP 旁路 API** `ChatBIController`(`/api/ai/chat-bi`)+ e2e `chat-bi.spec.ts`。`compileJava exit=0`。
   - **未删** `ChatBIService` + `ChatBiLlmParser` + DTO ——**实测纠正(§15)**:① v2 对它们**零功能依赖**(`chatbi/v2/lexer` 里只有 javadoc/TODO 提及,无 import 无调用);② 但 `ChatBiIntentLiveIT`(真 DeepSeek 5/5 intent)+ `ChatBIServiceLlmTest` **直接 @Autowired 用着 `ChatBiLlmParser`**,且这是**当前唯一可用且被测的"普通 model 零配置 NL→intent"**。现在删=回归 + 丢测试覆盖,无替代。→ **改为:只删旁路 public API,intent 服务降为内部 dormant,留到 v2 零配置就位后再退役。**
 
-**被真特性 build 卡住(实测,非推断)**:
-- `ab_semantic_model` **0 行** · 全仓**无 meta-model→semantic 生成器** · v2 `ask` 必须传 `semanticModelPid`。→ **v2 当前对普通 model 不能零配置跑**。
-- 所以 **Slice C(`chat_bi` agent 工具)+ 完整删 v1** 的**前置 = 建"从 `ab_meta_model`+fields+reference+dict 自动派生 baseline 语义模型"**(metrics/dimensions 推断 + 注册 `ab_semantic_model`)。这是**真特性切片**(含设计 + 单测 + live golden),不是 cleanup,本轮不强行假完成。
+**keystone 重新定位(实测纠正,§15)**:先前以为 C 卡在"v2 需语义模型 / 要建 meta-model→semantic 自动派生"。**错了**——`chat_bi` 工具根本不该走 v2 语义层,而是走 **`AggregateQueryService` 的 raw 聚合路径**(`modelCode + dimensions + metrics`,**零配置、无需语义模型**,正是 dashboard 图表底座,S5 golden 已 live 证)。所以:
+- v2 语义层(需 `ab_semantic_model`)= **进阶路径**(治理化 metric / 多轮),不是 baseline chat_bi 的前置。
+- meta-model→semantic 自动派生 = **只为进阶 v2 路径**,**不阻塞** baseline chat_bi 与渲染收口。
+
+**Slice C — DONE(本次,verified)**:`ChatBiSkill`(`aurabot/skill/builtin/ChatBiSkill.java`)—— agent LLM 用 native tool-use 填 `{modelCode, dimensions, metrics, filters}` → 走 raw `AggregateQueryService` → 返 `{records, columns, chartType}` payload → AuraBot 聊天 `AuraBotChat.tsx:178` 自动渲 `ChatBiResultCard`(ECharts)。**零配置 · 受治理(走 agent tool,非直连 API) · 复用底座**。`ChatBiSkillTest` 5/5(请求映射强制 raw 路径〔偷传 semanticModelCode/queryCode 被剥〕+ 响应映射 + chartType 推断 + 校验)。@Component 自动注册。
 
 **剩余真工作(按依赖序)**:
-1. **【keystone 特性】meta-model→semantic 自动派生**(解锁 C 与完整删 v1)。
-2. Slice C:v2 包成 `chat_bi` agent 工具(依赖 1)。
-3. Slice D:渲染收一个 `ChartDataSource` 契约(独立于 v1/v2,但动 live dashboard 底座,须配 S5 dashboard golden 回归)。
-4. Slice E:即席→沉淀桥。
-5. 完整退役 v1 service + 把 `ChatBiIntentLiveIT` 迁到 v2 intent 路径(依赖 1)。
+1. **chat_bi live golden**(= 我先前误判的"ChatBI UI golden"正解):起 agent 栈,AuraBot 聊天问 NL 数据问题 → 断言 `ChatBiResultCard` 真渲 ECharts + records 真出。**需 agent loop + DeepSeek + 浏览器**(heavy,要把 OOM 掉的 backend 重新拉起)。
+2. **完整退役 v1 service**(`ChatBIService` + `ChatBiLlmParser` + DTO + `ChatBiIntentLiveIT` + `ChatBIServiceLlmTest`)——**依赖 1**:live golden 把"NL→intent 正确"的覆盖从 `ChatBiLlmParser`(旧)迁到 chat_bi 工具(agent tool-use)后,才删,不丢覆盖。
+3. **Slice D**:渲染收一个 `ChartDataSource` / `SharedChartFactory` 内核(`ChatBiResultCard` 改走它);独立于 v1/v2,但动 live dashboard 底座,须配 S5 dashboard golden 回归。
+4. **Slice E**:即席→沉淀桥(即席图"存为看板" → `dashboard:create`)。
+5. (可选)v2 进阶路径:meta-model→semantic 自动派生 + v2 接 chat_bi 的"复杂多轮/治理 metric"档位。
