@@ -47,7 +47,7 @@ PluginPackageController / PluginTransactionalImportController(`plugin.plugin.man
 | ✅ VersionHistoryController | rollback dashboard | `dashboard.manage` | **已守护(PR #820 batch2)**:rollback 方法级,GET 列版本保留 |
 | ✅ ViewShareController | 创建/撤销分享链接 | `dashboard.manage` | **已守护(PR #820 batch2)**:share/revoke 方法级,GET /shared 白名单保留 |
 | NotificationRuleController | 规则 CRUD | `notification_rule_manage` | operator-held(注意是下划线码) |
-| NotificationTemplateController | 模板 CRUD | needs-new-code `notification.template.manage` | role-decision(operator?) |
+| ✅ NotificationTemplateController | 模板 CRUD | `notification.template.manage` | **已守护(PR #820 batch4)**:新码注册+授 operator(持 notification_rule_manage→应管模板),CRUD 方法级,GET list/preview 保留 |
 | CallbackController | BPM 回调推进节点 | `bpm.process.execute` | operator-held;**确认是否系统回调**(若系统-to-系统则改签名校验而非用户权限) |
 | ✅ OrchestrationController / SagaController | 流程执行 start/暂停/恢复/取消/重试/skip | `bpm.process.execute` | **已守护(PR #820 batch3)**:写方法方法级(operator-held,viewer 仅 bpm.task.read 受限),GET status/timeline/summary 保留 |
 | TriggerController | 触发器 CRUD + fire | CRUD→role-decision;fire/webhook→`bpm.process.execute` 或签名校验 | webhook 仅当配 secret 才校验,无 secret 不算豁免 |
@@ -57,7 +57,7 @@ PluginPackageController / PluginTransactionalImportController(`plugin.plugin.man
 | MetaFieldOrchestratorController / RollUpController | 字段编排 / 重算 | `meta.field.update`(operator 无) | role-decision |
 | RecordShareController / UserProjectBindingController | 授予他人访问 / 绑成员 | needs-new-code `record.share.manage` / `project.member.manage` | 授予他人 = 非 self |
 | AnnouncementController | 公告 CRUD | needs-new-code `org.announcement.manage` | role-decision |
-| TenantInviteController(generate/revoke) | 生成/吊销邀请码 | needs-new-code `org.tenant.invite.manage` | use/validate 保持开放 |
+| ✅ TenantInviteController(generate/revoke) | 生成/吊销邀请码 | `org.tenant.invite.manage` | **已守护(PR #820 batch4)**:新码注册+授 operator(持 member_management),generate/revoke 方法级,use/validate/current 保持开放 |
 | SemanticController(publish) | 发布语义目录 | needs-new-code `meta.semantic.publish` | query/sql 用 `query_builder`(operator-held);validate 纯内存豁免 |
 | BiTemporalController / MrpController | 双时态写 / MRP 运算 | needs-new-code `data.bitemporal.write` / `meta.manufacturing.mrp` | aps 同系列 |
 | McpAuditController / ActivityController / WdLeaveAiController | 审计/活动写 / leave-ai | needs-new-code | WdLeaveAi 无 @Profile,生产可达 |
