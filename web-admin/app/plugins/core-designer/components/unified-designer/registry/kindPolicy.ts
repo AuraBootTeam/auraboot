@@ -68,6 +68,21 @@ const SHARED_DETAIL_DISPLAY_BLOCKS = [
 ] as const;
 const SHARED_DASHBOARD_DISPLAY_BLOCKS = ['stat-card', 'description'] as const;
 
+// E2 batch — non-family display / chart / graph / layout / form / list blocks.
+// `divider` is a generic separator surfaced on every concrete kind. The viz/display
+// blocks (chart, rich-text, trace-graph, selection-info, gerber-viewer) belong to
+// the cockpit kinds (detail + dashboard). form-buttons/form-wizard are form
+// composition blocks; filters/toolbar are list tooling blocks.
+const SHARED_FORM_COMPOSE_BLOCKS = ['form-buttons', 'form-wizard'] as const;
+const SHARED_LIST_TOOL_BLOCKS = ['filters', 'toolbar'] as const;
+const SHARED_VIZ_DISPLAY_BLOCKS = [
+  'chart',
+  'rich-text',
+  'trace-graph',
+  'selection-info',
+  'gerber-viewer',
+] as const;
+
 const POLICIES: Record<PageSchemaV3Kind, KindPolicy> = {
   form: {
     rootBlockType: 'form',
@@ -77,6 +92,8 @@ const POLICIES: Record<PageSchemaV3Kind, KindPolicy> = {
       ...SHARED_LAYOUT_BLOCKS,
       ...SHARED_ACTION_BLOCKS,
       ...SHARED_WORKFLOW_BLOCKS,
+      ...SHARED_FORM_COMPOSE_BLOCKS,
+      'divider',
     ]),
   },
   list: {
@@ -90,6 +107,8 @@ const POLICIES: Record<PageSchemaV3Kind, KindPolicy> = {
       'widget',
       ...SHARED_LAYOUT_BLOCKS,
       ...SHARED_ACTION_BLOCKS,
+      ...SHARED_LIST_TOOL_BLOCKS,
+      'divider',
     ]),
   },
   detail: {
@@ -102,6 +121,9 @@ const POLICIES: Record<PageSchemaV3Kind, KindPolicy> = {
       ...SHARED_WORKFLOW_BLOCKS,
       ...SHARED_WORKBENCH_BLOCKS,
       ...SHARED_DETAIL_DISPLAY_BLOCKS,
+      ...SHARED_VIZ_DISPLAY_BLOCKS,
+      'toolbar',
+      'divider',
     ]),
   },
   dashboard: {
@@ -111,6 +133,8 @@ const POLICIES: Record<PageSchemaV3Kind, KindPolicy> = {
       'widget',
       ...SHARED_WORKBENCH_BLOCKS,
       ...SHARED_DASHBOARD_DISPLAY_BLOCKS,
+      ...SHARED_VIZ_DISPLAY_BLOCKS,
+      'divider',
     ]),
   },
   composite: {

@@ -293,6 +293,10 @@ public final class DslRegistry {
         REVIEW_DRAWER("review-drawer", "Review drawer block", "1.4"),
         STATUS_BANNER("status-banner", "Status banner block", "1.4"),
         TRACE_GRAPH("trace-graph", "Trace graph block (digital-thread lineage visualization)", "1.4"),
+        DIVIDER("divider", "Divider block (horizontal rule / labeled separator)", "1.5"),
+        RICH_TEXT("rich-text", "Rich-text block (sanitized HTML / markdown content)", "1.5"),
+        SELECTION_INFO("selection-info", "Selection info block (bound multi-select summary)", "1.5"),
+        GERBER_VIEWER("gerber-viewer", "Gerber viewer block (PCB board + CPL inspection)", "1.5"),
         CUSTOM("custom", "Custom block", "1.0");
 
         private final String code, label, since;

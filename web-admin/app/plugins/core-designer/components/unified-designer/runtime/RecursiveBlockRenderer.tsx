@@ -285,6 +285,29 @@ function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: Runtim
       return <RuntimeRecordCommentsPreview block={block} />;
     case 'embedded-list':
       return <RuntimeEmbeddedListPreview block={block} />;
+    // E2 batch — non-family display / chart / graph / layout / form / list blocks.
+    // Config-driven representative previews; the live /p/ page renders the real,
+    // fully data-bound platform renderer (wired in ui/schema-renderer/BlockRegistry).
+    case 'chart':
+      return <RuntimeChartPreview block={block} />;
+    case 'rich-text':
+      return <RuntimeRichTextPreview block={block} />;
+    case 'divider':
+      return <RuntimeDividerPreview block={block} />;
+    case 'toolbar':
+      return <RuntimeToolbarPreview block={block} variant="toolbar" />;
+    case 'form-buttons':
+      return <RuntimeToolbarPreview block={block} variant="form-buttons" />;
+    case 'filters':
+      return <RuntimeFiltersPreview block={block} />;
+    case 'form-wizard':
+      return <RuntimeFormWizardPreview block={block} />;
+    case 'trace-graph':
+      return <RuntimeTraceGraphPreview block={block} />;
+    case 'selection-info':
+      return <RuntimeSelectionInfoPreview block={block} />;
+    case 'gerber-viewer':
+      return <RuntimeGerberViewerPreview block={block} />;
     default: {
       // Plugin-contributed custom blocks may register a runtime renderer
       // (e.g. AuraQR's scannability-qc live score). When present it fully
@@ -1612,6 +1635,497 @@ function RuntimeEmbeddedListPreview({ block }: { block: DslBlockV3 }) {
         data-testid={`runtime-embedded-list-hint-${block.id}`}
       >
         {t(DESIGNER_I18N.unified.runtime.embeddedListPreview)}
+      </div>
+    </section>
+  );
+}
+
+// ── E2 batch representative previews ────────────────────────────────────────
+// Each mirrors the prop paths its platform renderer reads (verified against the
+// renderer source). The designer canvas shows a config-driven placeholder; the
+// full, data-bound component renders on the live /p/ page.
+
+function RuntimeChartPreview({ block }: { block: DslBlockV3 }) {
+  const t = useRuntimeText();
+  // ChartBlockRenderer reads bare block.chartType / block.dataSource /
+  // block.chartConfig ({ xField, yField, height }) / block.visualization.
+  const raw = block as unknown as Record<string, unknown>;
+  const chartType = getStringProp(raw.chartType) || 'bar';
+  const dataSourceId = getStringProp(raw.dataSource);
+  const config = getRawRecord(block, 'chartConfig');
+  const xField = getStringProp(config.xField);
+  const yField = getStringProp(config.yField);
+  // A chart needs a real binding to be meaningful — a bare canvas title is not
+  // enough (getBlockLabel falls back to the blockType, so it is excluded here).
+  const configured = Boolean(dataSourceId || xField || yField);
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-chart-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {!configured ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-chart-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.chartNotConfigured)}
+        </div>
+      ) : (
+        <div
+          className="rounded-md border border-slate-200 p-3 shadow-sm"
+          data-testid={`runtime-chart-sample-${block.id}`}
+        >
+          <div className="mb-2 flex items-center gap-2">
+            <span
+              className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700"
+              data-testid={`runtime-chart-type-${block.id}`}
+            >
+              {chartType}
+            </span>
+            {dataSourceId ? (
+              <span
+                className="font-mono text-xs text-slate-500"
+                data-testid={`runtime-chart-binding-${block.id}`}
+              >
+                {dataSourceId}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex h-16 items-end gap-1.5" aria-hidden="true">
+            {[40, 70, 55, 85, 60].map((h, i) => (
+              <span
+                key={i}
+                className="flex-1 rounded-t bg-indigo-300"
+                style={{ height: `${h}%` }}
+              />
+            ))}
+          </div>
+          {xField || yField ? (
+            <div className="mt-2 text-xs text-slate-400">
+              {[xField, yField].filter(Boolean).join(' · ')}
+            </div>
+          ) : null}
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-chart-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeRichTextPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  // RichTextBlockRenderer reads bare block.content (string or LocalizedText). The
+  // live renderer sanitizes + injects HTML; the preview shows the resolved text
+  // (representative; no dangerouslySetInnerHTML in the designer canvas).
+  const raw = block as unknown as Record<string, unknown>;
+  const content = readLocalizedLabel(raw.content, locale);
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-rich-text-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {content ? (
+        <div
+          className="prose prose-sm max-w-none rounded-md border border-slate-200 p-3 text-sm text-slate-700"
+          data-testid={`runtime-rich-text-content-${block.id}`}
+        >
+          {content}
+        </div>
+      ) : (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-rich-text-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.richTextEmpty)}
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-rich-text-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeDividerPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  // DividerBlockRenderer reads bare block.title (optional label divider).
+  const raw = block as unknown as Record<string, unknown>;
+  const label = readLocalizedLabel(raw.title, locale);
+
+  return (
+    <div
+      className="py-2"
+      data-testid={`runtime-divider-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      {label ? (
+        <div className="flex items-center gap-3" role="separator">
+          <span className="h-px flex-1 bg-slate-200" />
+          <span
+            className="text-xs font-medium uppercase tracking-wider text-slate-500"
+            data-testid={`runtime-divider-label-${block.id}`}
+          >
+            {label}
+          </span>
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
+      ) : (
+        <hr className="border-t border-slate-200" role="separator" />
+      )}
+    </div>
+  );
+}
+
+function RuntimeToolbarPreview({
+  block,
+  variant,
+}: {
+  block: DslBlockV3;
+  variant: 'toolbar' | 'form-buttons';
+}) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  // Toolbar / FormButtons renderers both read bare block.buttons (ButtonConfig[]).
+  const buttons = getRawArray(block, 'buttons');
+  const testId = variant === 'toolbar' ? 'runtime-toolbar' : 'runtime-form-buttons';
+  const justify = variant === 'form-buttons' ? 'justify-end' : 'justify-start';
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`${testId}-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {buttons.length > 0 ? (
+        <div className={`flex flex-wrap gap-2 ${justify}`} data-testid={`${testId}-buttons-${block.id}`}>
+          {buttons.map((button, index) => {
+            const code = getStringProp(button.code) || String(index);
+            const label =
+              readLocalizedLabel(button.label, locale) ||
+              readLocalizedLabel(button.content, locale) ||
+              code;
+            const primary =
+              getBooleanProp(button.primary) || getStringProp(button.variant) === 'primary';
+            const danger =
+              getBooleanProp(button.danger) || getStringProp(button.variant) === 'danger';
+            const tone = danger
+              ? 'border-rose-200 bg-rose-50 text-rose-700'
+              : primary
+                ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                : 'border-slate-200 bg-white text-slate-600';
+            return (
+              <span
+                key={code}
+                data-testid={`${testId}-button-${code}`}
+                className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium ${tone}`}
+              >
+                {label}
+              </span>
+            );
+          })}
+        </div>
+      ) : (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`${testId}-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.toolbarNoButtons)}
+        </div>
+      )}
+      <div className="mt-2 text-xs text-slate-400" data-testid={`${testId}-hint-${block.id}`}>
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeFiltersPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  // FiltersBlockRenderer reads bare block.fields (filter FieldConfig[]) + onSearch /
+  // onReset handler refs (fired on the Search / Reset buttons).
+  const fields = getRawArray(block, 'fields');
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-filters-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {fields.length > 0 ? (
+        <div
+          className="rounded-md border border-slate-200 bg-slate-50 p-3"
+          data-testid={`runtime-filters-sample-${block.id}`}
+        >
+          <div className="flex flex-wrap gap-2">
+            {fields.map((field, index) => {
+              const key = getStringProp(field.field) || String(index);
+              const label = readLocalizedLabel(field.label, locale) || key;
+              return (
+                <span
+                  key={key}
+                  data-testid={`runtime-filters-field-${key}`}
+                  className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600"
+                >
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+          <div className="mt-3 flex justify-end gap-2">
+            <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-500">
+              {t(DESIGNER_I18N.unified.runtime.filtersReset)}
+            </span>
+            <span className="rounded-md bg-indigo-500 px-2.5 py-1 text-xs font-medium text-white">
+              {t(DESIGNER_I18N.unified.runtime.filtersSearch)}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-filters-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.filtersNoFields)}
+        </div>
+      )}
+      <div className="mt-2 text-xs text-slate-400" data-testid={`runtime-filters-hint-${block.id}`}>
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeFormWizardPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  // FormWizardBlockRenderer reads bare block.steps ({ key, label, description?,
+  // blocks[] }). The preview shows the step rail; child blocks render per step live.
+  const steps = getRawArray(block, 'steps');
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-form-wizard-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {steps.length > 0 ? (
+        <ol
+          className="flex flex-wrap items-center gap-2"
+          data-testid={`runtime-form-wizard-steps-${block.id}`}
+        >
+          {steps.map((step, index) => {
+            const key = getStringProp(step.key) || String(index);
+            const label = readLocalizedLabel(step.label, locale) || key;
+            return (
+              <li
+                key={key}
+                data-testid={`runtime-form-wizard-step-${key}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                  index === 0
+                    ? 'bg-indigo-500 text-white'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/30 text-[10px]">
+                  {index + 1}
+                </span>
+                {label}
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-form-wizard-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.formWizardNoSteps)}
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-form-wizard-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeTraceGraphPreview({ block }: { block: DslBlockV3 }) {
+  const t = useRuntimeText();
+  // TraceGraphBlockRenderer reads bare block.dataSource (string id) + block.mode
+  // ('consumption' | 'genealogy'). The live @xyflow canvas renders on /p/; the
+  // preview is a static node→node placeholder (avoids the zero-height canvas pitfall).
+  const raw = block as unknown as Record<string, unknown>;
+  const dataSourceId = getStringProp(raw.dataSource);
+  const mode = getStringProp(raw.mode);
+  // A trace graph is driven by its data source; a bare canvas title is not enough.
+  const configured = Boolean(dataSourceId);
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-trace-graph-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {!configured ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-trace-graph-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.traceGraphNotConfigured)}
+        </div>
+      ) : (
+        <div
+          className="rounded-md border border-slate-200 p-3"
+          data-testid={`runtime-trace-graph-sample-${block.id}`}
+        >
+          <div className="flex items-center gap-2">
+            <span className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700">
+              {t(DESIGNER_I18N.unified.runtime.traceGraphNodeA)}
+            </span>
+            <span className="text-slate-300">→</span>
+            <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+              {t(DESIGNER_I18N.unified.runtime.traceGraphNodeB)}
+            </span>
+          </div>
+          <div
+            className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400"
+            data-testid={`runtime-trace-graph-binding-${block.id}`}
+          >
+            {mode ? (
+              <span
+                className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600"
+                data-testid={`runtime-trace-graph-mode-${block.id}`}
+              >
+                {mode}
+              </span>
+            ) : null}
+            {dataSourceId ? <span className="font-mono">{dataSourceId}</span> : null}
+          </div>
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-trace-graph-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeSelectionInfoPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  // SelectionInfoBlockRenderer reads bare block.title + the bound state key
+  // (block.selection.bind || block.bind || 'selectedRows').
+  const raw = block as unknown as Record<string, unknown>;
+  const selection = getRawRecord(block, 'selection');
+  const bind =
+    getStringProp(selection.bind) || getStringProp(raw.bind) || 'selectedRows';
+  const title = readLocalizedLabel(raw.title, locale) || getBlockLabel(block);
+
+  return (
+    <section
+      className="rounded-lg border border-blue-100 bg-blue-50 p-4"
+      data-testid={`runtime-selection-info-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      {title ? (
+        <div className="text-sm font-medium text-blue-900">{title}</div>
+      ) : null}
+      <div className="mt-1 text-2xl font-semibold text-blue-900">0</div>
+      <div
+        className="mt-1 text-xs text-blue-700"
+        data-testid={`runtime-selection-info-bind-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.selectionInfoBoundTo)}
+        <span className="ml-1 font-mono">{bind}</span>
+      </div>
+      <div
+        className="mt-2 text-xs text-blue-400"
+        data-testid={`runtime-selection-info-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeGerberViewerPreview({ block }: { block: DslBlockV3 }) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
+  // GerberViewerBlockRenderer reads bare block.title|label / block.dataSource /
+  // block.inspection / block.inspectionUrl / block.lineContext /
+  // block.lineInspectionField / block.empty. The live PCB canvas fetches gerber
+  // artifacts (auth token); the preview is a representative board placeholder.
+  const raw = block as unknown as Record<string, unknown>;
+  const dataSourceId = getStringProp(raw.dataSource);
+  const inspection = getStringProp(raw.inspection) || getStringProp(raw.inspectionUrl);
+  const lineField = getStringProp(raw.lineInspectionField);
+  // Driven by a data source / inspection binding; a bare canvas title is not enough.
+  const configured = Boolean(dataSourceId || inspection);
+
+  return (
+    <section
+      className="rounded-lg border border-slate-200 bg-white p-4"
+      data-testid={`runtime-gerber-viewer-${block.id}`}
+      style={getSpanGridStyle(block)}
+    >
+      <RuntimeTitle block={block} />
+      {!configured ? (
+        <div
+          className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
+          data-testid={`runtime-gerber-viewer-empty-${block.id}`}
+        >
+          {t(DESIGNER_I18N.unified.runtime.gerberViewerNotConfigured)}
+        </div>
+      ) : (
+        <div
+          className="rounded-md border border-slate-200 p-3"
+          data-testid={`runtime-gerber-viewer-sample-${block.id}`}
+        >
+          <div className="flex h-20 items-center justify-center rounded border border-emerald-700 bg-emerald-900/90">
+            <span className="rounded bg-emerald-700 px-2 py-0.5 text-[10px] font-medium text-emerald-50">
+              PCB
+            </span>
+          </div>
+          <div
+            className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400"
+            data-testid={`runtime-gerber-viewer-binding-${block.id}`}
+          >
+            {dataSourceId ? <span className="font-mono">{dataSourceId}</span> : null}
+            {lineField ? <span className="rounded bg-slate-100 px-1.5 py-0.5">{lineField}</span> : null}
+          </div>
+        </div>
+      )}
+      <div
+        className="mt-2 text-xs text-slate-400"
+        data-testid={`runtime-gerber-viewer-hint-${block.id}`}
+      >
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
       </div>
     </section>
   );
