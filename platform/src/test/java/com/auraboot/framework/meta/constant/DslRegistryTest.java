@@ -126,8 +126,14 @@ class DslRegistryTest {
     }
 
     @Test
-    void blockType_has30Values() {
-        assertEquals(30, DslRegistry.BlockType.values().length);
+    void blockTypeCodes_includeCardGrid() {
+        assertTrue(DslRegistry.BlockType.codes().contains("card-grid"),
+                "BlockType must include card-grid (S-PAGE-BLOCK-TYPE whitelist for Template Marketplace)");
+    }
+
+    @Test
+    void blockType_has35Values() {
+        assertEquals(35, DslRegistry.BlockType.values().length);
         Set<String> codes = DslRegistry.BlockType.codes();
         assertTrue(codes.containsAll(Set.of(
                 "form", "form-section", "form-buttons", "form-wizard",
