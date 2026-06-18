@@ -190,4 +190,13 @@ export function initBlockRegistry(): void {
       'TraceGraphBlockRenderer',
     ),
   });
+
+  // Generic card grid — used by Template Marketplace gallery and any block
+  // that needs a responsive grid of cards with per-card action buttons.
+  BlockRegistry.register('card-grid', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/CardGridBlockRenderer'),
+      'CardGridBlockRenderer',
+    ),
+  });
 }
