@@ -129,24 +129,12 @@ class BpmMultiInstanceSequentialTest extends BaseIntegrationTest {
     // =====================================================================
     // SEQ-01: N elements → exactly 1 active task at a time, advances on complete
     // =====================================================================
+    // Unblocked by SmartEngine 4.0.2: the engine now caches the full ordered MI
+    // candidate list at enter time (scoped to the activity instance) and reads it back
+    // at complete time, and binds nrOfInstances to the full candidate cardinality —
+    // so sequential countersign advances through every approver. (Was @Disabled against
+    // 4.0.1 with the two root causes documented in 2026-06-18-sequential-mi-...-analysis.md.)
     @Test
-    @Disabled("""
-            Multi-element sequential MI does not yet iterate end-to-end (empirically
-            verified 2026-06-17 against SmartEngine 4.0.1: after task #1 completes,
-            0 new tasks spawn). NOTE: the engine DOES support sequential MI
-            (UserTaskBehavior.handleMultiInstance + compensateExecutionAndTask,
-            priority-driven countersign); single-element (SEQ-02) and empty (SEQ-03)
-            sequential MI both pass. The multi-element gap has TWO root causes:
-            (1) handleMultiInstance derives nrOfInstances from totalExecutionInstanceList
-                .size() (created-so-far = 1 for sequential), so completionCondition
-                'nrOfCompletedInstances == nrOfInstances' is true after task #1; and
-            (2) the next candidate cannot be resolved at complete-time because the
-                AuraBoot dispatcher reads smart:miCollection from context.getRequest()
-                — populated at start, but the complete-command request lacks it.
-            Full fix = engine caches/persists the resolved MI candidate list at enter
-            and reuses it at compensate (independent of the complete-time request),
-            plus binds nrOfInstances to the full candidate cardinality. Scoped as a
-            SmartEngine follow-up; NOT a 'cannot do sequential' limitation.""")
     @DisplayName("SEQ-01: sequential MI with 3 approvers advances one-by-one to completion")
     void sequentialMiAdvancesOneByOne() {
         ProcessInstance instance = deployAndStart("three", List.of("u1", "u2", "u3"));

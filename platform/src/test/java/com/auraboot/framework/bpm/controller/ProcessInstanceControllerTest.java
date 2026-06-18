@@ -2,6 +2,7 @@ package com.auraboot.framework.bpm.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.bpm.service.ProcessEngineService;
+import com.auraboot.framework.bpm.service.ProcessOrchestrationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -16,12 +17,16 @@ class ProcessInstanceControllerTest {
     @Mock
     private ProcessEngineService processEngineService;
 
+    @Mock
+    private ProcessOrchestrationService orchestrationService;
+
     @Test
     void terminatePassesUserIdBeforeReason() {
         ProcessInstanceController.TerminateProcessRequest request =
                 new ProcessInstanceController.TerminateProcessRequest();
         request.setReason("E2E cleanup");
-        ProcessInstanceController controller = new ProcessInstanceController(processEngineService);
+        ProcessInstanceController controller =
+                new ProcessInstanceController(processEngineService, orchestrationService);
 
         ApiResponse<Void> response = controller.terminateProcessInstance("pi-1", request, 42L);
 

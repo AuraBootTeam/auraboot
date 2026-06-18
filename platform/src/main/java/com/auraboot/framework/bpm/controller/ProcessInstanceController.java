@@ -5,6 +5,7 @@ import com.auraboot.framework.application.annotation.CurrentUserId;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.dto.ProcessInstanceStatusDTO;
 import com.auraboot.framework.bpm.service.ProcessEngineService;
+import com.auraboot.framework.bpm.service.ProcessOrchestrationService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -34,6 +35,7 @@ import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 public class ProcessInstanceController {
 
     private final ProcessEngineService processEngineService;
+    private final ProcessOrchestrationService orchestrationService;
 
     /**
      * 启动流程实例
@@ -146,6 +148,26 @@ public class ProcessInstanceController {
         processEngineService.resumeProcessInstance(processInstanceId,userId+"");
         
         return ApiResponse.success();
+    }
+
+    /**
+     * GAP-252: deliver a message to resume a waiting receiveTask.
+     */
+    @PostMapping("/{processInstanceId}/messages")
+    @RequirePermission(MetaPermission.WORKFLOW_EXECUTE)
+    @Operation(summary = "Deliver message", description = "Deliver a named message to resume a receiveTask waiting in the process instance")
+    @SuppressWarnings("unchecked")
+    public ApiResponse<Map<String, Object>> deliverMessage(
+            @PathVariable String processInstanceId,
+            @RequestBody Map<String, Object> request) {
+        String messageName = request.get("messageName") == null ? null : String.valueOf(request.get("messageName"));
+        Object varsObj = request.get("variables");
+        Map<String, Object> variables = (varsObj instanceof Map) ? (Map<String, Object>) varsObj : Map.of();
+
+        int resumed = orchestrationService.deliverMessage(processInstanceId, messageName, variables);
+        return ApiResponse.success(Map.of(
+                "messageName", messageName == null ? "" : messageName,
+                "resumedReceiveTasks", resumed));
     }
 
     /**
