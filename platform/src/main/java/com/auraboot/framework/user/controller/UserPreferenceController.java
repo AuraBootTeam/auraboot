@@ -2,6 +2,7 @@ package com.auraboot.framework.user.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.user.service.UserPreferenceService;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/user-preferences")
 @RequiredArgsConstructor
+@AuthenticatedAccess("operates only on the caller's own preferences (MetaContext userId)")
 public class UserPreferenceController {
 
     private final UserPreferenceService userPreferenceService;

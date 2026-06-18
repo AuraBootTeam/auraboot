@@ -31,7 +31,10 @@ const WRITE = process.argv.includes('--write-baseline');
 const JSON_OUT = process.argv.includes('--json');
 
 const WRITE_MAPPING = /@(Post|Put|Delete|Patch)Mapping/;
-const GUARD = /@RequirePermission/;
+// A controller is "decided" once it carries either an RBAC guard (@RequirePermission) or an
+// explicit acknowledged authenticated-only marker (@AuthenticatedAccess). Both drop it out of the
+// undecided baseline.
+const GUARD = /@RequirePermission|@AuthenticatedAccess/;
 const ADMIN_PATH = /["(]\s*"?\/api\/admin\//;
 
 function walk(dir, out = []) {

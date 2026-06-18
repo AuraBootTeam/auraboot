@@ -22,7 +22,9 @@ related: 2026-06-18-oss-deep-review-plan.md
 ### ✅ 已守护(PR #820)
 PluginPackageController / PluginTransactionalImportController(`plugin.plugin.manage`)、SubjectPermissionController 写方法(`meta.permission.update`)、NlModelingController(`meta.model.update`)、ApsSchedulingController(`meta.manufacturing.aps`)、PlatformAiController(`ai.scoring.run`)。
 
-### EXEMPT — 合法豁免,保留 baseline(无需守护)
+### EXEMPT — 合法豁免(无需 RBAC 码)
+> ✅ **已显式标记 `@AuthenticatedAccess`(PR #820)**:UserPreference / UserProfile / Session / UserNote / DeviceToken / UserSoulProfile(6 个最明确的纯用户数据 controller)——shadow 不再记它们、deny 翻转时已就绪。其余 SELF/AUTH/WEBHOOK 待 shadow 数据确认后同样标记。
+
 | Controller | 豁免类别 | 证据 |
 |---|---|---|
 | AuthController / VerifyCodeController / DeactivationController | AUTH | pre-auth 流,JWT 白名单,登录/注册/验证码/注销自身 |
