@@ -19,6 +19,7 @@ import { ResultHelper } from '~/utils/type';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { useTreeData } from '~/framework/meta/hooks/useTreeData';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { useAuth } from '~/contexts/AuthContext';
 import {
   readDataSourceRows,
@@ -290,26 +291,9 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       if (dictItems) {
         const item = dictItems.find((i) => String(i.value) === String(value));
         if (item) {
-          // 使用 tag 样式显示字典标签, 颜色从 extension.color 读取
-          const tagColor = item.extension?.color || 'blue';
-          const tagColorMap: Record<string, string> = {
-            gray: 'bg-gray-100 text-gray-800',
-            red: 'bg-red-100 text-red-800',
-            orange: 'bg-orange-100 text-orange-800',
-            yellow: 'bg-yellow-100 text-yellow-800',
-            green: 'bg-green-100 text-green-800',
-            blue: 'bg-blue-100 text-blue-800',
-            indigo: 'bg-indigo-100 text-indigo-800',
-            purple: 'bg-purple-100 text-purple-800',
-            pink: 'bg-pink-100 text-pink-800',
-            cyan: 'bg-cyan-100 text-cyan-800',
-          };
-          const tagCls = tagColorMap[tagColor] || tagColorMap.blue;
-          return (
-            <span className={`rounded-pill inline-flex px-2 py-1 text-xs font-medium ${tagCls}`}>
-              {item.label}
-            </span>
-          );
+          // §3 / §1.3: dict-coded status renders as 色点 + 文字 (semantic dot + label),
+          // not a filled pill. Color from extension.color → canonical tone.
+          return <StatusDot tone={resolveStatusTone(item.extension?.color)} label={item.label} />;
         }
       }
       // 字典未加载或未找到匹配项时显示原始值

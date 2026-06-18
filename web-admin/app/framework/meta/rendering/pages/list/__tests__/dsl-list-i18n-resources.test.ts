@@ -36,6 +36,7 @@ const REQUIRED_COMMON_KEYS = [
   'created_today',
   'modified_this_week',
   'preset_views',
+  'view_saved',
   // System audit field column headers (#2)
   'created_at',
   'updated_at',

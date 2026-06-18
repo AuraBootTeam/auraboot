@@ -16,6 +16,11 @@
   --color-accent: #2563EB;
   --color-accent-hover: #1D4ED8;
   --color-accent-weak: #EFF4FF;
+  --color-inverse: #1A1A22;
+  --color-inverse-text: #FFFFFF;
+  --color-inverse-muted: #C9CCD3;
+  --color-inverse-hover: #2C2C36;
+  --color-inverse-border: #3A3A45;
 
   --color-status-gray: #71717A;
   --color-status-gray-bg: #F1F1F3;

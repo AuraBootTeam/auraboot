@@ -155,6 +155,13 @@ export const dsTokens = {
     accent: '#2563EB',
     accentHover: '#1D4ED8',
     accentWeak: '#EFF4FF',
+    // Always-dark inverse surface for floating action bars / tooltips
+    // (§3 深色批量操作栏). Theme-independent — same in light and dark.
+    inverse: '#1A1A22',
+    inverseText: '#FFFFFF',
+    inverseMuted: '#C9CCD3',
+    inverseHover: '#2C2C36',
+    inverseBorder: '#3A3A45',
   },
   // §1.3 semantic status colors — business dicts pick from these 5 only.
   status: {
@@ -277,6 +284,11 @@ export function buildThemeCss(tokens: DsTokens = dsTokens): string {
   lines.push(`  --color-accent: ${c.accent};`);
   lines.push(`  --color-accent-hover: ${c.accentHover};`);
   lines.push(`  --color-accent-weak: ${c.accentWeak};`);
+  lines.push(`  --color-inverse: ${c.inverse};`);
+  lines.push(`  --color-inverse-text: ${c.inverseText};`);
+  lines.push(`  --color-inverse-muted: ${c.inverseMuted};`);
+  lines.push(`  --color-inverse-hover: ${c.inverseHover};`);
+  lines.push(`  --color-inverse-border: ${c.inverseBorder};`);
   lines.push('');
 
   for (const [name, pair] of Object.entries(tokens.status)) {

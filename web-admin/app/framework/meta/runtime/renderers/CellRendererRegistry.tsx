@@ -15,6 +15,7 @@
  */
 
 import React from 'react';
+import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
@@ -103,7 +104,7 @@ class CellRendererRegistry {
       return renderer(context);
     } catch (error) {
       console.error(`[CellRendererRegistry] Error rendering ${type}:`, error);
-      return <span className="text-red-500">渲染错误</span>;
+      return <span className="text-status-red">渲染错误</span>;
     }
   }
 
@@ -190,7 +191,7 @@ function renderSmartText(value: any): React.ReactNode {
         href={str}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400"
+        className="text-accent hover:text-accent-hover hover:underline dark:text-blue-400"
         onClick={(e) => e.stopPropagation()}
       >
         {str}
@@ -203,7 +204,7 @@ function renderSmartText(value: any): React.ReactNode {
     return (
       <a
         href={`mailto:${str}`}
-        className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400"
+        className="text-accent hover:text-accent-hover hover:underline dark:text-blue-400"
         onClick={(e) => e.stopPropagation()}
       >
         {str}
@@ -232,13 +233,13 @@ cellRendererRegistry.register('text', ({ value }) => {
  * Reference/Lookup renderer - shows display name from _display suffix (GAP-124)
  */
 cellRendererRegistry.register('reference', ({ value, record, column }) => {
-  if (!value) return <span className="text-gray-400">-</span>;
+  if (!value) return <span className="text-text-3">-</span>;
   // Try _display suffix for resolved display name
   const displayKey = column?.field ? `${column.field}_display` : null;
   const displayValue = displayKey && record?.[displayKey];
   if (displayValue) {
     return (
-      <span className="text-blue-600" title={String(value)}>
+      <span className="text-accent" title={String(value)}>
         {String(displayValue)}
       </span>
     );
@@ -247,21 +248,8 @@ cellRendererRegistry.register('reference', ({ value, record, column }) => {
 });
 
 /**
- * 标签渲染器 - 带背景色的标签
+ * 标签渲染器 - 色点 + 文字 (semantic dot + label; see statusTone).
  */
-// Static color class map — Tailwind JIT requires full class names at compile time
-const TAG_COLOR_CLASSES: Record<string, string> = {
-  gray: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100',
-  red: 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100',
-  orange: 'bg-orange-100 text-orange-800 dark:bg-orange-800 dark:text-orange-100',
-  yellow: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100',
-  green: 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100',
-  blue: 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100',
-  indigo: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-100',
-  purple: 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100',
-  pink: 'bg-pink-100 text-pink-800 dark:bg-pink-800 dark:text-pink-100',
-  cyan: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-800 dark:text-cyan-100',
-};
 
 cellRendererRegistry.register('tag', ({ value, column, locale, t }) => {
   if (!value) return null;
@@ -288,26 +276,20 @@ cellRendererRegistry.register('tag', ({ value, column, locale, t }) => {
     return { label: String(v), color: colorMap[v] || 'gray' };
   };
 
-  // 支持数组标签
+  // §3 / §1.3: tags render as 色点 + 文字 (semantic dot + label), not pills.
   if (Array.isArray(value)) {
     return (
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
         {value.map((v, idx) => {
           const { label, color } = resolveTag(v);
-          const cls = TAG_COLOR_CLASSES[color] || TAG_COLOR_CLASSES.gray;
-          return (
-            <span key={idx} className={`rounded-full px-2 py-1 text-xs ${cls}`}>
-              {label}
-            </span>
-          );
+          return <StatusDot key={idx} tone={resolveStatusTone(color)} label={label} />;
         })}
       </div>
     );
   }
 
   const { label, color } = resolveTag(value);
-  const cls = TAG_COLOR_CLASSES[color] || TAG_COLOR_CLASSES.gray;
-  return <span className={`rounded-full px-2 py-1 text-xs ${cls}`}>{label}</span>;
+  return <StatusDot tone={resolveStatusTone(color)} label={label} />;
 });
 
 /**
@@ -362,8 +344,8 @@ cellRendererRegistry.register('boolean', ({ value, t }) => {
         : Boolean(value);
   const displayValue = boolVal ? t?.('common.yes') || 'Yes' : t?.('common.no') || 'No';
   const colorClass = boolVal
-    ? 'text-green-600 dark:text-green-400'
-    : 'text-gray-600 dark:text-gray-400';
+    ? 'text-status-green dark:text-green-400'
+    : 'text-text-2 dark:text-gray-400';
 
   return <span className={colorClass}>{displayValue}</span>;
 });
@@ -377,23 +359,17 @@ cellRendererRegistry.register('status', ({ value, column }) => {
   const statusConfig = column.render?.statusConfig || {};
   const config = statusConfig[value] || { color: 'gray', label: value };
 
-  const colorClasses = {
-    success: 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100',
-    error: 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100',
-    warning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100',
-    info: 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100',
-    gray: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100',
-  };
-
-  const colorClass = colorClasses[config.color as keyof typeof colorClasses] || colorClasses.gray;
-
+  // §3 / §1.3: status renders as 色点 + 文字 (semantic dot + label), not a pill.
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorClass}`}
-    >
-      {config.icon && <span className="mr-1">{config.icon}</span>}
-      {config.label || String(value)}
-    </span>
+    <StatusDot
+      tone={resolveStatusTone(config.color)}
+      label={
+        <>
+          {config.icon && <span className="mr-1">{config.icon}</span>}
+          {config.label || String(value)}
+        </>
+      }
+    />
   );
 });
 
@@ -409,13 +385,13 @@ cellRendererRegistry.register('progress', ({ value, column }) => {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="h-2 flex-1 rounded-full bg-gray-200 dark:bg-gray-700">
+      <div className="bg-border h-2 flex-1 rounded-full dark:bg-gray-700">
         <div
           className={`bg-${colorConfig}-600 h-2 rounded-full transition-all`}
           style={{ width: `${percentage}%` }}
         ></div>
       </div>
-      {showText && <span className="text-sm text-gray-600 dark:text-gray-400">{percentage}%</span>}
+      {showText && <span className="text-text-2 text-sm dark:text-gray-400">{percentage}%</span>}
     </div>
   );
 });
@@ -442,7 +418,7 @@ cellRendererRegistry.register('image', ({ value, column }) => {
             style={{ width: size, height: size }}
           />
         ))}
-        {value.length > 3 && <span className="text-xs text-gray-500">+{value.length - 3}</span>}
+        {value.length > 3 && <span className="text-text-2 text-xs">+{value.length - 3}</span>}
       </div>
     );
   }
@@ -469,7 +445,7 @@ cellRendererRegistry.register('avatar', ({ value, record, column }) => {
     const initial = name ? name.charAt(0).toUpperCase() : '?';
     return (
       <div
-        className="flex items-center justify-center rounded-full bg-gray-300 font-medium text-gray-700"
+        className="bg-border-strong text-text-2 flex items-center justify-center rounded-full font-medium"
         style={{ width: size, height: size }}
       >
         {initial}
@@ -500,12 +476,20 @@ cellRendererRegistry.register('user_identity', ({ value, record, column }) => {
 
   // Fallback: try _display suffix from generic reference enrichment
   const displaySuffix = column.field ? `${column.field}_display` : null;
-  const displayName = record?.[nameField] || record?.[usernameField]
-    || (displaySuffix && record?.[displaySuffix]) || value || '-';
+  const displayName =
+    record?.[nameField] ||
+    record?.[usernameField] ||
+    (displaySuffix && record?.[displaySuffix]) ||
+    value ||
+    '-';
   const username = record?.[usernameField];
   const userId = record?.[idField] ?? value;
   const avatarUrl = record?.[avatarField];
-  const subtitle = username ? `@${String(username)}` : (displayName !== value ? '' : `ID: ${String(userId)}`);
+  const subtitle = username
+    ? `@${String(username)}`
+    : displayName !== value
+      ? ''
+      : `ID: ${String(userId)}`;
   const initial = String(displayName || '?')
     .charAt(0)
     .toUpperCase();
@@ -521,7 +505,7 @@ cellRendererRegistry.register('user_identity', ({ value, record, column }) => {
         />
       ) : (
         <div
-          className="flex flex-shrink-0 items-center justify-center rounded-full bg-gray-300 font-medium text-gray-700"
+          className="bg-border-strong text-text-2 flex flex-shrink-0 items-center justify-center rounded-full font-medium"
           style={{ width: size, height: size }}
         >
           {initial || '?'}
@@ -529,7 +513,7 @@ cellRendererRegistry.register('user_identity', ({ value, record, column }) => {
       )}
       <div className="min-w-0">
         <div className="truncate">{String(displayName)}</div>
-        <div className="truncate text-xs text-gray-500">{subtitle}</div>
+        <div className="text-text-2 truncate text-xs">{subtitle}</div>
       </div>
     </div>
   );
@@ -553,7 +537,7 @@ cellRendererRegistry.register('link', ({ value, column }) => {
       href={href}
       target={target}
       rel={target === '_blank' ? 'noopener noreferrer' : undefined}
-      className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+      className="text-accent hover:text-accent-hover underline dark:text-blue-400 dark:hover:text-blue-300"
     >
       {text}
     </a>
@@ -571,7 +555,7 @@ cellRendererRegistry.register('url', ({ value, column }) => {
       href={String(value)}
       target={target}
       rel={target === '_blank' ? 'noopener noreferrer' : undefined}
-      className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400"
+      className="text-accent hover:text-accent-hover hover:underline dark:text-blue-400"
       onClick={(e) => e.stopPropagation()}
     >
       {String(value)}
@@ -587,7 +571,7 @@ cellRendererRegistry.register('email', ({ value }) => {
   return (
     <a
       href={`mailto:${String(value)}`}
-      className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400"
+      className="text-accent hover:text-accent-hover hover:underline dark:text-blue-400"
       onClick={(e) => e.stopPropagation()}
     >
       {String(value)}
@@ -603,10 +587,10 @@ cellRendererRegistry.register('color', ({ value }) => {
   return (
     <div className="flex items-center gap-1.5">
       <div
-        className="h-4 w-4 rounded border border-gray-300 dark:border-gray-600"
+        className="border-border-strong h-4 w-4 rounded border dark:border-gray-600"
         style={{ backgroundColor: String(value) }}
       />
-      <span className="text-xs text-gray-600 dark:text-gray-400">{String(value)}</span>
+      <span className="text-text-2 text-xs dark:text-gray-400">{String(value)}</span>
     </div>
   );
 });
@@ -663,12 +647,12 @@ cellRendererRegistry.register('json', ({ value }) => {
   try {
     const jsonStr = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
     return (
-      <pre className="max-w-xs overflow-auto rounded bg-gray-100 p-2 text-xs dark:bg-gray-800">
+      <pre className="bg-hover max-w-xs overflow-auto rounded p-2 text-xs dark:bg-gray-800">
         {jsonStr}
       </pre>
     );
   } catch (error) {
-    return <span className="text-red-500">Invalid JSON</span>;
+    return <span className="text-status-red">Invalid JSON</span>;
   }
 });
 
@@ -691,7 +675,7 @@ cellRendererRegistry.register('button', ({ value, record, column }) => {
     <button
       type="button"
       onClick={handleClick}
-      className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100"
+      className="bg-accent-weak text-accent hover:bg-accent-weak rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
       data-testid={`cell-button-${column?.field}`}
     >
       {String(label)}
@@ -718,6 +702,6 @@ cellRendererRegistry.register('custom', ({ value, record, column, expressionCont
     return <span>{String(value ?? '')}</span>;
   } catch (error) {
     console.error('[CellRendererRegistry] Custom render error:', error);
-    return <span className="text-red-500">渲染错误</span>;
+    return <span className="text-status-red">渲染错误</span>;
   }
 });
