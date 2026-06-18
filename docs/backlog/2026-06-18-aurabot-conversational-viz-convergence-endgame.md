@@ -139,3 +139,23 @@ related:
 1. 先清纯死代码(§4 步 1,零风险、立刻减面),还是先做渲染契约统一(步 4,根治 shape 漂移)?
 2. 是否现在补"AuraBot 聊天 ChatBI golden"(§5 误判闭环),还是连同步 4 一起做?
 3. **落地第一步**:验 v2 能否从 meta-model 零配置派生 baseline 语义模型(决定 v1 是直接删,还是先补派生)。
+
+## 7. 执行状态 + 落地实测发现(2026-06-18)
+
+> 锁定决策后开始执行,前两片安全清完,但实测**坐实了 §4「落地前必验」那块的答案——v2 还不能零配置跑,所以"删 v1 / chat_bi 工具"被一个真特性 build 卡住,不是 cleanup。诚实记录,不假完成(§1 测试缺失=未完成)。**
+
+**已完成(本次,verified)**:
+- **Slice A**:删死代码 `ChatBIPanel.tsx` + `AIChartRenderer.tsx` + barrel 导出(零消费方,`grep` 0 引用)。
+- **Slice B(收窄为安全版)**:删 v1 **HTTP 旁路 API** `ChatBIController`(`/api/ai/chat-bi`)+ e2e `chat-bi.spec.ts`。`compileJava exit=0`。
+  - **未删** `ChatBIService` + `ChatBiLlmParser` + DTO ——**实测纠正(§15)**:① v2 对它们**零功能依赖**(`chatbi/v2/lexer` 里只有 javadoc/TODO 提及,无 import 无调用);② 但 `ChatBiIntentLiveIT`(真 DeepSeek 5/5 intent)+ `ChatBIServiceLlmTest` **直接 @Autowired 用着 `ChatBiLlmParser`**,且这是**当前唯一可用且被测的"普通 model 零配置 NL→intent"**。现在删=回归 + 丢测试覆盖,无替代。→ **改为:只删旁路 public API,intent 服务降为内部 dormant,留到 v2 零配置就位后再退役。**
+
+**被真特性 build 卡住(实测,非推断)**:
+- `ab_semantic_model` **0 行** · 全仓**无 meta-model→semantic 生成器** · v2 `ask` 必须传 `semanticModelPid`。→ **v2 当前对普通 model 不能零配置跑**。
+- 所以 **Slice C(`chat_bi` agent 工具)+ 完整删 v1** 的**前置 = 建"从 `ab_meta_model`+fields+reference+dict 自动派生 baseline 语义模型"**(metrics/dimensions 推断 + 注册 `ab_semantic_model`)。这是**真特性切片**(含设计 + 单测 + live golden),不是 cleanup,本轮不强行假完成。
+
+**剩余真工作(按依赖序)**:
+1. **【keystone 特性】meta-model→semantic 自动派生**(解锁 C 与完整删 v1)。
+2. Slice C:v2 包成 `chat_bi` agent 工具(依赖 1)。
+3. Slice D:渲染收一个 `ChartDataSource` 契约(独立于 v1/v2,但动 live dashboard 底座,须配 S5 dashboard golden 回归)。
+4. Slice E:即席→沉淀桥。
+5. 完整退役 v1 service + 把 `ChatBiIntentLiveIT` 迁到 v2 intent 路径(依赖 1)。
