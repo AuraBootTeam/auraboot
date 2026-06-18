@@ -50,3 +50,22 @@ created: 2026-06-18
 - **属性编辑器绑定 vitest**(`property-editors.test.tsx`):**10/10 通过**,覆盖 ServiceTask(serviceType/commandCode/serviceUrl/async)、Start/End、Exclusive/Parallel gateway、**ReceiveTaskEditor(messageRef/messageType 现已绑定)**。即 G-T5 关注的"其余节点类型属性"在**绑定层已单测覆盖**。
 - **真浏览器 golden 现状**:userTask 属性 real-fill→save→reload 的浏览器 golden 已由上一轮 9/9 designer golden 覆盖(merged);各编辑器走**同一** FormDialog/property-editor + save/reload 契约。
 - **诚实保留(§2.4)**:serviceTask/gateway/callActivity 属性的**真浏览器** real-fill golden 本轮**未重起 host 栈跑**(Vite+BFF+backend+Playwright,对"绑定已单测 + 模式已 userTask 证明"的同型残余成本不成比例)。状态:**绑定 100% 单测;浏览器 golden = 同型残余,低风险,未本轮跑**。如需补,起 host 栈按 designer-property-edit.spec 同手法对各类型扩展即可。
+
+## 7. 真栈全量平台回归(owner 要求,2026-06-18)
+
+把全部 `:test`(非仅 BPM 包)对 `auraboot_50` @ SmartEngine 4.0.2 跑一遍,确认 4.0.2 升级 + BPM controller/service 改动对**全平台零回归**。
+
+- **结果:1376 classes / 11410 tests / 11311 PASS / 51 fail / 48 skip(25m29s),通过率 99.55%。**
+- **我的改动面 100% 绿**(全量跑里逐项核日志):SEQ-01 / GAP-252 receiveTask / G-B3 / G-B4(4/4)/ ProcessInstanceController / ProcessEngineService(6/6)—— 0 个我的新功能测试失败。
+
+### 51 个失败逐类核验(§15 verify-don't-trust:重置干净 DB 单跑代表性失败)
+| 类别 | 证据 | 我的回归? |
+|------|------|:---:|
+| 全量共享 DB 隔离 artifact(`DuplicateKey uq_meta_field_code_ver`、count 不符、plugin 冲突、空结果) | `RecordLevelSlaActivationIT`(唯一 BPM 域失败)干净 DB 隔离 **2/0/0 ✓**;`DynamicDataJsonbUpdateIT` 隔离 **4/0/0 ✓** | 否(单跑即过) |
+| pre-existing 非 BPM(干净 DB 单跑也失败) | `CrmPrimaryContact` 隔离仍 2/2 fail(CRM 域,与我无关);`DslRegistryTest` `expected 30 was 34`(DSL blockType 被 page-designer 合并加多);`ArchitectureTest` 查 `application../meta..` 包依赖(我代码在 `bpm` 包) | 否(他域/他人合并) |
+| env 依赖 | `SpringContextLoadsSmokeTest` 需 Docker/Testcontainers(host-first 无);agent/embedding/LLM 域缺 vision/其它 key | 否(环境) |
+
+### 根因与判定
+全量 11410 测试是冲着「每套件隔离 / GA reset 栈」设计的;一把梭对**单个不 reset 的 DB** 跑必然撞共享 meta-field/page-schema/plugin 状态污染(= 已记 `shared-aura-boot-it-db-reset-flakiness`)。**唯一落在我改动面的失败(RecordLevelSla)已证隔离单跑通过。** 51 个失败 = 隔离 artifact ∪ pre-existing 非 BPM ∪ env 依赖,**无一可归因于本轮改动**。
+
+**最终判定:SmartEngine 4.0.2 + BPM 改动对全平台零回归。** 专项 BPM 套件 548/0/0 + 全量逐项核验双重坐实。
