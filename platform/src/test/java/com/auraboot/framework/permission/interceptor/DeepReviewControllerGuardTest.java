@@ -1,5 +1,7 @@
 package com.auraboot.framework.permission.interceptor;
 
+import com.auraboot.framework.agent.controller.ApsSchedulingController;
+import com.auraboot.framework.agent.controller.PlatformAiController;
 import com.auraboot.framework.agent.nlmodeling.controller.NlModelingController;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
@@ -118,6 +120,18 @@ class DeepReviewControllerGuardTest {
     @DisplayName("NlModelingController is guarded by meta.model.update")
     void nlModelingControllerGuarded() throws Exception {
         assertGuard(NlModelingController.class, "apply", MetaPermission.MODEL_MANAGE);
+    }
+
+    @Test
+    @DisplayName("ApsSchedulingController is guarded by meta.manufacturing.aps")
+    void apsSchedulingControllerGuarded() throws Exception {
+        assertGuard(ApsSchedulingController.class, "runSchedule", MetaPermission.MANUFACTURING_APS);
+    }
+
+    @Test
+    @DisplayName("PlatformAiController.scoreRecords is guarded by ai.scoring.run")
+    void platformAiScoreRecordsGuarded() throws Exception {
+        assertGuard(PlatformAiController.class, "scoreRecords", MetaPermission.AI_SCORING_RUN);
     }
 
     // ---- helpers ----

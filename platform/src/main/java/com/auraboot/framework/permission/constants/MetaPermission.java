@@ -710,6 +710,14 @@ public final class MetaPermission {
      */
     public static final String MANUFACTURING_OEE = "meta.manufacturing.oee";
 
+    /**
+     * APS (Advanced Planning &amp; Scheduling) management permission for the platform-side
+     * {@code ApsSchedulingController}. run / clear schedule are compute-heavy write operations,
+     * so they are gated by a minimal manufacturing capability in the OSS default bootstrap
+     * (module {@code meta}) rather than left open via the PermissionInterceptor fail-open default.
+     */
+    public static final String MANUFACTURING_APS = "meta.manufacturing.aps";
+
     // ==================== DECISION RUNTIME permissions ====================
     // NOTE: These are for the Decision Runtime module (ab_drt_* tables, /api/decision).
     // They are DISTINCT from the meta.decision.* permissions above which belong to the
@@ -842,6 +850,13 @@ public final class MetaPermission {
      * Knowledge retrieval permission (run retrieval queries / playground).
      */
     public static final String AI_KNOWLEDGE_RETRIEVE = "ai.knowledge.retrieve";
+
+    /**
+     * Platform AI record-scoring permission for {@code PlatformAiController#scoreRecords}.
+     * Scoring triggers LLM calls (cost) and writes scores onto arbitrary model records, so it is
+     * gated rather than left open via the PermissionInterceptor fail-open default.
+     */
+    public static final String AI_SCORING_RUN = "ai.scoring.run";
 
     // ==================== Private Constructor ====================
 

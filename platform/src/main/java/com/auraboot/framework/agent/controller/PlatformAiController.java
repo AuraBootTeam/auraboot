@@ -5,6 +5,8 @@ import com.auraboot.framework.agent.dto.PlatformAiScoreResult;
 import com.auraboot.framework.agent.service.PlatformAiScoringService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +25,7 @@ public class PlatformAiController {
      * Uses configured LLM to score records 0-100 and write back to the specified field.
      */
     @PostMapping("/api/ai/score-records")
+    @RequirePermission(MetaPermission.AI_SCORING_RUN)
     public ApiResponse<PlatformAiScoreResult> scoreRecords(@RequestBody PlatformAiScoreRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
         try {

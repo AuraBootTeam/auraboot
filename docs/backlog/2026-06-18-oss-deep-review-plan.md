@@ -65,6 +65,7 @@ owner: diqi
 | DR-20260618-D1-bootstrap-001 | P1 | `notification/service/NotificationRuleService.java` | `@PostConstruct initSchema()` 启动期 CREATE TABLE+索引+swallow catch(§4.1) | 删除整个 @PostConstruct(表已由 schema.sql:5283 拥有)+ 连带清理 dataSource 字段/import | compile + reset-init-contracts gate ✅;schema.sql:5283 已含同表 |
 | DR-20260618-D2-gate-001 | P1 | `scripts/oss-golden-stack.sh` | PR #816 引入注释含 `auraboot-enterprise` 路径 → **origin/main 当前 check-oss-boundary 失败**(近期 PR 破坏本地门禁) | 注释去掉字面路径前缀 | check-oss-boundary ✅ |
 | DR-20260618-D4-dx-001 | P2 | `plugin/validation/ExtensionValidator.java` | inline bindingRules 仅 log.warn 不进 validator result(import 仍 success:true,规则静默 drop,§6 footgun) | 加 `S-EXT-INLINE-BINDING` validation warning | ExtensionValidatorInlineBindingTest PASS(emit + no-emit) |
+| DR-20260618-D1-perm-006 | P1 | `agent/controller/ApsSchedulingController.java` `PlatformAiController.java` | 任意用户可触发全租户 APS 排程(compute)/ LLM 记录评分(成本+写任意 model 字段) | 注册新码 `meta.manufacturing.aps` / `ai.scoring.run`(default-bootstrap + MetaPermission)+ 加 `@RequirePermission` | guard test 2 例 deny/allow PASS;validate-permission-codes drift 0(321→323);TenantBootstrapServiceTest PASS |
 
 **真栈验证反哺(两处比 reviewer 静态判断更深,印证「jsonb/IDOR 必真栈 IT」红线):**
 1. jsonb 不止「缺 ::jsonb cast」——根因是自定义 @Insert 不继承 @TableField typeHandler,Map 落到默认 handler 当 hstore;只有真 insert 非 null 值才暴露。
@@ -76,7 +77,6 @@ owner: diqi
 |---|---|---|---|---|
 | DR-20260618-D1-perm-004 | P1 | R2 F-03 | PermissionInterceptor fail-open,~116 个无注解写操作 controller 需逐一分类(self-scoped vs admin) | 系统性工程,需逐 controller 判定 + 防回归 CI gate(见下),改错会锁死正常功能 |
 | DR-20260618-D1-perm-005 | P2 | R2 C-05 | `validate-permission-codes.mjs` 无「写操作 controller 缺 @RequirePermission」扫描 | 依赖 perm-004 分类完成才能定 fail 基线 |
-| DR-20260618-D1-perm-006 | P1 | R4 F-01/02 | ApsSchedulingController / PlatformAiController.scoreRecords 无 @RequirePermission | 无现成语义匹配的已注册码,需先注册新码(MetaPermission+bootstrap) |
 | DR-20260618-D1-bootstrap-002 | P1 | R1 F2/F3 | SystemTaskInitializer @PostConstruct insert(11 sys task)+ SkillBootstrapRunner per-tenant upsert(§4.1) | 需把 seed 迁到 reset-init + 真栈验证 fresh DB 仍注册任务/skill,改错破坏调度 |
 | DR-20260618-D1-i18n-001 | P1 | R1 F4/F5 + R5 P1-001..007 | 后端 user-facing 中文(TenantApplication/TenantMember Excel)+ 前端 ~7 处框架组件硬编码中文(NotificationRuleBuilder/ChartWrapper/TenantSelection/QrCodeScanner/PermissionGuard/Header) | i18n key 基建 sweep,独立任务 |
 | DR-20260618-D5-frontend-001 | P1 | R5 P1-007 | `routes/project-management/` TSX 调幽灵 model `pm_*`(实际 `tpm_*`)→ 运行时 404 死路由 + 配置优先违规 | 需评估 DSL 页(tpm_*)功能完整性能否替代 Gantt/Board,删/迁是独立决策 |

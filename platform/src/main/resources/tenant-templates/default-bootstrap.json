@@ -1315,6 +1315,26 @@
       "resourceType": "function"
     },
     {
+      "code": "meta.manufacturing.aps",
+      "name": "Manage APS scheduling",
+      "description": "Manufacturing APS — run / clear advanced planning & scheduling",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:manufacturing-aps",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "ai.scoring.run",
+      "name": "Run AI record scoring",
+      "description": "Platform AI — run LLM record scoring and write scores onto model records",
+      "type": "function",
+      "module": "ai",
+      "resource": "ai:scoring",
+      "action": "run",
+      "resourceType": "function"
+    },
+    {
       "code": "org.role.read",
       "name": "Organization role read",
       "description": "Organization role — read",
