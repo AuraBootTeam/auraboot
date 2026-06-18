@@ -2026,7 +2026,16 @@ export function FormPageContent(props: PageContentProps) {
                                       refTarget: mergeRefTarget(rawField.refTarget, meta.refTarget),
                                       referenceModelCode:
                                         rawField.referenceModelCode || meta.referenceModelCode,
-                                      required: rawField.required ?? meta.required,
+                                      // A read-only field is never user-required (it is
+                                      // auto-generated / system-managed and cannot be typed
+                                      // into), so the `*` marker must match the submit gate,
+                                      // which excludes read-only fields from required
+                                      // validation (mergeFieldValidationRules: `!rawField.readOnly`).
+                                      // Without this guard an auto-numbered read-only field
+                                      // (e.g. sc_code) shows a misleading required `*`.
+                                      required: rawField.readOnly
+                                        ? false
+                                        : (rawField.required ?? meta.required),
                                       readOnly:
                                         rawField.readOnly ??
                                         meta.extension?.readOnly ??
