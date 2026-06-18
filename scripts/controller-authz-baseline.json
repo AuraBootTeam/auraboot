@@ -15,8 +15,6 @@
   "platform/src/main/java/com/auraboot/framework/bpm/controller/BpmAiController.java",
   "platform/src/main/java/com/auraboot/framework/bpm/controller/BpmNotifyController.java",
   "platform/src/main/java/com/auraboot/framework/bpm/controller/CallbackController.java",
-  "platform/src/main/java/com/auraboot/framework/bpm/controller/OrchestrationController.java",
-  "platform/src/main/java/com/auraboot/framework/bpm/controller/SagaController.java",
   "platform/src/main/java/com/auraboot/framework/bpm/controller/TriggerController.java",
   "platform/src/main/java/com/auraboot/framework/connector/airflow/AirflowWebhookController.java",
   "platform/src/main/java/com/auraboot/framework/conversation/controller/ConversationTurnController.java",

@@ -2,6 +2,8 @@ package com.auraboot.framework.permission.interceptor;
 
 import com.auraboot.framework.agent.controller.ApsSchedulingController;
 import com.auraboot.framework.agent.controller.PlatformAiController;
+import com.auraboot.framework.bpm.controller.OrchestrationController;
+import com.auraboot.framework.bpm.controller.SagaController;
 import com.auraboot.framework.agent.nlmodeling.controller.NlModelingController;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.organization.controller.OrgController;
@@ -160,6 +162,18 @@ class DeepReviewControllerGuardTest {
     @DisplayName("ViewShareController.shareView is guarded by dashboard.manage")
     void viewShareGuarded() throws Exception {
         assertGuard(ViewShareController.class, "shareView", "dashboard.manage");
+    }
+
+    @Test
+    @DisplayName("OrchestrationController.startExecution is guarded by bpm.process.execute")
+    void orchestrationGuarded() throws Exception {
+        assertGuard(OrchestrationController.class, "startExecution", "bpm.process.execute");
+    }
+
+    @Test
+    @DisplayName("SagaController.retrySaga is guarded by bpm.process.execute")
+    void sagaRetryGuarded() throws Exception {
+        assertGuard(SagaController.class, "retrySaga", "bpm.process.execute");
     }
 
     // ---- helpers ----

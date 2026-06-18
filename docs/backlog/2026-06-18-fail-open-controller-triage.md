@@ -49,7 +49,7 @@ PluginPackageController / PluginTransactionalImportController(`plugin.plugin.man
 | NotificationRuleController | 规则 CRUD | `notification_rule_manage` | operator-held(注意是下划线码) |
 | NotificationTemplateController | 模板 CRUD | needs-new-code `notification.template.manage` | role-decision(operator?) |
 | CallbackController | BPM 回调推进节点 | `bpm.process.execute` | operator-held;**确认是否系统回调**(若系统-to-系统则改签名校验而非用户权限) |
-| OrchestrationController / SagaController | 流程执行 暂停/取消/重试 | `bpm.process.execute`(operator-held)或 `bpm.process.admin`(operator 无) | role-decision:operator 能否管编排 |
+| ✅ OrchestrationController / SagaController | 流程执行 start/暂停/恢复/取消/重试/skip | `bpm.process.execute` | **已守护(PR #820 batch3)**:写方法方法级(operator-held,viewer 仅 bpm.task.read 受限),GET status/timeline/summary 保留 |
 | TriggerController | 触发器 CRUD + fire | CRUD→role-decision;fire/webhook→`bpm.process.execute` 或签名校验 | webhook 仅当配 secret 才校验,无 secret 不算豁免 |
 | BpmAiController / BpmNotifyController | AI 建议/生成 + CC/催办 | `bpm.task.manage`(operator-held) | BpmNotify 另有 `senderUserId` 取自 body 可伪造的**独立 bug** |
 | ReportScheduleController | 调度 CRUD + test-send | `sys.scheduler.update`(operator 无)或 `dashboard.manage`(operator 有) | role-decision |

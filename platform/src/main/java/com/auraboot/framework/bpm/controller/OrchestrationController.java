@@ -4,6 +4,7 @@ import com.auraboot.framework.bpm.dto.*;
 import com.auraboot.framework.bpm.service.ExecutionLogService;
 import com.auraboot.framework.bpm.service.ProcessOrchestrationService;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class OrchestrationController {
     // ==================== Execution Management ====================
 
     @PostMapping("/executions")
+    @RequirePermission("bpm.process.execute")
     @Operation(summary = "Start execution", description = "Start a new orchestrated process execution")
     public ApiResponse<ExecutionResult> startExecution(@RequestBody StartExecutionRequest request) {
         log.info("Starting orchestrated execution: processKey={}", request.processKey());
@@ -51,6 +53,7 @@ public class OrchestrationController {
     }
 
     @PostMapping("/executions/{id}/pause")
+    @RequirePermission("bpm.process.execute")
     @Operation(summary = "Pause execution", description = "Pause execution at the current node")
     public ApiResponse<Void> pauseExecution(@PathVariable String id, @RequestBody(required = false) ReasonRequest request) {
         String reason = request != null ? request.reason() : null;
@@ -59,6 +62,7 @@ public class OrchestrationController {
     }
 
     @PostMapping("/executions/{id}/resume")
+    @RequirePermission("bpm.process.execute")
     @Operation(summary = "Resume execution", description = "Resume a paused execution")
     public ApiResponse<Void> resumeExecution(@PathVariable String id) {
         orchestrationService.resumeExecution(id);
@@ -66,6 +70,7 @@ public class OrchestrationController {
     }
 
     @PostMapping("/executions/{id}/cancel")
+    @RequirePermission("bpm.process.execute")
     @Operation(summary = "Cancel execution", description = "Cancel an execution")
     public ApiResponse<Void> cancelExecution(@PathVariable String id, @RequestBody(required = false) ReasonRequest request) {
         String reason = request != null ? request.reason() : null;
@@ -76,6 +81,7 @@ public class OrchestrationController {
     // ==================== Node-Level Control ====================
 
     @PostMapping("/executions/{id}/retry/{nodeId}")
+    @RequirePermission("bpm.process.execute")
     @Operation(summary = "Retry from node", description = "Retry execution from a specific node")
     public ApiResponse<Void> retryFromNode(
             @PathVariable String id,
@@ -86,6 +92,7 @@ public class OrchestrationController {
     }
 
     @PostMapping("/executions/{id}/skip/{nodeId}")
+    @RequirePermission("bpm.process.execute")
     @Operation(summary = "Skip node", description = "Skip a failed node and continue execution")
     public ApiResponse<Void> skipNode(
             @PathVariable String id,
