@@ -2976,7 +2976,11 @@ function ListPageContentInner(props: PageContentProps) {
               data-testid="view-saved-hint"
             >
               <span className="bg-status-green rounded-pill h-1.5 w-1.5" aria-hidden="true" />
-              {t('common.view_saved') || 'Saved to current view'}
+              {/* usePageRuntime's t() returns the key itself when missing, so a
+                  plain `|| fallback` never fires — guard against the raw key leaking. */}
+              {((s) => (s && s !== 'common.view_saved' ? s : 'Saved to current view'))(
+                t('common.view_saved'),
+              )}
             </div>
           )}
           {/* Page title, view selector, and action buttons */}
