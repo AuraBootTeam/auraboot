@@ -67,10 +67,11 @@ PluginPackageController / PluginTransactionalImportController(`plugin.plugin.man
 | InboundEmailController | 入站邮件 webhook | needs-new-code 或加 webhook secret | 白名单 `/api/crm/inbound/**` 不覆盖 `/inbound-email/` |
 | DataSyncController / DslCompilerController / FormulaController / PivotQueryController / QueryBuilderController | 订阅/编译/公式/透视/查询 | role-decision(多为 query;查询端点优先 ABAC 而非粗粒度 controller 守护) | **禁用 operator/viewer 不持有的码守护 query 端点**(会废看板) |
 
-### 顺手发现的独立 bug(非 fail-open,单独修)
-- `BpmNotifyController` cc/urge 的 `senderUserId` 取自 request body → 可伪造冒充他人(应取 MetaContext)。
-- `SagaController.listSagas` / `AsyncTaskController.listTasks` 无 tenant/userId 过滤 → 跨租户/跨用户枚举。
-- `EmailAccountController.requireAccount(id)` 只查存在性不校验 tenant 归属 → 跨租户操作他人邮箱账户。
+### 顺手发现的独立 bug(非 fail-open;**主对话已 verify-before-flag 核验**)
+- ✅ **已修(PR #820)**:`BpmNotifyController` cc/urge 的 `senderUserId` 取自 request body → 可伪造冒充他人;`getReceived` 的 userId 同理可读他人通知。已改取 `MetaContext.getCurrentUserId()`,配 `BpmNotifyControllerSenderIdentityTest`(伪造值被忽略)。
+- ❌ **误报**:`SagaController.listSagas` QueryWrapper「无 tenant 过滤」—— `ab_saga` **不在** `MybatisPlusConfig.ignoreTable`,走 `TenantLineInnerInterceptor` 自动加 `tenant_id`,不跨租户(review-baseline 第 1 类)。
+- ❌ **很可能误报**:`EmailAccountController` 跨租户 —— `ab_email_account` 同样被 tenant 拦截器覆盖,`selectById` 自动加 `tenant_id`;`requireAccount` 缺显式 tenant 检查是冗余非漏洞(除非该表被 ignoreTable,实测不在)。
+- 🟡 **待确认 intent**:`AsyncTaskController.listTasks` —— `ab_async_task` **确在** ignoreTable(line 143,线程池无 MetaContext),故 list **不自动加 tenant/userId**,须手动 scope。是真潜在跨租户/跨用户 leak,但取决于「async task 列表是 admin 全量还是 user 自有」的产品意图 → 留 owner 定。
 
 ## 落地建议
 1. 按上表逐 controller 走方法级守护(写方法),码按「目标角色 × 已持码」选;needs-new-code 的批量注册(MetaPermission + default-bootstrap）。
