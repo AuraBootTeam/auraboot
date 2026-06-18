@@ -10,7 +10,7 @@
   "description": "DSL-driven page management for ab_page_schema system table",
   "author": "AuraBoot Team",
   "minPlatformVersion": "1.0.0",
-  "dependencies": [],
+  "dependencies": ["com.auraboot.core-meta"],
   "resourceDirs": {
     "dicts": "config/dicts.json",
     "fields": "config/fields.json",
