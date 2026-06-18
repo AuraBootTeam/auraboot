@@ -8,7 +8,7 @@ created: 2026-06-17
 
 > testing-gate §7 验收报告。本轨道的最终测试声明以本报告为准(非聊天总结/通过计数)。逐切片更新。
 
-`allowed_claim`: **S3 整链闭环 tested(真栈)—— S3-1 命令链(2/2)+ S3-2 BPMN/SLA/升级(2/2)+ S3-3 approve→CAPA 全链组装(1/1),共 5 tests 0 fail。S1-* did-not-run / planned。S3 完成,S1 未做。**
+`allowed_claim`: **S3 整链闭环 tested(真栈 5 tests)+ S1-3 邮件抽取智能 tested(真 DeepSeek 1 test,5/5 100% 字段准确 + E6 不瞎编)。共 6 tests 0 fail。S1-1/S1-2 deterministic 刀 did-not-run(机制与 S3-1/2 同构,ROI 次)。**
 
 ## SOT
 - 轨道 SOT:`docs/backlog/2026-06-17-s1s3-business-loop-golden-gap-and-plan.md`(取证纠正 + 切片计划 + findings F1/F2/F3)。
@@ -53,9 +53,19 @@ created: 2026-06-17
   - 异步(@Async 派发)用 **Awaitility** 轮询(≤30s)断言 CAPA 物化,非假设同步。
   - **关键正向发现**:approval → on_bpm_event automation → create_capa 异步链全通(eventBus + bridge + DB 查 + @Async 执行 + 跨线程 MetaContext),无产品 bug。
 - product bug:**无**。S3 整链(S3-1 命令 + S3-2 BPMN/SLA + S3-3 approve→CAPA)闭环。
-### S1-1 — crm:create_complaint 真栈命令 golden + F2 drift 记录  ⬜ planned
-### S1-2 — 投诉 create → automation 自动指派 + log  ⬜ planned
-### S1-3 — 邮件 → 投诉字段抽取 live IT(真 DeepSeek)  ⬜ planned
+### S1-3 — 邮件 → 投诉字段抽取 live IT(真 DeepSeek)  ✅ tested
+- 测试:`platform/src/test/java/com/auraboot/framework/agent/CsComplaintEmailExtractionLiveIT.java`(`@Tag("agent-eval-live")`,DEEPSEEK_API_KEY gated;`:testAgent`)
+- 命令:`cd platform && DEEPSEEK_API_KEY=sk-… ./gradlew :testAgent --tests '*CsComplaintEmailExtractionLiveIT*'`
+- 真凭据(JUnit XML):`tests="1" skipped="0" failures="0" errors="0"`;BUILD SUCCESSFUL in 42s。
+- 真智能报告(真 DeepSeek deepseek-chat,single sample):
+  - 5 封真实多句客户投诉邮件(中/英混,带噪声)→ register_complaint native tool-use:**called 5/5 · requiredComplete 5/5 · meanFieldAccuracy 100%(15/15)· 0 幻觉字段**。
+  - severity 从自然语言正确推断:产线停工→high / 严重质量事故→critical / 优先级不高→low / 中等→medium / high priority→high。account+contact 全对,description 全填。
+  - **E6 企业信任门(模糊邮件「设备好像有点问题」)**:模型**不调用、不瞎编 account/severity** = safe。
+  - faithful path:`LlmProvider#chat` + `tools[].inputSchema` + 读 `tool_use.input`(同 runtime ChatTurnRuntime)。lenient 聚合地板线(called≥80% / reqComplete≥60% / fieldAcc≥60% / 0 幻觉 / E6 不瞎编),打印报告即真信号。
+- 安全:跑后 `sed` redact `$DEEPSEEK_API_KEY`(build + 任务输出),残留=0 已核。
+- product bug:**无**。闭设计文档 S1「从邮件抽对 account/contact/description/severity」🟡。
+
+> S1-1(complaint create golden + F2 drift 取证)、S1-2(投诉 create → 自动指派 automation)未做(deterministic,机制与 S3-1/S3-2 同构,ROI 次于本 live 智能刀)。
 
 ## Final Evidence Pack
 
@@ -64,7 +74,7 @@ acceptance_report: docs/retro/2026-06-17-s1s3-business-loop-golden-testing-gate-
 claim_level: golden-candidate (S3-1 closed; track in progress)
 current_sot: docs/backlog/2026-06-17-s1s3-business-loop-golden-gap-and-plan.md; docs/backlog/2026-06-17-platform-capability-map-and-test-scenario-design.md
 business_scope: S1 CS complaint loop; S3 quality auto-CAPA. Non-goals: S6 browser golden, dashboard build, real-plugin import materialization.
-integration_tests: QualityAutoCapaChainGoldenIT (2) + QualityCapaBpmnSlaChainGoldenIT (2) + QualityCapaFullAssemblyGoldenIT (1), all real-stack, 5 tests 0 fail
+integration_tests: QualityAutoCapaChainGoldenIT (2) + QualityCapaBpmnSlaChainGoldenIT (2) + QualityCapaFullAssemblyGoldenIT (1) real-stack + CsComplaintEmailExtractionLiveIT (1, real DeepSeek), 6 tests 0 fail
 integration_coverage: coverage_not_measured (targeted IT slice, not a module coverage run)
 e2e_specs: n/a (backend business-chain golden, not browser E2E)
 feature_action_matrix: track gap-and-plan §3 (6 slices; S3-1 closed)
@@ -74,7 +84,7 @@ artifact_evidence: n/a
 permission_negative: n/a (self-contained synthetic models, no command permissions; permission gates covered by separate gate slice)
 visual_feedback: n/a
 skip_fixme_threshold_retry_audit: clean — no skip/fixme/threshold/retry; no waitForTimeout; deterministic synchronous entry (no @Async polling)
-did_not_run: S1-1, S1-2, S1-3; real-plugin import-materialization reachability (host-first runtime follow-up)
+did_not_run: S1-1 (complaint create golden + F2 drift evidence), S1-2 (complaint auto-assign automation); real-plugin import-materialization reachability (host-first runtime follow-up)
 remaining_blockers: none for S3-1; track continues
 allowed_claim: "S3-1 auto-CAPA chain golden: tested (real-stack 2/2). Remaining S1/S3 slices did not run."
 ```

@@ -57,7 +57,7 @@ related:
 | **S3-3** | 全链组装:defect → automation → BPMN approve(task complete → on_bpm_event)→ create_capa | T4+T6 | ✅ tested(`QualityCapaFullAssemblyGoldenIT` 1/1;**实测确认 task_completed→EventBus→bridge→on_bpm_event automation(DB 查持久化规则)→create_capa 异步全通**,无产品 bug)|
 | **S1-1** | `crm:create_complaint` 真栈命令 golden(用真 CRM 模型形状)+ 记录 F2 drift | T4 | ⬜ 计划 |
 | **S1-2** | 投诉 create → automation 自动指派 + `ab_automation_log` | T6 | ⬜ 计划 |
-| **S1-3** | 邮件 → 投诉字段抽取 live IT(真 DeepSeek,沿用 `AgentFormFillLiveIT` 模板) | T3 | ⬜ 计划 |
+| **S1-3** | 邮件 → 投诉字段抽取 live IT(真 DeepSeek) | T3 | ✅ tested(`CsComplaintEmailExtractionLiveIT` 1/1;真 DeepSeek:5/5 邮件 called+required complete,**字段准确 100%**〔含 severity 自然语言推断 high/critical/low/medium〕,0 幻觉字段;E6 模糊邮件不瞎编 account/severity = safe。key 跑后 redact 零残留)|
 
 > SLA 在 S1/S3 都受 F3 约束:只在实体进 BPMN 节点时验证激活(S3-2),裸 record SLA 列为 finding。
 
