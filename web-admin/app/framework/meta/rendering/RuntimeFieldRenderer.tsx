@@ -118,12 +118,20 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   const isReadOnly =
     isReadOnlyStatic || (readOnlyExpr ? evaluateCondition(readOnlyExpr, context) : false);
 
-  // Required: fieldMeta.required takes priority over validation rules
+  // Required: fieldMeta.required takes priority over validation rules.
+  // A read-only field is never user-required — it is system-managed / auto-generated
+  // (e.g. an auto-numbered code) and the user cannot type into it. Suppressing the
+  // required marker keeps the display consistent with the submit gate, which already
+  // excludes read-only fields from required validation (FormPageContent:
+  // `!rawField.readOnly && (rawField.required ?? meta.required)`). Without this guard
+  // an auto-generated read-only field shows a misleading `*` / "此字段为必填项".
   const isRequired =
-    fieldMeta?.required !== undefined
-      ? fieldMeta.required
-      : Boolean((field as any).required) ||
-        field.validation?.some((rule) => rule.type === 'required');
+    isReadOnly
+      ? false
+      : fieldMeta?.required !== undefined
+        ? fieldMeta.required
+        : Boolean((field as any).required) ||
+          field.validation?.some((rule) => rule.type === 'required');
 
   // 构建组件 props
   // 如果有 dictCode 且未指定组件或组件为 SmartInput，自动使用 SmartSelect
