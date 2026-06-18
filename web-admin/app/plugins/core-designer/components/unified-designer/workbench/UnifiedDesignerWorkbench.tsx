@@ -39,7 +39,11 @@ import {
   getDevicePreviewPreset,
 } from '../preview/devicePreviewPresets';
 import { getPageTemplate, getPageTemplates } from '../templates/pageTemplateRegistry';
-import { getKindPolicy, isBlockTypeAllowedForKind } from '../registry/kindPolicy';
+import {
+  canSwitchToKind,
+  getKindPolicy,
+  isBlockTypeAllowedForKind,
+} from '../registry/kindPolicy';
 import {
   createBlockTemplate,
   createModelFieldBlock,
@@ -245,6 +249,27 @@ export function UnifiedDesignerWorkbench({
         historyIndex: nextIndex,
       };
     });
+  };
+
+  // C4 — switch the page kind. Per the owner design decision (2026-06-18), the
+  // switch is BLOCKED whenever a descendant block is incompatible with the target
+  // kind (no silent data loss); the toolbar disables such targets. On a valid
+  // switch we change document.kind and swap the single root container's blockType
+  // to the target kind's root (e.g. detail → form), keeping all children. The
+  // whole switch is one undoable step.
+  const handleSwitchKind = (targetKind: PageSchemaV3['kind']) => {
+    if (targetKind === document.kind) return;
+    if (!canSwitchToKind(document.blocks, targetKind)) return;
+    const rootBlockType = getKindPolicy(targetKind).rootBlockType;
+    updateDocument((current) => ({
+      ...current,
+      kind: targetKind,
+      blocks: current.blocks.map((block, index) =>
+        index === 0 && rootBlockType ? { ...block, blockType: rootBlockType } : block,
+      ),
+    }));
+    setSelectedBlockId(null);
+    setMultiSelectedIds(new Set());
   };
 
   // D6 — apply a scenario template: replace the page's blocks (and title) with a
@@ -974,6 +999,7 @@ export function UnifiedDesignerWorkbench({
         publishStatus={publishStatus}
         publishError={publishError}
         onModeChange={setMode}
+        onSwitchKind={handleSwitchKind}
         onUndo={handleUndo}
         onRedo={handleRedo}
         onSave={handleSave}

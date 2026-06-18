@@ -77,7 +77,8 @@ describe('UnifiedDesignerWorkbench kind collapse', () => {
   it('renders the kind label instead of "Composite canvas" on a form page', () => {
     render(<UnifiedDesignerWorkbench initialDocument={formDocument} />);
     expect(screen.queryByText('Composite canvas')).not.toBeInTheDocument();
-    // Default locale is zh-CN
-    expect(screen.getByText('表单')).toBeInTheDocument();
+    // Default locale is zh-CN. Scope to the canvas band — the C4 kind-switch
+    // selector also renders a "表单" option, so a bare getByText is ambiguous.
+    expect(screen.getByTestId('canvas-root-drop-zone')).toHaveTextContent('表单');
   });
 });
