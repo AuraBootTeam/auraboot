@@ -268,9 +268,18 @@ dependencies {
     // Micrometer Prometheus registry for metrics export
     implementation 'io.micrometer:micrometer-registry-prometheus'
 
-    // OpenTelemetry Micrometer bridge (for trace-metric correlation)
+    // OpenTelemetry Micrometer bridge (for trace-metric correlation).
+    // Do NOT pin individual otel modules to a newer version: Spring Boot's
+    // io.spring.dependency-management aligns the whole otel stack to one managed
+    // version (1.49.0 on Boot 3.5.x), and a manual newer pin on exporter-otlp
+    // alone skews it against the transitively-managed sdk-common — crashing
+    // startup with NoClassDefFoundError ...StandardComponentId$ExporterType
+    // (a class that only exists in the newer exporter). Leave it unversioned so
+    // the whole stack stays consistent. To actually move to a newer otel, bump
+    // the entire stack via a forced resolution that beats the Spring BOM and
+    // re-verify the micrometer bridge — not a single-module pin.
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
-    implementation 'io.opentelemetry:opentelemetry-exporter-otlp:1.63.0'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
     implementation "io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64"
 
     // SmartEngine - Workflow engine
