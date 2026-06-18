@@ -31,6 +31,20 @@ describe('resolveStatusTone', () => {
     expect(resolveStatusTone('SUCCESS')).toBe('green');
     expect(resolveStatusTone('In_Progress')).toBe('blue');
   });
+  it('maps hex color values to the nearest tone by hue (dicts often store hex)', () => {
+    expect(resolveStatusTone('#10b981')).toBe('green'); // emerald
+    expect(resolveStatusTone('#22c55e')).toBe('green');
+    expect(resolveStatusTone('#ef4444')).toBe('red');
+    expect(resolveStatusTone('#dc2626')).toBe('red');
+    expect(resolveStatusTone('#f59e0b')).toBe('amber'); // amber
+    expect(resolveStatusTone('#eab308')).toBe('amber'); // yellow
+    expect(resolveStatusTone('#3b82f6')).toBe('blue');
+    expect(resolveStatusTone('#2563eb')).toBe('blue');
+    expect(resolveStatusTone('#9ca3af')).toBe('gray'); // low-saturation → gray
+    expect(resolveStatusTone('#6b7280')).toBe('gray');
+    expect(resolveStatusTone('10b981')).toBe('green'); // no leading #
+    expect(resolveStatusTone('#0f0')).toBe('green'); // 3-digit
+  });
   it('exposes a semantic dot bg class per tone', () => {
     expect(STATUS_TONE_DOT.green).toBe('bg-status-green');
     expect(STATUS_TONE_DOT.red).toBe('bg-status-red');
