@@ -621,3 +621,28 @@ and the live page confirms each dot renders that tone.
 
 **Verdict: PASS** — the dict-coded status/rating dots render in the CORRECT semantic
 colors (5 distinct, no longer all gray). Screenshot: `/tmp/color-list.png`.
+
+## Mockup-vs-live parity (2026-06-18, no new backend — existing golden screenshots vs mockup render)
+
+Compared the live list/form/detail (prior golden screenshots) against the reference mockup
+`auraboot-enterprise/docs/mockups/ux-design-system/index.html` (rendered statically).
+
+**Core design language MATCHES** across all three views: status 色点+文字, view toolbar
+(sort/fields/filter/row-height), preset views, tabs, compact rows, localized headers, 2-col
+form grid, required-red + field-level error, typed controls (stepper/¥/slider/rating/toggle/
+upload), detail breadcrumb+title+toolbar+tabs+2-col description.
+
+**Real bug found + FIXED**: §3-B saved-to-view hint leaked the raw i18n key
+`common.view_saved` on the live list (visible chip top-right). Root cause: `usePageRuntime`'s
+`t()` returns the KEY itself when missing, so `t(key) || fallback` never fires. Guarded the
+fallback (ListPageContent.tsx) so the English fallback shows instead of the raw key.
+
+**Divergences = demo-page DSL config / illustrative (not renderer defects)**:
+- Mockup detail has a right sticky 关键信息 panel + status banner; the crm_account demo page
+  DSL doesn't declare those blocks (renderer supports them — config-dependent).
+- Mockup uses avatar chips for user references + red conditional-format dates; demo pages/seed
+  don't exercise these.
+- Form section headers: mockup has an accent left-bar (`▍基本信息`); live is plain bold — minor
+  visual treatment difference.
+- ⚠️ FOLLOW-UP: detail 负责人 shows a raw ULID (`01KVCV...`) instead of a resolved user name —
+  reference-display resolution gap to investigate (possible raw-id leak per §2.2).
