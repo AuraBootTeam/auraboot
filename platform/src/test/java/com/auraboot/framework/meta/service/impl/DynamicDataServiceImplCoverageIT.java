@@ -5,9 +5,12 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.constant.DataType;
 import com.auraboot.framework.meta.constant.Status;
+import com.auraboot.framework.meta.dto.ActionExecutionResult;
 import com.auraboot.framework.meta.dto.DataExportRequest;
+import com.auraboot.framework.meta.dto.DataImportRequest;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.ExportResult;
+import com.auraboot.framework.meta.dto.ImportResult;
 import com.auraboot.framework.meta.dto.FieldOption;
 import com.auraboot.framework.meta.dto.FieldOptionRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
@@ -39,17 +42,22 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -99,6 +107,9 @@ class DynamicDataServiceImplCoverageIT {
     private Tenant testTenant;
     private boolean modelInitialized = false;
     private boolean seeded = false;
+
+    @TempDir
+    Path importTmp;
 
     @BeforeEach
     void ensureModelExists() {
@@ -284,6 +295,106 @@ class DynamicDataServiceImplCoverageIT {
         csv.setFormat(DataExportRequest.ExportFormat.CSV);
         ExportResult csvResult = dynamicDataService.exportData(modelCode, csv);
         assertNotNull(csvResult);
+    }
+
+    // ==================== importData ====================
+
+    @Test
+    @DisplayName("importData: CSV/JSON happy paths, field-mapping, file-not-found and per-row error branches")
+    void importDataBranches() throws Exception {
+        // NOTE: importData does not auto-generate the primary key (unlike create()), and the
+        // physical PK column is `pid VARCHAR(32) NOT NULL UNIQUE`. So a valid import (migration /
+        // re-import) must carry an explicit pid; these happy cases supply one.
+        // CSV happy path — header row are field codes; default skipFirstRow=true skips the header
+        Path csv = importTmp.resolve("ok.csv");
+        Files.writeString(csv, "pid,name,status\n"
+                + UniqueIdGenerator.generate() + ",imp-csv-1,active\n"
+                + UniqueIdGenerator.generate() + ",imp-csv-2,inactive\n");
+        ImportResult csvRes = dynamicDataService.importData(modelCode,
+                DataImportRequest.builder().filePath(csv.toString())
+                        .format(DataImportRequest.ImportFormat.CSV).build());
+        assertNotNull(csvRes);
+        assertTrue(csvRes.getSuccess(), "clean CSV import should succeed: " + csvRes.getSummary());
+        assertEquals(2, csvRes.getSuccessCount().intValue());
+
+        // JSON happy path — an array of objects
+        Path json = importTmp.resolve("ok.json");
+        Files.writeString(json, "[{\"pid\":\"" + UniqueIdGenerator.generate()
+                + "\",\"name\":\"imp-json-1\",\"status\":\"done\"}]");
+        ImportResult jsonRes = dynamicDataService.importData(modelCode,
+                DataImportRequest.builder().filePath(json.toString())
+                        .format(DataImportRequest.ImportFormat.JSON).build());
+        assertNotNull(jsonRes);
+        assertTrue(jsonRes.getSuccess(), "clean JSON import should succeed: " + jsonRes.getSummary());
+        assertEquals(1, jsonRes.getSuccessCount().intValue());
+
+        // Field mapping — source headers differ from field codes and are remapped before insert
+        Path mapped = importTmp.resolve("mapped.csv");
+        Files.writeString(mapped, "PID,Full Name,State\n"
+                + UniqueIdGenerator.generate() + ",imp-map-1,active\n");
+        ImportResult mapRes = dynamicDataService.importData(modelCode,
+                DataImportRequest.builder().filePath(mapped.toString())
+                        .format(DataImportRequest.ImportFormat.CSV)
+                        .fieldMapping(Map.of("PID", "pid", "Full Name", "name", "State", "status"))
+                        .build());
+        assertNotNull(mapRes);
+        assertTrue(mapRes.getSuccess(), "mapped CSV import should succeed: " + mapRes.getSummary());
+        assertEquals(1, mapRes.getSuccessCount().intValue());
+
+        // File not found — returns a failed result rather than throwing
+        ImportResult missingRes = dynamicDataService.importData(modelCode,
+                DataImportRequest.builder().filePath(importTmp.resolve("does-not-exist.csv").toString())
+                        .format(DataImportRequest.ImportFormat.CSV).build());
+        assertNotNull(missingRes);
+        assertFalse(missingRes.getSuccess());
+
+        // Per-row error — an unknown column makes toColumnData reject the row (failedCount path)
+        Path bad = importTmp.resolve("bad.csv");
+        Files.writeString(bad, "name,status,bogus_unknown_col\nimp-bad-1,active,oops\n");
+        ImportResult badRes = dynamicDataService.importData(modelCode,
+                DataImportRequest.builder().filePath(bad.toString())
+                        .format(DataImportRequest.ImportFormat.CSV).build());
+        assertNotNull(badRes);
+        assertFalse(badRes.getSuccess(), "rows with an unknown column should fail");
+        assertTrue(badRes.getFailedCount() >= 1);
+    }
+
+    // ==================== executeCustomAction ====================
+
+    @Test
+    @DisplayName("executeCustomAction: count, unsupported-action and truncate (with re-seed restore)")
+    void executeCustomActionBranches() {
+        // count — read-only aggregate over the model's own physical table
+        ActionExecutionResult count = dynamicDataService.executeCustomAction(modelCode, "count", Map.of());
+        assertNotNull(count);
+        assertTrue(count.getSuccess(), "count action should succeed");
+        assertNotNull(count.getResultData().get("count"));
+
+        // unsupported action — graceful failure result, not an exception
+        ActionExecutionResult unknown = dynamicDataService.executeCustomAction(modelCode, "no-such-action", Map.of());
+        assertNotNull(unknown);
+        assertFalse(unknown.getSuccess());
+
+        // truncate — deletes all tenant rows; re-seed afterward so shared state stays test-order independent
+        ActionExecutionResult truncate = dynamicDataService.executeCustomAction(modelCode, "truncate", Map.of());
+        assertNotNull(truncate);
+        assertTrue(truncate.getSuccess(), "truncate action should succeed");
+        assertNotNull(truncate.getResultData().get("deletedCount"));
+        seedData(9);
+    }
+
+    // ==================== relation methods (no relations defined -> reject) ====================
+
+    @Test
+    @DisplayName("relation methods reject when the model declares no relations")
+    void relationMethodsRejectWithoutRelations() {
+        String pid = seedOne("rel", "active");
+        assertThrows(MetaServiceException.class,
+                () -> dynamicDataService.getRelationData(modelCode, pid, "missing", Map.of()));
+        assertThrows(MetaServiceException.class,
+                () -> dynamicDataService.createRelations(modelCode, pid, "missing", List.of("x")));
+        assertThrows(MetaServiceException.class,
+                () -> dynamicDataService.removeRelations(modelCode, pid, "missing", List.of("x")));
     }
 
     // ==================== harness ====================
