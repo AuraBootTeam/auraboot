@@ -71,6 +71,105 @@ function useModelOptions(): { options: ModelOption[]; loaded: boolean } {
   return { options, loaded };
 }
 
+// D2 — rich property controls. The inspector turns a free-text box into a real
+// dropdown for fields that bind a registry code: dict / named-query / command /
+// permission. Each source is a global list endpoint; the response is unwrapped
+// robustly (array | data.records | data.list | data.content) and mapped to
+// { value: code, label: name|displayName|description }. Same philosophy as the
+// model selector: any fetch failure / missing read permission degrades to the
+// manual-entry fallback, so it NEVER blocks authoring. Endpoints verified against
+// the OSS controllers (CommandController /api/meta/commands listAll,
+// DictController /api/meta/dict, named-queries, /api/permissions) 2026-06-18.
+const REMOTE_SOURCES: Record<
+  string,
+  { url: string; params: Record<string, string | number> }
+> = {
+  'dict-select': { url: '/api/meta/dict', params: { page: 1, size: 500 } },
+  namedQuery: { url: '/api/meta/named-queries', params: { status: 'published', pageSize: 200 } },
+  'command-select': { url: '/api/meta/commands', params: {} },
+  // The permission registry is exposed as a tree (module → resource → action);
+  // unwrapRemoteRecords flattens the `children` so every code is selectable.
+  'permission-select': { url: '/api/permissions/tree', params: {} },
+};
+
+/** Remote-select control types that resolve their options from REMOTE_SOURCES. */
+const REMOTE_SELECT_TYPES = new Set(Object.keys(REMOTE_SOURCES));
+
+interface RemoteRecord {
+  code?: string;
+  permissionCode?: string;
+  queryCode?: string;
+  name?: string;
+  displayName?: string;
+  description?: string;
+  children?: RemoteRecord[];
+}
+
+function unwrapRemoteRecords(data: unknown): RemoteRecord[] {
+  let list: RemoteRecord[] = [];
+  if (Array.isArray(data)) {
+    list = data as RemoteRecord[];
+  } else if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+    const inner = obj.records ?? obj.list ?? obj.content ?? obj.data;
+    if (Array.isArray(inner)) list = inner as RemoteRecord[];
+  }
+  // Flatten any nested `children` (e.g. the permission tree) so every leaf code
+  // surfaces; flat lists (no children) pass through unchanged.
+  const flat: RemoteRecord[] = [];
+  const walk = (records: RemoteRecord[]): void => {
+    for (const record of records) {
+      flat.push(record);
+      if (Array.isArray(record.children)) walk(record.children);
+    }
+  };
+  walk(list);
+  return flat;
+}
+
+function mapRemoteOption(record: RemoteRecord): ModelOption | null {
+  const value = record.code ?? record.permissionCode ?? record.queryCode;
+  if (!value) return null;
+  const name = record.displayName ?? record.name ?? record.description;
+  return { value, label: name ? `${name} (${value})` : value };
+}
+
+/**
+ * Fetch each needed remote-select source once and return a map keyed by the
+ * control type. Only the sources actually present on the current block's fields
+ * are fetched (no wasted calls when no remote field is shown).
+ */
+function useRemoteOptions(neededTypes: string[]): Record<string, ModelOption[]> {
+  const [map, setMap] = useState<Record<string, ModelOption[]>>({});
+  const key = Array.from(new Set(neededTypes)).sort().join(',');
+
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    for (const type of key.split(',')) {
+      const source = REMOTE_SOURCES[type];
+      if (!source) continue;
+      void get<unknown>(source.url, source.params)
+        .then((result) => {
+          if (cancelled) return;
+          const options = unwrapRemoteRecords((result as { data?: unknown })?.data)
+            .map(mapRemoteOption)
+            .filter((option): option is ModelOption => option !== null);
+          setMap((prev) => ({ ...prev, [type]: options }));
+        })
+        .catch(() => {
+          // Graceful: leave this source unset → the field renders its manual
+          // fallback (the current value is always preserved).
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+
+  return map;
+}
+
 interface SchemaInspectorProps {
   block: DslBlockV3 | null;
   modelFields?: ModelFieldDefinition[];
@@ -89,6 +188,10 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
   const { locale } = useI18n();
   const fields = getInspectorFields(block);
   const { options: modelOptions } = useModelOptions();
+  // D2 — fetch only the remote-select sources this block's fields actually need.
+  const remoteOptions = useRemoteOptions(
+    fields.filter((field) => REMOTE_SELECT_TYPES.has(field.type)).map((field) => field.type),
+  );
   const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic');
 
   useEffect(() => {
@@ -155,6 +258,7 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
                 }))}
                 modelFields={modelFields}
                 modelOptions={modelOptions}
+                remoteOptions={remoteOptions[field.type] ?? []}
                 locale={locale}
                 onChange={onChange}
               />
@@ -282,6 +386,7 @@ function InspectorField({
   options,
   modelFields,
   modelOptions,
+  remoteOptions,
   locale,
   onChange,
 }: {
@@ -293,6 +398,7 @@ function InspectorField({
   options?: { label: string; value: string }[];
   modelFields: ModelFieldDefinition[];
   modelOptions: ModelOption[];
+  remoteOptions: ModelOption[];
   locale: string;
   onChange: (path: string, value: unknown) => void;
 }) {
@@ -361,6 +467,49 @@ function InspectorField({
             </option>
           ))}
         </select>
+      </label>
+    );
+  }
+
+  if (REMOTE_SELECT_TYPES.has(type)) {
+    // D2 — dict / named-query / command / permission selector. Same shape as the
+    // model selector: a dropdown over the live registry plus a manual-entry
+    // fallback (so a code not yet in the list — draft / cross-plugin / failed
+    // fetch — is never silently dropped).
+    const currentValue = typeof value === 'string' ? value : '';
+    const hasCurrent = currentValue && remoteOptions.some((option) => option.value === currentValue);
+    const selectOptions =
+      hasCurrent || !currentValue
+        ? remoteOptions
+        : [{ label: currentValue, value: currentValue }, ...remoteOptions];
+    const manualId = `${id}-manual`;
+
+    return (
+      <label className="block">
+        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {label}
+        </span>
+        <select
+          data-testid={id}
+          value={currentValue}
+          onChange={(event) => onChange(path, event.target.value)}
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        >
+          <option value="">{resolveDesignerText(DESIGNER_I18N.unified.unset, locale)}</option>
+          {selectOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <input
+          data-testid={manualId}
+          type="text"
+          value={currentValue}
+          placeholder={resolveDesignerText(DESIGNER_I18N.unified.unset, locale)}
+          onChange={(event) => onChange(path, event.target.value)}
+          className="mt-1.5 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 font-mono text-xs text-slate-500 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
       </label>
     );
   }

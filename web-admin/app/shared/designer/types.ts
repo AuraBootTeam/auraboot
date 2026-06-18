@@ -37,6 +37,7 @@ export type PropertyType =
   | 'icon'
   | 'array'
   | 'dict-select'
+  | 'permission-select'
   | 'semantic-model-select';
 
 /**
