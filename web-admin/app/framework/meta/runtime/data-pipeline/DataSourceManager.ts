@@ -542,6 +542,16 @@ export class DataSourceManager {
         // on config.adaptor, not block.blockType, so the migration needs an
         // adaptor → blockType bridge first).
         // Design: docs/plans/2026-04/2026-04-25-blockrenderer-runtime-registry-design.md
+        // A custom REST endpoint may return ResultData whose `data` is a plain array (not a
+        // paginated { records } object); treat that array as the rows so table columns bind.
+        if (Array.isArray(data)) {
+          return {
+            records: data,
+            total: data.length,
+            current: 1,
+            pageSize: data.length,
+          };
+        }
         if (data && typeof data === 'object') {
           return {
             records: data.records || data.list || [],
