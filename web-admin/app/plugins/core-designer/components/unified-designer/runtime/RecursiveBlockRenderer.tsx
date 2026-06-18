@@ -2,6 +2,7 @@ import React from 'react';
 import { usePermissions } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
+import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
 import type { DslBlockV3, PageSchemaV3 } from '../types';
 import { getCustomBlockRenderer } from './customBlockRendererRegistry';
 import {
@@ -4510,8 +4511,23 @@ const WIDGET_BODY_TYPES = new Set([
   'markdown',
 ]);
 
+/**
+ * Whether a widgetType owns its own visual body (chart / table / markdown /
+ * progress) rather than the single-value number-card box. The 7 explicit body
+ * types keep their hand-written representative previews; E1 extends this to ANY
+ * SharedChartFactory chart type (radar / gauge / funnel / heatmap / …) so the
+ * designer preview matches the live WidgetRenderer (which already supports all
+ * types via getChartComponent). number-card is excluded — it IS the value box.
+ */
+function isChartWidgetType(widgetType: string): boolean {
+  const normalized = normalizeChartType(widgetType);
+  if (normalized === 'number-card') return false;
+  return Boolean(getChartComponent(normalized));
+}
+
 function isWidgetBodyType(widgetType: string | undefined): boolean {
-  return typeof widgetType === 'string' && WIDGET_BODY_TYPES.has(widgetType);
+  if (typeof widgetType !== 'string') return false;
+  return WIDGET_BODY_TYPES.has(widgetType) || isChartWidgetType(widgetType);
 }
 
 function RuntimeWidgetBody({ block }: { block: DslBlockV3 }) {
@@ -4536,7 +4552,45 @@ function RuntimeWidgetBody({ block }: { block: DslBlockV3 }) {
   if (block.widgetType === 'markdown') {
     return <RuntimeMarkdownWidget block={block} />;
   }
+  // E1 — any other SharedChartFactory chart type (radar / scatter / gauge /
+  // funnel / heatmap / treemap / gantt / pareto / combo / …) gets a representative
+  // generic chart preview instead of falling back to the number-card box. The live
+  // page renders the real chart (WidgetRenderer → SharedChartFactory).
+  if (block.widgetType && isChartWidgetType(block.widgetType)) {
+    return <RuntimeGenericChartPreview block={block} />;
+  }
   return null;
+}
+
+function RuntimeGenericChartPreview({ block }: { block: DslBlockV3 }) {
+  const t = useRuntimeText();
+  const chartType = normalizeChartType(block.widgetType ?? '');
+  const dataSourceId = getStringProp(block.dataSource?.model) || getStringProp(block.dataSource?.metric);
+  return (
+    <div
+      className="flex min-h-0 flex-1 flex-col rounded-md border border-slate-200 bg-white p-3"
+      data-testid={`runtime-widget-chart-${block.id}`}
+      data-chart-type={chartType}
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+          {chartType}
+        </span>
+        {dataSourceId ? (
+          <span className="font-mono text-xs text-slate-500">{dataSourceId}</span>
+        ) : null}
+      </div>
+      {/* Representative chart silhouette (the live page renders the real chart). */}
+      <div className="flex h-16 items-end gap-1.5" aria-hidden="true">
+        {[45, 70, 55, 85, 60, 75].map((h, i) => (
+          <span key={i} className="flex-1 rounded-t bg-indigo-300" style={{ height: `${h}%` }} />
+        ))}
+      </div>
+      <div className="mt-2 text-xs text-slate-400">
+        {t(DESIGNER_I18N.unified.runtime.workbenchPreviewHint)}
+      </div>
+    </div>
+  );
 }
 
 function RuntimeBarChart({ block }: { block: DslBlockV3 }) {
