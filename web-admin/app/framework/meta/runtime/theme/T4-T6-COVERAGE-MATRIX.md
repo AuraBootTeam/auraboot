@@ -47,10 +47,27 @@
 | 状态横幅 + state_transition (按状态显隐, 命令后刷新)                                                                                          | ✅                    | golden-confirmed                                                                               |
 | 关联子列表 (API / resolveVia / FK)                                                                                                            | ✅                    | exists                                                                                         |
 
-## This pass — build order (TDD + real-page golden each)
+## Outcome (2026-06-18)
 
-1. **§3 status/tag → 色点+文字** + token-ify CellRendererRegistry (highest-value, clear spec deviation).
-2. **§3 「已保存到当前视图」hint** (missing UI).
-3. **§3 batch bar token-ify** + confirm dark per spec.
-4. **§3 conditional-format** apply-in-cell verify/complete.
-5. **§4/§5 conformance golden** of reference-picker / first-error-scroll / sub-table 合计 / timeline; fix concrete gaps + token-ify non-gated renderer palette found.
+The genuine interaction-upgrade gaps were all in **§3**; §4/§5 were already conformant.
+
+**Built this pass (TDD + golden):**
+
+1. **§3-A status/tag → 色点+文字** — `resolveStatusTone` + `StatusDot` (7 tests); `status`/`tag`
+   cell renderers re-skinned from pills to semantic dot+text; CellRendererRegistry fully
+   token-clean (0 light palette / 0 hex). Static golden: 进行中蓝/已完成绿/已驳回红/待审核橙/草稿灰.
+2. **§3-B 「已保存到当前视图」hint** — `useTransientFlag` (2 tests) + quiet token toast wired
+   into `ensureViewAndUpdateConfig`; i18n `common.view_saved` (zh-CN/en-US + contract test).
+3. **§3-C dark batch bar** — added a reusable **inverse** token set (always-dark surfaces);
+   `BulkActionToolbar` re-skinned (bg-inverse / accent badge / status-red / inverse-border).
+   Static golden confirms the dark bar.
+
+**Verified already-conformant (no change):**
+
+- §3-D conditional format — `getRowStyle → evaluateConditionalFormats` applied to ListTable rows + evaluator unit test + authoring panel.
+- §4 first-error scroll — `ValidationSummary` `scrollIntoView({block:'center'})`.
+- §4 reference picker — `RelationField` debounced (300ms) remote `fetchOptions(search)`.
+- §5 sub-table totals — `SubTableViewer` reactive SUM/AVG/COUNT/MIN/MAX footer.
+- §4/§5 renderer palette — these live in gated dirs (`app/ui`, `app/framework/meta/rendering`), already T3-swept.
+
+**Golden:** §3-A/§3-C static (control-gallery); consolidated real-stack golden (status dots in a real list + sort→saved-hint + select→dark batch bar) — see RENDERER-GOLDEN-2026-06-17.md append.
