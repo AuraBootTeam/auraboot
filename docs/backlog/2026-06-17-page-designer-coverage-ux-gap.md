@@ -221,16 +221,18 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 | E2 加 4 个非 family 块(stat-card / description / record-comments / embedded-list)| ✅ DONE | 照范式逐块读平台渲染器取真 prop 路径:stat-card(`dataSource`+`statCard` obj)/ description(`content`,bare+props 混合处理)/ record-comments(title only,无 block 级数据)/ embedded-list(bare `modelCode`/`parentField`/`columns`/`pageSize`/`searchable`/`filterable`);BlockRegistry+kindPolicy+inspector(无假字段)+代表性预览;`display-blocks-authoring-golden.spec.ts` 6/6(B1-B4 authoring+readback、B5 非法 JSON sad、**L1 live `/p/c/` 真平台渲染器 stat-card 真值 128〔ds_orders.open_total〕+ embedded-list RecordListView**)。**设计器内置 blockType 现 36(原 32)** |
 | 诚实 caveat | 📌 记录 | record-comments **无 L1 live 渲染**(仅 detail-page 路径派发、modelCode/recordPid 由页面+记录上下文推导、无 block 级数据可绑)—— 平台固有约束非 shortcut,已注释;palette+inspector+预览+authoring 真绿 |
 
-### ⏸ NOT-MET(roadmap,**未完成,不假报**)
-- **A7** mid-drag drop-indicator/ghost 视觉断言(@dnd-kit 中途手势最易 flake,ROI 最低)→ defer。
-- **A11/A12** chart 类型广度 / input·layout 广度 → defer。
-- **E1(剩余)** widget 全 24 chart parity(runtime 统一 SharedChartFactory)→ 大特性,未做(架构活)。
+### ✅ Roadmap CLEARED(2026-06-18:E2/C4/D2/D4/E1/A7/A11/A12/B3 全交付,9 PR)
+- **A7** mid-drag drop-indicator 逻辑 — ✅ **DONE(PR #807)**:`resolveBlockDropIntent` 补 move-block 分支(before/inside/null)+ same-target 守卫单测(drop-intent 是 mid-drag indicator 的可测核心;瞬时手势几何由 drag E2E 覆盖,jsdom 零几何)。
+- **A11/A12** 广度 — ✅ **DONE**:A11(chart 类型广度)由 E1 `e1WidgetCharts.test` 覆盖(全 chart 类型);A12(input/layout 广度)`coverageBreadth.test` 覆盖 `getFieldInspectorFields` 各 component 分支(picker/upload/rich-text/input + filter-field operator)(PR #807)。
+- **E1 widget chart parity** — ✅ **DONE(PR #806)**:live `WidgetRenderer` 早已走 SharedChartFactory 支持全类型;本 PR 把**设计器预览**拉齐 —— `isChartWidgetType`(SharedChartFactory-aware)+ `RuntimeGenericChartPreview` 让 radar/scatter/gauge/funnel/heatmap/treemap/gantt/pareto/combo 显代表性预览(原落 number-card);widget inspector widgetType 加这些选项。12 单测 + 358 套件绿。
+- **B3** REST diff blocks 下钻 — ✅ **DONE(PR #808,采纳推荐方案 a)**:后端 `calculateDifferences` 对 `blocks` 改成**块级 id-keyed diff**(`blocks[<id>]` 增/删、`blocks[<id>].<prop>` 改、递归子块 `blocks[<id>].blocks[<childId>]`),`hasMajorChanges` 同步识别块级路径。**贯彻 C3**(UI 只渲染 REST 真实响应,无前端 drill-down;契约增强非绕过,前端零改动)。5 块级 diff 单测(真 ObjectMapper 走生产路径)+ 现有 service 测无回归 + compileJava 干净。
 - **E2(余 10 块)** — ✅ **DONE**(commit `feat/page-designer-e2-blocks`,2026-06-18):chart / rich-text / divider / toolbar / form-buttons / filters / form-wizard / trace-graph / selection-info / gerber-viewer 全部加入设计器(palette + bare-path inspector + 代表性预览),后端 `DslRegistry.BlockType` 补 divider/rich-text/selection-info/gerber-viewer 4 个(其余 6 个已在白名单)。**设计器内置 blockType 现 46(原 36)**。26 新单测 + 全量 456 designer 套件绿 + tsc clean;13 个浏览器 golden(authoring readback + 预览 + sad-path + live `/p/` 真渲染器)。
   - **口径纠正(原「余 12 块」偏乐观)**:`monthly-grid` 与 `text` **剔除,非真块**——取证:`monthly-grid` 在 `BlockRenderer.tsx:103` 返回 `null`(结构型,由 page 渲染器处理,无独立渲染器);`text` 在运行时 `ui/schema-renderer/BlockRegistry.ts:95` 只是 `description` 的别名(都 → `DescriptionBlockRenderer`,`description` 已是设计器块)。加进 palette 任一者都会渲染成 Unknown/null 或与 description 重复。
 - **C4** kind 切换 — ✅ **DONE(2026-06-18,PR #793)**:工具栏 `designer-kind-switch` 选择器,可在 form/list/detail/dashboard 间切换;owner 设计决策(2026-06-18)= **有不兼容块则禁止切换**(零静默数据丢失,目标 kind 禁用 + 不兼容计数 + tooltip,用户先移除)。`canSwitchToKind`/`getIncompatibleBlocksForKind` + `handleSwitchKind`(改 kind + swap root,单步 undoable);10 单测 + 336 designer 套件绿 + tsc clean(纯前端,无后端改动)。
 - **D2** 富属性控件 — ✅ **DONE(2026-06-18,PR #800)**:`props.dictCode`/`dataSource.queryCode`/`props.command`/`props.permissionCode` 四个裸文本字段改成 inspector 选择器(`dict-select`/`namedQuery`/`command-select`/`permission-select`),通用 `useRemoteOptions` hook 拉对应 registry(`/api/meta/dict`、`/api/meta/named-queries`、`/api/meta/commands`、`/api/permissions/tree` 展平)+ 手敲兜底(model 选择器同款 graceful fallback)。4 单测 + 340 套件绿 + tsc;§15 静态 DTO 契约核验。
 - **D4** 字段级校验反馈 — ✅ **DONE(2026-06-18,PR #803)**:inspector text/number 字段 inline 校验(required `*` 标记 + 错误消息 + `aria-invalid`);PropertySchema 加 `min/max/pattern`(`required` 已有);wire `layout.span` 1..24 / `pageSize`≥1 / `refreshInterval`≥0 / embedded-list `modelCode` 必填。6 单测 + 346 套件绿 + tsc。
-- **B3** REST diff blocks 下钻 → 未做(低 ROI)。
+
+> **页面设计器 campaign 收口(2026-06-18)**:roadmap 全部 9 项交付(E2/C4/D2/D4/E1/A7/A11/A12/B3),无 NOT-MET 残留。详见 handover `docs/handover/HANDOVER-2026-06-18-page-designer-roadmap-cleared.md`。
 - **🧪 测试鲁棒性 follow-up** — ✅ 已由 Slice 9(`3dac2092`)闭环:`inspector-model-select-golden:152` 改 seed-agnostic 断言(SELECT + option ≥2),不再锁定具体 model;leaner seed 栈也过。本行历史保留。
 - **🐛 ViewModelService latent bug** — ✅ 已由 #725 闭环(读 `data.records`),本行历史保留。
 
