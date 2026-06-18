@@ -229,7 +229,8 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
   - **口径纠正(原「余 12 块」偏乐观)**:`monthly-grid` 与 `text` **剔除,非真块**——取证:`monthly-grid` 在 `BlockRenderer.tsx:103` 返回 `null`(结构型,由 page 渲染器处理,无独立渲染器);`text` 在运行时 `ui/schema-renderer/BlockRegistry.ts:95` 只是 `description` 的别名(都 → `DescriptionBlockRenderer`,`description` 已是设计器块)。加进 palette 任一者都会渲染成 Unknown/null 或与 description 重复。
 - **C4** kind 切换 — ✅ **DONE(2026-06-18,PR #793)**:工具栏 `designer-kind-switch` 选择器,可在 form/list/detail/dashboard 间切换;owner 设计决策(2026-06-18)= **有不兼容块则禁止切换**(零静默数据丢失,目标 kind 禁用 + 不兼容计数 + tooltip,用户先移除)。`canSwitchToKind`/`getIncompatibleBlocksForKind` + `handleSwitchKind`(改 kind + swap root,单步 undoable);10 单测 + 336 designer 套件绿 + tsc clean(纯前端,无后端改动)。
 - **D2** 富属性控件 — ✅ **DONE(2026-06-18,PR #800)**:`props.dictCode`/`dataSource.queryCode`/`props.command`/`props.permissionCode` 四个裸文本字段改成 inspector 选择器(`dict-select`/`namedQuery`/`command-select`/`permission-select`),通用 `useRemoteOptions` hook 拉对应 registry(`/api/meta/dict`、`/api/meta/named-queries`、`/api/meta/commands`、`/api/permissions/tree` 展平)+ 手敲兜底(model 选择器同款 graceful fallback)。4 单测 + 340 套件绿 + tsc;§15 静态 DTO 契约核验。
-- **D4** 字段级校验反馈 / **B3** REST diff blocks 下钻 → 未做(低 ROI)。
+- **D4** 字段级校验反馈 — ✅ **DONE(2026-06-18,PR #803)**:inspector text/number 字段 inline 校验(required `*` 标记 + 错误消息 + `aria-invalid`);PropertySchema 加 `min/max/pattern`(`required` 已有);wire `layout.span` 1..24 / `pageSize`≥1 / `refreshInterval`≥0 / embedded-list `modelCode` 必填。6 单测 + 346 套件绿 + tsc。
+- **B3** REST diff blocks 下钻 → 未做(低 ROI)。
 - **🧪 测试鲁棒性 follow-up** — ✅ 已由 Slice 9(`3dac2092`)闭环:`inspector-model-select-golden:152` 改 seed-agnostic 断言(SELECT + option ≥2),不再锁定具体 model;leaner seed 栈也过。本行历史保留。
 - **🐛 ViewModelService latent bug** — ✅ 已由 #725 闭环(读 `data.records`),本行历史保留。
 
