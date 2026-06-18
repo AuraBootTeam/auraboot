@@ -6,7 +6,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -82,6 +84,100 @@ class NlModelingManifestPostProcessingTest {
         assertTrue(m.has("dicts"), "dicts channel must be present in the manifest");
         assertEquals(1, m.get("dicts").size(), "dicts must be carried through");
         assertEquals("status_dict", m.get("dicts").get(0).get("code").asText());
+    }
+
+    @Test
+    void buildManifest_synthesizesDynamicCrudPermissions_forMenuPermissionRefs() throws Exception {
+        // The system prompt tells the model to gate a child menu on dynamic.<model>.read but to
+        // emit no explicit permissions (they are not platform-auto-created on model publish). The
+        // manifest must synthesize the dynamic CRUD permissions so the menu->permission referential
+        // check in PluginImportService.validateManifest passes at apply() time. (Live-surfaced gap:
+        // "Menu 'NL_EQUIP_INSPECTION_LIST' references missing permission: dynamic.equip_inspection.read".)
+        NlModelingResponse.Resources res = NlModelingResponse.Resources.builder()
+                .models(List.of(mutable("code", "equip_inspection", "displayName:zh-CN", "设备点检")))
+                .menus(List.of(mutable("code", "nl_ei_list", "path", "/p/equip_inspection",
+                        "permissionCode", "dynamic.equip_inspection.read")))
+                .build();
+
+        JsonNode m = mapper.readTree(service.buildPluginManifestJson("x", res));
+
+        Set<String> permCodes = new HashSet<>();
+        m.get("permissions").forEach(p -> permCodes.add(p.get("code").asText()));
+        assertTrue(permCodes.contains("dynamic.equip_inspection.read"),
+                "the menu-referenced dynamic read permission must be synthesized into the manifest");
+        assertTrue(permCodes.containsAll(Set.of(
+                        "dynamic.equip_inspection.read", "dynamic.equip_inspection.create",
+                        "dynamic.equip_inspection.update", "dynamic.equip_inspection.delete")),
+                "the full dynamic CRUD permission set must be synthesized for the model");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void normalizePageToV4_coercesUnknownBlockType_toKindDefault() {
+        // Live-surfaced gap: the LLM confuses page kind with blockType, emitting a detail page with a
+        // block typed "detail" — not a registered DslRegistry blockType — which the import gate rejects
+        // ("[S-PAGE-BLOCK-TYPE] ... unknown blockType: 'detail'"). The normalizer must coerce it to a
+        // valid kind-appropriate block ("description") so the page passes the gate.
+        Map<String, Object> page = mutable(
+                "kind", "detail",
+                "blocks", List.of(mutable("id", "b1", "blockType", "detail",
+                        "fields", List.of(mutable("field", "name")))));
+
+        Map<String, Object> out = NlModelingService.normalizePageToV4(page);
+
+        List<Map<String, Object>> blocks = (List<Map<String, Object>>) out.get("blocks");
+        assertEquals("description", blocks.get(0).get("blockType"),
+                "an unknown 'detail' blockType on a detail page must be coerced to 'description'");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void normalizePageToV4_coercesUnknownBlockType_byPageKind() {
+        // list → table, form → form-section (kind-appropriate defaults for unknown block types).
+        Map<String, Object> listPage = NlModelingService.normalizePageToV4(mutable(
+                "kind", "list", "blocks", List.of(mutable("id", "x", "blockType", "grid"))));
+        assertEquals("table", ((List<Map<String, Object>>) listPage.get("blocks")).get(0).get("blockType"));
+
+        Map<String, Object> formPage = NlModelingService.normalizePageToV4(mutable(
+                "kind", "form", "blocks", List.of(mutable("id", "y", "blockType", "fieldset"))));
+        assertEquals("form-section", ((List<Map<String, Object>>) formPage.get("blocks")).get(0).get("blockType"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void normalizePageToV4_leavesValidBlockType_untouched() {
+        // A registered blockType (table, description, ...) must not be rewritten.
+        Map<String, Object> page = NlModelingService.normalizePageToV4(mutable(
+                "kind", "detail", "blocks", List.of(
+                        mutable("id", "d", "blockType", "description"),
+                        mutable("id", "t", "blockType", "activity-timeline"))));
+        List<Map<String, Object>> blocks = (List<Map<String, Object>>) page.get("blocks");
+        assertEquals("description", blocks.get(0).get("blockType"));
+        assertEquals("activity-timeline", blocks.get(1).get("blockType"),
+                "a valid blockType must be left untouched");
+    }
+
+    @Test
+    void buildManifest_preservesExplicitPermissions_andDoesNotDuplicate() throws Exception {
+        // A custom permission the model emitted is preserved; a dynamic permission already present
+        // is not duplicated by the synthesizer.
+        NlModelingResponse.Resources res = NlModelingResponse.Resources.builder()
+                .models(List.of(mutable("code", "book")))
+                .permissions(List.of(
+                        mutable("code", "book.export", "name:zh-CN", "导出图书"),
+                        mutable("code", "dynamic.book.read")))
+                .build();
+
+        JsonNode m = mapper.readTree(service.buildPluginManifestJson("x", res));
+
+        List<String> codes = new ArrayList<>();
+        m.get("permissions").forEach(p -> codes.add(p.get("code").asText()));
+        assertTrue(codes.contains("book.export"), "an explicit custom permission must be preserved");
+        assertEquals(1, codes.stream().filter("dynamic.book.read"::equals).count(),
+                "an already-present dynamic permission must not be duplicated");
+        assertTrue(codes.containsAll(Set.of(
+                        "dynamic.book.create", "dynamic.book.update", "dynamic.book.delete")),
+                "missing dynamic CRUD permissions are still synthesized alongside the existing one");
     }
 
     @Test
