@@ -142,6 +142,34 @@ class ToolLoopServiceSafetyTest {
     }
 
     @Test
+    @DisplayName("forbidden runtime-authorization effect denies the tool — command never executes")
+    void runtimeAuthorizationDenyBlocksToolExecution() {
+        // RuntimeAuth gate (8): the runtime authorizer rejects this call's effect
+        // class. The default impl grants all, so a denying authorizer is wired in
+        // to prove ToolLoopService ENFORCES the decision — the tool must not run.
+        when(runtimeAuthorizationService.authorizeIncremental(any()))
+                .thenReturn(RuntimeAuthorizationService.IncrementalAuthorization.reject(
+                        "forbidden_effect:NET_EXTERNAL", "runtime-policy"));
+
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("cmd:crm:contact_lead")
+                .description("Advance a lead")
+                .toolType("dsl_command")
+                .sourceCode("crm:contact_lead")
+                .riskLevel("L1")
+                .build();
+
+        String result = service.executeToolCall(1L, "run-authz-deny", "task-authz-deny", "agent",
+                tool.getName(), Map.of("targetRecordId", "lead-1"), List.of(tool), null);
+
+        assertThat(result)
+                .contains("Runtime authorization denied for tool 'cmd:crm:contact_lead'")
+                .contains("forbidden_effect:NET_EXTERNAL");
+        // Enforcement: the denied effect blocks dispatch — the command never runs.
+        verifyNoInteractions(commandExecutor);
+    }
+
+    @Test
     @DisplayName("R3 alias in BIF risk escalates colon command tool to approval")
     void r3AliasEscalatesColonCommandToApproval() {
         BifContext.setCurrentBif(BusinessIntentFrame.builder()
