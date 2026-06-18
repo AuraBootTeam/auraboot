@@ -313,7 +313,12 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
 
   return (
     <div className="mb-3 flex justify-start">
-      <div className="w-full max-w-[95%] overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm dark:border-indigo-700 dark:bg-gray-800">
+      <div
+        data-testid="chatbi-result-card"
+        data-chart-type={chartType}
+        data-row-count={records.length}
+        className="w-full max-w-[95%] overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm dark:border-indigo-700 dark:bg-gray-800"
+      >
         {/* Header */}
         <div className="flex items-center gap-2 border-b border-indigo-100 bg-indigo-50 px-3 py-2 dark:border-indigo-800 dark:bg-indigo-900/20">
           <svg
@@ -345,7 +350,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
         )}
 
         {/* Chart or Table */}
-        <div className="bg-gray-900 p-3">
+        <div data-testid="chatbi-chart-area" className="bg-gray-900 p-3">
           {showChart ? (
             <EChartsChart
               chartType={chartType}
