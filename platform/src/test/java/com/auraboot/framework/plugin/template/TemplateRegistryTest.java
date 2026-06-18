@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -159,35 +158,8 @@ class TemplateRegistryTest {
         assertThat(bare.icon()).isNull();
     }
 
-    // ---- A4: env-gated test-fixtures discovery ----
-
     @Test
-    @DisplayName("discoversTestFixtureTemplate only when testEnv supplier returns true")
-    void discoversTestFixtureTemplate_onlyWhenTestEnv() throws IOException {
-        createPlugin(
-                tempDir.resolve("plugins/test-fixtures/oss-tpl-smoke"),
-                """
-                {
-                  "catalogType": "template",
-                  "displayName": "OSS Smoke Fixture",
-                  "namespace": "smoke"
-                }
-                """
-        );
-
-        // testEnv = true: should discover the fixture
-        TemplateRegistry testRegistry = new TemplateRegistry(objectMapper, List.of(tempDir), () -> true);
-        Map<String, TemplateRegistry.TemplateDef> testResult = testRegistry.discoverForTest(tempDir);
-        assertThat(testResult).containsKey("oss-tpl-smoke");
-
-        // testEnv = false: must NOT discover the fixture
-        TemplateRegistry prodRegistry = new TemplateRegistry(objectMapper, List.of(tempDir), () -> false);
-        Map<String, TemplateRegistry.TemplateDef> prodResult = prodRegistry.discoverForTest(tempDir);
-        assertThat(prodResult).doesNotContainKey("oss-tpl-smoke");
-    }
-
-    @Test
-    @DisplayName("legacyTemplatesDirStillDiscovered regardless of testEnv")
+    @DisplayName("legacyTemplatesDirStillDiscovered via plugins/templates subdir")
     void legacyTemplatesDirStillDiscovered() throws IOException {
         createPlugin(
                 tempDir.resolve("plugins/templates/legacy-x"),
@@ -199,10 +171,9 @@ class TemplateRegistryTest {
                 """
         );
 
-        // testEnv=false: legacy templates are always discovered
-        TemplateRegistry prodRegistry = new TemplateRegistry(objectMapper, List.of(tempDir), () -> false);
-        Map<String, TemplateRegistry.TemplateDef> result = prodRegistry.discoverForTest(tempDir);
-        assertThat(result).containsKey("legacy-x");
+        TemplateRegistry registry = new TemplateRegistry(objectMapper, List.of(tempDir));
+        assertThat(registry.listAll()).extracting(TemplateRegistry.TemplateDef::id)
+                .contains("legacy-x");
     }
 
     // ---- helpers ----

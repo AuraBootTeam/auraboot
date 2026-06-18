@@ -16,7 +16,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.BooleanSupplier;
 
 /**
  * Registry of application templates discovered from plugin directories.
@@ -31,27 +30,17 @@ public class TemplateRegistry {
     private static final String PLUGIN_JSON = "plugin.json";
     private static final String TEMPLATE_CATALOG_TYPE = "template";
 
-    private static final BooleanSupplier DEFAULT_TEST_ENV = () ->
-            "test".equalsIgnoreCase(System.getenv("AURA_ENV"))
-                    || "true".equalsIgnoreCase(System.getenv("IMPORT_TEST_FIXTURES"));
-
     private final ObjectMapper objectMapper;
     private final List<Path> searchRoots;
-    private final BooleanSupplier testEnv;
 
     @Autowired
     public TemplateRegistry(ObjectMapper objectMapper) {
-        this(objectMapper, defaultSearchRoots(Paths.get(System.getProperty("user.dir"))), DEFAULT_TEST_ENV);
+        this(objectMapper, defaultSearchRoots(Paths.get(System.getProperty("user.dir"))));
     }
 
     TemplateRegistry(ObjectMapper objectMapper, List<Path> searchRoots) {
-        this(objectMapper, searchRoots, DEFAULT_TEST_ENV);
-    }
-
-    TemplateRegistry(ObjectMapper objectMapper, List<Path> searchRoots, BooleanSupplier testEnv) {
         this.objectMapper = objectMapper;
         this.searchRoots = List.copyOf(searchRoots);
-        this.testEnv = testEnv;
     }
 
     /**
@@ -113,15 +102,6 @@ public class TemplateRegistry {
         Path legacyTemplatesDir = pluginsDir.resolve("templates");
         if (Files.isDirectory(legacyTemplatesDir)) {
             discoverPluginChildren(root, legacyTemplatesDir, true, templates);
-        }
-
-        if (testEnv.getAsBoolean()) {
-            Path testFixturesDir = pluginsDir.resolve("test-fixtures");
-            if (Files.isDirectory(testFixturesDir)) {
-                // each plugins/test-fixtures/<x>/plugin.json is a candidate; legacy=false so it
-                // is only treated as a template when its manifest has catalogType/pluginType=template
-                discoverPluginChildren(root, testFixturesDir, false, templates);
-            }
         }
     }
 
