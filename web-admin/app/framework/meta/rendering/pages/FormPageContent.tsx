@@ -23,6 +23,7 @@ import { useComputedFields } from '~/framework/meta/hooks/useComputedFields';
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
+import { scrollToFormField } from '~/framework/meta/rendering/pages/form/scrollToFormField';
 import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
@@ -1257,9 +1258,17 @@ export function FormPageContent(props: PageContentProps) {
 
   const notifyValidationFailure = useCallback(
     (validationResult: FormValidationResult) => {
-      const firstFieldError = Object.values(validationResult.fieldErrors)[0];
+      const firstFieldCode = Object.keys(validationResult.fieldErrors)[0];
+      const firstFieldError = firstFieldCode
+        ? validationResult.fieldErrors[firstFieldCode]
+        : undefined;
       const firstSummaryError = validationResult.summaryErrors[0];
       showErrorToast(firstSummaryError || firstFieldError || 'Please fix validation errors');
+      // §4: scroll to + focus the first invalid field on submit (mixed-timing
+      // validation — field-level errors render, and the page jumps to the first one).
+      if (firstFieldCode && typeof document !== 'undefined') {
+        requestAnimationFrame(() => scrollToFormField(firstFieldCode));
+      }
     },
     [showErrorToast],
   );

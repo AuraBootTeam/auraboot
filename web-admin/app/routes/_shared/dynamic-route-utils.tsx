@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
+import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
 
 // 导入并重新导出统一的 i18n 实现
@@ -229,8 +230,7 @@ function getReferenceDisplayField(field: FieldConfig): string | undefined {
     ...(field.props?.refTarget || {}),
     ...(field.refTarget || {}),
   };
-  const candidate =
-    refTarget.displayField || refTarget.labelField || refTarget.targetField;
+  const candidate = refTarget.displayField || refTarget.labelField || refTarget.targetField;
   return candidate ? String(candidate) : undefined;
 }
 
@@ -244,13 +244,7 @@ function getReferenceDisplayField(field: FieldConfig): string | undefined {
 const referenceLabelCache = new Map<string, string>();
 const referenceLabelInflight = new Map<string, Promise<string>>();
 
-const REFERENCE_DISPLAY_CANDIDATE_FIELDS = [
-  'name',
-  'title',
-  'displayName',
-  'label',
-  'code',
-];
+const REFERENCE_DISPLAY_CANDIDATE_FIELDS = ['name', 'title', 'displayName', 'label', 'code'];
 
 function pickReferenceLabel(
   record: Record<string, unknown>,
@@ -525,10 +519,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         );
       }
 
-      if (
-        ['jsonviewer', 'json', 'jsonb'].includes(componentType) ||
-        isJsonFieldCode(field.field)
-      ) {
+      if (['jsonviewer', 'json', 'jsonb'].includes(componentType) || isJsonFieldCode(field.field)) {
         const formattedJson = formatJsonValue(value);
         if (!formattedJson) {
           return <span className="py-1 text-sm text-gray-400">&mdash;</span>;
@@ -555,27 +546,8 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         }
         const item = items.find((i) => String(i.value) === String(value));
         if (item) {
-          const color = item.extension?.color || 'gray';
-          const TAG_COLORS: Record<string, string> = {
-            gray: 'bg-gray-100 text-gray-800',
-            red: 'bg-red-100 text-red-800',
-            orange: 'bg-orange-100 text-orange-800',
-            yellow: 'bg-yellow-100 text-yellow-800',
-            green: 'bg-green-100 text-green-800',
-            blue: 'bg-blue-100 text-blue-800',
-            indigo: 'bg-indigo-100 text-indigo-800',
-            purple: 'bg-purple-100 text-purple-800',
-            pink: 'bg-pink-100 text-pink-800',
-            cyan: 'bg-cyan-100 text-cyan-800',
-          };
-          const cls = TAG_COLORS[color] || TAG_COLORS.gray;
-          return (
-            <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}
-            >
-              {item.label}
-            </span>
-          );
+          // §3 / §1.3: dict-coded status renders as 色点 + 文字, not a filled pill.
+          return <StatusDot tone={resolveStatusTone(item.extension?.color)} label={item.label} />;
         }
       }
 
@@ -766,11 +738,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
             : null;
         let pretty: string;
         try {
-          pretty = JSON.stringify(
-            envelope != null ? JSON.parse(envelope) : displayValue,
-            null,
-            2,
-          );
+          pretty = JSON.stringify(envelope != null ? JSON.parse(envelope) : displayValue, null, 2);
         } catch {
           pretty = envelope != null ? envelope : String(displayValue);
         }

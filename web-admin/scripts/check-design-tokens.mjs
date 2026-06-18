@@ -33,7 +33,7 @@ const WEB_ADMIN = resolve(__dirname, '..');
 const SCAN_ROOTS = ['app/ui', 'app/framework/meta/rendering'].map((r) => resolve(WEB_ADMIN, r));
 
 // Ratchet baselines — current combined counts. LOWER as sweeps land; never raise.
-const PALETTE_BASELINE = 1235; // G1: palette utilities bypassing semantic tokens
+const PALETTE_BASELINE = 1216; // G1: palette utilities bypassing semantic tokens
 const I18N_BASELINE = 111; // G2: hardcoded user-facing placeholder/title/aria-label strings
 
 const EXT = new Set(['.ts', '.tsx']);

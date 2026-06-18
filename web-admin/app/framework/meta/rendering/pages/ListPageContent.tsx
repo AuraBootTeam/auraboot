@@ -43,6 +43,7 @@ import { useAuth } from '~/contexts/AuthContext';
 import { ListPageHeader } from './list/ListPageHeader';
 import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
 import { useTransientFlag } from '~/hooks/useTransientFlag';
+import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { useAutoSaveView } from '~/framework/smart/hooks/useAutoSaveView';
 import {
   DEFAULT_ROW_HEIGHT,
@@ -1885,28 +1886,8 @@ function ListPageContentInner(props: PageContentProps) {
         if (dictItems) {
           const item = dictItems.find((i) => String(i.value) === String(value));
           if (item) {
-            // Display dict label with tag style, color from extension.color
-            const tagColor = item.extension?.color || 'blue';
-            const colorMap: Record<string, string> = {
-              gray: 'bg-gray-100 text-gray-800',
-              red: 'bg-red-100 text-red-800',
-              orange: 'bg-orange-100 text-orange-800',
-              yellow: 'bg-yellow-100 text-yellow-800',
-              green: 'bg-green-100 text-green-800',
-              blue: 'bg-blue-100 text-blue-800',
-              indigo: 'bg-indigo-100 text-indigo-800',
-              purple: 'bg-purple-100 text-purple-800',
-              pink: 'bg-pink-100 text-pink-800',
-              cyan: 'bg-cyan-100 text-cyan-800',
-            };
-            const colorCls = colorMap[tagColor] || colorMap.blue;
-            return (
-              <span
-                className={`rounded-pill inline-flex px-2 py-1 text-xs font-medium ${colorCls}`}
-              >
-                {item.label}
-              </span>
-            );
+            // §3 / §1.3: dict-coded status renders as 色点 + 文字, not a filled pill.
+            return <StatusDot tone={resolveStatusTone(item.extension?.color)} label={item.label} />;
           }
         }
         // Dict not loaded or no match — show raw value

@@ -73,10 +73,40 @@ seed('gray', [
   'disabled',
 ]);
 
-/** Map any status/tag color name to one of the 5 canonical semantic tones. */
+/** Map a hex color (dicts often store `#10b981` etc.) to the nearest tone by hue. */
+function hexToTone(raw: string): StatusTone | null {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3)
+    h = h
+      .split('')
+      .map((c) => c + c)
+      .join('');
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  const l = (max + min) / 2;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  if (s < 0.18) return 'gray'; // desaturated → neutral
+  let hue = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  hue *= 60;
+  if (hue < 0) hue += 360;
+  if (hue < 20 || hue >= 330) return 'red';
+  if (hue < 70) return 'amber';
+  if (hue < 170) return 'green';
+  if (hue < 265) return 'blue';
+  return 'gray'; // purple/magenta — no semantic status tone
+}
+
+/** Map any status/tag color (name OR hex) to one of the 5 canonical semantic tones. */
 export function resolveStatusTone(color: string | undefined | null): StatusTone {
   if (!color) return 'gray';
-  return TONE_BY_NAME[String(color).trim().toLowerCase()] ?? 'gray';
+  const key = String(color).trim().toLowerCase();
+  return TONE_BY_NAME[key] ?? hexToTone(key) ?? 'gray';
 }
 
 /** 色点 + 文字 presentation for a status/tag value. */
