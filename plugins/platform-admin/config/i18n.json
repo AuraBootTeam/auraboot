@@ -615,7 +615,5 @@
 
   { "key": "template.gallery.title", "zh-CN": "应用模板市场", "en-US": "Template Marketplace", "source": "import", "refType": "label" },
   { "key": "template.gallery.install", "zh-CN": "一键应用", "en-US": "Install", "source": "import", "refType": "label" },
-  { "key": "template.gallery.installed", "zh-CN": "模板已应用", "en-US": "Template installed", "source": "import", "refType": "label" },
-  { "key": "template.gallery.confirm", "zh-CN": "确认应用此模板？这将在当前租户创建模板包含的模型与页面。", "en-US": "Install this template? This will create the models and pages included in the template for the current tenant.", "source": "import", "refType": "label" },
   { "key": "template.gallery.empty", "zh-CN": "暂无可用模板", "en-US": "No templates available", "source": "import", "refType": "label" }
 ]

@@ -88,6 +88,39 @@ describe('ActionRegistry record navigation', () => {
   });
 });
 
+describe('ActionRegistry dialog.confirm', () => {
+  it('resolves object-form message to zh-CN string before passing to confirm dialog', async () => {
+    const confirm = vi.fn().mockResolvedValue(true);
+
+    await actionRegistry.execute('dialog.confirm', {
+      confirm,
+      args: {
+        message: {
+          'zh-CN': '确认应用此模板？这将在当前租户创建模板包含的模型与页面。',
+          'en-US': "Install this template? It will create the template's models and pages in your tenant.",
+        },
+      },
+    });
+
+    expect(confirm).toHaveBeenCalledWith({
+      content: '确认应用此模板？这将在当前租户创建模板包含的模型与页面。',
+    });
+  });
+
+  it('throws when user cancels (object-form message)', async () => {
+    const confirm = vi.fn().mockResolvedValue(false);
+
+    await expect(
+      actionRegistry.execute('dialog.confirm', {
+        confirm,
+        args: {
+          message: { 'zh-CN': '确认？', 'en-US': 'Confirm?' },
+        },
+      }),
+    ).rejects.toThrow('User cancelled');
+  });
+});
+
 describe('ActionRegistry refresh', () => {
   it('prefers explicit data source targets over page-level loadData', async () => {
     const loadData = vi.fn();

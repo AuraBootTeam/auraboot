@@ -2337,7 +2337,7 @@
                   "id": "confirm",
                   "action": "dialog.confirm",
                   "args": {
-                    "message": "$i18n:template.gallery.confirm"
+                    "message": { "zh-CN": "确认应用此模板？这将在当前租户创建模板包含的模型与页面。", "en-US": "Install this template? It will create the template's models and pages in your tenant." }
                   }
                 },
                 {
@@ -2351,7 +2351,7 @@
                   "id": "toast",
                   "action": "toast.success",
                   "args": {
-                    "message": "$i18n:template.gallery.installed"
+                    "message": { "zh-CN": "模板已应用", "en-US": "Template installed" }
                   }
                 },
                 {
