@@ -69,7 +69,8 @@ class DashboardGeneratorSkillIT extends BaseIntegrationTest {
         ws.addObject().put("type", "smart-number-card").put("title", "Total Sales")
                 .put("dataSourceType", "namedQuery").put("dataSourceCode", "total_sales");
         ws.addObject().put("type", "smart-bar-chart").put("title", "Sales by Region")
-                .put("dataSourceType", "namedQuery").put("dataSourceCode", "sales_by_region");
+                .put("dataSourceType", "model").put("dataSourceCode", "sales_order")
+                .put("dimension", "region").put("metricField", "amount").put("aggregation", "sum");
         ws.addObject().put("type", "smart-table-chart").put("title", "Top Orders")
                 .put("dataSourceType", "model").put("dataSourceCode", "sales_order");
 
@@ -105,8 +106,31 @@ class DashboardGeneratorSkillIT extends BaseIntegrationTest {
         assertThat(widgets.get(2).get("type").asText()).isEqualTo("smart-table-chart");
         assertThat(widgets.get(2).get("w").asInt()).isEqualTo(12);
         assertThat(widgets.get(2).get("y").asInt()).as("full-width table wraps to a new row").isEqualTo(4);
-        // data source carried into config
-        assertThat(widgets.get(1).get("config").get("dataSource").get("code").asText()).isEqualTo("sales_by_region");
+        // Data source emitted in the ChartDataSource shape the widget renderers
+        // read (web-admin .../hooks/useChartData.ts) — NOT the old {type, code}
+        // shape that rendered empty charts. namedQuery -> queryCode.
+        JsonNode numberCardDs = widgets.get(0).get("config").get("dataSource");
+        assertThat(numberCardDs.get("type").asText()).isEqualTo("namedQuery");
+        assertThat(numberCardDs.get("queryCode").asText()).isEqualTo("total_sales");
+        assertThat(numberCardDs.has("code")).as("must not emit the dead {code} key").isFalse();
+
+        // model chart -> aggregate(modelCode + dimensions + metrics) — a complete,
+        // renderable aggregate query (isDataSourceComplete: modelCode + metrics).
+        JsonNode barDs = widgets.get(1).get("config").get("dataSource");
+        assertThat(barDs.get("type").asText()).isEqualTo("aggregate");
+        assertThat(barDs.get("modelCode").asText()).isEqualTo("sales_order");
+        assertThat(barDs.get("dimensions").get(0).asText()).isEqualTo("region");
+        JsonNode barMetric = barDs.get("metrics").get(0);
+        assertThat(barMetric.get("field").asText()).isEqualTo("amount");
+        assertThat(barMetric.get("aggregation").asText()).isEqualTo("sum");
+        assertThat(barMetric.get("alias").asText()).isEqualTo("value");
+
+        // model widget without an explicit metric still gets a count metric so the
+        // aggregate query is complete (renders a value rather than "No data yet").
+        JsonNode tableDs = widgets.get(2).get("config").get("dataSource");
+        assertThat(tableDs.get("type").asText()).isEqualTo("aggregate");
+        assertThat(tableDs.get("modelCode").asText()).isEqualTo("sales_order");
+        assertThat(tableDs.get("metrics").get(0).get("aggregation").asText()).isEqualTo("count");
 
         log.info("[S5 dashboard skill] PASS — dashboard {} persisted with {} auto-laid widgets", code, widgets.size());
     }
