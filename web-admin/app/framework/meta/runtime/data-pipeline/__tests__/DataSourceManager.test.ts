@@ -61,6 +61,37 @@ describe('DataSourceManager', () => {
     ]);
   });
 
+  it('table adaptor treats a plain top-level array as records (custom REST endpoint returning data:[...])', async () => {
+    // A custom endpoint (e.g. GET /api/qr) returns ResultData with `data` being a plain array, not a
+    // paginated { records } object. The `table` adaptor must surface those rows so a DSL table column
+    // binds row[field]; otherwise the page falls back to the default optionList adaptor → {value,label}
+    // → every column renders "-".
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: [
+        { pid: 'a', shortCode: 'X1', title: 'Alpha' },
+        { pid: 'b', shortCode: 'X2', title: 'Beta' },
+      ],
+    } as any);
+
+    const manager = new DataSourceManager(createExpressionContext({} as any));
+    manager.register('qrList', {
+      type: 'api',
+      endpoint: '/api/qr',
+      method: 'get',
+      adaptor: 'table',
+      autoFetch: false,
+    });
+
+    await manager.fetch('qrList');
+
+    const data = manager.getData('qrList');
+    expect(data.records).toHaveLength(2);
+    expect(data.total).toBe(2);
+    expect(data.records[0].shortCode).toBe('X1');
+    expect(data.records[1].title).toBe('Beta');
+  });
+
   it('passes format=records for namedQuery sources so metric-strip gets raw aggregate rows', async () => {
     mockedFetchResult.mockResolvedValueOnce({
       code: '0',
