@@ -73,7 +73,8 @@ PATH_HITS=$(grep -rEn \
   | grep -v 'oss-scope\.json' \
   | grep -v 'scripts/dev/env\.sh' \
   | grep -v 'scripts/dev/start-dev-infra\.sh' \
-  | grep -v 'scripts/lib/test-multi-worktree-guard\.sh' || true)
+  | grep -v 'scripts/lib/test-multi-worktree-guard\.sh' \
+  | grep -v 'scripts/oss-golden-stack\.sh' || true)
   # Intentional exclusions:
   #  - publish-repos.sh: multi-repo release script (OSS + enterprise sync)
   #  - reset-and-init.sh: normalized local lifecycle entrypoint can target
@@ -88,6 +89,8 @@ PATH_HITS=$(grep -rEn \
   #    (PRODUCT=enterprise branch; no enterprise imports in OSS code)
   #  - scripts/lib/test-multi-worktree-guard.sh: tests the multi-worktree guard with enterprise
   #    paths as fixtures (no enterprise code imported)
+  #  - oss-golden-stack.sh: header comment points at the enterprise engineering-gotchas runbook
+  #    that documents the bring-up (doc reference only; no enterprise code imported)
 
 if [ -n "$PATH_HITS" ]; then
   echo "ERROR: Config/script files reference enterprise paths:"

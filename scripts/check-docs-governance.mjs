@@ -433,11 +433,20 @@ function auditLinks(repoRoot, abs, data, options, add) {
 }
 
 function resolveDocPath(repoRoot, fromFile, target) {
-  const cleaned = String(target).split('#')[0].trim();
+  // Strip a `#anchor` and an optional trailing ` (human description)` annotation —
+  // distilled_to entries are commonly annotated, e.g.
+  //   path/to/canonical.md (what landed there)
+  const cleaned = String(target).split('#')[0].replace(/\s+\([^)]*\)\s*$/, '').trim();
   if (!cleaned) return null;
   const candidates = [
     path.resolve(repoRoot, cleaned),
     path.resolve(path.dirname(fromFile), cleaned),
+    // Cross-repo precipitation: a doc may distill a lesson into the sibling
+    // canonical repo (OSS → auraboot-enterprise/...), which lives next to this
+    // repo in the workspace. Resolve such targets against the workspace parent so
+    // a side-by-side `auraboot-enterprise/docs/...` reference is honored instead of
+    // erroring as "target not found".
+    path.resolve(repoRoot, '..', cleaned),
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
