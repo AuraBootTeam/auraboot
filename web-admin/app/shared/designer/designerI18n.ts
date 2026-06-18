@@ -346,6 +346,16 @@ export const DESIGNER_I18N = {
     // Toolbar
     untitled: { 'zh-CN': '未命名设计器', 'en-US': 'Unified Designer' } as L,
     pages: { 'zh-CN': '页面', 'en-US': 'Pages' } as L,
+    // C4 — page-kind switch control.
+    kindSwitchLabel: { 'zh-CN': '页面类型', 'en-US': 'Page kind' } as L,
+    kindForm: { 'zh-CN': '表单', 'en-US': 'Form' } as L,
+    kindList: { 'zh-CN': '列表', 'en-US': 'List' } as L,
+    kindDetail: { 'zh-CN': '详情', 'en-US': 'Detail' } as L,
+    kindDashboard: { 'zh-CN': '仪表盘', 'en-US': 'Dashboard' } as L,
+    kindSwitchBlocked: {
+      'zh-CN': '当前有 {n} 个块在该类型下不兼容,请先移除',
+      'en-US': '{n} block(s) are incompatible with this kind — remove them first',
+    } as L,
     preview: { 'zh-CN': '预览', 'en-US': 'Preview' } as L,
     history: { 'zh-CN': '历史', 'en-US': 'History' } as L,
     undo: { 'zh-CN': '撤销', 'en-US': 'Undo' } as L,
