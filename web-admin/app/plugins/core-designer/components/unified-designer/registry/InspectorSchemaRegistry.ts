@@ -39,7 +39,7 @@ export class InspectorSchemaRegistry {
 
 const defaultFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
   { key: 'region', label: 'Region', type: 'text' },
 ];
 
@@ -64,7 +64,7 @@ const aiLockField: PropertySchema<string> = {
 const modelContainerFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'dataSource.model', label: 'Model', type: 'model' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const formSectionFields: PropertySchema<string>[] = [
@@ -73,14 +73,14 @@ const formSectionFields: PropertySchema<string>[] = [
   { key: 'props.collapsible', label: 'Collapsible', type: 'boolean' },
   { key: 'props.visibleWhen', label: 'Visible when JSON', type: 'json' },
   { key: 'layout.columns', label: 'Columns', type: 'number' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const columnsContainerFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'layout.columns', label: 'Columns', type: 'number' },
   { key: 'layout.gap', label: 'Gap', type: 'number' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const listFields: PropertySchema<string>[] = [
@@ -95,12 +95,12 @@ const listFields: PropertySchema<string>[] = [
       { label: 'Multiple rows', value: 'multiple' },
     ],
   },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const dashboardFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
   { key: 'layout.cols', label: 'Columns', type: 'number' },
   { key: 'layout.rowHeight', label: 'Row height', type: 'number' },
   { key: 'layout.gap', label: 'Gap', type: 'number' },
@@ -139,7 +139,7 @@ const fieldFields: PropertySchema<string>[] = [
   { key: 'props.options', label: 'Options JSON', type: 'json' },
   { key: 'props.visibleWhen', label: 'Visible when JSON', type: 'json' },
   { key: 'props.validationRules', label: 'Validation rules JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const pickerFieldFields: PropertySchema<string>[] = [
@@ -161,7 +161,7 @@ const pickerFieldFields: PropertySchema<string>[] = [
   { key: 'props.searchPlaceholder', label: 'Search placeholder', type: 'text' },
   { key: 'props.searchField', label: 'Search field', type: 'text' },
   { key: 'props.searchParameter', label: 'Search parameter', type: 'text' },
-  { key: 'props.pageSize', label: 'Page size', type: 'number' },
+  { key: 'props.pageSize', label: 'Page size', type: 'number', min: 1 },
   { key: 'props.pickerParameters', label: 'Picker parameters JSON', type: 'json' },
 ];
 
@@ -213,7 +213,7 @@ const columnFields: PropertySchema<string>[] = [
 const tableFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'props.rows', label: 'Preview rows JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const subTableFields: PropertySchema<string>[] = [
@@ -222,19 +222,19 @@ const subTableFields: PropertySchema<string>[] = [
   { key: 'dataSource.parentField', label: 'Parent field', type: 'text' },
   { key: 'dataSource.childField', label: 'Child field', type: 'text' },
   { key: 'props.rows', label: 'Preview rows JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const repeaterFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'props.rows', label: 'Preview rows JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const subformFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'props.rows', label: 'Preview rows JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const helperDataSourceFields: PropertySchema<string>[] = [
@@ -272,7 +272,7 @@ const aiFillBannerFields: PropertySchema<string>[] = [
   { key: 'props.feedback', label: 'Apply feedback', type: 'text' },
   { key: 'props.emptyText', label: 'Empty text', type: 'text' },
   ...helperDataSourceFields,
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const bpmPanelFields: PropertySchema<string>[] = [
@@ -295,7 +295,7 @@ const bpmPanelFields: PropertySchema<string>[] = [
   { key: 'props.actions', label: 'Actions JSON', type: 'json' },
   { key: 'props.emptyText', label: 'Empty text', type: 'text' },
   ...helperDataSourceFields,
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const activityTimelineFields: PropertySchema<string>[] = [
@@ -303,7 +303,7 @@ const activityTimelineFields: PropertySchema<string>[] = [
   { key: 'props.items', label: 'Items JSON', type: 'json' },
   { key: 'props.emptyText', label: 'Empty text', type: 'text' },
   ...helperDataSourceFields,
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const fieldHistoryFields: PropertySchema<string>[] = [
@@ -311,7 +311,7 @@ const fieldHistoryFields: PropertySchema<string>[] = [
   { key: 'props.entries', label: 'Entries JSON', type: 'json' },
   { key: 'props.emptyText', label: 'Empty text', type: 'text' },
   ...helperDataSourceFields,
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // Workbench blocks — metric-strip & status-banner.
@@ -345,7 +345,7 @@ const metricStripFields: PropertySchema<string>[] = [
   // subText, subTextField, tone, valueMap, onClick, visibleWhen, activeWhen }.
   // Authored as JSON — the renderer iterates this array directly.
   { key: 'metrics', label: 'Metrics JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const statusBannerFields: PropertySchema<string>[] = [
@@ -365,7 +365,7 @@ const statusBannerFields: PropertySchema<string>[] = [
   { key: 'summaryFields', label: 'Summary fields JSON', type: 'json' },
   // poll: { enabledWhenStatuses, reload, intervalMs, refreshPageWhenStatuses }.
   { key: 'poll', label: 'Polling JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // Workbench-family batch 2 inspector schemas. Same contract as metric-strip /
@@ -410,7 +410,7 @@ const workbenchActionBarFields: PropertySchema<string>[] = [
   // actions: array of { code, label, variant, visibleWhen, activeWhen,
   // disabledWhen, onClick }. Authored as JSON — the renderer iterates it.
   { key: 'actions', label: 'Actions JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // EvidencePanelBlockRenderer reads block.dataSource (string id) / block.context /
@@ -423,7 +423,7 @@ const evidencePanelFields: PropertySchema<string>[] = [
   // sections: array of { key, field, label, format } — the renderer iterates it.
   { key: 'sections', label: 'Sections JSON', type: 'json' },
   { key: 'empty', label: 'Empty state JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // RecordInspectorBlockRenderer reads block.context / block.fields / block.empty
@@ -435,7 +435,7 @@ const recordInspectorFields: PropertySchema<string>[] = [
   // fields: array of { field, path, label, span } — the renderer iterates it.
   { key: 'fields', label: 'Fields JSON', type: 'json' },
   { key: 'empty', label: 'Empty state JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // CandidateListBlockRenderer reads block.dataSource (string id) / block.item /
@@ -451,7 +451,7 @@ const candidateListFields: PropertySchema<string>[] = [
   { key: 'selection', label: 'Selection JSON', type: 'json' },
   { key: 'actions', label: 'Actions JSON', type: 'json' },
   { key: 'maxHeight', label: 'Max height', type: 'number' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // ArtifactTimelineBlockRenderer reads block.dataSource (string id) / block.item /
@@ -464,7 +464,7 @@ const artifactTimelineFields: PropertySchema<string>[] = [
   // hashField, fileIdField }. Authored as JSON.
   { key: 'item', label: 'Item config JSON', type: 'json' },
   { key: 'empty', label: 'Empty state JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -487,7 +487,7 @@ const statCardFields: PropertySchema<string>[] = [
   // statCard: { value, unit, trend, trendDirection: up|down|flat, valueField }.
   // Authored as JSON — the renderer spreads this object over props.
   { key: 'statCard', label: 'Stat card JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // DescriptionBlockRenderer reads `block.content ?? props.content ?? props.text`.
@@ -496,7 +496,7 @@ const statCardFields: PropertySchema<string>[] = [
 const descriptionFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'content', label: 'Content', type: 'text' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // RecordComments (dispatched by DetailPageContent) derives modelCode + recordPid
@@ -507,7 +507,7 @@ const descriptionFields: PropertySchema<string>[] = [
 // ignores them).
 const recordCommentsFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // EmbeddedListBlockRenderer reads bare top-level block.modelCode (or childModel),
@@ -516,15 +516,15 @@ const recordCommentsFields: PropertySchema<string>[] = [
 // record id is resolved from the detail route, so this is a DETAIL-only block.
 const embeddedListFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
-  { key: 'modelCode', label: 'Model code', type: 'text' },
+  { key: 'modelCode', label: 'Model code', type: 'text', required: true },
   { key: 'parentField', label: 'Parent field (foreign key)', type: 'text' },
   // columns: array of { field, label, dataType?, dictCode?, width?, align? }.
   // Authored as JSON — the renderer iterates this array directly.
   { key: 'columns', label: 'Columns JSON', type: 'json' },
-  { key: 'pageSize', label: 'Page size', type: 'number' },
+  { key: 'pageSize', label: 'Page size', type: 'number', min: 1 },
   { key: 'searchable', label: 'Searchable', type: 'boolean' },
   { key: 'filterable', label: 'Filterable', type: 'boolean' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // ReviewDrawerBlockRenderer is the row-level review overlay (the most complex
@@ -552,7 +552,7 @@ const reviewDrawerFields: PropertySchema<string>[] = [
   // source: { record, summary, cards, policies, jsonField, … }.
   { key: 'source', label: 'Source evidence JSON', type: 'json' },
   { key: 'empty', label: 'Empty state JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const actionTypeField: PropertySchema<string> = {
@@ -581,7 +581,7 @@ const actionBaseFields: PropertySchema<string>[] = [
 
 const actionCommonFeedbackFields: PropertySchema<string>[] = [
   { key: 'props.feedback', label: 'Feedback', type: 'text' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const actionExecutionModeField: PropertySchema<string> = {
@@ -630,7 +630,7 @@ const navigateActionFields: PropertySchema<string>[] = [
     ],
   },
   { key: 'props.params', label: 'Params JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const overlayActionFields: PropertySchema<string>[] = [
@@ -725,7 +725,7 @@ const widgetFields: PropertySchema<string>[] = [
   { key: 'props.columns', label: 'Columns JSON', type: 'json' },
   { key: 'props.rows', label: 'Rows JSON', type: 'json' },
   { key: 'props.markdown', label: 'Markdown', type: 'text' },
-  { key: 'props.refreshInterval', label: 'Refresh seconds', type: 'number' },
+  { key: 'props.refreshInterval', label: 'Refresh seconds', type: 'number', min: 0 },
   { key: 'layout.x', label: 'X', type: 'number' },
   { key: 'layout.y', label: 'Y', type: 'number' },
   { key: 'layout.w', label: 'Width', type: 'number' },
@@ -774,22 +774,22 @@ const chartFields: PropertySchema<string>[] = [
   { key: 'visualization', label: 'Visualization JSON', type: 'json' },
   { key: 'linkage', label: 'Linkage JSON', type: 'json' },
   { key: 'drillDown', label: 'Drilldown JSON', type: 'json' },
-  { key: 'refreshInterval', label: 'Refresh seconds', type: 'number' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'refreshInterval', label: 'Refresh seconds', type: 'number', min: 0 },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // RichTextBlockRenderer reads bare block.content (string or LocalizedText; HTML is
 // sanitized before render). No other authorable props.
 const richTextFields: PropertySchema<string>[] = [
   { key: 'content', label: 'Content (HTML)', type: 'text' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // DividerBlockRenderer reads bare block.title (optional label divider; no title =
 // plain horizontal rule). Only authorable surface.
 const dividerFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Label (optional)', type: 'text' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // ToolbarBlockRenderer / FormButtonsBlockRenderer both read bare block.buttons —
@@ -798,11 +798,11 @@ const dividerFields: PropertySchema<string>[] = [
 // navigateTo|apiAction|handler }. Authored as JSON — the renderer iterates it.
 const toolbarFields: PropertySchema<string>[] = [
   { key: 'buttons', label: 'Buttons JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 const formButtonsFields: PropertySchema<string>[] = [
   { key: 'buttons', label: 'Buttons JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // FiltersBlockRenderer reads bare block.fields (array of filter FieldConfig, each
@@ -812,14 +812,14 @@ const filtersFields: PropertySchema<string>[] = [
   { key: 'fields', label: 'Filter fields JSON', type: 'json' },
   { key: 'onSearch', label: 'On search handler', type: 'text' },
   { key: 'onReset', label: 'On reset handler', type: 'text' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // FormWizardBlockRenderer reads bare block.steps — array of { key, label,
 // description?, blocks[] }. Authored as JSON; child blocks render per step.
 const formWizardFields: PropertySchema<string>[] = [
   { key: 'steps', label: 'Steps JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // TraceGraphBlockRenderer reads bare block.dataSource (string id whose flat rows
@@ -837,7 +837,7 @@ const traceGraphFields: PropertySchema<string>[] = [
       { label: 'Genealogy (finished SN → component)', value: 'genealogy' },
     ],
   },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // SelectionInfoBlockRenderer reads bare block.title + the bound runtime-state key
@@ -846,7 +846,7 @@ const traceGraphFields: PropertySchema<string>[] = [
 const selectionInfoFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'bind', label: 'Selection state key', type: 'text' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 // GerberViewerBlockRenderer reads bare block.title (or block.label) / block.dataSource
@@ -862,7 +862,7 @@ const gerberViewerFields: PropertySchema<string>[] = [
   { key: 'lineContext', label: 'Line context expression', type: 'text' },
   { key: 'lineInspectionField', label: 'Line inspection field', type: 'text' },
   { key: 'empty', label: 'Empty state JSON', type: 'json' },
-  { key: 'layout.span', label: 'Span', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry {

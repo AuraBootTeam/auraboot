@@ -617,6 +617,12 @@ export const DESIGNER_I18N = {
     } as L,
     apply: { 'zh-CN': '应用', 'en-US': 'Apply' } as L,
     invalidJson: { 'zh-CN': 'JSON 格式错误', 'en-US': 'Invalid JSON' } as L,
+    // D4 — inline field validation messages.
+    validationRequired: { 'zh-CN': '此项必填', 'en-US': 'This field is required' } as L,
+    validationNotNumber: { 'zh-CN': '请输入数字', 'en-US': 'Must be a number' } as L,
+    validationMin: { 'zh-CN': '不能小于 {min}', 'en-US': 'Must be ≥ {min}' } as L,
+    validationMax: { 'zh-CN': '不能大于 {max}', 'en-US': 'Must be ≤ {max}' } as L,
+    validationPattern: { 'zh-CN': '格式不正确', 'en-US': 'Invalid format' } as L,
     jsonProps: { 'zh-CN': '属性', 'en-US': 'Props' } as L,
     jsonLayout: { 'zh-CN': '布局', 'en-US': 'Layout' } as L,
     jsonDataSource: { 'zh-CN': '数据源', 'en-US': 'Data source' } as L,
