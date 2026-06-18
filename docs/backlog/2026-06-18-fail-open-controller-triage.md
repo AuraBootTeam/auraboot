@@ -41,11 +41,11 @@ PluginPackageController / PluginTransactionalImportController(`plugin.plugin.man
 
 | Controller | 写操作 | 建议码 | 备注 |
 |---|---|---|---|
-| OrgController | dept/employee CRUD + 转岗 | `org.team.manage` | operator-held;**方法级守护写方法**(类级会连 GET 读一起锁,viewer 持 org.team.read 应保留读) |
-| TeamController | team CRUD + member | `org.team.manage` | operator-held;方法级 |
-| TenantMemberController | 审批/状态/删除/导入 | `org.team.manage` | operator-held;**有现存 IT,改时同步 fixture 角色** |
-| VersionHistoryController | rollback dashboard | `dashboard.manage` | operator-held;方法级(GET 列版本保留) |
-| ViewShareController | 创建/撤销分享链接 | `dashboard.manage` | operator-held;方法级(GET /shared 白名单保留) |
+| ✅ OrgController | dept/employee CRUD + 转岗 | `org.team.manage` | **已守护(PR #820 batch2)**:8 写方法方法级,GET 读保留 |
+| ✅ TeamController | team CRUD + member | `org.team.manage` | **已守护(PR #820 batch2)**:5 写方法方法级 |
+| TenantMemberController | 审批/状态/删除/导入 | `org.team.manage` | operator-held;**有现存 IT,改时同步 fixture 角色**(故未在 batch2) |
+| ✅ VersionHistoryController | rollback dashboard | `dashboard.manage` | **已守护(PR #820 batch2)**:rollback 方法级,GET 列版本保留 |
+| ✅ ViewShareController | 创建/撤销分享链接 | `dashboard.manage` | **已守护(PR #820 batch2)**:share/revoke 方法级,GET /shared 白名单保留 |
 | NotificationRuleController | 规则 CRUD | `notification_rule_manage` | operator-held(注意是下划线码) |
 | NotificationTemplateController | 模板 CRUD | needs-new-code `notification.template.manage` | role-decision(operator?) |
 | CallbackController | BPM 回调推进节点 | `bpm.process.execute` | operator-held;**确认是否系统回调**(若系统-to-系统则改签名校验而非用户权限) |

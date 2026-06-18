@@ -4,6 +4,10 @@ import com.auraboot.framework.agent.controller.ApsSchedulingController;
 import com.auraboot.framework.agent.controller.PlatformAiController;
 import com.auraboot.framework.agent.nlmodeling.controller.NlModelingController;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.organization.controller.OrgController;
+import com.auraboot.framework.organization.controller.TeamController;
+import com.auraboot.framework.versioning.controller.VersionHistoryController;
+import com.auraboot.framework.view.controller.ViewShareController;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.permission.constants.MetaPermission;
@@ -132,6 +136,30 @@ class DeepReviewControllerGuardTest {
     @DisplayName("PlatformAiController.scoreRecords is guarded by ai.scoring.run")
     void platformAiScoreRecordsGuarded() throws Exception {
         assertGuard(PlatformAiController.class, "scoreRecords", MetaPermission.AI_SCORING_RUN);
+    }
+
+    @Test
+    @DisplayName("OrgController.createDepartment is guarded by org.team.manage")
+    void orgControllerWriteGuarded() throws Exception {
+        assertGuard(OrgController.class, "createDepartment", "org.team.manage");
+    }
+
+    @Test
+    @DisplayName("TeamController.createTeam is guarded by org.team.manage")
+    void teamControllerWriteGuarded() throws Exception {
+        assertGuard(TeamController.class, "createTeam", "org.team.manage");
+    }
+
+    @Test
+    @DisplayName("VersionHistoryController.rollback is guarded by dashboard.manage")
+    void versionHistoryRollbackGuarded() throws Exception {
+        assertGuard(VersionHistoryController.class, "rollback", "dashboard.manage");
+    }
+
+    @Test
+    @DisplayName("ViewShareController.shareView is guarded by dashboard.manage")
+    void viewShareGuarded() throws Exception {
+        assertGuard(ViewShareController.class, "shareView", "dashboard.manage");
     }
 
     // ---- helpers ----
