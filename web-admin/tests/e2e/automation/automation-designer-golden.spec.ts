@@ -189,6 +189,21 @@ async function setAutomationName(page: Page, name: string): Promise<void> {
   }).toPass({ timeout: 15_000, intervals: [250, 500, 1_000] });
 }
 
+// Webhook fail-closed (#557): an inbound-webhook automation must carry a token/
+// signature validation mode + a secret, otherwise the endpoint refuses the trigger
+// ("validation not configured"). These helpers configure token validation via the
+// real property panel and fire the inbound POST with the matching X-Webhook-Token.
+const WEBHOOK_TOKEN = 'e2e-designer-webhook-token';
+async function configureWebhookToken(page: Page, triggerId: string): Promise<void> {
+  await fillNodeConfig(page, triggerId, { validationMode: 'token', secret: WEBHOOK_TOKEN });
+}
+function fireInboundWebhook(page: Page, pid: string, data: Record<string, unknown>) {
+  return page.request.post(`/api/automations/webhooks/${pid}`, {
+    headers: { 'X-Webhook-Token': WEBHOOK_TOKEN },
+    data,
+  });
+}
+
 // ───────────────────────── tests ─────────────────────────
 
 // Serialize against other e2et_order-mutating automation files. H1 leaves an enabled
@@ -897,12 +912,19 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await openNewDesigner(page);
     await setAutomationName(page, `N-TRIGGER-WEBHOOK ${uniqueId()}`);
 
-    // trigger-webhook has no required config (validationMode defaults to none) and no
-    // modelCode (FINDING-1 made model_code nullable). Action does not depend on ${recordId}.
+    // The webhook endpoint is fail-closed (PR #557): a 'none' validationMode is
+    // REFUSED. Configure token validation + a secret via the real property panel and
+    // present it as X-Webhook-Token on the inbound POST. No modelCode (FINDING-1 made
+    // model_code nullable). Action does not depend on ${recordId}.
+    const webhookSecret = `nwh_${uniqueId()}`;
     const trigger = await dragNodeToCanvas(page, 'trigger-webhook', { x: 150, y: 80 });
     const action = await dragNodeToCanvas(page, 'action-call-api', { x: 150, y: 240 });
     await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
     await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, {
+      validationMode: 'token',
+      secret: webhookSecret,
+    });
     await fillNodeConfig(page, action, {
       url: CALLAPI_OK_URL,
       method: 'GET',
@@ -911,13 +933,15 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     createdPids.push(pid);
     await enableViaListToggle(page, pid);
 
-    // FIRE via the real inbound webhook endpoint (resolves the automation by pid).
+    // FIRE via the real inbound webhook endpoint (resolves the automation by pid),
+    // presenting the configured token.
     const firedAt = Date.now();
     const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
+      headers: { 'X-Webhook-Token': webhookSecret },
       data: { event: 'order.shipped', ref: `NWH ${uniqueId()}` },
     });
     expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
-    expect(String((await resp.json())?.code), 'webhook POST accepted').toBe('0');
+    expect(String((await resp.json())?.code), 'token-validated webhook POST accepted').toBe('0');
 
     const log = await pollLogTerminal(page, pid, firedAt);
     expect(String(log!.status).toLowerCase(), `N-TRIGGER-WEBHOOK run: ${JSON.stringify(log)}`).toBe('success');
@@ -937,6 +961,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const action = await dragNodeToCanvas(page, 'action-start-process', { x: 150, y: 240 });
     await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
     await connectEdge(page, trigger, action);
+    await configureWebhookToken(page, trigger);
     await fillNodeConfig(page, action, {
       processKey: '付款审批流程',
       businessKey: '${bizKey}',
@@ -960,9 +985,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await enableViaListToggle(page, pid);
 
     const firedAt = Date.now();
-    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
-      data: { bizKey: businessKey },
-    });
+    const resp = await fireInboundWebhook(page, pid, { bizKey: businessKey });
     expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
     expect(String((await resp.json())?.code), 'webhook POST accepted').toBe('0');
 
@@ -1437,15 +1460,14 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       fields:
         '{"e2et_order_id":"${parentOrderId}","e2et_item_name":"${item}","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
     });
+    await configureWebhookToken(page, trigger);
     const { pid } = await saveAutomation(page);
     createdPids.push(pid);
     await enableViaListToggle(page, pid);
 
     // Fire via the real inbound webhook with a 3-element collection (+ the parent id).
     const firedAt = Date.now();
-    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
-      data: { items: names, parentOrderId },
-    });
+    const resp = await fireInboundWebhook(page, pid, { items: names, parentOrderId });
     expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
     const log = await pollLogTerminal(page, pid, firedAt);
     expect(String(log!.status).toLowerCase(), `N-LOOP run: ${JSON.stringify(log)}`).toBe('success');
@@ -1758,15 +1780,14 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       modelCode: '订单明细',
       fields: '{"e2et_order_id":"${parentOrderId}","e2et_item_name":"' + itemName + '","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}',
     });
+    await configureWebhookToken(page, trigger);
     const { pid } = await saveAutomation(page);
     createdPids.push(pid);
     await enableViaListToggle(page, pid);
 
     // Fire with an EMPTY collection → the loop body iterates 0 times.
     const firedAt = Date.now();
-    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
-      data: { items: [], parentOrderId },
-    });
+    const resp = await fireInboundWebhook(page, pid, { items: [], parentOrderId });
     expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
     const log = await pollLogTerminal(page, pid, firedAt);
     expect(String(log!.status).toLowerCase(), `N-LOOP-EDGE empty-collection run should still succeed: ${JSON.stringify(log)}`).toBe('success');
@@ -1800,6 +1821,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await connectEdge(page, trigger, delayNode);
     await connectEdge(page, delayNode, body);
     await fillNodeConfig(page, delayNode, { duration: '1', unit: '秒' });
+    await configureWebhookToken(page, trigger);
     await fillNodeConfig(page, body, {
       modelCode: '订单明细',
       fields: `{"e2et_order_id":"${parentOrderId}","e2et_item_name":"${itemName}","e2et_item_spec":"std","e2et_item_qty":1,"e2et_item_price":10}`,
@@ -1813,9 +1835,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await enableViaListToggle(page, pid);
 
     const firedAt = Date.now();
-    const resp = await page.request.post(`/api/automations/webhooks/${pid}`, {
-      data: { parentOrderId },
-    });
+    const resp = await fireInboundWebhook(page, pid, { parentOrderId });
     expect(resp.status(), `webhook POST must not 5xx; got ${resp.status()}`).toBeLessThan(500);
     const log = await pollLogTerminal(page, pid, firedAt, 60_000);
     expect(String(log!.status).toLowerCase(), `N-DELAY run: ${JSON.stringify(log)}`).toBe('success');

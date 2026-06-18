@@ -99,6 +99,30 @@ export function AutomationList({
     }
   };
 
+  const handleDuplicate = async (automation: Automation) => {
+    try {
+      const response = await fetch(`/api/automations/${automation.pid}/duplicate`, {
+        method: 'post',
+        headers: authHeaders,
+      });
+      if (!response.ok) {
+        throw new Error('Failed to duplicate automation');
+      }
+      const result = await response.json().catch(() => null);
+      const created = result?.data as Automation | undefined;
+      showSuccessToast(
+        st('$i18n:automation.list.duplicated') || `Duplicated "${automation.name}"`,
+      );
+      revalidator.revalidate();
+      // Jump straight into the new clone so the user can rename / edit it.
+      if (created?.pid) {
+        navigate(`/automation/${created.pid}`);
+      }
+    } catch (err) {
+      showErrorToast(err instanceof Error ? err.message : 'Failed to duplicate');
+    }
+  };
+
   const handleSelectTemplate = async (template: AutomationTemplate) => {
     const resolvedName = resolveLocalizedText(template.name, locale);
     const resolvedDescription = resolveLocalizedText(template.description, locale);
@@ -319,6 +343,14 @@ export function AutomationList({
                     data-testid={`btn-export-${automation.pid}`}
                   >
                     {st('$i18n:automation.list.export') || 'Export'}
+                  </button>
+                  <button
+                    onClick={() => handleDuplicate(automation)}
+                    disabled={!hydrated}
+                    className="rounded-md bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+                    data-testid={`btn-duplicate-${automation.pid}`}
+                  >
+                    {st('$i18n:automation.list.duplicate') || 'Duplicate'}
                   </button>
                   <Link
                     to={`/automation/${automation.pid}`}

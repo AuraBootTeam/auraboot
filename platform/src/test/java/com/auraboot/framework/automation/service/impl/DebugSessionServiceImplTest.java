@@ -531,4 +531,74 @@ class DebugSessionServiceImplTest {
                 .isInstanceOf(ValidationException.class);
         verify(eventPublisher, never()).subscribe(anyString());
     }
+
+    // ------------------------------------------------------------------
+    // designer-flow derivation — debug a flowConfig-built automation whose
+    // flat actions[] is empty (the designer stores steps in flowConfig nodes).
+    // ------------------------------------------------------------------
+
+    /** A designer-built automation: flowConfig trigger→a0→a1, flat actions[] empty. */
+    private Automation designerAutomation(String... actionNodeTypes) {
+        Automation a = new Automation();
+        a.setPid(AUTOMATION_PID);
+        a.setTenantId(1L);
+        a.setActions(new ArrayList<>()); // designer flows leave the flat column empty
+        List<Map<String, Object>> nodes = new ArrayList<>();
+        List<Map<String, Object>> edges = new ArrayList<>();
+        nodes.add(Map.of("id", "t", "type", "trigger-record-create",
+                "data", Map.of("type", "trigger-record-create", "label", "OnCreate",
+                        "config", Map.of("triggerType", "on_record_create", "modelCode", "e2et_order"))));
+        String prev = "t";
+        for (int i = 0; i < actionNodeTypes.length; i++) {
+            String id = "a" + i;
+            String nodeType = actionNodeTypes[i];
+            String actionType = nodeType.substring("action-".length()).replace('-', '_');
+            nodes.add(Map.of("id", id, "type", nodeType,
+                    "data", Map.of("type", nodeType, "label", "step-" + i,
+                            "config", Map.of("actionType", actionType))));
+            edges.add(Map.of("id", "e" + i, "source", prev, "target", id));
+            prev = id;
+        }
+        Map<String, Object> flowConfig = new HashMap<>();
+        flowConfig.put("nodes", nodes);
+        flowConfig.put("edges", edges);
+        a.setFlowConfig(flowConfig);
+        return a;
+    }
+
+    @Test
+    @DisplayName("createSession derives the action count from flowConfig when flat actions[] is empty (designer flow)")
+    void createSession_designerFlow_derivesActionsFromFlowConfig() {
+        Automation designer = designerAutomation("action-update-record", "action-create-record");
+        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(designer);
+        when(debugSessionMapper.findActiveByAutomationId(AUTOMATION_PID)).thenReturn(null);
+
+        DebugSessionDTO dto = service.createSession(AUTOMATION_PID, new DebugSessionCreateRequest());
+
+        assertThat(dto.getTotalActions())
+                .as("debugger must see the 2 action nodes derived from flowConfig, not 0")
+                .isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("step executes the flowConfig-derived actions in graph order (designer flow)")
+    void step_designerFlow_executesDerivedActionsInGraphOrder() {
+        DebugSession s = baseSession("paused", 0);
+        when(debugSessionMapper.findByPid(SESSION_PID)).thenReturn(s);
+        when(automationMapper.findByPid(AUTOMATION_PID))
+                .thenReturn(designerAutomation("action-update-record", "action-create-record"));
+        when(actionExecutor.execute(any(), anyMap())).thenReturn("ok");
+
+        DebugSessionDTO step1 = service.step(SESSION_PID);
+        assertThat(step1.getTotalActions()).isEqualTo(2);
+        assertThat(s.getCurrentActionIndex()).isEqualTo(1);
+        assertThat(s.getStatus()).isEqualTo("paused");
+        assertThat(s.getActionResults()).hasSize(1);
+        assertThat(s.getActionResults().get(0).getActionType()).isEqualTo("update_record");
+
+        service.step(SESSION_PID); // second step → last action → completed
+        assertThat(s.getStatus()).isEqualTo("completed");
+        assertThat(s.getActionResults()).hasSize(2);
+        assertThat(s.getActionResults().get(1).getActionType()).isEqualTo("create_record");
+    }
 }
