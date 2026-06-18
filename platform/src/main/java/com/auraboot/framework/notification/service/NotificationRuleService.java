@@ -16,15 +16,12 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.sql.DataSource;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,61 +44,13 @@ public class NotificationRuleService {
     private final NotificationRuleMapper ruleMapper;
     private final DynamicDataService dynamicDataService;
     private final ObjectMapper objectMapper;
-    private final DataSource dataSource;
-
-    // -------------------------------------------------------------------------
-    // Schema auto-init
-    // -------------------------------------------------------------------------
-
-    /**
-     * Ensure the ab_notification_rule table exists on startup.
-     * This avoids requiring a manual migration step during development.
-     */
-    @PostConstruct
-    public void initSchema() {
-        try {
-            JdbcTemplate jdbc = new JdbcTemplate(dataSource);
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ab_notification_rule (
-                    id              BIGSERIAL PRIMARY KEY,
-                    tenant_id       BIGINT NOT NULL,
-                    code            VARCHAR(100) NOT NULL,
-                    name            VARCHAR(200) NOT NULL,
-                    description     TEXT,
-                    enabled         BOOLEAN DEFAULT TRUE,
-                    trigger_type    VARCHAR(30) NOT NULL DEFAULT 'scheduled',
-                    trigger_config  JSONB,
-                    condition_model_code  VARCHAR(100),
-                    condition_filter      JSONB,
-                    action_channel        VARCHAR(30),
-                    action_template_code  VARCHAR(100),
-                    recipient_type        VARCHAR(30),
-                    recipient_field       VARCHAR(100),
-                    last_evaluated_at     TIMESTAMPTZ,
-                    send_count            INT DEFAULT 0,
-                    deleted_flag    BOOLEAN DEFAULT FALSE,
-                    created_at      TIMESTAMPTZ DEFAULT NOW(),
-                    updated_at      TIMESTAMPTZ DEFAULT NOW()
-                )
-                """);
-            jdbc.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_rule_tenant_code
-                    ON ab_notification_rule (tenant_id, code)
-                    WHERE deleted_flag = FALSE
-                """);
-            jdbc.execute("""
-                CREATE INDEX IF NOT EXISTS idx_notification_rule_tenant
-                    ON ab_notification_rule (tenant_id)
-                """);
-            log.info("NotificationRuleService: table ab_notification_rule ready");
-        } catch (Exception e) {
-            log.warn("NotificationRuleService: schema init warning: {}", e.getMessage());
-        }
-    }
 
     // -------------------------------------------------------------------------
     // CRUD
     // -------------------------------------------------------------------------
+    // NOTE: the ab_notification_rule table + indexes are owned by database/schema.sql
+    // (and the reset/init scripts). Startup-time DDL is forbidden by the bootstrap red line
+    // (no @PostConstruct / ApplicationRunner schema writes), so no initSchema() lives here.
 
     /** List all rules for the current tenant. */
     public List<NotificationRuleDTO> listRules() {
