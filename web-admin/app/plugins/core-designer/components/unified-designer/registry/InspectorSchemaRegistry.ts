@@ -730,6 +730,139 @@ const widgetFields: PropertySchema<string>[] = [
   { key: 'layout.h', label: 'Height', type: 'number' },
 ];
 
+// ── E2 batch: non-family display / layout / form / list blocks ──────────────
+// Same contract as the workbench + display families above: every key below is a
+// BARE top-level path (no props.*) when the platform renderer reads it there, and
+// `props.*` only when it actually reads props. Each schema was verified against
+// the renderer source under framework/meta/rendering/blocks/ — no invented fields.
+
+// ChartBlockRenderer reads bare block.chartType / block.dataSource (string id) /
+// block.chartConfig / block.visualization / block.linkage / block.drillDown /
+// block.refreshInterval / block.title (props.* are legacy fallbacks). The chart
+// itself is rendered by SharedChartFactory (28 registered types); the select lists
+// the common ones — any unsupported value surfaces a clear "Unsupported chart type"
+// message on the live page (never silent).
+const chartFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  {
+    key: 'chartType',
+    label: 'Chart type',
+    type: 'select',
+    options: [
+      { label: 'Bar', value: 'bar' },
+      { label: 'Line', value: 'line' },
+      { label: 'Pie', value: 'pie' },
+      { label: 'Area', value: 'area' },
+      { label: 'Scatter', value: 'scatter' },
+      { label: 'Radar', value: 'radar' },
+      { label: 'Gauge', value: 'gauge' },
+      { label: 'Funnel', value: 'funnel' },
+      { label: 'Heatmap', value: 'heatmap' },
+      { label: 'Treemap', value: 'treemap' },
+      { label: 'Gantt', value: 'gantt' },
+      { label: 'Pareto', value: 'pareto' },
+      { label: 'Combo', value: 'combo' },
+      { label: 'Table', value: 'table' },
+    ],
+  },
+  { key: 'dataSource', label: 'Data source', type: 'text' },
+  // chartConfig: { xField, yField, height, … } — the renderer spreads it.
+  { key: 'chartConfig', label: 'Chart config JSON', type: 'json' },
+  // visualization: { stacked, smooth, … } — unified visualization props.
+  { key: 'visualization', label: 'Visualization JSON', type: 'json' },
+  { key: 'linkage', label: 'Linkage JSON', type: 'json' },
+  { key: 'drillDown', label: 'Drilldown JSON', type: 'json' },
+  { key: 'refreshInterval', label: 'Refresh seconds', type: 'number' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// RichTextBlockRenderer reads bare block.content (string or LocalizedText; HTML is
+// sanitized before render). No other authorable props.
+const richTextFields: PropertySchema<string>[] = [
+  { key: 'content', label: 'Content (HTML)', type: 'text' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// DividerBlockRenderer reads bare block.title (optional label divider; no title =
+// plain horizontal rule). Only authorable surface.
+const dividerFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Label (optional)', type: 'text' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// ToolbarBlockRenderer / FormButtonsBlockRenderer both read bare block.buttons —
+// an array of ButtonConfig { code, label|content, icon, variant|primary|danger,
+// visibleWhen, disabled|disableWhen|enableWhen, events.onClick|action|commandCode|
+// navigateTo|apiAction|handler }. Authored as JSON — the renderer iterates it.
+const toolbarFields: PropertySchema<string>[] = [
+  { key: 'buttons', label: 'Buttons JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+const formButtonsFields: PropertySchema<string>[] = [
+  { key: 'buttons', label: 'Buttons JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// FiltersBlockRenderer reads bare block.fields (array of filter FieldConfig, each
+// { field, … } rendered via FieldRenderer) + block.onSearch / block.onReset
+// (handler refs fired on the Search / Reset buttons).
+const filtersFields: PropertySchema<string>[] = [
+  { key: 'fields', label: 'Filter fields JSON', type: 'json' },
+  { key: 'onSearch', label: 'On search handler', type: 'text' },
+  { key: 'onReset', label: 'On reset handler', type: 'text' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// FormWizardBlockRenderer reads bare block.steps — array of { key, label,
+// description?, blocks[] }. Authored as JSON; child blocks render per step.
+const formWizardFields: PropertySchema<string>[] = [
+  { key: 'steps', label: 'Steps JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// TraceGraphBlockRenderer reads bare block.dataSource (string id whose flat rows
+// are mapped to nodes/edges) + block.mode ('consumption' | 'genealogy'; inferred
+// from row fields when omitted). The live canvas renders on /p/; the designer shows
+// a config-driven representative preview (avoids the @xyflow zero-height pitfall).
+const traceGraphFields: PropertySchema<string>[] = [
+  { key: 'dataSource', label: 'Data source', type: 'text' },
+  {
+    key: 'mode',
+    label: 'Mode',
+    type: 'select',
+    options: [
+      { label: 'Consumption (work-order → lot)', value: 'consumption' },
+      { label: 'Genealogy (finished SN → component)', value: 'genealogy' },
+    ],
+  },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// SelectionInfoBlockRenderer reads bare block.title + the bound runtime-state key
+// (block.selection.bind || block.bind || 'selectedRows'). The inspector exposes the
+// simpler bare `bind` text path the renderer reads directly.
+const selectionInfoFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'bind', label: 'Selection state key', type: 'text' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
+// GerberViewerBlockRenderer reads bare block.title (or block.label) / block.dataSource
+// (string id) / block.inspection (runtime value expr) / block.inspectionUrl /
+// block.lineContext / block.lineInspectionField / block.empty ({ title }). The PCB
+// board canvas + CPL inspection render on the live /p/ page (it fetches gerber
+// artifacts with the auth token); the designer shows a representative preview.
+const gerberViewerFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'dataSource', label: 'Data source', type: 'text' },
+  { key: 'inspection', label: 'Inspection expression', type: 'text' },
+  { key: 'inspectionUrl', label: 'Inspection URL', type: 'text' },
+  { key: 'lineContext', label: 'Line context expression', type: 'text' },
+  { key: 'lineInspectionField', label: 'Line inspection field', type: 'text' },
+  { key: 'empty', label: 'Empty state JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number' },
+];
+
 export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry {
   const registry = new InspectorSchemaRegistry(defaultFields);
   registry.registerAll({
@@ -763,6 +896,17 @@ export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry 
     description: descriptionFields,
     'record-comments': recordCommentsFields,
     'embedded-list': embeddedListFields,
+    // E2 batch: non-family display / layout / form / list blocks.
+    chart: chartFields,
+    'rich-text': richTextFields,
+    divider: dividerFields,
+    toolbar: toolbarFields,
+    'form-buttons': formButtonsFields,
+    filters: filtersFields,
+    'form-wizard': formWizardFields,
+    'trace-graph': traceGraphFields,
+    'selection-info': selectionInfoFields,
+    'gerber-viewer': gerberViewerFields,
     action: [...actionBaseFields, ...actionCommonFeedbackFields],
     widget: widgetFields,
   });

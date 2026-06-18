@@ -556,6 +556,43 @@ export const DESIGNER_I18N = {
         'zh-CN': '内嵌列表(实时记录在已发布页面加载)',
         'en-US': 'Embedded list — live records load on the published page',
       } as L,
+      // E2 batch (chart / rich-text / divider / toolbar / form-buttons / filters /
+      // form-wizard / trace-graph / selection-info / gerber-viewer) representative
+      // previews. Same contract: the designer canvas shows a config-driven
+      // placeholder; the live /p/ page renders the fully data-bound platform renderer.
+      chartNotConfigured: {
+        'zh-CN': '未配置图表(需设置数据源或字段)',
+        'en-US': 'No chart configured (set a data source or fields)',
+      } as L,
+      richTextEmpty: {
+        'zh-CN': '未配置富文本内容',
+        'en-US': 'No rich-text content',
+      } as L,
+      toolbarNoButtons: {
+        'zh-CN': '未配置按钮',
+        'en-US': 'No buttons configured',
+      } as L,
+      filtersNoFields: {
+        'zh-CN': '未配置筛选字段',
+        'en-US': 'No filter fields configured',
+      } as L,
+      filtersReset: { 'zh-CN': '重置', 'en-US': 'Reset' } as L,
+      filtersSearch: { 'zh-CN': '搜索', 'en-US': 'Search' } as L,
+      formWizardNoSteps: {
+        'zh-CN': '未配置步骤',
+        'en-US': 'No wizard steps configured',
+      } as L,
+      traceGraphNotConfigured: {
+        'zh-CN': '未配置追溯数据源',
+        'en-US': 'No trace data source configured',
+      } as L,
+      traceGraphNodeA: { 'zh-CN': '上游节点', 'en-US': 'Source node' } as L,
+      traceGraphNodeB: { 'zh-CN': '下游节点', 'en-US': 'Target node' } as L,
+      selectionInfoBoundTo: { 'zh-CN': '绑定状态', 'en-US': 'Bound to' } as L,
+      gerberViewerNotConfigured: {
+        'zh-CN': '未配置 Gerber 数据源',
+        'en-US': 'No Gerber data source configured',
+      } as L,
     },
 
     // Inspector shell
