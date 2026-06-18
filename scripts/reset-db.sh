@@ -7,7 +7,11 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-SCHEMA_FILE="$PROJECT_ROOT/platform/src/main/resources/database/schema.sql"
+# Schema is applied via Flyway migrations (db/migration/**) — schema.sql is no
+# longer the load path. See end-state spec:
+# docs/superpowers/specs/2026-06-18-postgresql-flyway-schema-governance-endstate.md
+CORE_MIGRATION_DIR="$PROJECT_ROOT/platform/src/main/resources/db/migration/core"
+FLYWAY_MIGRATE="$SCRIPT_DIR/db/flyway-migrate.sh"
 
 PG_HOST="${PG_HOST:-${PGHOST:-localhost}}"
 PG_PORT="${PG_PORT:-${PGPORT:-5432}}"
@@ -42,9 +46,11 @@ echo ""
 echo "Target: $PG_HOST:$PG_PORT/$PG_DB (user $PG_USER)"
 echo ""
 
-# Check if schema file exists
-if [ ! -f "$SCHEMA_FILE" ]; then
-    echo "Error: Schema file not found at $SCHEMA_FILE"
+# Flyway core migrations + runner must be present (schema source of truth).
+if [ ! -d "$CORE_MIGRATION_DIR" ] || [ ! -x "$FLYWAY_MIGRATE" ]; then
+    echo "Error: Flyway core migrations or runner missing:"
+    echo "  migrations: $CORE_MIGRATION_DIR"
+    echo "  runner:     $FLYWAY_MIGRATE"
     exit 1
 fi
 
@@ -75,8 +81,9 @@ psql_run postgres -c "DROP DATABASE IF EXISTS $DB_IDENT WITH (FORCE);"
 echo "Step 3: Creating database '$PG_DB'..."
 psql_run postgres -c "CREATE DATABASE $DB_IDENT;"
 
-echo "Step 4: Initializing schema..."
-psql_run "$PG_DB" -f "$SCHEMA_FILE"
+echo "Step 4: Applying schema via Flyway (db/migration/core)..."
+PG_HOST="$PG_HOST" PG_PORT="$PG_PORT" PG_USER="$PG_USER" PG_PASSWORD="$PG_PASSWORD" PG_DB="$PG_DB" \
+    "$FLYWAY_MIGRATE" --edition oss
 
 echo ""
 echo "Step 5: Migrating deprecated blockType aliases in ab_page_schema..."
