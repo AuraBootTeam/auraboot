@@ -66,6 +66,7 @@ owner: diqi
 | DR-20260618-D2-gate-001 | P1 | `scripts/oss-golden-stack.sh` | PR #816 引入注释含 `auraboot-enterprise` 路径 → **origin/main 当前 check-oss-boundary 失败**(近期 PR 破坏本地门禁) | 注释去掉字面路径前缀 | check-oss-boundary ✅ |
 | DR-20260618-D4-dx-001 | P2 | `plugin/validation/ExtensionValidator.java` | inline bindingRules 仅 log.warn 不进 validator result(import 仍 success:true,规则静默 drop,§6 footgun) | 加 `S-EXT-INLINE-BINDING` validation warning | ExtensionValidatorInlineBindingTest PASS(emit + no-emit) |
 | DR-20260618-D1-perm-006 | P1 | `agent/controller/ApsSchedulingController.java` `PlatformAiController.java` | 任意用户可触发全租户 APS 排程(compute)/ LLM 记录评分(成本+写任意 model 字段) | 注册新码 `meta.manufacturing.aps` / `ai.scoring.run`(default-bootstrap + MetaPermission)+ 加 `@RequirePermission` | guard test 2 例 deny/allow PASS;validate-permission-codes drift 0(321→323);TenantBootstrapServiceTest PASS |
+| DR-20260618-D1-perm-005 | P2 | `scripts/check-controller-authz.mjs` + `controller-authz-baseline.json` | 无门禁防止**新增** fail-open 写 controller(perm-004 surface 会静默增长) | 新本地门禁:枚举有写映射 / 无 @RequirePermission / 非 /api/admin 的 controller,baseline 现状 75 个,只对**新增**报错 | baseline=75 准确;compare PASS;负向测试(模拟新增)→ exit 1 named;6 个已修 controller 不在 baseline |
 
 **真栈验证反哺(两处比 reviewer 静态判断更深,印证「jsonb/IDOR 必真栈 IT」红线):**
 1. jsonb 不止「缺 ::jsonb cast」——根因是自定义 @Insert 不继承 @TableField typeHandler,Map 落到默认 handler 当 hstore;只有真 insert 非 null 值才暴露。
@@ -75,8 +76,7 @@ owner: diqi
 
 | ID | severity | 来源 | 内容 | 不在本 PR 的原因 |
 |---|---|---|---|---|
-| DR-20260618-D1-perm-004 | P1 | R2 F-03 | PermissionInterceptor fail-open,~116 个无注解写操作 controller 需逐一分类(self-scoped vs admin) | 系统性工程,需逐 controller 判定 + 防回归 CI gate(见下),改错会锁死正常功能 |
-| DR-20260618-D1-perm-005 | P2 | R2 C-05 | `validate-permission-codes.mjs` 无「写操作 controller 缺 @RequirePermission」扫描 | 依赖 perm-004 分类完成才能定 fail 基线 |
+| DR-20260618-D1-perm-004 | P1 | R2 F-03 | PermissionInterceptor fail-open。**精确清单(本轮 grep 实测,replaces 估计 ~116)**:178 个有写映射的 controller,其中 **75 个无 `@RequirePermission` 且非 `/api/admin`**。**须逐个人工分类,禁盲目批量守护**:① 合法豁免(auth flow `AuthController`/`VerifyCodeController`/`DeactivationController`、`@Profile(test)` `TestSeed`/`TestFixture`、签名 webhook `MarketplaceStripeWebhook`、self-scoped `TenantSelection`/`TenantPreference`/`Notification`(本人)/`AuraBot*` 会话)② 真需守护(`OrgController`/`TeamController` 组织架构、`DataSyncController`、`NotificationTemplateController`/`NotificationRuleController` 配置、`QueryBuilderController` 等)| 系统性工程:75 条逐个判定 self-scoped vs admin(需领域知识,盲目守护会锁死 auth/test/self 流)。本 PR 已修其中影响面最大的 6 个(perm-001/002/003/006);余 ~69 待分类。**surface 增长已被 perm-005 门禁(`check-controller-authz.mjs`)封住**,只剩存量分类 |
 | DR-20260618-D1-bootstrap-002 | P1 | R1 F2/F3 | SystemTaskInitializer @PostConstruct insert(11 sys task)+ SkillBootstrapRunner per-tenant upsert(§4.1) | 需把 seed 迁到 reset-init + 真栈验证 fresh DB 仍注册任务/skill,改错破坏调度 |
 | DR-20260618-D1-i18n-001 | P1 | R1 F4/F5 + R5 P1-001..007 | 后端 user-facing 中文(TenantApplication/TenantMember Excel)+ 前端 ~7 处框架组件硬编码中文(NotificationRuleBuilder/ChartWrapper/TenantSelection/QrCodeScanner/PermissionGuard/Header) | i18n key 基建 sweep,独立任务 |
 | DR-20260618-D5-frontend-001 | P1 | R5 P1-007 | `routes/project-management/` TSX 调幽灵 model `pm_*`(实际 `tpm_*`)→ 运行时 404 死路由 + 配置优先违规 | 需评估 DSL 页(tpm_*)功能完整性能否替代 Gantt/Board,删/迁是独立决策 |
