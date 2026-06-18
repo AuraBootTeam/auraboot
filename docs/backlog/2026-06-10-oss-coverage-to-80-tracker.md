@@ -213,6 +213,24 @@ passes; the bump to lock in wave 3 should land in the next clean full-suite cons
 recurring jsonb-typeHandler omission (3 entities in 2 days) is worth a one-shot audit of all
 `@TableField` String fields mapped to jsonb columns + promoting the rule to canonical.
 
+**Wave 4 (2026-06-18 — "覆盖率收尾固化" follow-up):** (1) jsonb guardrail re-verified clean
+on current `origin/main` — `scripts/check-jsonb-typehandler.sh` reports **38 String→jsonb
+fields protected, 0 defects** (the wave-3 "2 latent" pair is dispositioned: KbChunk fixed,
+InvariantEvaluationLog confirmed false-positive). (2) `DynamicDataServiceImplCoverageIT`
+extended with `importData` (CSV/JSON/field-map/file-not-found/per-row-error),
+`executeCustomAction` (count/truncate/unsupported), and the relation methods'
+no-relations-defined reject path — all **previously 0% covered** (grep-verified zero test
+callers), all green on a current-schema DB. Behavioral finding F4: `importData` does not
+auto-generate the PK (unlike `create()`), so imports of new records without an explicit
+`pid` fail every row — low-priority backlog. **The BUNDLE floor stays 0.73 (still NOT
+bumped):** a clean consolidated measurement needs a DB that is BOTH at the current Flyway
+baseline AND reset+bootstrapped. The shared dev `aura_boot` is mid Flyway-baseline transition
+(stale billing schema → 51 billing failures on a snapshot); a fresh baseline DB lacks
+bootstrap seed (→ 75 scattered 403/404/MetaServiceException failures); and jacoco
+under-records in a fresh worktree. The bump remains queued for the next clean reset+bootstrap
+consolidation. Full evidence:
+`docs/retro/2026-06-18-oss-coverage-gate-consolidation-testing-gate-acceptance-report.md`.
+
 **Frontend** — wired in `web-admin/vitest.config.ts` `coverage.thresholds` (lines 19 /
 stmts 18 / funcs 16 / branches 16 today). Raise in lockstep with new tests.
 
