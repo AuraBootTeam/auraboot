@@ -246,7 +246,7 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
             #{binding.roleId}, #{binding.permissionId},
             #{binding.grantType}, #{binding.priority},
             #{binding.effectiveDate}, #{binding.expiryDate},
-            #{binding.conditions},
+            #{binding.conditions,typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}::jsonb,
             #{binding.status}, #{binding.deletedFlag},
             #{binding.createdAt}, #{binding.updatedAt}, #{binding.createdBy}, #{binding.updatedBy}
         )
