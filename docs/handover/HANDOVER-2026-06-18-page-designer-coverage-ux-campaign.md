@@ -70,7 +70,7 @@ created: 2026-06-18
 - 无需 reset。新会话续推 E2 加块照范式起自己的隔离 runtime(`dev.sh runtime allocate` 自己 slot + 独立 DB,**绝不 reset 共享 aura_boot / 绝不 oss-reset pkill 并发会话**)
 
 ## Next Steps(新会话照 gap doc 范式)
-1. **E2 余 12 非 family 块**(chart/trace-graph/form-buttons/form-wizard/filters/toolbar/monthly-grid/divider/rich-text/gerber-viewer/selection-info/text):照 #766/#767/#773 范式,逐块读平台渲染器取 bare-path prop → BlockRegistry+inspector+代表性预览+golden。机械重复,trace-graph(@xyflow)+ gerber-viewer 较复杂需留意。
+1. ~~**E2 余 12 非 family 块**~~ — ✅ **DONE(2026-06-18,PR #787)**:取证后实际 **10 块**(monthly-grid/text 剔除,非真块);全部交付 + 三层验证(单测 456 / 后端真栈 / 真浏览器)+ 合并 main `2d810f035`。续接 handover `HANDOVER-2026-06-18-page-designer-e2-blocks.md`。
 2. **C4 kind 切换**:需先定设计决策(换 kind 后不兼容 block:丢弃/警告/保留),owner 拍板后实现。
 3. **E1 widget 全 24 chart parity**:需把 widget runtime 统一到 `SharedChartFactory`(架构活)。
 4. A7(mid-drag 视觉,flaky)/ A11·A12(广度)/ D2·D4(富属性控件+字段级校验)/ B3(REST diff 下钻)。
