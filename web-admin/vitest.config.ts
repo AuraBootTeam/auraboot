@@ -54,17 +54,20 @@ export default defineConfig({
         '**/types/**',
       ],
       thresholds: {
-        // Ratchet — raised 2026-06-11 (round 2) after coverage PRs #540/#541/#542/#543
-        // (designer runtime engines + studio/plugin hooks + useTaskCenter/useDslForm).
-        // Measured: lines 25.61 / stmts 25.13 / funcs 22.35 / branches 19.9. Floors sit
-        // just under measured for flaky margin. NOTE: vitest covers logic (services /
-        // hooks / engines / utils); React presentation components are covered by
-        // Playwright E2E, so the vitest line ceiling is ~30% — reaching 80% line needs
-        // E2E coverage merge, not more component unit tests (see tracker §7).
-        lines: 25,
-        statements: 24,
-        functions: 22,
-        branches: 19,
+        // Ratchet — consolidated 2026-06-19 (wave 4). The floors lagged actual by ~5pt:
+        // a fresh full run measured lines 30.17 / stmts 29.62 / funcs 27.39 / branches
+        // 24.55 (423 spec files / 4342 tests) but the floors were still at the round-2
+        // values. Raised to lock in the achieved coverage (~2-3pt flaky margin) and
+        // extended ActionRegistry handler coverage (navigate/new/search/reset/setState +
+        // error branches). NOTE: vitest covers logic (services / hooks / engines / utils);
+        // React presentation components are covered by Playwright E2E, so the vitest line
+        // ceiling is ~30% — reaching 80% line needs the coverage:e2e harness merged with
+        // vitest (GA stack) or a redefined target, NOT more component unit tests (tracker §7,
+        // owner task #14). The logic layer is now near-exhausted (~5 .ts modules remain).
+        lines: 28,
+        statements: 27,
+        functions: 25,
+        branches: 22,
       },
     },
     // 禁用 watch 模式的交互提示
