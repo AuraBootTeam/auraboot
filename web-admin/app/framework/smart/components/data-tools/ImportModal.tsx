@@ -8,6 +8,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { cn } from '~/utils/cn';
 import { ResultHelper } from '~/utils/type';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface ImportModalProps {
   /** Whether the modal is open */
@@ -42,6 +43,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   modelCode,
   onImportComplete,
 }) => {
+  const { t } = useI18n();
   const [step, setStep] = useState<ImportStep>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
@@ -66,44 +68,63 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     onClose();
   }, [resetState, onClose]);
 
-  const parseFileForPreview = useCallback(async (selectedFile: File) => {
-    setFile(selectedFile);
-    setError(null);
+  const parseFileForPreview = useCallback(
+    async (selectedFile: File) => {
+      setFile(selectedFile);
+      setError(null);
 
-    try {
-      const fileExt = selectedFile.name.split('.').pop()?.toLowerCase();
+      try {
+        const fileExt = selectedFile.name.split('.').pop()?.toLowerCase();
 
-      if (fileExt === 'csv') {
-        const text = await selectedFile.text();
-        const Papa = await import('papaparse');
-        const result = Papa.default.parse(text, { header: true, preview: 10 });
-        if (result.errors.length > 0) {
-          setError(`CSV parsing error: ${result.errors[0].message}`);
+        if (fileExt === 'csv') {
+          const text = await selectedFile.text();
+          const Papa = await import('papaparse');
+          const result = Papa.default.parse(text, { header: true, preview: 10 });
+          if (result.errors.length > 0) {
+            setError(
+              t(
+                'import.error.csv_parse',
+                { message: result.errors[0].message },
+                `CSV parsing error: ${result.errors[0].message}`,
+              ),
+            );
+            return;
+          }
+          const data = result.data as PreviewRow[];
+          setPreviewColumns(result.meta.fields || []);
+          setPreviewData(data);
+        } else if (fileExt === 'xlsx' || fileExt === 'xls') {
+          const XLSX = await import('xlsx');
+          const buffer = await selectedFile.arrayBuffer();
+          const workbook = XLSX.read(buffer, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json<PreviewRow>(firstSheet, { defval: '' });
+          const preview = jsonData.slice(0, 10);
+          const cols = preview.length > 0 ? Object.keys(preview[0]) : [];
+          setPreviewColumns(cols);
+          setPreviewData(preview);
+        } else {
+          setError(
+            t(
+              'import.error.unsupported_format',
+              undefined,
+              'Unsupported file format. Please use .xlsx, .xls, or .csv files.',
+            ),
+          );
           return;
         }
-        const data = result.data as PreviewRow[];
-        setPreviewColumns(result.meta.fields || []);
-        setPreviewData(data);
-      } else if (fileExt === 'xlsx' || fileExt === 'xls') {
-        const XLSX = await import('xlsx');
-        const buffer = await selectedFile.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array' });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json<PreviewRow>(firstSheet, { defval: '' });
-        const preview = jsonData.slice(0, 10);
-        const cols = preview.length > 0 ? Object.keys(preview[0]) : [];
-        setPreviewColumns(cols);
-        setPreviewData(preview);
-      } else {
-        setError('Unsupported file format. Please use .xlsx, .xls, or .csv files.');
-        return;
-      }
 
-      setStep('preview');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse file');
-    }
-  }, []);
+        setStep('preview');
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : t('import.error.parse_failed', undefined, 'Failed to parse file'),
+        );
+      }
+    },
+    [t],
+  );
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,12 +160,18 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error(`Import failed: ${response.statusText}`);
+        throw new Error(
+          t(
+            'import.error.failed_status',
+            { status: response.statusText },
+            `Import failed: ${response.statusText}`,
+          ),
+        );
       }
 
       const result = await response.json();
       if (!ResultHelper.isSuccess(result)) {
-        throw new Error(result.desc || 'Import failed');
+        throw new Error(result.desc || t('import.error.failed', undefined, 'Import failed'));
       }
 
       const importData: ImportResultData = {
@@ -158,10 +185,12 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       setStep('result');
       onImportComplete?.(importData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed');
+      setError(
+        err instanceof Error ? err.message : t('import.error.failed', undefined, 'Import failed'),
+      );
       setStep('preview');
     }
-  }, [file, modelCode, onImportComplete]);
+  }, [file, modelCode, onImportComplete, t]);
 
   if (!open) return null;
 
@@ -173,16 +202,19 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
-          className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-2xl"
+          className="bg-panel rounded-card-lg flex max-h-[80vh] w-full max-w-2xl flex-col shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">Import Data</h2>
+          <div className="border-border flex items-center justify-between border-b px-6 py-4">
+            <h2 className="text-text text-lg font-semibold">
+              {t('import.title', undefined, 'Import Data')}
+            </h2>
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500"
+              aria-label={t('common.close', undefined, 'Close')}
+              className="text-text-3 hover:bg-hover hover:text-text-2 rounded-control focus-visible:shadow-focus p-2 focus:outline-none"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -207,12 +239,12 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
                 className={cn(
-                  'rounded-lg border-2 border-dashed p-12 text-center transition-colors',
-                  dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 bg-gray-50',
+                  'rounded-card border-2 border-dashed p-12 text-center transition-colors',
+                  dragOver ? 'border-accent bg-accent-weak' : 'border-border-strong bg-subtle',
                 )}
               >
                 <svg
-                  className="mx-auto mb-4 h-12 w-12 text-gray-400"
+                  className="text-text-3 mx-auto mb-4 h-12 w-12"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -224,13 +256,15 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                     d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                   />
                 </svg>
-                <p className="mb-2 text-sm text-gray-600">Drag and drop your file here, or</p>
+                <p className="text-text-2 mb-2 text-sm">
+                  {t('import.upload.drag_hint', undefined, 'Drag and drop your file here, or')}
+                </p>
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="rounded-md bg-blue-50 px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-100"
+                  className="bg-accent-weak text-accent rounded-control focus-visible:shadow-focus px-4 py-2 text-sm font-medium hover:brightness-95 focus:outline-none"
                 >
-                  Browse Files
+                  {t('import.upload.browse', undefined, 'Browse Files')}
                 </button>
                 <input
                   ref={fileInputRef}
@@ -239,13 +273,17 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                   onChange={handleFileSelect}
                   className="hidden"
                 />
-                <p className="mt-3 text-xs text-gray-500">
-                  Supports: Excel (.xlsx, .xls), CSV (.csv)
+                <p className="text-text-2 mt-3 text-xs">
+                  {t(
+                    'import.upload.supports',
+                    undefined,
+                    'Supports: Excel (.xlsx, .xls), CSV (.csv)',
+                  )}
                 </p>
                 <a
                   href={`/api/meta/excel/template/${modelCode}`}
                   download
-                  className="mt-3 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                  className="text-accent hover:text-accent-hover focus-visible:shadow-focus mt-3 inline-flex items-center gap-1 text-sm hover:underline focus:outline-none"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -255,7 +293,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  Download Import Template
+                  {t('import.upload.download_template', undefined, 'Download Import Template')}
                 </a>
               </div>
             )}
@@ -265,41 +303,47 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               <div>
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-700">Preview</h3>
-                    <p className="text-xs text-gray-500">
-                      {file?.name} - Showing first {previewData.length} rows
+                    <h3 className="text-text-2 text-sm font-medium">
+                      {t('import.preview.title', undefined, 'Preview')}
+                    </h3>
+                    <p className="text-text-2 text-xs">
+                      {t(
+                        'import.preview.summary',
+                        { name: file?.name, count: previewData.length },
+                        `${file?.name} - Showing first ${previewData.length} rows`,
+                      )}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={resetState}
-                    className="text-sm text-blue-600 hover:text-blue-700"
+                    className="text-accent hover:text-accent-hover focus-visible:shadow-focus text-sm focus:outline-none"
                   >
-                    Change File
+                    {t('import.preview.change_file', undefined, 'Change File')}
                   </button>
                 </div>
 
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50">
+                <div className="border-border rounded-card overflow-x-auto border">
+                  <table className="divide-border min-w-full divide-y text-sm">
+                    <thead className="bg-subtle">
                       <tr>
                         {previewColumns.map((col) => (
                           <th
                             key={col}
-                            className="px-3 py-2 text-left text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
+                            className="text-text-2 px-3 py-2 text-left text-xs font-medium whitespace-nowrap uppercase"
                           >
                             {col}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-border divide-y">
                       {previewData.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
+                        <tr key={idx} className="hover:bg-subtle">
                           {previewColumns.map((col) => (
                             <td
                               key={col}
-                              className="max-w-[200px] truncate px-3 py-2 whitespace-nowrap text-gray-700"
+                              className="text-text-2 max-w-[200px] truncate px-3 py-2 whitespace-nowrap"
                             >
                               {String(row[col] ?? '')}
                             </td>
@@ -315,8 +359,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             {/* Importing Step */}
             {step === 'importing' && (
               <div className="py-12 text-center">
-                <span className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-3 border-blue-200 border-t-blue-600" />
-                <p className="text-sm text-gray-600">Importing data...</p>
+                <span className="border-accent-weak border-t-accent rounded-pill mb-4 inline-block h-10 w-10 animate-spin border-3" />
+                <p className="text-text-2 text-sm">
+                  {t('import.importing', undefined, 'Importing data...')}
+                </p>
               </div>
             )}
 
@@ -326,7 +372,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 {importResult.success ? (
                   <>
                     <svg
-                      className="mx-auto mb-4 h-16 w-16 text-green-500"
+                      className="text-status-green mx-auto mb-4 h-16 w-16"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -338,12 +384,14 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    <h3 className="mb-2 text-lg font-semibold text-gray-900">Import Complete</h3>
+                    <h3 className="text-text mb-2 text-lg font-semibold">
+                      {t('import.result.complete', undefined, 'Import Complete')}
+                    </h3>
                   </>
                 ) : (
                   <>
                     <svg
-                      className="mx-auto mb-4 h-16 w-16 text-yellow-500"
+                      className="text-status-amber mx-auto mb-4 h-16 w-16"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -355,23 +403,35 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
                       />
                     </svg>
-                    <h3 className="mb-2 text-lg font-semibold text-gray-900">
-                      Import Completed with Errors
+                    <h3 className="text-text mb-2 text-lg font-semibold">
+                      {t(
+                        'import.result.complete_with_errors',
+                        undefined,
+                        'Import Completed with Errors',
+                      )}
                     </h3>
                   </>
                 )}
                 <div className="mt-4 flex justify-center gap-8">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{importResult.imported}</div>
-                    <div className="text-xs text-gray-500">Imported</div>
+                    <div className="text-status-green text-2xl font-bold">
+                      {importResult.imported}
+                    </div>
+                    <div className="text-text-2 text-xs">
+                      {t('import.result.imported', undefined, 'Imported')}
+                    </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">{importResult.failed}</div>
-                    <div className="text-xs text-gray-500">Failed</div>
+                    <div className="text-status-red text-2xl font-bold">{importResult.failed}</div>
+                    <div className="text-text-2 text-xs">
+                      {t('import.result.failed', undefined, 'Failed')}
+                    </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-gray-600">{importResult.total}</div>
-                    <div className="text-xs text-gray-500">Total</div>
+                    <div className="text-text-2 text-2xl font-bold">{importResult.total}</div>
+                    <div className="text-text-2 text-xs">
+                      {t('import.result.total', undefined, 'Total')}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -379,28 +439,30 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 
             {/* Error Display */}
             {error && (
-              <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3">
-                <p className="text-sm text-red-600">{error}</p>
+              <div className="border-status-red bg-status-red-bg rounded-control mt-4 border p-3">
+                <p className="text-status-red text-sm">{error}</p>
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+          <div className="border-border flex justify-end gap-3 border-t px-6 py-4">
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded-control focus-visible:shadow-focus border px-4 py-2 text-sm font-medium focus:outline-none"
             >
-              {step === 'result' ? 'Close' : 'Cancel'}
+              {step === 'result'
+                ? t('common.close', undefined, 'Close')
+                : t('common.cancel', undefined, 'Cancel')}
             </button>
             {step === 'preview' && (
               <button
                 type="button"
                 onClick={handleImport}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="bg-accent hover:bg-accent-hover rounded-control focus-visible:shadow-focus px-4 py-2 text-sm font-medium text-white focus:outline-none"
               >
-                Start Import
+                {t('import.start', undefined, 'Start Import')}
               </button>
             )}
           </div>
