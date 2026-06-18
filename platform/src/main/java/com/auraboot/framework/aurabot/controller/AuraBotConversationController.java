@@ -7,6 +7,7 @@ import com.auraboot.framework.aurabot.dto.AuraBotConversationMessage;
 import com.auraboot.framework.aurabot.dto.AuraBotMessageCreateRequest;
 import com.auraboot.framework.aurabot.service.AuraBotConversationService;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +16,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/ai/aurabot/conversations")
 @RequiredArgsConstructor
+@AuthenticatedAccess("operates only on the caller's own aurabot conversations (currentHumanMemberId)")
 public class AuraBotConversationController {
 
     private final AuraBotConversationService conversationService;

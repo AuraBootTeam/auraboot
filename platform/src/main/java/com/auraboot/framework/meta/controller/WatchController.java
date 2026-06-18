@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.service.WatchService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.meta.util.PageKeyConverter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RequestMapping("/api/dynamic")
 @RequiredArgsConstructor
 @Tag(name = "Watch/Follow", description = "Record watch/follow subscription endpoints")
+@AuthenticatedAccess("toggles only the caller's own watch row (MetaContext userId + tenantId)")
 public class WatchController {
 
     private final WatchService watchService;

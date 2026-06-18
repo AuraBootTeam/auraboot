@@ -3,6 +3,7 @@ package com.auraboot.framework.im.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
 import com.auraboot.framework.im.dto.ConversationListItem;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
@@ -24,6 +25,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/im/conversations")
+@AuthenticatedAccess("operations are scoped to conversations the caller is a member of (isMember + userId/tenantId)")
 public class ImConversationController {
 
     private final ImConversationService conversationService;

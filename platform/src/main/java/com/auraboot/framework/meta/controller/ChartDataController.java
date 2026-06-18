@@ -4,6 +4,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.AggregateQueryRequest;
 import com.auraboot.framework.meta.dto.AggregateQueryResponse;
 import com.auraboot.framework.meta.service.AggregateQueryService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/meta")
 @RequiredArgsConstructor
+@AuthenticatedAccess("read-only POST-as-query (aggregate); data-level access enforced by ABAC, not RBAC action codes")
 public class ChartDataController {
 
     private final AggregateQueryService aggregateQueryService;

@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.conversation.dto.ActiveTurnDTO;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.conversation.turn.TurnHandle;
 import com.auraboot.framework.conversation.turn.TurnRegistry;
 import com.auraboot.framework.exception.RootUnCheckedException;
@@ -24,6 +25,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/conversations")
+@AuthenticatedAccess("turn cancel is restricted to the conversation initiator; reads are membership-checked")
 public class ConversationTurnController {
 
     private final TurnRegistry turnRegistry;

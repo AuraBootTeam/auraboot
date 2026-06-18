@@ -23,7 +23,7 @@ related: 2026-06-18-oss-deep-review-plan.md
 PluginPackageController / PluginTransactionalImportController(`plugin.plugin.manage`)、SubjectPermissionController 写方法(`meta.permission.update`)、NlModelingController(`meta.model.update`)、ApsSchedulingController(`meta.manufacturing.aps`)、PlatformAiController(`ai.scoring.run`)。
 
 ### EXEMPT — 合法豁免(无需 RBAC 码)
-> ✅ **已显式标记 `@AuthenticatedAccess`(PR #820)**:UserPreference / UserProfile / Session / UserNote / DeviceToken / UserSoulProfile(6 个最明确的纯用户数据 controller)——shadow 不再记它们、deny 翻转时已就绪。其余 SELF/AUTH/WEBHOOK 待 shadow 数据确认后同样标记。
+> ✅ **已显式标记 `@AuthenticatedAccess`(PR #820,共 20 个 EXEMPT-SELF)**:UserPreference/UserProfile/Session/UserNote/DeviceToken/UserSoulProfile + Notification/Inbox/Im×3(Conversation/Message/NotificationPreference)/AuraBot/AuraBotConversation/ConversationTurn/UserEngagement/Watch/Deactivation/Review/BatchQuery/ChartData。shadow 不再记它们 → `[authz-shadow]` 日志只剩真正待定端点;deny 翻转时已就绪。baseline 收缩至 48(仅剩待定 NEEDS-GUARD + AUTH/WEBHOOK)。其余 AUTH/WEBHOOK(自带签名/pre-auth)+ NEEDS-GUARD 待 shadow 数据 + 角色矩阵确认。
 
 | Controller | 豁免类别 | 证据 |
 |---|---|---|

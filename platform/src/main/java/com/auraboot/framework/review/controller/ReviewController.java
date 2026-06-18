@@ -1,6 +1,7 @@
 package com.auraboot.framework.review.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.review.dto.ReviewCreateRequest;
 import com.auraboot.framework.review.dto.ReviewResponse;
 import com.auraboot.framework.review.dto.ReviewSummaryResponse;
@@ -16,6 +17,7 @@ import java.util.List;
 @RequestMapping("/api/reviews")
 @RequiredArgsConstructor
 @Tag(name = "Reviews", description = "Generic review and rating API")
+@AuthenticatedAccess("createReview/vote are scoped to the caller (requireCurrentUserId); listing is read")
 public class ReviewController {
 
     private final ReviewService reviewService;
