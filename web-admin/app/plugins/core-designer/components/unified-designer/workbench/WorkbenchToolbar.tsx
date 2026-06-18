@@ -2,6 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Download, History, Redo2, Undo2, Upload } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
+import {
+  KIND_SWITCH_TARGETS,
+  getIncompatibleBlocksForKind,
+} from '../registry/kindPolicy';
 import type { PageSchemaV3, WorkbenchMode } from '../types';
 
 export type DesignerSaveStatus = 'saved' | 'dirty' | 'saving' | 'invalid' | 'error';
@@ -29,6 +33,11 @@ interface WorkbenchToolbarProps {
   publishStatus?: DesignerPublishStatus;
   publishError?: string | null;
   onModeChange: (mode: WorkbenchMode) => void;
+  /**
+   * Switch the page kind (C4). The toolbar disables any target kind that has
+   * incompatible descendant blocks; this is only invoked for a valid target.
+   */
+  onSwitchKind?: (kind: PageSchemaV3['kind']) => void;
   onUndo: () => void;
   onRedo: () => void;
   onSave: () => void;
@@ -46,6 +55,14 @@ interface WorkbenchToolbarProps {
   onOpenVersions?: () => void;
 }
 
+// C4 — localized labels for the switchable page kinds.
+const KIND_LABELS = {
+  form: DESIGNER_I18N.unified.kindForm,
+  list: DESIGNER_I18N.unified.kindList,
+  detail: DESIGNER_I18N.unified.kindDetail,
+  dashboard: DESIGNER_I18N.unified.kindDashboard,
+} as const;
+
 export function WorkbenchToolbar({
   document,
   mode,
@@ -61,6 +78,7 @@ export function WorkbenchToolbar({
   publishStatus = 'draft',
   publishError,
   onModeChange,
+  onSwitchKind,
   onUndo,
   onRedo,
   onSave,
@@ -101,6 +119,51 @@ export function WorkbenchToolbar({
         <div className="font-mono text-xs text-slate-400">{document.id}</div>
       </div>
       <div className="flex max-w-full shrink-0 items-center gap-2 overflow-x-auto">
+        {onSwitchKind ? (
+          <label
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-500"
+            data-testid="designer-kind-switch-label"
+          >
+            {resolveDesignerText(DESIGNER_I18N.unified.kindSwitchLabel, locale)}
+            <select
+              data-testid="designer-kind-switch"
+              value={KIND_SWITCH_TARGETS.includes(document.kind) ? document.kind : ''}
+              onChange={(event) => {
+                const next = event.target.value as PageSchemaV3['kind'];
+                if (next) onSwitchKind(next);
+              }}
+              className="rounded-md border border-slate-200 px-2 py-1 text-sm text-slate-700"
+            >
+              {KIND_SWITCH_TARGETS.includes(document.kind) ? null : (
+                <option value="" disabled>
+                  {document.kind}
+                </option>
+              )}
+              {KIND_SWITCH_TARGETS.map((kind) => {
+                const incompatible =
+                  kind === document.kind ? [] : getIncompatibleBlocksForKind(document.blocks, kind);
+                const singleRoot = (document.blocks?.length ?? 0) === 1;
+                const blocked = kind !== document.kind && (!singleRoot || incompatible.length > 0);
+                const blockedText = resolveDesignerText(
+                  DESIGNER_I18N.unified.kindSwitchBlocked,
+                  locale,
+                ).replace('{n}', String(incompatible.length));
+                return (
+                  <option
+                    key={kind}
+                    value={kind}
+                    disabled={blocked}
+                    data-testid={`designer-kind-option-${kind}`}
+                    title={blocked ? blockedText : ''}
+                  >
+                    {resolveDesignerText(KIND_LABELS[kind as keyof typeof KIND_LABELS], locale)}
+                    {blocked && incompatible.length ? ` (${incompatible.length})` : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        ) : null}
         {returnHref ? (
           <a
             href={returnHref}

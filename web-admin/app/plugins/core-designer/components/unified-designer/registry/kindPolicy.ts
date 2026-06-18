@@ -155,3 +155,57 @@ export function isBlockTypeAllowedForKind(kind: PageSchemaV3Kind, blockType: str
   // Plugin-contributed custom blocks may opt into specific kinds (see customBlockRegistry).
   return isCustomBlockAllowedForKind(kind, blockType);
 }
+
+// ── C4: page-kind switching ────────────────────────────────────────────────
+// The concrete kinds a user can switch a page between. `composite` is the
+// internal escape hatch (rootBlockType null, allows everything) and is NOT a
+// normal authoring entry point, so it is excluded from the switch targets.
+export const KIND_SWITCH_TARGETS: PageSchemaV3Kind[] = ['form', 'list', 'detail', 'dashboard'];
+
+/** A block that is valid under the current kind but not under a target kind. */
+export interface IncompatibleBlock {
+  id: string;
+  blockType: string;
+}
+
+/**
+ * Blocks that would be invalid if the page switched to `targetKind`.
+ *
+ * The page root (`blocks[0]`, whose blockType is the current kind's root
+ * container) is swapped to the target kind's root on switch, so it is excluded;
+ * only its descendants are checked against the target kind's palette policy.
+ * Returns [] for `composite` (allows everything).
+ */
+export function getIncompatibleBlocksForKind(
+  blocks: DslBlockV3[] | undefined,
+  targetKind: PageSchemaV3Kind,
+): IncompatibleBlock[] {
+  if (!getKindPolicy(targetKind).allowedBlockTypes) return [];
+  const out: IncompatibleBlock[] = [];
+  const walk = (bs: DslBlockV3[] | undefined): void => {
+    for (const block of bs ?? []) {
+      if (!isBlockTypeAllowedForKind(targetKind, block.blockType)) {
+        out.push({ id: block.id, blockType: block.blockType });
+      }
+      walk(block.blocks);
+    }
+  };
+  // Skip the root container itself; check every descendant.
+  walk(blocks?.[0]?.blocks);
+  return out;
+}
+
+/**
+ * Whether the page may switch to `targetKind`. Per the C4 design (owner choice
+ * 2026-06-18): the switch is BLOCKED when any descendant block is incompatible —
+ * no silent data loss, the author removes the offending blocks first. Also
+ * requires the standard single-root structure (every designer-authored page has
+ * exactly one root container); multi-root / rootless documents are not switchable.
+ */
+export function canSwitchToKind(
+  blocks: DslBlockV3[] | undefined,
+  targetKind: PageSchemaV3Kind,
+): boolean {
+  if (!blocks || blocks.length !== 1) return false;
+  return getIncompatibleBlocksForKind(blocks, targetKind).length === 0;
+}
