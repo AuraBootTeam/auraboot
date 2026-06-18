@@ -203,3 +203,14 @@ floating bar (`/tmp/s3-3-batchbar.png`):
   pills because `TableBlockRenderer` + `RecordListView` have an inline dict-tag pill that short-circuits
   before the §3-A `StatusDot` in `CellRendererRegistry`. The dot conversion needs to be applied to those
   two block renderers' dict-coded branch.
+
+### §3-A follow-up — bypass FIXED (commit 64fb05579)
+
+The §3-A FAIL above was fixed the same session: `TableBlockRenderer.tsx` and
+`RecordListView.tsx` now route their dict-coded status branch through
+`StatusDot(resolveStatusTone(extension.color))` (dropping the inline pill +
+the hardcoded `tagColorMap`/`DICT_COLOR_MAP`; palette ratchet 1271→1235).
+Verified by reading the exact bypass sites the golden traced + tsc clean + 130
+block-renderer tests + gate green. Re-golden of the rendered dots deferred (the
+fix is a direct substitution at the traced root cause; StatusDot itself is
+golden-verified). Will be confirmed on the next real-stack/deploy golden.
