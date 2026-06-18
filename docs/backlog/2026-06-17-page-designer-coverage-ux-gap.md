@@ -224,7 +224,9 @@ schema-driven,20 个 block 有专属 inspector;PropertyType 类型系统声明 2
 ### ⏸ NOT-MET(roadmap,**未完成,不假报**)
 - **A7** mid-drag drop-indicator/ghost 视觉断言(@dnd-kit 中途手势最易 flake,ROI 最低)→ defer。
 - **A11/A12** chart 类型广度 / input·layout 广度 → defer。
-- **E1(剩余)** widget 全 24 chart parity(runtime 统一 SharedChartFactory)/ **E2(剩余)** 余 12 个非 family 块(chart/trace-graph/form-buttons/form-wizard/filters/toolbar/monthly-grid/divider/rich-text/gerber-viewer/selection-info/text)palette + 完整数据绑定设计器渲染 → 大特性,未做(**workbench-family 8 块 + 4 展示/数据块已交付,设计器现 36 blockType**)。
+- **E1(剩余)** widget 全 24 chart parity(runtime 统一 SharedChartFactory)→ 大特性,未做(架构活)。
+- **E2(余 10 块)** — ✅ **DONE**(commit `feat/page-designer-e2-blocks`,2026-06-18):chart / rich-text / divider / toolbar / form-buttons / filters / form-wizard / trace-graph / selection-info / gerber-viewer 全部加入设计器(palette + bare-path inspector + 代表性预览),后端 `DslRegistry.BlockType` 补 divider/rich-text/selection-info/gerber-viewer 4 个(其余 6 个已在白名单)。**设计器内置 blockType 现 46(原 36)**。26 新单测 + 全量 456 designer 套件绿 + tsc clean;13 个浏览器 golden(authoring readback + 预览 + sad-path + live `/p/` 真渲染器)。
+  - **口径纠正(原「余 12 块」偏乐观)**:`monthly-grid` 与 `text` **剔除,非真块**——取证:`monthly-grid` 在 `BlockRenderer.tsx:103` 返回 `null`(结构型,由 page 渲染器处理,无独立渲染器);`text` 在运行时 `ui/schema-renderer/BlockRegistry.ts:95` 只是 `description` 的别名(都 → `DescriptionBlockRenderer`,`description` 已是设计器块)。加进 palette 任一者都会渲染成 Unknown/null 或与 description 重复。
 - **C4** kind 切换 → 未做(C5 多选+批量+框选已全交付)。
 - **D2/D4** 富属性控件全接入(dict/namedQuery/command/permission 选择器)、字段级校验反馈;**B3** REST diff blocks 下钻 → 未做。
 - **🧪 测试鲁棒性 follow-up** — ✅ 已由 Slice 9(`3dac2092`)闭环:`inspector-model-select-golden:152` 改 seed-agnostic 断言(SELECT + option ≥2),不再锁定具体 model;leaner seed 栈也过。本行历史保留。
