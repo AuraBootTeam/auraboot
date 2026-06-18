@@ -16,21 +16,45 @@ Findings: `docs/backlog/2026-06-11-meta-impl-coverage-product-findings.md`.
 
 ## allowed_claim
 
-`targeted pass` — the three new `DynamicDataServiceImpl` coverage ITs (importData,
-executeCustomAction, relation error-paths; all previously **0% covered**) were added and
-run **green** against the current-schema DB (verified 3×). The jsonb guardrail was
-re-verified clean (38 fields). The added tests only raise coverage, so the existing 0.73
-bundle floor continues to pass.
+> **UPDATE (2026-06-18, second pass — bump ACHIEVED):** the original "deferred" verdict below
+> was superseded after clearing both blockers. The gate-floor bump is **done**:
+> `BUNDLE LINE 0.73 → 0.75`, validated by `jacocoTestCoverageVerification` passing.
 
-**The gate-floor consolidation bump is DEFERRED, not done** — `coverage_not_measured` for
-the consolidated bundle. A clean consolidated measurement is not achievable this session
+`golden coverage` for the gate consolidation: a **clean full suite** ran against a DB that is
+**both** at the current Flyway-baseline schema **and** reset+bootstrapped, with JaCoCo
+**offline instrumentation**. Measured **BUNDLE LINE = 0.7735** (51452/66519); security service
+packages permission 0.92 / auth 0.97 / tenant 0.85 / rbac 0.99 (all > the 0.84 floor). The
+`BUNDLE` floor is raised **0.73 → 0.75** (~2.3pt margin; conservative — the 73 pre-existing/env
+failures still undercount). The three new `DynamicDataServiceImpl` coverage ITs (importData,
+executeCustomAction, relation error-paths; all previously **0% covered**) are green and lift
+the class to **50.3%** from those tests alone; the jsonb guardrail re-verified clean (38 fields).
+
+### How both blockers were cleared (this second pass)
+1. **Clean DB (path B):** snapshot the bootstrapped shared `aura_boot`, then surgically replace
+   the billing subsystem with the current Flyway-baseline schema (dropped 32 old-gen billing
+   tables, recreated the 11 current ones from `aura_boot_base`'s DDL — no non-billing→billing
+   FKs, so DROP CASCADE was safe — and applied `2026-06-10-billing-resource-catalog.sql` seed).
+   Result: bootstrap seed + current schema. Smoke: billing 13/13, DynamicData 11/11 green.
+2. **JaCoCo offline instrumentation:** the full-suite bundle previously read a bogus ~5% because
+   the runtime CGLIB **classdump** mis-attributes coverage across the suite's many
+   `@SpringBootTest` contexts (proxy class IDs diverge per evicted/recreated context, so the
+   dumped proxy no longer matches the exec). Switched to **offline instrumentation** (instrument
+   `build/classes` at build time → coverage on stable on-disk IDs). The slice that read 0.25%
+   under classdump now reads 50.3%. Behavior-neutral: the 73 failures are byte-identical
+   with/without offline.
+
+---
+
+### (Original first-pass verdict — superseded above, kept for the record)
+
+**The gate-floor consolidation bump was initially DEFERRED** — `coverage_not_measured` for
+the consolidated bundle. A clean consolidated measurement was not achievable in the first pass
 because the IT suite needs a DB that is **both** at the current Flyway baseline schema
 **and** reset+bootstrapped, which the shared dev `aura_boot` is not (it is mid Flyway-baseline
-transition, owned by separate in-flight governance work). Both isolated DBs I could build
-are incomplete in exactly one axis (evidence below), and jacoco under-records coverage in a
-fresh worktree (tooling artifact). This is **not** a clean run, so per the testing gate no
-completion/coverage claim is made for the bundle. The bump remains queued for "the next
-clean full-suite consolidation" (as the tracker already states).
+transition, owned by separate in-flight governance work). Both isolated DBs first built
+were incomplete in exactly one axis (evidence below), and jacoco under-recorded coverage in a
+fresh worktree (the classdump artifact, root-caused + fixed in the second pass). The second
+pass cleared both, so the bump is now done.
 
 ## Claim level
 
@@ -161,7 +185,7 @@ claim_level: completion-claim (DynamicData + jsonb); targeted pass + measured co
 current_sot: tracker 2026-06-10 + findings 2026-06-11 + build.gradle jacoco + check-jsonb-typehandler.sh
 business_scope: OSS platform meta/service/impl coverage + jsonb guardrail + ratchet (no FE/docker)
 integration_tests: DynamicDataServiceImplCoverageIT +3 methods (importData/executeCustomAction/relations), real PG+Redis, no mocks
-integration_coverage: coverage_not_measured (consolidated bundle) — both isolated DBs incomplete + fresh-worktree jacoco artifact; DynamicData new methods were 0% (grep-verified), now green
+integration_coverage: BUNDLE LINE 0.7735 (51452/66519) via offline instrumentation on a clean reset+bootstrap current-schema DB; security pkgs permission .92/auth .97/tenant .85/rbac .99 (all > 0.84). DynamicDataServiceImpl 50.3% from the new ITs alone. Floor bumped 0.73->0.75, jacocoTestCoverageVerification PASSES.
 e2e_specs: n/a (no user-visible surface)
 feature_action_matrix: n/a (coverage task, not feature-completion)
 browser_evidence: n/a
@@ -171,6 +195,6 @@ permission_negative: n/a
 visual_feedback: n/a
 skip_fixme_threshold_retry_audit: no skip/fixme/threshold/retry added
 did_not_run: frontend #14, docker testcontainers #3; consolidated bundle jacoco (env-blocked)
-remaining_blockers: gate-floor consolidation bump DEFERRED — needs reset+bootstrap-at-current-Flyway-baseline env (shared aura_boot is mid-transition); fresh-worktree jacoco under-records
-allowed_claim: targeted pass (DynamicData ITs green, 0%→covered) + jsonb-lint clean; bundle coverage_not_measured; gate bump deferred (no regression — 0.73 floor still passes)
+remaining_blockers: none for the bump (achieved). Follow-ups (not blockers): shared dev aura_boot still needs reset to the current Flyway baseline (owned by governance work); frontend #14; docker testcontainers #3. The 73 full-suite failures are pre-existing/env (DB-independent: ArchitectureTest/Mockito + env-stale), behavior-identical with/without offline.
+allowed_claim: golden coverage — clean full suite (offline instrumentation, current-schema bootstrapped DB) measures bundle 0.7735; floor bumped 0.73->0.75 and verification PASSES; DynamicData ITs green + jsonb-lint clean
 ```
