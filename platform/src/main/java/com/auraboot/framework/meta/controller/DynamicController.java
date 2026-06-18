@@ -582,7 +582,13 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}/export")
     @Operation(summary = "导出数据", description = "根据页面定义导出数据")
-    @RequirePermission("model.{pageKey}.export")
+    // Export is gated by read: exporting is just packaging data the user can already
+    // read, and the page-permission metadata already advertises canExport = canRead ||
+    // canExport (see getPagePermissions). A separate model.<model>.export permission is
+    // not auto-created on model publish (only the E2E test seed makes it), so requiring
+    // it here 403s for every real model while the UI shows the export button — an
+    // endpoint-vs-metadata inconsistency. Align to read.
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<Map<String, Object>> exportData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> exportParams) {
@@ -670,7 +676,8 @@ public class DynamicController {
      */
     @GetMapping("/{pageKey}/download")
     @Operation(summary = "下载导出文件", description = "下载导出的CSV文件")
-    @RequirePermission("model.{pageKey}.export")
+    // Gated by read — see exportData above (export = packaging readable data).
+    @RequirePermission("model.{pageKey}.read")
     public void downloadExport(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "文件路径") @RequestParam String file,
