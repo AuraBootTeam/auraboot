@@ -24,7 +24,19 @@ const actionStatusColors: Record<string, string> = {
 function DebugActionList() {
   const st = useSmartText();
   const session = useDebugSession((s) => s.session);
+  const updateBreakpoints = useDebugSession((s) => s.updateBreakpoints);
   if (!session) return null;
+
+  // Toggle a breakpoint on an action index. This is the only UI affordance to
+  // set/clear breakpoints; Continue then pauses at the next set breakpoint
+  // (backend continueExecution honors session.breakpoints).
+  const toggleBreakpoint = (index: number) => {
+    const current = session.breakpoints || [];
+    const next = current.includes(index)
+      ? current.filter((b) => b !== index)
+      : [...current, index].sort((a, b) => a - b);
+    void updateBreakpoints(next);
+  };
 
   const results = session.actionResults || [];
   const resultMap = new Map<number, ActionResult>();
@@ -61,10 +73,24 @@ function DebugActionList() {
               data-testid="automation-debug-action-row"
               data-action-index={index}
             >
-              {/* Breakpoint indicator */}
-              <div className="w-3 shrink-0">
-                {isBreakpoint && <span className="text-sm text-red-500">●</span>}
-              </div>
+              {/* Breakpoint toggle — click the gutter to set/clear a breakpoint. */}
+              <button
+                type="button"
+                onClick={() => toggleBreakpoint(index)}
+                title={
+                  isBreakpoint
+                    ? st('$i18n:automation.debug.breakpoint.clear') || 'Clear breakpoint'
+                    : st('$i18n:automation.debug.breakpoint.set') || 'Set breakpoint'
+                }
+                aria-pressed={isBreakpoint}
+                data-testid="automation-debug-breakpoint-toggle"
+                data-action-index={index}
+                className="flex w-4 shrink-0 items-center justify-center text-sm leading-none"
+              >
+                <span className={isBreakpoint ? 'text-red-500' : 'text-gray-300 hover:text-red-300'}>
+                  ●
+                </span>
+              </button>
 
               {/* Step number */}
               <span className="w-6 shrink-0 text-right font-mono text-sm text-gray-400">
