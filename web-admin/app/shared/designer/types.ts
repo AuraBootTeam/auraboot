@@ -49,6 +49,11 @@ export interface PropertySchema<TLabel = string | I18nText> {
   label: TLabel;
   type: PropertyType;
   required?: boolean;
+  /** D4 — inline field validation (number bounds + text/regex format). */
+  min?: number;
+  max?: number;
+  /** A regular-expression source string the text value must match. */
+  pattern?: string;
   options?: { label: TLabel; value: string }[];
   placeholder?: TLabel;
   description?: TLabel;

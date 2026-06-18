@@ -259,6 +259,12 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
                 modelFields={modelFields}
                 modelOptions={modelOptions}
                 remoteOptions={remoteOptions[field.type] ?? []}
+                validation={{
+                  required: field.required,
+                  min: field.min,
+                  max: field.max,
+                  pattern: field.pattern,
+                }}
                 locale={locale}
                 onChange={onChange}
               />
@@ -377,6 +383,53 @@ function stringifyJsonField(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
+/**
+ * D4 — compute the inline validation message for a text/number inspector field.
+ * Returns '' when valid. Optional + empty is valid; required + empty fails. A
+ * malformed `pattern` in the schema is ignored (never blocks authoring).
+ */
+function validateInspectorValue(
+  value: unknown,
+  type: string,
+  validation: { required?: boolean; min?: number; max?: number; pattern?: string } | undefined,
+  locale: string,
+): string {
+  if (!validation) return '';
+  const isEmpty = value === undefined || value === null || value === '';
+  if (validation.required && isEmpty) {
+    return resolveDesignerText(DESIGNER_I18N.unified.validationRequired, locale);
+  }
+  if (isEmpty) return '';
+  if (type === 'number') {
+    const num = typeof value === 'number' ? value : Number(value);
+    if (Number.isNaN(num)) {
+      return resolveDesignerText(DESIGNER_I18N.unified.validationNotNumber, locale);
+    }
+    if (validation.min !== undefined && num < validation.min) {
+      return resolveDesignerText(DESIGNER_I18N.unified.validationMin, locale).replace(
+        '{min}',
+        String(validation.min),
+      );
+    }
+    if (validation.max !== undefined && num > validation.max) {
+      return resolveDesignerText(DESIGNER_I18N.unified.validationMax, locale).replace(
+        '{max}',
+        String(validation.max),
+      );
+    }
+  }
+  if (validation.pattern && typeof value === 'string') {
+    try {
+      if (!new RegExp(validation.pattern).test(value)) {
+        return resolveDesignerText(DESIGNER_I18N.unified.validationPattern, locale);
+      }
+    } catch {
+      // Invalid regex in the schema — ignore rather than block the author.
+    }
+  }
+  return '';
+}
+
 function InspectorField({
   block,
   path,
@@ -387,6 +440,7 @@ function InspectorField({
   modelFields,
   modelOptions,
   remoteOptions,
+  validation,
   locale,
   onChange,
 }: {
@@ -399,11 +453,19 @@ function InspectorField({
   modelFields: ModelFieldDefinition[];
   modelOptions: ModelOption[];
   remoteOptions: ModelOption[];
+  validation?: { required?: boolean; min?: number; max?: number; pattern?: string };
   locale: string;
   onChange: (path: string, value: unknown) => void;
 }) {
   const value = getByPath(block as unknown as Record<string, unknown>, path);
   const id = `inspector-field-${path}`;
+  // D4 — inline field validation (required / number bounds / regex format). Only
+  // text + number fields are validated; structural types (json/boolean/select/
+  // model/remote-select) carry their own affordances.
+  const validationError =
+    type === 'number' || type === 'text' || type === 'textarea'
+      ? validateInspectorValue(value, type, validation, locale)
+      : '';
   const jsonValue = type === 'json' ? stringifyJsonField(value) : '';
   const [jsonDraft, setJsonDraft] = useState(jsonValue);
   const [jsonError, setJsonError] = useState('');
@@ -630,16 +692,27 @@ function InspectorField({
     <label className="block">
       <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
+        {validation?.required ? <span className="ml-1 text-red-500">*</span> : null}
       </span>
       <input
         data-testid={id}
         type={type === 'number' ? 'number' : 'text'}
         value={toInspectorInputValue(value)}
+        aria-invalid={Boolean(validationError)}
         onChange={(event) =>
           onChange(path, type === 'number' ? Number(event.target.value) : event.target.value)
         }
-        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        className={`w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 ${
+          validationError
+            ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
+            : 'border-slate-300 focus:border-blue-500 focus:ring-blue-100'
+        }`}
       />
+      {validationError ? (
+        <div className="mt-1 text-xs font-medium text-red-600" data-testid={`inspector-field-error-${path}`}>
+          {validationError}
+        </div>
+      ) : null}
     </label>
   );
 }
