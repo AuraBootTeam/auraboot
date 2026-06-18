@@ -60,12 +60,13 @@ const GALLERY_ROUTE = '/p/c/template_center';
 const TARGET_TEMPLATE_ID = 'simple-inventory';
 
 /** Expected resolved i18n text for "installed" success toast.
- *  template.gallery.installed → zh-CN: "模板已应用" | en: "Template installed"
+ *  The page config uses an object-form message: { "zh-CN": "模板已应用", "en-US": "Template installed" }.
  *  We match either language so the golden is locale-agnostic. */
 const INSTALLED_TOAST_PATTERN = /模板已应用|Template installed/i;
 
 /** Patterns that indicate a raw i18n key leaked into the UI — these are BUG indicators.
- *  The spec explicitly asserts the toast does NOT match these. */
+ *  A raw "$i18n:..." key or an unresolved "template.gallery.installed" string reaching the
+ *  DOM means the object-form message was not resolved by the platform's i18n pipeline. */
 const RAW_I18N_KEY_PATTERN = /template\.gallery\.installed|\$i18n:/;
 
 /** Admin credential for obtaining a JWT for backend cross-check. */
@@ -233,7 +234,7 @@ test.describe('Template Center Gallery — Golden', () => {
    *   step 1: api.request GET /api/templates/{id}/preview  → previewData
    *   step 2: dialog.confirm (renders ConfirmDialog with data-testid="confirm-dialog")
    *   step 3: api.request POST /api/templates/{id}/install → installResult
-   *   step 4: toast.success $i18n:template.gallery.installed
+   *   step 4: toast.success — object-form message { "zh-CN": "模板已应用", "en-US": "Template installed" }
    *   step 5: reloadDataSource "templates"
    *
    * Critical assertions:
@@ -308,8 +309,8 @@ test.describe('Template Center Gallery — Golden', () => {
       expect(installResp.ok(), `Install API returned ${installResp.status()}`).toBe(true);
 
       // Step 4: Toast with resolved text should appear (role="alert" in Toast.tsx)
-      // The toast message is the resolved value of $i18n:template.gallery.installed
-      // → "模板已应用" (zh-CN) or "Template installed" (en)
+      // The toast message is resolved from the object-form config
+      // { "zh-CN": "模板已应用", "en-US": "Template installed" } by the platform i18n pipeline.
       const successToast = page.locator('[role="alert"]').filter({ hasText: INSTALLED_TOAST_PATTERN });
       await expect(successToast).toBeVisible({ timeout: 10_000 });
 

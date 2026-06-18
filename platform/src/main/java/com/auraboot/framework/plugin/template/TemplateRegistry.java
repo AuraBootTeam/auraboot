@@ -81,16 +81,6 @@ public class TemplateRegistry {
         return templates;
     }
 
-    /**
-     * Package-private test seam: runs discovery against a single root and returns the result map.
-     * Allows unit tests to point at a temp directory without going through the full multi-root logic.
-     */
-    Map<String, TemplateDef> discoverForTest(Path root) {
-        LinkedHashMap<String, TemplateDef> templates = new LinkedHashMap<>();
-        discoverUnderRoot(root, templates);
-        return templates;
-    }
-
     private void discoverUnderRoot(Path root, Map<String, TemplateDef> templates) {
         Path pluginsDir = root.resolve("plugins");
         if (!Files.isDirectory(pluginsDir)) {
