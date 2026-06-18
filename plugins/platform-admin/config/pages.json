@@ -2294,5 +2294,78 @@
         ]
       }
     ]
+  },
+  {
+    "pageKey": "template_center",
+    "name": "$i18n:template.gallery.title",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": { "type": "stack" },
+    "dataSources": {
+      "templates": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/templates",
+        "adaptor": "table"
+      }
+    },
+    "blocks": [
+      {
+        "id": "template_gallery_grid",
+        "blockType": "card-grid",
+        "dataSource": "templates",
+        "titleField": "name",
+        "descriptionField": "description",
+        "categoryField": "category",
+        "iconField": "icon",
+        "cardActions": [
+          {
+            "code": "install",
+            "label": "$i18n:template.gallery.install",
+            "variant": "primary",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "id": "preview",
+                  "action": "api.request",
+                  "method": "get",
+                  "endpoint": "/api/templates/{id}/preview",
+                  "target": "previewData"
+                },
+                {
+                  "id": "confirm",
+                  "action": "dialog.confirm",
+                  "args": {
+                    "message": "$i18n:template.gallery.confirm"
+                  }
+                },
+                {
+                  "id": "install",
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/templates/{id}/install",
+                  "target": "installResult"
+                },
+                {
+                  "id": "toast",
+                  "action": "toast.success",
+                  "args": {
+                    "message": "$i18n:template.gallery.installed"
+                  }
+                },
+                {
+                  "id": "reload",
+                  "action": "reloadDataSource",
+                  "args": {
+                    "dataSourceId": "templates"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
   }
 ]
