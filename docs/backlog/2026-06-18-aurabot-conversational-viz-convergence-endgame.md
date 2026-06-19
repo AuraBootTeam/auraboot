@@ -168,5 +168,5 @@ related:
    - **决策**:`DDR-2026-06-19-aurabot-chat-tool-exposure-pin-vs-retrieve`(ENT #582)——**选 A 常驻 pin**:chat-bi 是通用数据查询**原语**(已 pin 的 `execute_sql` 的安全结构化版),不是领域工具 → 进常驻集;grounding 检索留给领域长尾。业界 hybrid(pin 核心 + 检索长尾)。
    - **实现(OSS #845)**:`ChatToolResolver.ensurePlatformTools` 无条件含 `PLATFORM_CHAT_BI_TOOL`(`aurabot_chat-bi`,不像 SQL 兜底那样被移除)。**路由修**:只缓存 code+readOnly、不缓存 agent-def(`cacheSyntheticPlatformTool` 会强制 `toolType=platform`→走 `AuraBotSkillToolProvider.execute` 失败桩),让 `resolveToolDefinition` 经 `aurabot:` 前缀判为 `AURABOT_SKILL`→`SkillToolExecutor`→真 `ChatBiSkill`。
    - **验证**:golden 绿(un-fixme);live 证 `tool=aurabot:chat-bi, status=success` + `getModelDefinition crm_lead`(tenant 325894...,90 行);工具解析单测 39 绿。**Slice C 现真接通默认对话**。
-3. **Slice E**:即席→沉淀桥(即席图"存为看板" → `dashboard:create`)。additive。
+3. **Slice E — DONE(2026-06-19,OSS #853)**:即席→沉淀桥。ChatBiSkill payload 带上聚合 spec(dimensions+metrics);ChatBiResultCard 加「存为看板」按钮 → 建 1-widget `DashboardCreateRequest`(chartType→smart-* widget,dataSource aggregate,scope `personal`)→ `dashboardService.create`(`POST /api/dashboards`)→ 内联确认。**e2e + 真 DB 验**:chat-bi `status=success` → `Dashboard created pid=...` → `ab_dashboard` 行「Leads by status \| personal \| 1 widget」。即席(聊天卡)↔沉淀(持久看板)接成一条增长漏斗。
 4. (可选)v2 进阶路径:meta-model→semantic 自动派生 + v2 接 chat-bi 的"复杂多轮/治理 metric"档位。
