@@ -44,7 +44,7 @@ public class TenantServiceImpl extends ServiceImpl<TenantMapper, Tenant> impleme
 
         // 检查租户名称是否已存在
         if (!isNameAvailable(tenant.getName())) {
-            throw new BusinessException("租户名称已存在: " + tenant.getName());
+            throw BusinessException.i18n("tenant.name_exists", tenant.getName());
         }
         
         // 设置创建和更新时间
@@ -65,12 +65,12 @@ public class TenantServiceImpl extends ServiceImpl<TenantMapper, Tenant> impleme
         
         Tenant existingTenant = getById(tenant.getId());
         if (existingTenant == null) {
-            throw new BusinessException("租户不存在: " + tenant.getId());
+            throw BusinessException.i18n("tenant.not_found", tenant.getId());
         }
         
         // 如果修改了名称，检查新名称是否可用
         if (!existingTenant.getName().equals(tenant.getName()) && !isNameAvailable(tenant.getName())) {
-            throw new BusinessException("租户名称已存在: " + tenant.getName());
+            throw BusinessException.i18n("tenant.name_exists", tenant.getName());
         }
         
         tenant.setUpdatedAt(Instant.now());
@@ -154,7 +154,7 @@ public class TenantServiceImpl extends ServiceImpl<TenantMapper, Tenant> impleme
         
         Tenant tenant = getById(tenantId);
         if (tenant == null) {
-            throw new BusinessException("租户不存在: " + tenantId);
+            throw BusinessException.i18n("tenant.not_found", tenantId);
         }
         
         tenant.setStatus(StatusConstants.ACTIVE);
@@ -170,7 +170,7 @@ public class TenantServiceImpl extends ServiceImpl<TenantMapper, Tenant> impleme
         
         Tenant tenant = getById(tenantId);
         if (tenant == null) {
-            throw new BusinessException("租户不存在: " + tenantId);
+            throw BusinessException.i18n("tenant.not_found", tenantId);
         }
         
         tenant.setStatus(StatusConstants.INACTIVE);
@@ -186,7 +186,7 @@ public class TenantServiceImpl extends ServiceImpl<TenantMapper, Tenant> impleme
 
         Tenant tenant = getById(tenantId);
         if (tenant == null) {
-            throw new BusinessException("租户不存在: " + tenantId);
+            throw BusinessException.i18n("tenant.not_found", tenantId);
         }
 
         tenant.setStatus(StatusConstants.SUSPENDED);
@@ -203,7 +203,7 @@ public class TenantServiceImpl extends ServiceImpl<TenantMapper, Tenant> impleme
         
         Tenant tenant = getById(tenantId);
         if (tenant == null) {
-            throw new BusinessException("租户不存在: " + tenantId);
+            throw BusinessException.i18n("tenant.not_found", tenantId);
         }
         
         tenant.setStatus(StatusConstants.ACTIVE);
@@ -219,7 +219,7 @@ public class TenantServiceImpl extends ServiceImpl<TenantMapper, Tenant> impleme
         
         Tenant tenant = getById(tenantId);
         if (tenant == null) {
-            throw new BusinessException("租户不存在: " + tenantId);
+            throw BusinessException.i18n("tenant.not_found", tenantId);
         }
         
         return getBaseMapper().deleteById(tenant.getId()) > 0;

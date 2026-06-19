@@ -260,9 +260,33 @@ public class GlobalExceptionHandler {
         ResponseCode responseCode = ex.getResponseCode() != null
                 ? ex.getResponseCode()
                 : ResponseCode.BUSINESS_ERROR;
-        Object detail = isDevEnvironment() ? buildDevDetail(ex) : localizeI18nMessage(ex.getMessage(), request);
+        Object detail = isDevEnvironment() ? buildDevDetail(ex) : localizeBusinessMessage(ex, request);
         ApiResponse<Object> response = ApiResponse.errorWithContext(responseCode, detail);
         return ResponseEntity.status(mapResponseCodeToStatus(responseCode)).body(response);
+    }
+
+    /**
+     * Localize a BusinessException's user-facing message. Static {@code $i18n:<key>} messages go
+     * through {@link #localizeI18nMessage}; parameterized ones (constructed via
+     * {@code BusinessException.i18n(key, args)}) substitute {@code {0}} via
+     * {@link I18nService#getMessage}. Non-{@code $i18n:} messages pass through unchanged.
+     */
+    String localizeBusinessMessage(BusinessException ex, HttpServletRequest request) {
+        Object[] args = ex.getI18nArgs();
+        String text = ex.getMessage();
+        if (args == null || args.length == 0) {
+            return localizeI18nMessage(text, request);
+        }
+        if (text == null || !text.startsWith("$i18n:")) {
+            return text;
+        }
+        String key = text.substring("$i18n:".length());
+        String locale = i18nLocaleResolver.resolveLocale(request);
+        String value = i18nService.getMessage(locale, key, args);
+        if (value == null) {
+            value = i18nService.getMessage("zh-CN", key, args); // base-locale fallback (ja/ko gaps)
+        }
+        return value != null ? value : key;
     }
 
     /**

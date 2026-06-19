@@ -1148,3 +1148,6 @@ tenant:
   member:
     already_member: User is already a member of this tenant
     not_in_tenant: User does not belong to any tenant
+    not_found: "Member not found: {0}"
+  not_found: "Tenant not found: {0}"
+  name_exists: "Tenant name already exists: {0}"

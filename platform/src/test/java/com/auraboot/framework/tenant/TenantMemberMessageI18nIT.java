@@ -30,4 +30,19 @@ class TenantMemberMessageI18nIT extends BaseIntegrationTest {
         assertThat(i18nService.getValue("en-US", "tenant.member.not_in_tenant"))
                 .isEqualTo("User does not belong to any tenant");
     }
+
+    @Test
+    @DisplayName("parameterized tenant keys substitute {0} per locale (getMessage)")
+    void parameterizedKeysSubstitute() {
+        assertThat(i18nService.getMessage("zh-CN", "tenant.member.not_found", 42L))
+                .isEqualTo("成员不存在: 42");
+        assertThat(i18nService.getMessage("en-US", "tenant.member.not_found", 42L))
+                .isEqualTo("Member not found: 42");
+        assertThat(i18nService.getMessage("zh-CN", "tenant.not_found", 7L))
+                .isEqualTo("租户不存在: 7");
+        assertThat(i18nService.getMessage("en-US", "tenant.name_exists", "acme"))
+                .isEqualTo("Tenant name already exists: acme");
+        // missing locale -> null so the boundary falls back to the base locale
+        assertThat(i18nService.getMessage("ja-JP", "tenant.member.not_found", 42L)).isNull();
+    }
 }
