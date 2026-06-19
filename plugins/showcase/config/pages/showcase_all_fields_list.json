@@ -347,8 +347,7 @@
               },
               "confirm": "delete.confirm",
               "action": {
-                "type": "command",
-                "command": "sc:delete_showcase"
+                "type": "command"
               }
             }
           ],

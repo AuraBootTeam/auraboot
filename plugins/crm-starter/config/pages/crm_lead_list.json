@@ -193,8 +193,7 @@
               },
               "confirm": "delete.confirm",
               "action": {
-                "type": "command",
-                "command": "crm:delete_lead"
+                "type": "command"
               }
             }
           ],
