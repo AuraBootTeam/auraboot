@@ -83,8 +83,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "org_employee_form",
-            "command": "org:create_employee"
+            "to": "org_employee_form"
           }
         }
       ]
@@ -158,8 +157,7 @@
               },
               "action": {
                 "type": "navigate",
-                "to": "org_employee_form",
-                "command": "org:update_employee"
+                "to": "org_employee_form"
               }
             },
             {

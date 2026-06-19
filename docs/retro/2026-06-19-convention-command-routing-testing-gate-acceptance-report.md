@@ -102,3 +102,44 @@ did_not_run: Phase 1 generator + full re-seed + all-pages golden + enterprise ov
 remaining_blockers: none in slice
 allowed_claim: targeted pass (Phase 0 showcase slice fully verified end-to-end; NOT a platform-wide completion claim)
 ```
+
+---
+
+# 验收报告补遗 — Phase 1 OSS 插件页面清扫(2026-06-19)
+
+> 前提:Phase 0 已 merge(#874,`e8e3c9129`),约定机制对**任意模型**已生效(page-schema 端点对所有 model 挂 `commands`,`FormPageContent` 对所有 model 按模式解析)。Phase 1 = 把 OSS authored 插件页面里**冗余的** create/update 命令清掉,让它们走约定 → 干净 URL。
+
+## allowed_claim(Phase 1)
+
+**`targeted pass` — OSS authored 页面 create/update 命令清扫完成并验证**:对所有 OSS 插件页面做了**安全清扫**(仅当按钮 command 正好等于该模型约定 create/update 时才去掉,变体/跨模型/内联命令自动保留),crm-starter + org-management 真浏览器 golden 通过。**不含** enterprise overlay 与 delete 命令约定(见 did_not_run)。
+
+## 关键澄清(范围收敛的依据,取证)
+
+- **`?commandCode=` 只来自 navigate 动作**(create/edit 跳转表单);**delete 是原地 `type:command`、不 navigate → 不产生 URL 参数**,故 delete 不在 URL 清理范围(其约定化是独立的零配置增强,无 URL 收益)。
+- **生成器 `autoCreateDefaultPages` 产出空 stub**(`[{"blockType":"toolbar"}...]`,**无任何带 command 的按钮**)→ 无需改生成器;`?commandCode=` 仅源于 authored 插件页面。证据:`MetaModelServiceImpl.java:2144-2156`。
+
+## 清扫范围与安全规则
+
+- 规则:`code∈{create,edit}`+`action.type=navigate`+`command==约定[model].create/update`,或 `code=submit`+`action.type=command`+`command==约定 create/update`(且模型同时有 create+update)→ 去掉 `command`;否则保留。约定映射来自 `ab_command_definition.execution_config.type`。
+- 结果:**15 文件 / 18 命令**(crm-starter 12:6 list create + 6 form submit;org-management 6:3×(create+edit))。showcase 的 create/update 已在 Phase 0;wd(workflow-demo)**正确未动**(`create_and_submit` 变体 + `save_draft` 非 submit + `wd:update_leave_balance` 内联 `type:command`)。
+- 正确跳过取证:`crm_account_detail` 的 add/edit/delete 是 **crm_contact 子资源**命令(≠本页模型约定,跳);`wd_leave_balance_list` edit 是内联 `type:command`(非 navigate,跳)。
+
+## 测试层矩阵(Phase 1)
+
+| 层 | 状态 | 证据 |
+|---|---|---|
+| 平台 validator(全 OSS swept 插件 re-import) | ✅ tested | slot-55 `import-plugins.sh demo`:org-management / crm-starter / showcase 全 **OK** + reference-integrity OK |
+| Web E2E 真浏览器 golden | ✅ golden(4/4) | `/tmp/golden-sweep.mjs`:crm_account + org_department 各「干净 URL 创建→正确约定命令 200」+「列表 新建 → 干净 URL」 |
+| 前端/后端回归 | 复用 Phase 0 | Phase 1 无代码改动(纯 JSON 数据),机制单测/回归见上半报告 |
+| diff 安全性 | ✅ | 结构化 round-trip 0 噪声,`git diff --stat` 15 文件 18+/36-(仅删 command 行) |
+
+## did_not_run(Phase 1,明确)
+
+- **enterprise overlay 插件页面清扫**:`auraboot-enterprise` 是独立仓(plugins/web-admin-ext),需另起 worktree+栈;本轮未做。**下一增量**,recipe 同 `/tmp/sweep-convention.mjs`(按 `execution_config.type` 精确匹配)。
+- **delete 命令约定**:`useActionHandler` 行删除路径未接约定(delete 无 URL 收益);若要"删除按钮也零配置"需补 wiring。
+- **全量逐页 golden**:仅抽样 crm_account/org_department(+ Phase 0 showcase)真浏览器;其余 swept 页面由平台 validator re-import 覆盖(非逐页 golden)。
+
+## allowed_claim(总)
+
+Phase 0 机制全平台生效 + Phase 1 OSS authored 页面清扫完成并抽样 golden 验证;**enterprise 与 delete 约定为下一增量**。非"全平台逐页 golden 完成"声明。
+

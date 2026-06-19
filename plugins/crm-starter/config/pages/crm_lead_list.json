@@ -21,8 +21,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "crm_lead_form",
-            "command": "crm:create_lead"
+            "to": "crm_lead_form"
           }
         }
       ]

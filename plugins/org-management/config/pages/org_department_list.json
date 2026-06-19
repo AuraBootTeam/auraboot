@@ -71,8 +71,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "org_department_form",
-            "command": "org:create_department"
+            "to": "org_department_form"
           }
         }
       ]
@@ -135,8 +134,7 @@
               },
               "action": {
                 "type": "navigate",
-                "to": "org_department_form",
-                "command": "org:update_department"
+                "to": "org_department_form"
               }
             },
             {

@@ -21,8 +21,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "crm_contact_form",
-            "command": "crm:create_contact"
+            "to": "crm_contact_form"
           }
         }
       ]
