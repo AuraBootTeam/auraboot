@@ -56,21 +56,12 @@ async function sendAuraBotMessage(page: Page, panel: Locator, message: string) {
 test.describe('chat-bi browser golden (AuraBot chat renders a chart)', () => {
   test.describe.configure({ timeout: 180000 });
 
-  // BLOCKED — runnable repro of a real Slice C wiring gap found 2026-06-19.
-  // The DEFAULT AuraBot chat resolves tools via LLM grounding (ChatToolResolver →
-  // GroundingPort → ToolDiscoveryPort), and only fill_form / execute_sql are always-on
-  // (ensurePlatformTools). The chat-bi skill is REGISTERED (AuraBotSkillToolProvider,
-  // code aurabot:chat-bi) but NOT in the always-available set, so a default-chat turn
-  // never offers it → AuraBotChatToolRuntimeAdapter rejects the scripted tool_use as
-  // "unavailable AuraBot tool aurabot:chat-bi". (Named-agent specs work because the
-  // agent carries explicit tools, bypassing grounding.) Backbone is otherwise proven:
-  // ChatBiSkillTest + ChatBiToolIntentLiveIT + S5 aggregate golden + the data path
-  // verified live here (crm_lead 90 rows). Fix to unblock: make chat-bi reachable by
-  // the default chat — add it to ChatToolResolver's always-available tools (it is
-  // read-only / LOW risk like the query tools) OR make it a grounding candidate for
-  // data/chart intents. Cross-cutting (offered to every chat turn) → design first.
-  // Note: the marker name must then match the SANITIZED LLM name (aurabot_chat-bi).
-  test.fixme('agent chat-bi tool over crm_lead renders a chart card inline', async ({ page }) => {
+  // chat-bi is now pinned as an always-on platform tool in ChatToolResolver
+  // (DDR-2026-06-19-aurabot-chat-tool-exposure-pin-vs-retrieve): it's the safe structured
+  // sibling of the always-on platform_execute_sql, so the default chat always offers it.
+  // The stub emits the SANITIZED LLM name aurabot_chat-bi (provider code aurabot:chat-bi),
+  // which routes to the real ChatBiSkill over the real crm_lead model.
+  test('agent chat-bi tool over crm_lead renders a chart card inline', async ({ page }) => {
     await page.goto('/');
     const panel = await openAuraBotPanel(page);
     await ensureFreshSession(page, panel);
@@ -78,7 +69,7 @@ test.describe('chat-bi browser golden (AuraBot chat renders a chart)', () => {
     await sendAuraBotMessage(
       page,
       panel,
-      stubToolUse('aurabot:chat-bi', {
+      stubToolUse('aurabot_chat-bi', {
         modelCode: 'crm_lead',
         dimensions: ['crm_lead_status'],
         metrics: [{ field: 'pid', aggregation: 'count', alias: 'cnt' }],
