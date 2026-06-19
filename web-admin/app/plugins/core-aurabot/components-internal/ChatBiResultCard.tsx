@@ -11,8 +11,16 @@
  */
 
 import { useState, useMemo, lazy, Suspense } from 'react';
+import { toast } from 'sonner';
+import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 
 const ReactECharts = lazy(() => import('echarts-for-react'));
+
+interface ChatBiMetric {
+  field: string;
+  aggregation: string;
+  alias?: string;
+}
 
 interface ChatBiResult {
   interpretation?: string;
@@ -21,10 +29,23 @@ interface ChatBiResult {
   chartConfig?: Record<string, unknown>;
   columns?: string[];
   records?: Record<string, unknown>[];
+  // Aggregate spec carried by the chat-bi tool — lets an ad-hoc chart be persisted as a
+  // dashboard widget ("save as dashboard" bridge) without re-deriving it.
+  dimensions?: string[];
+  metrics?: ChatBiMetric[];
   total?: number;
   sql?: string;
   truncated?: boolean;
 }
+
+// Map a chat-bi chartType to the matching dashboard widget type.
+const CHART_TYPE_TO_WIDGET: Record<string, string> = {
+  bar: 'smart-bar-chart',
+  line: 'smart-line-chart',
+  pie: 'smart-pie-chart',
+  number: 'smart-number-card',
+  table: 'smart-table-chart',
+};
 
 interface ChatBiResultCardProps {
   result: ChatBiResult;
@@ -311,6 +332,44 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
 
   const showChart = chartType !== 'table' && records.length > 0;
 
+  // ── Ad-hoc → persisted bridge: save this chart as a dashboard widget ──
+  const { modelCode, dimensions = [], metrics = [] } = result;
+  const [saving, setSaving] = useState(false);
+  const [savedPid, setSavedPid] = useState<string | null>(null);
+  const canSave = !!modelCode && metrics.length > 0 && records.length > 0 && !savedPid;
+
+  const handleSaveDashboard = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      const title = String(interpretation || modelCode || 'Chart').slice(0, 200);
+      const widgetType = CHART_TYPE_TO_WIDGET[chartType] || 'smart-bar-chart';
+      const widgets = [
+        {
+          id: 'chatbi_chart',
+          type: widgetType,
+          x: 0,
+          y: 0,
+          w: 6,
+          h: 4,
+          title,
+          config: {
+            title,
+            dataSource: { type: 'aggregate', modelCode, dimensions, metrics },
+          },
+        },
+      ];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dash: any = await dashboardService.create({ title, scope: 'personal', widgets } as any);
+      setSavedPid(dash?.pid || dash?.code || 'saved');
+      toast.success('已存为看板');
+    } catch {
+      toast.error('存为看板失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="mb-3 flex justify-start">
       <div
@@ -362,6 +421,32 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
             <DataTable records={records} columns={effectiveColumns} />
           )}
         </div>
+
+        {/* Actions: ad-hoc → persisted bridge (save this chart as a dashboard widget) */}
+        {(canSave || savedPid) && (
+          <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-3 py-1.5 dark:border-gray-700">
+            {savedPid ? (
+              <span data-testid="chatbi-saved-dashboard" className="text-xs font-medium text-green-600 dark:text-green-400">
+                已存为看板 ✓
+              </span>
+            ) : (
+              <button
+                data-testid="chatbi-save-dashboard"
+                onClick={handleSaveDashboard}
+                disabled={saving}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
+              >
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+                {saving ? '保存中…' : '存为看板'}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* SQL toggle */}
         {sql && (

@@ -95,5 +95,23 @@ test.describe('chat-bi browser golden (AuraBot chat renders a chart)', () => {
 
     // Interpretation header text flows through.
     await expect(card).toContainText('Leads by status');
+
+    // Slice E — ad-hoc → persisted bridge: persist this chart as a dashboard.
+    const saveBtn = card.getByTestId('chatbi-save-dashboard');
+    await expect(saveBtn, 'save-as-dashboard action should be available').toBeVisible({ timeout: 10000 });
+    const createResponse = page.waitForResponse(
+      (r) =>
+        r.request().method() === 'POST' &&
+        /\/api\/dashboards\/?($|\?)/.test(new URL(r.url()).pathname) &&
+        r.status() === 200,
+      { timeout: 30000 },
+    );
+    await saveBtn.click();
+    const created = await createResponse;
+    expect(created.status(), 'POST /api/dashboards should succeed').toBe(200);
+    await expect(
+      card.getByTestId('chatbi-saved-dashboard'),
+      'card should confirm the chart was saved as a dashboard',
+    ).toBeVisible({ timeout: 10000 });
   });
 });

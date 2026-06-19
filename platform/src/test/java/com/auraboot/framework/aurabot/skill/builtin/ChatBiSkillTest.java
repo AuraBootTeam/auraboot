@@ -95,6 +95,11 @@ class ChatBiSkillTest {
         assertThat(payload.get("records")).hasSize(2);
         assertThat(payload.get("records").get(0).get("crm_lead_status").asText()).isEqualTo("new");
         assertThat(payload.get("rowCount").asInt()).isEqualTo(2);
+        // aggregate spec carried for the "save as dashboard" bridge (Slice E)
+        assertThat(payload.get("dimensions").toString()).contains("crm_lead_status");
+        assertThat(payload.get("metrics")).hasSize(1);
+        assertThat(payload.get("metrics").get(0).get("field").asText()).isEqualTo("pid");
+        assertThat(payload.get("metrics").get(0).get("aggregation").asText()).isEqualTo("count");
     }
 
     @Test
