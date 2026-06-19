@@ -140,8 +140,7 @@
               },
               "confirm": "delete.confirm",
               "action": {
-                "type": "command",
-                "command": "crm:delete_account"
+                "type": "command"
               }
             }
           ],

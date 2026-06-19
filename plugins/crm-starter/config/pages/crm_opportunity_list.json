@@ -160,8 +160,7 @@
               },
               "confirm": "delete.confirm",
               "action": {
-                "type": "command",
-                "command": "crm:delete_opportunity"
+                "type": "command"
               }
             }
           ],

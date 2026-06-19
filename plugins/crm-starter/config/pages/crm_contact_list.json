@@ -97,8 +97,7 @@
               },
               "confirm": "delete.confirm",
               "action": {
-                "type": "command",
-                "command": "crm:delete_contact"
+                "type": "command"
               }
             }
           ],
