@@ -87,10 +87,11 @@ test.describe('chat-bi browser golden (AuraBot chat renders a chart)', () => {
     const rowCount = Number(await card.getAttribute('data-row-count'));
     expect(rowCount, 'chat-bi should return real grouped rows from crm_lead').toBeGreaterThan(0);
 
-    // ECharts renders an SVG inside the card's chart area.
+    // The shared dashboard chart component (SharedChartFactory, via a synchronous static
+    // dataSource) renders an ECharts canvas inside the card's chart area.
     await expect(
-      panel.getByTestId('chatbi-chart-area').locator('svg').first(),
-      'ECharts SVG should render',
+      panel.getByTestId('chatbi-chart-area').locator('canvas').first(),
+      'ECharts canvas should render',
     ).toBeVisible({ timeout: 30000 });
 
     // Interpretation header text flows through.

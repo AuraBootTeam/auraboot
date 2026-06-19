@@ -10,11 +10,11 @@
  * @since 3.2.0
  */
 
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { toast } from 'sonner';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
-
-const ReactECharts = lazy(() => import('echarts-for-react'));
+import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
+import type { ChartDataSource } from '~/framework/smart/types/chart';
 
 interface ChatBiMetric {
   field: string;
@@ -50,12 +50,6 @@ const CHART_TYPE_TO_WIDGET: Record<string, string> = {
 interface ChatBiResultCardProps {
   result: ChatBiResult;
 }
-
-// ECharts color palette matching dashboard theme
-const CHART_COLORS = [
-  '#5B8FF9', '#5AD8A6', '#F6BD16', '#E86452', '#6DC8EC',
-  '#945FB9', '#FF9845', '#1E9493', '#FF99C3', '#269A99',
-];
 
 /**
  * Auto-detect label and value fields from data columns.
@@ -98,151 +92,65 @@ function inferFields(
   return { labelField, valueField };
 }
 
-function EChartsChart({
+/**
+ * Render a chat-bi result via the shared dashboard chart components (SharedChartFactory),
+ * fed a {type:'static'} ChartDataSource — the chat card no longer carries its own ECharts
+ * config (Slice D renderer convergence). The aggregate spec (dimensions/metrics) is carried
+ * by the chat-bi tool; for a raw tool result it is inferred from the column types.
+ * (useChartData resolves static sources synchronously, so the chart mounts with data.)
+ */
+function ChatBiChart({
   chartType,
   records,
   columns,
+  dimensions,
+  metrics,
   chartConfig,
+  title,
 }: {
   chartType: string;
   records: Record<string, unknown>[];
   columns: string[];
+  dimensions?: string[];
+  metrics?: ChatBiMetric[];
   chartConfig?: Record<string, unknown>;
+  title?: string;
 }) {
-  const option = useMemo(() => {
+  const dataSource = useMemo<ChartDataSource>(() => {
     const { labelField, valueField } = inferFields(records, columns, chartConfig);
-    const labels = records.map((r) => String(r[labelField] ?? ''));
-    const values = records.map((r) => Number(r[valueField] ?? 0));
-
-    const bg = 'transparent';
-
-    if (chartType === 'pie') {
-      return {
-        backgroundColor: bg,
-        tooltip: {
-          trigger: 'item',
-          formatter: '{b}: {c} ({d}%)',
-          backgroundColor: 'rgba(50,50,50,0.9)',
-          borderColor: '#555',
-          textStyle: { color: '#fff', fontSize: 12 },
-        },
-        legend: {
-          type: 'scroll',
-          bottom: 0,
-          textStyle: { color: '#e5e7eb', fontSize: 11 },
-          pageTextStyle: { color: '#9ca3af' },
-          pageIconColor: '#9ca3af',
-          pageIconInactiveColor: '#4b5563',
-        },
-        series: [
-          {
-            type: 'pie',
-            radius: ['30%', '60%'],
-            center: ['50%', '42%'],
-            data: records.map((r, i) => ({
-              name: String(r[labelField] ?? ''),
-              value: Number(r[valueField] ?? 0),
-              itemStyle: {
-                color: CHART_COLORS[i % CHART_COLORS.length],
-                borderColor: '#1f2937',
-                borderWidth: 2,
-              },
-            })),
-            label: {
-              show: records.length <= 10,
-              formatter: '{b}\n{d}%',
-              fontSize: 11,
-              color: '#e5e7eb',
-            },
-            labelLine: {
-              lineStyle: { color: '#6b7280' },
-            },
-            emphasis: {
-              itemStyle: { shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.4)' },
-              label: { fontSize: 13, fontWeight: 'bold' },
-            },
-          },
-        ],
-      };
-    }
-
-    if (chartType === 'line') {
-      return {
-        backgroundColor: bg,
-        tooltip: {
-          trigger: 'axis',
-          backgroundColor: 'rgba(50,50,50,0.9)',
-          borderColor: '#555',
-          textStyle: { color: '#fff' },
-        },
-        grid: { left: '10%', right: '4%', bottom: '14%', top: '10%' },
-        xAxis: {
-          type: 'category',
-          data: labels,
-          axisLabel: { color: '#d1d5db', fontSize: 10, rotate: labels.length > 6 ? 30 : 0 },
-          axisLine: { lineStyle: { color: '#4b5563' } },
-        },
-        yAxis: {
-          type: 'value',
-          axisLabel: { color: '#d1d5db', fontSize: 10 },
-          splitLine: { lineStyle: { color: '#374151', type: 'dashed' } },
-        },
-        series: [
-          {
-            type: 'line',
-            data: values,
-            smooth: true,
-            areaStyle: { opacity: 0.2, color: CHART_COLORS[0] },
-            lineStyle: { color: CHART_COLORS[0], width: 2 },
-            itemStyle: { color: CHART_COLORS[0] },
-          },
-        ],
-      };
-    }
-
-    // Default: bar chart
+    const effectiveDimensions =
+      dimensions && dimensions.length > 0 ? dimensions : chartType === 'number' ? [] : [labelField];
+    const effectiveMetrics =
+      metrics && metrics.length > 0
+        ? metrics
+        : [{ field: valueField, aggregation: 'sum', alias: valueField }];
     return {
-      backgroundColor: bg,
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: 'rgba(50,50,50,0.9)',
-        borderColor: '#555',
-        textStyle: { color: '#fff' },
-      },
-      grid: { left: '10%', right: '4%', bottom: '14%', top: '10%' },
-      xAxis: {
-        type: 'category',
-        data: labels,
-        axisLabel: { color: '#d1d5db', fontSize: 10, rotate: labels.length > 6 ? 30 : 0 },
-        axisLine: { lineStyle: { color: '#4b5563' } },
-      },
-      yAxis: {
-        type: 'value',
-        axisLabel: { color: '#d1d5db', fontSize: 10 },
-        splitLine: { lineStyle: { color: '#374151', type: 'dashed' } },
-      },
-      series: [
-        {
-          type: 'bar',
-          data: values.map((v, i) => ({
-            value: v,
-            itemStyle: {
-              color: CHART_COLORS[i % CHART_COLORS.length],
-              borderRadius: [3, 3, 0, 0],
-            },
-          })),
-          barMaxWidth: 40,
-        },
-      ],
-    };
-  }, [chartType, records, columns, chartConfig]);
+      type: 'static',
+      staticData: records,
+      dimensions: effectiveDimensions,
+      metrics: effectiveMetrics,
+    } as ChartDataSource;
+  }, [chartType, records, columns, dimensions, metrics, chartConfig]);
+
+  const widgetType = normalizeChartType(CHART_TYPE_TO_WIDGET[chartType] || 'smart-bar-chart');
+  const ChartComponent = getChartComponent(widgetType);
+  if (!ChartComponent) {
+    return <DataTable records={records} columns={columns} />;
+  }
 
   return (
-    <Suspense fallback={<div className="flex h-[280px] items-center justify-center text-gray-400 text-sm">Loading chart...</div>}>
-      <ReactECharts
-        option={option}
-        style={{ height: 280, width: '100%' }}
-        opts={{ renderer: 'svg' }}
+    <Suspense
+      fallback={
+        <div className="flex h-[280px] items-center justify-center text-sm text-gray-400">
+          Loading chart...
+        </div>
+      }
+    >
+      <ChartComponent
+        title={title}
+        dataSource={dataSource}
+        className="h-[280px] w-full"
+        style={{ height: 280 }}
       />
     </Suspense>
   );
@@ -257,13 +165,13 @@ function DataTable({
 }) {
   return (
     <div className="max-h-[300px] overflow-auto">
-      <table className="w-full text-xs text-gray-300">
+      <table className="w-full text-xs text-gray-700 dark:text-gray-300">
         <thead>
-          <tr className="border-b border-gray-700">
+          <tr className="border-b border-gray-200 dark:border-gray-700">
             {columns.map((col) => (
               <th
                 key={col}
-                className="px-2 py-1.5 text-left font-medium text-gray-400"
+                className="px-2 py-1.5 text-left font-medium text-gray-500 dark:text-gray-400"
               >
                 {col}
               </th>
@@ -274,7 +182,7 @@ function DataTable({
           {records.map((row, i) => (
             <tr
               key={i}
-              className="border-b border-gray-800 hover:bg-gray-800/50"
+              className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
             >
               {columns.map((col) => (
                 <td key={col} className="px-2 py-1.5">
@@ -409,13 +317,16 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
         )}
 
         {/* Chart or Table */}
-        <div data-testid="chatbi-chart-area" className="bg-gray-900 p-3">
+        <div data-testid="chatbi-chart-area" className="bg-white p-3 dark:bg-gray-800">
           {showChart ? (
-            <EChartsChart
+            <ChatBiChart
               chartType={chartType}
               records={records}
               columns={effectiveColumns}
+              dimensions={dimensions}
+              metrics={metrics}
               chartConfig={chartConfig}
+              title={interpretation}
             />
           ) : (
             <DataTable records={records} columns={effectiveColumns} />

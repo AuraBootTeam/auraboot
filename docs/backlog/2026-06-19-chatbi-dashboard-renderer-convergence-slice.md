@@ -1,6 +1,6 @@
 ---
 type: backlog
-status: planned
+status: done
 created: 2026-06-19
 owner: agent-quality-campaign
 related:
@@ -9,7 +9,9 @@ related:
 
 # Slice D — ChatBi 即席图 ↔ 看板图 渲染收口(独立切片)
 
-> 把 AuraBot 聊天即席图(`ChatBiResultCard` 自有 ECharts)与看板图(`SharedChartFactory` 的 `Smart*Chart`)的渲染收成一套,消除两套 ECharts option 构建的冗余。**已实测确认不能简单 drop-in**——干净收口要动共享渲染层 + dashboard 全量 golden 回归,故单独成片,不在收敛终局尾巴上硬塞。
+> 把 AuraBot 聊天即席图(`ChatBiResultCard` 自有 ECharts)与看板图(`SharedChartFactory` 的 `Smart*Chart`)的渲染收成一套,消除两套 ECharts option 构建的冗余。
+>
+> **✅ DONE(2026-06-19)**:走**修法 B**——`useChartData` static 分支改**同步**(`useMemo` 直返,不再 effect+setData)→ ECharts 首帧即带数据挂载,不再缓存空 scale → 柱子正确。`ChatBiResultCard` 删自有 `EChartsChart`+`CHART_COLORS`,改薄适配器复用 `getChartComponent`+static dataSource。**验证**:chat-bi golden 截图柱值正确(9/18/11/29/23)+ dashboard/workbench golden 26 passed 无回归 + chart 单测 5 文件 18 passed。`enabled:false` 契约保留(static memo 也 gate enabled)。下方原始分析保留作记录。
 
 ## 来龙去脉
 
