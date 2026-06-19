@@ -778,13 +778,20 @@ jacocoTestCoverageVerification {
         // (51452/66519); security service packages 0.85-0.99. Floor raised 0.73->0.75 (same ~2pt
         // flaky margin; conservative — 73 pre-existing/env failures still undercount coverage).
         // Evidence: docs/retro/2026-06-18-oss-coverage-gate-consolidation-testing-gate-acceptance-report.md.
+        // 2026-06-19 backend IT waves 5-8 (#847-#850): real-stack ITs for DataDomainServiceImpl
+        // (7->96%), FieldMaskServiceImpl (22->84%), VirtualFieldEngine.evaluate, ApiConnector +
+        // JdbcConnector CRUD, plus three live bugs fixed (two missing cache regions + a
+        // tenant-interceptor recursive-CTE break, all surfaced by the ITs) and a systemic
+        // cache-name audit (every @Cacheable/@CacheEvict name now registered). The clean full
+        // suite now measures 77.69% (51718/66566); floor raised 0.75->0.76 (security packages
+        // still 0.85-0.99). Keep raising it per wave toward the 0.80 target.
         rule {
             enabled = true
             element = 'BUNDLE'
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.75
+                minimum = 0.76
             }
         }
         // Lock the already-strong security/identity domains so they cannot rot.
