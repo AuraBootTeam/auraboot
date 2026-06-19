@@ -8,9 +8,43 @@ import {
   normalizeLoadedRecordForForm,
   resolveAfterSubmitRedirect,
   resolveAsyncCommandDispatch,
+  resolveSubmitCommandCode,
   shouldBypassFormSubmit,
   unwrapJsonLikeValue,
 } from '../FormPageContent';
+
+describe('resolveSubmitCommandCode (convention over configuration)', () => {
+  const crud = {
+    create: 'sc:create_showcase',
+    update: 'sc:update_showcase',
+    delete: 'sc:delete_showcase',
+  };
+
+  it('falls back to the model create command in new mode when no explicit command', () => {
+    expect(resolveSubmitCommandCode(null, crud, false)).toBe('sc:create_showcase');
+  });
+
+  it('falls back to the model update command in edit mode when no explicit command', () => {
+    expect(resolveSubmitCommandCode(null, crud, true)).toBe('sc:update_showcase');
+  });
+
+  it('lets an explicit command override the convention map (create mode)', () => {
+    expect(resolveSubmitCommandCode('sc:register_showcase', crud, false)).toBe('sc:register_showcase');
+  });
+
+  it('lets an explicit command override the convention map (edit mode)', () => {
+    expect(resolveSubmitCommandCode('custom:amend', crud, true)).toBe('custom:amend');
+  });
+
+  it('returns null for a pure-CRUD model so the caller uses the dynamic CRUD API', () => {
+    expect(resolveSubmitCommandCode(null, undefined, false)).toBeNull();
+    expect(resolveSubmitCommandCode(null, {}, true)).toBeNull();
+  });
+
+  it('returns null when the map lacks the needed operation (update missing in edit mode)', () => {
+    expect(resolveSubmitCommandCode(null, { create: 'sc:create_showcase' }, true)).toBeNull();
+  });
+});
 
 describe('mergeLoadedRecordWithDirtyFields', () => {
   it('keeps user-edited fields when a late edit-record fetch resolves', () => {

@@ -598,6 +598,15 @@ export interface UnifiedSchema {
   /** Default command associated with the page, when provided by PageSchemaDTO. */
   commandCode?: string;
 
+  /**
+   * Convention-resolved CRUD command codes for this page's model, keyed by
+   * operation type (create/update/delete). Server-attached so standard
+   * create/edit/delete forms route through the business command without
+   * per-page config or a URL `?commandCode=` param. Absent/empty → the runtime
+   * falls back to the dynamic CRUD API.
+   */
+  commands?: Record<string, string>;
+
   // Page-level data source (overrides default model table query)
   dataSource?: PageDataSourceConfig;
 
