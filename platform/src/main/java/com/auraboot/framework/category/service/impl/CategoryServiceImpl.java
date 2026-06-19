@@ -34,7 +34,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
     public Category createCategory(Category category) {
         // 检查类目编码在租户下是否已存在
         if (!isCodeAvailable(category.getCode(), category.getTenantId())) {
-            throw new BusinessException("类目编码在该租户下已存在: " + category.getCode());
+            throw BusinessException.i18n("category.code_exists", category.getCode());
         }
 
         // 设置业务ID
@@ -52,7 +52,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
         if (category.getParentId() != null && category.getParentId() > 0) {
             Category parent = getById(category.getParentId());
             if (parent == null) {
-                throw new BusinessException("父类目不存在");
+                throw new BusinessException("$i18n:category.parent_not_found");
             }
             categoryTreePolicy.assertChildAllowed(parent, category.getCategoryType());
             category.setLevel(parent.getLevel() + 1);
@@ -92,18 +92,18 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
     public Category updateCategory(Category category) {
         Category existing = getById(category.getId());
         if (existing == null) {
-            throw new BusinessException("类目不存在");
+            throw new BusinessException("$i18n:category.not_found");
         }
 
         // 检查租户ID是否匹配（防止跨租户操作）
         if (!existing.getTenantId().equals(category.getTenantId())) {
-            throw new BusinessException("不允许修改其他租户的类目");
+            throw new BusinessException("$i18n:category.cross_tenant_modify");
         }
 
         // 检查类目编码是否被其他类目使用
         if (!existing.getCode().equals(category.getCode())
             && !isCodeAvailable(category.getCode(), category.getTenantId())) {
-            throw new BusinessException("类目编码在该租户下已存在: " + category.getCode());
+            throw BusinessException.i18n("category.code_exists", category.getCode());
         }
 
         category.setUpdatedAt(Instant.now());
@@ -162,12 +162,12 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
     public boolean deleteCategory(Long categoryId) {
         // 检查是否有子类目
         if (hasChildren(categoryId)) {
-            throw new BusinessException("存在子类目，无法删除");
+            throw new BusinessException("$i18n:category.has_children");
         }
 
         Category category = getById(categoryId);
         if (category == null) {
-            throw new BusinessException("类目不存在");
+            throw new BusinessException("$i18n:category.not_found");
         }
 
         // 如果有父类目，检查是否需要更新父类目的 is_leaf 状态
@@ -210,7 +210,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
     public boolean moveCategory(Long categoryId, Long newParentId) {
         Category category = getById(categoryId);
         if (category == null) {
-            throw new BusinessException("类目不存在");
+            throw new BusinessException("$i18n:category.not_found");
         }
         Long oldParentId = category.getParentId();
 
@@ -218,18 +218,18 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
         if (newParentId != null && newParentId > 0) {
             Category newParent = getById(newParentId);
             if (newParent == null) {
-                throw new BusinessException("新父类目不存在");
+                throw new BusinessException("$i18n:category.new_parent_not_found");
             }
 
             // 检查租户是否相同
             if (!newParent.getTenantId().equals(category.getTenantId())) {
-                throw new BusinessException("不允许移动到其他租户的类目下");
+                throw new BusinessException("$i18n:category.cross_tenant_move");
             }
 
             // 不能移动到自己的子类目下
             List<Long> childIds = getChildCategoryIds(categoryId);
             if (childIds.contains(newParentId)) {
-                throw new BusinessException("不能移动到自己的子类目下");
+                throw new BusinessException("$i18n:category.move_to_descendant");
             }
 
             // 检查层级限制

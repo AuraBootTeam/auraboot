@@ -1162,3 +1162,21 @@ tenant:
     not_found: "成员不存在: {0}"
   not_found: "租户不存在: {0}"
   name_exists: "租户名称已存在: {0}"
+
+role:
+  not_found: "角色不存在: {0}"
+  original_not_found: "原角色不存在: {0}"
+  system_no_disable: 系统角色不允许禁用
+  system_no_delete: 系统角色不允许删除
+  in_use: 该角色正在被使用，无法删除
+  code_exists: "角色编码已存在: {0}"
+
+category:
+  code_exists: "类目编码在该租户下已存在: {0}"
+  parent_not_found: 父类目不存在
+  not_found: 类目不存在
+  cross_tenant_modify: 不允许修改其他租户的类目
+  has_children: 存在子类目，无法删除
+  new_parent_not_found: 新父类目不存在
+  cross_tenant_move: 不允许移动到其他租户的类目下
+  move_to_descendant: 不能移动到自己的子类目下

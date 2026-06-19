@@ -1151,3 +1151,21 @@ tenant:
     not_found: "Member not found: {0}"
   not_found: "Tenant not found: {0}"
   name_exists: "Tenant name already exists: {0}"
+
+role:
+  not_found: "Role not found: {0}"
+  original_not_found: "Original role not found: {0}"
+  system_no_disable: System roles cannot be disabled
+  system_no_delete: System roles cannot be deleted
+  in_use: Role is in use and cannot be deleted
+  code_exists: "Role code already exists: {0}"
+
+category:
+  code_exists: "Category code already exists in this tenant: {0}"
+  parent_not_found: Parent category not found
+  not_found: Category not found
+  cross_tenant_modify: Modifying categories of another tenant is not allowed
+  has_children: Category has child categories and cannot be deleted
+  new_parent_not_found: New parent category not found
+  cross_tenant_move: Moving under a category of another tenant is not allowed
+  move_to_descendant: A category cannot be moved under its own descendant
