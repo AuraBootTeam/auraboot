@@ -785,13 +785,19 @@ jacocoTestCoverageVerification {
         // cache-name audit (every @Cacheable/@CacheEvict name now registered). The clean full
         // suite now measures 77.69% (51718/66566); floor raised 0.75->0.76 (security packages
         // still 0.85-0.99). Keep raising it per wave toward the 0.80 target.
+        // 2026-06-19 backend IT waves 9-21 (#852-#867): SodService/DrtDefinition/CloudConfig CRUD,
+        // FieldValidation, FieldBindingContext (1->73%), RelationSync, ActivityEventListener
+        // (7->58%, @Async unwrapped via AopTestUtils), AsyncTask, AssertPhase, VirtualFieldEngine
+        // graph (->82%), DynamicData typed-coercion + Excel export, AuditTrail (52->86%), Category,
+        // DataPermission/PostExecution branches. Clean full suite now 78.69% (52380/66566); floor
+        // raised 0.76->0.77 (1.69pt margin, same as the 0.76 bump; security packages 0.85-0.99).
         rule {
             enabled = true
             element = 'BUNDLE'
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.76
+                minimum = 0.77
             }
         }
         // Lock the already-strong security/identity domains so they cannot rot.
