@@ -241,7 +241,8 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
         sessionManagementService.createSession(user.getId(), newJwt, null, null);
 
         response.setStatus(StatusConstants.SUCCESS);
-        response.setMessage("租户创建成功，您已成为该租户的管理员");
+        // i18n key — resolved to the request locale by the controller (TenantSelectionController).
+        response.setMessage("$i18n:tenant.application.create_success");
         response.setTenantId(createdTenant.getId());
         response.setTenantName(createdTenant.getName());
         response.setJwt(newJwt);
@@ -258,19 +259,19 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
         Invitation invitation = tenantInviteService.findByInvitationCode(request.getInviteCode());
         if (invitation == null) {
             response.setStatus("error");
-            response.setMessage("无效的邀请码");
+            response.setMessage("$i18n:tenant.application.invite_invalid");
             return response;
         }
 
         if (!StatusConstants.ACTIVE.equals(invitation.getStatus())) {
             response.setStatus("error");
-            response.setMessage("邀请码已失效");
+            response.setMessage("$i18n:tenant.application.invite_revoked");
             return response;
         }
 
         if (invitation.getExpiredAt() != null && invitation.getExpiredAt().isBefore(Instant.now())) {
             response.setStatus("error");
-            response.setMessage("邀请码已过期");
+            response.setMessage("$i18n:tenant.application.invite_expired");
             return response;
         }
 
@@ -281,9 +282,9 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
         Tenant tenant = tenantService.getById(invitation.getTenantId());
 
         response.setStatus(StatusConstants.PENDING);
-        response.setMessage("加入申请已提交，等待租户管理员审批");
+        response.setMessage("$i18n:tenant.application.join_pending");
         response.setTenantId(invitation.getTenantId());
-        response.setTenantName(tenant != null ? tenant.getName() : "未知租户");
+        response.setTenantName(tenant != null ? tenant.getName() : "$i18n:tenant.application.unknown_tenant");
         response.setNeedsApproval(true);
 
         return response;

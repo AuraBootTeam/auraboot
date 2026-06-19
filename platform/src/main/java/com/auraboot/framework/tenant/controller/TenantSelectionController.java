@@ -6,6 +6,9 @@ import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.i18n.service.I18nService;
+import com.auraboot.framework.i18n.util.I18nLocaleResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.service.RoleService;
@@ -57,6 +60,8 @@ public class TenantSelectionController {
     private final UserRoleService userRoleService;
     private final JwtUtil jwtUtil;
     private final SessionManagementService sessionManagementService;
+    private final I18nService i18nService;
+    private final I18nLocaleResolver i18nLocaleResolver;
 
     /**
      * List all spaces (tenants) the current user belongs to.
@@ -113,7 +118,8 @@ public class TenantSelectionController {
     @PostMapping("/process")
     public ApiResponse<TenantSelectionResponse> processTenantSelection(
             @RequestBody TenantSelectionRequest request,
-            @CurrentUserId Long userId) {
+            @CurrentUserId Long userId,
+            HttpServletRequest httpRequest) {
 
         User user = userService.findByUserId(userId);
 
@@ -126,7 +132,34 @@ public class TenantSelectionController {
             default -> throw new RootUnCheckedException(UnreachableCodePathException);
         }
 
+        localizeResponse(response, httpRequest);
         return ApiResponse.success(response);
+    }
+
+    /**
+     * Resolve any {@code $i18n:<key>} placeholders in the user-facing response fields to the
+     * request locale, using the existing i18n catalog (I18nLocaleResolver + I18nService). The
+     * service layer (which has no request/locale) emits keys; localization happens here.
+     */
+    private void localizeResponse(TenantSelectionResponse response, HttpServletRequest httpRequest) {
+        if (response == null) {
+            return;
+        }
+        String locale = i18nLocaleResolver.resolveLocale(httpRequest);
+        response.setMessage(localize(response.getMessage(), locale));
+        response.setTenantName(localize(response.getTenantName(), locale));
+    }
+
+    private String localize(String text, String locale) {
+        if (text == null || !text.startsWith("$i18n:")) {
+            return text;
+        }
+        String key = text.substring("$i18n:".length());
+        String value = i18nService.getValue(locale, key);
+        if (value == null) {
+            value = i18nService.getValue("zh-CN", key); // base-locale fallback (e.g. ja/ko gaps)
+        }
+        return value != null ? value : key;
     }
 
     /**
