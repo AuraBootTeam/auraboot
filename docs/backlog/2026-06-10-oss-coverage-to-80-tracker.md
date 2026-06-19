@@ -355,3 +355,33 @@ either (a) implementing `loadModelRelations` (a product change, then those lines
 justification — **plus** continuing the heavy-fixture waves (PluginPackage 631 / Bootstrap 382 /
 ImWebSocket 198), each a multi-hour harness. The quick/medium/model-harness service wins are now
 exhausted; the remaining addressable surface is heavy-harness or cheap-branch-only (~17–30 lines/wave).
+
+## 11. Session progress log — 2026-06-19 (waves 24–31) + the PLATEAU finding
+
+Waves 24–31 (#869–#880, ~34 coverage PRs total this run): InvariantDefinition 1→89, SemanticQuery
+1→24, Idempotency 57→82, OutboxWorker 13→49, SchemaAccessProjector (dynamic-access + field-filter),
+DataPermissionEngine (no-policy + effective-row-policy via a seeded role/policy/binding/user-role
+chain), DynamicTableOeeAdapter 1→36, ActivityEventListener branches, FieldValidation branches.
+
+**Measured plateau (decisive):** the consolidation bundle moved 0.7847 (w18) → 0.7869 (w21) →
+0.7878 (w27) → **0.7884 (w31)**. Waves 28–31 added only **+0.06% net**. Root cause: the all-new
+0–7%-coverage classes are exhausted; the remaining waves cover the *second half* of
+already-partially-covered classes (DataPermission 55%, OEE, AEL 58%, FieldValidation 46%), so new
+ITs overlap heavily with existing coverage and net bundle gain has collapsed to ~6–10 lines/wave.
+
+**Conclusion — 0.80 is NOT reachable by more incremental ITs.** At ~6–10 net lines/wave, +774 lines
+to 0.80 ≈ 80+ waves. The remaining uncovered lines are concentrated in:
+- **Unreachable code** — DynamicData relation cluster (~336, `loadModelRelations` stub, §10).
+- **Heavy-harness classes** — PluginPackageServiceImpl (631, plugin zip/PF4J), BootstrapRepair/Engine
+  (382, startup state), ImWebSocketHandler (198, ws session) — each a major multi-session harness.
+- **Deep branches of partially-covered classes** — high overlap, tiny net gain per IT.
+
+**Recommended paths to 0.80 (require a decision, not more ITs):**
+1. Implement `loadModelRelations` (product) → unlocks the 336 relation lines + makes the feature real.
+2. A gate-denominator decision: exclude genuinely-unreachable (relation stub) + infra-only code from
+   the jacoco denominator with this finding as justification (note: do NOT exclude reachable business
+   logic — that's the anti-pattern).
+3. Commit to the heavy-harness classes (PluginPackage/Bootstrap/ImWebSocket) across multiple sessions.
+
+Floor held at **0.77** (bundle 0.7884; a 0.78 floor would have only 0.84pt margin, below the ~1.69pt
+ratchet precedent). Security packages remain 0.85–0.99.
