@@ -1,25 +1,25 @@
 /**
- * BlockRenderer - Profile-aware block dispatcher
+ * BlockRenderer - Profile-aware block dispatcher (kernel)
  *
  * Resolves block renderers from the current RenderProfile context, then falls
- * back to the runtime BlockRegistry (DESIGNER-001). The registry is the single
- * source of truth for blockType → component mapping; profiles override
- * specific entries at runtime. Each block is wrapped in BlockErrorBoundary for
- * crash isolation.
+ * back to the host-injected global block resolver (the admin `BlockRegistry`
+ * registers itself via `setBlockResolver` at boot — DESIGNER-001). The resolver
+ * is the single source of truth for blockType → component mapping; profiles
+ * override specific entries at runtime. `custom` blocks render through the
+ * host-injected `CustomBlockComponent`. Each block is wrapped in
+ * BlockErrorBoundary for crash isolation.
+ *
+ * The dispatch logic is product-agnostic; the concrete registry + custom loader
+ * are injected by the host (see ./blockResolver) so the kernel stays admin-free.
  */
 
 import React, { Suspense, useMemo } from 'react';
-import type { BlockConfig } from '~/framework/meta/schemas/types';
-import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import { useProfileSafe, BlockErrorBoundary } from '@auraboot/runtime-kernel';
-import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
-import { BlockRegistry } from '~/ui/schema-renderer/BlockRegistry';
+import { useProfileSafe } from '../profiles/ProfileContext';
+import type { BlockRendererProps } from '../profiles/types';
+import { BlockErrorBoundary } from './BlockErrorBoundary';
+import { getBlockResolver, getCustomBlockComponent } from './blockResolver';
 
-export interface BlockRendererProps {
-  block: BlockConfig;
-  runtime: SchemaRuntime;
-  areaId: string;
-}
+export type { BlockRendererProps };
 
 export const BlockRenderer: React.FC<BlockRendererProps> = ({
   block,
@@ -65,8 +65,8 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({
       if (Renderer) return Renderer;
     }
 
-    // 2. Runtime registry (DESIGNER-001 single source of truth)
-    const spec = BlockRegistry.get(blockType);
+    // 2. Host-injected global block resolver (DESIGNER-001 single source of truth)
+    const spec = getBlockResolver()?.get(blockType);
     if (spec) return spec.component;
 
     // 3. `custom` is handled below; structural types (`monthly-grid`) are
@@ -88,10 +88,19 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({
       );
     }
 
+    const CustomBlock = getCustomBlockComponent();
     return (
       <BlockErrorBoundary blockType={blockType} blockId={block.id}>
         <div className={`block-${blockType} ${block.className || ''}`}>
-          <ComponentLoader componentName={block.component} props={{ block, runtime }} />
+          {CustomBlock ? (
+            <Suspense fallback={<div className="bg-muted h-24 animate-pulse rounded" />}>
+              <CustomBlock componentName={block.component} props={{ block, runtime }} />
+            </Suspense>
+          ) : (
+            <div className="border-status-red bg-status-red-bg rounded border p-4">
+              <p className="text-red-800">Custom block loader not registered</p>
+            </div>
+          )}
         </div>
       </BlockErrorBoundary>
     );

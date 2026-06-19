@@ -11,26 +11,27 @@ import type {
 } from './types';
 import {
   DEFAULT_RUNTIME_PROFILE,
-  getDefaultPluginRuntimeProfiles,
+  isRuntimeProfileAllowed,
+  isRuntimeProfileEnabled,
   type RuntimeProfile,
 } from '@auraboot/runtime-kernel';
 
+// Thin host-typed wrappers over the kernel profile-gating predicates. The
+// gating *logic* (default-to-plugin-default vs default-to-all) lives in the
+// kernel (@auraboot/runtime-kernel); these only extract the declared profile
+// list from the admin PluginManifest / SlotContribution shapes.
 export function isPluginEnabledForRuntime(
   manifest: PluginManifest,
   runtimeProfile: RuntimeProfile,
 ): boolean {
-  const runtimeProfiles = manifest.clientConfig?.runtimeProfiles ?? getDefaultPluginRuntimeProfiles();
-  return runtimeProfiles.includes(runtimeProfile);
+  return isRuntimeProfileEnabled(manifest.clientConfig?.runtimeProfiles, runtimeProfile);
 }
 
 export function isSlotEnabledForRuntime(
   slot: SlotContribution,
   runtimeProfile: RuntimeProfile,
 ): boolean {
-  if (!slot.runtimeProfiles || slot.runtimeProfiles.length === 0) {
-    return true;
-  }
-  return slot.runtimeProfiles.includes(runtimeProfile);
+  return isRuntimeProfileAllowed(slot.runtimeProfiles, runtimeProfile);
 }
 
 /**

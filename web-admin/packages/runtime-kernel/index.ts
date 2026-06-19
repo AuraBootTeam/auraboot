@@ -28,6 +28,8 @@ export {
   getRuntimeProfileFromPathname,
   isAnonymousRuntimeProfile,
   isPublicRuntimePathname,
+  isRuntimeProfileAllowed,
+  isRuntimeProfileEnabled,
   normalizeRuntimePathname,
   shouldBootCorePlugins,
   type RuntimeProfile,
@@ -45,5 +47,15 @@ export type {
   LayoutConfig,
 } from './profiles/types';
 
-// ── Generic rendering primitives ─────────────────────────────────────────────
+// ── Rendering: dispatcher + crash isolation + host injection ─────────────────
 export { BlockErrorBoundary } from './rendering/BlockErrorBoundary';
+export { BlockRenderer } from './rendering/BlockRenderer';
+export {
+  setBlockResolver,
+  getBlockResolver,
+  setCustomBlockComponent,
+  getCustomBlockComponent,
+  type KernelBlockSpec,
+  type KernelBlockResolver,
+  type CustomBlockComponent,
+} from './rendering/blockResolver';

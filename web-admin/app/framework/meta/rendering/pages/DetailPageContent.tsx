@@ -20,7 +20,7 @@ import { Link, useLocation, useNavigate as useRouterNavigate } from 'react-route
 import { PrintButton } from '~/framework/meta/rendering/components/PrintButton';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { RecordShareDialog } from '~/ui/shared/RecordShareDialog';
-import type { PageContentProps } from '@auraboot/runtime-kernel';
+import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import {
   getLocalizedText,
@@ -47,7 +47,6 @@ import { ActivityTimeline } from '~/framework/meta/rendering/blocks/ActivityTime
 import { RecordComments } from '~/framework/meta/rendering/blocks/RecordComments';
 import { NbaSuggestionBar } from '~/framework/meta/rendering/blocks/NbaSuggestionBar';
 import { BpmPanelBlock } from '~/framework/meta/rendering/blocks/BpmPanelBlock';
-import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
 import { LayoutRenderer } from '~/framework/meta/rendering/layout/LayoutRenderer';
 import { resolveRecordParams } from '~/framework/meta/rendering/blocks/ChartBlockRenderer';
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';

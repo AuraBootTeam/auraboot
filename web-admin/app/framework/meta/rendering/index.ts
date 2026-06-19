@@ -4,7 +4,7 @@
 
 // Main renderers
 export { SchemaRenderer, SchemaRendererWithContainer } from '~/framework/meta/rendering/SchemaRenderer';
-export { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
+export { BlockRenderer } from '@auraboot/runtime-kernel';
 export { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
 
 // Block renderers
@@ -32,5 +32,5 @@ export {
 
 // Types
 export type { SchemaRendererProps } from '~/framework/meta/rendering/SchemaRenderer';
-export type { BlockRendererProps } from '~/framework/meta/rendering/BlockRenderer';
+export type { BlockRendererProps } from '@auraboot/runtime-kernel';
 export type { FieldRendererProps } from '~/framework/meta/rendering/FieldRenderer';
