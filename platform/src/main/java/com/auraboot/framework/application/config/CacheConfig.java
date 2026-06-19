@@ -84,6 +84,7 @@ public class CacheConfig {
             "schemaPermissionProjection",
             "dataFilterResult",
             "fieldPermissionProjection",
+            "fieldMaskConfig",                                // FieldMaskServiceImpl @CacheEvict; absent here = saveConfig/deleteConfig threw "Cannot find cache" in prod (caught 2026-06-19 by the cache-name audit + FieldMaskServiceImpl coverage IT)
 
             // Data domain (row-level domain isolation) — DataDomainServiceImpl uses
             // @Cacheable/@CacheEvict("userDataDomainIds"). Omitting it from this fixed

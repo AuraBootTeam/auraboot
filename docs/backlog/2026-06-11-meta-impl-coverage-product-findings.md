@@ -161,3 +161,20 @@ the class is now **96.6%** line-covered (115/119).
 > small" — it is **unexercised**, and unexercised cache-region / interceptor / CTE wiring fails
 > the first time it runs. Cross-cutting infra (cache names, tenant interceptor, recursive CTEs)
 > is exactly what unit tests with mocked mappers miss and real-stack ITs catch.
+
+## Wave 6 (2026-06-19) — FieldMaskServiceImpl: same cache-region bug + a systemic audit
+
+`FieldMaskServiceImpl` (field data masking) was ~22% covered. Same class of bug as wave-5's
+`userDataDomainIds`: it uses `@CacheEvict("fieldMaskConfig")`, but **`fieldMaskConfig` was not in
+`CacheConfig`'s fixed `setCacheNames(...)` list** → `saveConfig` / `deleteConfig` threw
+`Cannot find cache named 'fieldMaskConfig'` in production. Fixed (registered the cache); covered
+by `FieldMaskServiceImplCoverageIT` (CRUD + list/detail masking) + the extended pure
+`FieldMaskServiceImplTest` (all 9 mask types). Class now 84.1% line.
+
+**Systemic audit (closes the class of bug):** diffed *every* `@Cacheable/@CacheEvict/@CachePut`
+cache name used across `src/main` against the names registered in `CacheConfig.setCacheNames`.
+After registering `userDataDomainIds` (#847) and `fieldMaskConfig` (this wave), the set
+USED-minus-REGISTERED is **empty** — no other service references an unregistered cache. The
+fragility is the `@Primary` `CaffeineCacheManager` using a *fixed* `setCacheNames` allow-list:
+any new `@Cacheable("x")` whose name isn't added there fails at runtime, not at startup. A
+cheap guard would be a `check-*.sh` (or an ArchUnit/unit test) asserting USED ⊆ REGISTERED.
