@@ -103,7 +103,7 @@ test.describe('PluginSlot System', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Navigate to create form of a model
-    const createBtn = page.locator('button:has-text("新建"), a:has-text("新建")').first();
+    const createBtn = page.locator('button:has-text("新建"):not(:has-text("今日")), a:has-text("新建"):not(:has-text("今日"))').first();
     const hasCreateBtn = await createBtn.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasCreateBtn) {

@@ -72,7 +72,7 @@ async function navigateToProcessDefinitionList(page: Page): Promise<void> {
   const ensureReadyOrSkip = async () => {
     const pageReady = page
       .locator(
-        'main table, main [data-testid="dynamic-list"], main [data-testid="toolbar-btn-create"], main button:has-text("创建"), main button:has-text("新建"), main button:has-text("Create")',
+        'main table, main [data-testid="dynamic-list"], main [data-testid="toolbar-btn-create"], main button:has-text("创建"), main button:has-text("新建"):not(:has-text("今日")), main button:has-text("Create")',
       )
       .first();
     const failureState = page

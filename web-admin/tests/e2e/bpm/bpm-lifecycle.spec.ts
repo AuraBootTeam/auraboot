@@ -89,7 +89,7 @@ test.describe('BPM Process Lifecycle', () => {
     await page.waitForLoadState('domcontentloaded');
     const tableVisible = await page.locator('main table').first().isVisible({ timeout: 8000 }).catch(() => false);
     const createVisible = await page
-      .locator('main [data-testid="toolbar-btn-create"], main button:has-text("创建"), main button:has-text("新建"), main button:has-text("Create")')
+      .locator('main [data-testid="toolbar-btn-create"], main button:has-text("创建"), main button:has-text("新建"):not(:has-text("今日")), main button:has-text("Create")')
       .first()
       .isVisible({ timeout: 1000 })
       .catch(() => false);

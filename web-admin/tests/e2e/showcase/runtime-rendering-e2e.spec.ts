@@ -316,7 +316,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     // first; fall back to localized text.
     const createBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+        '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
       )
       .first();
     await expect(createBtn).toBeVisible({ timeout: 8_000 });
@@ -344,7 +344,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     // Open the create form via the toolbar (NOT page.goto).
     const createBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+        '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
       )
       .first();
     await expect(createBtn).toBeVisible({ timeout: 8_000 });

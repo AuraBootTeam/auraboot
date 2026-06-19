@@ -73,7 +73,7 @@ test.describe('Organization Department', () => {
 
     // Click create/add button
     const addBtn = page.locator(
-      '[data-testid="toolbar-btn-create"], button:has-text("新增"), button:has-text("新建"), button:has-text("Create")'
+      '[data-testid="toolbar-btn-create"], button:has-text("新增"), button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")'
     ).first();
     await expect(addBtn).toBeVisible({ timeout: 5000 });
     await addBtn.click();
