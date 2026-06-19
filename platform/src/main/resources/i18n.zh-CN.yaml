@@ -1147,3 +1147,12 @@ bpmn:
     exclusive_gateway_min_outgoing: 排他网关至少需要两条出边
     exclusive_gateway_edge_missing_condition: '排他网关 "{name}" 的出边缺少条件'
     exclusive_gateway_multiple_defaults: '排他网关 "{name}" 配置了多个默认流向'
+
+tenant:
+  application:
+    create_success: 租户创建成功，您已成为该租户的管理员
+    invite_invalid: 无效的邀请码
+    invite_revoked: 邀请码已失效
+    invite_expired: 邀请码已过期
+    join_pending: 加入申请已提交，等待租户管理员审批
+    unknown_tenant: 未知租户

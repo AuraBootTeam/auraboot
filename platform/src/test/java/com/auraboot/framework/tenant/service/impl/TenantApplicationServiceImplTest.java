@@ -176,7 +176,9 @@ class TenantApplicationServiceImplTest {
                 TenantBootstrapService.BootstrapResult.success(3, 5, 10, 100);
         when(tenantBootstrapService.bootstrapTenant(99L, 7L)).thenReturn(bootstrapResult);
         when(userDetailsService.loadUserByUsername(anyString())).thenReturn(null);
-        when(jwtUtil.generateTokenWithTenantId(any(), anyString(), anyLong(), anyInt()))
+        // 5-arg overload (UserDetails, userPid, tenantId, memberId, securityVersion) — the service
+        // now mints a member-scoped token. Stale 4-arg stub left this call unmatched.
+        when(jwtUtil.generateTokenWithTenantId(any(), anyString(), anyLong(), any(), anyInt()))
                 .thenReturn("jwt-token");
 
         TenantSelectionRequest req = new TenantSelectionRequest();
