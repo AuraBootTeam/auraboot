@@ -641,8 +641,25 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               actionDef as unknown as Record<string, unknown>,
               normalizedButton as unknown as Record<string, unknown>,
             );
+            // Convention over configuration: a command-type button with no
+            // explicit command (e.g. a standard row delete) routes through the
+            // model's CRUD command the server resolved onto schema.commands,
+            // keyed by the derived operationType (create/update/delete). Explicit
+            // command still wins.
+            const effectiveCommand =
+              (typeof actionDef.command === 'string' && actionDef.command) ||
+              (operationType
+                ? runtime?.getSchema?.()?.commands?.[operationType]
+                : undefined) ||
+              undefined;
+            if (!effectiveCommand) {
+              throw new Error(
+                `No command resolved for button "${normalizedButton.code}": ` +
+                  `no explicit command and no convention "${operationType}" command on the model`,
+              );
+            }
             const commandResult = await executeCommand(
-              actionDef.command,
+              effectiveCommand,
               targetRecordId,
               payload,
               operationType,

@@ -147,8 +147,7 @@
               },
               "confirm": "delete.confirm",
               "action": {
-                "type": "command",
-                "command": "org:delete_department"
+                "type": "command"
               }
             }
           ],

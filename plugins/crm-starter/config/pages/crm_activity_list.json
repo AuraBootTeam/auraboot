@@ -137,8 +137,7 @@
               },
               "confirm": "delete.confirm",
               "action": {
-                "type": "command",
-                "command": "crm:delete_activity"
+                "type": "command"
               }
             }
           ],

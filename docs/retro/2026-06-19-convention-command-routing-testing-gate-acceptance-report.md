@@ -143,3 +143,44 @@ allowed_claim: targeted pass (Phase 0 showcase slice fully verified end-to-end; 
 
 Phase 0 机制全平台生效 + Phase 1 OSS authored 页面清扫完成并抽样 golden 验证;**enterprise 与 delete 约定为下一增量**。非"全平台逐页 golden 完成"声明。
 
+---
+
+# 验收报告补遗 — Phase 2 删除命令约定 + enterprise 范围核实(2026-06-19)
+
+> 完成 OSS「标准页零配置」全 CRUD 闭环:删除按钮也由约定路由(`commands.delete`),无需配置。
+
+## allowed_claim(Phase 2)
+
+**`targeted pass` — 删除约定接入 + OSS 删除命令清扫,真浏览器 golden 验证**:`useActionHandler` 命令路径在按钮无显式 command 时按 `operationType` 从 `runtime.getSchema().commands` 解析(create/update/delete 三类统一),OSS 列表删除按钮去掉冗余 delete 命令;showcase + crm_account 真删除 golden 通过。
+
+## enterprise 范围核实(取证,结论:实质 no-op)
+
+实测 `auraboot-enterprise/plugins/*/config/pages/` 的 create/update 命令引用 **仅 4 处,全在内部 `test-fixtures` 插件**(默认不导入,`AURA_ENV=test` 才启用,非生产页);`web-admin-ext` **0 处**。即真实 authored CRUD 页全在 OSS(已 #883 + 本轮清扫)。**enterprise overlay sweep 实为 no-op**,不单独起企业版栈做装饰性清扫。
+
+## 改动
+
+- 前端:`useActionHandler` 命令路径——`effectiveCommand = 显式 command || runtime.getSchema().commands[operationType]`(operationType 由按钮 code/label 推导 create/update/delete),并加无命令防御 throw。显式 command 仍优先。
+- 数据:OSS 列表删除按钮去 delete 命令 **11 文件 / 11 命令**(crm-starter 6 + org-management 3 + showcase 1 + workflow-demo 1)。
+
+## 安全规则与歧义处理(取证)
+
+- 仅当删除按钮 `command` **正好等于后端 API 权威解析的** `commands.delete` 才去掉。删除每模型唯一 → 无歧义。
+- **歧义模型显式保留**:`wd_leave_request` 有两个 `type=create` 命令,后端 `resolveCrudCommands`(putIfAbsent first-match)解析 create=`wd:create_and_submit_leave_request`(API 实测)。其 submit 命令**不动**(保留显式,避免依赖 putIfAbsent 顺序的脆弱性)。这修正了自建 last-write conv-map 与后端 first-match 不一致的隐患——改用 page-schema API 的 `commands` 作权威白名单。
+
+## 测试层矩阵(Phase 2)
+
+| 层 | 状态 | 证据 |
+|---|---|---|
+| 平台 validator(swept 插件 re-import) | ✅ tested | slot-55:org-management / crm-starter / showcase OK + reference-integrity OK |
+| Web E2E 真浏览器 golden | ✅ golden(2/2) | `/tmp/golden-delete.mjs`:showcase + crm_account 行删除(按钮无 command)→ 约定解析 `sc:delete_showcase` / `crm:delete_account` 200 + 行数 6→5 / 2→1 |
+| 前端回归 | ✅ tested | hooks + rendering pages **433 passed / 38 files**(含 useActionHandler async/bpm/flow-args 全套件,0 失败) |
+
+## did_not_run(Phase 2)
+
+- 逐插件删除 golden(抽样 showcase/crm;org/wd 由 validator re-import + 同一 useActionHandler 路径覆盖)。
+- useActionHandler 命令解析的独立单测(内联于大 useCallback,未抽纯函数;由真浏览器 golden + 既有 hooks 回归覆盖)。
+
+## allowed_claim(全任务总)
+
+约定机制全平台生效(Phase 0)+ OSS authored 页面 create/edit/delete **零配置闭环**(Phase 1 + Phase 2)+ 抽样真浏览器 golden 全绿;enterprise 经取证为 no-op。非"全平台逐页 golden 完成"声明。
+
