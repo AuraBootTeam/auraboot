@@ -532,6 +532,30 @@ export function resolveAfterSubmitRedirect(
   });
 }
 
+/**
+ * Resolve the edit-mode record-prefill fetch endpoint.
+ *
+ * When the schema declares a `recordSource.endpoint`, that custom URL is used
+ * and `{recordId}` / `${recordId}` placeholders are interpolated with the
+ * URL-encoded record id. This unblocks `skipTableCreation` models (e.g.
+ * `ab_qr_code`) whose reads are served by a custom REST endpoint and would
+ * otherwise 400/500 against the generic `/api/dynamic/<model>/<id>` route.
+ *
+ * Falls back to the default `/api/dynamic/<tableName>/<recordId>` when no
+ * `recordSource` is configured — preserving 100 % backward compatibility.
+ */
+export function resolveEditRecordEndpoint(
+  schema: { recordSource?: { endpoint?: string } } | null | undefined,
+  tableName: string,
+  recordId: string,
+): string {
+  const custom = schema?.recordSource?.endpoint;
+  if (custom && custom.trim()) {
+    return custom.replace(/\$\{recordId\}|\{recordId\}/g, encodeURIComponent(recordId));
+  }
+  return `/api/dynamic/${tableName}/${recordId}`;
+}
+
 function inferEditCommandCode(commandCode: string | null, isEditMode: boolean): string | null {
   if (!isEditMode || !commandCode) return commandCode;
   if (commandCode.includes(':create_')) {
@@ -852,8 +876,9 @@ export function FormPageContent(props: PageContentProps) {
       dirtyFieldsRef.current.clear();
       setMainRecordLoaded(false);
       try {
-        const resp = await fetchResult<any>(`/api/dynamic/${tableName}/${recordId}`, {
-          method: 'get',
+        const endpoint = resolveEditRecordEndpoint(schema, tableName, recordId);
+        const resp = await fetchResult<any>(endpoint, {
+          method: (schema?.recordSource?.method as any) || 'get',
           token: token || undefined,
         });
         if (ResultHelper.isSuccess(resp) && resp.data) {
