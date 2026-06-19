@@ -41,6 +41,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AsyncTaskServiceImplCoverageIT {
 
     private static final long TENANT_ID = 991_000_001L;
+    private static final long USER_ID = 991_000_002L;
+    private static final long OTHER_USER_ID = 991_000_003L;
     private final AtomicLong seq = new AtomicLong();
 
     @Autowired
@@ -65,6 +67,10 @@ class AsyncTaskServiceImplCoverageIT {
     }
 
     private AsyncTask seedTask(String taskType) {
+        return seedTaskForUser(taskType, USER_ID);
+    }
+
+    private AsyncTask seedTaskForUser(String taskType, long createdBy) {
         AsyncTask t = new AsyncTask();
         t.setTenantId(TENANT_ID);
         t.setTaskCode(UniqueIdGenerator.generate());
@@ -75,10 +81,24 @@ class AsyncTaskServiceImplCoverageIT {
         t.setProgress(0);
         t.setRetryCount(0);
         t.setMaxRetries(3);
-        t.setCreatedBy(991_000_002L);
+        t.setCreatedBy(createdBy);
         t.setCreatedAt(Instant.now());
         asyncTaskMapper.insert(t);
         return t;
+    }
+
+    @Test
+    @DisplayName("listTasks is scoped to the caller — a tenant member cannot enumerate another member's tasks")
+    void listTasksScopedToCaller() {
+        AsyncTask mine = seedTaskForUser("scope_mine_" + seq.incrementAndGet(), USER_ID);
+        AsyncTask others = seedTaskForUser("scope_other_" + seq.incrementAndGet(), OTHER_USER_ID);
+
+        IPage<AsyncTaskDTO> asMe = asyncTaskService.listTasks(TENANT_ID, USER_ID, null, null, 1, 50);
+
+        assertTrue(asMe.getRecords().stream().anyMatch(r -> r.getTaskCode().equals(mine.getTaskCode())),
+                "caller should see their own task");
+        assertTrue(asMe.getRecords().stream().noneMatch(r -> r.getTaskCode().equals(others.getTaskCode())),
+                "caller must NOT see another member's task (cross-user enumeration)");
     }
 
     @Test
@@ -89,11 +109,11 @@ class AsyncTaskServiceImplCoverageIT {
         AsyncTaskDTO dto = asyncTaskService.getTask(seeded.getTaskCode());
         assertEquals(seeded.getTaskCode(), dto.getTaskCode());
 
-        IPage<AsyncTaskDTO> all = asyncTaskService.listTasks(TENANT_ID, null, null, 1, 20);
+        IPage<AsyncTaskDTO> all = asyncTaskService.listTasks(TENANT_ID, USER_ID, null, null, 1, 20);
         assertTrue(all.getRecords().stream().anyMatch(r -> r.getTaskCode().equals(seeded.getTaskCode())));
 
         IPage<AsyncTaskDTO> filtered = asyncTaskService.listTasks(
-                TENANT_ID, AsyncTask.STATUS_PENDING, seeded.getTaskType(), 1, 20);
+                TENANT_ID, USER_ID, AsyncTask.STATUS_PENDING, seeded.getTaskType(), 1, 20);
         assertTrue(filtered.getRecords().stream().anyMatch(r -> r.getTaskCode().equals(seeded.getTaskCode())));
 
         AsyncTaskDTO cancelled = asyncTaskService.cancelTask(seeded.getTaskCode());
