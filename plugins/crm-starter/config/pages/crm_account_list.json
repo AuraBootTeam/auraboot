@@ -21,8 +21,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "crm_account_form",
-            "command": "crm:create_account"
+            "to": "crm_account_form"
           }
         }
       ]
