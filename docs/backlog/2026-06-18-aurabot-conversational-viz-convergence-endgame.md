@@ -162,7 +162,7 @@ related:
 - **结果**:单一入口(AuraBot)+ 单一查询底座(`AggregateQueryService`/`ChartDataSource`)+ chat-bi 受治理 agent 工具 + v1 旁路/死代码全清。**终局的后端骨架已落地。**
 
 **剩余 = 前端 + 浏览器(需重拉 OOM 掉的栈,前端切片,单独一轮)**:
-1. **Slice D**(真前端重构):`ChatBiResultCard`(records-driven)与 dashboard chart 组件(`SharedChartFactory` 注册的 23 类,**fetch/dataSource-driven**)是**两种抽象**——收口需给 chart 组件加"接 pre-fetched records"模式(或抽一个纯 echarts 渲染内核),**动 live dashboard 底座**,必须配 S5 dashboard golden + AuraBot chat 渲染 golden 回归。不是快改。
+1. **Slice D — 试过 + revert,起成独立切片(2026-06-19)**:`ChatBiResultCard` 改复用 `SmartBarChart` static dataSource,**§2.2 视觉截图抓到 green-but-broken**(canvas 断言/单测全绿,但柱子渲染 tiny;数据/键/option 全对)。根因:`SmartBarChart` 是看板组件(自带外壳)+ `useChartData` static 异步 setData → echarts 数据到达前挂载缓存 scale,没重算到聊天卡小容器;S5 看板里它正常 → context-specific。干净修要动共享渲染层(抽纯 option builder,或 `useChartData` static 同步)+ **dashboard 全量 golden 回归**,低 ROI 不在终局尾巴硬塞。完整取证 + 两条修法 + 完成判定 → `docs/backlog/2026-06-19-chatbi-dashboard-renderer-convergence-slice.md`。
 2. **chat-bi 浏览器 golden — DONE(2026-06-19,B1,golden 绿)**:重拉栈(java -jar bootJar + host Vite/BFF)写 `chat-bi-render-golden.spec.ts`(+ ChatBiResultCard `data-testid`),**golden 抓到真 Slice C wiring gap → 据此定 DDR → 修 → 跑绿**。
    - **gap(golden 抓,§15 backend-log 实证)**:chat-bi 注册了但**默认 AuraBot 聊天够不着**——默认聊天工具集走 **LLM grounding 发现**(`ChatToolResolver`→`GroundingPort`),只 `fill_form`/`execute_sql` 常驻;chat-bi 不在 → 默认轮次不 offer → 拒「unavailable」。named-agent 带显式工具能跑、绕过 grounding。
    - **决策**:`DDR-2026-06-19-aurabot-chat-tool-exposure-pin-vs-retrieve`(ENT #582)——**选 A 常驻 pin**:chat-bi 是通用数据查询**原语**(已 pin 的 `execute_sql` 的安全结构化版),不是领域工具 → 进常驻集;grounding 检索留给领域长尾。业界 hybrid(pin 核心 + 检索长尾)。
