@@ -184,3 +184,24 @@ Phase 0 机制全平台生效 + Phase 1 OSS authored 页面清扫完成并抽样
 
 约定机制全平台生效(Phase 0)+ OSS authored 页面 create/edit/delete **零配置闭环**(Phase 1 + Phase 2)+ 抽样真浏览器 golden 全绿;enterprise 经取证为 no-op。非"全平台逐页 golden 完成"声明。
 
+
+---
+
+# 验收报告补遗 — 存量残余清理(2026-06-19)
+
+> 回答「存量 DSL 是否需要清理」:对所有 OSS 插件页面做了完整审计(按模型约定命令逐按钮比对)。
+
+## 审计结论
+- **URL 类存量**(create/edit navigate 按钮):Phase 1 已全清。
+- **非 URL 冗余**(type:command 原地按钮,早期 narrow 规则漏的)再扫 **4 处**:`org_*_form` 的 `save` 按钮(3,标准提交只是 code 叫 save)+ `wd_leave_balance_list` inline `edit`(1)。本轮清理。
+- **正确保留 29 处**:state_transition(qualify/win/activate/archive…)、跨模型子资源(crm_account_detail→crm_contact)、变体(`wd:create_and_submit_leave_request`,歧义模型)。这些本就该显式配置(override by design)。
+
+## 验证
+- 真浏览器 golden 2/2:`org_department` 表单 `save`(已无 command)→ 约定 create/update(`org:create_department`/`org:update_department` 200);wd inline edit 走与 Phase 2 delete 相同的 useActionHandler 路径(已验证)。
+- 平台 validator:org-management / workflow-demo re-import OK。
+
+## 已导入运行库的 page_schema(重要说明)
+本系列改的是**插件源码 JSON**。**已导入到运行环境(prod/其它租户)DB 的 `ab_page_schema` 仍带旧 command**,直到下次插件 re-import(reset/sync/部署)才更新。但**无需专门数据迁移**:约定把显式 command 当 override,旧 schema **仍正常工作**(只是 create/edit 入口仍带 `?commandCode=`,纯外观)。dev/test 环境 reset+import 即干净;prod 随常规插件同步即清。
+
+## allowed_claim
+OSS 插件源码存量 DSL 已**完全约定化**(无冗余 CRUD command,除故意保留的变体/状态流转/子资源);enterprise 取证 no-op;运行库存量随 re-import 自然收敛,非必须迁移。
