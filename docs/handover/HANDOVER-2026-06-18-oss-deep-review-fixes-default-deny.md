@@ -40,7 +40,7 @@ OSS 全仓深度 code review(五维 + 6 reviewer)→ 修复 verified findings。
 ### 非安全轨道(各自独立,排期)
 - [ ] **i18n sweep**:后端 user-facing 中文(TenantApplication/TenantMember Excel)+ ~7 前端框架组件(NotificationRuleBuilder/ChartWrapper/TenantSelection/QrCodeScanner/PermissionGuard/Header)
 - [ ] **21 个 new-surface 测试 gap**(R6,~42h):17 后端 Service/Controller + 4 前端组件零测;详见 plan doc R6 段
-- [ ] **project-management pm_* 幽灵路由**:TSX 调不存在的 `pm_*` model(实际 `tpm_*`)→ 运行时 404 死路由 + 配置优先违规。删 TSX 路由 / 迁 DSL 页(tpm_*)是产品决策
+- [x] ~~**project-management pm_* 幽灵路由**~~ ❌ **误报(2026-06-19 核验,禁删)**:R5 称死路由应删,但 `oss-scope.json:154-160` 明确 pm-* = `[A] 企业完整 PM 插件(非 OSS tpm 模板)`;路由已注册(route-manifest:79-80)+ executive-dashboard 8 链接 + 4 E2E spec。`pm_*` model 后端在私有/vertical 仓(OSS+enterprise 都没有)→ **有意的企业 PM 脚手架,删=破外部功能**。详 plan doc D5-frontend-001
 - [ ] **§4.1 启动写库**:SystemTaskInitializer @PostConstruct insert(11 sys task)+ SkillBootstrapRunner per-tenant upsert → 迁 seed,需 fresh-DB 验证调度仍注册(有破坏风险)
 - [ ] **P2**:RestRoute.of() readOnlyTx=false 默认(GET 路由可写库)/ AutomationTrigger 条件求值静默 false 无 AutomationLog
 
