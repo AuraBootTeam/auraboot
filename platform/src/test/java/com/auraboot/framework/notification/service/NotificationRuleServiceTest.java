@@ -20,7 +20,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
-import javax.sql.DataSource;
 import java.util.List;
 import java.util.Map;
 
@@ -40,15 +39,13 @@ class NotificationRuleServiceTest {
     NotificationRuleMapper ruleMapper;
     @Mock
     DynamicDataService dynamicDataService;
-    @Mock
-    DataSource dataSource;
 
     private NotificationRuleService svc;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        svc = new NotificationRuleService(ruleMapper, dynamicDataService, objectMapper, dataSource);
+        svc = new NotificationRuleService(ruleMapper, dynamicDataService, objectMapper);
         MetaContext.setSystemTenantContext(10L);
     }
 

@@ -3,6 +3,7 @@ package com.auraboot.framework.inbox.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.inbox.dto.InboxItemResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.inbox.model.InboxItem;
 import com.auraboot.framework.inbox.service.InboxService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -26,6 +27,7 @@ import java.util.Set;
 @RestController
 @RequestMapping({"/api/inbox", "/api/mobile/inbox"})
 @RequiredArgsConstructor
+@AuthenticatedAccess("inbox actions are scoped to the caller's own items (userId + tenantId)")
 public class InboxController {
 
     private final InboxService inboxService;
