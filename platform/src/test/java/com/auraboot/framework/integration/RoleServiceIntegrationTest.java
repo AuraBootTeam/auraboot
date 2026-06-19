@@ -111,7 +111,9 @@ class RoleServiceIntegrationTest extends BaseIntegrationTest {
 
         assertThatThrownBy(() -> roleService.updateRole(role))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("角色不存在");
+                // Message is an i18n key now; the id is carried as a substitution arg (resolved
+                // to the request locale by GlobalExceptionHandler).
+                .hasMessageContaining("$i18n:role.not_found");
     }
 
     // ======================================================================
@@ -270,7 +272,7 @@ class RoleServiceIntegrationTest extends BaseIntegrationTest {
         // original code already exists — copy with same code should fail
         assertThatThrownBy(() -> roleService.copyRole(createdRoleId, "Duplicate", "test_role_rs01_" + runId))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("角色编码已存在");
+                .hasMessageContaining("$i18n:role.code_exists");
     }
 
     @Test
@@ -278,7 +280,7 @@ class RoleServiceIntegrationTest extends BaseIntegrationTest {
     void copyRole_notFound_throwsException() {
         assertThatThrownBy(() -> roleService.copyRole(999999L, "New Name", "new_code_xyz"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("原角色不存在");
+                .hasMessageContaining("$i18n:role.original_not_found");
     }
 
     // ======================================================================
