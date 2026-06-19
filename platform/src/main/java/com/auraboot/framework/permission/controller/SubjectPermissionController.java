@@ -1,6 +1,8 @@
 package com.auraboot.framework.permission.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.dto.SubjectPermissionCreateRequest;
 import com.auraboot.framework.permission.dto.SubjectPermissionDTO;
 import com.auraboot.framework.permission.service.SubjectPermissionService;
@@ -60,6 +62,7 @@ public class SubjectPermissionController {
      * @return Created declaration
      */
     @PostMapping
+    @RequirePermission(MetaPermission.PERMISSION_MANAGE)
     public ApiResponse<SubjectPermissionDTO> addPermission(
             @Valid @RequestBody SubjectPermissionCreateRequest request) {
         
@@ -82,6 +85,7 @@ public class SubjectPermissionController {
      * @return List of created declarations
      */
     @PostMapping("/batch")
+    @RequirePermission(MetaPermission.PERMISSION_MANAGE)
     public ApiResponse<List<SubjectPermissionDTO>> batchAddPermissions(
             @RequestParam @NotNull String subjectType,
             @RequestParam @NotNull Long subjectId,
@@ -105,6 +109,7 @@ public class SubjectPermissionController {
      * @return Success response
      */
     @DeleteMapping("/{id}")
+    @RequirePermission(MetaPermission.PERMISSION_MANAGE)
     public ApiResponse<Void> removePermission(@PathVariable @NotNull Long id) {
         log.info("Removing permission declaration: id={}", id);
         
@@ -123,6 +128,7 @@ public class SubjectPermissionController {
      * @return Success response
      */
     @DeleteMapping("/subject")
+    @RequirePermission(MetaPermission.PERMISSION_MANAGE)
     public ApiResponse<Void> removeAllPermissions(
             @RequestParam @NotNull String subjectType,
             @RequestParam @NotNull Long subjectId) {

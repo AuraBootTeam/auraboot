@@ -4,6 +4,7 @@ import com.auraboot.framework.application.annotation.CurrentUserId;
 import com.auraboot.framework.auth.entity.UserSession;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import java.util.Map;
 @RequestMapping("/api/user/sessions")
 @RequiredArgsConstructor
 @Tag(name = "Session Management", description = "User session management")
+@AuthenticatedAccess("operates only on the caller's own sessions (@CurrentUserId)")
 public class SessionController {
 
     private final SessionManagementService sessionManagementService;

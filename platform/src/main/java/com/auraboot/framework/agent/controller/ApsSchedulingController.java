@@ -3,6 +3,8 @@ package com.auraboot.framework.agent.controller;
 import com.auraboot.framework.agent.service.ApsSchedulingService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +19,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/manufacturing/aps")
 @RequiredArgsConstructor
+// run/clear are compute-heavy writes; gate the whole controller rather than relying on the
+// PermissionInterceptor fail-open default for un-annotated handlers.
+@RequirePermission(MetaPermission.MANUFACTURING_APS)
 public class ApsSchedulingController {
 
     private final ApsSchedulingService apsSchedulingService;

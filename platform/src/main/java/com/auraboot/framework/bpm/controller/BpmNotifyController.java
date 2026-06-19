@@ -1,5 +1,6 @@
 package com.auraboot.framework.bpm.controller;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.entity.BpmNotifyRecord;
 import com.auraboot.framework.bpm.service.BpmNotifyService;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -20,7 +21,9 @@ public class BpmNotifyController {
     public ApiResponse<Void> sendCarbonCopy(@RequestBody Map<String, Object> request) {
         String taskId = (String) request.get("taskId");
         String processInstanceId = (String) request.get("processInstanceId");
-        Long senderUserId = Long.valueOf(request.get("senderUserId").toString());
+        // Sender is the authenticated caller — never trust a body-supplied senderUserId
+        // (that let any user impersonate another when sending CC notifications).
+        Long senderUserId = MetaContext.getCurrentUserId();
         @SuppressWarnings("unchecked")
         List<Long> recipientUserIds = ((List<Number>) request.get("recipientUserIds"))
                 .stream().map(Number::longValue).toList();
@@ -34,7 +37,8 @@ public class BpmNotifyController {
     public ApiResponse<Void> sendUrge(@RequestBody Map<String, Object> request) {
         String taskId = (String) request.get("taskId");
         String processInstanceId = (String) request.get("processInstanceId");
-        Long senderUserId = Long.valueOf(request.get("senderUserId").toString());
+        // Sender is the authenticated caller — never trust a body-supplied senderUserId.
+        Long senderUserId = MetaContext.getCurrentUserId();
         Long assigneeUserId = Long.valueOf(request.get("assigneeUserId").toString());
         String content = (String) request.getOrDefault("content", "");
 
@@ -44,8 +48,10 @@ public class BpmNotifyController {
 
     @GetMapping("/received")
     public ApiResponse<List<BpmNotifyRecord>> getReceived(
-            @RequestParam Long userId,
             @RequestParam(defaultValue = "CC") String type) {
+        // Always scope to the authenticated caller — a body/query-supplied userId let any user
+        // read another user's received notifications (IDOR).
+        Long userId = MetaContext.getCurrentUserId();
         return ApiResponse.ok(notifyService.getReceivedNotifications(userId, type));
     }
 

@@ -24,12 +24,15 @@ public class RecordCommentService {
     private static final String TABLE = "ab_record_comment";
 
     public List<Map<String, Object>> listComments(String modelCode, String recordPid) {
+        // JdbcTemplate bypasses the MyBatis tenant interceptor, so tenant_id must be scoped
+        // explicitly here to keep comments isolated per tenant.
+        Long tenantId = MetaContext.getCurrentTenantId();
         return jdbcTemplate.queryForList(
                 "SELECT id, model_code, record_pid, content, mentions, created_by, created_at, updated_at, is_edited "
                 + "FROM " + TABLE
-                + " WHERE model_code = ? AND record_pid = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)"
+                + " WHERE tenant_id = ? AND model_code = ? AND record_pid = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)"
                 + " ORDER BY created_at DESC",
-                modelCode, recordPid);
+                tenantId, modelCode, recordPid);
     }
 
     public Map<String, Object> addComment(String modelCode, String recordPid, String content, String mentions) {
@@ -57,21 +60,40 @@ public class RecordCommentService {
             throw new IllegalArgumentException("Comment content cannot be empty");
         }
 
+        // Only the author may edit, scoped to their own tenant. JdbcTemplate bypasses the MyBatis
+        // tenant interceptor, so without explicit tenant_id + created_by any authenticated user
+        // could edit any comment by id (IDOR). created_by is a varchar column (it stores the user
+        // id as text), so the parameter must be bound as a String, not a bigint.
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+
         List<Map<String, Object>> result = jdbcTemplate.queryForList(
                 "UPDATE " + TABLE
                 + " SET content = ?, updated_at = NOW(), is_edited = true"
-                + " WHERE id = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)"
+                + " WHERE id = ? AND tenant_id = ? AND created_by = ?"
+                + " AND (deleted_flag = FALSE OR deleted_flag IS NULL)"
                 + " RETURNING id, content, updated_at, is_edited",
-                content, commentId);
+                content, commentId, tenantId, String.valueOf(userId));
 
-        if (result.isEmpty()) throw new RuntimeException("Comment not found: " + commentId);
+        if (result.isEmpty()) {
+            throw new RuntimeException("Comment not found or not owned by current user: " + commentId);
+        }
         return result.get(0);
     }
 
     public void deleteComment(Long commentId) {
-        jdbcTemplate.update(
-                "UPDATE " + TABLE + " SET deleted_flag = true WHERE id = ?", commentId);
-        log.info("Comment {} deleted", commentId);
+        // Author + tenant scoped (JdbcTemplate bypasses the tenant interceptor — see editComment).
+        // created_by is a varchar column, so bind the user id as a String.
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        int affected = jdbcTemplate.update(
+                "UPDATE " + TABLE + " SET deleted_flag = true"
+                + " WHERE id = ? AND tenant_id = ? AND created_by = ?",
+                commentId, tenantId, String.valueOf(userId));
+        if (affected == 0) {
+            throw new RuntimeException("Comment not found or not owned by current user: " + commentId);
+        }
+        log.info("Comment {} deleted by user {}", commentId, userId);
     }
 
     public List<Map<String, Object>> listActivity(String modelCode, String recordPid) {

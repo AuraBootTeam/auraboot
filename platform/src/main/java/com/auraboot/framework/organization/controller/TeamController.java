@@ -8,6 +8,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.organization.dto.*;
 import com.auraboot.framework.organization.service.TeamMemberService;
 import com.auraboot.framework.organization.service.TeamService;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,7 @@ public class TeamController {
     }
 
     @PostMapping
+    @RequirePermission("org.team.manage")
     public ApiResponse<TeamResponse> createTeam(
             @Valid @RequestBody TeamCreateRequest request,
             @CurrentUserId Long userId) {
@@ -47,6 +49,7 @@ public class TeamController {
     }
 
     @PutMapping("/{pid}")
+    @RequirePermission("org.team.manage")
     public ApiResponse<TeamResponse> updateTeam(
             @PathVariable String pid,
             @Valid @RequestBody TeamUpdateRequest request,
@@ -55,6 +58,7 @@ public class TeamController {
     }
 
     @DeleteMapping("/{pid}")
+    @RequirePermission("org.team.manage")
     public ApiResponse<Boolean> deleteTeam(@PathVariable String pid) {
         teamService.deleteTeam(pid);
         return ApiResponse.success(true);
@@ -68,6 +72,7 @@ public class TeamController {
     }
 
     @PostMapping("/{teamPid}/members")
+    @RequirePermission("org.team.manage")
     public ApiResponse<TeamMemberResponse> addMember(
             @PathVariable String teamPid,
             @Valid @RequestBody TeamMemberAddRequest request,
@@ -76,6 +81,7 @@ public class TeamController {
     }
 
     @DeleteMapping("/{teamPid}/members/{memberPid}")
+    @RequirePermission("org.team.manage")
     public ApiResponse<Boolean> removeMember(
             @PathVariable String teamPid,
             @PathVariable String memberPid) {

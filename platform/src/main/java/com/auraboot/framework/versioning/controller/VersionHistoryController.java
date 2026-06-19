@@ -2,6 +2,7 @@ package com.auraboot.framework.versioning.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.versioning.dto.DesignVersionDTO;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.versioning.service.VersionHistoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -76,6 +77,7 @@ public class VersionHistoryController {
      * Rollback dashboard to a specific version
      */
     @PostMapping("/{pid}/versions/{versionPid}/rollback")
+    @RequirePermission("dashboard.manage")
     @Operation(summary = "Rollback to version",
             description = "Rollback a dashboard to a specific version. Creates a backup and applies the target snapshot.")
     public ApiResponse<DesignVersionDTO> rollback(

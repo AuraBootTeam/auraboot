@@ -7,6 +7,7 @@ import com.auraboot.framework.aurabot.service.ChatToolResolver;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.conversation.ConversationTurnService;
 import com.auraboot.framework.conversation.InboundMode;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.conversation.SseResponseSink;
 import com.auraboot.framework.conversation.TurnRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestController
 @RequestMapping("/api/ai/aurabot")
+@AuthenticatedAccess("chat/execute run the caller's own conversation turns via ConversationTurnService (MetaContext)")
 public class AuraBotController {
 
     private final AuraBotChatService chatService;

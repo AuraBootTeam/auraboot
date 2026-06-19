@@ -11,6 +11,7 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.dto.*;
 import com.auraboot.framework.organization.service.OrgEmployeeService;
 import com.auraboot.framework.organization.service.OrganizationService;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import com.auraboot.framework.user.dao.entity.User;
@@ -58,6 +59,7 @@ public class OrgController {
      * Create a new department.
      */
     @PostMapping("/departments")
+    @RequirePermission("org.team.manage")
     public ApiResponse<Map<String, Object>> createDepartment(@RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
         Map<String, Object> created = dynamicDataService.create(MODEL_ORG_DEPARTMENT, data);
         return ApiResponse.success(created);
@@ -67,6 +69,7 @@ public class OrgController {
      * Update a department by PID.
      */
     @PutMapping("/departments/{pid}")
+    @RequirePermission("org.team.manage")
     public ApiResponse<Void> updateDepartment(
             @PathVariable String pid,
             @RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
@@ -79,6 +82,7 @@ public class OrgController {
      * Validates no child departments and no employees exist before deletion.
      */
     @DeleteMapping("/departments/{pid}")
+    @RequirePermission("org.team.manage")
     public ApiResponse<Void> deleteDepartment(@PathVariable String pid) {
         // Check for child departments
         List<String> subPids = organizationService.getDeptAndSubPids(pid);
@@ -133,6 +137,7 @@ public class OrgController {
      * One-stop employee creation: creates user + member + employee with bidirectional linking.
      */
     @PostMapping("/employees")
+    @RequirePermission("org.team.manage")
     public ApiResponse<OrgEmployeeDTO> createEmployee(@Valid @RequestBody CreateEmployeeRequest request) {
         OrgEmployeeDTO employee = orgEmployeeService.createWithUser(request);
         return ApiResponse.success(employee);
@@ -142,6 +147,7 @@ public class OrgController {
      * Link an existing tenant member to a new employee record.
      */
     @PostMapping("/employees/link")
+    @RequirePermission("org.team.manage")
     public ApiResponse<OrgEmployeeDTO> linkMember(@Valid @RequestBody LinkMemberRequest request) {
         OrgEmployeeDTO employee = orgEmployeeService.linkMember(request);
         return ApiResponse.success(employee);
@@ -151,6 +157,7 @@ public class OrgController {
      * Update an employee record via dynamic data service.
      */
     @PutMapping("/employees/{pid}")
+    @RequirePermission("org.team.manage")
     public ApiResponse<Void> updateEmployee(
             @PathVariable String pid,
             @RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
@@ -162,6 +169,7 @@ public class OrgController {
      * Transfer an employee to a new department and/or position.
      */
     @PutMapping("/employees/{pid}/transfer")
+    @RequirePermission("org.team.manage")
     public ApiResponse<Void> transferEmployee(
             @PathVariable String pid,
             @Valid @RequestBody TransferRequest request) {
@@ -173,6 +181,7 @@ public class OrgController {
      * Batch transfer multiple employees to a new department and/or position.
      */
     @PutMapping("/employees/batch-transfer")
+    @RequirePermission("org.team.manage")
     public ApiResponse<Void> batchTransferEmployees(@Valid @RequestBody BatchTransferRequest request) {
         TransferRequest transferRequest = new TransferRequest();
         transferRequest.setNewDeptPid(request.newDeptPid());

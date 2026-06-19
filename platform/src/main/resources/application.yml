@@ -336,6 +336,14 @@ aura:
   security:
     cross-tenant:
       enabled: ${AURA_CROSS_TENANT_ENABLED:true}
+    authz:
+      # Behavior for /api/** handlers that declare neither @RequirePermission nor
+      # @AuthenticatedAccess (the "un-annotated" surface). Staged default-deny migration:
+      #   allow  - legacy fail-open: permit silently
+      #   shadow - permit, but log each reached endpoint once ([authz-shadow]) to collect the
+      #            real-traffic coverage needed before enforcing (default)
+      #   deny   - fail-closed / default-deny: reject un-annotated handlers
+      unannotated-mode: ${AURA_AUTHZ_UNANNOTATED_MODE:shadow}
   git:
     repos-base-path: ${AURA_GIT_REPOS_PATH:./data/git-repos}
     default-repo-id: 1           # 默认仓库ID

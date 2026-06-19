@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.plugin.dto.PluginImportRequest;
 import com.auraboot.framework.plugin.dto.PluginImportResult;
 import com.auraboot.framework.plugin.service.PluginTransactionalImportService;
@@ -19,6 +20,10 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/plugins/import-tx")
+// Transactional plugin import writes models/permissions/menus into the tenant — an admin
+// operation. Guard with the same code as the sibling plugin controllers rather than relying
+// on the PermissionInterceptor fail-open default.
+@RequirePermission("plugin.plugin.manage")
 public class PluginTransactionalImportController {
 
     @Autowired

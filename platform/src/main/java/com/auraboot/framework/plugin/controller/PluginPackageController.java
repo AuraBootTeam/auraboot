@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.controller;
 
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.plugin.dto.packages.*;
 import com.auraboot.framework.plugin.dto.uninstall.UninstallPreviewResult;
 import com.auraboot.framework.plugin.service.PluginPackageService;
@@ -28,6 +29,11 @@ import java.util.Map;
 @RequestMapping("/api/plugins/packages")
 @RequiredArgsConstructor
 @Tag(name = "Plugin Packages", description = "Unified plugin package management")
+// Plugin install/uninstall/rollback/cleanup are destructive admin operations.
+// Guard the whole controller with the same code its sibling install/import controllers use
+// (MarketplaceInstallController / PluginImportController), instead of relying on the
+// PermissionInterceptor fail-open default for un-annotated handlers.
+@RequirePermission("plugin.plugin.manage")
 public class PluginPackageController {
 
     private final PluginPackageService packageService;

@@ -2,6 +2,7 @@ package com.auraboot.framework.tenant.controller;
 
 import com.auraboot.framework.application.annotation.CurrentUserId;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.tenant.dao.entity.Invitation;
 import com.auraboot.framework.tenant.service.TenantInviteService;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ public class TenantInviteController {
 
     @PostMapping("/generate")
     @ResponseBody
+    @RequirePermission("org.tenant.invite.manage")
     public ApiResponse<String> generateInviteCode(
             @CurrentUserId Long userId,
             @RequestParam(required = true) Integer expiryDays) {
@@ -71,6 +73,7 @@ public class TenantInviteController {
     
     @PostMapping("/revoke")
     @ResponseBody
+    @RequirePermission("org.tenant.invite.manage")
     public ApiResponse<Boolean> revokeInviteCode(
             @RequestParam String code,
             @CurrentUserId Long userId) {

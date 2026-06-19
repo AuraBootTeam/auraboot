@@ -56,6 +56,8 @@ import java.util.Objects;
 @Slf4j
 @RestController
 @RequestMapping(UserSoulProfileController.BASE_PATH)
+@com.auraboot.framework.permission.annotation.AuthenticatedAccess(
+        "user endpoints are tenant + user scoped (MetaContext); a user sees only their own profile")
 public class UserSoulProfileController {
 
     public static final String BASE_PATH = "/api/user/soul-profile";

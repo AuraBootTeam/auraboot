@@ -5,6 +5,7 @@ import com.auraboot.framework.auth.dto.DeactivationRequest;
 import com.auraboot.framework.auth.dto.DeactivationResponse;
 import com.auraboot.framework.auth.entity.UserDeactivation;
 import com.auraboot.framework.auth.service.UserDeactivationService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.common.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth/deactivation")
 @RequiredArgsConstructor
+@AuthenticatedAccess("request/cancel act only on the caller's own deactivation (@CurrentUserId)")
 public class DeactivationController {
 
     private final UserDeactivationService deactivationService;
