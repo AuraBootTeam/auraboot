@@ -271,3 +271,50 @@ only needed for the ~9 testcontainers tests + infra subprojects.
 - **Phase 4:** frontend hooks/util/renderers to 80%; subproject (storage/mq) IT under Docker.
 
 Each phase lands as a feature branch + PR, raises the ratchet floor, never regresses.
+
+## 8. Session progress log — 2026-06-18/19 (waves 5–14)
+
+JaCoCo measurement was first fixed (#838 offline instrumentation: the on-the-fly agent +
+CGLIB classdump read a bogus ~5% bundle because proxy class IDs diverge across the many
+evicted/recreated `@SpringBootTest` contexts; offline instruments `build/classes` at build
+time → coverage on stable on-disk IDs). Backend BUNDLE floor then ratcheted **0.73 → 0.75 →
+0.76**; frontend vitest floors consolidated to **28/27/25/22**.
+
+Real-stack IT waves (all merged, each measured against a clean `aura_boot_clean` snapshot via
+the path-B recipe + offline jacoco):
+
+| wave | PR | class | before→after | note |
+|---|---|---|---|---|
+| 5 | #847 | DataDomainServiceImpl | 7%→96% | **2 prod bugs fixed**: missing `userDataDomainIds` cache region + tenant interceptor injecting `dt.tenant_id` into a recursive CTE (`ignoreTable("domain_tree")`) |
+| 6 | #848 | FieldMaskServiceImpl | 22%→84% | **prod bug**: missing `fieldMaskConfig` cache region; + systemic cache-name audit (every `@Cacheable`/`@CacheEvict` name now in the fixed `CaffeineCacheManager` allowlist) |
+| 7 | #849 | VirtualFieldEngine.evaluate, ApiConnectorServiceImpl | — | SpEL evaluate paths + connector CRUD |
+| 8 | #850 | JdbcConnectorServiceImpl | →44% | connector + endpoint CRUD (invoke() needs a live pool, out of scope) |
+| 9 | #852 | SodService | 39%→77% | rule CRUD + validation + checkSod(pass) |
+| 10 | #854 | DrtDefinitionServiceImpl | 42%→97% | decision-definition CRUD |
+| 11 | #856 | CloudConfigServiceImpl | 47%→92% | cloud-config CRUD |
+| 12 | #857 | FieldValidationServiceImpl | pure validators | code/dataType/refTarget |
+| 13 | #858 | FieldBindingContextServiceImpl | 1%→73% | **model+field harness** (reusable) |
+| 14 | #859 | RelationSyncServiceImpl | 8%→17% | non-relation branches only |
+| consolidation | #851 | — | bundle 0.7769 → floor 0.76 | — |
+
+**Current state:** bundle ≈ **0.781**, floor 0.76, security packages 0.85–0.99.
+
+**Remaining gap to 0.80 (~+1250 covered lines) is dominated by hard-to-test classes** that need
+heavy fixtures (genuinely multi-session, diminishing per-wave returns — RelationSync's bulk, the
+inverse-sync path, needs bidirectional reference metadata; the cheap branches alone gave only ~17
+lines):
+
+- `PluginPackageServiceImpl` (631) — plugin zip/jar parse + PF4J install; needs real package fixtures.
+- `saas/bootstrap/BootstrapRepairService` (250) + `BootstrapEngineService` (132) — startup repair/seed state.
+- `im/websocket/ImWebSocketHandler` (198) — websocket session harness.
+- `meta/service/impl/pipeline/phases/AssertPhase` (185) — command-pipeline phase context.
+- `meta/service/impl/ActivityEventListener` (144) — needs the activity events published + asserted.
+- `RelationSyncServiceImpl` inverse-sync (~175 remaining) — bidirectional reference metadata.
+- external: `email/service/GmailApiClient` (117), `iot/tsport/.../TDengineTimeSeriesPort` (112).
+
+The next floor bump (0.76 → 0.77) needs bundle ≥ ~0.79 for the conventional ~2pt flaky margin,
+so it should follow the next batch of these heavier waves rather than land per-wave.
+
+**Reusable assets:** worktree `auraboot-cov6` + `aura_boot_clean`/`aura_boot_base` DBs (kept),
+the path-B clean-DB recipe, offline-jacoco gradle wiring, and the model+field IT harness (see
+`FieldBindingContextServiceImplCoverageIT` / `RelationSyncServiceImplCoverageIT`).
