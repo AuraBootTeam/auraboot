@@ -28,6 +28,8 @@ created: 2026-06-19
 - 原"两份 spec 抢 `ab_agent_observation`"的冲突,由 §2.1 四层归属裁决消除。
 - **§2 冻结集克制在核心契约表(§2.0)**——富 schema/SLO/失败测试路由进领域设计 / 实施计划 / 测试策略,避免 DDR 膨胀成"提前设计整个终局"。
 - **开发门禁**:M1 / 可观测 P2 前必须批准 §2;**P0(纯运行时实证)不焊任何契约,与批准并行**。
+- **SPM 不是事件模型,是事件属性**:主模型 = 事件优先(`event_name`+params,对齐 Google GA4 / Segment),SPM 降为"DSL 派生的稳定元素身份"属性、丢掉 URL 透传(§5.4)。
+- **底座领域无关**:除可观测/行为两域,**开源 phone-home(部署/实例遥测 + 授权,域 C,§5C)** 是第三个自然落点,复用同一底座——反过来验证"一套底座、多领域"的设计成立。
 
 ---
 
@@ -39,6 +41,7 @@ created: 2026-06-19
 统一遥测与分析平台
 ├── 可观测性域(A):traces/spans/metrics/logs · Agent/tool/LLM 技术遥测(OTel,唯一事实源)· SRE/安全/审计
 ├── 行为分析域(B):pageview/click/exposure · SPM/session/funnel/retention/path · 产品与业务事件(含 Agent 业务结果)
+├── 部署/实例遥测与授权域(C,开源 phone-home):instance/version/edition/license · 版本分布 · 授权合规(§5C,本期可缓)
 └── 共享底座:Kafka(分 topic)· ClickHouse(分库)· PostgreSQL(投影/轻量档)· 治理目录 · 租户/隐私/采样/TTL · 薄上游(context/时钟/ULID/correlation 传播)
 ```
 **共享底座 ≠ 同一张表 / 同一 schema。**
@@ -272,8 +275,11 @@ SRE:p50/p95/p99、错误率、环节耗时、慢查询(`MetaPerformanceMonitor`+
 服务端 outcome 入口(b):应用内 publisher →(outbox,§2.4)→ aura.behavior.events.v1
 ```
 
-### 5.4 SPM 位置码模型
-`spm=a.b.c.d`(应用域.pageKey.blockId.elementCode),`BlockRenderer` 自动注入 `data-spm`(锚定 DSL 稳定标识,跨版本不漂)。**语法需冻结**(允许字符 / `.` 转义 / 最大长度 / 大小写 / SPM 版本 / `block.id` 缺失降级 `spm_quality=degraded` / 禁把 record·content id 放进 SPM)+ 曝光阈值·停留·去重 + A/B `experiment_id/variant_id`——**完整语法见领域设计**。
+### 5.4 事件模型与 SPM 定位(事件优先;SPM = 属性,非模型)
+**主模型 = 事件优先**(`event_name` + params),对齐 **Google GA4**(event-based,2023 起取代 Universal Analytics 的 pageview/坑位范式;gtag/GTM + dataLayer + enhanced measurement 自动采)与 Segment/Amplitude/PostHog 的"语义事件 + autocapture"收敛。**SPM 不是事件模型,是事件上的一个属性**(稳定元素身份)。
+- **为何降级**:阿里 SPM(2013 淘系)是"位置码 + URL 透传",绑定多页应用链接跳转;SPA/低代码下 URL 透传过时。**丢掉 URL 透传**,跨页/跨事件因果改用 `interaction_id`(§2.3,对应 GA4 不靠坑位码、靠事件参数+关联键)。
+- **为何保留(差异化)**:通用 web 的 SPM 痛点是"每个链接手动装饰"→业界转 autocapture(CSS 指纹,改版即漂)。**AuraBoot 是低代码,DSL 树已声明结构**→`BlockRenderer` 零配置自动派生稳定 `spm=a.b.c.d`(`应用域.pageKey.blockId.elementCode`),**同时拿到 autocapture 的零手工 + SPM 的跨版本稳定身份**——别家做不到的护城河。保留 DSL 自动派生 + autocapture 兜底(双轨)。
+- **语法需冻结**(允许字符 / `.` 转义 / 最大长度 / 大小写 / SPM 版本 / `block.id` 缺失降级 `spm_quality=degraded` / 禁把 record·content id 放进 SPM)+ 曝光阈值·停留·去重 + A/B `experiment_id/variant_id`——**完整语法见领域设计**。
 
 ### 5.5 BehaviorEvent v1(信封关键字段 + 收窄 agent_obs)
 关键字段:`schema_version, event_id, event_name, event_category, source, occurred_at, received_at, tenant_id, user_id/anon_id, client_session_id, derived_session_id, interaction_id, trace_id, source_span_id, run_id, props, producer_name, producer_version, consent_state, consent_version, sampling_probability`。约定:客户端 ULID 首次入队生成、重试不重生成;未知 event_name 进 quarantine;`api` 若指接口耗时/错误率→**删,归 OTel**,若指用户业务 API 动作→改清晰业务名。
@@ -285,6 +291,27 @@ SRE:p50/p95/p99、错误率、环节耗时、慢查询(`MetaPerformanceMonitor`+
 
 ### 5.7 分析
 产品:UV/PV/漏斗/留存/路径 + SPM 点位(看板 70% 现成 + 新 `smart-retention-chart`/`smart-sankey-chart`/`smart-realtime-board`,前后端两边注册)。低代码运营回流:DSL 树派生 SPM → 页面/行动点使用度回流、A/B。
+
+---
+
+## 5C. 部署/实例遥测与授权域(域 C)— 开源 phone-home
+
+> 开源后分析"客户版本分布 / 授权情况"的领域。**复用 §2 契约 + §3 底座**(入口→Kafka→ClickHouse→看板、治理目录、consent/隐私、失败容错、F0 可靠性),证明底座领域无关。但**身份 / 信任边界 / 授权**三点必须区别于行为域。业界参考:GitLab Service Ping + Seat Link、PostHog/Sentry/Metabase/n8n/Grafana usage telemetry、HashiCorp license utilization reporting。
+
+### 5C.1 是什么
+自托管开源实例**定期向厂商回传**:版本、edition、实例指纹、功能使用、活跃用户数、license key 状态。厂商侧据此出**版本分布 / 功能采纳 / 授权合规**看板。
+
+### 5C.2 与行为域的 4 个关键不同(不能照搬)
+1. **身份模型翻转**:主键不是 `tenant_id/user_id`,是 **`instance_id`(部署指纹)+ `license_key` + `edition` + `version`**;是"多个独立部署 → 一个中央分析",不是"一个部署内多租户"。
+2. **跨信任边界 + 公网入口**:上报方是不可信外部客户端,无共享 session/MetaContext。认证走 **license key / 签名实例 token**(非 MetaContext)+ 反滥用 + **版本偏斜容忍**(老实例发老 schema → Avro backward 长期成立)。
+3. **授权 = 独立控制面**:**版本分布 = 分析**(进 ClickHouse 看板);**license 合规/席位/到期 = 控制功能**。license/usage 事件走 **F0(never-lose / never-sample)+ outbox**(§2.4/§2.5);**接现有 entitlement 底座**(`auraboot.entitlement.enabled`、aura-billing),不另造。
+4. **隐私/opt-out = 开源生死线**:默认透明 + 可 opt-out(部分司法区 opt-in)+ 匿名化 + 公开 telemetry 文档。复用 §9 consent/脱敏原语,但把"可关闭 + 透明"提为一等公民。
+
+### 5C.3 工程要点
+phone-home 客户端要**离线缓冲 + 重试**(同行为 SDK);服务端容忍 late/dup/乱序(§8 失败矩阵已覆盖)。新增 topic:`aura.deployment.telemetry.v1`(分析)/ `aura.license.events.v1`(F0)。
+
+### 5C.4 本期范围
+建议本期**先不实施**域 C(等开源节奏定);**架构契约 §2/§3 已为它预留**,开源启动时按本节落地即可,无需重构底座。
 
 ---
 
@@ -379,6 +406,10 @@ S0 共享代码契约(seam 只插一次):
 6. §2.8/§4.4 semconv **pin 版本**(`gen_ai.provider.name`/`finish_reasons`/成本 `aura.*`)+ Kafka span links + Collector 可靠性。
 7. §7 路线 **S0 seam-first**(chokepoint 只插一次)+ P0 验收改基线拓扑(不要求统一端到端)+ Agent outcome 不等 M4。
 8. §3 ClickHouse **低基数分区**修正 + `interaction_trace_link` 投影;§8 补失败场景矩阵 + 平台 SLO;§10 拆"冻结前必拍 / 不阻塞"。
+
+**2026-06-20 修订(SPM 定位 + 第三域):**
+9. §5.4 SPM 降为**事件属性**、主模型改**事件优先**(对齐 Google GA4 / Segment)、**删 URL 透传**(保留 DSL 派生 + autocapture 兜底);§0/§1.1 同步。
+10. 新增 **§5C 部署/实例遥测与授权域(开源 phone-home)**——复用 §2/§3 底座,点明 instance 身份 / 公网 license-key 入口 / license 走 F0 / 接 entitlement / opt-out;验证底座领域无关。
 
 ---
 
