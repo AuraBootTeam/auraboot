@@ -48,7 +48,7 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
         // 获取用户的租户ID
         Long tenantId = tenantMemberService.getTenantIdByUserId(userId);
         if (tenantId == null) {
-            throw new BusinessException("用户未加入任何租户");
+            throw new BusinessException("$i18n:tenant.member.not_in_tenant");
         }
         
         // 计算过期时间
