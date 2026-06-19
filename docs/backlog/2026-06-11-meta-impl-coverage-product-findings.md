@@ -134,3 +134,30 @@ class's coverage — natural future-wave targets). **Worth promoting to canonica
   `"boolean"` primitives (valid set is `"integer"`, `"string"`, `"decimal"`,
   `"boolean"`, …); the valid types are only discoverable from the validator
   error message. Consider documenting the legal `dataType` set on the DTO.
+
+## Wave 5 (2026-06-19) — DataDomainServiceImpl: two live bugs (fixed)
+
+`DataDomainServiceImpl` (row-level data-domain isolation) sat at **~7% line coverage**, which
+hid **two production bugs** — both surfaced the moment a real-stack IT
+(`DataDomainServiceImplCoverageIT`) exercised it. Fixed in-band (the IT is the regression test);
+the class is now **96.6%** line-covered (115/119).
+
+- **Bug 1 — missing cache region (every domain mutation 500'd).** The class uses
+  `@Cacheable`/`@CacheEvict("userDataDomainIds")`, but the cache name was **not** in the
+  `@Primary` `CacheManager`'s fixed `setCacheNames(...)` list (`CacheConfig`). With a fixed-name
+  Caffeine manager, an unlisted cache throws `IllegalArgumentException: Cannot find cache named
+  'userDataDomainIds'` — so **create/update/delete/assignUser/removeUser and
+  getUserDomainIdsWithDescendants all threw in production**. Fix: register `userDataDomainIds`.
+
+- **Bug 2 — tenant interceptor breaks the recursive CTE (domain filtering 500'd).**
+  `DataDomainMapper.findDescendantIds` is a `WITH RECURSIVE domain_tree ...` CTE. The
+  MyBatis-Plus `TenantLineInnerInterceptor` treated the CTE alias `dt` as a tenant table and
+  injected `dt.tenant_id = ?` → `column dt.tenant_id does not exist` (`BadSqlGrammarException`),
+  500'ing `getUserDomainIdsWithDescendants` / `buildDomainFilter` / `filterByDomain`. The CTE
+  already filters `tenant_id` explicitly in both terms. Fix: add `domain_tree` to the
+  interceptor's `ignoreTable` list (`MybatisPlusConfig`).
+
+> **Lesson (reinforces the initiative):** a near-zero-coverage service is not "low risk because
+> small" — it is **unexercised**, and unexercised cache-region / interceptor / CTE wiring fails
+> the first time it runs. Cross-cutting infra (cache names, tenant interceptor, recursive CTEs)
+> is exactly what unit tests with mocked mappers miss and real-stack ITs catch.

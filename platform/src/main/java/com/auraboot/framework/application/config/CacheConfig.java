@@ -85,6 +85,14 @@ public class CacheConfig {
             "dataFilterResult",
             "fieldPermissionProjection",
 
+            // Data domain (row-level domain isolation) — DataDomainServiceImpl uses
+            // @Cacheable/@CacheEvict("userDataDomainIds"). Omitting it from this fixed
+            // setCacheNames list made EVERY domain mutation (create/update/delete/assignUser)
+            // and domain filtering throw "Cannot find cache named 'userDataDomainIds'" in
+            // production. Caught 2026-06-19 by the DataDomainServiceImpl coverage IT (the
+            // class sat at ~7% line coverage, hiding the bug).
+            "userDataDomainIds",
+
             // Model metadata caches
             "modelDefinitions",
             "fieldDefinitions",
