@@ -8,6 +8,7 @@ import {
   normalizeLoadedRecordForForm,
   resolveAfterSubmitRedirect,
   resolveAsyncCommandDispatch,
+  resolveEditRecordEndpoint,
   resolveSubmitCommandCode,
   shouldBypassFormSubmit,
   unwrapJsonLikeValue,
@@ -303,5 +304,22 @@ describe('JSON-like form values', () => {
       default_headers: '{\n  "X-Codex-QA": "true"\n}',
       retry_policy: '{\n  "maxRetries": 2\n}',
     });
+  });
+});
+
+describe('resolveEditRecordEndpoint', () => {
+  it('defaults to the generic dynamic endpoint when no recordSource', () => {
+    expect(resolveEditRecordEndpoint(undefined, 'crm_lead', 'r1')).toBe('/api/dynamic/crm_lead/r1');
+    expect(resolveEditRecordEndpoint({}, 'crm_lead', 'r1')).toBe('/api/dynamic/crm_lead/r1');
+  });
+  it('uses the custom endpoint and interpolates {recordId} / ${recordId}', () => {
+    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordId}' } }, 'qr_code', 'abc'))
+      .toBe('/api/qr/abc');
+    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/${recordId}' } }, 'qr_code', 'abc'))
+      .toBe('/api/qr/abc');
+  });
+  it('url-encodes the recordId', () => {
+    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordId}' } }, 'qr_code', 'a/b'))
+      .toBe('/api/qr/a%2Fb');
   });
 });
