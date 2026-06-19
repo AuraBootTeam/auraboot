@@ -214,9 +214,50 @@ public class ChatToolResolver {
                     .build();
 
     /**
+     * chat-bi — the always-on STRUCTURED data-query / chart primitive: the safe governed
+     * sibling of {@code platform_execute_sql} (aggregate over a published model, no raw SQL).
+     * Pinned per DDR-2026-06-19-aurabot-chat-tool-exposure-pin-vs-retrieve: it is a universal
+     * data-query primitive (not a domain tool), so it is always available and — unlike the SQL
+     * fallback — never removed (domain list/get tools cannot do aggregation/charts). Routes to
+     * the real {@code aurabot:chat-bi} skill ({@code ChatBiSkill}), which is the source of truth
+     * for the full param contract + validation; this schema is the LLM-facing hint. The name is
+     * the sanitized form of the provider code {@code aurabot:chat-bi}.
+     */
+    private static final LlmChatRequest.Tool PLATFORM_CHAT_BI_TOOL =
+            LlmChatRequest.Tool.builder()
+                    .name("aurabot_chat-bi")
+                    .description("Aggregate a published business model and return a chart, governed and "
+                            + "zero-setup. Use when the user asks to see data / counts / totals / a chart "
+                            + "(e.g. \"leads by status\", \"orders per month\"). Prefer this over "
+                            + "platform_execute_sql for aggregation. Group by the dimension field(s) and "
+                            + "choose the metric aggregation; use the model's primary key with count for "
+                            + "row counts.")
+                    .inputSchema(Map.of("type", "object",
+                            "properties", Map.of(
+                                    "modelCode", Map.of("type", "string",
+                                            "description", "The model to aggregate (e.g. crm_lead)."),
+                                    "dimensions", Map.of("type", "array",
+                                            "items", Map.of("type", "string"),
+                                            "description", "Group-by fields (category axis / pie slices). Omit for a single KPI."),
+                                    "metrics", Map.of("type", "array",
+                                            "items", Map.of("type", "object",
+                                                    "properties", Map.of(
+                                                            "field", Map.of("type", "string"),
+                                                            "aggregation", Map.of("type", "string",
+                                                                    "enum", List.of("count", "count_distinct", "sum", "avg", "max", "min"))),
+                                                    "required", List.of("field", "aggregation"))),
+                                    "chartType", Map.of("type", "string",
+                                            "enum", List.of("bar", "line", "pie", "table")),
+                                    "interpretation", Map.of("type", "string",
+                                            "description", "One-line restatement of the question for the result header.")),
+                            "required", List.of("modelCode", "metrics")))
+                    .build();
+
+    /**
      * Ensure platform tools are present in the tool list.
      * SQL is not exposed when a model-specific read tool exists, so CRM/list/NQ
      * tools remain the primary path and SQL cannot bypass their safer contracts.
+     * chat-bi is always present (universal data-query primitive, never removed).
      */
     private void ensurePlatformTools(List<LlmChatRequest.Tool> tools) {
         Set<String> existing = tools.stream()
@@ -226,11 +267,21 @@ public class ChatToolResolver {
         if (!existing.contains(PLATFORM_FILL_FORM_TOOL.getName())) {
             tools.add(PLATFORM_FILL_FORM_TOOL);
         }
+        if (!existing.contains(PLATFORM_CHAT_BI_TOOL.getName())) {
+            tools.add(PLATFORM_CHAT_BI_TOOL);
+        }
         if (!hasDomainReadTool(tools) && !existing.contains(PLATFORM_EXECUTE_SQL_TOOL.getName())) {
             tools.add(PLATFORM_EXECUTE_SQL_TOOL);
         }
         cacheSyntheticPlatformTool(PLATFORM_FILL_FORM_TOOL, "platform.fill_form", true, "L1");
         cacheSyntheticPlatformTool(PLATFORM_EXECUTE_SQL_TOOL, "platform.execute_sql", true, "L1");
+        // chat-bi must execute via the REAL aurabot skill path (SkillToolExecutor), not the
+        // synthetic-provider path. Cache only the code + read-only and leave the AgentToolDefinition
+        // unset so ChatToolExecutor.resolveToolDefinition types it as AURABOT_SKILL (via inferToolType
+        // on the aurabot: prefix) rather than "platform". cacheSyntheticPlatformTool would force
+        // toolType="platform" → AuraBotSkillToolProvider.execute() (the bypassed/failure stub).
+        discoveredProviderToolCodeByName.put(PLATFORM_CHAT_BI_TOOL.getName(), "aurabot:chat-bi");
+        discoveredToolReadOnlyByName.put(PLATFORM_CHAT_BI_TOOL.getName(), true);
     }
 
     private void removeSqlFallbackWhenDomainReadToolAvailable(List<LlmChatRequest.Tool> tools) {
