@@ -5,7 +5,7 @@
  * Supports automatic refresh, drill-down filters, and linkage filters.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { chartDataService } from '~/shared/services/chartDataService';
 import type {
   ChartDataSource,
@@ -83,6 +83,24 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
   const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
+  // Static sources resolve SYNCHRONOUSLY (no fetch) — return the data on the very first
+  // render so ECharts mounts with data and never caches an empty scale. Without this the
+  // async setData path left charts mis-scaled in animated / small containers (Slice D:
+  // ad-hoc chat-bi charts rendered tiny). Fetch sources (aggregate / namedQuery / api)
+  // are unchanged and stay async.
+  const isStatic = dataSource?.type === 'static';
+  const staticData = useMemo<AggregateQueryResponse | null>(() => {
+    if (!isStatic || !enabled) return null;
+    return {
+      rows: dataSource.staticData || [],
+      summary: {},
+      meta: {
+        dimensions: dataSource.dimensions || [],
+        metrics: dataSource.metrics?.map((m) => m.alias || m.field) || [],
+      },
+    } as AggregateQueryResponse;
+  }, [isStatic, enabled, dataSource]);
+
   /**
    * Check if data source configuration is complete enough to fetch data
    */
@@ -113,24 +131,7 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
     }
 
     if (dataSource.type === 'static') {
-      const nextData = {
-        rows: dataSource.staticData || [],
-        summary: {},
-        meta: {
-          dimensions: dataSource.dimensions || [],
-          metrics: dataSource.metrics?.map((m) => m.alias || m.field) || [],
-        },
-      };
-      setData((currentData) => {
-        if (
-          currentData &&
-          JSON.stringify(currentData.rows) === JSON.stringify(nextData.rows) &&
-          JSON.stringify(currentData.meta) === JSON.stringify(nextData.meta)
-        ) {
-          return currentData;
-        }
-        return nextData;
-      });
+      // Handled synchronously by the staticData useMemo + the return below. No async fetch.
       return;
     }
 
@@ -230,9 +231,9 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
   }, []);
 
   return {
-    data,
-    loading,
-    error,
+    data: isStatic ? staticData : data,
+    loading: isStatic ? false : loading,
+    error: isStatic ? null : error,
     refetch: fetchData,
   };
 }
