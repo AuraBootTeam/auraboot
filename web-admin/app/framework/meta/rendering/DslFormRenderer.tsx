@@ -20,8 +20,7 @@
  */
 
 import React, { Suspense, useEffect } from 'react';
-import { profileRegistry } from '~/framework/meta/profiles/ProfileRegistry';
-import { ProfileProvider } from '~/framework/meta/profiles/ProfileContext';
+import { profileRegistry, ProfileProvider } from '@auraboot/runtime-kernel';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { ErrorAlert } from '~/ui/ErrorAlert';
 import type { UseDslFormReturn } from '~/framework/meta/hooks/useDslForm';

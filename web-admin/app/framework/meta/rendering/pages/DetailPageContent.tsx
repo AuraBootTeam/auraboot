@@ -20,7 +20,7 @@ import { Link, useLocation, useNavigate as useRouterNavigate } from 'react-route
 import { PrintButton } from '~/framework/meta/rendering/components/PrintButton';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { RecordShareDialog } from '~/ui/shared/RecordShareDialog';
-import type { PageContentProps } from '~/framework/meta/profiles/types';
+import type { PageContentProps } from '@auraboot/runtime-kernel';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import {
   getLocalizedText,

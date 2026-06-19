@@ -11,8 +11,7 @@
 import React, { Suspense, useMemo } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import { useProfileSafe } from '~/framework/meta/profiles/ProfileContext';
-import { BlockErrorBoundary } from '~/framework/meta/rendering/BlockErrorBoundary';
+import { useProfileSafe, BlockErrorBoundary } from '@auraboot/runtime-kernel';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
 import { BlockRegistry } from '~/ui/schema-renderer/BlockRegistry';
 

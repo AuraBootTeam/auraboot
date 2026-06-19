@@ -13,7 +13,7 @@ import {
   DEFAULT_RUNTIME_PROFILE,
   getDefaultPluginRuntimeProfiles,
   type RuntimeProfile,
-} from '~/framework/runtime';
+} from '@auraboot/runtime-kernel';
 
 export function isPluginEnabledForRuntime(
   manifest: PluginManifest,

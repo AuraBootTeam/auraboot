@@ -2,7 +2,7 @@ import { redirect, type MiddlewareFunction } from 'react-router';
 import { sessionStorage } from '~/shared/services/session.js';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { PLUGIN_PUBLIC_ROUTES } from '~/plugins/_public-routes';
-import { isPublicRuntimePathname } from '~/framework/runtime';
+import { isPublicRuntimePathname } from '@auraboot/runtime-kernel';
 
 // Routes that never require authentication
 const PUBLIC_ROUTES = [
