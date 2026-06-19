@@ -112,6 +112,9 @@ public class MybatisPlusConfig {
                     || "ab_jdbc_connector_endpoint".equals(tableName)  // No tenant_id (parented by connector_pid)
                     || "ab_mkt_publisher_payout".equals(tableName)    // No tenant_id, publisher-scoped (not tenant-scoped)
 
+                    // ── Recursive CTE (not a real table) ──
+                    || "domain_tree".equals(tableName)               // DataDomainMapper.findDescendantIds recursive CTE. The interceptor was injecting "dt.tenant_id = ?" on the CTE alias → "column dt.tenant_id does not exist", 500'ing getUserDomainIdsWithDescendants / buildDomainFilter / filterByDomain in production (caught 2026-06-19 by the DataDomainServiceImpl coverage IT). The CTE's anchor + recursive terms already filter tenant_id explicitly.
+
                     // ── Currency (has tenant_id, but all queries pass it explicitly as @Param) ──
                     || "ab_exchange_rate".equals(tableName)           // ExchangeRateMapper passes tenantId explicitly
 
