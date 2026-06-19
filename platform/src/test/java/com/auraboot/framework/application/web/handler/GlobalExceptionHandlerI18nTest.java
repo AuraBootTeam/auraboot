@@ -1,5 +1,6 @@
 package com.auraboot.framework.application.web.handler;
 
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -80,5 +81,41 @@ class GlobalExceptionHandlerI18nTest {
     @Test
     void nullMessagePassesThrough() {
         assertThat(handler.localizeI18nMessage(null, request)).isNull();
+    }
+
+    @Test
+    void resolvesParameterizedBusinessException() {
+        // BusinessException.i18n(key, args) carries the {0} args to the boundary.
+        when(localeResolver.resolveLocale(request)).thenReturn("en-US");
+        when(i18nService.getMessage("en-US", "tenant.member.not_found", 42L))
+                .thenReturn("Member not found: 42");
+
+        BusinessException ex = BusinessException.i18n("tenant.member.not_found", 42L);
+        String out = handler.localizeBusinessMessage(ex, request);
+
+        assertThat(out).isEqualTo("Member not found: 42");
+    }
+
+    @Test
+    void parameterizedFallsBackToBaseLocale() {
+        when(localeResolver.resolveLocale(request)).thenReturn("ja-JP");
+        when(i18nService.getMessage("ja-JP", "tenant.not_found", 7L)).thenReturn(null);
+        when(i18nService.getMessage("zh-CN", "tenant.not_found", 7L)).thenReturn("租户不存在: 7");
+
+        BusinessException ex = BusinessException.i18n("tenant.not_found", 7L);
+
+        assertThat(handler.localizeBusinessMessage(ex, request)).isEqualTo("租户不存在: 7");
+    }
+
+    @Test
+    void staticBusinessExceptionStillResolvesWithoutArgs() {
+        when(localeResolver.resolveLocale(request)).thenReturn("en-US");
+        when(i18nService.getValue("en-US", "tenant.member.already_member"))
+                .thenReturn("User is already a member of this tenant");
+
+        BusinessException ex = new BusinessException("$i18n:tenant.member.already_member");
+
+        assertThat(handler.localizeBusinessMessage(ex, request))
+                .isEqualTo("User is already a member of this tenant");
     }
 }
