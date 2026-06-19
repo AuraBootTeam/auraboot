@@ -127,6 +127,26 @@ public class I18nService {
     }
 
     /**
+     * Resolve a parameterized message: look up the template by key, then substitute {@code {0}},
+     * {@code {1}} ... via {@link java.text.MessageFormat}. Returns {@code null} if the key is
+     * absent (so callers can fall back to a base locale). With no args this is identical to
+     * {@link #getValue(String, String)}.
+     *
+     * <p>Note: MessageFormat treats a single quote {@code '} as an escape. Catalog templates that
+     * need a literal apostrophe must double it ({@code ''}). The current keys contain none.
+     */
+    public String getMessage(String locale, String key, Object... args) {
+        String template = getValue(locale, key);
+        if (template == null) {
+            return null;
+        }
+        if (args == null || args.length == 0) {
+            return template;
+        }
+        return java.text.MessageFormat.format(template, args);
+    }
+
+    /**
      * Clear the cache for a specific locale or all locales
      */
     public void clearCache(String locale) {
