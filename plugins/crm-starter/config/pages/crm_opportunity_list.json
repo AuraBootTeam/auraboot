@@ -21,8 +21,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "crm_opportunity_form",
-            "command": "crm:create_opportunity"
+            "to": "crm_opportunity_form"
           }
         }
       ]

@@ -54,8 +54,7 @@
             "en-US": "Save"
           },
           "action": {
-            "type": "command",
-            "command": "crm:update_campaign"
+            "type": "command"
           }
         },
         {
