@@ -4,8 +4,8 @@
 #
 # Brings up a fully isolated host-first stack (zero docker) ready to run real-browser
 # golden specs against the code in THIS checkout/worktree, collapsing the ~6 manual
-# failure points documented in the enterprise (EE) canonical agent-rules doc
-#   docs/agent-rules/engineering-gotchas/e2e-playwright.md
+# failure points documented in the enterprise agent-rules e2e-playwright runbook
+#   (docs/agent-rules/engineering-gotchas/e2e-playwright.md)
 #   §"OSS auraboot host-first 视觉 golden 全栈 bring-up runbook".
 #
 # It does NOT reset the shared host and NEVER FORCE_HOSTs — it always uses an isolated
