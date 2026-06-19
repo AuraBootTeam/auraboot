@@ -544,6 +544,25 @@ function inferEditCommandCode(commandCode: string | null, isEditMode: boolean): 
 }
 
 /**
+ * Resolve the submit command for a form, convention over configuration.
+ *
+ * An explicit command (URL `?commandCode=`, the form button's command, or the
+ * action object's command — already passed through {@link inferEditCommandCode})
+ * always wins. When none is provided, fall back to the model's CRUD command that
+ * the server resolved onto `schema.commands`: `update` when editing (a record id
+ * is present), `create` when new. Returns null when neither is available (a pure
+ * CRUD model), so the caller persists via the dynamic CRUD API instead.
+ */
+export function resolveSubmitCommandCode(
+  explicitCommandCode: string | null,
+  schemaCommands: Record<string, string> | undefined,
+  isEditMode: boolean,
+): string | null {
+  if (explicitCommandCode) return explicitCommandCode;
+  return schemaCommands?.[isEditMode ? 'update' : 'create'] ?? null;
+}
+
+/**
  * Map field dataType to SubTableColumn type for sub-table cell editors.
  */
 function mapDataTypeToColumnType(dataType: string): SubTableColumn['type'] {
@@ -1351,11 +1370,21 @@ export function FormPageContent(props: PageContentProps) {
         effectiveAction && typeof effectiveAction === 'object'
           ? (effectiveAction as Record<string, unknown>).command
           : undefined;
-      const effectiveCommandCode = inferEditCommandCode(
+      const explicitCommandCode = inferEditCommandCode(
         urlCommandCode ||
           effectiveButton.commandCode ||
           (typeof actionCommandCode === 'string' ? actionCommandCode : null) ||
           null,
+        Boolean(recordId),
+      );
+      // Convention over configuration: an explicit command (URL / button /
+      // action) wins; otherwise route through the model's CRUD command the
+      // server resolved onto `schema.commands` (update when editing, create when
+      // new). Pure-CRUD models stay null and fall back to the dynamic CRUD API
+      // below.
+      const effectiveCommandCode = resolveSubmitCommandCode(
+        explicitCommandCode,
+        schema?.commands as Record<string, string> | undefined,
         Boolean(recordId),
       );
       const shouldValidate =

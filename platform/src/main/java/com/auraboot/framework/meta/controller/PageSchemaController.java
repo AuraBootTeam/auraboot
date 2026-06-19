@@ -12,6 +12,7 @@ import com.auraboot.framework.meta.dto.PageSchemaVersionCreateRequest;
 import com.auraboot.framework.meta.dto.PageSchemaVersionDTO;
 import com.auraboot.framework.meta.dto.PaginationRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.meta.service.PageSchemaVersionService;
 import com.auraboot.framework.application.annotation.CurrentUserId;
@@ -54,6 +55,9 @@ public class PageSchemaController {
 
     @Autowired
     private PluginResourceTracker pluginResourceTracker;
+
+    @Autowired
+    private CommandService commandService;
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -450,6 +454,12 @@ public class PageSchemaController {
         PageSchemaDTO schema = pageSchemaService.findAnyByPageKey(pageKey);
         if (schema == null) {
             return ApiResponse.error("Page not found: " + pageKey);
+        }
+        // Convention over configuration: attach the model's CRUD command codes so
+        // standard create/edit/delete forms route through the business command
+        // without hard-coding it in the page DSL or carrying it in the URL.
+        if (schema.getModelCode() != null && !schema.getModelCode().isBlank()) {
+            schema.setCommands(commandService.resolveCrudCommands(schema.getModelCode()));
         }
         return ApiResponse.success(schema);
     }
