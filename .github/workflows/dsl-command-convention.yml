@@ -1,0 +1,53 @@
+name: DSL Command Convention CI
+
+# Regression gate for convention-over-configuration CRUD command routing
+# (docs/backlog/2026-06-19-convention-over-config-command-routing.md).
+# Standard create/edit/delete buttons on DSL pages must NOT hard-code the
+# model's CRUD command — the platform resolves it by convention (page-schema
+# `commands` map). Hard-coding it is redundant and re-introduces the
+# `/p/<model>/new?commandCode=...` URL. This gate fails when an authored page
+# button hard-codes a command that exactly equals its model's convention
+# command (unambiguous models only; variants / state-transition / cross-model /
+# ambiguous-model actions are never flagged).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/**/config/pages/**'
+      - 'plugins/**/config/commands/**'
+      - 'scripts/check-dsl-command-convention.mjs'
+      - '.github/workflows/dsl-command-convention.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'plugins/**/config/pages/**'
+      - 'plugins/**/config/commands/**'
+      - 'scripts/check-dsl-command-convention.mjs'
+      - '.github/workflows/dsl-command-convention.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dsl-command-convention-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: DSL command convention gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Check DSL pages for redundant convention CRUD commands
+        run: node scripts/check-dsl-command-convention.mjs
