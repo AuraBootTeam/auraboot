@@ -660,3 +660,36 @@ describe('canonicalizePageSchemaDto', () => {
     });
   });
 });
+
+describe('canonicalizePageSchemaDto — convention command map carry-through', () => {
+  it('carries the server-resolved commands map onto the unified schema', () => {
+    const dto: PageSchemaDTO = {
+      pageKey: 'showcase_all_fields_form',
+      kind: 'form',
+      modelCode: 'showcase_all_fields',
+      blocks: [],
+      commands: {
+        create: 'sc:create_showcase',
+        update: 'sc:update_showcase',
+        delete: 'sc:delete_showcase',
+      },
+    };
+    const schema = canonicalizePageSchemaDto(dto);
+    expect(schema.commands).toEqual({
+      create: 'sc:create_showcase',
+      update: 'sc:update_showcase',
+      delete: 'sc:delete_showcase',
+    });
+  });
+
+  it('omits commands when the DTO has none (pure CRUD model)', () => {
+    const dto: PageSchemaDTO = {
+      pageKey: 'plain_model_form',
+      kind: 'form',
+      modelCode: 'plain_model',
+      blocks: [],
+    };
+    const schema = canonicalizePageSchemaDto(dto);
+    expect(schema.commands).toBeUndefined();
+  });
+});

@@ -213,8 +213,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "showcase_all_fields_form",
-            "command": "sc:create_showcase"
+            "to": "showcase_all_fields_form"
           }
         }
       ]
