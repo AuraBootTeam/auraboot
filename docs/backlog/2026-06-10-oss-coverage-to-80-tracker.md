@@ -318,3 +318,40 @@ so it should follow the next batch of these heavier waves rather than land per-w
 **Reusable assets:** worktree `auraboot-cov6` + `aura_boot_clean`/`aura_boot_base` DBs (kept),
 the path-B clean-DB recipe, offline-jacoco gradle wiring, and the model+field IT harness (see
 `FieldBindingContextServiceImplCoverageIT` / `RelationSyncServiceImplCoverageIT`).
+
+## 9. Session progress log — 2026-06-19 (waves 9–23, floor -> 0.77)
+
+Continued from §8. Waves 9–23 (#852–#870), all merged, each real-stack IT against `aura_boot_clean`:
+
+| wave(s) | classes | result |
+|---|---|---|
+| 9–12 | SodService 39→77, DrtDefinition 42→97, CloudConfig 47→92, FieldValidation pure validators | clean CRUD/pure |
+| 13 | FieldBindingContextServiceImpl | 1→73% (model+field harness, reusable) |
+| 14 | RelationSyncServiceImpl | 8→17% (non-relation branches only — see §10) |
+| 15 | ActivityEventListener | 7→58% (**@Async unwrapped via `AopTestUtils.getTargetObject`** so onCommandCompleted runs sync in-thread) |
+| 16 | AsyncTaskServiceImpl | 38→58% (read/cancel/delete over a seeded task) |
+| 17 | AssertPhase | 18→28% (SpEL assert + precondition via hand-built CommandPipelineContext) |
+| 18 | VirtualFieldEngine graph | →82% (validateDependencyGraph cycle/acyclic + getComputationOrder via virtual-field harness) |
+| 19 | DynamicDataServiceImpl typed coercion + Excel export | convertFieldValue + exportAsExcel(0%); notes update() doesn't string→type coerce like create() |
+| 20 | CategoryServiceImpl CRUD + AuditTrailService | AuditTrail 52→86% |
+| 21 | DataPermissionEngine no-policy + PostExecutionPhase dry-run | branch coverage |
+| consolidation #868 | — | bundle 0.7869 → **floor 0.76→0.77** (1.69pt margin; security pkgs 0.85–0.99) |
+| 22 | InvariantDefinitionServiceImpl | 1→89% (CRUD; note: type/severity/scope valid sets are lowercase despite uppercase error text) |
+| 23 | SemanticQueryService | 1→24% (empty/cross-model/unknown-model rejects; happy path needs ab_semantic_model harness) |
+
+**Current state:** floor **0.77**, bundle ≈ **0.787**, security packages 0.85–0.99, 26 PRs this run.
+
+## 10. Blocker for the 0.80 target: the biggest gap is unreachable code
+
+The single largest remaining line gap — `DynamicDataServiceImpl`'s relation/sub-table cluster
+(~336 lines: getRelationData / saveWithRelations / createRelations / removeRelations / reference
+enrichment) — is **unreachable**: `MetaModelServiceImpl.loadModelRelations` is a TODO stub returning
+an empty list, so `model.getRelations()` is always empty and the relation happy paths never run.
+See [`2026-06-19-dynamicdata-relations-unwired-coverage-finding.md`](2026-06-19-dynamicdata-relations-unwired-coverage-finding.md).
+
+Consequence: ~336 "missed" lines cannot be closed by tests. Reaching 0.80 from 0.787 therefore needs
+either (a) implementing `loadModelRelations` (a product change, then those lines become testable), or
+(b) excluding the unreachable relation methods from the jacoco denominator with that finding as
+justification — **plus** continuing the heavy-fixture waves (PluginPackage 631 / Bootstrap 382 /
+ImWebSocket 198), each a multi-hour harness. The quick/medium/model-harness service wins are now
+exhausted; the remaining addressable surface is heavy-harness or cheap-branch-only (~17–30 lines/wave).
