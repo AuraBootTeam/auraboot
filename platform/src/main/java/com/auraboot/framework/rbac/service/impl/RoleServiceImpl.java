@@ -82,7 +82,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         
         Role existingRole = getById(role.getId());
         if (existingRole == null) {
-            throw new BusinessException("角色不存在: " + role.getId());
+            throw BusinessException.i18n("role.not_found", role.getId());
         }
         
         // 系统角色不允许修改某些字段
@@ -183,7 +183,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         
         Role role = getById(roleId);
         if (role == null) {
-            throw new BusinessException("角色不存在: " + roleId);
+            throw BusinessException.i18n("role.not_found", roleId);
         }
         
         role.setStatus(StatusConstants.ACTIVE);
@@ -199,12 +199,12 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         
         Role role = getById(roleId);
         if (role == null) {
-            throw new BusinessException("角色不存在: " + roleId);
+            throw BusinessException.i18n("role.not_found", roleId);
         }
         
         // 系统角色不允许禁用
         if (Boolean.TRUE.equals(role.getIsSystem())) {
-            throw new BusinessException("系统角色不允许禁用");
+            throw new BusinessException("$i18n:role.system_no_disable");
         }
         
         role.setStatus(StatusConstants.INACTIVE);
@@ -220,18 +220,18 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         
         Role role = getById(roleId);
         if (role == null) {
-            throw new BusinessException("角色不存在: " + roleId);
+            throw BusinessException.i18n("role.not_found", roleId);
         }
         
         // 系统角色不允许删除
         if (Boolean.TRUE.equals(role.getIsSystem())) {
-            throw new BusinessException("系统角色不允许删除");
+            throw new BusinessException("$i18n:role.system_no_delete");
         }
         
         // 检查是否有用户正在使用该角色
         long userCount = userRoleService.countByRoleId(roleId);
         if (userCount > 0) {
-            throw new BusinessException("该角色正在被使用，无法删除");
+            throw new BusinessException("$i18n:role.in_use");
         }
         
         // 同时删除角色Permission关联
@@ -332,12 +332,12 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         
         Role originalRole = getById(roleId);
         if (originalRole == null) {
-            throw new BusinessException("原角色不存在: " + roleId);
+            throw BusinessException.i18n("role.original_not_found", roleId);
         }
         
         // 检查新编码是否可用
         if (!isCodeAvailable(newCode, originalRole.getTenantId())) {
-            throw new BusinessException("角色编码已存在: " + newCode);
+            throw BusinessException.i18n("role.code_exists", newCode);
         }
         
         // 创建新角色
