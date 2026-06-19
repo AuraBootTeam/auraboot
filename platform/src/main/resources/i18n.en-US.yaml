@@ -1136,3 +1136,12 @@ bpmn:
     exclusive_gateway_min_outgoing: Exclusive gateway requires at least two outgoing edges
     exclusive_gateway_edge_missing_condition: 'Exclusive gateway "{name}" has an outgoing edge without a condition'
     exclusive_gateway_multiple_defaults: 'Exclusive gateway "{name}" has multiple default flows'
+
+tenant:
+  application:
+    create_success: Tenant created — you are now its administrator
+    invite_invalid: Invalid invite code
+    invite_revoked: Invite code is no longer active
+    invite_expired: Invite code has expired
+    join_pending: Your join request has been submitted and is awaiting tenant admin approval
+    unknown_tenant: Unknown tenant
