@@ -8,9 +8,13 @@ import com.auraboot.framework.exception.PermissionDeniedException;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.bpm.converter.BpmnConversionException;
+import com.auraboot.framework.i18n.service.I18nService;
+import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import com.auraboot.framework.meta.exception.TemporalParseException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -57,6 +61,11 @@ public class GlobalExceptionHandler {
 
     @Value("${spring.profiles.active:prod}")
     private String activeProfile;
+
+    @Autowired
+    private I18nService i18nService;
+    @Autowired
+    private I18nLocaleResolver i18nLocaleResolver;
 
     private boolean isDevEnvironment() {
         return activeProfile.contains("dev") || activeProfile.contains("local");
@@ -244,15 +253,35 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     @ResponseBody
-    public ResponseEntity<ApiResponse<Object>> handleBusinessException(BusinessException ex) {
+    public ResponseEntity<ApiResponse<Object>> handleBusinessException(BusinessException ex,
+                                                                       HttpServletRequest request) {
         log.error("Business exception:", ex);
 
         ResponseCode responseCode = ex.getResponseCode() != null
                 ? ex.getResponseCode()
                 : ResponseCode.BUSINESS_ERROR;
-        Object detail = isDevEnvironment() ? buildDevDetail(ex) : ex.getMessage();
+        Object detail = isDevEnvironment() ? buildDevDetail(ex) : localizeI18nMessage(ex.getMessage(), request);
         ApiResponse<Object> response = ApiResponse.errorWithContext(responseCode, detail);
         return ResponseEntity.status(mapResponseCodeToStatus(responseCode)).body(response);
+    }
+
+    /**
+     * Resolve a {@code $i18n:<key>} message to the request locale via the existing i18n catalog
+     * (I18nLocaleResolver + I18nService), mirroring TenantSelectionController (#885). Messages
+     * NOT prefixed with {@code $i18n:} pass through unchanged, so this is a no-op for every
+     * BusinessException message not yet migrated to a key — zero behavior change for those.
+     */
+    String localizeI18nMessage(String text, HttpServletRequest request) {
+        if (text == null || !text.startsWith("$i18n:")) {
+            return text;
+        }
+        String key = text.substring("$i18n:".length());
+        String locale = i18nLocaleResolver.resolveLocale(request);
+        String value = i18nService.getValue(locale, key);
+        if (value == null) {
+            value = i18nService.getValue("zh-CN", key); // base-locale fallback (ja/ko gaps)
+        }
+        return value != null ? value : key;
     }
 
     /**

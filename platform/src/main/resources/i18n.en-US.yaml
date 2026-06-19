@@ -1145,3 +1145,6 @@ tenant:
     invite_expired: Invite code has expired
     join_pending: Your join request has been submitted and is awaiting tenant admin approval
     unknown_tenant: Unknown tenant
+  member:
+    already_member: User is already a member of this tenant
+    not_in_tenant: User does not belong to any tenant

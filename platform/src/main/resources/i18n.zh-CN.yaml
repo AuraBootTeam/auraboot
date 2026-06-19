@@ -1156,3 +1156,6 @@ tenant:
     invite_expired: 邀请码已过期
     join_pending: 加入申请已提交，等待租户管理员审批
     unknown_tenant: 未知租户
+  member:
+    already_member: 用户已经是该租户的成员
+    not_in_tenant: 用户未加入任何租户
