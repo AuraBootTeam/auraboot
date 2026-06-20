@@ -226,7 +226,7 @@ projection_version, first_seen_at, last_seen_at
 
 **P0 运行时实证(2026-06-20,host-first 零 docker,runtime `obs-p0-baseline-54`/`auraboot_54`,跑预构建 bootJar + `MANAGEMENT_TRACING_ENABLED=true`)**:同一 `/chat/stream` 请求 → OTel `X-Trace-Id=db4e41a06e9f5dfbe2b8c5e23cc98cac`(32-hex)vs `ab_ai_trace.trace_id=72738caf-1d05-4b54-933a-77d91cbfe654`(UUID + 3 子 span `d1_grounding/resolve_tools/render_prompt`);**OTel id 在 `ab_ai_trace` 全表出现 0 次(零桥接)**;OTLP sink 收 28 个 span POST(导出真在跑);MQ 默认 `local`(默认配置不过 Kafka)。→ **「两套鹰眼不互通」由推断升为实证;§4.1 全部 call-site 结论(自研 span 名 / UUID 格式 / 导出管道)经真栈核对成立。**
 ### 4.2 Gap
-A-G1 两 traceId 不通(🟡 **ab_ai_trace 已桥接** `94b6ef0a3`,审计/Kafka 待接)/ A-G2 审计无 trace_id(列已加 `49da15ebe`,填充待接)/ A-G3 ✅ 日志已带 traceId(`ed7f823d2`)/ A-G4 Kafka 断链 / A-G5 ✅ **P0 已实证(见 §4.1)** / A-G6 成本未计算。
+A-G1 两 traceId 不通(🟡 **ab_ai_trace 已桥接** `94b6ef0a3` + 审计三表已 stamp,**仅 Kafka 跨消息待接**)/ A-G2 ✅ **审计三表 trace_id/span_id stamp 已接**(`c12dd028f` command/`d3be6a867` admin/`8efbc05e6` query;列 `49da15ebe`)/ A-G3 ✅ 日志已带 traceId(`ed7f823d2`)/ A-G4 Kafka 断链 / A-G5 ✅ **P0 已实证(见 §4.1)** / A-G6 成本未计算。
 ### 4.3 目标
 OTel 骨架;`ab_ai_trace` 翻转为投影 consumer(P1 盖 traceId→P3 投影→P5 关直写)。投影契约列为**验收目标**,明细回领域设计(UUID↔32-hex/span 映射/root 识别/乱序·late/幂等键 `(tenant_id,trace_id,span_id)`/`projection_version,is_complete`/backfill/双轨比对/flag 回滚)。
 ### 4.4 埋点(命名按 §2.8:标准名优先、否则 `aura.*`)
@@ -369,7 +369,7 @@ S0 合并后(并行):P1(日志 %X{traceId}+审计 trace_id+ab_ai_trace 盖 trace
 
 | 切片 | 精确触点 | 验证 |
 |---|---|---|
-| **P1 审计填充接线** ⚙️〔ab_ai_trace 桥接 ✅ `94b6ef0a3`;命令审计 stamp ✅ `c12dd028f`(编译+机制已验〔同桥接的 `Tracer.currentSpan()`〕;完整路径验证待 seed model+命令——最小栈无命令)〕 | 剩 `AdminEventLogService`(admin)/ `QueryAuditServiceImpl:1417`(query)同步路径,**同命令审计模式**(`Tracer.currentSpan()` 直接取 + entity/insert 加列);3 表完整路径验证须 seed 命令/查询触发审计写入 | rebuild → 触发审计 → `trace_id`=`X-Trace-Id` |
+| **P1 trace 关联 ✅ 完整 feature** | ab_ai_trace 桥接 `94b6ef0a3`(✅ 运行时验证)+ 审计三表 stamp `c12dd028f`/`d3be6a867`/`8efbc05e6`(编译过;`Tracer.currentSpan()` 同步请求线程,机制同已验桥接)+ 日志 `ed7f823d2` + 迁移 `49da15ebe` | 审计三表完整路径验证(请求→审计行 `trace_id`==`X-Trace-Id`)待 seed model+命令/查询触发——**独立设置任务,非代码缺口**;ab_ai_trace 桥接已端到端验证 |
 | **A-G4 Kafka 透传** ⚙️ | `platform-mq-kafka/.../KafkaMqProvider.send` producer 注入 W3C `traceparent` 到 record headers;consumer 提取续 span(`record.headers().add` 已有框架) | 跨语言 round-trip 契约测试(MQ=kafka);trace 过 Kafka 不断 |
 | **S0 seam ports** ⚙️ | 新建 `CorrelationSnapshot`/`AgentTelemetryFacade`/`TechnicalTelemetryPort`/`BusinessOutcomePort`/`ObservationPort`/`OutboxPort`(framework/agent 或 observability 包);chokepoint `AgentRunService`/`ToolLoopService`/`AuraBotChatService` 改用 facade(一次插桩,§2.6) | 单测 facade + 真栈 chokepoint 不旁路 `ConversationTurnService` |
 | **P2 OTel 化 agent/LLM** ⚙️ | 上述 chokepoint 发 OTel span(GenAI semconv,§4.4 命名);LLM provider 层接 `gen_ai.*` | Jaeger 端到端链(P0 升 P2 验收) |
