@@ -17,6 +17,8 @@ import com.auraboot.framework.view.dto.SavedViewDTO;
 import com.auraboot.framework.view.dto.SavedViewUpdateRequest;
 import com.auraboot.framework.view.entity.SavedView;
 import com.auraboot.framework.view.entity.ViewConfig;
+import com.auraboot.framework.meta.entity.PageSchema;
+import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
 import com.auraboot.framework.view.service.SavedViewService;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,7 @@ import java.util.stream.Collectors;
 public class SavedViewServiceImpl implements SavedViewService {
 
     private final SavedViewMapper savedViewMapper;
+    private final PageSchemaMapper pageSchemaMapper;
     private final UserPermissionService userPermissionService;
     private final CurrentUserTeamResolver currentUserTeamResolver;
     private final TeamMapper teamMapper;
@@ -51,6 +54,9 @@ public class SavedViewServiceImpl implements SavedViewService {
         log.info("Creating saved view: name={}, modelCode={}", request.getName(), request.getModelCode());
 
         validateCreateRequest(request);
+        if (StringUtils.hasText(request.getPageKey())) {
+            validatePageKeyExists(request.getPageKey());
+        }
         if ("team".equals(request.getScope())) {
             validateCurrentUserInTeam(request.getTeamId());
         }
@@ -384,6 +390,26 @@ public class SavedViewServiceImpl implements SavedViewService {
     }
 
     // ==================== Private Helper Methods ====================
+
+    /**
+     * Validate that the pageKey references a row in {@code ab_page_schema}.
+     * A SavedView stores user-configured column/sort/filter state keyed by pageKey.
+     * If the page doesn't exist, the frontend {@code useSavedViews} hook does a
+     * strict-equality match and silently returns no views, making the saved view
+     * permanently invisible — so we reject at write time instead.
+     *
+     * <p>pageKey format: {@code <modelCode>_<list|form|detail>}
+     * (e.g. {@code crm_lead_list}); the JSON filename under
+     * {@code config/pages/<pageKey>.json} in the plugin.
+     */
+    private void validatePageKeyExists(String pageKey) {
+        PageSchema page = pageSchemaMapper.selectAnyByPageKey(pageKey);
+        if (page == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "[S-SAVED-VIEW] pageKey '" + pageKey + "' does not exist in ab_page_schema; "
+                            + "define it as config/pages/" + pageKey + ".json in your plugin before creating a SavedView");
+        }
+    }
 
     private void validateCreateRequest(SavedViewCreateRequest request) {
         if (!StringUtils.hasText(request.getName())) {
