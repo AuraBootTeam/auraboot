@@ -24,11 +24,11 @@ test.describe('Global Search (Cmd+K) @smoke', () => {
     await page.goto('/dashboards', { waitUntil: 'load' });
     await page.waitForLoadState('networkidle').catch(() => null);
 
-    const trigger = page.locator('[data-testid="cmd-k-trigger"]');
+    const trigger = page.locator('[data-testid="header-search-trigger"]');
     await expect(trigger).toBeVisible({ timeout: 15000 });
     await expect(trigger).toBeEnabled({ timeout: 5000 });
     await page.waitForFunction(() => {
-      const btn = document.querySelector('[data-testid="cmd-k-trigger"]');
+      const btn = document.querySelector('[data-testid="header-search-trigger"]');
       return (
         !!btn &&
         Object.keys(btn).some((k) => k.startsWith('__reactFiber') || k.startsWith('__reactProps'))
@@ -63,7 +63,7 @@ test.describe('Global Search (Cmd+K) @smoke', () => {
   test('SEARCH-01: Cmd+K trigger button visible in header', async ({ page }) => {
     await page.goto('/dashboards', { waitUntil: 'load' });
 
-    const trigger = page.locator('[data-testid="cmd-k-trigger"]');
+    const trigger = page.locator('[data-testid="header-search-trigger"]');
     await expect(trigger).toBeVisible({ timeout: 10000 });
 
     // Should show keyboard shortcut hint
@@ -82,12 +82,12 @@ test.describe('Global Search (Cmd+K) @smoke', () => {
 
   test('SEARCH-03: Keyboard shortcut opens and Esc closes', async ({ page }) => {
     await page.goto('/dashboards', { waitUntil: 'load' });
-    const trigger = page.locator('[data-testid="cmd-k-trigger"]');
+    const trigger = page.locator('[data-testid="header-search-trigger"]');
     await expect(trigger).toBeVisible({ timeout: 10000 });
     await expect(trigger).toBeEnabled({ timeout: 5000 });
     await page.waitForFunction(
       () => {
-        const btn = document.querySelector('[data-testid="cmd-k-trigger"]');
+        const btn = document.querySelector('[data-testid="header-search-trigger"]');
         return (
           !!btn &&
           Object.keys(btn).some((k) => k.startsWith('__reactFiber') || k.startsWith('__reactProps'))
