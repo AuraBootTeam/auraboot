@@ -7,7 +7,10 @@ import com.auraboot.framework.bi.dto.ReportScheduleRequest;
 import com.auraboot.framework.bi.dto.ReportScheduleResponse;
 import com.auraboot.framework.bi.service.ReportDeliveryService;
 import com.auraboot.framework.bi.service.ReportScheduleService;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UlidGenerator;
+import com.auraboot.framework.meta.dto.AuditTrailEvent;
+import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,7 @@ public class ReportScheduleServiceImpl implements ReportScheduleService {
 
     private final ReportScheduleMapper reportScheduleMapper;
     private final ReportDeliveryService reportDeliveryService;
+    private final AuditTrailService auditTrailService;
 
     @Override
     public List<ReportScheduleResponse> listSchedules(Long tenantId) {
@@ -57,6 +61,7 @@ public class ReportScheduleServiceImpl implements ReportScheduleService {
 
         reportScheduleMapper.insert(entity);
         log.info("Created report schedule: id={}, name={}, reportId={}", entity.getId(), entity.getName(), entity.getReportId());
+        recordScheduleAudit(entity, "CREATE", tenantId, userId);
 
         return toResponse(entity);
     }
@@ -76,6 +81,7 @@ public class ReportScheduleServiceImpl implements ReportScheduleService {
 
         reportScheduleMapper.updateById(entity);
         log.info("Updated report schedule: id={}", id);
+        recordScheduleAudit(entity, "UPDATE", tenantId, MetaContext.getCurrentUserId());
 
         return toResponse(entity);
     }
@@ -87,6 +93,7 @@ public class ReportScheduleServiceImpl implements ReportScheduleService {
         entity.setUpdatedAt(new Date());
         reportScheduleMapper.updateById(entity);
         log.info("Soft-deleted report schedule: id={}", id);
+        recordScheduleAudit(entity, "DELETE", tenantId, MetaContext.getCurrentUserId());
     }
 
     @Override
@@ -101,6 +108,23 @@ public class ReportScheduleServiceImpl implements ReportScheduleService {
         entity.setLastRunError(null);
         entity.setUpdatedAt(new Date());
         reportScheduleMapper.updateById(entity);
+        recordScheduleAudit(entity, "TEST_SEND", tenantId, MetaContext.getCurrentUserId());
+    }
+
+    /**
+     * Emit a tamper-evident audit trail record for a report-schedule mutation
+     * (B6 / Q15 — report actions were previously invisible to the audit subsystem).
+     */
+    private void recordScheduleAudit(ReportSchedule entity, String operationType, Long tenantId, Long actorId) {
+        auditTrailService.recordAudit(AuditTrailEvent.builder()
+                .tenantId(tenantId)
+                .eventType("REPORT_SCHEDULE")
+                .entityType("report_schedule")
+                .entityId(entity.getId())
+                .entityPid(entity.getPid())
+                .operationType(operationType)
+                .actorId(actorId)
+                .build());
     }
 
     private ReportSchedule getAndValidate(Long id, Long tenantId) {
