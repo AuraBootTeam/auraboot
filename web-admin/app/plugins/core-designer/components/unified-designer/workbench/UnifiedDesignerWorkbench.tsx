@@ -4,16 +4,9 @@ import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import {
   DndContext,
   DragOverlay,
-  KeyboardSensor,
-  PointerSensor,
   closestCenter,
   pointerWithin,
-  useSensor,
-  useSensors,
   type CollisionDetection,
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
 } from '@dnd-kit/core';
 import type {
   DslBlockV3,
@@ -33,6 +26,7 @@ import { setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
 import { useDesignerDocument, serializeDocument } from '../document/useDesignerDocument';
 import { useDesignerSelection } from '../selection/useDesignerSelection';
+import { useDesignerDnd } from '../dnd/useDesignerDnd';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
 import {
   DEVICE_PREVIEW_PRESETS,
@@ -52,15 +46,7 @@ import {
   type ModelFieldTargetBlockType,
 } from '../registry/createBlockTemplate';
 import { collectBlockIds } from '../utils/blockIds';
-import {
-  buildDesignerCollisionCandidates,
-  readDragData,
-  readDropData,
-  resolveBlockDropIntent,
-  resolveCanvasBlockAncestorDropAction,
-  resolveDragEndAction,
-  type DragData,
-} from '../dnd/dndShared';
+import { buildDesignerCollisionCandidates, type DragData } from '../dnd/dndShared';
 import {
   canMoveExistingBlockBeforeTarget,
   canMoveExistingBlockToParent,
@@ -72,7 +58,7 @@ import {
 } from './WorkbenchToolbar';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
 import { ResourcePanel } from './ResourcePanel';
-import { CanvasHost, type ActiveDropIntent } from '../canvas/CanvasHost';
+import { CanvasHost } from '../canvas/CanvasHost';
 import { InspectorHost } from './InspectorHost';
 import { RecursiveBlockRenderer } from '../runtime/RecursiveBlockRenderer';
 import { defaultRuntimeExecutionServices } from '../runtime/runtimeExecution';
@@ -165,8 +151,6 @@ export function UnifiedDesignerWorkbench({
   } = useDesignerSelection();
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
-  const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
-  const [activeDropIntent, setActiveDropIntent] = useState<ActiveDropIntent>(null);
 
   // Toolbar save indicator follows the live document snapshot; wired into the
   // document kernel's onChange so every edit / undo / redo refreshes it.
@@ -186,10 +170,6 @@ export function UnifiedDesignerWorkbench({
   const updateDocument = documentKernel.update;
   const handleUndo = documentKernel.undo;
   const handleRedo = documentKernel.redo;
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor),
-  );
   const blockRegistry = useMemo(() => createDefaultBlockRegistryV3(), []);
   const blockDefinitions = useMemo(
     () =>
@@ -646,77 +626,51 @@ export function UnifiedDesignerWorkbench({
     canMoveBlockBeforeTarget,
     canMoveBlockToParent,
   };
-  const rootAccepts = activeDrag?.kind === 'palette-block' && canAddBlockToRoot(activeDrag.blockType);
-
-  const handleDragStart = (event: DragStartEvent) => {
-    const drag = readDragData(event.active.data.current);
-    setActiveDrag(drag);
-    setActiveDropIntent(null);
-    if (drag?.kind === 'canvas-block') setSelectedBlockId(drag.blockId);
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const drag = readDragData(event.active.data.current);
-    const drop = readDropData(event.over?.data.current);
-    if (!drag || !drop || drop.kind !== 'block') {
-      setActiveDropIntent(null);
-      return;
-    }
-    const intent = resolveBlockDropIntent(drag, drop.blockId, dropCapabilities);
-    setActiveDropIntent(intent ? { blockId: drop.blockId, intent } : null);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const drag = readDragData(event.active.data.current);
-    const drop = readDropData(event.over?.data.current);
-    setActiveDrag(null);
-    setActiveDropIntent(null);
-
-    let action: ReturnType<typeof resolveDragEndAction> = null;
-    if (drag?.kind === 'canvas-block' && drop?.kind === 'block') {
-      const dropPath = findBlockById(document.blocks, drop.blockId)?.path.map((item) => item.id) ?? [];
-      action = resolveCanvasBlockAncestorDropAction(
-        drag.blockId,
-        dropPath,
-        {
-          ...dropCapabilities,
-          canAddBlockToRoot,
-        },
-        {
-          getBlockType: (blockId) => findBlockById(document.blocks, blockId)?.block.blockType,
-        },
-      );
-    }
-    action ??= resolveDragEndAction(drag, drop, {
-      ...dropCapabilities,
-      canAddBlockToRoot,
-    });
-    if (!action) return;
-
-    switch (action.type) {
-      case 'add-block-root':
-        handleAddBlockToRoot(action.blockType);
-        break;
-      case 'add-block-before':
-        handleAddBlockBeforeTarget(action.targetBlockId, action.blockType);
-        break;
-      case 'add-block-inside':
-        handleAddBlockToParent(action.parentBlockId, action.blockType);
-        break;
-      case 'add-field-before':
-        handleAddModelFieldBeforeTarget(action.targetBlockId, action.field);
-        break;
-      case 'add-field-inside':
-        handleAddModelFieldToParent(action.parentBlockId, action.field);
-        break;
-      case 'move-before':
-        handleMoveBefore(action.movingBlockId, action.targetBlockId);
-        break;
-      case 'move-inside':
-        handleMoveToParent(action.movingBlockId, action.parentBlockId);
-        break;
-    }
-  };
+  // Block-tree drag-and-drop kernel: owns the active-drag / drop-intent state
+  // and the @dnd-kit start/over/end glue, dispatching the resolved drop action
+  // back here so this workbench keeps its own add/move executors.
+  const {
+    activeDrag,
+    activeDropIntent,
+    rootAccepts,
+    sensors,
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+    clearActiveDrag,
+  } = useDesignerDnd({
+    dropCapabilities,
+    canAddBlockToRoot,
+    getBlockPath: (blockId) =>
+      findBlockById(document.blocks, blockId)?.path.map((item) => item.id) ?? [],
+    getBlockType: (blockId) => findBlockById(document.blocks, blockId)?.block.blockType,
+    onSelectCanvasBlock: setSelectedBlockId,
+    onDropAction: (action) => {
+      switch (action.type) {
+        case 'add-block-root':
+          handleAddBlockToRoot(action.blockType);
+          break;
+        case 'add-block-before':
+          handleAddBlockBeforeTarget(action.targetBlockId, action.blockType);
+          break;
+        case 'add-block-inside':
+          handleAddBlockToParent(action.parentBlockId, action.blockType);
+          break;
+        case 'add-field-before':
+          handleAddModelFieldBeforeTarget(action.targetBlockId, action.field);
+          break;
+        case 'add-field-inside':
+          handleAddModelFieldToParent(action.parentBlockId, action.field);
+          break;
+        case 'move-before':
+          handleMoveBefore(action.movingBlockId, action.targetBlockId);
+          break;
+        case 'move-inside':
+          handleMoveToParent(action.movingBlockId, action.parentBlockId);
+          break;
+      }
+    },
+  });
 
   const handleSave = async () => {
     const validation = validatePageSchemaV3(document);
@@ -975,10 +929,7 @@ export function UnifiedDesignerWorkbench({
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => {
-            setActiveDrag(null);
-            setActiveDropIntent(null);
-          }}
+          onDragCancel={clearActiveDrag}
         >
           {getPageTemplates().length > 0 ? (
             <div
