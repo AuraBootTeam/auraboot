@@ -155,7 +155,7 @@ test.describe('Showcase Smoke Tests', () => {
     // Wait for header to stabilize and the global keyboard listener to attach.
     // The trigger button being enabled implies the surrounding effect (which
     // also registers the Cmd+K window keydown handler) has run.
-    const trigger = page.locator('[data-testid="cmd-k-trigger"]');
+    const trigger = page.locator('[data-testid="header-search-trigger"]');
     await expect(trigger).toBeVisible({ timeout: 15000 });
     await expect(trigger).toBeEnabled({ timeout: 5000 });
     await page.waitForLoadState('load');
