@@ -1,6 +1,6 @@
 {
   "reactUserFacing": 9014,
   "reactComments": 6820,
-  "dslViolations": 64,
+  "dslViolations": 25,
   "note": "ratchet baseline; only decreases allowed"
 }

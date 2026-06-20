@@ -2,7 +2,11 @@
   {
     "code": "ai_center",
     "name": "AI 中心",
+    "name:zh-CN": "AI 中心",
+    "name:en": "AI Center",
     "description": "AI中心：驾驶舱、AI同事、知识库、审批、运行日志、设置",
+    "description:zh-CN": "AI中心：驾驶舱、AI同事、知识库、审批、运行日志、设置",
+    "description:en": "AI Center: cockpit, AI colleagues, knowledge base, approvals, run logs, settings",
     "type": "menu",
     "module": "system",
     "resource": "/ai",

@@ -99,6 +99,13 @@ public class PermissionDefinitionDTO {
     @Builder.Default
     private Map<String, String> localizedNames = new LinkedHashMap<>();
 
+    /**
+     * Captures all "description:*" localized description entries (e.g. "description:en", "description:zh-CN").
+     */
+    @JsonIgnore
+    @Builder.Default
+    private Map<String, String> localizedDescriptions = new LinkedHashMap<>();
+
     @JsonIgnore
     private Map<String, Object> unknownFields;
 
@@ -116,6 +123,15 @@ public class PermissionDefinitionDTO {
             localizedNames.put(locale, strVal);
             return;
         }
+        if (key != null && key.startsWith("description:") && value instanceof String strVal) {
+            if (localizedDescriptions == null) {
+                localizedDescriptions = new LinkedHashMap<>();
+            }
+            String locale = key.substring("description:".length());
+            if ("en".equals(locale)) locale = "en-US";
+            localizedDescriptions.put(locale, strVal);
+            return;
+        }
         unknownFields.put(key, value);
     }
 
@@ -125,6 +141,16 @@ public class PermissionDefinitionDTO {
         if (localizedNames != null) result.putAll(localizedNames);
         if (nameZhCN != null && !nameZhCN.isBlank()) result.putIfAbsent("zh-CN", nameZhCN);
         if (nameEn != null && !nameEn.isBlank()) result.putIfAbsent("en-US", nameEn);
+        return result;
+    }
+
+    /**
+     * Return all localized descriptions captured from "description:*" JSON keys.
+     */
+    @JsonIgnore
+    public Map<String, String> getAllLocalizedDescriptions() {
+        Map<String, String> result = new LinkedHashMap<>();
+        if (localizedDescriptions != null) result.putAll(localizedDescriptions);
         return result;
     }
 
