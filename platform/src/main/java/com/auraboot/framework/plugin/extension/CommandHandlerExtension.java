@@ -166,6 +166,19 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         if (execConfig == null || execConfig.isEmpty()) {
             return false;
         }
+        // An explicit `handlerParams.dslPersistence` flag wins: a command whose
+        // handler owns its persistence (and accepts non-model command inputs) can
+        // set it false to opt out of the generic field-map + field-edit permission
+        // path while still being declared type=create (so its CRUD create resolves
+        // into schema.commands and forms can submit it without an explicit
+        // ?commandCode). handlerParams is the import-preserved config slot.
+        Object handlerParams = execConfig.get("handlerParams");
+        if (handlerParams instanceof Map<?, ?> hp) {
+            Object explicit = hp.get("dslPersistence");
+            if (explicit instanceof Boolean dslPersist) {
+                return dslPersist;
+            }
+        }
         String operationType = request != null ? request.getOperationType() : null;
         if ("delete".equalsIgnoreCase(operationType) || "state_transition".equalsIgnoreCase(operationType)) {
             return true;
