@@ -239,10 +239,15 @@ public class ReconciliationService extends BaseMetaService {
         pageSize = PaginationSafetyUtils.pageSize(pageSize, 200);
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, 200);
 
+        // Bug fix: selectCount(qw) must use a wrapper WITHOUT orderBy — PostgreSQL rejects
+        // "SELECT COUNT(*) ... ORDER BY ..." as invalid SQL. Use a separate count-only wrapper.
+        QueryWrapper<ReconciliationRun> countQw = new QueryWrapper<>();
+        countQw.eq("tenant_id", tenantId);
+        long total = runMapper.selectCount(countQw);
+
         QueryWrapper<ReconciliationRun> qw = new QueryWrapper<>();
         qw.eq("tenant_id", tenantId);
         qw.orderByDesc("created_at");
-        long total = runMapper.selectCount(qw);
 
         qw.last("LIMIT " + pageSize + " OFFSET " + offset);
         List<ReconciliationRun> runs = runMapper.selectList(qw);
@@ -279,10 +284,15 @@ public class ReconciliationService extends BaseMetaService {
             items = itemMapper.findByRunIdAndStatus(run.getId(), matchStatus, pageSize, offset);
             total = itemMapper.countByRunIdAndStatus(run.getId(), matchStatus);
         } else {
+            // Bug fix: selectCount(qw) must use a wrapper WITHOUT orderBy — PostgreSQL rejects
+            // "SELECT COUNT(*) ... ORDER BY ..." as invalid SQL. Use a separate count-only wrapper.
+            QueryWrapper<ReconciliationItem> countQw = new QueryWrapper<>();
+            countQw.eq("run_id", run.getId());
+            total = itemMapper.selectCount(countQw);
+
             QueryWrapper<ReconciliationItem> qw = new QueryWrapper<>();
             qw.eq("run_id", run.getId());
             qw.orderByAsc("match_status", "id");
-            total = itemMapper.selectCount(qw);
             qw.last("LIMIT " + pageSize + " OFFSET " + offset);
             items = itemMapper.selectList(qw);
         }
@@ -802,10 +812,17 @@ public class ReconciliationService extends BaseMetaService {
     }
 
     private void validateProfileType(String type) {
-        if (type == null) return;
-        Set<String> valid = Set.of("supplier", "bank", "intercompany");
+        // Bug fix: profile_type is NOT NULL in DB — reject null explicitly instead of silent pass-through.
+        if (type == null) {
+            throw new MetaServiceException("Profile type must not be null. Must be one of: SUPPLIER, BANK, INTERCOMPANY");
+        }
+        // Bug fix: valid set was lowercase but comparison used type.toUpperCase(), so every valid
+        // lowercase input ("supplier", "bank", "intercompany") was always rejected. Fix: compare
+        // case-insensitively by upper-casing both sides, consistent with mapRequestToProfile which
+        // stores profileType.toUpperCase().
+        Set<String> valid = Set.of("SUPPLIER", "BANK", "INTERCOMPANY");
         if (!valid.contains(type.toUpperCase())) {
-            throw new MetaServiceException("Invalid profile type: " + type + ". Must be one of: " + valid);
+            throw new MetaServiceException("Invalid profile type: " + type + ". Must be one of: SUPPLIER, BANK, INTERCOMPANY");
         }
     }
 
