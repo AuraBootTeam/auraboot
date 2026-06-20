@@ -39,6 +39,7 @@ import type {
   ReportDsl,
   ReportParameter,
 } from '../types';
+import { DEFAULT_PAGE_CONFIG } from '../types';
 
 /** Layer-2 paged-media profile — the report-specific layout state that must not
  * live in the Layer-1 block-tree kernel. */
@@ -145,7 +146,13 @@ export function reportDslToBlockTree(
     if (block.blockType === 'chart') {
       const spec = reportChartToSpec(block, dsl.dataSources[block.dataSource]);
       charts[block.id] = spec;
-      node.props = { chartSpec: spec };
+      const chartProps: Record<string, unknown> = { chartSpec: spec };
+      // Preserve report-chart layout/visual extras that ChartSpec cannot hold,
+      // so the block-tree → ReportDsl reverse (canvas save path) is lossless.
+      if (block.width !== undefined) chartProps.width = block.width;
+      if (block.height !== undefined) chartProps.height = block.height;
+      if (block.colors !== undefined) chartProps.colors = block.colors;
+      node.props = chartProps;
     } else {
       const props = toBlockProps(block);
       if (Object.keys(props).length > 0) node.props = props;
@@ -172,4 +179,71 @@ export function reportDslToBlockTree(
   };
 
   return { page, layoutProfile, charts, warnings };
+}
+
+// ---------------------------------------------------------------------------
+// Reverse adapter (block-tree → ReportDsl) — the canvas SAVE path (Phase 2).
+// Exact inverse of reportDslToBlockTree, so dsl → tree → dsl is the identity.
+// ---------------------------------------------------------------------------
+
+/** Reverse of reportChartToSpec: recover the report ChartBlock fields from a
+ * renderer-agnostic ChartSpec. */
+function chartSpecToReportChartFields(spec: ChartSpec): Record<string, unknown> {
+  const chartType =
+    spec.type === 'pie'
+      ? 'pie'
+      : spec.visual?.orientation === 'horizontal'
+        ? 'horizontal-bar'
+        : 'bar';
+  const fields: Record<string, unknown> = {
+    chartType,
+    categoryField: spec.dimensions[0]?.field ?? '',
+    valueField: spec.measures[0]?.field ?? '',
+  };
+  const aggregation = spec.measures[0]?.aggregation;
+  if (aggregation) fields.aggregation = aggregation;
+  return fields;
+}
+
+function nodeToReportBlock(node: DslBlockV3): ReportBlock {
+  const blockType = node.blockType.replace(/^report-/, '');
+  const block: Record<string, unknown> = { id: node.id, blockType };
+  if (node.title !== undefined) block.title = node.title;
+  const ref = (node.dataSource as { ref?: string } | undefined)?.ref;
+  if (ref !== undefined) block.dataSource = ref;
+
+  const props = (node.props ?? {}) as Record<string, unknown>;
+  if (blockType === 'chart') {
+    Object.assign(block, chartSpecToReportChartFields(props.chartSpec as ChartSpec));
+    if (props.width !== undefined) block.width = props.width;
+    if (props.height !== undefined) block.height = props.height;
+    if (props.colors !== undefined) block.colors = props.colors;
+  } else {
+    Object.assign(block, props);
+  }
+  return block as unknown as ReportBlock;
+}
+
+/** Serialize a normalized block-tree (PageSchemaV3 produced by reportDslToBlockTree)
+ * back to the persisted ReportDsl. This is the save path the unified CanvasHost
+ * uses in Phase 2 (it edits the block-tree; on save we reconstruct ReportDsl). */
+export function blockTreeToReportDsl(page: PageSchemaV3): ReportDsl {
+  const ext = (page.extension ?? {}) as {
+    reportLayoutProfile?: ReportLayoutProfile;
+    reportDataSources?: Record<string, ReportDataSource>;
+  };
+  const profile = ext.reportLayoutProfile ?? { page: { ...DEFAULT_PAGE_CONFIG } };
+
+  const dsl: ReportDsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title: typeof page.title === 'string' ? page.title : '',
+    page: profile.page,
+    dataSources: ext.reportDataSources ?? {},
+    body: page.blocks.map(nodeToReportBlock),
+  };
+  if (profile.header) dsl.header = profile.header;
+  if (profile.footer) dsl.footer = profile.footer;
+  if (profile.parameters) dsl.parameters = profile.parameters;
+  return dsl;
 }
