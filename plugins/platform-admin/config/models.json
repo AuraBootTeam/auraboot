@@ -69,7 +69,7 @@
     "semantic_description": "Webhook subscription configuration specifying target URL, event trigger, authentication secret, and retry policy. Answers: which external systems should be notified of which platform events, and how?",
     "domain_category": "platform",
     "data_sensitivity": "restricted",
-    "lifecycle_description": "ACTIVE ↔ INACTIVE (通过 enabled 字段切换;无删除前的 ARCHIVED 转迁)"
+    "lifecycle_description": "ACTIVE ↔ INACTIVE (toggled via the enabled field; no ARCHIVED transition before deletion)"
   },
   {
     "code": "webhook_delivery_log",
