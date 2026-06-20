@@ -102,6 +102,7 @@ function dslViolations() {
   for (const p of walk(PLUGINS_ROOT, ['.json'])) {
     const fname = basename(p);
     if (fname.toLowerCase().includes('i18n')) continue; // catalog
+    if (p.includes('/test-fixtures/')) continue; // test-only plugin (AURA_ENV=test), not a product surface
     let data;
     try { data = JSON.parse(readFileSync(p, 'utf8')); } catch { continue; }
     const rel = relative(REPO, p);
