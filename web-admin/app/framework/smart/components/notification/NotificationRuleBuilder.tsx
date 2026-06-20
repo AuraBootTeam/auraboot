@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { post, put, get, ErrorCodes } from '~/shared/services/http-client';
+import { useSmartText } from '~/utils/i18n';
 import {
   BellIcon,
   ClockIcon,
@@ -45,125 +46,17 @@ interface ModelOption {
   name: string;
 }
 
+type PresetTemplate = {
+  label: string;
+  icon: string;
+  rule: Partial<NotificationRule>;
+};
+
 interface Props {
   initial?: NotificationRule | null;
   onSaved: (rule: NotificationRule) => void;
   onCancel: () => void;
 }
-
-// ============================================================================
-// Preset templates
-// ============================================================================
-
-const PRESET_TEMPLATES: Array<{
-  label: string;
-  icon: string;
-  rule: Partial<NotificationRule>;
-}> = [
-  {
-    label: '逾期付款提醒',
-    icon: '💰',
-    rule: {
-      code: 'overdue-payment-alert',
-      name: '逾期付款提醒',
-      description: 'Daily check for AR invoices past due date',
-      triggerType: 'scheduled',
-      triggerConfig: JSON.stringify({ schedule: 'daily', hour: 9, minute: 0 }),
-      conditionModelCode: 'fin_ar_invoice',
-      conditionFilter: JSON.stringify([
-        { fieldName: 'due_date', operator: 'LT', value: 'today' },
-        { fieldName: 'status', operator: 'NE', value: 'paid' },
-      ]),
-      actionChannel: 'in_app',
-      recipientType: 'operator',
-    },
-  },
-  {
-    label: '低库存预警',
-    icon: '📦',
-    rule: {
-      code: 'low-stock-warning',
-      name: '低库存预警',
-      description: 'Daily check for items with quantity below threshold',
-      triggerType: 'scheduled',
-      triggerConfig: JSON.stringify({ schedule: 'daily', hour: 8, minute: 0 }),
-      conditionModelCode: 'inv_item',
-      conditionFilter: JSON.stringify([{ fieldName: 'quantity', operator: 'LT', value: '10' }]),
-      actionChannel: 'in_app',
-      recipientType: 'operator',
-    },
-  },
-  {
-    label: '审批超时提醒',
-    icon: '⏰',
-    rule: {
-      code: 'approval-overdue-reminder',
-      name: '审批超时提醒',
-      description: 'Daily check for pending approvals older than 3 days',
-      triggerType: 'scheduled',
-      triggerConfig: JSON.stringify({ schedule: 'daily', hour: 10, minute: 0 }),
-      conditionModelCode: 'bpm_task',
-      conditionFilter: JSON.stringify([{ fieldName: 'status', operator: 'EQ', value: 'pending' }]),
-      actionChannel: 'in_app',
-      recipientType: 'record_owner',
-    },
-  },
-];
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const TRIGGER_TYPES = [
-  {
-    value: 'scheduled',
-    label: '定时触发',
-    description: '按固定时间周期执行规则',
-    icon: <ClockIcon className="h-5 w-5" />,
-  },
-  {
-    value: 'event',
-    label: '事件触发',
-    description: '当记录发生变化时执行规则',
-    icon: <BoltIcon className="h-5 w-5" />,
-  },
-];
-
-const SCHEDULE_OPTIONS = [
-  { value: 'hourly', label: '每小时' },
-  { value: 'daily', label: '每天' },
-  { value: 'weekly', label: '每周' },
-];
-
-const EVENT_OPTIONS = [
-  { value: 'created', label: '记录创建' },
-  { value: 'updated', label: '记录更新' },
-  { value: 'deleted', label: '记录删除' },
-];
-
-const CHANNEL_OPTIONS = [
-  { value: 'in_app', label: '站内消息' },
-  { value: 'email', label: '邮件' },
-  { value: 'webhook', label: 'Webhook' },
-];
-
-const RECIPIENT_OPTIONS = [
-  { value: 'operator', label: '操作人' },
-  { value: 'record_owner', label: '记录负责人' },
-  { value: 'specific_users', label: '指定用户' },
-];
-
-const FILTER_OPERATORS = [
-  { value: 'EQ', label: '等于' },
-  { value: 'NE', label: '不等于' },
-  { value: 'GT', label: '大于' },
-  { value: 'GE', label: '大于等于' },
-  { value: 'LT', label: '小于' },
-  { value: 'LE', label: '小于等于' },
-  { value: 'like', label: '包含' },
-  { value: 'is_null', label: '为空' },
-  { value: 'is_not_null', label: '不为空' },
-];
 
 // ============================================================================
 // Helpers
@@ -194,7 +87,111 @@ function parseTriggerConfig(json?: string): Record<string, string> {
 // ============================================================================
 
 export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: Props) {
+  const st = useSmartText();
   const isEdit = !!initial?.id;
+
+  // Preset templates (labels/names localized at render time)
+  const PRESET_TEMPLATES: PresetTemplate[] = [
+    {
+      label: st('$i18n:notification_rule.preset_overdue_payment', 'Overdue payment reminder'),
+      icon: '💰',
+      rule: {
+        code: 'overdue-payment-alert',
+        name: st('$i18n:notification_rule.preset_overdue_payment', 'Overdue payment reminder'),
+        description: 'Daily check for AR invoices past due date',
+        triggerType: 'scheduled',
+        triggerConfig: JSON.stringify({ schedule: 'daily', hour: 9, minute: 0 }),
+        conditionModelCode: 'fin_ar_invoice',
+        conditionFilter: JSON.stringify([
+          { fieldName: 'due_date', operator: 'LT', value: 'today' },
+          { fieldName: 'status', operator: 'NE', value: 'paid' },
+        ]),
+        actionChannel: 'in_app',
+        recipientType: 'operator',
+      },
+    },
+    {
+      label: st('$i18n:notification_rule.preset_low_stock', 'Low stock warning'),
+      icon: '📦',
+      rule: {
+        code: 'low-stock-warning',
+        name: st('$i18n:notification_rule.preset_low_stock', 'Low stock warning'),
+        description: 'Daily check for items with quantity below threshold',
+        triggerType: 'scheduled',
+        triggerConfig: JSON.stringify({ schedule: 'daily', hour: 8, minute: 0 }),
+        conditionModelCode: 'inv_item',
+        conditionFilter: JSON.stringify([{ fieldName: 'quantity', operator: 'LT', value: '10' }]),
+        actionChannel: 'in_app',
+        recipientType: 'operator',
+      },
+    },
+    {
+      label: st('$i18n:notification_rule.preset_approval_overdue', 'Approval overdue reminder'),
+      icon: '⏰',
+      rule: {
+        code: 'approval-overdue-reminder',
+        name: st('$i18n:notification_rule.preset_approval_overdue', 'Approval overdue reminder'),
+        description: 'Daily check for pending approvals older than 3 days',
+        triggerType: 'scheduled',
+        triggerConfig: JSON.stringify({ schedule: 'daily', hour: 10, minute: 0 }),
+        conditionModelCode: 'bpm_task',
+        conditionFilter: JSON.stringify([{ fieldName: 'status', operator: 'EQ', value: 'pending' }]),
+        actionChannel: 'in_app',
+        recipientType: 'record_owner',
+      },
+    },
+  ];
+
+  const TRIGGER_TYPES = [
+    {
+      value: 'scheduled',
+      label: st('$i18n:notification_rule.trigger_scheduled', 'Scheduled'),
+      description: st('$i18n:notification_rule.trigger_scheduled_desc', 'Run the rule on a fixed time schedule'),
+      icon: <ClockIcon className="h-5 w-5" />,
+    },
+    {
+      value: 'event',
+      label: st('$i18n:notification_rule.trigger_event', 'Event'),
+      description: st('$i18n:notification_rule.trigger_event_desc', 'Run the rule when a record changes'),
+      icon: <BoltIcon className="h-5 w-5" />,
+    },
+  ];
+
+  const SCHEDULE_OPTIONS = [
+    { value: 'hourly', label: st('$i18n:notification_rule.schedule_hourly', 'Hourly') },
+    { value: 'daily', label: st('$i18n:notification_rule.schedule_daily', 'Daily') },
+    { value: 'weekly', label: st('$i18n:notification_rule.schedule_weekly', 'Weekly') },
+  ];
+
+  const EVENT_OPTIONS = [
+    { value: 'created', label: st('$i18n:notification_rule.event_created', 'Record created') },
+    { value: 'updated', label: st('$i18n:notification_rule.event_updated', 'Record updated') },
+    { value: 'deleted', label: st('$i18n:notification_rule.event_deleted', 'Record deleted') },
+  ];
+
+  const CHANNEL_OPTIONS = [
+    { value: 'in_app', label: st('$i18n:notification_rule.channel_in_app', 'In-app message') },
+    { value: 'email', label: st('$i18n:notification_rule.channel_email', 'Email') },
+    { value: 'webhook', label: 'Webhook' },
+  ];
+
+  const RECIPIENT_OPTIONS = [
+    { value: 'operator', label: st('$i18n:notification_rule.recipient_operator', 'Operator') },
+    { value: 'record_owner', label: st('$i18n:notification_rule.recipient_record_owner', 'Record owner') },
+    { value: 'specific_users', label: st('$i18n:notification_rule.recipient_specific_users', 'Specific users') },
+  ];
+
+  const FILTER_OPERATORS = [
+    { value: 'EQ', label: st('$i18n:notification_rule.op_eq', 'Equals') },
+    { value: 'NE', label: st('$i18n:notification_rule.op_ne', 'Not equals') },
+    { value: 'GT', label: st('$i18n:notification_rule.op_gt', 'Greater than') },
+    { value: 'GE', label: st('$i18n:notification_rule.op_ge', 'Greater or equal') },
+    { value: 'LT', label: st('$i18n:notification_rule.op_lt', 'Less than') },
+    { value: 'LE', label: st('$i18n:notification_rule.op_le', 'Less or equal') },
+    { value: 'like', label: st('$i18n:notification_rule.op_like', 'Contains') },
+    { value: 'is_null', label: st('$i18n:notification_rule.op_is_null', 'Is empty') },
+    { value: 'is_not_null', label: st('$i18n:notification_rule.op_is_not_null', 'Is not empty') },
+  ];
 
   // Form state
   const [code, setCode] = useState(initial?.code ?? '');
@@ -239,7 +236,7 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
   }, []);
 
   // Apply preset template
-  const applyPreset = (preset: (typeof PRESET_TEMPLATES)[0]) => {
+  const applyPreset = (preset: PresetTemplate) => {
     const r = preset.rule;
     if (r.code) setCode(r.code);
     if (r.name) setName(r.name);
@@ -300,11 +297,11 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
 
   const handleSave = async () => {
     if (!code.trim()) {
-      setError('规则代码不能为空');
+      setError(st('$i18n:notification_rule.err_code_required', 'Rule code is required'));
       return;
     }
     if (!name.trim()) {
-      setError('规则名称不能为空');
+      setError(st('$i18n:notification_rule.err_name_required', 'Rule name is required'));
       return;
     }
     setError(null);
@@ -320,10 +317,10 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
       if (result.code === ErrorCodes.SUCCESS && result.data) {
         onSaved(result.data);
       } else {
-        setError(result.message ?? '保存失败，请重试');
+        setError(result.message ?? st('$i18n:notification_rule.save_failed_retry', 'Save failed, please retry'));
       }
     } catch (e: any) {
-      setError(e.message ?? '保存失败');
+      setError(e.message ?? st('$i18n:notification_rule.save_failed', 'Save failed'));
     } finally {
       setSaving(false);
     }
@@ -337,7 +334,7 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
           <div className="mb-3 flex items-center gap-2">
             <SparklesIcon className="h-4 w-4 text-indigo-500" />
             <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
-              快速开始 — 选择模板
+              {st('$i18n:notification_rule.quick_start', 'Quick start — choose a template')}
             </span>
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -356,17 +353,17 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
             onClick={() => setShowPresets(false)}
             className="mt-2 text-xs text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300"
           >
-            从空白创建 →
+            {st('$i18n:notification_rule.start_blank', 'Start from blank →')}
           </button>
         </div>
       )}
 
       {/* Basic Info */}
-      <Section title="基础信息" icon={<BellIcon className="h-4 w-4" />}>
+      <Section title={st('$i18n:notification_rule.section_basic', 'Basic info')} icon={<BellIcon className="h-4 w-4" />}>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-              规则代码 <span className="text-red-500">*</span>
+              {st('$i18n:notification_rule.label_code', 'Rule code')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -379,26 +376,26 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-              规则名称 <span className="text-red-500">*</span>
+              {st('$i18n:notification_rule.label_name', 'Rule name')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="规则显示名称"
+              placeholder={st('$i18n:notification_rule.ph_name', 'Rule display name')}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             />
           </div>
         </div>
         <div className="mt-3">
           <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-            描述
+            {st('$i18n:notification_rule.label_description', 'Description')}
           </label>
           <input
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="可选描述..."
+            placeholder={st('$i18n:notification_rule.ph_description', 'Optional description...')}
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
           />
         </div>
@@ -412,12 +409,12 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
             />
             <div className="peer h-5 w-9 rounded-full bg-gray-200 peer-checked:bg-indigo-600 peer-focus:ring-2 peer-focus:ring-indigo-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-indigo-600" />
           </label>
-          <span className="text-sm text-gray-600 dark:text-gray-400">启用规则</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">{st('$i18n:notification_rule.enable_rule', 'Enable rule')}</span>
         </div>
       </Section>
 
       {/* Trigger */}
-      <Section title="触发方式" icon={<ClockIcon className="h-4 w-4" />}>
+      <Section title={st('$i18n:notification_rule.section_trigger', 'Trigger')} icon={<ClockIcon className="h-4 w-4" />}>
         <div className="grid grid-cols-2 gap-3">
           {TRIGGER_TYPES.map((t) => (
             <button
@@ -452,7 +449,7 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
           {triggerType === 'scheduled' ? (
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                执行频率
+                {st('$i18n:notification_rule.label_frequency', 'Frequency')}
               </label>
               <select
                 value={schedule}
@@ -469,7 +466,7 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
           ) : (
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                触发事件
+                {st('$i18n:notification_rule.label_trigger_event', 'Trigger event')}
               </label>
               <select
                 value={eventType}
@@ -488,17 +485,17 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
       </Section>
 
       {/* Condition */}
-      <Section title="触发条件" icon={<FunnelIcon className="h-4 w-4" />}>
+      <Section title={st('$i18n:notification_rule.section_condition', 'Condition')} icon={<FunnelIcon className="h-4 w-4" />}>
         <div className="mb-3">
           <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-            数据模型
+            {st('$i18n:notification_rule.label_model', 'Data model')}
           </label>
           <select
             value={conditionModel}
             onChange={(e) => setConditionModel(e.target.value)}
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
           >
-            <option value="">-- 选择模型 --</option>
+            <option value="">{st('$i18n:notification_rule.select_model', '-- Select model --')}</option>
             {models.map((m) => (
               <option key={m.code} value={m.code}>
                 {m.name} ({m.code})
@@ -515,7 +512,7 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
                 type="text"
                 value={filter.fieldName}
                 onChange={(e) => updateFilter(index, 'fieldName', e.target.value)}
-                placeholder="字段名"
+                placeholder={st('$i18n:notification_rule.ph_field', 'Field name')}
                 className="flex-1 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               />
               <select
@@ -533,7 +530,7 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
                 type="text"
                 value={filter.value}
                 onChange={(e) => updateFilter(index, 'value', e.target.value)}
-                placeholder="值"
+                placeholder={st('$i18n:notification_rule.ph_value', 'Value')}
                 disabled={['is_null', 'is_not_null'].includes(filter.operator)}
                 className="flex-1 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:ring-1 focus:ring-indigo-500 disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               />
@@ -552,16 +549,16 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
           className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-sm text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
         >
           <PlusIcon className="h-3.5 w-3.5" />
-          添加条件
+          {st('$i18n:notification_rule.add_condition', 'Add condition')}
         </button>
       </Section>
 
       {/* Action */}
-      <Section title="通知动作" icon={<MegaphoneIcon className="h-4 w-4" />}>
+      <Section title={st('$i18n:notification_rule.section_action', 'Notification action')} icon={<MegaphoneIcon className="h-4 w-4" />}>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-              通知渠道
+              {st('$i18n:notification_rule.label_channel', 'Notification channel')}
             </label>
             <select
               value={channel}
@@ -577,19 +574,19 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-              消息模板代码
+              {st('$i18n:notification_rule.label_template', 'Message template code')}
             </label>
             <input
               type="text"
               value={templateCode}
               onChange={(e) => setTemplateCode(e.target.value)}
-              placeholder="template-code（可选）"
+              placeholder={st('$i18n:notification_rule.ph_template', 'template-code (optional)')}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-              接收人策略
+              {st('$i18n:notification_rule.label_recipient', 'Recipient strategy')}
             </label>
             <select
               value={recipientType}
@@ -606,7 +603,9 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
           {(recipientType === 'record_owner' || recipientType === 'specific_users') && (
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                {recipientType === 'record_owner' ? '负责人字段名' : '用户ID（逗号分隔）'}
+                {recipientType === 'record_owner'
+                  ? st('$i18n:notification_rule.label_owner_field', 'Owner field name')
+                  : st('$i18n:notification_rule.label_user_ids', 'User IDs (comma separated)')}
               </label>
               <input
                 type="text"
@@ -633,14 +632,18 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
           onClick={onCancel}
           className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
         >
-          取消
+          {st('$i18n:notification_rule.cancel', 'Cancel')}
         </button>
         <button
           onClick={handleSave}
           disabled={saving}
           className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
         >
-          {saving ? '保存中...' : isEdit ? '更新规则' : '创建规则'}
+          {saving
+            ? st('$i18n:notification_rule.saving', 'Saving...')
+            : isEdit
+              ? st('$i18n:notification_rule.update_rule', 'Update rule')
+              : st('$i18n:notification_rule.create_rule', 'Create rule')}
         </button>
       </div>
     </div>

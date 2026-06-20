@@ -15,6 +15,7 @@ import {
 import { useRootLoaderData } from '~/root';
 import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { useSmartText } from '~/utils/i18n';
 import { useHydrated } from '~/hooks/useHydrated';
 import { InboxHeaderWidget } from '~/ui/inbox/InboxDropdown';
 import { CommandPalette } from '~/ui/CommandPalette';
@@ -23,7 +24,7 @@ import { useAuraBot } from '~/plugins/core-aurabot/components-shell/AuraBotProvi
 interface HeaderProps {
   sidebarOpen?: boolean;
   setSidebarOpen?: (open: boolean) => void;
-  // 新增配置选项
+  // Additional config options
   showSidebar?: boolean;
   showNotifications?: boolean;
   showLanguageSwitch?: boolean;
@@ -43,6 +44,7 @@ export default function Header({
   const user = rootData?.user ?? null;
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();
+  const st = useSmartText();
   const isHydrated = useHydrated();
 
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -54,8 +56,8 @@ export default function Header({
   const themeDropdownRef = useRef<HTMLDivElement>(null);
   const langDropdownRef = useRef<HTMLDivElement>(null);
 
-  const workspaceLabel = locale.startsWith('zh') ? '工作空间' : 'Workspaces';
-  const platformConsoleLabel = locale.startsWith('zh') ? '平台控制台' : 'Platform Console';
+  const workspaceLabel = st('$i18n:header.workspaces', 'Workspaces');
+  const platformConsoleLabel = st('$i18n:header.platform_console', 'Platform Console');
 
   // Env chip — visible only when the build is non-production. Reads the Vite
   // mode at build time so production bundles drop the chip entirely.
@@ -113,7 +115,7 @@ export default function Header({
     ],
   });
 
-  // 处理点击外部关闭下拉菜单
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
@@ -162,7 +164,7 @@ export default function Header({
       data-print="hide"
     >
       <div className="flex h-14 items-center justify-between bg-gradient-to-r from-white/50 to-gray-50/50 px-4 sm:px-6 lg:px-8 dark:from-gray-800/50 dark:to-gray-900/50">
-        {/* 左侧：Logo和菜单按钮 */}
+        {/* Left: logo and menu button */}
         <div className="flex items-center">
           {showSidebar && (
             <button
@@ -196,9 +198,9 @@ export default function Header({
           )}
         </div>
 
-        {/* 右侧：工具栏 */}
+        {/* Right: toolbar */}
         <div className="flex items-center gap-1">
-          {/* 全局搜索 Cmd+K */}
+          {/* Global search Cmd+K */}
           {!simplified && <CommandPalette />}
 
           {/* AuraBot toggle */}
@@ -220,7 +222,7 @@ export default function Header({
           {/* Unified inbox entry point */}
           {!simplified && showNotifications && <InboxHeaderWidget />}
 
-          {/* 语言切换 - 只在非简化模式显示 */}
+          {/* Language switch — only shown in non-compact mode */}
           {!simplified && showLanguageSwitch && (
             <div className="relative" ref={langDropdownRef} data-testid="lang-toggle">
               <button
@@ -257,7 +259,7 @@ export default function Header({
             </div>
           )}
 
-          {/* 主题切换 */}
+          {/* Theme switch */}
           <div className="relative" ref={themeDropdownRef} data-testid="theme-toggle">
             <button
               onClick={() => setShowThemeDropdown(!showThemeDropdown)}
@@ -299,7 +301,7 @@ export default function Header({
             )}
           </div>
 
-          {/* 分隔线 */}
+          {/* Divider */}
           {user && (
             <span
               className="mx-1.5 w-px h-5 bg-[#e3e8ee] dark:bg-gray-700"
@@ -307,7 +309,7 @@ export default function Header({
             />
           )}
 
-          {/* 用户菜单 */}
+          {/* User menu */}
           {user ? (
             <div className="relative" ref={userDropdownRef} data-testid="user-menu">
               <button
