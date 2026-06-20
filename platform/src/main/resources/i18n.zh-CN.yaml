@@ -1180,3 +1180,10 @@ category:
   new_parent_not_found: 新父类目不存在
   cross_tenant_move: 不允许移动到其他租户的类目下
   move_to_descendant: 不能移动到自己的子类目下
+
+permission:
+  assign_failed: 分配权限失败
+  remove_failed: 移除权限失败
+  remove_all_failed: 移除所有权限失败
+  sync_failed: 同步权限失败
+  copy_failed: 复制权限失败

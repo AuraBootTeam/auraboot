@@ -39,4 +39,13 @@ class RoleCategoryMessageI18nIT extends BaseIntegrationTest {
         assertThat(i18nService.getMessage("en-US", "category.code_exists", "C-001"))
                 .isEqualTo("Category code already exists in this tenant: C-001");
     }
+
+    @Test
+    @DisplayName("permission.* keys (cause-preserving exception wraps) resolve per locale")
+    void permissionKeys() {
+        assertThat(i18nService.getValue("zh-CN", "permission.assign_failed")).isEqualTo("分配权限失败");
+        assertThat(i18nService.getValue("en-US", "permission.assign_failed")).isEqualTo("Failed to assign permission");
+        assertThat(i18nService.getValue("zh-CN", "permission.remove_all_failed")).isEqualTo("移除所有权限失败");
+        assertThat(i18nService.getValue("en-US", "permission.copy_failed")).isEqualTo("Failed to copy permissions");
+    }
 }

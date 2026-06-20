@@ -1169,3 +1169,10 @@ category:
   new_parent_not_found: New parent category not found
   cross_tenant_move: Moving under a category of another tenant is not allowed
   move_to_descendant: A category cannot be moved under its own descendant
+
+permission:
+  assign_failed: Failed to assign permission
+  remove_failed: Failed to remove permission
+  remove_all_failed: Failed to remove all permissions
+  sync_failed: Failed to sync permissions
+  copy_failed: Failed to copy permissions
