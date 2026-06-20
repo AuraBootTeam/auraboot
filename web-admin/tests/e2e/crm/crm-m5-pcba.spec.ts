@@ -317,7 +317,7 @@ test.describe('CRM M5 PCBA J6 (L4 UI golden)', () => {
     // open the create form (新建 / Create / New / + button)
     const createBtn = page
       .getByRole('button', { name: /新建|新增|创建|Create|New/ })
-      .or(page.locator('button:has-text("新建")'))
+      .or(page.locator('button:has-text("新建"):not(:has-text("今日"))'))
       .first();
     await createBtn.click({ timeout: 8000 });
     // the form should show the localized product-model label, never the raw code —

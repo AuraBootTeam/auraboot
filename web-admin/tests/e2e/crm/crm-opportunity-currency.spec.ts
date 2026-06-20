@@ -350,7 +350,7 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     // Find and click the "Create" / "新增" / "New" button
     const createBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("新增"), button:has-text("新建"), button:has-text("Create")',
+        '[data-testid="toolbar-btn-create"], button:has-text("新增"), button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
       )
       .first();
     await expect(createBtn).toBeVisible({ timeout: 5_000 });

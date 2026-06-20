@@ -121,7 +121,7 @@ test.describe('D11 — showcase_all_fields error paths', () => {
 
     const createBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+        '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
       )
       .first();
     await expect(createBtn).toBeVisible({ timeout: 8_000 });

@@ -114,7 +114,7 @@ test.describe('Permission Control', () => {
     // Check for any action buttons on the page
     const hasActionButtons = await page
       .locator(
-        'button:has-text("新建"), button:has-text("创建"), button:has-text("Create"), button:has-text("New")',
+        'button:has-text("新建"):not(:has-text("今日")), button:has-text("创建"), button:has-text("Create"), button:has-text("New")',
       )
       .first()
       .isVisible({ timeout: 5000 })
