@@ -83,7 +83,7 @@ test.describe('E2E Test Customer — CRUD + UNIQUE_COMPOSITE', () => {
     // Click create button
     const createBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+        '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
       )
       .first();
     await createBtn.waitFor({ state: 'visible', timeout: 5000 });

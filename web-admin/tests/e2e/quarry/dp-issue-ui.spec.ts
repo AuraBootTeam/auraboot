@@ -260,7 +260,7 @@ test.describe('DP Issue — UI Tests', () => {
 
     // Click toolbar "新建" button
     const addBtn = page
-      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建")')
+      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日"))')
       .first();
     await addBtn.click();
 

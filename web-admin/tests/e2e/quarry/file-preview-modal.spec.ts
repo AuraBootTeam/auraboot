@@ -158,7 +158,7 @@ test.describe('File Preview Modal', () => {
 
     // Click create button to open form
     const addBtn = page
-      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建")')
+      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日"))')
       .first();
     await addBtn.click();
     await page.waitForURL((url) => url.pathname.includes('/new'), { timeout: 10000 });
