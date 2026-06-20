@@ -6,6 +6,12 @@ created: 2026-06-18
 
 # AuraBoot 行为采集与数据分析平台 — 完整设计方案
 
+> 🛑 **SUPERSEDED / 已去冲突(2026-06-20)** — 本文降为**下位领域设计**;**上位裁决以统一 SoT 为准**:`auraboot/docs/backlog/2026-06-19-unified-telemetry-analytics-platform-architecture.md`(§2 已冻结 v1.0)。以下本文与 SoT 冲突段一律以 SoT 覆盖,实现以 SoT 为准:
+> - **SPM 模型已删除** → 用 SoT §5.4「UI 元素身份契约」(`ui_element_id` 稳定 join key;`spm/path` 仅派生可读、非键);**事件优先**(`event_name`+params)为主模型。
+> - **`eventType=agent_obs` 收编已废** → Agent 技术遥测归 OTel(SoT §2.1);行为域只接 Agent **业务结果**(`agent.task.completed`/`handoff`/`abandoned`,经服务端 **outbox**)。
+> - **topic = 单 `aura.behavior.events.v1`**(非按 eventType 分);wire/Kafka key matrix 见 SoT §2.7。
+> - 可靠性(outbox 同库事务)/ 幂等(终态 vs 可重复)/ 采样保真(F0–F3 + measurement_mode)/ 关联键(词典+矩阵+`interaction_id` 1:N)以 SoT §2.3–§2.5 为准。
+
 > 日期:2026-06-18 · 状态:草案待评审(brainstorming 产出,待 owner 分析后转 writing-plans)
 > 定位:production-ready 平台原生能力,**非 MVP/PoC/demo**
 
