@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { useReportStore } from '../store/useReportStore';
+import { useReportDocument } from '../state/ReportDocumentProvider';
 import { DataTableBlockEditor } from './DataTableBlockEditor';
 import { GroupedTableBlockEditor } from './GroupedTableBlockEditor';
 import { StatCardBlockEditor } from './StatCardBlockEditor';
@@ -14,7 +14,6 @@ import { BarcodeBlockEditor } from './BarcodeBlockEditor';
 import { WatermarkBlockEditor } from './WatermarkBlockEditor';
 import { ParameterEditor } from './ParameterEditor';
 import { BandEditor } from './BandEditor';
-import type { PageConfig } from '../types';
 
 /** Trash icon SVG path */
 const TrashIcon: React.FC = () => (
@@ -109,7 +108,8 @@ export const BlockPropertyPanel: React.FC = () => {
     updateHeader,
     updateFooter,
     updateDescription,
-  } = useReportStore();
+    mutateNoHistory,
+  } = useReportDocument();
 
   if (!report) return null;
 
@@ -287,15 +287,10 @@ export const BlockPropertyPanel: React.FC = () => {
             parameters={report.parameters || []}
             dataSources={report.dataSources}
             onChange={(params) => {
-              if (report) {
-                useReportStore.getState().updateBlock('__noop', {}); // trigger dirty
-                // Direct mutation via store - parameters are on the report object
-                const store = useReportStore.getState();
-                if (store.report) {
-                  store.report.parameters = params;
-                  useReportStore.setState({ isDirty: true });
-                }
-              }
+              // Parameters edit is non-undoable (mirrors the prior store path that
+              // set report.parameters + isDirty WITHOUT pushing history). The
+              // document mutation makes the report dirty via snapshot divergence.
+              mutateNoHistory((r) => ({ ...r, parameters: params }));
             }}
           />
         </div>
