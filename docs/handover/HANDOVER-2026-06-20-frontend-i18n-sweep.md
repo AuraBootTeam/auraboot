@@ -106,3 +106,30 @@ created: 2026-06-20
 - **后端 i18n 模式**(若再遇后端硬编码):`throw BusinessException.i18n(key, args)` 或 `i18nWrap(cause, key, args)`;`GlobalExceptionHandler` 已解析。
 - **review line 全局状态**:见 `HANDOVER-2026-06-18-oss-deep-review-fixes-default-deny.md` §全量交付更新(2026-06-20)——含安全 default-deny owner 待办(ops shadow → 产品角色矩阵)。
 - 其它 i18n 剩余(非前端):安全 default-deny 全量收尾 gated ops/产品;测试 gap 在并发覆盖率 campaign。**勿在本线碰**。
+
+---
+
+## Continuation — 2026-06-20 (session 2):前端 4 组件完成 + 权限 i18n 平台能力 + 棘轮门禁
+
+> 接手者按本文 Next Steps 完成了 deep-review R5 的剩余前端组件,并额外补了权限显示名 i18n 平台能力(上一会话只做了权限**异常消息**,未做**显示名**)。分支 `feat/frontend-i18n-sweep`(off origin/main 58d4786dc)。
+
+### 已完成(本续)
+- [x] **Header / PermissionGuard / QrCodeScanner / NotificationRuleBuilder** 全部迁移到 `useSmartText('$i18n:<ns>.<key>', '<English fallback>')` + yaml(`header. permission_guard. qr_scanner. notification_rule.` 段进 `i18n.{zh-CN,en-US}.yaml`)。注释中文 → 英文;native 语言名(简体中文/日本語/한국어)保留。NotificationRuleBuilder 的 option-label 常量数组移进组件内以便用 hook。
+- [x] **权限显示名 i18n 平台能力**(额外,非本 handover 原列):`PermissionDefinitionDTO` 捕获 `description:*` + 导入生成 `permission.{code}` / `permission.{code}.description` i18n 记录(镜像 menu)+ 前端 `PermissionTree`/`PermissionTab` 用 `t('permission.{code}', _, name)` 消费 + 5 个 permission.json 补 `name:zh-CN/en` + `description:zh-CN/en`。注意:前端用 fallback 参数而非 `t() || name`(t miss 返 key 会泄漏)。
+- [x] **i18n 棘轮门禁** `scripts/check-i18n-hardcoded.mjs`(react user-facing / comments / dsl 三指标,baseline 锁现状,`--check` 防回升)。
+
+### Commits(分支 `feat/frontend-i18n-sweep`)
+- `3bf6f1214` W0 gate + baseline
+- `e865a8014` W1 permission name/description i18n end-to-end(后端+前端+39 config+测试)
+- `b0a2f0c42` W2 frontend 4 components(本 handover 原列剩余)
+
+### 验证(全绿)
+- 后端 `cd platform && ./gradlew :test --tests "*I18n*" --tests "*PermissionDefinition*" --tests "*PluginImportServiceImplCore*"` → BUILD SUCCESSFUL(含 i18n coverage/workflow IT,确认新 yaml 段编译)。
+- 前端 `cd web-admin && npx vitest run`(PermissionTree/PermissionGuard/QrCodeScanner/NotificationRuleBuilder i18n + 既有 Header)→ 8 绿;`pnpm typecheck` exit 0。
+- `node scripts/check-i18n-hardcoded.mjs --check` → react 9014→8929 / comments 6820→6784 / dsl 64→25,无回升。
+- `bash scripts/check-oss-boundary.sh` → passed。
+
+### 范围说明(给下一接手者)
+- 本线 = deep-review R5 的**特定组件**轨,**非整库 9k 全扫**。`check-i18n-hardcoded.mjs --report` 显示的 react ~8929 是**全库 i18n 债**(含大量未列入本轨的组件 + native 语言名),仅作债务追踪/防回升,**不是本轨待办**。整库全扫是更大决策(owner 未授权)。
+- 余下 deep-review R5:本 handover 表中 4 组件已清零(Header 仅剩 native 语言名,设计保留)。
+

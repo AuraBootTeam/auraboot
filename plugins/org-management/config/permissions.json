@@ -28,7 +28,11 @@
   {
     "code": "permission_management",
     "name": "权限管理",
+    "name:zh-CN": "权限管理",
+    "name:en": "Permission Management",
     "description": "管理角色和权限配置",
+    "description:zh-CN": "管理角色和权限配置",
+    "description:en": "Manage role and permission configuration",
     "type": "menu",
     "module": "rbac",
     "resource": "/enterprise/permissions",
@@ -48,7 +52,11 @@
   {
     "code": "member_management",
     "name": "成员管理",
+    "name:zh-CN": "成员管理",
+    "name:en": "Member Management",
     "description": "管理租户成员和用户",
+    "description:zh-CN": "管理租户成员和用户",
+    "description:en": "Manage tenant members and users",
     "type": "menu",
     "module": "tenant",
     "resource": "/enterprise/members",

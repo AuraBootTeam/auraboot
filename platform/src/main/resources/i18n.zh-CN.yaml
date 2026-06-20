@@ -1192,3 +1192,88 @@ chart:
   configure_datasource: 请在右侧配置数据源
   load_failed: 数据加载失败
   no_data: 暂无数据
+
+header:
+  workspaces: 工作空间
+  platform_console: 平台控制台
+
+permission_guard:
+  no_access: 无权限
+
+qr_scanner:
+  camera_access_failed: 无法访问摄像头，请检查权限设置
+  enter_login_code: 请输入设备登录码
+  unknown_device: 未知设备
+  close: 关闭
+  title: 扫描设备二维码
+  instruction: 请将摄像头对准TV设备上显示的二维码，或手动输入设备登录码
+  scan_tab: 扫描二维码
+  manual_tab: 手动输入
+  frame_hint: 将二维码放在框内
+  camera_tip: 提示：如果无法使用摄像头，可以切换到手动输入模式
+  input_label: 设备登录码或二维码内容
+  input_placeholder: 请输入设备登录码或粘贴二维码的完整内容...
+  cancel: 取消
+  confirm: 确认
+
+notification_rule:
+  preset_overdue_payment: 逾期付款提醒
+  preset_low_stock: 低库存预警
+  preset_approval_overdue: 审批超时提醒
+  trigger_scheduled: 定时触发
+  trigger_scheduled_desc: 按固定时间周期执行规则
+  trigger_event: 事件触发
+  trigger_event_desc: 当记录发生变化时执行规则
+  schedule_hourly: 每小时
+  schedule_daily: 每天
+  schedule_weekly: 每周
+  event_created: 记录创建
+  event_updated: 记录更新
+  event_deleted: 记录删除
+  channel_in_app: 站内消息
+  channel_email: 邮件
+  recipient_operator: 操作人
+  recipient_record_owner: 记录负责人
+  recipient_specific_users: 指定用户
+  op_eq: 等于
+  op_ne: 不等于
+  op_gt: 大于
+  op_ge: 大于等于
+  op_lt: 小于
+  op_le: 小于等于
+  op_like: 包含
+  op_is_null: 为空
+  op_is_not_null: 不为空
+  err_code_required: 规则代码不能为空
+  err_name_required: 规则名称不能为空
+  save_failed_retry: 保存失败，请重试
+  save_failed: 保存失败
+  quick_start: 快速开始 — 选择模板
+  start_blank: 从空白创建 →
+  section_basic: 基础信息
+  label_code: 规则代码
+  label_name: 规则名称
+  ph_name: 规则显示名称
+  label_description: 描述
+  ph_description: 可选描述...
+  enable_rule: 启用规则
+  section_trigger: 触发方式
+  label_frequency: 执行频率
+  label_trigger_event: 触发事件
+  section_condition: 触发条件
+  label_model: 数据模型
+  select_model: "-- 选择模型 --"
+  ph_field: 字段名
+  ph_value: 值
+  add_condition: 添加条件
+  section_action: 通知动作
+  label_channel: 通知渠道
+  label_template: 消息模板代码
+  ph_template: template-code（可选）
+  label_recipient: 接收人策略
+  label_owner_field: 负责人字段名
+  label_user_ids: 用户ID（逗号分隔）
+  cancel: 取消
+  saving: 保存中...
+  update_rule: 更新规则
+  create_rule: 创建规则
