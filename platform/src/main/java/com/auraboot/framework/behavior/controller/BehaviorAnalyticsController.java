@@ -1,6 +1,7 @@
 package com.auraboot.framework.behavior.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.behavior.dto.BehaviorDailyPoint;
 import com.auraboot.framework.behavior.dto.BehaviorEventCount;
 import com.auraboot.framework.behavior.dto.BehaviorOverview;
 import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
@@ -33,5 +34,11 @@ public class BehaviorAnalyticsController {
     @GetMapping("/top-events")
     public List<BehaviorEventCount> topEvents() {
         return behaviorEventMapper.topEvents(MetaContext.getCurrentTenantId());
+    }
+
+    /** Daily PV/UV/total time series for the current tenant (dashboard trend). */
+    @GetMapping("/daily")
+    public List<BehaviorDailyPoint> daily() {
+        return behaviorEventMapper.dailyTrend(MetaContext.getCurrentTenantId());
     }
 }

@@ -1,5 +1,6 @@
 package com.auraboot.framework.behavior.mapper;
 
+import com.auraboot.framework.behavior.dto.BehaviorDailyPoint;
 import com.auraboot.framework.behavior.dto.BehaviorEventCount;
 import com.auraboot.framework.behavior.dto.BehaviorOverview;
 import com.auraboot.framework.behavior.entity.BehaviorEvent;
@@ -35,4 +36,17 @@ public interface BehaviorEventMapper extends BaseMapper<BehaviorEvent> {
             LIMIT 20
             """)
     List<BehaviorEventCount> topEvents(@Param("tenantId") Long tenantId);
+
+    /** Daily PV/UV/total time series for a tenant (analysis: dashboard trend). */
+    @Select("""
+            SELECT to_char(date_trunc('day', COALESCE(occurred_at, created_at)), 'YYYY-MM-DD') AS day,
+                   count(*)                                                  AS total_events,
+                   count(*) FILTER (WHERE event_name = 'page_view')          AS page_views,
+                   count(DISTINCT COALESCE(CAST(user_id AS text), anon_id))  AS unique_visitors
+            FROM ab_behavior_event
+            WHERE tenant_id = #{tenantId}
+            GROUP BY 1
+            ORDER BY 1
+            """)
+    List<BehaviorDailyPoint> dailyTrend(@Param("tenantId") Long tenantId);
 }
