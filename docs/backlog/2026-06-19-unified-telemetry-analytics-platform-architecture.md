@@ -6,430 +6,376 @@ created: 2026-06-19
 
 # 统一遥测与分析平台 — 架构 SoT(候选)+ 冻结契约(§2)
 
-> **文档身份**(解上一轮评审"身份自相矛盾"):本文是**统一平台架构 SoT 候选稿**;**§2 是拟冻结契约**(DDR 级),owner 批准后升正式 DDR(可保留为本文 §2,不另立文件)。批准前 `status=active`(草案)。
+> **修订**:2026-06-19 创建;2026-06-20 R2(纳第二轮评审 8 项);2026-06-20 R3(纳第三轮评审:**删除 SPM 模型** + §2 内部矛盾消解 + 域 C 改 non-normative)。变更见 §11。
 >
-> **文档层级**(保持"统一 1 份"为上位,不炸成多文件):
-> - 本文 = **上位架构 SoT + 冻结契约**(双域关系、共享底座、跨域关联、拟冻结不变量)。
-> - 两份旧草稿 = **下位领域设计**(去冲突后保留富细节:完整 BehaviorEvent 信封 / SPM 语法 / quarantine / 权限 / SDK / 投影映射):`feat/observability-unification-plan`(可观测域)、`feat/behavior-analytics-spec`(行为域)。
-> - 本文**只 supersede 旧草稿的"总架构裁决"部分**,不取代其领域级实现细节(本文已压掉这些,不足以单独取代)。
+> **文档身份**:本文 = **统一平台架构 SoT 候选 + §2 拟冻结契约(DDR 级)**。owner 批准 §2 后升正式 DDR(可保留为本文 §2)。批准前 `status=active`(草案)。
 >
-> **评审状态**(2026-06-19 第二轮专家评审后):`架构方向 APPROVED / §2 本版已纳入 8 项 CHANGES / P0 立即可开 / M1·P2 待 §2 最终冻结后开`。本版相对上一版的修改见 §11。
+> **文档层级 + 合并门禁**(R3 收紧):本文是**上位架构 SoT**;两份旧草稿(`feat/observability-unification-plan` 可观测域、`feat/behavior-analytics-spec` 行为域)是**下位领域设计**。⚠️ **合并门禁**:§2 冻结**必须**与"两份下位领域设计完成去冲突"在**同一 PR**内完成——否则实现者从下位文档进入仍会读到旧结论(行为设计仍以 SPM 为骨架 / `eventType=agent_obs` / 按 eventType 分 topic;可观测设计仍有 `otel.events` / 旧 GenAI 属性 / runtime eval 读异步流)。本文只取代旧草稿的"总架构裁决",其领域级细节须按本文回改后保留。
 >
-> **方向对齐**:`auraboot-enterprise/docs/backlog/2026-06-16-agent-os-gap-analysis.md`(eval 飞轮 / OTel GenAI 语义 / runtime-offline 分离)。
-> **证据基础**:§4.1/§5.1 现状基于 2026-06-18 对 OSS `auraboot/platform` 的 call-site 深挖,锚点见附录 A,区分【实测】/【推断🟡】。
+> **评审状态**(第三轮后):`总体架构方向 APPROVED · Agent 数据归属 APPROVED · 事件模型(删 SPM)APPROVED · §2 冻结契约 CHANGES→本版已纳入,待 owner 拍 §10-A · P0 GO · S0/M1/P2 待 §2 冻结后开 · 域 C non-normative(不进本轮冻结集)`。
+>
+> **证据基础**:§4.1/§5.1 现状基于 2026-06-18 对 OSS `auraboot/platform` 的 call-site 深挖,锚点见附录 A,区分【实测】/【推断🟡】。**外部行业对照(GA4/Segment/OTel 等)实现时按 pin 版本核对,见附录 B。**
 > **产品定位**:production-ready 平台原生能力,非 MVP/PoC/demo。
 
 ---
 
 ## 0. TL;DR
 
-- **一个平台、两个领域、一套下游底座、关联键互通**;统一的是文档与平台契约,**不统一事件 schema**。
-- 两域回答不同问题:**行为域**=用户/Agent 做了什么、是否转化/留存/放弃;**可观测域**=一次请求/执行怎么完成、哪里慢、为什么失败。
-- 原"两份 spec 抢 `ab_agent_observation`"的冲突,由 §2.1 四层归属裁决消除。
-- **§2 冻结集克制在核心契约表(§2.0)**——富 schema/SLO/失败测试路由进领域设计 / 实施计划 / 测试策略,避免 DDR 膨胀成"提前设计整个终局"。
-- **开发门禁**:M1 / 可观测 P2 前必须批准 §2;**P0(纯运行时实证)不焊任何契约,与批准并行**。
-- **SPM 不是事件模型,是事件属性**:主模型 = 事件优先(`event_name`+params,对齐 Google GA4 / Segment),SPM 降为"DSL 派生的稳定元素身份"属性、丢掉 URL 透传(§5.4)。
-- **底座领域无关**:除可观测/行为两域,**开源 phone-home(部署/实例遥测 + 授权,域 C,§5C)** 是第三个自然落点,复用同一底座——反过来验证"一套底座、多领域"的设计成立。
+- **一个平台、两个核心领域(A 可观测 / B 行为)+ 可扩展领域(C 部署遥测,本期非规范)、一套下游底座、关联键互通**;统一的是文档与平台契约,**不统一事件 schema**。
+- **删除 SPM 模型**(R3):事件优先(`event_name` 表语义)+ **UI 元素身份契约**(`ui_element_id` 稳定 join key,**非** `a.b.c.d` 路径串)+ `interaction_id` 表因果。四段串退化为重复字段——其信息已在 `page_id/block_id/element_code`;稳定身份应是不可变 ID 而非路径(rename/clone/模板实例化会改路径)。对齐 GA4(event-based)/ Segment(语义事件 + Tracking Plan)/ Amplitude·PostHog(自动采集 + 业务精确事件)的"事件 + 元素元数据",非独立位置码模型。
+- Agent 数据抢 `ab_agent_observation` 的冲突,由 §2.1 四层归属裁决消除。
+- **§2 冻结集克制在核心契约表(§2.0)**,富 schema/SLO/失败测试路由领域设计 / 实施 / 测试。
+- **底座领域无关**:开源 phone-home(域 C)是一次 architecture fitness test——证明底座方向对,也证明当前契约还按双域设计、未真正泛化(需第四入口/独立身份/独立 schema/授权控制面),故本期作 non-normative(§5C)。
+- **开发门禁**:M1 / 可观测 P2 前必须批准 §2 + 完成领域设计去冲突;**P0(纯实证)不焊契约,与批准并行**。
 
 ---
 
-## 1. 平台定位:两域一底座
+## 1. 平台定位
 
 ### 1.1 总体关系
-
 ```text
-统一遥测与分析平台
-├── 可观测性域(A):traces/spans/metrics/logs · Agent/tool/LLM 技术遥测(OTel,唯一事实源)· SRE/安全/审计
-├── 行为分析域(B):pageview/click/exposure · SPM/session/funnel/retention/path · 产品与业务事件(含 Agent 业务结果)
-├── 部署/实例遥测与授权域(C,开源 phone-home):instance/version/edition/license · 版本分布 · 授权合规(§5C,本期可缓)
-└── 共享底座:Kafka(分 topic)· ClickHouse(分库)· PostgreSQL(投影/轻量档)· 治理目录 · 租户/隐私/采样/TTL · 薄上游(context/时钟/ULID/correlation 传播)
+统一遥测与分析平台(两核心领域 + 可扩展领域,共享下游底座)
+├── A 可观测性域:traces/spans/metrics/logs · Agent/tool/LLM 技术遥测(OTel,唯一事实源)· SRE/安全/审计
+├── B 行为分析域:pageview/click/exposure · 事件优先 + UI 元素身份 · funnel/retention/path · 产品与业务事件(含 Agent 业务结果)
+├── C 部署/实例遥测与授权域(开源 phone-home,**本期 non-normative**,§5C):instance/version/edition/license · 版本分布 · 授权合规
+└── 共享底座:Kafka(分 topic)· 分析存储 port〔ClickHouse=reference impl〕· PostgreSQL(投影/轻量/outbox)· 治理目录 · 租户/隐私/采样/TTL · 薄上游(context/时钟/ULID/correlation)
 ```
 **共享底座 ≠ 同一张表 / 同一 schema。**
 
-### 1.2 三个采集入口(故意分开)
-
+### 1.2 采集入口(故意分开)
 ```text
-(a) Web 行为:   Browser SDK ─► /api/collect ─► behavior topic ─► Flink/微批 ─► CH
-(b) 服务端结果: 应用内 outcome publisher ─►(outbox)─► behavior topic        ← Agent 业务结果走这条,非浏览器
-(c) 技术可观测: 进程内 OTel SDK ─► OTLP ─► Collector ─► Jaeger / Prometheus / Kafka ─► CH
+(a) Web 行为:   Browser SDK ─► /api/collect ─► behavior topic ─► 流处理 ─► 分析存储
+(b) 服务端结果: 应用内 publisher ─►(outbox,同业务库事务)─► behavior topic
+(c) 技术可观测: 进程内 OTel SDK ─► OTLP ─► Collector ─► Jaeger / Prometheus / Kafka ─► 分析存储
+(d) 实例遥测〔域 C,本期非规范〕: 自托管实例 ─► 公网签名网关 ─► Kafka / entitlement 控制面   ← 不复用 /api/collect、不直连 Kafka
 ```
-- (a) 关心离线缓冲/sendBeacon/consent/SPM/限流;(c) 关心 span 生命周期/context 传播/tail sampling/OTLP——不合并。
-- **(b)(c) 在同一 Agent chokepoint 同源**(§2.6:一次插桩、多 adapter)。
+(a) 离线缓冲/sendBeacon/consent/限流;(c) span 生命周期/context 传播/tail sampling/OTLP——不合并。**(b)(c) 在同一 Agent chokepoint 同源**(§2.6)。
 
-### 1.3 文档层级 — 见文首"文档身份/层级"。(解阻塞 1)
+### 1.3 文档层级 + 合并门禁 — 见文首"文档层级 + 合并门禁"。
 
 ---
 
 ## 2. 冻结契约(DDR 级 / 开发门禁)
 
-> 原则:**冻结不变量,版本化可变量**(§2.11)。冻结集克制在 §2.0 核心表;明细在 §2.1–§2.11 展开,富 schema 路由领域设计。
+> 原则:**冻结不变量,版本化可变量**(§2.11)。冻结集克制在 §2.0;明细 §2.1–§2.11,富 schema 路由领域设计。
 
 ### 2.0 核心契约表(= 冻结集)
-
 | 类别 | 冻结结论 |
 |---|---|
-| 原始技术遥测 | **OTel 唯一技术遥测写入模型** |
+| 原始技术遥测(诊断 token/延迟/异常) | **OTel span 唯一事实源** |
+| **计费/配额使用量** | **`GenAiUsageRecord` 唯一计费事实源**(不从 sampled span 汇总,R3) |
 | 业务分析事实 | **BehaviorEvent 唯一行为分析事实模型** |
-| 真实业务状态 | **仍以各业务领域 DB 为权威**,不由 BehaviorEvent 替代 |
-| Agent outcome | **durable outbox,never sample** |
-| 审计/安全决定 | **durable,never sample** |
-| 普通 trace | 可采样、queued、best-effort |
-| `ab_agent_observation` | 派生判断层,不存原始遥测 |
+| 真实业务状态 | **各业务领域 DB 为权威**,不由 BehaviorEvent 替代 |
+| **UI 元素身份** | **`ui_element_id` 稳定 join key**(不可变;`ui_path`/四段串仅派生可读,非键,R3) |
+| Agent outcome / 审计·安全决定 | **durable + unsampled**(outbox,at-least-once + 幂等 → 计数精确;非传输 exactly-once,R3) |
+| 普通 trace / click·exposure | 可采样、best-effort/queued |
+| `ab_agent_observation` | 派生判断层,不存原始遥测;`subject_type+subject_id` 必填、`source_ref` ≥1 |
 | `ab_ai_trace` | OTel 投影读模型 |
-| 跨域强关联 | **`interaction_id → trace_id → run_id`** |
-| session | `client_session_id` 与 `derived_session_id` 分开 |
-| schema | Behavior=Avro;OTel=OTLP/semconv;治理目录统一 |
-| 采集入口 | Web / server outcome / OTLP **三入口分开** |
-| seam | 一个语义 seam、多 adapter;**可靠性按数据类别区分** |
+| 跨域强关联 | **`interaction_id ↔ trace_id[] ↔ run_id[]`**(强关联,**不承诺 1:1**,R3) |
+| session | `client_session_id`(原始)与 `derived_session_id`(流处理投影,不回写原始)分开 |
+| schema | Behavior=Avro(`BACKWARD_TRANSITIVE`);OTel=OTLP/semconv;治理目录统一 |
+| 采集入口 | Web / server outcome / OTLP **三入口分开**(域 C 第四入口非本期) |
+| seam | 一个语义 seam、多 adapter;可靠性按数据类别区分;outcome 与业务状态同库事务 |
+| **分析存储** | **`AnalyticalStorePort`/`BehaviorStorePort` 不变量;ClickHouse=reference impl**(DDL/分区/集群数版本化,R3) |
 | 底座 | 部署单元内默认共享、逻辑分域、阈值可拆 |
-| ClickHouse | 时间低基数分区;tenant 放排序键 |
-| 实施门禁 | topic/correlation/reliability/sampling 契约批准后开放 M1/P2 |
+| 实施门禁 | topic/key/correlation/reliability/sampling 契约批准 + 领域设计去冲突后开放 M1/P2 |
 
-### 2.1 Agent 数据四层归属(消冲突核心)
-
+### 2.1 Agent 数据四层归属
 | Agent 数据 | 唯一事实源 |
 |---|---|
-| run/tool/LLM/token/耗时/异常 原始技术遥测 | **OTel span**(GenAI semconv) |
-| 采纳/放弃/人工接管/任务完成/业务转化 业务结果 | **BehaviorEvent**(只接业务语义,不接完整 trace) |
-| `ab_agent_observation` | **derived observation/decision record**(判定层,必引 trace_id/span_id) |
-| `ab_ai_trace` | **OTel 流的 PG 投影**(产品 UI 读模型) |
+| run/tool/LLM/**诊断 usage 属性**(token/延迟/异常) | **OTel span**(GenAI semconv) |
+| **计费/配额使用量** | **`GenAiUsageRecord`**(§2.5,durable;OTel 的 token 属性只是诊断镜像、不用于账单) |
+| 采纳/放弃/接管/完成/业务转化 | **BehaviorEvent**(只接业务语义,不接完整 trace) |
+| `ab_agent_observation` | **derived observation/decision record**(判定层) |
+| `ab_ai_trace` | **OTel 流的 PG 投影** |
 
-`ab_agent_observation` 只存:在线质量判定/能力评估/异常结论/策略违规或安全判断/人工复核;**不存**原始 tool 流水/token·耗时/prompt·completion 副本/run 逐步日志。建议表结构:`trace_id, span_id, source_event_id, observation_kind, judge_type, judge_version, verdict, score, reason_code, created_at`(+ 现有 tenant_id/pid/severity)。
+`ab_agent_observation` 只存判定(在线质量/能力评估/异常/策略/人工复核),不存原始遥测。引用规则:`subject_type + subject_id` 必填,`source_ref` 至少一个;**`trace_id/span_id` 仅在 subject 是 span 时必填**(behavior-event observation 用 `source_event_id`、offline 用 `dataset_id+evaluation_run_id`、release verdict 用 `release_id+evaluation_run_id`)。
 
 ### 2.2 三采集入口分开 — 见 §1.2(冻结)
 
-### 2.3 关联键:词典 + 按记录类型必填矩阵 + interaction_id(改阻塞 3)
-
-**不是"每条记录都带全部键"**(不可能:pageview 无 trace、cron 无 user、匿名无 user_id、offline eval 跨千条 trace)。统一字段词典 + **按记录类型必填矩阵**:
+### 2.3 关联键:词典 + 按记录类型必填矩阵
+**不是"每条记录都带全部键"**。统一字段词典 + 矩阵(R3:拆 Server BusinessEvent / Agent Outcome;observation 引用按 subject 类型):
 
 | 记录类型 | 必填 | 条件/可选 |
 |---|---|---|
-| Web BehaviorEvent | `tenant_id, event_id, occurred_at, client_session_id, user_id/anon_id` | `interaction_id, trace_id, source_span_id` |
-| Server Outcome | `tenant_id, event_id, run_id, occurred_at` | `trace_id, source_span_id, session_id, user_id` |
+| Web BehaviorEvent | `tenant_id, event_id, event_name, occurred_at, client_session_id, user_id/anon_id` | `interaction_id, caused_by_event_id, ui_element_id, trace_id, source_span_id` |
+| Server **BusinessEvent** | `tenant_id, event_id, event_name, occurred_at` | `interaction_id, trace_id, aggregate_id` |
+| Server **Agent Outcome** | 上 + `run_id` | `trace_id, source_span_id, session_id, user_id` |
 | OTel span | `trace_id, span_id, start_time, end_time` | `tenant_id, run_id, session_id, user_id_hash` |
-| Observation | `observation_id, subject_type, subject_id, judge_type, judge_version` | `trace_id, span_id, source_event_id, dataset_id` |
+| Observation | `observation_id, subject_type, subject_id, judge_type, judge_version`(+`source_ref`≥1) | `trace_id, span_id, source_event_id, dataset_id, evaluation_run_id` |
 
-**关联强度分级**(不把三者写成等价 JOIN):
-- **强关联**:`interaction_id` / `trace_id` / `run_id` / `event_id`
-- **弱关联**:`session_id`
-- **归因关联**:`user_id` + 时间窗(标记 heuristic)
+**关联强度**(不写成等价 JOIN):强 `interaction_id`/`trace_id`/`run_id`/`event_id`(**基数 1:N**);弱 `session_id`;归因 `user_id`+时间窗(heuristic)。
 
-**`interaction_id`(必增)**:浏览器跑行为 SDK 而非 OTel SDK,**点击不会天然带服务端 traceId**。链路:
-```text
-用户点击 ─► BehaviorEvent(interaction_id=I123)
-        └► 下一次业务 HTTP 带 X-Aura-Interaction-Id: I123 ─► 服务端 root span 写 aura.interaction.id=I123
-```
+**`interaction_id`**:浏览器跑行为 SDK 非 OTel SDK,点击不天然带服务端 traceId。一个 interaction → 0..N traces → 每 trace 0..N runs(点"生成报告"可同时触发权限检查/建任务/轮询/SSE/异步 run)。SPA/API 用 `X-Aura-Interaction-Id` header(**显式作用域 `withInteraction(id, fn)`,禁"全局下一请求用当前 id"——并发点击会串线**);同源跨文档导航用短时 `navigation_id`;跨域仅双方协作才精确关联,否则降级 referrer/session。
 
-**session 两层**:`client_session_id`(SDK 生成,原始事实)/ `derived_session_id`(流处理生成)/ `sessionization_version`(算法版本)——改 30min gap 不污染历史语义。
+**session**:`client_session_id`(SDK 原始)/ `derived_session_id` + `sessionization_version`(流处理投影,**原始 topic 为 null、不回写原始事件**)。
 
-### 2.4 可靠性分级 + 幂等(改阻塞 4)
-
-`@Async @EventListener` 适合故障隔离/非关键遥测,**不保证不丢**(业务已提交→进程崩→listener 未跑→outcome 永久丢失;确定性 id 解决重复不解决丢失)。按数据类别定交付保证:
+### 2.4 可靠性分级 + outbox + 幂等
+`@Async @EventListener` 适合故障隔离/非关键遥测,**不保证不丢**。按数据类别定交付保证:
 
 | 数据 | 交付保证 | 方式 |
 |---|---|---|
-| 普通 OTel span | best-effort / queued | SDK → Collector |
-| **Agent 业务 outcome** | **durable at-least-once** | **transactional outbox → Kafka** |
-| **审计/策略决定** | **durable,不可采样** | 审计事务 / outbox |
-| derived observation | 若影响 eval/发布门禁则 durable | outbox 或可靠 consumer |
+| 普通 OTel span | best-effort/queued | SDK → Collector |
+| **Agent 业务 outcome** | **durable + unsampled** | **transactional outbox → Kafka** |
+| **审计/策略决定** | **durable + unsampled** | 审计事务 / outbox |
+| derived observation | 若影响 eval/门禁则 durable | outbox 或可靠 consumer |
 | 普通 click/exposure | 预算内可丢 | SDK 批量上报 |
 
-- **Outbox**:F0 类同一本地事务写"业务状态 + behavior_outbox",提交后 relay/CDC → Kafka → 幂等 consumer → PG/CH。
-- **幂等**:服务端 outcome `event_id` 从 run 确定性派生(`runId+outcomeKind`),禁随机;Kafka producer 开 idempotence 防 broker 重试重复,但**不替代** outbox 与 sink 端去重。
-- **ClickHouse 去重**:`ReplacingMergeTree` 仅 merge 时清重,**查询时仍可能有重复**→精确漏斗须写入前去重 / 查询去重 / 专门 deduplicated projection。
+- **Outbox 硬约束**:outbox **必须与产生权威业务状态的 DB 处于同一本地事务**;共享的是 outbox schema/relay/治理,**不是强制所有服务写一个中央 `behavior_outbox` 表**(状态在库 A、outbox 在库 B 则无法原子提交)。`outcomePublisher.publish()` 必须在**真正的状态事务 seam** 上(§2.6 示例)。
+- **幂等键**:终态(completed/failed)= `hash(run_id, terminal_state, state_version)`;**可重复状态变化**(handoff 等)= `hash(run_id, outcome_kind, transition_id)`;或直接用业务状态机 version。禁随机 id。Kafka producer 开 idempotence 防 broker 重试,但不替代 outbox 与 sink 去重。
+- **ClickHouse 去重**:`ReplacingMergeTree` 仅 merge 时清重,查询时仍可能有重复→精确漏斗须写入前/查询去重或 deduplicated projection。
 
-### 2.5 保真分级 + 成本独立记录(改阻塞 5)
-
-采样与"精确计数/成本/eval"冲突,引入保真等级:
-
+### 2.5 保真分级 + 成本独立记录
 | 等级 | 含义 | 覆盖 |
 |---|---|---|
-| **F0** | Exact / Never Sample | 业务 outcome、审计、安全决策、**计费 usage** |
+| **F0** | Unsampled + Durable(at-least-once+幂等→计数精确) | 业务 outcome、审计、安全决策、**计费 usage** |
 | **F1** | Full Retention | 错误、慢请求、策略违规、关键 Agent run |
 | **F2** | Sampled Telemetry | 普通 trace、普通工具调用 |
-| **F3** | Sampled Behavior | 高频 click/exposure(必带 `sampling_probability`) |
+| **F3** | Sampled Behavior | 高频 click/exposure |
 
-- **成本不挂 sampled span**:独立 durable `GenAiUsageRecord`(`tenant_id, run_id, trace_id, provider, request_model, response_model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens, amount, currency, pricing_version, pricing_effective_at`);OTel span 只是其关联视图。
-- **runtime eval 走同步控制路径**(返回 continue/pause/reject/escalate decision),**不依赖**可能延迟/采样/丢失的 Collector→Kafka 流;异步流只供分析与后续反馈。
+- **成本独立事实源**:durable `GenAiUsageRecord`(`tenant_id, run_id, trace_id, provider, request_model, response_model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens, amount, currency, pricing_version, pricing_effective_at`)是**唯一计费来源**;OTel span 的 token 属性是诊断镜像。金额从 usage ledger + pricing version,**不从 sampled span 汇总**。
+- **采样单位 + 测量模式(R3)**:F3 事件带 `sampling_unit`(event|session|user|element)、`sampling_rule_id`、`sampling_decision_id`。**漏斗/路径/留存默认按 `client_session_id`/`anon_id` 确定性采样**(非逐事件随机,否则序列断裂);分析 API 返回 `measurement_mode = exact | estimated`——**精确漏斗仅由 F0/F1 或 session 级确定性采样构成**,禁把估算点击与 F0 精确 outcome 混进同一漏斗显示成精确转化。A/B assignment 与主 outcome 不随普通 click 采掉。
+- **runtime eval 走同步控制路径**(continue/pause/reject/escalate),不依赖可能延迟/采样的异步流;异步流只供分析与反馈。
 
-### 2.6 一个 seam、多 adapter、按可靠性分级输出(改阻塞 4/7)
-
-Agent chokepoint(`AgentRunService`/`ToolLoopService`/`AuraBotChatService`)= 一次语义插桩,多 adapter 输出,**故障隔离 + 按 §2.4 分级**(不做"必须同时成功"的事务双写;F0 outcome 走 outbox):
+### 2.6 一个 seam、多 adapter、故障隔离
 ```java
-try (AgentRunInstrumentation run = telemetry.startRun(ctxSnapshot)) {  // §2.3 同步快照,异步侧不读 ThreadLocal
-    Result r = execute();
-    run.recordTechnicalResult(r);          // OTel span(best-effort)
-    outcomePublisher.publish(r);           // BehaviorEvent outcome(outbox,durable,幂等)
+// 必须位于真正的业务状态事务 seam;execute() 提交后外层再提交会令 outcome 提前生成
+@Transactional
+public Result run(...) {
+    CorrelationSnapshot ctx = telemetry.snapshot();   // §2.3 同步快照,异步侧不读 ThreadLocal
+    Result r = execute();                              // 写权威业务状态
+    technicalTelemetry.recordRun(ctx, r);             // OTel span(best-effort)
+    outboxPort.enqueueOutcome(ctx, r);                // 同事务写 outbox(durable,幂等)→ relay → Kafka
     return r;
 }
 ```
-**correlation 在 seam 同步快照**(`MetaContext`/span context 是 ThreadLocal,异步 worker 执行时可能已失效——库内已知坑 `MetaContext not initialized / @Async 丢上下文`):seam 抓 `{traceId, spanId, runId, sessionId, tenantId, userId}` 注入每个信封 + Kafka header。
+复用现成 `@Async @EventListener` 范式做 best-effort 输出(OTel span/derived observation);F0 outcome 走 outbox。**禁同步事务双写**(要求 OTel 与 Kafka 同时成功)。
 
-### 2.7 Wire contract(M1 前定死,改阻塞 2)
-
+### 2.7 Wire contract(M1 前定死)
 ```text
-aura.behavior.events.v1        # 行为事件(单 topic,event_name 在 payload)
-aura.behavior.quarantine.v1    # 未知/非法事件隔离(不静默吞)
-aura.otel.traces.v1            # OTLP protobuf,不过行为 Avro registry
-aura.otel.logs.v1
-aura.otel.metrics.v1           # 仅在确需进 Kafka 时
-aura.audit.events.v1           # 若本期实施审计事件流
+aura.behavior.events.v1 / aura.behavior.quarantine.v1
+aura.otel.traces.v1 / aura.otel.logs.v1 / aura.otel.metrics.v1(仅确需进 Kafka 时)
+aura.audit.events.v1(若本期实施)
 ```
-- **删除上一版臆造的 `otel.events`**(OTel 正式信号只有 traces/metrics/logs;GenAI event 是 log record 或 span 内 event,不是第四类信号)。
-- **行为 wire**:入口接 JSON,**进 Kafka 前转 canonical Avro**;key = `tenantId:anonId`(或 `sessionId`,session-preserving §2.11*);Avro subject = `aura.behavior.events.v1-value`(TopicNameStrategy);compatibility = **backward**(默认,纳入冻结)。
-- **OTel wire**:OTLP protobuf,走 Collector Kafka exporter,不进 Avro registry。
+- 删除上一版臆造的 `otel.events`(理由见 §2.8)。行为入口接 JSON,**进 Kafka 前转 canonical Avro**;OTLP protobuf 走 Collector Kafka exporter,不进 Avro registry。Avro compatibility = **`BACKWARD_TRANSITIVE`**(长期演进契约)。
+- **Kafka key matrix(R3,替代模糊单规则)**,header 带 `partition_key_kind` / `partition_key_version`:
 
-### 2.8 schema 分治 + semconv 版本钉定(改阻塞 6)
+| 事件来源 | Kafka key |
+|---|---|
+| Web 行为 | `tenant_id:client_session_id`(不可用时 `tenant_id:anon_id`) |
+| Agent outcome | `tenant_id:run_id`(有 `client_session_id` 时优先后者) |
+| 普通 server business event | `tenant_id:aggregate_id` 或明确 ordering key |
+| quarantine | 原始 key 或 `tenant_id:event_id` |
 
-- 行为=Avro+业务 registry;OTel=OTLP+semantic conventions;**不要求 OTel span 过行为 Avro 校验**;统一治理目录(属性/事件 catalog、owner/版本/弃用、分类/敏感性、覆盖率、跨域关联键)。
-- **不冻结裸属性名,冻结**:`semconv_source / semconv_version / schema_url / compatibility_policy`(pin OTel core semconv 1.x + GenAI semconv 指定 release/commit;AuraBoot 扩展用 `aura.agent.* / aura.cost.* / aura.security.*`)。
-- 实现时按 pin 核对当前名(如 `gen_ai.system` 已废弃→`gen_ai.provider.name`、`finish_reason`→`finish_reasons` 数组);**`gen_ai.usage.cost` 非现成标准属性**→用 `aura.gen_ai.cost.*` 或独立 usage record(§2.5)。
+(引擎以后可 `keyBy` 重分区,故不强迫所有事件共享同一原始排序语义;但 session-preserving key 是 M1 即冻结的 keying 不变量。)
 
-### 2.9 共享底座:默认共享、逻辑分域、阈值可拆(冻结契约、拓扑可变)
+### 2.8 schema 分治 + semconv 钉定
+- 行为=Avro+registry;OTel=OTLP+semconv;不要求 OTel span 过行为 Avro;统一治理目录。
+- **OTel 信号(R3 措辞修正)**:**本期采用稳定 OTLP 管道 `traces/metrics/logs`**;GenAI event 表达为 **LogRecord 或 SpanEvent**;Events 是演进中的特殊 log 类型、Profiles 2026-03 进 public alpha——**均本期不纳入、预留扩展**(删 `otel.events` 是**本期范围裁决**,非"OTel 永远只有三信号"的事实判断)。
+- **不冻结裸属性名,冻结** `semconv_source/semconv_version/schema_url/compatibility_policy`(pin OTel core 1.x + GenAI semconv release/commit)。**命名一致性**:有 pinned semconv 定义→用标准名(`gen_ai.provider.name`、`gen_ai.response.finish_reasons` 数组);**无标准定义→`aura.*`**(`aura.agent.code`/`aura.tool.name`/`aura.tool.outcome`/`aura.gen_ai.cost.*`/`aura.security.*`),**禁无 owner 的裸命名空间**。`gen_ai.usage.cost` 非现成标准→用 `aura.gen_ai.cost.*` 或 usage record。
 
-每个 deployment cell/环境/区域默认共用一套 Kafka + 一套 ClickHouse,经 topic/database/RBAC/quota/资源组逻辑隔离;容量/合规/数据驻留/故障域达阈值时**允许物理拆分,逻辑契约不变**。本地 host-first 不跑两套 CH。
+### 2.9 共享底座:默认共享、逻辑分域、阈值可拆(拓扑可变、逻辑契约冻结)
+部署单元默认共用一套 Kafka + 一套分析存储,经 topic/database/RBAC/quota 逻辑隔离;容量/合规/数据驻留/故障域达阈值时允许物理拆分、逻辑契约不变。本地 host-first 不跑两套 CH。
 
 ### 2.10 采样/TTL:统一策略模型 + 分域执行适配器
-
-```text
-统一治理/策略模型 → BehaviorSamplingAdapter / OtelTailSamplingAdapter / ClickHouseRetentionAdapter / PostgresRetentionAdapter
-```
-共享策略模型与治理界面,**执行机制分域**(行为采样在 SDK/collect/consumer;trace 采样在 SDK head + Collector tail;TTL 行为按 event type/删除、trace 按错误·慢·安全·敏感级)。
+统一策略/治理模型 → `BehaviorSamplingAdapter`/`OtelTailSamplingAdapter`/`{ClickHouse,Postgres}RetentionAdapter`;执行机制分域(§2.5 采样单位)。
 
 ### 2.11 freeze / version 清单
-
 | 冻结(不变量) | 版本化(可演进) |
 |---|---|
-| 数据归属 / 原始事实源唯一性 | 具体 TTL 天数 |
-| 关联键语义 + 强弱归因分级 + correlation 快照(§2.3/§2.6) | 采样比例 |
-| topic/database 命名 + wire contract(§2.7) | ClickHouse 精确 DDL / 分区数 |
-| 可靠性分级 + outbox + 幂等键(§2.4) | **流处理引擎(Flink / Kafka Streams)** * |
-| 保真分级 + 成本独立记录(§2.5) | 物理集群数量 |
-| PII 分类 / schema 兼容(backward) | 具体 widget / 看板 |
-| seam 输出模式 + 跨域引用(§2.6/§6) | Mobile 时点 |
+| 数据归属/原始事实源唯一性(含计费=usage record) | TTL 天数 / 采样比例 |
+| 关联键语义 + 强弱归因分级 + 1:N 基数 + correlation 快照 | ClickHouse 精确 DDL/分区数 |
+| topic/database 命名 + wire + **Kafka key matrix** | **流处理引擎(Flink/Kafka Streams)** * |
+| 可靠性分级 + outbox 同库约束 + 幂等键 | 物理集群数量 |
+| 保真分级 + 成本独立记录 + 采样单位/测量模式 | 具体 widget/看板 |
+| PII 分类 / Avro `BACKWARD_TRANSITIVE` | Mobile 时点 / 域 C 商业策略 |
+| seam 输出模式 + 跨域引用 + **分析存储 port** | **ClickHouse 作为 reference impl 的实现细节** |
 
-\* **引擎可变,但保住引擎可选性的 keying 是不变量**:session 化要求"同 session→同 partition"(key=`tenantId:anonId`),**M1 建 topic 时即冻结**。正文目标架构保持引擎中立(不把 Flink 写成已选终局)。
+\* 引擎可变,但 session-preserving key(`tenant_id:client_session_id`)M1 即冻结。正文保持引擎中立(不把 Flink 写成已选)。
 
 ---
 
 ## 3. 共享底座
-
 | 组件 | 共享方式 |
 |---|---|
-| **Kafka** | 一集群;topic 见 §2.7;分区按 `tenantId` 哈希 + session-preserving key |
-| **ClickHouse** | 一集群分库:`behavior.*` 与 `otel_traces`/`otel_logs`;**分区改低基数**(见下);共享关联列 |
-| **PostgreSQL** | 行为 minimal 存储 + `ab_ai_trace` 投影 + `ab_agent_observation` 判定层 + `behavior_outbox` |
+| **Kafka** | 一集群;topic 见 §2.7;key matrix 见 §2.7 |
+| **分析存储** | **`AnalyticalStorePort` 不变量;ClickHouse=reference impl**;一集群分库 `behavior.*`/`otel_*` |
+| **PostgreSQL** | 行为 minimal 存储 + `ab_ai_trace` 投影 + `ab_agent_observation` 判定 + 业务库内 outbox |
 | **治理目录** | 事件/属性 catalog、owner/版本/分类、覆盖率、跨域关联键 |
-| **薄上游共享** | context 获取(tenant/user/session/trace)、分类/脱敏/consent 接口、统一时钟+ULID/event-id、correlation 传播读写 |
-| **本地** | host-first 零 docker:CH 原生 binary / Flink standalone / Jaeger·otelcol 二进制,slot 隔离;minimal 档零新增依赖 |
+| **薄上游共享** | context 获取、分类/脱敏/consent 接口、统一时钟+ULID/event-id、correlation 传播 |
+| **本地** | host-first 零 docker;minimal 档零新增依赖 |
 
-**行为明细表分区(改阻塞 8,改掉上一版 `PARTITION BY (tenantId, day)` 反模式)**:
+**ClickHouse reference DDL(版本化,非冻结;最终排序键由真实 workload 验证)**:
 ```sql
 PARTITION BY toYYYYMM(occurred_at)             -- 低基数;按日 TTL 价值大再评估 toDate
 ORDER BY (tenant_id, event_name, occurred_at, event_id)   -- tenant 进排序键,不进 PARTITION BY
 ```
-**跨域关联用显式投影,不长期 JOIN 两张原始大表**:
+**`interaction_trace_link`(1:N,显式投影,不长期 JOIN 两原始大表)**:
 ```text
-interaction_trace_link(tenant_id, interaction_id, behavior_event_id, trace_id, root_span_id, run_id, linked_at, link_type)
+link_id, tenant_id, interaction_id, behavior_event_id, trace_id, root_span_id, run_id,
+link_method(explicit_header|server_outcome|reconstructed), link_confidence(exact|heuristic),
+projection_version, first_seen_at, last_seen_at
+唯一键允许一对多:(tenant_id, interaction_id, trace_id, behavior_event_id)
 ```
 
 ---
 
 ## 4. 可观测域(A)
-
 ### 4.1 现状(call-site 实证)
-两套并行"鹰眼",各自真在跑、traceId 不互通:① 基础设施 tracing(OTel→Jaeger,HTTP 入站 span 自动 / 10 处 `@Observed` / `TraceIdResponseFilter` 回写;本地 dev 默认关、Jaeger 未自动起)【实测】;② 自研 AI 链路(`ab_ai_trace`/`_span`,run/tool/turn 真写 + `/aurabot/traces` UI,自研 UUID 与 OTel 无关)【实测】;③ L3 观测(6 发布者)/L4 评估/审计 全 wired【实测】。
-
+两套并行"鹰眼",各自真在跑、traceId 不互通:① 基础设施 tracing(OTel→Jaeger,HTTP 入站 span 自动 / 10 处 `@Observed` / `TraceIdResponseFilter`;dev 默认关、Jaeger 未自动起)【实测】;② 自研 AI 链路(`ab_ai_trace`/`_span` + `/aurabot/traces`,自研 UUID 与 OTel 无关)【实测】;③ L3 观测(6 发布者)/L4 评估/审计 全 wired【实测】。
 ### 4.2 Gap
-A-G1 两套 traceId 不通 / A-G2 审计三表无 trace_id(`X-Request-ID` 孤儿)/ A-G3 日志缺 `%X{traceId}` / A-G4 Kafka 跨消息断链 / A-G5 无运行时实证 / A-G6 LLM 成本未计算。
-
+A-G1 两 traceId 不通 / A-G2 审计无 trace_id(`X-Request-ID` 孤儿)/ A-G3 日志缺 `%X{traceId}` / A-G4 Kafka 断链 / A-G5 无实证 / A-G6 成本未计算。
 ### 4.3 目标
-OTel 骨架:agent/LLM/tool 改发 OTel span(GenAI semconv),全链一 traceId;`ab_ai_trace` 翻转为**投影 consumer**(P1 先盖 OTel traceId,P3 换投影,P5 关直接写库)。**投影契约列为验收目标(非既成事实)**,明细回领域设计:UUID↔32-hex 兼容 / span 映射 / root span 识别 / 乱序·late span / 幂等键 `(tenant_id,trace_id,span_id)` / `projection_version,is_complete,projection lag` / backfill / 双轨比对 / feature flag 回滚。
-
-### 4.4 埋点(GenAI semconv + 扩展,改阻塞 6)
-- 强制属性按 §2.3 矩阵;LLM:`gen_ai.provider.name`(非废弃 `gen_ai.system`)`gen_ai.request.model` `gen_ai.usage.input_tokens/output_tokens` `gen_ai.response.finish_reasons`(数组)`gen_ai.operation.name` + `agent.code/tool.name/tool.outcome` + 成本走 `aura.gen_ai.cost.*`/usage record + 安全 `aura.security.*`。
-- **Kafka span**:单消息无 ambient → MAY parent-child;**批量 receive / 已有 ambient context → SHOULD span links**(一个 span 只能一个 parent)。
-- **Collector 可靠性**:Kafka exporter 是同步 producer,须 batch + queued retry;重要链路启用持久化 WAL,监控 queue/drop;tail sampling 处理 late spans/decision cache/trace affinity/内存。
-
+OTel 骨架;`ab_ai_trace` 翻转为投影 consumer(P1 盖 traceId→P3 投影→P5 关直写)。投影契约列为**验收目标**,明细回领域设计(UUID↔32-hex/span 映射/root 识别/乱序·late/幂等键 `(tenant_id,trace_id,span_id)`/`projection_version,is_complete`/backfill/双轨比对/flag 回滚)。
+### 4.4 埋点(命名按 §2.8:标准名优先、否则 `aura.*`)
+强制属性按 §2.3;LLM `gen_ai.provider.name`/`gen_ai.request.model`/`gen_ai.usage.input_tokens·output_tokens`/`gen_ai.response.finish_reasons` + **`aura.agent.code`/`aura.tool.name`/`aura.tool.outcome`** + 成本 `aura.gen_ai.cost.*`(或 usage record)+ 安全 `aura.security.*`。Kafka span:单消息无 ambient→MAY parent-child;批量/已有 ambient→SHOULD span links。Collector:Kafka exporter 同步 producer 须 batch+queued retry、重要链路 WAL、监控 queue/drop;tail sampling 处理 late/decision cache/affinity/内存。
 ### 4.5 分析
-SRE:p50/p95/p99、错误率、环节耗时、慢查询(`MetaPerformanceMonitor`+`SlowQueryInterceptor`→Prometheus+Grafana RED/USE;span 时延进 CH)。安全:`trace_id` 串"命令→查询→观测→审计"。Agent 技术质量:喂 eval 飞轮——runtime eval 同步控制(§2.5)、offline eval 读 CH 历史做发布门禁。
+SRE(p50/p95/p99、错误率、慢查询→Prometheus+Grafana RED/USE)/ 安全(`trace_id` 串命令→查询→观测→审计)/ Agent 质量(runtime eval 同步、offline eval 读 CH 门禁)。
 
 ---
 
 ## 5. 行为分析域(B)
-
 ### 5.1 现状(带证据)
-`grep spm` 全仓 0 命中(无通用埋点);但零件现成【实测,领域设计 §2】:`AdminLayout` 已有 pageview 钩子(落点是状态覆盖表,无流水)/ `ab_agent_observation` 是唯一 append-only 流水范式 / `KafkaMqProvider`+DLQ 可复用 / DSL Dashboard 35+ 图表(funnel/heatmap 已有,分析层 ~70% 现成)/ `BlockRenderer`+`block.id`+`fieldCode` 是 SPM 自动派生基础。
-
+`grep spm` 全仓 0 命中【实测,领域设计 §2】;零件现成:`AdminLayout` pageview 钩子(落点状态覆盖表无流水)/ `ab_agent_observation` append-only 流水范式 / `KafkaMqProvider`+DLQ / DSL Dashboard 35+ 图表(funnel/heatmap 已有,~70% 现成)/ `BlockRenderer`+`block.id`+`fieldCode` 是 **UI 元素身份自动派生**基础。
 ### 5.2 Gap
-集中在 ① 事件流水留存 ② 元素级 SPM ③ 真实时流处理 ④ 采样/限流 ⑤ 留存/Sankey/实时大盘 widget ⑥ 隐私合规(详领域设计 §3)。
-
-### 5.3 架构(双轨采集 + 服务端 outcome 入口)
+① 事件流水留存 ② **UI 元素身份 + 自动采集** ③ 真实时流处理 ④ 采样/限流 ⑤ 留存/Sankey/实时大盘 widget ⑥ 隐私合规(详领域设计)。
+### 5.3 架构(自动采集 + 声明式事件 + 服务端 outcome 入口)
 ```text
-双轨 SDK(自动 pageview/click/exposure + SPM 声明)→ 批量缓冲 sendBeacon
-   → /api/collect(BeaconController:服务端权威补全 tenant/user + registry 校验 + 采样 + 脱敏 + 背压)
-   → aura.behavior.events.v1(Avro)
-   → StreamProcessorPort(SPI):full=Flink / minimal=Kafka-consumer 微批(引擎中立,§2.11*)
-   → BehaviorStorePort(SPI):full=ClickHouse / minimal=PG 分区
+SDK(自动 pageview/click/exposure + 声明式语义事件)→ 批量缓冲 sendBeacon
+   → /api/collect(服务端权威补全 tenant/user + registry 校验 + 采样 + 脱敏 + 背压)→ aura.behavior.events.v1(Avro)
+   → StreamProcessorPort(full=Flink / minimal=微批,引擎中立)→ BehaviorStorePort(full=CH / minimal=PG)
    → /api/analytics/*(events/aggregate/funnel/retention/path/realtime-SSE)→ DSL Dashboard + 新 widget
-服务端 outcome 入口(b):应用内 publisher →(outbox,§2.4)→ aura.behavior.events.v1
+服务端 outcome 入口(b):应用内 publisher →(outbox 同业务库事务,§2.4)→ aura.behavior.events.v1
 ```
+### 5.4 事件模型 + UI 元素身份契约(删除 SPM,R3)
+**主模型 = 事件优先**(`event_name` 表语义),对齐 GA4(event-based;UA 标准 property 2023-07-01 起停止处理新数据)/ Segment(语义事件 + Tracking Plan 治理 Page·Track)/ Amplitude·PostHog(自动采集 + 业务精确事件双轨)。**删除 SPM 模型**(四段码/`spm` 字段/语法/registry/SPM 专属分析);保留**薄 UI 元素身份契约**:
+- **稳定 join key = `ui_element_id`**(不可变)。`ui_path`(如 `crm/lead-list/toolbar/create`)仅派生可读、非键、非冻结。事件元素信息:
+  ```text
+  ui_element: { definition_id(=ui_element_id), app_id, page_id, block_id, element_code,
+                component_path[], identity_source(dsl|declared|autocapture), identity_quality(stable|degraded|heuristic) }
+  ```
+- **ID 生命周期**:rename→ID 不变;move→ID 不变、path 变;copy/clone→新 ID;delete/recreate→新 ID;migrate→registry 存历史 path alias。`component_path[]` 表达嵌套(page→tab→form→field→action),**不把整树压进单段**;查询 API 支持任意层级过滤;四段仅作 v1 可读形式,非唯一物理模型。
+- **自动 vs 声明事件(必冻结其一,默认 `augment`)**:`augment`(自动 click + 语义事件都发,语义事件 `caused_by_event_id`→自动 click,共享 `interaction_id`)/ `replace`(声明节点只发语义事件)/ `off`。看板按 `event_category`(ui_interaction|navigation|business_intent|business_outcome|experiment)区分,**禁把 generic click 与 semantic action 混算**。**业务完成事件优先由服务端事务 seam 发布**(§2.4),不把按钮点击当业务成功。
+- **autocapture 隐私 allowlist**:默认**禁**采 input/textarea value、innerHTML、完整 textContent、完整 href/query、未登记 `data-*`、全量 class、record/content id;默认**只允许** `ui_element_id`、tag、role、allowlist 内 aria、稳定 page/block/element 标识、清洗后 route template。autocapture(`identity_quality=heuristic`)**不可直接用于长期 KPI / 核心漏斗 / 发布门禁**,须先在治理页提升为 declared/stable。
+- DOM 标记 `data-aura-element-id`(替代 `data-spm`)。**完整契约见领域设计的"UI Element Identity Contract"**(§五最小冻结清单)。
 
-### 5.4 事件模型与 SPM 定位(事件优先;SPM = 属性,非模型)
-**主模型 = 事件优先**(`event_name` + params),对齐 **Google GA4**(event-based,2023 起取代 Universal Analytics 的 pageview/坑位范式;gtag/GTM + dataLayer + enhanced measurement 自动采)与 Segment/Amplitude/PostHog 的"语义事件 + autocapture"收敛。**SPM 不是事件模型,是事件上的一个属性**(稳定元素身份)。
-- **为何降级**:阿里 SPM(2013 淘系)是"位置码 + URL 透传",绑定多页应用链接跳转;SPA/低代码下 URL 透传过时。**丢掉 URL 透传**,跨页/跨事件因果改用 `interaction_id`(§2.3,对应 GA4 不靠坑位码、靠事件参数+关联键)。
-- **为何保留(差异化)**:通用 web 的 SPM 痛点是"每个链接手动装饰"→业界转 autocapture(CSS 指纹,改版即漂)。**AuraBoot 是低代码,DSL 树已声明结构**→`BlockRenderer` 零配置自动派生稳定 `spm=a.b.c.d`(`应用域.pageKey.blockId.elementCode`),**同时拿到 autocapture 的零手工 + SPM 的跨版本稳定身份**——别家做不到的护城河。保留 DSL 自动派生 + autocapture 兜底(双轨)。
-- **语法需冻结**(允许字符 / `.` 转义 / 最大长度 / 大小写 / SPM 版本 / `block.id` 缺失降级 `spm_quality=degraded` / 禁把 record·content id 放进 SPM)+ 曝光阈值·停留·去重 + A/B `experiment_id/variant_id`——**完整语法见领域设计**。
-
-### 5.5 BehaviorEvent v1(信封关键字段 + 收窄 agent_obs)
-关键字段:`schema_version, event_id, event_name, event_category, source, occurred_at, received_at, tenant_id, user_id/anon_id, client_session_id, derived_session_id, interaction_id, trace_id, source_span_id, run_id, props, producer_name, producer_version, consent_state, consent_version, sampling_probability`。约定:客户端 ULID 首次入队生成、重试不重生成;未知 event_name 进 quarantine;`api` 若指接口耗时/错误率→**删,归 OTel**,若指用户业务 API 动作→改清晰业务名。
-- **与 §2.1 对齐(改行为草稿 §7)**:**删除 `eventType=agent_obs` 整条遥测收编**;Agent 业务结果经入口(b)以业务 `eventName`(`agent.task.completed`/`agent.handoff`/`agent.abandoned`)发出,技术遥测归 OTel。
-- **完整信封 / quarantine / 权限 `analytics.*` / 身份·consent 分层 见领域设计。**
-
+### 5.5 BehaviorEvent v1(信封关键字段)
+`schema_version, event_id, event_name, event_category, source, occurred_at, received_at, tenant_id, user_id/anon_id, client_session_id, interaction_id, caused_by_event_id, trace_id, source_span_id, run_id, ui_element{...§5.4}, props, producer_name, producer_version, consent_state, consent_version, sampling_unit, sampling_probability`。约定:客户端 ULID 首次入队生成、重试不重生成;未知 event_name 进 quarantine;`api` 若指接口耗时→删归 OTel,若指业务动作→改业务名;**Server BusinessEvent 不要求 run_id,仅 Agent Outcome 要求**(§2.3);`derived_session_id` 不在原始信封(§2.3)。Agent 业务结果经入口(b)以业务 `eventName`(`agent.task.completed`/`agent.handoff`/`agent.abandoned`)发出。**完整信封/quarantine/权限 `analytics.*`/身份·consent 分层见领域设计。**
 ### 5.6 存储 SPI(`BehaviorStorePort`)
-`writeBatch / queryEvents / queryAggregate / queryFunnel / queryRetention / queryPath / queryRealtime / deleteByUser(GDPR)`;full=ClickHouse(分区见 §3)/ minimal=PG 月分区+rollup / 可选 TDengine;`aura.analytics.store.tier`。
-
+`writeBatch/queryEvents/queryAggregate/queryFunnel/queryRetention/queryPath/queryRealtime/deleteByUser(GDPR)`;full=CH/minimal=PG/可选 TDengine。
 ### 5.7 分析
-产品:UV/PV/漏斗/留存/路径 + SPM 点位(看板 70% 现成 + 新 `smart-retention-chart`/`smart-sankey-chart`/`smart-realtime-board`,前后端两边注册)。低代码运营回流:DSL 树派生 SPM → 页面/行动点使用度回流、A/B。
+产品:UV/PV/漏斗/留存/路径 + **UI Element Analysis**(元素级使用率/热力图,看板 70% 现成 + 新 retention/sankey/realtime widget)。运营回流:DSL 树派生稳定元素身份 → 页面/行动点使用度回流、A/B。M2 = **自动采集 + 声明式事件治理**(非"SPM 双轨")。
 
 ---
 
-## 5C. 部署/实例遥测与授权域(域 C)— 开源 phone-home
+## 5C. 部署/实例遥测与授权域(域 C)— **non-normative,本轮不进冻结集**
 
-> 开源后分析"客户版本分布 / 授权情况"的领域。**复用 §2 契约 + §3 底座**(入口→Kafka→ClickHouse→看板、治理目录、consent/隐私、失败容错、F0 可靠性),证明底座领域无关。但**身份 / 信任边界 / 授权**三点必须区别于行为域。业界参考:GitLab Service Ping + Seat Link、PostHog/Sentry/Metabase/n8n/Grafana usage telemetry、HashiCorp license utilization reporting。
+> 开源 phone-home。**作为 architecture fitness test**:验证底座(topic/schema 治理、Kafka/CH、版本偏斜、幂等/重试、隐私、不可信公网客户端)可复用——方向对,但也证明当前 §2(入口/身份矩阵/topic/部署边界)仍按双域设计,需补**第四入口 + 独立身份 + 独立 schema + 授权控制面**才真正泛化。**本期不实施、不声称受 §2 冻结契约覆盖**;开源启动时按本节落地或正式纳入 §2。业界参考:GitLab Service Ping + Seat Link、PostHog/Sentry/Metabase/n8n/Grafana usage telemetry、HashiCorp license utilization reporting。
 
-### 5C.1 是什么
-自托管开源实例**定期向厂商回传**:版本、edition、实例指纹、功能使用、活跃用户数、license key 状态。厂商侧据此出**版本分布 / 功能采纳 / 授权合规**看板。
+### 5C.1 拆 C1 / C2(性质不同,必须分开)
+- **C1 部署/产品遥测**:版本分布、edition、功能采纳、聚合活跃量;可关闭;ClickHouse 分析。
+- **C2 授权用量报告**:席位/配额/合同用量;与 entitlement/billing **对账**;按合同自动或人工提交;**权威落控制面 DB,不以 ClickHouse 为准**。链路:`LicenseUsageStatement → 验签/防重放 → entitlement·billing DB(权威）→ outbox → aura.license.events.v1 → CH 分析投影`。
 
-### 5C.2 与行为域的 4 个关键不同(不能照搬)
-1. **身份模型翻转**:主键不是 `tenant_id/user_id`,是 **`instance_id`(部署指纹)+ `license_key` + `edition` + `version`**;是"多个独立部署 → 一个中央分析",不是"一个部署内多租户"。
-2. **跨信任边界 + 公网入口**:上报方是不可信外部客户端,无共享 session/MetaContext。认证走 **license key / 签名实例 token**(非 MetaContext)+ 反滥用 + **版本偏斜容忍**(老实例发老 schema → Avro backward 长期成立)。
-3. **授权 = 独立控制面**:**版本分布 = 分析**(进 ClickHouse 看板);**license 合规/席位/到期 = 控制功能**。license/usage 事件走 **F0(never-lose / never-sample)+ outbox**(§2.4/§2.5);**接现有 entitlement 底座**(`auraboot.entitlement.enabled`、aura-billing),不另造。
-4. **隐私/opt-out = 开源生死线**:默认透明 + 可 opt-out(部分司法区 opt-in)+ 匿名化 + 公开 telemetry 文档。复用 §9 consent/脱敏原语,但把"可关闭 + 透明"提为一等公民。
-
-### 5C.3 工程要点
-phone-home 客户端要**离线缓冲 + 重试**(同行为 SDK);服务端容忍 late/dup/乱序(§8 失败矩阵已覆盖)。新增 topic:`aura.deployment.telemetry.v1`(分析)/ `aura.license.events.v1`(F0)。
-
-### 5C.4 本期范围
-建议本期**先不实施**域 C(等开源节奏定);**架构契约 §2/§3 已为它预留**,开源启动时按本节落地即可,无需重构底座。
+### 5C.2 关键不同(不能照搬双域)
+1. **第四入口**:公网 instance telemetry gateway(签名信封 + 反滥用/auth/replay protection + canonicalization → Kafka/控制面);**不复用 `/api/collect`、不让外部实例直连 Kafka/registry**。
+2. **独立记录类型**:`DeploymentTelemetrySnapshot` / `LicenseUsageStatement`(**不塞进 BehaviorEvent/OTel span**);topic `aura.deployment.telemetry.v1`(C1)/ `aura.license.events.v1`(C2)**不在 §2.7 冻结列表**(non-normative)。
+3. **身份(不用 raw license key 作身份/长期凭据)**:`installation_id`(首装随机、持久、可重置)+ `subscription_id` + `license_id`(非 secret)+ `reporting_credential`(bootstrap 后签发、可轮换/撤销)+ `report_sequence` + `schema_version`。raw `license_key` 仅首次 bootstrap 换取受限 credential;不用硬件指纹作主身份;尽量实例内聚合、不发用户级数据;报告带 sequence/时间窗/签名,服务端 replay protection。
+4. **F0 ≠ never-lose**:公网/离线/air-gapped 不能承诺端到端不丢。客户端=有界 durable queue + retry backoff + deterministic report id + **人工 export fallback**;服务端=idempotent at-least-once + sequence/replay detection + ack。"精确"指**幂等投影后的业务计数效果**,非传输 exactly-once。
+5. **opt-out 与合同计量分开**:三开关 `product_usage_telemetry` / `version_update_check` / `license_utilization_reporting`(产品分析按法律 opt-in/out;版本检查独立;license 用量是否必需取决于合同/部署模式;air-gapped 支持人工报告;管理员可预览待发 payload;**默认开/关不写成架构不变量**,由产品/法务/版本策略定)。
 
 ---
 
 ## 6. 跨域关联(产品行为 ↔ 技术链路)
-
 ```text
-用户点击(域B,interaction_id=I123)
-   └► X-Aura-Interaction-Id ─► HTTP root span(aura.interaction.id=I123,trace_id=T)
-        ─► Kafka(traceparent 透传)─► Agent run(run_id=R)─► tool ─► LLM(域A,trace_id=T)
+点击(域B,interaction_id=I123,ui_element_id=elm_…)
+   └► X-Aura-Interaction-Id ─► HTTP root span(aura.interaction.id=I123,trace_id=T)─► Kafka(traceparent)─► Agent run(R)─► tool ─► LLM(域A,T)
         ↘ outcome:agent.task.completed(域B,outbox,带 interaction_id/trace_id/run_id)
 ```
-- 关联强度(§2.3):**强** `interaction_id/trace_id/run_id`;**弱** `session_id`;**归因** `user_id`+时间窗(heuristic)。
-- **精确诊断走 `interaction_trace_link` 投影**(§3),不长期 JOIN 两张原始大表;user/session/window 仅归因、显式标 heuristic。
+基数 1:N;精确诊断走 `interaction_trace_link`(§3),user/session/window 仅归因(heuristic)。
 
 ---
 
-## 7. 实施路线(seam-first,改阻塞 7)
-
+## 7. 实施路线(seam-first;S0 在 §2 批准后)
 ```text
-T0(并行):
-  P0 现状实证(不焊契约)  ∥  批准 §2 契约
-
-S0 共享代码契约(seam 只插一次):
-  CorrelationSnapshot / AgentTelemetryFacade / TechnicalTelemetryPort / BusinessOutcomePort
-  / ObservationPort / OutboxPort / topic·schema constants
-
-契约批准后(并行):
-  P1 日志 %X{traceId} + 审计表 trace_id + ab_ai_trace 盖 OTel traceId
-  M1 Web behavior 采集(/api/collect + Kafka + PG minimal + 自动 pageview/click + 基础 UV/PV + 多租户 + 权限 + 隐私基线 + golden);
-     **Agent 业务 outcome 不依赖 Flink**,先进 Kafka+PG minimal,实时漏斗后补
-
-随后:
-  P2 OTel adapter 实现(agent/LLM span + Kafka traceparent 透传)  ∥  M1/M2 outcome adapter + SPM + 治理 + 漏斗
-  Observation 按迁移计划切 derived-only
-
-最后:
-  P3/P4/P5 Collector / ClickHouse / 投影 / 分析 / 收口  ∥  M3/M4 深度分析 / 实时流
+T0(并行):P0 现状实证(不焊契约) ∥ §2 评审 + 领域设计去冲突 + 批准
+§2 批准后:S0 共享代码契约(含 topic/schema/key constants = 固化契约,故必在批准后)
+  CorrelationSnapshot / AgentTelemetryFacade / TechnicalTelemetryPort / BusinessOutcomePort / ObservationPort / OutboxPort
+S0 合并后(并行):P1(日志 %X{traceId}+审计 trace_id+ab_ai_trace 盖 traceId) ∥ M1(Web 采集+/api/collect+Kafka+PG minimal+自动采集+基础 UV/PV+多租户+权限+隐私基线+golden;Agent outcome 走 outbox 进 Kafka+PG,不依赖 Flink)
+随后:P2(OTel adapter+Kafka traceparent) ∥ M2(UI 元素身份+治理+漏斗);Observation 切 derived-only
+最后:P3/P4/P5(Collector/CH/投影/分析/收口) ∥ M3/M4(深度分析/实时流)
 ```
-
-**P0 验收(改阻塞 7,与已知 gap 一致——不要求统一端到端)**:① HTTP 入站 span 在 Jaeger 可见 ② 自研 trace 在 `/aurabot/traces` 可见 ③ 两者 ID 确认不同 ④ Kafka 后链路确认断开 ⑤ 产出基线 trace topology 证据。**统一端到端链路 = P2 验收。**
-
-| 域A | 域B | 依赖 |
-|---|---|---|
-| P0 实证 / P1 关联统一 | M1 采集底座(含 server outcome via outbox) | S0 后并行 |
-| P2 OTel adapter | M2 SPM+治理+漏斗 | 共用底座(§3) |
-| P3/P4/P5 | M3/M4 | Agent 边界统一(§2.1/§2.6 已前置 S0) |
+**P0 验收(基线拓扑,不要求统一端到端)**:① HTTP span 在 Jaeger ② 自研 trace 在 `/aurabot/traces` ③ 两 ID 确认不同 ④ Kafka 后链路确认断 ⑤ 基线 trace topology 证据。统一端到端=P2 验收。
 
 ---
 
 ## 8. 测试策略(真栈,host-first 零 docker)
-
-- **happy 路径 golden**:行为(SPM 派生纯函数 + 真浏览器点击→`/api/collect`→落库反查)/ 可观测(P0 Jaeger 基线 + Kafka traceparent round-trip 契约 + 审计 trace_id 反查)/ 存储 SPI 双实现同契约套 / dashboard golden(真数据→真 widget→断言数值)。
-- **失败场景(必验)**:业务提交后/事件发布前 crash · Kafka 不可用/恢复/replay · Collector queue 满 · 重复消息 · 乱序 · late span/late 行为 · 客户端时钟偏差 · 新旧 schema 混跑 · 投影 consumer 重启+backfill · 跨租户伪造 tenantId · consent 撤回 · PII 脱敏 · GDPR 删除 · tail-sampling 压力 · CH 查询时重复。
-- **跨域 golden 拆三步**(不把浏览器事件描述成经 Collector):A 浏览器→behavior pipeline→behavior 表;B HTTP/Agent→OTel pipeline→Jaeger/trace 表;C `interaction_id`→`interaction_trace_link` 断言关联正确。
-- **平台自身 SLO**:accepted/rejected/sampled/dropped · Kafka lag · Collector queue util · DLQ/quarantine age · correlation coverage · duplicate rate · ingest-to-query freshness · `ab_ai_trace` projection lag · 查询 p95 · 删除 SLA · 插桩对业务 p99 的额外开销。
+- **happy golden**:行为(UI 元素身份派生纯函数 + 真浏览器点击→`/api/collect`→落库反查)/ 可观测(P0 Jaeger 基线 + Kafka traceparent round-trip + 审计 trace_id 反查)/ 存储 SPI 双实现同契约套 / dashboard golden(真数据→真 widget→断言数值)。
+- **失败场景(必验)**:业务提交后/发布前 crash · Kafka 不可用/恢复/replay · Collector queue 满 · 重复/乱序 · late span/late 行为 · 时钟偏差 · 新旧 schema 混跑 · 投影重启+backfill · 跨租户伪造 tenantId · consent 撤回 · PII 脱敏 · GDPR 删除 · tail-sampling 压力 · CH 查询时重复 · 并发点击 interaction 不串线。
+- **跨域 golden 拆三步**:A 浏览器→behavior→behavior 表;B HTTP/Agent→OTel→trace 表;C `interaction_id`→`interaction_trace_link` 断言关联。
+- **平台 SLO**:accepted/rejected/sampled/dropped · Kafka lag · Collector queue · DLQ/quarantine age · correlation coverage · duplicate rate · ingest-to-query freshness · `ab_ai_trace` projection lag · 查询 p95 · 删除 SLA · 插桩对业务 p99 开销。
 
 ---
 
 ## 9. 风险与缓解
-
 | 风险 | 缓解 |
 |---|---|
-| CH/Flink/Jaeger 破"本地零 docker" | host-first 原生 binary;minimal 档零依赖 |
-| 业务提交后事件丢失 | F0 transactional outbox(§2.4) |
-| outcome 重试双计 | 确定性幂等键 + sink 去重(§2.4) |
-| 采样致成本/eval 失真 | 保真分级 + 独立 usage record + runtime eval 同步(§2.5) |
-| 异步丢 ThreadLocal 上下文 | seam 同步快照(§2.6) |
-| 高基数分区爆 parts | 低基数时间分区 + tenant 进排序键(§3) |
-| 两支开发线撞 chokepoint | S0 seam-first 一次插桩(§7);收口走 `ConversationTurnService` |
-| semconv 漂移 | pin 版本 + 兼容策略,实现核对(§2.8) |
-| 匿名上报伪造 tenant | 受信 site/app key/host binding/签名 token,不信客户端 tenantId |
-| 隐私合规 | OTel 用 user.hash 不传明文 / user_id 不作 Prometheus label / prompt·completion 默认关 + 源端脱敏 / GDPR 删除覆盖 user_id+anon_id+identity link+原始+投影 |
-| 私有化 Flink 运维重 | 私有化默认 minimal 微批 |
+| 本地零 docker | host-first 原生 binary;minimal 零依赖 |
+| 业务提交后丢事件 | F0 同库 transactional outbox(§2.4) |
+| outcome 重试双计 | 终态/可重复幂等键 + sink 去重(§2.4) |
+| 采样致成本/eval/漏斗失真 | 计费独立 usage record + session 级确定性采样 + measurement_mode(§2.5) |
+| 异步丢 ThreadLocal | seam 同步快照(§2.6) |
+| 并发点击 interaction 串线 | 显式 `withInteraction` 作用域(§2.3) |
+| 高基数分区 | 低基数时间分区 + tenant 进排序键(§3) |
+| 撞 chokepoint | S0 seam-first 一次插桩;收口走 `ConversationTurnService` |
+| semconv 漂移 | pin 版本 + 兼容策略 + 命名一致(§2.8) |
+| autocapture 采 PII | 默认 deny allowlist + heuristic 不入 KPI/门禁(§5.4) |
+| 匿名/公网伪造身份 | 受信 key/签名 token;域 C installation_id+reporting_credential、不用 raw license key(§5C) |
+| 隐私合规 | user.hash 不传明文 / 不作 Prometheus label / prompt·completion 默认关+源端脱敏 / GDPR 删除覆盖 user_id+anon_id+identity link+原始+投影 |
 
 ---
 
 ## 10. 待 owner 拍板
-
-**A. 批准 §2 冻结契约前必须拍板**:① topic 名称/payload/key(§2.7 已给建议,确认即冻结)② OLAP = ClickHouse 还是保持逻辑中立 ③ 规模假设(SaaS 千万级/天、私有化 ≤百万级/天?)④ 业务 outcome 是否本期进入 ⑤ 审计/安全事件最低可靠性范围(是否本期实施 `aura.audit.events.v1`)。
-
-**B. 不阻塞冻结(版本化)**:Flink vs Kafka Streams(引擎中立,keying 已冻结)/ Mobile M4 vs M4+ / 具体 widget / 采样率 / TTL 天数。
+**A. 批准 §2 前必须**:① 确认 §2.7 topic + **Kafka key matrix**(已给建议)② 规模假设(SaaS 千万级/天、私有化 ≤百万级/天?)③ 业务 outcome 是否本期进入 ④ 审计/安全事件本期是否实施 `aura.audit.events.v1` ⑤ **执行门禁:两份下位领域设计去冲突 + 本文同 PR**(§1.3)。
+**B. 已由本版裁决(owner 可override)**:分析存储 = port 冻结 + ClickHouse reference impl(原"OLAP 待选"open item 关闭);域 C = non-normative;事件模型删 SPM。
+**C. 不阻塞(版本化)**:Flink vs Kafka Streams / Mobile 时点 / widget / 采样率 / TTL / 域 C 商业策略。
 
 ---
 
-## 11. 本版相对上一版的修改(纳入第二轮评审 8 项 CHANGES)
-
-1. 文档身份/层级澄清(SoT 候选 + 内嵌 §2 拟冻结契约 + 旧草稿降领域设计去冲突,不再"supersede 又依赖")。
-2. §2.7 wire contract 定死 + **删除臆造 `otel.events`**;引擎中立(不把 Flink 写成已选)。
-3. §2.3 关联键改"词典 + 必填矩阵 + 强弱归因分级",**新增 `interaction_id`** 与 session 两层。
-4. §2.4 可靠性分级 + **transactional outbox**(F0 never-lose),区分丢失与重复。
-5. §2.5 保真分级 F0–F3 + **独立 `GenAiUsageRecord`** + runtime eval 同步控制。
-6. §2.8/§4.4 semconv **pin 版本**(`gen_ai.provider.name`/`finish_reasons`/成本 `aura.*`)+ Kafka span links + Collector 可靠性。
-7. §7 路线 **S0 seam-first**(chokepoint 只插一次)+ P0 验收改基线拓扑(不要求统一端到端)+ Agent outcome 不等 M4。
-8. §3 ClickHouse **低基数分区**修正 + `interaction_trace_link` 投影;§8 补失败场景矩阵 + 平台 SLO;§10 拆"冻结前必拍 / 不阻塞"。
-
-**2026-06-20 修订(SPM 定位 + 第三域):**
-9. §5.4 SPM 降为**事件属性**、主模型改**事件优先**(对齐 Google GA4 / Segment)、**删 URL 透传**(保留 DSL 派生 + autocapture 兜底);§0/§1.1 同步。
-10. 新增 **§5C 部署/实例遥测与授权域(开源 phone-home)**——复用 §2/§3 底座,点明 instance 身份 / 公网 license-key 入口 / license 走 F0 / 接 entitlement / opt-out;验证底座领域无关。
+## 11. 修订历史
+**R1(2026-06-19)** 两草稿合并单一 SoT。
+**R2(2026-06-20,第二轮评审 8 项)** 文档身份/层级;wire contract 定死 + 删 `otel.events`;关联键词典+矩阵+`interaction_id`+session 两层;可靠性分级+outbox;保真分级 F0–F3+`GenAiUsageRecord`;semconv pin;S0 seam-first + P0 基线验收;ClickHouse 低基数分区 + `interaction_trace_link` + 失败矩阵 + SLO。
+**R3(2026-06-20,第三轮评审)**
+1. **删除 SPM 模型** → 事件优先 + `ui_element_id` 稳定 join key + ID 生命周期 + auto/declared(augment 默认)+ caused_by + event_category + autocapture 隐私 allowlist + 导航分场景(`navigation_id`/显式 `withInteraction`);`data-spm`→`data-aura-element-id`。
+2. **token 事实源裁决**:OTel=诊断 usage 属性,`GenAiUsageRecord`=唯一计费源(§2.0/§2.1/§2.5)。
+3. **observation 引用**:`subject_type+subject_id`+`source_ref`≥1;trace/span 仅 span-subject 必填。
+4. **幂等**:终态 vs 可重复(handoff)分键;**Server BusinessEvent 不要求 run_id**(仅 Agent Outcome)。
+5. **derived_session_id** 移出原始信封(投影态)。
+6. **Kafka key matrix**(按来源)+ `partition_key_kind/version`;Avro `BACKWARD_TRANSITIVE`。
+7. **outbox 同业务库事务**约束 + seam 位置;示例置于 `@Transactional` 状态 seam。
+8. **保真**:`sampling_unit`/`measurement_mode=exact|estimated`;漏斗默认 session 级确定性采样。
+9. **semconv 措辞**:OTLP 三信号为本期范围裁决(非事实判断),Events/Profiles 预留;`aura.*` 命名一致(无裸命名空间)。
+10. **interaction 基数 1:N**;`interaction_trace_link` 加 link_method/confidence/version。
+11. **OLAP 二义消解**:`AnalyticalStorePort` 冻结 + ClickHouse reference impl;CH DDL/分区移入版本化。
+12. **域 C non-normative**:拆 C1/C2 + 第四入口 + 独立 record/topic + `installation_id`/`reporting_credential`(非 raw license key)+ F0 改"Unsampled+Durable"+ 三 opt-out 开关。
+13. **措辞**:"两个核心领域 + 可扩展领域";**合并门禁**(领域设计去冲突同 PR)。
 
 ---
 
 ## 附录 A — 实证锚点(file:line)
-
 | 主题 | 锚点 |
 |---|---|
-| AI Trace 表/Service | `auraboot/platform/.../db/migration/core/V20260618000000__baseline_core_schema.sql`(`ab_ai_trace`/`ab_ai_trace_span`);`framework/agent/trace/AiTraceService.java`;`TraceContext.java` |
+| AI Trace 表/Service | `V20260618000000__baseline_core_schema.sql`(`ab_ai_trace`/`ab_ai_trace_span`);`framework/agent/trace/AiTraceService.java`;`TraceContext.java` |
 | AI Trace 写入点 | `AgentRunService.java:185/427/454/464`、`ToolLoopService.java:221/240/269/319`、`AuraBotChatService.java:352/375/416/695` |
 | AI Trace 读侧 | `AiTraceController`(`/api/ai/traces`);`web-admin/app/plugins/core-aurabot/pages/ai-trace/index.tsx` |
 | Agent 观测/评估 | `AgentObservationService`(`@Async @EventListener`,6 发布者);`ScheduledOnlineEvalJob`(默认关);`AgentOnlineEvalService`;`HeuristicTurnQualityJudge` |
-| L1 配置/依赖 | `application.yml`(`management.tracing`/`logging.pattern`);`application-dev.yml`(`tracing.enabled:false`);`build.gradle`(`micrometer-tracing-bridge-otel`/`opentelemetry-exporter-otlp`/`micrometer-registry-prometheus`,Spring Boot 3.5.14) |
+| L1 配置/依赖 | `application.yml`/`application-dev.yml`(`tracing.enabled:false`);`build.gradle`(micrometer-tracing-bridge-otel/opentelemetry-exporter-otlp/micrometer-registry-prometheus,Spring Boot 3.5.14) |
 | `@Observed`/Metrics | command/query/permission/plugin import/rest pipeline/dynamic data(10 处);`MetaPerformanceMonitor`;`SlowQueryInterceptor`;`TraceIdResponseFilter` |
-| Kafka | `platform-mq-kafka/.../KafkaMqProvider.java`(裸 producer/consumer);`KafkaSchemaRegistryClient`(已有未用) |
+| Kafka | `platform-mq-kafka/.../KafkaMqProvider.java`;`KafkaSchemaRegistryClient`(已有未用) |
 | 行为现状 | `AdminLayout.tsx:37-51`;`UserEngagementServiceImpl:53-83,127-152`;`BlockRenderer.tsx:62-76`;`HttpClient.ts:59-77`;DSL `widgetRegistry` |
 | 审计表(无 trace 列) | `ab_command_audit_log`/`ab_admin_event_log`/`ab_query_audit_log`/`ab_agent_observation` |
 
-## 附录 B — 关联文档 / 领域设计
-
+## 附录 B — 关联文档 / 领域设计 / 外部对照
 - 方向对齐:`auraboot-enterprise/docs/backlog/2026-06-16-agent-os-gap-analysis.md`
-- 现有 canonical:`auraboot-enterprise/docs/standards/meta/observability.md`、`.../system-reference/subsystems/40-可观测性系统.md`
-- 下位领域设计(去冲突后保留富细节):`feat/observability-unification-plan`(可观测域)、`feat/behavior-analytics-spec`(行为域,含完整 BehaviorEvent 信封/SPM 语法/quarantine/权限/SDK)
-- 外部最佳实践参考(实现时按 pin 版本核对):OTel GenAI semconv / OTel messaging spans(span links)/ OTel Collector kafka exporter + tail sampling / ClickHouse 分区键 / Debezium outbox / Kafka producer idempotence / ClickHouse ReplacingMergeTree / OTel handling sensitive data
+- 现有 canonical:`auraboot-enterprise/docs/standards/meta/observability.md`、`.../subsystems/40-可观测性系统.md`
+- 下位领域设计(**须去冲突后保留**):`feat/observability-unification-plan`、`feat/behavior-analytics-spec`
+- 外部对照(实现时按 pin 版本核对):OTel signals(traces/metrics/logs stable;Events/Profiles 演进)/ GenAI semconv / messaging span links / Collector kafka exporter + tail sampling / ClickHouse 分区键 + ReplacingMergeTree / Debezium outbox / Kafka idempotence / OTel sensitive data / GA4 event model / Segment Track spec / GitLab Service Ping + Seat Link / HashiCorp license utilization / PostHog autocapture allowlist
