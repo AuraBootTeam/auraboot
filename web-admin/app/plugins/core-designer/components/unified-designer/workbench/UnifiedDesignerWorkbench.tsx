@@ -31,6 +31,7 @@ import {
 } from '../utils/recursiveBlockWalker';
 import { setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
+import { useDesignerDocument, serializeDocument } from '../document/useDesignerDocument';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
 import {
   DEVICE_PREVIEW_PRESETS,
@@ -122,8 +123,6 @@ export interface UnifiedDesignerWorkbenchProps {
   aiCopilot?: boolean | { domainGuidance?: string };
 }
 
-const MAX_DOCUMENT_HISTORY = 50;
-
 export function UnifiedDesignerWorkbench({
   initialDocument,
   modelFieldsByModel = {},
@@ -138,12 +137,7 @@ export function UnifiedDesignerWorkbench({
 }: UnifiedDesignerWorkbenchProps) {
   const { locale } = useI18n();
   const initialSnapshot = serializeDocument(initialDocument);
-  const [documentHistory, setDocumentHistory] = useState(() => ({
-    document: initialDocument,
-    history: [initialSnapshot],
-    historyIndex: 0,
-  }));
-  const [savedSnapshot, setSavedSnapshot] = useState(() => serializeDocument(initialDocument));
+  const [savedSnapshot, setSavedSnapshot] = useState(initialSnapshot);
   const savedSnapshotRef = useRef(initialSnapshot);
   const [saveStatus, setSaveStatus] = useState<DesignerSaveStatus>('saved');
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -165,7 +159,25 @@ export function UnifiedDesignerWorkbench({
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
   const [activeDropIntent, setActiveDropIntent] = useState<ActiveDropIntent>(null);
-  const document = documentHistory.document;
+
+  // Toolbar save indicator follows the live document snapshot; wired into the
+  // document kernel's onChange so every edit / undo / redo refreshes it.
+  const syncSaveStateForSnapshot = (snapshot: string) => {
+    setSaveStatus(snapshot === savedSnapshotRef.current ? 'saved' : 'dirty');
+    setSaveError(null);
+    setValidationErrorCount(0);
+  };
+
+  // Shared block-tree document + history kernel. Selection, drag-and-drop, the
+  // block registry, and save/publish state are layered on top by this workbench.
+  const documentKernel = useDesignerDocument({
+    initialDocument,
+    onChange: syncSaveStateForSnapshot,
+  });
+  const document = documentKernel.document;
+  const updateDocument = documentKernel.update;
+  const handleUndo = documentKernel.undo;
+  const handleRedo = documentKernel.redo;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor),
@@ -179,10 +191,10 @@ export function UnifiedDesignerWorkbench({
     [blockRegistry, document.kind],
   );
 
-  const currentSnapshot = serializeDocument(document);
+  const currentSnapshot = documentKernel.currentSnapshot;
   const isDirty = currentSnapshot !== savedSnapshot;
-  const canUndo = documentHistory.historyIndex > 0;
-  const canRedo = documentHistory.historyIndex < documentHistory.history.length - 1;
+  const canUndo = documentKernel.canUndo;
+  const canRedo = documentKernel.canRedo;
 
   const selectedBlockResult = useMemo(
     () => (selectedBlockId ? findBlockById(document.blocks, selectedBlockId) : null),
@@ -194,62 +206,6 @@ export function UnifiedDesignerWorkbench({
     document.modelCode ??
     null;
   const selectedModelFields = selectedModelCode ? (modelFieldsByModel[selectedModelCode] ?? []) : [];
-
-  const updateDocument = (updater: (current: PageSchemaV3) => PageSchemaV3) => {
-    setDocumentHistory((state) => {
-      const snapshot = serializeDocument(state.document);
-      const nextDocument = updater(state.document);
-      const serializedNext = serializeDocument(nextDocument);
-      if (serializedNext === snapshot) return state;
-
-      const nextHistory = [
-        ...state.history.slice(0, state.historyIndex + 1),
-        serializedNext,
-      ];
-      const trimmedHistory = nextHistory.slice(-MAX_DOCUMENT_HISTORY);
-      syncSaveStateForSnapshot(serializedNext);
-
-      return {
-        document: nextDocument,
-        history: trimmedHistory,
-        historyIndex: trimmedHistory.length - 1,
-      };
-    });
-  };
-
-  const syncSaveStateForSnapshot = (snapshot: string) => {
-    setSaveStatus(snapshot === savedSnapshotRef.current ? 'saved' : 'dirty');
-    setSaveError(null);
-    setValidationErrorCount(0);
-  };
-
-  const handleUndo = () => {
-    setDocumentHistory((state) => {
-      if (state.historyIndex <= 0) return state;
-      const nextIndex = state.historyIndex - 1;
-      const snapshot = state.history[nextIndex];
-      syncSaveStateForSnapshot(snapshot);
-      return {
-        ...state,
-        document: parseDocumentSnapshot(snapshot),
-        historyIndex: nextIndex,
-      };
-    });
-  };
-
-  const handleRedo = () => {
-    setDocumentHistory((state) => {
-      if (state.historyIndex >= state.history.length - 1) return state;
-      const nextIndex = state.historyIndex + 1;
-      const snapshot = state.history[nextIndex];
-      syncSaveStateForSnapshot(snapshot);
-      return {
-        ...state,
-        document: parseDocumentSnapshot(snapshot),
-        historyIndex: nextIndex,
-      };
-    });
-  };
 
   // C4 — switch the page kind. Per the owner design decision (2026-06-18), the
   // switch is BLOCKED whenever a descendant block is incompatible with the target
@@ -867,11 +823,7 @@ export function UnifiedDesignerWorkbench({
   // it clean/saved (it now matches the backend exactly).
   const resetToDocument = (nextDocument: PageSchemaV3) => {
     const snapshot = serializeDocument(nextDocument);
-    setDocumentHistory({
-      document: nextDocument,
-      history: [snapshot],
-      historyIndex: 0,
-    });
+    documentKernel.reset(nextDocument);
     savedSnapshotRef.current = snapshot;
     setSavedSnapshot(snapshot);
     setSaveStatus('saved');
@@ -1194,14 +1146,6 @@ function DragGhost({ drag }: { drag: DragData }) {
 function localizedLabel(value: ModelFieldDefinition['label']): string {
   if (typeof value === 'string') return value;
   return value['zh-CN'] || value['en-US'] || Object.values(value)[0] || '';
-}
-
-function serializeDocument(document: PageSchemaV3): string {
-  return JSON.stringify(document);
-}
-
-function parseDocumentSnapshot(snapshot: string): PageSchemaV3 {
-  return JSON.parse(snapshot) as PageSchemaV3;
 }
 
 function formatValidationSaveError(errorCount: number): string {
