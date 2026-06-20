@@ -14,6 +14,9 @@ public class MetaContext {
     private static final ThreadLocal<MetaContext> HOLDER = new ThreadLocal<>();
     private static final ThreadLocal<Long> MEMBER_ID = new ThreadLocal<>();
     private static final ThreadLocal<Long> ENV_ID = new ThreadLocal<>();
+    /** OTel trace id snapshotted at the request seam so async workers / LLM call sites
+     *  can correlate without an active span (A-G6 / §2.6). */
+    private static final ThreadLocal<String> OTEL_TRACE_ID = new ThreadLocal<>();
     private static final ThreadLocal<Boolean> ENV_FILTER_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Boolean> LOCK_GUARD_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Boolean> DATA_PERMISSION_BYPASSED = ThreadLocal.withInitial(() -> false);
@@ -80,9 +83,19 @@ public class MetaContext {
         HOLDER.remove();
         MEMBER_ID.remove();
         ENV_ID.remove();
+        OTEL_TRACE_ID.remove();
         ENV_FILTER_BYPASSED.remove();
         LOCK_GUARD_BYPASSED.remove();
         DATA_PERMISSION_BYPASSED.remove();
+    }
+
+    /** Snapshotted OTel trace id for the current thread (A-G6 correlation); may be null. */
+    public static void setOtelTraceId(String otelTraceId) {
+        OTEL_TRACE_ID.set(otelTraceId);
+    }
+
+    public static String getOtelTraceId() {
+        return OTEL_TRACE_ID.get();
     }
 
     // ---- env-layering extension (PoC) ----

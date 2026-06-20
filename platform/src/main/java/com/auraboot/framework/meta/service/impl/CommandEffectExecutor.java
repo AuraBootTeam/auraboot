@@ -15,6 +15,7 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.OutboxWriter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -40,6 +41,7 @@ public class CommandEffectExecutor {
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
     private final ObjectMapper objectMapper;
+    private final Tracer tracer;
 
     public void executeEffectPhase(List<BindingRule> effectRules,
                             CommandDefinition command,
@@ -92,6 +94,12 @@ public class CommandEffectExecutor {
             auditLog.setPhaseReached(phaseReached);
             auditLog.setPhaseTimings(phaseTimings != null ? objectMapper.writeValueAsString(phaseTimings) : null);
             auditLog.setCreatedAt(Instant.now());
+            // Anchor the audit row to the request's OTel trace (A-G2, P1). Synchronous
+            // command path -> the request span is active on this thread. Null otherwise.
+            if (tracer.currentSpan() != null) {
+                auditLog.setTraceId(tracer.currentSpan().context().traceId());
+                auditLog.setSpanId(tracer.currentSpan().context().spanId());
+            }
 
             commandAuditLogMapper.insertLog(auditLog);
         } catch (Exception e) {
