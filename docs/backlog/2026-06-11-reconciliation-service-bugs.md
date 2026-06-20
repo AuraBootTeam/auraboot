@@ -6,6 +6,9 @@ created: 2026-06-11
 
 # ReconciliationService — product bugs surfaced by coverage IT (2026-06-11)
 
+> ✅ **Bugs 1/2/3 FIXED (2026-06-20, PR #927)** — type-validation case mismatch, null-type clean ValidationException, and count-with-ORDER-BY SQL. IT assertions flipped to correct behavior (35 tests green, no hang).
+> ⏸ **Bug 4 DEFERRED** — persisting the FAILED-run audit despite the outer `@Transactional` rollback. The `REQUIRES_NEW` re-insert approach **deadlocks** against locks held by the still-open outer tx (independent re-run hung >1h). Needs a proper redesign (persist the audit outside the rolled-back tx, e.g. an after-rollback hook / dedicated audit path). Bug 4 stays characterized as `PRODUCT BUG (deferred)` in the IT. Doc remains `active` for bug 4.
+
 Found while writing `ReconciliationServiceIntegrationTest` (OSS coverage #8/#9). The IT
 **documents** these as current behavior (so coverage is real and characterization-stable);
 they are NOT fixed here — fixing is separate scope. Each test that encodes a bug is marked
