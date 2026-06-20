@@ -636,6 +636,80 @@ public class ApprovalHandler implements CommandHandlerExtension {
 
 Plugin handlers are discovered through the `ExtensionRegistry`. Platform handlers take priority; plugin handlers execute when no platform handler matches.
 
+#### Handler accessors (`CommandContext`)
+
+A plugin handler reaches host services through accessors on its `CommandContext`. Each returns `null` when the host has not wired that bridge, so a handler should null-check and fall back:
+
+| Accessor | Purpose |
+|----------|---------|
+| `context.dataAccessor()` | Read/write dynamic-model records |
+| `context.fileAccessor()` | Read uploaded file bytes |
+| `context.aiProviderAccessor()` | Call the platform LLM provider |
+| `context.asyncTaskAccessor()` | Offload a follow-up command onto the background async-task queue (see below) |
+
+---
+
+## Asynchronous Commands
+
+Long-running commands (file parsing, bulk pricing, document import, an LLM call) should not block the HTTP request or a global progress modal. The platform offers two background-execution mechanisms, both backed by the same `ab_async_task` queue.
+
+### 1. Whole-command async — `handlerParams.async`
+
+Mark a command async in its config and the *entire* command runs as a background task. The execute call returns immediately with `{ "async": true, "taskCode": "..." }`; the handler runs later through `CommandHandlerAsyncTaskExecutor`, preserving the originating tenant/user context.
+
+```json
+{
+  "code": "myns:batch_recompute",
+  "type": "custom",
+  "modelCode": "my_model",
+  "handler": "myns:batch_recompute",
+  "handlerParams": { "async": true }
+}
+```
+
+Use this when the command itself is the slow work and the caller only needs to know it was accepted.
+
+### 2. Sync handler offloads sub-tasks — `AsyncTaskAccessor`
+
+When a command must stay **synchronous** (so it can return a created record id for immediate navigation) but also kick off slow follow-up work, the handler submits that follow-up onto the queue and returns fast:
+
+```java
+@Override
+public Object execute(CommandContext context) {
+    String quoteId = db.create("my_model", payload);   // fast, synchronous
+
+    AsyncTaskAccessor asyncTasks = context.asyncTaskAccessor();
+    if (asyncTasks != null && !context.dryRun()) {
+        // returns a taskCode immediately; the command runs in the background
+        asyncTasks.submitCommandTask(
+            "myns:parse_attachment", "my_model", quoteId,
+            Map.of("file_id", fileId));
+    } else {
+        // host has no async bridge (older runtime) — run inline as a fallback
+        parseInline(context, quoteId, fileId);
+    }
+    return Map.of("recordId", quoteId);
+}
+```
+
+This is what the quote-create flow uses: `create` binds the record and returns in ~0.1s while each attachment upload/parse and the BOM import run as separate background tasks, so the form navigates straight to the detail page.
+
+> **Opt out of DSL persistence — `handlerParams.dslPersistence: false`.** A plugin-handled command declared `type: create`/`update` normally runs the platform's implicit field-map + field-edit permission check before the handler. If the command accepts **non-model** inputs (e.g. attachment file ids) that check rejects them with a 403. Set `handlerParams.dslPersistence: false` so the handler owns persistence and the command still resolves into `schema.commands` (so a form can submit it without an explicit `?commandCode`):
+>
+> ```json
+> { "type": "create", "handler": "myns:create_thing",
+>   "handlerParams": { "dslPersistence": false } }
+> ```
+
+### Surfacing progress in the UI
+
+Every background command lands in `ab_async_task` (type `command-handler`) with the target `recordId`, a `status` (`running`/`success`/`failed`), `progress`, `progress_message`, and `error_message`. A detail page shows progress by:
+
+1. A named query that joins the latest `command-handler` task for the record (e.g. quote-core's `qo_quote_recompute_status`).
+2. A `status-banner` block on the relevant tab that polls that query (`intervalMs: 1500`) and reloads when the task completes.
+
+Because the status is derived from `ab_async_task`, **any** command you make async automatically gets the running→done banner — no extra per-command wiring.
+
 ---
 
 ## Command Execution
