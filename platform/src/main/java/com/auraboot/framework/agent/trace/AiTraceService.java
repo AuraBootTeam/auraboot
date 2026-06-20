@@ -2,12 +2,8 @@ package com.auraboot.framework.agent.trace;
 
 import com.auraboot.framework.agent.trace.entity.AiTrace;
 import com.auraboot.framework.agent.trace.entity.AiTraceSpan;
-import com.auraboot.framework.agent.trace.entity.GenAiUsageRecord;
 import com.auraboot.framework.agent.trace.mapper.AiTraceMapper;
 import com.auraboot.framework.agent.trace.mapper.AiTraceSpanMapper;
-import com.auraboot.framework.agent.trace.mapper.GenAiUsageMapper;
-import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.observability.GenAiPricing;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -35,7 +31,7 @@ public class AiTraceService {
     private final AiTraceMapper traceMapper;
     private final AiTraceSpanMapper spanMapper;
     private final ObjectMapper objectMapper;
-    private final GenAiUsageMapper genAiUsageMapper;
+    private final GenAiUsageRecorder genAiUsageRecorder;
 
     // =========================================================================
     // Trace lifecycle
@@ -184,25 +180,9 @@ public class AiTraceService {
                                 .setSql(cost != null, "total_cost = total_cost + " + cost));
             }
 
-            // Durable usage ledger (A-G6, §2.5) — billing source of truth, separate
-            // from the (sampleable) span. Computed cost (GenAiPricing) wins; falls back
-            // to the provider-supplied diagnostic cost for unpriced models.
-            Long tenantId = MetaContext.getCurrentTenantId();
-            if (tenantId != null) {
-                GenAiUsageRecord usage = new GenAiUsageRecord();
-                usage.setTenantId(tenantId);
-                usage.setTraceId(ctx.getTraceId());
-                usage.setSpanId(ctx.getSpanId());
-                usage.setRequestModel(model);
-                usage.setResponseModel(model);
-                usage.setInputTokens(inputTokens);
-                usage.setOutputTokens(outputTokens);
-                BigDecimal computed = GenAiPricing.cost(model, inputTokens, outputTokens);
-                usage.setAmount(computed.signum() != 0 ? computed : cost);
-                usage.setCurrency("USD");
-                usage.setPricingVersion(GenAiPricing.PRICING_VERSION);
-                genAiUsageMapper.insert(usage);
-            }
+            // Durable usage ledger (A-G6, §2.5) via the shared recorder.
+            genAiUsageRecorder.record(ctx.getTraceId(), ctx.getSpanId(), model,
+                    inputTokens, outputTokens, null, null, cost);
         } catch (Exception e) {
             log.warn("Failed to record generation {}: {}", ctx.getSpanId(), e.getMessage());
         }
