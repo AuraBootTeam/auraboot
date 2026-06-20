@@ -208,6 +208,13 @@ public class QueryAuditLog {
     @TableField("security_validation_time_ms")
     private Integer securityValidationTimeMs;
 
+    /** OTel W3C traceId/spanId of the request (A-G2, P1) — correlates audit -> trace. */
+    @TableField("trace_id")
+    private String traceId;
+
+    @TableField("span_id")
+    private String spanId;
+
     /**
      * Record creation timestamp
      */
