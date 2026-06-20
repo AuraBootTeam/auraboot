@@ -1,0 +1,27 @@
+{
+  "registryVersion": 1,
+  "decision": "DDR-2026-06-18-designer-kernel-boundary",
+  "note": "Central registry of designer LAYOUT families (DDR R3: registration-based, N families; the stable thing is the registry, not the number). check-designer-boundary.mjs validates each designer surface's designer.family.json `family` against the keys here. This file is vendored per-repo (CI single-repo checkout); keep the enterprise copy in sync — registryVersion mismatch is reported as stale.",
+  "families": {
+    "block-tree": {
+      "canonicalKernel": "unified-designer",
+      "description": "Recursive block tree (page / form / list / detail / report). Layer-1 kernel = unified-designer (CanvasHost + BlockRegistry + node-tree store)."
+    },
+    "grid": {
+      "canonicalKernel": "dashboard-grid",
+      "description": "Free grid of widgets (dashboard). Layer-1 kernel = core-dashboard grid + SharedChartFactory."
+    },
+    "flow": {
+      "canonicalKernel": "flow-designer-sdk",
+      "description": "Node-and-edge graph (automation / BPM / BPMN). Layer-1 kernel = flow-designer-sdk (@xyflow/react based)."
+    },
+    "physical-canvas": {
+      "canonicalKernel": null,
+      "description": "Absolute mm/px canvas for print/label (QR designer). No shared Layer-1 kernel yet — only one physical surface exists; DDR non-goal to extract physical-canvas-sdk until a 2nd appears. Surfaces own their canvas math but must consume Layer-0 SDK."
+    },
+    "cell-grid": {
+      "canonicalKernel": "cell-grid-kernel",
+      "description": "Spreadsheet-style cell grid (Chinese-style/spreadsheet report, B8). 5th family; kernel not yet built (planned on Univer). Registered so the gate accepts it once B8 lands."
+    }
+  }
+}

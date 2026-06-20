@@ -1,0 +1,12 @@
+{
+  "_doc": "Config for scripts/check-designer-boundary.mjs (B3a designer boundary gate, DDR-2026-06-18). surfaceRoots are scanned for direct child dirs whose name matches *-designer / *-designer-sdk; expectedSurfaces are governed designer surfaces whose dir name does not follow that convention (must still carry a designer.family.json). allowlist = name-matched dirs that are intentionally NOT governed surfaces, each with a reason.",
+  "registryPath": "scripts/designer-family-registry.json",
+  "surfaceRoots": ["web-admin/app/plugins/core-designer/components"],
+  "expectedSurfaces": [
+    "web-admin/app/plugins/core-dashboard",
+    "web-admin/app/plugins/core-automation"
+  ],
+  "allowlist": {
+    "web-admin/app/plugins/core-designer/components/flow-designer": "placeholder stub (FlowDesigner.tsx renders a 'TODO 替换为真实的流程设计器实现' panel); not a governed surface. Remove from allowlist when a real flow surface lands here."
+  }
+}
