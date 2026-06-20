@@ -1,8 +1,10 @@
 ---
 type: backlog
-status: active
+status: closed
 created: 2026-05-28
 ---
+
+<!-- no-precipitation: terminal slice report; deliverable validate-flow.mjs + graphDocumentSchema is the durable artifact, no reusable lesson to distill -->
 
 # A1 — flow-designer-sdk JSON Schema validator + CLI lint — report
 

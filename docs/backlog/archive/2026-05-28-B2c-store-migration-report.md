@@ -1,8 +1,10 @@
 ---
 type: backlog
-status: active
+status: closed
 created: 2026-05-28
 ---
+
+<!-- no-precipitation: terminal phase-1 store-migration checkpoint; downstream Phase2/3 shipped (#332/#342/#347) -->
 
 # B2c — useBPMNStore → useFlowStore Migration (Phase 1 Checkpoint)
 

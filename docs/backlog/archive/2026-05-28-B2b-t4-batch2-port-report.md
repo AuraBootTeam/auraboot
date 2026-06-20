@@ -1,8 +1,10 @@
 ---
 type: backlog
-status: active
+status: closed
 created: 2026-05-28
 ---
+
+<!-- no-precipitation: completed BPMN-node migration-batch record (PR #323) -->
 
 # B2b batch2 — T4 BPMN→SDK port report (4 nodes + 5 editors)
 

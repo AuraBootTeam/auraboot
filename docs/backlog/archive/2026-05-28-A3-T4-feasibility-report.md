@@ -1,8 +1,10 @@
 ---
 type: backlog
-status: active
+status: closed
 created: 2026-05-28
 ---
+
+<!-- no-precipitation: superseded planning/estimate snapshot; the scoped T4 migration since landed (useBpmFlowStore + PRs #320-#347) -->
 
 # A3 — flow-designer-sdk BPM-shaped Smoke PoC & T4 Feasibility Report
 

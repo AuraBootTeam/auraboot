@@ -1,8 +1,10 @@
 ---
 type: backlog
-status: active
+status: closed
 created: 2026-05-28
 ---
+
+<!-- no-precipitation: stale BLOCKED record; blocker and tracked spec (automation-golden.spec.ts) both resolved; lesson in AGENTS §2.1 environment-invalid -->
 
 # B1 — Automation 黄金 E2E (BLOCKED_WITH_OWNER)
 

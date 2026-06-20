@@ -1,8 +1,10 @@
 ---
 type: backlog
-status: active
+status: closed
 created: 2026-05-28
 ---
+
+<!-- no-precipitation: completed BPMN-node migration-batch record (PR #325); T4 layer1+2 complete -->
 
 # T4 B2b batch3 — pickers + shared.tsx + CallActivity + edge editor port report
 

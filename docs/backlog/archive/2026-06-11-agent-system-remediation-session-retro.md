@@ -1,10 +1,12 @@
 ---
 type: retro
-status: active
+status: closed
 created: 2026-06-11
 relates_to:
   - docs/backlog/2026-06-10-agent-system-review-and-remediation.md
 ---
+
+<!-- no-precipitation: agent-spike-verification lessons already codified in AGENTS.md §15 keyword table + enterprise spike-verification-discipline.md (cross-repo); record stays for grep -->
 
 # Agent 系统 review+修复 会话复盘(2026-06-10 ~ 06-11)
 
