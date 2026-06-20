@@ -85,6 +85,128 @@ export interface SmartBarChartProps {
  * />
  */
 /**
+ * Subset of the resolved chart data this component reads when building options.
+ * (Mirrors the shape returned by `useChartData`.)
+ */
+export interface BarChartData {
+  rows: Record<string, unknown>[];
+  meta?: {
+    dimensions?: string[];
+    metrics?: string[];
+  };
+}
+
+/** Visual props that influence option building (subset of SmartBarChartProps). */
+export interface BarOptionProps {
+  title?: string;
+  orientation?: 'vertical' | 'horizontal';
+  stacked?: boolean;
+  showLabel?: boolean;
+  chartOptions?: Partial<EChartsOption>;
+}
+
+/**
+ * Build the ECharts `option` exactly the way SmartBarChart has historically built
+ * it inline. Extracted verbatim (no behavior change) as a pure, exported helper so
+ * the B2d equivalence/characterization test can compare it against the
+ * ChartSpec→ECharts adapter (`chartSpecToEChartsOption`) without rendering.
+ *
+ * Output MUST stay byte-for-byte identical to the previous inline `useMemo`.
+ */
+export function buildBarOptionLegacy(
+  data: BarChartData | null | undefined,
+  props: BarOptionProps,
+): EChartsOption {
+  const { title, orientation = 'vertical', stacked = false, showLabel = false, chartOptions } =
+    props;
+
+  if (!data?.rows?.length) {
+    return {
+      title: title ? { text: title, left: 'center', textStyle: { fontSize: 14 } } : undefined,
+      xAxis: { type: orientation === 'vertical' ? 'category' : 'value', data: [] },
+      yAxis: { type: orientation === 'vertical' ? 'value' : 'category', data: [] },
+      series: [],
+    };
+  }
+
+  const dimensions = data.meta?.dimensions || [];
+  const metrics = data.meta?.metrics || [];
+  const dimensionKey = dimensions[0];
+
+  // Extract category labels from the dimension field
+  const categories = data.rows.map((row) => String(row[dimensionKey] ?? ''));
+
+  // Build series for each metric
+  const series = metrics.map((metricKey) => ({
+    name: metricKey,
+    type: 'bar' as const,
+    stack: stacked ? 'total' : undefined,
+    data: data.rows.map((row) => Number(row[metricKey]) || 0),
+    label: {
+      show: showLabel,
+      position: (orientation === 'vertical' ? 'top' : 'right') as 'top' | 'right',
+    },
+    emphasis: {
+      focus: 'series' as const,
+    },
+  }));
+
+  const baseOptions: EChartsOption = {
+    title: title
+      ? {
+          text: title,
+          left: 'center',
+          textStyle: { fontSize: 14, fontWeight: 500 },
+        }
+      : undefined,
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+    },
+    legend:
+      metrics.length > 1
+        ? {
+            bottom: 0,
+            type: 'scroll',
+          }
+        : undefined,
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: metrics.length > 1 ? '15%' : '3%',
+      top: title ? '15%' : '10%',
+      containLabel: true,
+    },
+    xAxis:
+      orientation === 'vertical'
+        ? {
+            type: 'category',
+            data: categories,
+            axisLabel: {
+              rotate: categories.length > 10 ? 45 : 0,
+              hideOverlap: true,
+            },
+          }
+        : {
+            type: 'value',
+          },
+    yAxis:
+      orientation === 'vertical'
+        ? {
+            type: 'value',
+          }
+        : {
+            type: 'category',
+            data: categories,
+          },
+    series,
+  };
+
+  // Merge with custom options
+  return chartOptions ? { ...baseOptions, ...chartOptions } : baseOptions;
+}
+
+/**
  * Check if data source is configured enough to fetch data
  */
 function isDataSourceConfigured(dataSource: ChartDataSource): boolean {
@@ -159,94 +281,16 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
   );
 
   /**
-   * Build ECharts options from data
+   * Build ECharts options from data.
+   *
+   * Delegates to the pure, exported `buildBarOptionLegacy` helper so the option
+   * shape can be characterized/compared in tests (B2d). Behavior is identical to
+   * the previous inline builder.
    */
-  const options: EChartsOption = useMemo(() => {
-    if (!data?.rows?.length) {
-      return {
-        title: title ? { text: title, left: 'center', textStyle: { fontSize: 14 } } : undefined,
-        xAxis: { type: orientation === 'vertical' ? 'category' : 'value', data: [] },
-        yAxis: { type: orientation === 'vertical' ? 'value' : 'category', data: [] },
-        series: [],
-      };
-    }
-
-    const dimensions = data.meta?.dimensions || [];
-    const metrics = data.meta?.metrics || [];
-    const dimensionKey = dimensions[0];
-
-    // Extract category labels from the dimension field
-    const categories = data.rows.map((row) => String(row[dimensionKey] ?? ''));
-
-    // Build series for each metric
-    const series = metrics.map((metricKey) => ({
-      name: metricKey,
-      type: 'bar' as const,
-      stack: stacked ? 'total' : undefined,
-      data: data.rows.map((row) => Number(row[metricKey]) || 0),
-      label: {
-        show: showLabel,
-        position: (orientation === 'vertical' ? 'top' : 'right') as 'top' | 'right',
-      },
-      emphasis: {
-        focus: 'series' as const,
-      },
-    }));
-
-    const baseOptions: EChartsOption = {
-      title: title
-        ? {
-            text: title,
-            left: 'center',
-            textStyle: { fontSize: 14, fontWeight: 500 },
-          }
-        : undefined,
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-      },
-      legend:
-        metrics.length > 1
-          ? {
-              bottom: 0,
-              type: 'scroll',
-            }
-          : undefined,
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: metrics.length > 1 ? '15%' : '3%',
-        top: title ? '15%' : '10%',
-        containLabel: true,
-      },
-      xAxis:
-        orientation === 'vertical'
-          ? {
-              type: 'category',
-              data: categories,
-              axisLabel: {
-                rotate: categories.length > 10 ? 45 : 0,
-                hideOverlap: true,
-              },
-            }
-          : {
-              type: 'value',
-            },
-      yAxis:
-        orientation === 'vertical'
-          ? {
-              type: 'value',
-            }
-          : {
-              type: 'category',
-              data: categories,
-            },
-      series,
-    };
-
-    // Merge with custom options
-    return chartOptions ? { ...baseOptions, ...chartOptions } : baseOptions;
-  }, [data, title, orientation, stacked, showLabel, chartOptions]);
+  const options: EChartsOption = useMemo(
+    () => buildBarOptionLegacy(data, { title, orientation, stacked, showLabel, chartOptions }),
+    [data, title, orientation, stacked, showLabel, chartOptions],
+  );
 
   /**
    * ECharts event handlers
