@@ -3,17 +3,24 @@
  *
  * Three-panel layout: BlockPalette | ReportCanvas | BlockPropertyPanel
  * Features: auto-save, Ctrl+S, beforeunload, undo/redo, preview/export
+ *
+ * B1 Phase 2b (report-canvas swap): the report DOCUMENT + SELECTION + UNDO/REDO
+ * HISTORY now live in the unified-designer kernels via `ReportDocumentProvider`.
+ * `ReportDesigner` is a thin outer shell that mounts the provider; all context
+ * consumption (and the load/save orchestration that wires the fetched ReportDsl
+ * into the document kernel) lives in `ReportDesignerInner`.
  */
 
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useReportStore } from './store/useReportStore';
+import { ReportDocumentProvider, useReportDocument } from './state/ReportDocumentProvider';
 import { ReportToolbar } from './components/ReportToolbar';
 import { BlockPalette } from './components/BlockPalette';
 import { ReportCanvas } from './components/ReportCanvas';
 import { BlockPropertyPanel } from './components/BlockPropertyPanel';
-import { ReportPageContent } from './renderers/ReportPageContent';
 import { fetchReportData } from './services/fetchReportData';
 import { reportDesignerService } from './services/reportDesignerService';
+import { createEmptyReport } from './types';
 import { useVersioning, VersionHistoryPanel } from '~/shared/versioning';
 import { pageSchemaVersionService } from '~/shared/versioning/versionService';
 
@@ -24,31 +31,72 @@ interface ReportDesignerProps {
   initialTitle?: string;
 }
 
-export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initialTitle }) => {
+const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialTitle }) => {
+  const { report, isDirty, loadDocument, markSaved, setDirty, undo, redo } = useReportDocument();
   const {
-    report,
-    isDirty,
     isSaving,
     isLoading,
     previewMode,
+    pageId,
     setPreviewMode,
-    loadReportById,
-    createReport,
-    saveReport,
+    setPageId,
+    setSaving,
+    setLoading,
     reset,
   } = useReportStore();
 
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSaveTimeRef = useRef<number>(0);
 
+  // ── Load / save orchestration (service calls + document-kernel wiring) ──────
+  const loadReportById = useCallback(
+    async (pid: string) => {
+      setLoading(true);
+      try {
+        const result = await reportDesignerService.loadByPid(pid);
+        loadDocument(result.dsl);
+        setPageId(result.pid);
+        setLoading(false);
+      } catch (error) {
+        setLoading(false);
+        throw error;
+      }
+    },
+    [loadDocument, setPageId, setLoading],
+  );
+
+  const createReport = useCallback(
+    (title: string) => {
+      loadDocument(createEmptyReport(title));
+      setPageId(null);
+      // A freshly created (unsaved) report is dirty — preserves prior store behavior.
+      setDirty(true);
+    },
+    [loadDocument, setPageId, setDirty],
+  );
+
+  const saveReport = useCallback(async () => {
+    if (!report) throw new Error('No report to save');
+    setSaving(true);
+    try {
+      const pid = await reportDesignerService.save(report, pageId || undefined);
+      setPageId(pid);
+      markSaved();
+      setSaving(false);
+      return pid;
+    } catch (error) {
+      setSaving(false);
+      throw error;
+    }
+  }, [report, pageId, setSaving, setPageId, markSaved]);
+
   // Version history management
   const versioning = useVersioning({
     service: pageSchemaVersionService,
-    resourcePid: useReportStore.getState().pageId || undefined,
+    resourcePid: pageId || undefined,
     onRollbackComplete: () => {
       // Reload report after rollback
-      const pid = useReportStore.getState().pageId;
-      if (pid) loadReportById(pid);
+      if (pageId) loadReportById(pageId);
     },
   });
 
@@ -63,7 +111,8 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
     return () => {
       reset();
     };
-  }, [reportId, initialTitle, loadReportById, createReport, reset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportId, initialTitle]);
 
   // Auto-save
   useEffect(() => {
@@ -113,17 +162,17 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        useReportStore.getState().undo();
+        undo();
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
         e.preventDefault();
-        useReportStore.getState().redo();
+        redo();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave]);
+  }, [handleSave, undo, redo]);
 
   // beforeunload
   useEffect(() => {
@@ -145,14 +194,12 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
 
   // Excel Export
   const handleExportExcel = useCallback(async () => {
-    const state = useReportStore.getState();
-    const pid = state.pageId;
-    if (!pid) {
+    if (!pageId) {
       alert('Please save the report before exporting to Excel.');
       return;
     }
     try {
-      const blob = await reportDesignerService.exportExcel(pid);
+      const blob = await reportDesignerService.exportExcel(pageId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -165,18 +212,16 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
       console.error('Excel export failed:', error);
       alert(error instanceof Error ? error.message : 'Excel export failed');
     }
-  }, [report]);
+  }, [report, pageId]);
 
   // JSON Export
   const handleExportJson = useCallback(async () => {
-    const state = useReportStore.getState();
-    const pid = state.pageId;
-    if (!pid) {
+    if (!pageId) {
       alert('Please save the report before exporting to JSON.');
       return;
     }
     try {
-      const blob = await reportDesignerService.exportJson(pid);
+      const blob = await reportDesignerService.exportJson(pageId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -189,18 +234,16 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
       console.error('JSON export failed:', error);
       alert(error instanceof Error ? error.message : 'JSON export failed');
     }
-  }, [report]);
+  }, [report, pageId]);
 
   // PDF Export
   const handleExportPdf = useCallback(async () => {
-    const state = useReportStore.getState();
-    const pid = state.pageId;
-    if (!pid) {
+    if (!pageId) {
       alert('Please save the report before exporting to PDF.');
       return;
     }
     try {
-      const blob = await reportDesignerService.exportPdf(pid);
+      const blob = await reportDesignerService.exportPdf(pageId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -213,7 +256,7 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
       console.error('PDF export failed:', error);
       alert(error instanceof Error ? error.message : 'PDF export failed');
     }
-  }, [report]);
+  }, [report, pageId]);
 
   if (isLoading) {
     return (
@@ -276,6 +319,14 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = ({ reportId, initia
         isRollingBack={versioning.isRollingBack}
       />
     </div>
+  );
+};
+
+export const ReportDesigner: React.FC<ReportDesignerProps> = (props) => {
+  return (
+    <ReportDocumentProvider>
+      <ReportDesignerInner {...props} />
+    </ReportDocumentProvider>
   );
 };
 
