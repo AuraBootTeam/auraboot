@@ -54,8 +54,17 @@ public class UsageRecordingLlmProvider implements LlmProvider {
                 });
     }
 
-    /** OTel trace id of the active span, captured on the calling thread; null if no span. */
+    /**
+     * OTel trace id for the current generation. Prefers the seam-snapshotted id in
+     * {@link MetaContext} (set at the request seam, available on async worker threads
+     * where the span is not propagated, §2.6); falls back to the active span for
+     * synchronous call sites.
+     */
     private String currentTraceId() {
+        String snapshot = MetaContext.getOtelTraceId();
+        if (snapshot != null) {
+            return snapshot;
+        }
         if (tracer == null || tracer.currentSpan() == null) {
             return null;
         }

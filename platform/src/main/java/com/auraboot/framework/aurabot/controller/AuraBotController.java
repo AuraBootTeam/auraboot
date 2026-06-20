@@ -83,6 +83,7 @@ public class AuraBotController {
             SseResponseSink sink = new SseResponseSink(emitter, objectMapper);
             try {
                 MetaContext.setContext(tenantId, userId, userPid, username);
+                MetaContext.setOtelTraceId(request.getOtelTraceId());
                 if (memberId != null) {
                     MetaContext.setMemberId(memberId);
                 }
@@ -153,10 +154,15 @@ public class AuraBotController {
                 ? ConversationTurnService.ConfirmDecision.APPROVED
                 : ConversationTurnService.ConfirmDecision.DENIED;
 
+        // Snapshot the OTel traceId on the request thread (span active) so the async
+        // worker / LLM call sites can correlate (A-G6 / §2.6).
+        final String otelTraceId = tracer.currentSpan() != null
+                ? tracer.currentSpan().context().traceId() : null;
         asyncExecutor.execute(() -> {
             SseResponseSink sink = new SseResponseSink(emitter, objectMapper);
             try {
                 MetaContext.setContext(tenantId, userId, userPid, username);
+                MetaContext.setOtelTraceId(otelTraceId);
                 if (memberId != null) {
                     MetaContext.setMemberId(memberId);
                 }
