@@ -1,0 +1,12 @@
+{
+  "surface": "flow-designer-sdk",
+  "role": "kernel",
+  "family": "flow",
+  "layer1Kernel": "self",
+  "conformance": "conforming",
+  "layer0": ["PropertySchema", "DataSourcePicker", "ExpressionBuilder"],
+  "storage": "n/a (Layer-1 kernel; flow surfaces own their storage)",
+  "owner": "core-designer",
+  "decision": "DDR-2026-06-18-designer-kernel-boundary",
+  "note": "Layer-1 kernel of the flow family (@xyflow/react based: FlowCanvas + FlowPalette + FlowPropertyPanel + NodeRegistry + useFlowStore). Consumed by automation / BPM / BPMN surfaces, which only register nodes/edges."
+}

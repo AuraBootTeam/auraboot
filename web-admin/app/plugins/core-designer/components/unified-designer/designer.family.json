@@ -1,0 +1,13 @@
+{
+  "surface": "unified-designer",
+  "role": "kernel",
+  "family": "block-tree",
+  "layer1Kernel": "self",
+  "layoutProfile": "default",
+  "conformance": "conforming",
+  "layer0": ["PropertySchema", "InspectorSchemaRegistry", "BlockRegistry", "DataSourcePicker", "ExpressionBuilder", "ChartSpec", "Versioning"],
+  "storage": { "primary": "ab_page_schema" },
+  "owner": "core-designer",
+  "decision": "DDR-2026-06-18-designer-kernel-boundary",
+  "note": "Layer-1 kernel of the block-tree family (CanvasHost + BlockRegistry + node-tree store + InspectorSchemaRegistry). page/form/list/detail surfaces reuse it directly; report-designer must converge onto it (B1)."
+}
