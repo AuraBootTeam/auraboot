@@ -1696,6 +1696,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             }
         }
 
+        generatePermissionI18nRecords(manifest.getPermissions(), tenantId);
         bindImportedPermissionsToTenantAdmin(manifest.getPermissions(), tenantId);
     }
 
@@ -1838,6 +1839,43 @@ public class PluginImportServiceImpl implements PluginImportService {
             i18nService.clearCache(null);
             log.info("Auto-generated {} menu i18n records from localized names", count);
         }
+    }
+
+    /**
+     * Auto-generate i18n records for permissions from their localized name/description fields.
+     * Key format: permission.{CODE} (name) and permission.{CODE}.description (description),
+     * matching frontend consumption in routes/enterprise/permission (PermissionTree/PermissionTab).
+     */
+    private void generatePermissionI18nRecords(List<PermissionDefinitionDTO> permissions, Long tenantId) {
+        List<I18nResource> resources = new ArrayList<>();
+        for (PermissionDefinitionDTO permission : permissions) {
+            if (permission.getCode() == null || permission.getCode().isBlank()) continue;
+            String nameKey = "permission." + permission.getCode();
+            for (Map.Entry<String, String> entry : permission.getAllLocalizedNames().entrySet()) {
+                resources.add(buildImportI18nResource(nameKey, entry.getKey(), entry.getValue(), "permission"));
+            }
+            String descKey = "permission." + permission.getCode() + ".description";
+            for (Map.Entry<String, String> entry : permission.getAllLocalizedDescriptions().entrySet()) {
+                resources.add(buildImportI18nResource(descKey, entry.getKey(), entry.getValue(), "permission"));
+            }
+        }
+
+        if (!resources.isEmpty()) {
+            int count = i18nResourceService.batchUpsert(resources);
+            i18nService.clearCache(null);
+            log.info("Auto-generated {} permission i18n records from localized names/descriptions", count);
+        }
+    }
+
+    private I18nResource buildImportI18nResource(String i18nKey, String lang, String value, String refType) {
+        I18nResource res = new I18nResource();
+        res.setI18nKey(i18nKey);
+        res.setLang(lang);
+        res.setValue(value);
+        res.setSource(I18nResource.SOURCE_IMPORT);
+        res.setRefType(refType);
+        res.setStatus(I18nResource.STATUS_APPROVED);
+        return res;
     }
 
     /**
