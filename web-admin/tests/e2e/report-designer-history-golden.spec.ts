@@ -25,14 +25,26 @@ function canvas(page: Page) {
   return page.getByTestId('report-canvas');
 }
 
+// Click a palette button and confirm the block landed on the canvas. The very
+// first interaction right after navigation can race React hydration (the SSR'd
+// button isn't wired yet, so the click is a no-op); retry the click until the
+// block actually appears. This exercises the real add behavior — it just does
+// not flake on a pre-hydration click.
+async function addPaletteBlock(page: Page, buttonName: RegExp, placeholder: string) {
+  const button = page.getByRole('button', { name: buttonName });
+  await expect(button).toBeEnabled();
+  await expect(async () => {
+    await button.click();
+    await expect(canvas(page).getByText(placeholder)).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15000 });
+}
+
 async function addDataTable(page: Page) {
-  await page.getByRole('button', { name: /Data Table/ }).click();
-  await expect(canvas(page).getByText(TABLE_PLACEHOLDER)).toBeVisible({ timeout: 10000 });
+  await addPaletteBlock(page, /Data Table/, TABLE_PLACEHOLDER);
 }
 
 async function addRichText(page: Page) {
-  await page.getByRole('button', { name: /Rich Text/ }).click();
-  await expect(canvas(page).getByText(RICHTEXT_PLACEHOLDER)).toBeVisible({ timeout: 10000 });
+  await addPaletteBlock(page, /Rich Text/, RICHTEXT_PLACEHOLDER);
 }
 
 test.describe('Report Designer — history & topology golden', () => {

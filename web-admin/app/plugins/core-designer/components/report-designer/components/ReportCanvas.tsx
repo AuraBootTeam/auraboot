@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useState, useRef } from 'react';
-import { useReportStore } from '../store/useReportStore';
+import { useReportDocument } from '../state/ReportDocumentProvider';
 import { A4Page } from './A4Page';
 import { ReportTableBlock } from '../blocks/ReportTableBlock';
 import { ReportGroupedTableBlock } from '../blocks/ReportGroupedTableBlock';
@@ -30,7 +30,7 @@ const GripVertical: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 export const ReportCanvas: React.FC = () => {
-  const { report, selectedBlockId, selectBlock, reorderBlock } = useReportStore();
+  const { report, selectedBlockId, selectBlock, reorderBlock } = useReportDocument();
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());

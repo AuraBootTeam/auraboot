@@ -122,7 +122,37 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['react-grid-layout', 'react-draggable', 'react-resizable'],
+    // Pre-bundle deps pulled by lazy routes (page/report/dashboard designers) so
+    // the dev server does not re-optimize mid-navigation — a re-optimization
+    // reload aborts in-flight dynamic imports ("Failed to fetch dynamically
+    // imported module"), which makes the designer golden suites flaky when run
+    // cold/in isolation. Same rationale as the original react-grid-layout entry.
+    include: [
+      'react-grid-layout',
+      'react-draggable',
+      'react-resizable',
+      'jsbarcode',
+      'zustand',
+      'zustand/middleware',
+      'zustand/middleware/immer',
+      '@dnd-kit/core',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-label',
+      '@radix-ui/react-select',
+      '@radix-ui/react-switch',
+      '@tanstack/react-query',
+      '@heroicons/react/24/outline',
+      '@messageformat/core',
+      'dayjs/plugin/timezone',
+      'dayjs/plugin/utc',
+      'class-variance-authority',
+      'clsx',
+      'lucide-react',
+      'sonner',
+      'dayjs',
+      'jsep',
+      'ajv',
+    ],
   },
   build: {
     modulePreload: false,
