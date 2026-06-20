@@ -1187,3 +1187,8 @@ permission:
   remove_all_failed: 移除所有权限失败
   sync_failed: 同步权限失败
   copy_failed: 复制权限失败
+
+chart:
+  configure_datasource: 请在右侧配置数据源
+  load_failed: 数据加载失败
+  no_data: 暂无数据

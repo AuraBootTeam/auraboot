@@ -1176,3 +1176,8 @@ permission:
   remove_all_failed: Failed to remove all permissions
   sync_failed: Failed to sync permissions
   copy_failed: Failed to copy permissions
+
+chart:
+  configure_datasource: Configure a data source
+  load_failed: Failed to load data
+  no_data: No data
