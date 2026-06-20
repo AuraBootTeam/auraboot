@@ -33,6 +33,8 @@ public class LlmProviderFactory {
     private final CloudConfigService cloudConfigService;
     private final AgentProperties agentProperties;
     private final ObjectMapper objectMapper;
+    /** A-G6: wraps resolved providers so every LLM call writes the usage ledger. */
+    private final com.auraboot.framework.agent.trace.GenAiUsageRecorder genAiUsageRecorder;
 
     /**
      * Global kill-switch for the stub LLM provider. When true, every
@@ -44,10 +46,12 @@ public class LlmProviderFactory {
     private boolean stubMode;
 
     public LlmProviderFactory(List<LlmProvider> providers, CloudConfigService cloudConfigService,
-                               AgentProperties agentProperties, ObjectMapper objectMapper) {
+                               AgentProperties agentProperties, ObjectMapper objectMapper,
+                               com.auraboot.framework.agent.trace.GenAiUsageRecorder genAiUsageRecorder) {
         this.cloudConfigService = cloudConfigService;
         this.agentProperties = agentProperties;
         this.objectMapper = objectMapper;
+        this.genAiUsageRecorder = genAiUsageRecorder;
 
         this.providerMap = new HashMap<>();
         LlmProvider openAiRef = null;
@@ -65,6 +69,16 @@ public class LlmProviderFactory {
      * Uses apiFormat from CloudConfig to decide: "messages" → Anthropic bean, otherwise → OpenAI-compatible bean.
      */
     public LlmProvider getProvider(String providerCode) {
+        LlmProvider raw = resolveRawProvider(providerCode);
+        if (raw == null || raw instanceof UsageRecordingLlmProvider
+                || StubLlmProvider.PROVIDER_CODE.equals(raw.getProviderCode())) {
+            return raw;
+        }
+        // A-G6 chokepoint: every resolved provider records usage at chat/streamChat.
+        return new UsageRecordingLlmProvider(raw, genAiUsageRecorder);
+    }
+
+    private LlmProvider resolveRawProvider(String providerCode) {
         if (providerCode == null || providerCode.isBlank()) {
             providerCode = "anthropic";
         }

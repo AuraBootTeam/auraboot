@@ -48,19 +48,15 @@ public class ChatTurnRuntime {
     private final ExecutionEnvelopePlanner executionEnvelopePlanner;
     private final ToolMetadataRegistry toolMetadataRegistry;
     private final ToolPolicyEngine toolPolicyEngine;
-    /** A-G6 durable usage ledger; null in the no-arg (test) constructor. */
-    private final com.auraboot.framework.agent.trace.GenAiUsageRecorder genAiUsageRecorder;
 
     public ChatTurnRuntime() {
-        this(new ExecutionEnvelopePlanner(), new ToolMetadataRegistry(), new ToolPolicyEngine(), null);
+        this(new ExecutionEnvelopePlanner(), new ToolMetadataRegistry(), new ToolPolicyEngine());
     }
 
     @Autowired
     public ChatTurnRuntime(ExecutionEnvelopePlanner executionEnvelopePlanner,
                            ToolMetadataRegistry toolMetadataRegistry,
-                           ToolPolicyEngine toolPolicyEngine,
-                           com.auraboot.framework.agent.trace.GenAiUsageRecorder genAiUsageRecorder) {
-        this.genAiUsageRecorder = genAiUsageRecorder;
+                           ToolPolicyEngine toolPolicyEngine) {
         this.executionEnvelopePlanner = executionEnvelopePlanner != null
                 ? executionEnvelopePlanner
                 : new ExecutionEnvelopePlanner();
@@ -335,15 +331,6 @@ public class ChatTurnRuntime {
             sink.onWarnings(aggregate.getWarnings());
         }
         emitThinkingBlocks(aggregate, thinkingFallback, sink);
-
-        // A-G6: the streaming chat's main generation does not go through
-        // recordGeneration, so record the durable usage ledger here from the
-        // aggregated response (traceId in scope; model from the request).
-        if (genAiUsageRecorder != null && aggregate != null) {
-            genAiUsageRecorder.record(traceId, null, request.getModel(),
-                    aggregate.getInputTokens(), aggregate.getOutputTokens(),
-                    aggregate.getCacheReadInputTokens(), aggregate.getCacheCreationInputTokens(), null);
-        }
 
         String finalText = accumulated.isEmpty()
                 ? LlmMessageTapeSupport.extractTextFromResponse(aggregate)

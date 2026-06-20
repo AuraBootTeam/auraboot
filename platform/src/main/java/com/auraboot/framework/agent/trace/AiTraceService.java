@@ -31,7 +31,6 @@ public class AiTraceService {
     private final AiTraceMapper traceMapper;
     private final AiTraceSpanMapper spanMapper;
     private final ObjectMapper objectMapper;
-    private final GenAiUsageRecorder genAiUsageRecorder;
 
     // =========================================================================
     // Trace lifecycle
@@ -180,9 +179,6 @@ public class AiTraceService {
                                 .setSql(cost != null, "total_cost = total_cost + " + cost));
             }
 
-            // Durable usage ledger (A-G6, §2.5) via the shared recorder.
-            genAiUsageRecorder.record(ctx.getTraceId(), ctx.getSpanId(), model,
-                    inputTokens, outputTokens, null, null, cost);
         } catch (Exception e) {
             log.warn("Failed to record generation {}: {}", ctx.getSpanId(), e.getMessage());
         }
