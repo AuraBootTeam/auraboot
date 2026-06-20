@@ -32,6 +32,7 @@ import {
 import { setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
 import { useDesignerDocument, serializeDocument } from '../document/useDesignerDocument';
+import { useDesignerSelection } from '../selection/useDesignerSelection';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
 import {
   DEVICE_PREVIEW_PRESETS,
@@ -148,13 +149,20 @@ export function UnifiedDesignerWorkbench({
   const [publishError, setPublishError] = useState<string | null>(null);
   const [mode, setMode] = useState<WorkbenchMode>('edit');
   const [previewDeviceId, setPreviewDeviceId] = useState<string>(DEFAULT_DEVICE_PREVIEW_ID);
-  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  // Multi-selection is intentionally a separate set from `selectedBlockId`.
-  // `selectedBlockId` is dual-purpose: it is both the inspector target AND the
-  // drop-placement context (palette drops land inside / before it). Multi-select
-  // must not perturb that context, so it tracks its own ids and leaves the
-  // primary selection (and therefore the drop context) intact.
-  const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(() => new Set());
+  // Primary + additive multi-selection model, extracted to a shared kernel so
+  // the report designer (block-tree family) reuses the same modifier-click /
+  // marquee rules. `selectedBlockId` is dual-purpose: the inspector target AND
+  // the drop-placement context (palette drops land inside / before it);
+  // multi-selection tracks its own ids without perturbing it.
+  const {
+    selectedBlockId,
+    multiSelectedIds,
+    setSelectedBlockId,
+    setMultiSelectedIds,
+    selectFromCanvas: handleCanvasSelect,
+    selectFromMarquee: handleMarqueeSelect,
+    clearMultiSelection,
+  } = useDesignerSelection();
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
@@ -296,61 +304,6 @@ export function UnifiedDesignerWorkbench({
     });
   };
 
-  // Canvas selection with modifier support. A plain click is single-select
-  // (clears multi-selection, current behaviour); a shift / cmd / ctrl click
-  // toggles the block in/out of the multi-selection AND makes it the primary
-  // selection (so the inspector + drop context still point at it).
-  //
-  // When the first additive click happens while only a single block is selected
-  // (multi-set empty), the existing primary block is folded into the set first
-  // so that "click A, shift+click B" yields the intuitive {A, B} selection.
-  const handleCanvasSelect = (blockId: string, modifiers?: { additive?: boolean }) => {
-    if (!modifiers?.additive) {
-      setMultiSelectedIds((current) => (current.size === 0 ? current : new Set()));
-      setSelectedBlockId(blockId);
-      return;
-    }
-    const primaryId = selectedBlockId;
-    setMultiSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.size === 0 && primaryId && primaryId !== blockId) {
-        next.add(primaryId);
-      }
-      if (next.has(blockId)) {
-        next.delete(blockId);
-      } else {
-        next.add(blockId);
-      }
-      return next;
-    });
-    setSelectedBlockId(blockId);
-  };
-
-  const clearMultiSelection = () => {
-    setMultiSelectedIds((current) => (current.size === 0 ? current : new Set()));
-  };
-
-  // Box-select (geometric marquee) result: the canvas reports the ids of every
-  // block its selection rectangle covered. We replace the multi-selection with
-  // those ids (a fresh marquee is a fresh selection, not additive) and make the
-  // last one the primary selection so the inspector + drop context stay live.
-  // An empty marquee (covered nothing) clears the multi-selection. The primary
-  // single-selection is left untouched on an empty marquee so an accidental
-  // empty drag does not blow away the current inspector target.
-  const handleMarqueeSelect = (blockIds: string[]) => {
-    if (blockIds.length === 0) {
-      clearMultiSelection();
-      return;
-    }
-    if (blockIds.length === 1) {
-      // A marquee that grabbed exactly one block behaves like a single select.
-      setMultiSelectedIds((current) => (current.size === 0 ? current : new Set()));
-      setSelectedBlockId(blockIds[0]);
-      return;
-    }
-    setMultiSelectedIds(new Set(blockIds));
-    setSelectedBlockId(blockIds[blockIds.length - 1]);
-  };
 
   // Batch-delete every deletable block in the multi-selection in a single
   // history step (one updateDocument → one undo). Undeletable blocks (the root
