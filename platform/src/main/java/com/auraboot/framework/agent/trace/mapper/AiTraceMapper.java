@@ -16,15 +16,16 @@ public interface AiTraceMapper extends BaseMapper<AiTrace> {
 
     @Insert("""
         INSERT INTO ab_ai_trace (
-            trace_id, tenant_id, session_id, name, user_id, input, status, metadata, start_time
+            trace_id, otel_trace_id, tenant_id, session_id, name, user_id, input, status, metadata, start_time
         ) VALUES (
-            #{traceId}, #{tenantId}, #{sessionId}, #{name}, #{userId}, #{input}, #{status},
+            #{traceId}, #{otelTraceId}, #{tenantId}, #{sessionId}, #{name}, #{userId}, #{input}, #{status},
             CAST(#{metadataJson} AS jsonb), #{startTime}
         )
     """)
     @InterceptorIgnore(tenantLine = "true")
     int insertTraceRecord(
             @Param("traceId") String traceId,
+            @Param("otelTraceId") String otelTraceId,
             @Param("tenantId") Long tenantId,
             @Param("sessionId") String sessionId,
             @Param("name") String name,

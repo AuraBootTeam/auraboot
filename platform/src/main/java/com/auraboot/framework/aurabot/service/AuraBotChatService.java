@@ -350,7 +350,8 @@ public class AuraBotChatService {
                     "recordPid", Objects.toString(request.getPageContext().getRecordPid(), "")));
         }
         TraceContext trace = aiTraceService.createTrace(tenantId, request.getSessionId(),
-                request.getMessage(), MetaContext.getCurrentUserId(), traceMetadata);
+                request.getMessage(), MetaContext.getCurrentUserId(), traceMetadata,
+                request.getOtelTraceId());
 
         // 2. Resolve model and options
         String model = options.getModel();
