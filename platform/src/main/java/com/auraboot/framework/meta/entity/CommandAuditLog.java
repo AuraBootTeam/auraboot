@@ -61,6 +61,13 @@ public class CommandAuditLog {
     @TableField("ip_address")
     private String ipAddress;
 
+    /** OTel W3C traceId/spanId of the request (A-G2, P1) — correlates audit -> trace. */
+    @TableField("trace_id")
+    private String traceId;
+
+    @TableField("span_id")
+    private String spanId;
+
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private Instant createdAt;
 }
