@@ -1,8 +1,8 @@
 ---
 title: CommandHandlerExtension interface duplication + dslPersistence config-slot cleanup
-date: 2026-06-20
+created: 2026-06-20
 type: backlog
-status: open
+status: active
 area: platform/command-pipeline, platform-plugin-api
 related: docs/core-concepts/commands.md
 ---

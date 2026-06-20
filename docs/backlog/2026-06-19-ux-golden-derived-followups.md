@@ -1,8 +1,8 @@
 ---
 title: Follow-ups surfaced by the UX design-system golden verification
-date: 2026-06-19
+created: 2026-06-19
 type: backlog
-status: open
+status: active
 area: platform/permission, crm-starter, web-admin/i18n, web-admin/design-system
 related: docs/handover/HANDOVER-2026-06-18-export-perm-and-owner-reference.md
 ---

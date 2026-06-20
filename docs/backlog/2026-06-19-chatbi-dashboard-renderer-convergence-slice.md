@@ -1,6 +1,6 @@
 ---
 type: backlog
-status: done
+status: shipped
 created: 2026-06-19
 owner: agent-quality-campaign
 related:
