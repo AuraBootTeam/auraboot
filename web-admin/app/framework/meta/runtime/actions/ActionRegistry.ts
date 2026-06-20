@@ -617,12 +617,64 @@ actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) 
 });
 
 /**
+ * promptInputForm - dispatch the 'dialog:form' event (rendered by FormDialog) to
+ * collect a set of fields, resolving with the collected values; rejects on cancel.
+ *
+ * Shared by the `dialog.form` action (which stores the values into stateManager)
+ * and `command.execute`'s `inputFields` sugar (which merges them into the command
+ * payload). Pre-fetches options for select fields with api/static dataSources.
+ */
+async function promptInputForm(
+  fields: Array<Record<string, any>>,
+  title: any,
+  fetchResult?: (url: string, opts: any) => Promise<any>,
+): Promise<Record<string, any>> {
+  // Pre-fetch options for select fields with API datasources
+  const fieldOptions: Record<string, Array<{ label: string; value: string }>> = {};
+  for (const field of fields) {
+    if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
+      try {
+        const result = await fetchResult(field.dataSource.endpoint, { method: 'get' });
+        fieldOptions[field.field] = result.data || [];
+      } catch (e) {
+        console.error(`[promptInputForm] Failed to fetch options for ${field.field}:`, e);
+        fieldOptions[field.field] = [];
+      }
+    } else if (field.dataSource?.type === 'static') {
+      fieldOptions[field.field] = field.dataSource.data || [];
+    }
+  }
+
+  // Build default values from field configs
+  const defaults: Record<string, any> = {};
+  for (const field of fields) {
+    if (field.defaultValue !== undefined) {
+      defaults[field.field] = field.defaultValue;
+    }
+  }
+
+  return new Promise<Record<string, any>>((resolve, reject) => {
+    const event = new CustomEvent('dialog:form', {
+      detail: {
+        title,
+        fields,
+        fieldOptions,
+        defaults,
+        onSubmit: (formData: Record<string, any>) => resolve(formData),
+        onCancel: () => reject(new Error('User cancelled')),
+      },
+    });
+    window.dispatchEvent(event);
+  });
+}
+
+/**
  * dialog.form - Display a dynamic form dialog
  *
- * Renders a modal form with configurable fields. Pre-fetches options
- * for select fields with API datasources. On submit, stores collected
- * form values in stateManager under form.{fieldName} keys for
- * subsequent handler steps.
+ * Renders a modal form with configurable fields (via promptInputForm/FormDialog).
+ * On submit, stores collected form values in stateManager under form.{fieldName}
+ * keys for subsequent handler steps. See also command.execute's `inputFields` sugar
+ * for the common "click button → small form → submit command" pattern.
  *
  * DSL format:
  * {
@@ -642,54 +694,18 @@ actionRegistry.register('dialog.form', async ({ args, stateManager, scopeId, fet
     console.error('[ActionRegistry] dialog.form: missing fields in args');
     return;
   }
-
-  // Pre-fetch options for select fields with API datasources
-  const fieldOptions: Record<string, Array<{ label: string; value: string }>> = {};
-  for (const field of args.fields) {
-    if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
-      try {
-        const result = await fetchResult(field.dataSource.endpoint, { method: 'get' });
-        fieldOptions[field.field] = result.data || [];
-      } catch (e) {
-        console.error(`[dialog.form] Failed to fetch options for ${field.field}:`, e);
-        fieldOptions[field.field] = [];
-      }
-    } else if (field.dataSource?.type === 'static') {
-      fieldOptions[field.field] = field.dataSource.data || [];
-    }
+  let formData: Record<string, any>;
+  try {
+    formData = await promptInputForm(args.fields, args.title, fetchResult);
+  } catch {
+    return; // user cancelled
   }
-
-  // Build default values from field configs
-  const defaults: Record<string, any> = {};
-  for (const field of args.fields) {
-    if (field.defaultValue !== undefined) {
-      defaults[field.field] = field.defaultValue;
-    }
-  }
-
-  return new Promise<void>((resolve, reject) => {
-    const event = new CustomEvent('dialog:form', {
-      detail: {
-        title: args.title,
-        fields: args.fields,
-        fieldOptions,
-        defaults,
-        onSubmit: (formData: Record<string, any>) => {
-          // Store form values in stateManager under form.{fieldName}
-          if (stateManager && scopeId) {
-            Object.entries(formData).forEach(([key, value]) => {
-              stateManager.updateForm(scopeId, key, value);
-            });
-          }
-          resolve();
-        },
-        onCancel: () => {
-          reject(new Error('User cancelled'));
-        },
-      },
+  // Store form values in stateManager under form.{fieldName}
+  if (stateManager && scopeId) {
+    Object.entries(formData).forEach(([key, value]) => {
+      stateManager.updateForm(scopeId, key, value);
     });
-    window.dispatchEvent(event);
-  });
+  }
 });
 
 /**
@@ -955,6 +971,20 @@ actionRegistry.register(
     }
     targetRecordId = targetRecordId ?? targetRecordPid;
     targetRecordPid = targetRecordPid ?? targetRecordId;
+
+    // inputFields sugar: pop a small form (reusing FormDialog) to collect a few
+    // fields, then merge the collected values into the command payload. Lets a DSL
+    // page express "click button → small form → submit command" in one action,
+    // without a page-specific React component. User cancel aborts (no submit).
+    if (Array.isArray(args?.inputFields) && args.inputFields.length > 0) {
+      let collected: Record<string, any>;
+      try {
+        collected = await promptInputForm(args.inputFields, args?.inputFieldsTitle, fetchResult);
+      } catch {
+        return; // user cancelled the form — abort the command silently
+      }
+      payload = { ...payload, ...collected };
+    }
 
     const body: Record<string, any> = {
       targetRecordPid,
