@@ -19,7 +19,7 @@ public interface CommandAuditLogMapper extends BaseMapper<CommandAuditLog> {
         INSERT INTO ab_command_audit_log
         (tenant_id, command_code, command_pid, user_id, request_payload,
          execution_result, success, error_message, execution_time_ms,
-         phase_reached, phase_timings, ip_address, created_at)
+         phase_reached, phase_timings, ip_address, trace_id, span_id, created_at)
         VALUES
         (#{tenantId}, #{commandCode}, #{commandPid}, #{userId},
          #{requestPayload, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
@@ -27,7 +27,7 @@ public interface CommandAuditLogMapper extends BaseMapper<CommandAuditLog> {
          #{success}, #{errorMessage}, #{executionTimeMs},
          #{phaseReached},
          #{phaseTimings, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
-         #{ipAddress}, #{createdAt})
+         #{ipAddress}, #{traceId}, #{spanId}, #{createdAt})
         """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertLog(CommandAuditLog log);
