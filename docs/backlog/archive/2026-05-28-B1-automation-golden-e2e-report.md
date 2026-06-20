@@ -1,8 +1,10 @@
 ---
 type: backlog
-status: active
+status: closed
 created: 2026-05-28
 ---
+
+<!-- no-precipitation: obsolete env-invalid preflight snapshot; automation golden since shipped (automation-golden.spec.ts) -->
 
 # B1 方案 A — Automation 黄金 E2E (host stack 降级版)
 

@@ -1,8 +1,10 @@
 ---
 type: backlog
-status: active
+status: closed
 created: 2026-05-28
 ---
+
+<!-- no-precipitation: terminal port/gap-fill report (78 tests passed); flow-designer-sdk hooks are the durable artifact -->
 
 # B2a — flow-designer-sdk G7+G8 gap fill (2026-05-28)
 

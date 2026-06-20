@@ -1,8 +1,10 @@
 ---
 type: backlog
-status: active
+status: closed
 created: 2026-05-28
 ---
+
+<!-- no-precipitation: terminal adapter-migration checkpoint (PR #332); Phase 3 consumer migration completed via PRs #342/#347 -->
 
 # B2c-followup — `useBpmFlowStore` Adapter + Consumer Migration
 
