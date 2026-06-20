@@ -35,6 +35,8 @@ public class LlmProviderFactory {
     private final ObjectMapper objectMapper;
     /** A-G6: wraps resolved providers so every LLM call writes the usage ledger. */
     private final com.auraboot.framework.agent.trace.GenAiUsageRecorder genAiUsageRecorder;
+    /** Optional OTel tracer; the decorator stamps the active trace id on usage rows. */
+    private final io.micrometer.tracing.Tracer tracer;
 
     /**
      * Global kill-switch for the stub LLM provider. When true, every
@@ -47,11 +49,13 @@ public class LlmProviderFactory {
 
     public LlmProviderFactory(List<LlmProvider> providers, CloudConfigService cloudConfigService,
                                AgentProperties agentProperties, ObjectMapper objectMapper,
-                               com.auraboot.framework.agent.trace.GenAiUsageRecorder genAiUsageRecorder) {
+                               com.auraboot.framework.agent.trace.GenAiUsageRecorder genAiUsageRecorder,
+                               org.springframework.beans.factory.ObjectProvider<io.micrometer.tracing.Tracer> tracerProvider) {
         this.cloudConfigService = cloudConfigService;
         this.agentProperties = agentProperties;
         this.objectMapper = objectMapper;
         this.genAiUsageRecorder = genAiUsageRecorder;
+        this.tracer = tracerProvider.getIfAvailable();
 
         this.providerMap = new HashMap<>();
         LlmProvider openAiRef = null;
@@ -75,7 +79,7 @@ public class LlmProviderFactory {
             return raw;
         }
         // A-G6 chokepoint: every resolved provider records usage at chat/streamChat.
-        return new UsageRecordingLlmProvider(raw, genAiUsageRecorder);
+        return new UsageRecordingLlmProvider(raw, genAiUsageRecorder, tracer);
     }
 
     private LlmProvider resolveRawProvider(String providerCode) {
