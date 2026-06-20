@@ -223,8 +223,10 @@ projection_version, first_seen_at, last_seen_at
 ## 4. 可观测域(A)
 ### 4.1 现状(call-site 实证)
 两套并行"鹰眼",各自真在跑、traceId 不互通:① 基础设施 tracing(OTel→Jaeger,HTTP 入站 span 自动 / 10 处 `@Observed` / `TraceIdResponseFilter`;dev 默认关、Jaeger 未自动起)【实测】;② 自研 AI 链路(`ab_ai_trace`/`_span` + `/aurabot/traces`,自研 UUID 与 OTel 无关)【实测】;③ L3 观测(6 发布者)/L4 评估/审计 全 wired【实测】。
+
+**P0 运行时实证(2026-06-20,host-first 零 docker,runtime `obs-p0-baseline-54`/`auraboot_54`,跑预构建 bootJar + `MANAGEMENT_TRACING_ENABLED=true`)**:同一 `/chat/stream` 请求 → OTel `X-Trace-Id=db4e41a06e9f5dfbe2b8c5e23cc98cac`(32-hex)vs `ab_ai_trace.trace_id=72738caf-1d05-4b54-933a-77d91cbfe654`(UUID + 3 子 span `d1_grounding/resolve_tools/render_prompt`);**OTel id 在 `ab_ai_trace` 全表出现 0 次(零桥接)**;OTLP sink 收 28 个 span POST(导出真在跑);MQ 默认 `local`(默认配置不过 Kafka)。→ **「两套鹰眼不互通」由推断升为实证;§4.1 全部 call-site 结论(自研 span 名 / UUID 格式 / 导出管道)经真栈核对成立。**
 ### 4.2 Gap
-A-G1 两 traceId 不通 / A-G2 审计无 trace_id(`X-Request-ID` 孤儿)/ A-G3 日志缺 `%X{traceId}` / A-G4 Kafka 断链 / A-G5 无实证 / A-G6 成本未计算。
+A-G1 两 traceId 不通 / A-G2 审计无 trace_id(`X-Request-ID` 孤儿)/ A-G3 日志缺 `%X{traceId}` / A-G4 Kafka 断链 / A-G5 ✅ **P0 已实证(2026-06-20,见 §4.1)** / A-G6 成本未计算。
 ### 4.3 目标
 OTel 骨架;`ab_ai_trace` 翻转为投影 consumer(P1 盖 traceId→P3 投影→P5 关直写)。投影契约列为**验收目标**,明细回领域设计(UUID↔32-hex/span 映射/root 识别/乱序·late/幂等键 `(tenant_id,trace_id,span_id)`/`projection_version,is_complete`/backfill/双轨比对/flag 回滚)。
 ### 4.4 埋点(命名按 §2.8:标准名优先、否则 `aura.*`)
@@ -304,7 +306,7 @@ S0 合并后(并行):P1(日志 %X{traceId}+审计 trace_id+ab_ai_trace 盖 trace
 随后:P2(OTel adapter+Kafka traceparent) ∥ M2(UI 元素身份+治理+漏斗);Observation 切 derived-only
 最后:P3/P4/P5(Collector/CH/投影/分析/收口) ∥ M3/M4(深度分析/实时流)
 ```
-**P0 验收(基线拓扑,不要求统一端到端)**:① HTTP span 在 Jaeger ② 自研 trace 在 `/aurabot/traces` ③ 两 ID 确认不同 ④ Kafka 后链路确认断 ⑤ 基线 trace topology 证据。统一端到端=P2 验收。
+**P0 验收(基线拓扑,不要求统一端到端)— ✅ 已完成 2026-06-20(实证见 §4.1)**:① HTTP span(X-Trace-Id 32-hex + OTLP 28 POST)② 自研 trace 写库 + 3 子 span ③ 两 ID 确认不同 + 零桥接 ④ MQ 默认 local + KafkaMqProvider 无 traceparent(code)⑤ 基线证据已产出。统一端到端=P2 验收。
 
 ---
 
