@@ -6,6 +6,8 @@ import com.auraboot.framework.bi.dto.ReportScheduleRequest;
 import com.auraboot.framework.bi.dto.ReportScheduleResponse;
 import com.auraboot.framework.bi.service.ReportScheduleService;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,6 +32,7 @@ public class ReportScheduleController {
     private final ReportScheduleService reportScheduleService;
 
     @GetMapping
+    @RequirePermission(MetaPermission.REPORT_GENERATE)
     @Operation(summary = "List all report schedules")
     public ApiResponse<List<ReportScheduleResponse>> list() {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -37,6 +40,7 @@ public class ReportScheduleController {
     }
 
     @GetMapping("/{id}")
+    @RequirePermission(MetaPermission.REPORT_GENERATE)
     @Operation(summary = "Get a report schedule by ID")
     public ApiResponse<ReportScheduleResponse> get(@PathVariable Long id) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -44,6 +48,7 @@ public class ReportScheduleController {
     }
 
     @PostMapping
+    @RequirePermission(MetaPermission.REPORT_GENERATE)
     @Operation(summary = "Create a new report schedule")
     public ApiResponse<ReportScheduleResponse> create(
             @Valid @RequestBody ReportScheduleRequest request,
@@ -53,6 +58,7 @@ public class ReportScheduleController {
     }
 
     @PutMapping("/{id}")
+    @RequirePermission(MetaPermission.REPORT_GENERATE)
     @Operation(summary = "Update a report schedule")
     public ApiResponse<ReportScheduleResponse> update(
             @PathVariable Long id,
@@ -62,6 +68,7 @@ public class ReportScheduleController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermission(MetaPermission.REPORT_GENERATE)
     @Operation(summary = "Delete a report schedule")
     public ApiResponse<String> delete(@PathVariable Long id) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -70,6 +77,7 @@ public class ReportScheduleController {
     }
 
     @PostMapping("/{id}/test-send")
+    @RequirePermission(MetaPermission.REPORT_GENERATE)
     @Operation(summary = "Trigger immediate test delivery for a schedule")
     public ApiResponse<String> testSend(@PathVariable Long id) {
         Long tenantId = MetaContext.getCurrentTenantId();
