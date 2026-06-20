@@ -14,7 +14,7 @@
 import React, { useState, useCallback } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
+import { BlockRenderer } from '@auraboot/runtime-kernel';
 
 interface WizardStep {
   key: string;

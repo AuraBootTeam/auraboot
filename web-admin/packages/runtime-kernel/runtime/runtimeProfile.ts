@@ -50,3 +50,33 @@ export function shouldBootCorePlugins(profile: RuntimeProfile): boolean {
 export function getDefaultPluginRuntimeProfiles(): RuntimeProfile[] {
   return [DEFAULT_RUNTIME_PROFILE];
 }
+
+/**
+ * Plugin federation gating — is a plugin (whose manifest declares
+ * `runtimeProfiles`) enabled for the current runtime profile? A plugin that
+ * declares no profiles defaults to the plugin default set (admin-only), so
+ * admin plugins never leak into anonymous public runtimes.
+ *
+ * Generic over the declared profile list so the kernel stays free of the
+ * host's PluginManifest type; the host passes `manifest.clientConfig?.runtimeProfiles`.
+ */
+export function isRuntimeProfileEnabled(
+  declaredProfiles: readonly RuntimeProfile[] | null | undefined,
+  current: RuntimeProfile,
+): boolean {
+  const profiles = declaredProfiles ?? getDefaultPluginRuntimeProfiles();
+  return profiles.includes(current);
+}
+
+/**
+ * Slot / contribution gating — a contribution that declares no profiles is
+ * allowed in every runtime; otherwise it is restricted to the declared set.
+ * (Differs from {@link isRuntimeProfileEnabled}: the empty default is "all".)
+ */
+export function isRuntimeProfileAllowed(
+  declaredProfiles: readonly RuntimeProfile[] | null | undefined,
+  current: RuntimeProfile,
+): boolean {
+  if (!declaredProfiles || declaredProfiles.length === 0) return true;
+  return declaredProfiles.includes(current);
+}

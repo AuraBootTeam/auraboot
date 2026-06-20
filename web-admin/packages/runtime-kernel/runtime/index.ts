@@ -5,6 +5,8 @@ export {
   getRuntimeProfileFromPathname,
   isAnonymousRuntimeProfile,
   isPublicRuntimePathname,
+  isRuntimeProfileAllowed,
+  isRuntimeProfileEnabled,
   normalizeRuntimePathname,
   shouldBootCorePlugins,
   type RuntimeProfile,

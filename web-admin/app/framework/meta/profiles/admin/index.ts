@@ -9,8 +9,7 @@
  */
 
 import React from 'react';
-import type { RenderProfile } from '../types';
-import { profileRegistry } from '../ProfileRegistry';
+import { profileRegistry, type RenderProfile } from '@auraboot/runtime-kernel';
 
 // Lazy block renderers — each block type is a separate chunk
 const FormBlockRenderer = React.lazy(() =>
