@@ -6,6 +6,8 @@ import com.auraboot.framework.i18n.service.I18nResourceService;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.notification.entity.NotificationTemplate;
 import com.auraboot.framework.notification.mapper.NotificationTemplateMapper;
+import com.auraboot.framework.meta.entity.PageSchema;
+import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.view.entity.SavedView;
 import com.auraboot.framework.view.entity.ViewConfig;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
@@ -113,6 +115,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final PluginQualityScorer qualityScorer;
     private final com.auraboot.framework.plugin.validation.PageSchemaImportGate pageSchemaImportGate;
     private final SavedViewMapper savedViewMapper;
+    private final PageSchemaMapper pageSchemaMapper;
     private final NotificationTemplateMapper notificationTemplateMapper;
     private final AutoPermissionAssignmentService autoPermissionAssignmentService;
     private final ApplicationEventPublisher applicationEventPublisher;
@@ -2181,6 +2184,20 @@ public class PluginImportServiceImpl implements PluginImportService {
 
             String scope = dto.getScope() != null ? dto.getScope() : "global";
             String pageKey = dto.getPageKey();
+
+            // Validate pageKey references an existing page in ab_page_schema.
+            // A SavedView with a dangling pageKey will be permanently invisible to users
+            // because useSavedViews does a strict-equals match on pageKey.
+            if (pageKey != null && !pageKey.isBlank()) {
+                PageSchema page = pageSchemaMapper.selectAnyByPageKey(pageKey);
+                if (page == null) {
+                    String msg = "[S-SAVED-VIEW] pageKey '" + logSafe(pageKey) + "' does not exist in ab_page_schema; "
+                            + "define it as config/pages/" + logSafe(pageKey) + ".json in your plugin before declaring a SavedView";
+                    log.warn("Skipping saved view '{}': {}", logSafe(dto.getName()), msg);
+                    result.addWarning(msg);
+                    continue;
+                }
+            }
 
             // Check if a view with same name+modelCode+viewType+scope already exists
             List<SavedView> existing = savedViewMapper.findGlobalViews(dto.getModelCode(), pageKey);
