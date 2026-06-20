@@ -1,13 +1,16 @@
 ---
 type: backlog
-status: active
+status: closed
 created: 2026-06-11
 ---
 
+<!-- no-precipitation: all 4 bugs fixed (PR #927 bugs 1/2/3, PR #938 bug 4); the durable lesson (REQUIRES_NEW failed-audit deadlock in a @Transactional catch) is codified in auraboot-enterprise/docs/agent-rules/engineering-gotchas/backend-spring-db.md (ENT #601). This doc stays as the historical bug record. -->
+
 # ReconciliationService — product bugs surfaced by coverage IT (2026-06-11)
 
-> ✅ **Bugs 1/2/3 FIXED (2026-06-20, PR #927)** — type-validation case mismatch, null-type clean ValidationException, and count-with-ORDER-BY SQL. IT assertions flipped to correct behavior (35 tests green, no hang).
-> ⏸ **Bug 4 DEFERRED** — persisting the FAILED-run audit despite the outer `@Transactional` rollback. The `REQUIRES_NEW` re-insert approach **deadlocks** against locks held by the still-open outer tx (independent re-run hung >1h). Needs a proper redesign (persist the audit outside the rolled-back tx, e.g. an after-rollback hook / dedicated audit path). Bug 4 stays characterized as `PRODUCT BUG (deferred)` in the IT. Doc remains `active` for bug 4.
+> ✅ **ALL 4 BUGS FIXED — CLOSED (2026-06-20).**
+> - **Bugs 1/2/3 (PR #927)** — type-validation case mismatch, null-type clean ValidationException, count-with-ORDER-BY SQL.
+> - **Bug 4 (PR #938)** — persist the FAILED-run audit despite the outer `@Transactional` rollback. **Done correctly** via `TransactionSynchronization.afterCompletion(ROLLED_BACK)` + a fresh `TransactionTemplate`: by afterCompletion the outer tx's locks are released, so NO deadlock. (The earlier `REQUIRES_NEW`-inside-the-open-tx attempt deadlocked >1h — see the gotcha in `engineering-gotchas/backend-spring-db.md`.) IT flipped to assert the FAILED-run IS persisted; independent re-run 35 tests green, completes in ~69s.
 
 Found while writing `ReconciliationServiceIntegrationTest` (OSS coverage #8/#9). The IT
 **documents** these as current behavior (so coverage is real and characterization-stable);
