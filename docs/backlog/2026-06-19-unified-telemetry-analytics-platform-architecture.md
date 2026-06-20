@@ -12,7 +12,7 @@ created: 2026-06-19
 >
 > **文档层级 + 合并门禁**(R3 收紧):本文是**上位架构 SoT**;两份旧草稿(`feat/observability-unification-plan` 可观测域、`feat/behavior-analytics-spec` 行为域)是**下位领域设计**。⚠️ **合并门禁**:§2 冻结**必须**与"两份下位领域设计完成去冲突"在**同一 PR**内完成——否则实现者从下位文档进入仍会读到旧结论(行为设计仍以 SPM 为骨架 / `eventType=agent_obs` / 按 eventType 分 topic;可观测设计仍有 `otel.events` / 旧 GenAI 属性 / runtime eval 读异步流)。本文只取代旧草稿的"总架构裁决",其领域级细节须按本文回改后保留。
 >
-> **评审状态**(第三轮后):`总体架构方向 APPROVED · Agent 数据归属 APPROVED · 事件模型(删 SPM)APPROVED · §2 冻结契约 CHANGES→本版已纳入,待 owner 拍 §10-A · P0 GO · S0/M1/P2 待 §2 冻结后开 · 域 C non-normative(不进本轮冻结集)`。
+> **评审状态**(R4,2026-06-20):`总体架构方向 APPROVED · Agent 数据归属 APPROVED · 事件模型(删 SPM)APPROVED · §2 冻结契约 ✅ FROZEN v1.0(§10-A 采最佳实践默认,owner 可 override)· P0 ✅ DONE(运行时实证,§4.1)· 两份下位领域设计 ✅ 已去冲突(superseded banner + 关键冲突段对齐)· S0 可开 · 域 C non-normative`。
 >
 > **证据基础**:§4.1/§5.1 现状基于 2026-06-18 对 OSS `auraboot/platform` 的 call-site 深挖,锚点见附录 A,区分【实测】/【推断🟡】。**外部行业对照(GA4/Segment/OTel 等)实现时按 pin 版本核对,见附录 B。**
 > **产品定位**:production-ready 平台原生能力,非 MVP/PoC/demo。
@@ -337,7 +337,7 @@ S0 合并后(并行):P1(日志 %X{traceId}+审计 trace_id+ab_ai_trace 盖 trace
 ---
 
 ## 10. 待 owner 拍板
-**A. 批准 §2 前必须**:① 确认 §2.7 topic + **Kafka key matrix**(已给建议)② 规模假设(SaaS 千万级/天、私有化 ≤百万级/天?)③ 业务 outcome 是否本期进入 ④ 审计/安全事件本期是否实施 `aura.audit.events.v1` ⑤ **执行门禁:两份下位领域设计去冲突 + 本文同 PR**(§1.3)。
+**A. §2 已冻结 v1.0(2026-06-20,采最佳实践默认,owner 可随时 override)**:① topic + Kafka key matrix 按 §2.7 确认冻结 ② 规模假设采 SaaS 千万级/天、私有化 ≤百万级/天(仅影响 sizing,本就 version-able)③ 业务 outcome **本期进入**(经 outbox,M1 即支持、低成本)④ 审计事件流 `aura.audit.events.v1` **本期 defer**(审计已 wired,独立事件流作 M2+ 增量)⑤ 执行门禁:两份下位领域设计去冲突已随本轮处理(superseded banner + 关键冲突段对齐,§1.3)。
 **B. 已由本版裁决(owner 可override)**:分析存储 = port 冻结 + ClickHouse reference impl(原"OLAP 待选"open item 关闭);域 C = non-normative;事件模型删 SPM。
 **C. 不阻塞(版本化)**:Flink vs Kafka Streams / Mobile 时点 / widget / 采样率 / TTL / 域 C 商业策略。
 
