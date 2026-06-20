@@ -60,6 +60,23 @@ public class BusinessException extends RootUnCheckedException {
         return ex;
     }
 
+    /**
+     * Cause-preserving variant of {@link #i18n}: wrap a low-level failure (DB / IO / etc.) into a
+     * BusinessException carrying an {@code $i18n:<key>} message AND the original cause, so the
+     * cause chain survives for {@code GlobalExceptionHandler} / observability while the user sees
+     * a localized message. {@code cause} is first to disambiguate from the {@code (String, args)}
+     * overload. Use in {@code catch} blocks instead of {@code new BusinessException(msg, cause)}
+     * (whose {@code (String, Throwable)} ctor drops the message).
+     */
+    public static BusinessException i18nWrap(Throwable cause, String key, Object... args) {
+        BusinessException ex = new BusinessException("$i18n:" + key);
+        ex.i18nArgs = (args == null || args.length == 0) ? null : args;
+        if (cause != null) {
+            ex.initCause(cause);
+        }
+        return ex;
+    }
+
     /** Substitution args for a parameterized {@code $i18n:} message, or null. */
     public Object[] getI18nArgs() {
         return i18nArgs;

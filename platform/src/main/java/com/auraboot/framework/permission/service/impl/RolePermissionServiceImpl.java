@@ -98,7 +98,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             
         } catch (Exception e) {
             log.error("分配Permission到角色失败: roleId={}", roleId, e);
-            throw new BusinessException("分配Permission失败: " + e.getMessage(), e);
+            throw BusinessException.i18nWrap(e, "permission.assign_failed");
         }
     }
     
@@ -125,7 +125,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             
         } catch (Exception e) {
             log.error("从角色移除Permission失败: roleId={}, permissionId={}", roleId, permissionId, e);
-            throw new BusinessException("移除Permission失败: " + e.getMessage(), e);
+            throw BusinessException.i18nWrap(e, "permission.remove_failed");
         }
     }
     
@@ -150,7 +150,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             
         } catch (Exception e) {
             log.error("移除角色的所有Permission失败: roleId={}", roleId, e);
-            throw new BusinessException("移除所有Permission失败: " + e.getMessage(), e);
+            throw BusinessException.i18nWrap(e, "permission.remove_all_failed");
         }
     }
     
@@ -238,7 +238,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             
         } catch (Exception e) {
             log.error("同步角色Permission失败: roleId={}", roleId, e);
-            throw new BusinessException("同步Permission失败: " + e.getMessage(), e);
+            throw BusinessException.i18nWrap(e, "permission.sync_failed");
         }
     }
     
@@ -270,7 +270,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             
         } catch (Exception e) {
             log.error("从角色移除Permission失败: roleId={}", roleId, e);
-            throw new BusinessException("移除Permission失败: " + e.getMessage(), e);
+            throw BusinessException.i18nWrap(e, "permission.remove_failed");
         }
     }
     
@@ -343,7 +343,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
         } catch (Exception e) {
             log.error("复制角色Permission失败: sourceRoleId={}, targetRoleId={}", 
                 sourceRoleId, targetRoleId, e);
-            throw new BusinessException("复制Permission失败: " + e.getMessage(), e);
+            throw BusinessException.i18nWrap(e, "permission.copy_failed");
         }
     }
 }
