@@ -709,3 +709,34 @@ There are no `page_type`, `page_category`, or `dsl_schema` columns.
 6. **Grid layout for dashboards, stack for details.** Dashboards benefit from multi-column grid layouts. Detail pages work well with stack layout and tabbed sections.
 
 7. **Always specify `schemaVersion: 4`.** This is the v4 flat format. V1 formats with `dslSchema` nesting are no longer supported.
+
+---
+
+## Saved Views
+
+A **SavedView** (`ab_saved_view`) stores a user-configured column/sort/filter/density preset for a specific page. Users can name and share these presets as "personal", "team", or "global" views.
+
+### pageKey contract
+
+Every `SavedView` row has a `page_key` column that **must exactly match a `page_key` in `ab_page_schema`**.
+
+- **Canonical format:** `{modelCode}_{kind}` — e.g. `crm_lead_list`, `crm_lead_form`, `crm_lead_detail`.
+- **JSON filename:** `config/pages/{pageKey}.json` inside your plugin zip/directory.
+
+**The backend enforces this at write time (since 2026-06-20):**
+
+- `SavedViewService.create()` calls `pageSchemaMapper.selectAnyByPageKey(pageKey)` and throws  
+  `[S-SAVED-VIEW] pageKey '<key>' does not exist in ab_page_schema …` if the page is not found.
+- `PluginImportServiceImpl.importSavedViews()` skips the entry and adds a `[S-SAVED-VIEW]` warning  
+  to the import result when the page is missing.
+
+**Why strict?** The frontend `useSavedViews` hook performs a strict-equals match on `pageKey`.  
+A `SavedView` with a dangling `pageKey` is silently invisible to every user on every page load —  
+there is no graceful fallback. Rejecting at write time surfaces the misconfiguration immediately.
+
+### Common trap: normalization
+
+The backend does **not** normalize `pageKey` (no lowercase conversion, no slash→underscore).  
+Whatever string you write is what `useSavedViews` matches. Make sure the `pageKey` in  
+`savedViews/*.json` inside your plugin exactly matches the `pageKey` field in the corresponding  
+`config/pages/{pageKey}.json` file.

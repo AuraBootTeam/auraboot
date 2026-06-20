@@ -2,6 +2,8 @@ package com.auraboot.framework.view.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.entity.PageSchema;
+import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.organization.entity.Team;
 import com.auraboot.framework.organization.mapper.TeamMapper;
 import com.auraboot.framework.permission.constants.MetaPermission;
@@ -37,6 +39,7 @@ import static org.mockito.Mockito.*;
 class SavedViewServiceImplTest {
 
     @Mock SavedViewMapper savedViewMapper;
+    @Mock PageSchemaMapper pageSchemaMapper;
     @Mock UserPermissionService userPermissionService;
     @Mock CurrentUserTeamResolver currentUserTeamResolver;
     @Mock TeamMapper teamMapper;
@@ -68,6 +71,8 @@ class SavedViewServiceImplTest {
 
     @Test
     void create_personal_succeeds_andClearsPersonalDefaults() {
+        PageSchema page = new PageSchema();
+        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(page);
         when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
                 .thenReturn(0);
 
@@ -80,6 +85,8 @@ class SavedViewServiceImplTest {
 
     @Test
     void create_team_validatesMembership() {
+        PageSchema page = new PageSchema();
+        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(page);
         when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of("teamA"));
         when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
                 .thenReturn(0);
@@ -105,6 +112,8 @@ class SavedViewServiceImplTest {
 
     @Test
     void create_duplicateName_fails() {
+        PageSchema page = new PageSchema();
+        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(page);
         when(savedViewMapper.countByNameForUser(anyString(), anyString(), eq("My View"), anyString(), isNull()))
                 .thenReturn(1);
         assertThrows(ValidationException.class, () -> service.create(createReq("personal", null)));
@@ -218,6 +227,8 @@ class SavedViewServiceImplTest {
         when(savedViewMapper.findByPid("g1")).thenReturn(src);
         when(userPermissionService.hasPermission(7L, MetaPermission.VIEW_MANAGE)).thenReturn(false);
         when(savedViewMapper.countByNameForUser(any(), any(), any(), any(), any())).thenReturn(0);
+        PageSchema page = new PageSchema();
+        when(pageSchemaMapper.selectAnyByPageKey("k")).thenReturn(page);
 
         SavedViewDTO dto = service.duplicate("g1", "Dup");
 
@@ -263,8 +274,69 @@ class SavedViewServiceImplTest {
         assertFalse(service.isNameUnique("m", "k", "n", null));
     }
 
+    // ---- pageKey validation tests ----
+
+    @Test
+    void create_withNonExistentPageKey_throwsValidationError() {
+        // Arrange: pageSchemaMapper returns null → page does not exist
+        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(null);
+
+        SavedViewCreateRequest req = createReq("personal", null);
+
+        // Act + Assert: must throw before reaching insertSavedView
+        ValidationException ex = assertThrows(ValidationException.class,
+                () -> service.create(req));
+
+        assertTrue(ex.getMessage().contains("[S-SAVED-VIEW]"),
+                "Error must carry the [S-SAVED-VIEW] error code prefix");
+        assertTrue(ex.getMessage().contains("crm/leads"),
+                "Error must name the offending pageKey");
+        verify(savedViewMapper, never()).insertSavedView(any());
+    }
+
+    @Test
+    void create_withValidPageKey_succeeds() {
+        // Arrange: pageSchemaMapper returns a real page → validation passes
+        PageSchema existingPage = new PageSchema();
+        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(existingPage);
+        when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
+                .thenReturn(0);
+
+        // Act
+        SavedViewDTO dto = service.create(createReq("personal", null));
+
+        // Assert: happy path completes
+        assertNotNull(dto);
+        assertEquals("My View", dto.getName());
+        verify(savedViewMapper).insertSavedView(any(SavedView.class));
+    }
+
+    @Test
+    void create_withNullPageKey_skipsPageKeyValidation() {
+        // A request with no pageKey should skip the pageKey check entirely
+        SavedViewCreateRequest req = new SavedViewCreateRequest();
+        req.setName("No PageKey View");
+        req.setModelCode("crm.lead");
+        // pageKey intentionally null
+        req.setScope("personal");
+        req.setViewType("table");
+        req.setViewConfig(new ViewConfig());
+        req.setIsDefault(false);
+
+        when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
+                .thenReturn(0);
+
+        // Should not call pageSchemaMapper at all
+        SavedViewDTO dto = service.create(req);
+
+        assertNotNull(dto);
+        verify(pageSchemaMapper, never()).selectAnyByPageKey(any());
+    }
+
     @Test
     void teamScope_dtoPopulatesTeamName() {
+        PageSchema page = new PageSchema();
+        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(page);
         when(savedViewMapper.countByNameForUser(any(), any(), any(), any(), any())).thenReturn(0);
         when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of("tA"));
         Team team = new Team(); team.setName("Team A");
