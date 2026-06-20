@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.trace;
 
 import com.auraboot.framework.agent.trace.entity.GenAiUsageRecord;
+import com.auraboot.framework.agent.trace.mapper.AiTraceMapper;
 import com.auraboot.framework.agent.trace.mapper.GenAiUsageMapper;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.observability.GenAiPricing;
@@ -22,6 +23,7 @@ import java.math.BigDecimal;
 public class GenAiUsageRecorder {
 
     private final GenAiUsageMapper genAiUsageMapper;
+    private final AiTraceMapper aiTraceMapper;
 
     /**
      * Record one LLM generation. Tenant is read from {@link MetaContext} (the turn
@@ -35,6 +37,11 @@ public class GenAiUsageRecorder {
                        BigDecimal diagnosticCost) {
         try {
             Long tenantId = MetaContext.getCurrentTenantId();
+            if (tenantId == null && traceId != null) {
+                // Streaming/reactor thread has no MetaContext (§2.6); resolve tenant
+                // from the trace (created earlier on the request thread).
+                tenantId = aiTraceMapper.selectTenantByTraceId(traceId);
+            }
             if (tenantId == null) {
                 return;
             }

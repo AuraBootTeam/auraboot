@@ -35,6 +35,12 @@ public interface AiTraceMapper extends BaseMapper<AiTrace> {
             @Param("metadataJson") String metadataJson,
             @Param("startTime") java.time.Instant startTime);
 
+    /** Resolve the trace's tenant from its id — fallback when MetaContext is absent
+     *  on a streaming/reactor thread (A-G6 usage ledger, §2.6). */
+    @Select("SELECT tenant_id FROM ab_ai_trace WHERE trace_id = #{traceId} LIMIT 1")
+    @InterceptorIgnore(tenantLine = "true")
+    Long selectTenantByTraceId(@Param("traceId") String traceId);
+
     @Update("""
         UPDATE ab_ai_trace
         SET output = #{output},

@@ -462,7 +462,8 @@ public class AuraBotChatService {
                         userPermissionService, pendingToolStore, pendingToolSnapshotFactory, maxToolRounds);
             } else {
                 streamOutcome = streamProvider(providerCode, config, model, systemPrompt,
-                        request.getHistory(), request.getMessage(), maxTokens, sink);
+                        request.getHistory(), request.getMessage(), maxTokens, sink,
+                        trace != null ? trace.getTraceId() : null);
             }
             endTraceForStreamOutcome(trace, streamOutcome);
             return streamOutcome;
@@ -650,7 +651,7 @@ public class AuraBotChatService {
 
     private TurnOutcome streamProvider(String providerCode, ProviderConfig config, String model, String systemPrompt,
                                        List<ChatMessage> history, String userMessage,
-                                       int maxTokens, ResponseSink sink) throws Exception {
+                                       int maxTokens, ResponseSink sink, String traceId) throws Exception {
         LlmProvider provider = llmProviderFactory.getProvider(providerCode);
         if (provider == null) {
             String msg = "LLM provider not available: " + providerCode;
@@ -676,7 +677,7 @@ public class AuraBotChatService {
                 config.getApiKey(),
                 config.getBaseUrl(),
                 sink,
-                null);
+                traceId);
     }
 
     private String firstNonBlank(String... values) {
