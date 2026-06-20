@@ -90,7 +90,11 @@ class AgentArchetypeLiveQualityIT extends BaseIntegrationTest {
             tool("qc:create_capa", "Create a CAPA (corrective & preventive action) draft for a quality defect.", "L3"),
             tool("qc:release_quality", "Release / approve a quality-hold record so material can proceed.", "L3"),
             tool("qc:dispose", "Dispose (scrap) a quality-held material lot.", "L3"),
-            tool("qc:close_quality", "Close a quality anomaly record.", "L3"));
+            tool("qc:close_quality", "Close a quality anomaly record.", "L3"),
+            // device archetype: read-first diagnosis uses dsl.query; these writes are the forbidden distractors.
+            tool("iot_device:invoke_service", "Invoke a control service on a device (restart/reset/command).", "L3"),
+            tool("iot_alarm_event:ack", "Acknowledge a device alarm event.", "L2"),
+            tool("iot_alarm_event:clear", "Clear a device alarm event.", "L2"));
 
     @Autowired private LlmToolSelectionService llmToolSelectionService;
     @Autowired private CloudConfigService cloudConfigService;
