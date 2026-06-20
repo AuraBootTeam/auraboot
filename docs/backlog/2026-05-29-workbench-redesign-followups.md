@@ -39,10 +39,12 @@ created: 2026-05-29
 - **Suggestions:** "Export" → trigger an existing dashboard-export-excel flow if applicable; "+ New" → open a command palette filtered to "create" actions.
 
 ### W-FU-6 · Sparkline tooltip on hover
+- ✅ **DONE (2026-06-20, PR #934)** — hover tooltip added (transparent per-point hit-areas, design-system tokens, optional labels, boundary-clamped); 10 vitest.
 - **Current state:** SVG `polyline` with no interactivity.
 - **Cost vs value:** small, but only worth adding if users actually inspect 7-day numbers (probably not in the workbench summary context). Defer until asked.
 
 ### W-FU-7 · i18n parity audit for new workbench keys
+- ✅ **DONE (2026-06-20, verified)** — all 7 keys present with non-empty zh-CN + en-US (also ja-JP/ko-KR) in `seed/i18n-base.json`; `validate-plugin-i18n.mjs` 15 files 0 fail. No change needed.
 - **New keys added this round:** `workbench.title`, `workbench.subline`, `workbench.export`, `workbench.new`, `workbench.inbox.col.task`, `workbench.inbox.col.type`, `workbench.inbox.col.due`.
 - **Verify:** `node scripts/validate-i18n-parity.mjs` (if it exists) — confirm all 7 keys have non-empty `zh-CN` and `en-US` values.
 
