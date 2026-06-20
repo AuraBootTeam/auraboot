@@ -52,11 +52,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>Uses {@code integration-test} profile (shared Postgres :5432). All data is created
  * under a dedicated tenant with {@code recon}-prefixed codes and hard-deleted in tearDown.
  *
- * <p>4 product bugs were characterized and are now fixed (see individual test methods for details):
+ * <p>3 product bugs fixed (see individual test methods for details):
  * 1. validateProfileType: lowercase Set vs toUpperCase comparison (all valid types rejected).
  * 2. validateProfileType: null type silently passed, causing raw DB DataIntegrityViolationException.
  * 3. listRuns / getRunItems unfiltered: selectCount(qw) with ORDER BY → invalid PostgreSQL SQL.
- * 4. startReconciliation: @Transactional rollback swallowed FAILED run audit record.
+ * Bug 4 (startReconciliation: @Transactional rollback swallows FAILED run audit record) is
+ * characterized in {@code testStartReconciliation_modelNotFound_transactionRollback} and deferred
+ * — the REQUIRES_NEW approach caused a deadlock; proper redesign tracked in backlog.
  */
 @Slf4j
 @SpringBootTest(classes = TestApplication.class)
@@ -510,12 +512,19 @@ class ReconciliationServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("startReconciliation: FAILED run is persisted for audit after fix (REQUIRES_NEW escapes outer tx rollback)")
-    void testStartReconciliation_modelNotFound_failedRunPersisted() {
-        // Fix verified: startReconciliation's catch block now calls persistFailedRunAudit() which
-        // is annotated @Transactional(REQUIRES_NEW). It suspends the (doomed) outer transaction,
-        // commits the FAILED run audit record in its own independent transaction, then allows the
-        // outer tx to roll back. The FAILED run record survives the outer rollback.
+    @DisplayName("startReconciliation: PRODUCT BUG (deferred) — @Transactional rolls back FAILED run on exception (run not persisted)")
+    void testStartReconciliation_modelNotFound_transactionRollback() {
+        // PRODUCT BUG (bug-4, deferred): startReconciliation is @Transactional. When loadRecords
+        // fails (model not found), the catch block sets status=FAILED and calls
+        // runMapper.updateById(run), then re-throws MetaServiceException. Because
+        // MetaServiceException is a RuntimeException, Spring's @Transactional rolls back the
+        // ENTIRE transaction — including the initial runMapper.insert(run).
+        // Result: the run record is NOT persisted in the DB, even though the code explicitly
+        // tries to save it with FAILED status.
+        //
+        // The proper fix (REQUIRES_NEW via programmatic TransactionTemplate) caused a DEADLOCK
+        // in integration testing and has been deferred to its own backlog item. This test
+        // characterizes the current (known-buggy) behavior so it acts as a regression guard.
 
         String code = CODE_PREFIX + RUN + "_nomodel";
         ReconciliationProfile profile = insertProfileDirectly(code, "SUPPLIER");
@@ -526,22 +535,19 @@ class ReconciliationServiceIntegrationTest {
         req.setPeriodStart(LocalDate.of(2025, 1, 1));
         req.setPeriodEnd(LocalDate.of(2025, 1, 31));
 
-        // Exception IS still thrown (wrapping the loadRecords failure)
+        // Exception IS thrown (wrapping the loadRecords failure)
         MetaServiceException ex = assertThrows(MetaServiceException.class,
                 () -> reconciliationService.startReconciliation(req));
         assertTrue(ex.getMessage().startsWith("Reconciliation failed:"),
                 "Expected 'Reconciliation failed:' but got: " + ex.getMessage());
 
-        // The run record IS now persisted with STATUS_FAILED (REQUIRES_NEW committed it independently)
+        // The run record is NOT persisted because @Transactional rolled back on exception
         QueryWrapper<ReconciliationRun> qw = new QueryWrapper<>();
         qw.eq("tenant_id", testTenant.getId());
         qw.eq("profile_id", profile.getId());
         List<ReconciliationRun> runs = runMapper.selectList(qw);
-        assertEquals(1, runs.size(),
-                "FAILED run should be persisted for audit — REQUIRES_NEW committed independently");
-        assertEquals(ReconciliationRun.STATUS_FAILED, runs.get(0).getStatus());
-        assertNotNull(runs.get(0).getErrorMessage());
-        assertNotNull(runs.get(0).getCompletedAt());
+        assertTrue(runs.isEmpty(),
+                "Run should NOT be persisted — @Transactional rolled back on RuntimeException (bug-4, deferred)");
     }
 
     // ==================== Run Query Tests ====================

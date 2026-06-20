@@ -16,10 +16,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -51,7 +48,6 @@ public class ReconciliationService extends BaseMetaService {
     private final ReconciliationItemMapper itemMapper;
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
-    private final PlatformTransactionManager transactionManager;
 
     // ==================== Profile CRUD ====================
 
@@ -214,14 +210,10 @@ public class ReconciliationService extends BaseMetaService {
                     run.getUnmatchedBCount(), run.getDiscrepancyCount());
 
         } catch (Exception e) {
-            // Bug fix: this method is @Transactional; catching and re-throwing a RuntimeException
-            // rolls back the entire transaction — including the initial runMapper.insert(run) — so
-            // the FAILED audit record is never persisted. Fix: delegate the audit write to a
-            // REQUIRES_NEW transaction so it commits independently even when the outer tx rolls back.
             run.setStatus(ReconciliationRun.STATUS_FAILED);
             run.setErrorMessage(e.getMessage());
             run.setCompletedAt(Instant.now());
-            persistFailedRunAudit(run);
+            runMapper.updateById(run);
             log.error("Reconciliation run failed: {}", run.getRunCode(), e);
             throw new MetaServiceException("Reconciliation failed: " + e.getMessage());
         }
@@ -817,34 +809,6 @@ public class ReconciliationService extends BaseMetaService {
     private int calcDateDifference(LocalDate a, LocalDate b) {
         if (a == null || b == null) return Integer.MAX_VALUE;
         return (int) Math.abs(ChronoUnit.DAYS.between(a, b));
-    }
-
-    /**
-     * Persists a FAILED reconciliation run for audit purposes in an independent new transaction.
-     *
-     * <p>This must NOT rely on the calling transaction from {@link #startReconciliation} because
-     * startReconciliation is @Transactional and re-throws a RuntimeException in the catch block,
-     * causing Spring to roll back the entire outer transaction (including the initial
-     * runMapper.insert). We use a programmatic TransactionTemplate with PROPAGATION_REQUIRES_NEW
-     * so the audit write commits independently, surviving the outer rollback.
-     *
-     * <p>Note: @Transactional(REQUIRES_NEW) on a method in the same bean would be ignored due to
-     * Spring's proxy-based AOP (self-invocation bypasses the proxy). A programmatic transaction
-     * is the correct fix here.
-     */
-    private void persistFailedRunAudit(ReconciliationRun run) {
-        TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
-        txTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        txTemplate.executeWithoutResult(status -> {
-            // The outer transaction already inserted the run (MyBatis-Plus populated run.getId()),
-            // but the outer tx will be rolled back when the exception re-propagates, erasing that
-            // insert. In PostgreSQL READ COMMITTED, our new inner tx cannot see the outer tx's
-            // uncommitted insert, so updateById finds 0 rows. We must insert a fresh row. Reset the
-            // id so MyBatis-Plus generates a new key; the outer tx's uncommitted row will be rolled
-            // back harmlessly.
-            run.setId(null);
-            runMapper.insert(run);
-        });
     }
 
     private void validateProfileType(String type) {
