@@ -363,6 +363,24 @@ S0 合并后(并行):P1(日志 %X{traceId}+审计 trace_id+ab_ai_trace 盖 trace
 
 ---
 
+## 12. 实现执行 backlog(剩余切片 → 精确触点 → 验证法)
+
+> 给未来会话/owner 直接接力,免重新推导。**已交付**:SoT 冻结 v1.0 · P0 实证 · A-G3 日志(`ed7f823d2`)· A-G1/A-G2 迁移(`49da15ebe`,`V20260620000000`)。下表为剩余,按 §7 顺序;⚙️=需 jar rebuild 验证(heavy)。
+
+| 切片 | 精确触点 | 验证 |
+|---|---|---|
+| **P1 填充接线** ⚙️ | 审计 trace_id:`CommandEffectExecutor.saveAuditLog`(command)/ `AdminEventLogService`(admin)/ `QueryAuditServiceImpl:1417`(query)——从 Micrometer `Tracer.currentSpan().context()` 取 traceId/spanId 写新列;`ab_ai_trace.otel_trace_id`:`AiTraceService.createTrace`(`framework/agent/trace/AiTraceService.java`)起点 stamp 当前 OTel traceId | rebuild → 请求 → 审计行 `trace_id` = `X-Trace-Id`;`ab_ai_trace.otel_trace_id` = 同请求 OTel traceId(真栈,同 P0 法) |
+| **A-G4 Kafka 透传** ⚙️ | `platform-mq-kafka/.../KafkaMqProvider.send` producer 注入 W3C `traceparent` 到 record headers;consumer 提取续 span(`record.headers().add` 已有框架) | 跨语言 round-trip 契约测试(MQ=kafka);trace 过 Kafka 不断 |
+| **S0 seam ports** ⚙️ | 新建 `CorrelationSnapshot`/`AgentTelemetryFacade`/`TechnicalTelemetryPort`/`BusinessOutcomePort`/`ObservationPort`/`OutboxPort`(framework/agent 或 observability 包);chokepoint `AgentRunService`/`ToolLoopService`/`AuraBotChatService` 改用 facade(一次插桩,§2.6) | 单测 facade + 真栈 chokepoint 不旁路 `ConversationTurnService` |
+| **P2 OTel 化 agent/LLM** ⚙️ | 上述 chokepoint 发 OTel span(GenAI semconv,§4.4 命名);LLM provider 层接 `gen_ai.*` | Jaeger 端到端链(P0 升 P2 验收) |
+| **P3 事件流** ⚙️ | OTel Collector(host-first binary)→ Kafka exporter;ClickHouse sink(`AnalyticalStorePort` impl);`ab_ai_trace` 投影 consumer(替直写,§4.3) | 同 span 进 Jaeger+CH;`/aurabot/traces` 改读投影行为不变 |
+| **M1 行为采集底座** ⚙️ | `@aura/track` SDK(`web-admin/app/shared/track/`)+ `BeaconController`(`/api/collect`)+ `aura.behavior.events.v1` + `BehaviorStorePort` PG impl + 自动 pageview/click + 基础 UV/PV dashboard(DSL)+ server outcome publisher(outbox) | 真浏览器 golden:点击→`/api/collect`→落库反查;outcome→PG |
+| **P4/P5 · M2–M4** | 见 §7（分析层 / SPM-free UI 元素身份 M2 / ClickHouse tier M3 / 实时流 M4 / 域 C non-normative） | 见 §8 |
+
+**P1 填充接线是 unblocked 的下一步**(S0 facade 可同期建,outcome 用它);其余按依赖序。所有 ⚙️ 切片须 jar rebuild + 真栈验证(host-first,复用 `obs-p0-baseline-54` 法)。
+
+---
+
 ## 附录 A — 实证锚点(file:line)
 | 主题 | 锚点 |
 |---|---|
