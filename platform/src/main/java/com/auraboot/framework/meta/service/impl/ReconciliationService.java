@@ -16,7 +16,10 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -48,6 +51,7 @@ public class ReconciliationService extends BaseMetaService {
     private final ReconciliationItemMapper itemMapper;
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
+    private final PlatformTransactionManager transactionManager;
 
     // ==================== Profile CRUD ====================
 
@@ -210,10 +214,14 @@ public class ReconciliationService extends BaseMetaService {
                     run.getUnmatchedBCount(), run.getDiscrepancyCount());
 
         } catch (Exception e) {
+            // Bug fix: this method is @Transactional; catching and re-throwing a RuntimeException
+            // rolls back the entire transaction — including the initial runMapper.insert(run) — so
+            // the FAILED audit record is never persisted. Fix: delegate the audit write to a
+            // REQUIRES_NEW transaction so it commits independently even when the outer tx rolls back.
             run.setStatus(ReconciliationRun.STATUS_FAILED);
             run.setErrorMessage(e.getMessage());
             run.setCompletedAt(Instant.now());
-            runMapper.updateById(run);
+            persistFailedRunAudit(run);
             log.error("Reconciliation run failed: {}", run.getRunCode(), e);
             throw new MetaServiceException("Reconciliation failed: " + e.getMessage());
         }
@@ -239,10 +247,15 @@ public class ReconciliationService extends BaseMetaService {
         pageSize = PaginationSafetyUtils.pageSize(pageSize, 200);
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, 200);
 
+        // Bug fix: selectCount(qw) must use a wrapper WITHOUT orderBy — PostgreSQL rejects
+        // "SELECT COUNT(*) ... ORDER BY ..." as invalid SQL. Use a separate count-only wrapper.
+        QueryWrapper<ReconciliationRun> countQw = new QueryWrapper<>();
+        countQw.eq("tenant_id", tenantId);
+        long total = runMapper.selectCount(countQw);
+
         QueryWrapper<ReconciliationRun> qw = new QueryWrapper<>();
         qw.eq("tenant_id", tenantId);
         qw.orderByDesc("created_at");
-        long total = runMapper.selectCount(qw);
 
         qw.last("LIMIT " + pageSize + " OFFSET " + offset);
         List<ReconciliationRun> runs = runMapper.selectList(qw);
@@ -279,10 +292,15 @@ public class ReconciliationService extends BaseMetaService {
             items = itemMapper.findByRunIdAndStatus(run.getId(), matchStatus, pageSize, offset);
             total = itemMapper.countByRunIdAndStatus(run.getId(), matchStatus);
         } else {
+            // Bug fix: selectCount(qw) must use a wrapper WITHOUT orderBy — PostgreSQL rejects
+            // "SELECT COUNT(*) ... ORDER BY ..." as invalid SQL. Use a separate count-only wrapper.
+            QueryWrapper<ReconciliationItem> countQw = new QueryWrapper<>();
+            countQw.eq("run_id", run.getId());
+            total = itemMapper.selectCount(countQw);
+
             QueryWrapper<ReconciliationItem> qw = new QueryWrapper<>();
             qw.eq("run_id", run.getId());
             qw.orderByAsc("match_status", "id");
-            total = itemMapper.selectCount(qw);
             qw.last("LIMIT " + pageSize + " OFFSET " + offset);
             items = itemMapper.selectList(qw);
         }
@@ -801,11 +819,46 @@ public class ReconciliationService extends BaseMetaService {
         return (int) Math.abs(ChronoUnit.DAYS.between(a, b));
     }
 
+    /**
+     * Persists a FAILED reconciliation run for audit purposes in an independent new transaction.
+     *
+     * <p>This must NOT rely on the calling transaction from {@link #startReconciliation} because
+     * startReconciliation is @Transactional and re-throws a RuntimeException in the catch block,
+     * causing Spring to roll back the entire outer transaction (including the initial
+     * runMapper.insert). We use a programmatic TransactionTemplate with PROPAGATION_REQUIRES_NEW
+     * so the audit write commits independently, surviving the outer rollback.
+     *
+     * <p>Note: @Transactional(REQUIRES_NEW) on a method in the same bean would be ignored due to
+     * Spring's proxy-based AOP (self-invocation bypasses the proxy). A programmatic transaction
+     * is the correct fix here.
+     */
+    private void persistFailedRunAudit(ReconciliationRun run) {
+        TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+        txTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        txTemplate.executeWithoutResult(status -> {
+            // The outer transaction already inserted the run (MyBatis-Plus populated run.getId()),
+            // but the outer tx will be rolled back when the exception re-propagates, erasing that
+            // insert. In PostgreSQL READ COMMITTED, our new inner tx cannot see the outer tx's
+            // uncommitted insert, so updateById finds 0 rows. We must insert a fresh row. Reset the
+            // id so MyBatis-Plus generates a new key; the outer tx's uncommitted row will be rolled
+            // back harmlessly.
+            run.setId(null);
+            runMapper.insert(run);
+        });
+    }
+
     private void validateProfileType(String type) {
-        if (type == null) return;
-        Set<String> valid = Set.of("supplier", "bank", "intercompany");
+        // Bug fix: profile_type is NOT NULL in DB — reject null explicitly instead of silent pass-through.
+        if (type == null) {
+            throw new MetaServiceException("Profile type must not be null. Must be one of: SUPPLIER, BANK, INTERCOMPANY");
+        }
+        // Bug fix: valid set was lowercase but comparison used type.toUpperCase(), so every valid
+        // lowercase input ("supplier", "bank", "intercompany") was always rejected. Fix: compare
+        // case-insensitively by upper-casing both sides, consistent with mapRequestToProfile which
+        // stores profileType.toUpperCase().
+        Set<String> valid = Set.of("SUPPLIER", "BANK", "INTERCOMPANY");
         if (!valid.contains(type.toUpperCase())) {
-            throw new MetaServiceException("Invalid profile type: " + type + ". Must be one of: " + valid);
+            throw new MetaServiceException("Invalid profile type: " + type + ". Must be one of: SUPPLIER, BANK, INTERCOMPANY");
         }
     }
 
