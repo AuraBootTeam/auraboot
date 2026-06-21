@@ -1298,7 +1298,11 @@ describe('ReviewDrawerBlockRenderer', () => {
     const candidateCard = screen.getByTestId('review-drawer-candidate-ME-1');
     expect(screen.getByTestId('review-drawer-candidate-list')).toHaveClass('flex-1');
     expect(screen.getByTestId('review-drawer-tab-candidates')).toHaveClass('h-full');
-    expect(candidateCard).toHaveClass('block', 'p-2');
+    expect(screen.getByTestId('review-drawer-decision-panel')).toHaveClass(
+      'max-h-[48%]',
+      'overflow-auto',
+    );
+    expect(candidateCard).toHaveClass('block', 'p-3');
     expect(candidateCard).toHaveTextContent('D410000006100');
     expect(candidateCard).toHaveTextContent('贴片电阻 240Ω ±1% 0201');
     expect(candidateCard).toHaveTextContent('0201');
@@ -1333,6 +1337,19 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByText('导出状态')).not.toBeVisible();
     fireEvent.click(screen.getByTestId('review-drawer-export-action-download_new_bom'));
     expect(runtime.__reload).toHaveBeenCalledWith(['exports']);
+  });
+
+  it('wraps long candidate detail values instead of truncating price and BOM evidence', () => {
+    const runtime = makeReviewDrawerRuntime();
+
+    render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+
+    const specField = screen.getByTestId('review-drawer-candidate-ME-1-field-spec');
+    expect(specField).toHaveClass('grid-cols-[72px_minmax(0,1fr)]');
+    const specValue = specField.querySelector('dd');
+    expect(specValue).not.toBeNull();
+    expect(specValue).toHaveClass('break-words', 'whitespace-normal');
+    expect(specValue).not.toHaveClass('truncate');
   });
 
   it('opens a configured candidate action form and merges values into command payload', async () => {
