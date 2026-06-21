@@ -19,12 +19,14 @@
       "ds_behavior_overview": {
         "type": "api",
         "endpoint": "/api/analytics/behavior/overview",
+        "url": "/api/analytics/behavior/overview",
         "method": "get",
         "autoFetch": true
       },
       "ds_top_events": {
         "type": "api",
         "endpoint": "/api/analytics/behavior/top-events",
+        "url": "/api/analytics/behavior/top-events",
         "method": "get",
         "autoFetch": true
       }
