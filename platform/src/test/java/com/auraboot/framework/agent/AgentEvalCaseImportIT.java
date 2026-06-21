@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.plugin.dto.imports.AgentDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
+import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.service.impl.PluginResourceImporter;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.junit.jupiter.api.AfterEach;
@@ -140,5 +141,54 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
                 "re-import must DELETE old cases and INSERT new ones — still exactly 1 row, no dup");
         assertEquals("Query alarm history for device B (updated)", rows2.get(0).getTaskDescription(),
                 "taskDescription must reflect the updated case from the second import");
+    }
+
+    @Test
+    @DisplayName("rollback soft-deletes eval cases; restore un-deletes them")
+    void rollbackAndRestoreFollowsAgentLifecycle() {
+        // Import agent with one eval case; capture the returned PluginResource
+        CapabilityEvalCase evalCase = CapabilityEvalCase.builder()
+                .caseId(CASE_ID)
+                .taskDescription("Lifecycle test: query alarms")
+                .expectedToolCodes(List.of("dsl.query"))
+                .forbiddenToolCodes(List.of())
+                .category("lifecycle")
+                .build();
+
+        AgentDefinitionDTO dto = AgentDefinitionDTO.builder()
+                .agentCode(AGENT_CODE)
+                .name("Lifecycle IT Agent")
+                .description("Eval case lifecycle integration test")
+                .agentType("reactive")
+                .status("active")
+                .evalCases(List.of(evalCase))
+                .build();
+
+        PluginResource pr = resourceImporter.importAgentDefinition(
+                dto, PLUGIN_PID, "lifecycle-1", tenantId, ImportRequest.ConflictStrategy.OVERWRITE);
+
+        // Confirm 1 active eval case exists before rollback
+        int activeBeforeRollback = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ? AND deleted_flag = FALSE",
+                Integer.class, tenantId, AGENT_CODE);
+        assertEquals(1, activeBeforeRollback, "precondition: 1 active eval case before rollback");
+
+        // Rollback: should soft-delete eval cases
+        resourceImporter.rollbackResource(pr);
+
+        int activeAfterRollback = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ? AND deleted_flag = FALSE",
+                Integer.class, tenantId, AGENT_CODE);
+        assertEquals(0, activeAfterRollback,
+                "after rollback, eval cases must be soft-deleted (deleted_flag = TRUE)");
+
+        // Restore: should un-delete eval cases
+        resourceImporter.restoreResource(pr);
+
+        int activeAfterRestore = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ? AND deleted_flag = FALSE",
+                Integer.class, tenantId, AGENT_CODE);
+        assertEquals(1, activeAfterRestore,
+                "after restore, eval cases must be active again (deleted_flag = FALSE)");
     }
 }

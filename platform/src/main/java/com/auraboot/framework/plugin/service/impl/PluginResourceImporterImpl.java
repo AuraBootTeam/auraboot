@@ -2418,6 +2418,11 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                             WHERE pid = ?
                             """, resource.getResourcePid());
                 }
+                jdbcTemplate.update("""
+                        UPDATE ab_agent_eval_case
+                        SET deleted_flag = TRUE, updated_at = NOW()
+                        WHERE tenant_id = ? AND agent_code = ?
+                        """, resource.getTenantId(), resource.getResourceCode());
             }
             case PROCESS -> processDefinitionMapper.updateStatus(resource.getResourcePid(), "archived");
             default -> log.warn("Rollback not implemented for resource type: {}", type);
@@ -2426,10 +2431,26 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     @Override
     public void restoreResource(PluginResource resource) {
+        log.info("Restoring resource: {} ({})", logSafe(resource.getResourceCode()), resource.getResourceType());
+        ResourceType type = resource.getResourceTypeEnum();
+        if (type == ResourceType.AGENT_DEFINITION) {
+            if (resource.getResourcePid() != null) {
+                jdbcTemplate.update("""
+                        UPDATE ab_agent_definition
+                        SET deleted_flag = FALSE, updated_at = NOW()
+                        WHERE pid = ?
+                        """, resource.getResourcePid());
+            }
+            jdbcTemplate.update("""
+                    UPDATE ab_agent_eval_case
+                    SET deleted_flag = FALSE, updated_at = NOW()
+                    WHERE tenant_id = ? AND agent_code = ?
+                    """, resource.getTenantId(), resource.getResourceCode());
+            return;
+        }
         if (resource.getPreviousState() == null) {
             return;
         }
-        log.info("Restoring resource: {} ({})", logSafe(resource.getResourceCode()), resource.getResourceType());
     }
 
     // ==================== Helper Methods ====================
