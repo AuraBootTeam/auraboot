@@ -23,17 +23,12 @@ if (!fs.existsSync(ROOT)) {
 }
 const PREFIXES = ['crm:', 'qc:', 'iot_', 'pe:', 'mfg:'];
 
-// M2-migration-target: AgentArchetypeEvalCases.java intentionally retains cs/pcba/competitive
-// archetype cases until M2 moves them to plugin JSON. Exclude it from the scan.
-const EXCLUDE_FILES = ['AgentArchetypeEvalCases.java'];
-
 let hits = [];
 for (const p of PREFIXES) {
   try {
     const out = execSync(`grep -rn "${p}" ${ROOT} || true`, { encoding: 'utf8' });
     out.split('\n').filter(Boolean)
        .filter(l => /expectedToolCodes|forbiddenToolCodes|CapabilityEvalCase|EvalCase/.test(l))
-       .filter(l => !EXCLUDE_FILES.some(ex => l.includes(ex)))
        .forEach(l => hits.push(l));
   } catch {}
 }

@@ -6,8 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Structural validation for eval cases — the mechanism that replaces the
- *  hardcoded AgentArchetypeEvalCasesTest assertions. Used by OSS deterministic
+/** Structural validation for eval cases. Used by OSS deterministic
  *  tests (over GenericEvalCaseFixture) and as a plugin import-time gate. */
 public final class EvalCaseStructureValidator {
 

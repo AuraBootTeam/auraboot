@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Live-LLM golden for the <strong>device read-first diagnostic agent</strong>
- * ({@link AgentArchetypeEvalCases#deviceAgent()}), driven against a real
+ * (device_diagnostics archetype), driven against a real
  * OpenAI-compatible model (DeepSeek). Mirrors {@link CapabilityEvalLiveIT}'s seed
  * harness but proves the read-first contract specifically:
  *
@@ -268,9 +268,8 @@ class DeviceAgentLiveEvalIT extends BaseIntegrationTest {
 
     /**
      * Test-local fixture: the device diagnostic agent eval cases.
-     * These were previously in {@code AgentArchetypeEvalCases.deviceAgent()} and have been
-     * migrated to the pcba-manufacturing plugin's agent-definitions.json (loaded from DB via
-     * CapabilityEvalService.loadRegisteredCases). Duplicated here as test fixture data for
+     * These were migrated to the pcba-manufacturing plugin's agent-definitions.json (loaded from
+     * DB via CapabilityEvalService.loadRegisteredCases). Duplicated here as test fixture data for
      * the LLM tool-selection assertions; the plugin→DB→engine flow is proven by separate ITs.
      * Known tradeoff: mild duplication between this fixture and the plugin JSON.
      */
