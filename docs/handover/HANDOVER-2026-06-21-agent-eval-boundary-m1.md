@@ -1,3 +1,10 @@
+---
+type: handover
+status: superseded
+created: 2026-06-21
+superseded_by: docs/handover/HANDOVER-2026-06-21-agent-eval-boundary-complete.md
+---
+
 # Session Handover - 2026-06-21
 
 ## Session Summary

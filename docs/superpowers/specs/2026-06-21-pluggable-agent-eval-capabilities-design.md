@@ -1,8 +1,8 @@
 ---
 title: 业务 AI 能力按需注入架构 — Agent 能力评估(eval cases)边界治理
-type: design
+type: plan-design
 status: active
-date: 2026-06-21
+created: 2026-06-21
 feature: pluggable-agent-eval-capabilities
 related:
   - OSS boundary 红线(check-oss-boundary.sh 只查 import enterprise,抓不到业务数据硬编码)
