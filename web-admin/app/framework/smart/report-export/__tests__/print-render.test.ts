@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   aggregateChartRows,
+  renderBarcodeSvg,
   reportChartBlockToChartSpec,
   renderReportChartSvg,
 } from '../print-render';
@@ -118,5 +119,27 @@ describe('aggregateChartRows (matches backend aggregateChartMetrics)', () => {
       { status: 'Open', cases: 5 }, // 5 + 0 (non-number 'n/a')
       { status: 'Other', cases: 7 }, // missing category -> Other
     ]);
+  });
+});
+
+describe('renderBarcodeSvg (real CODE128 barcode, no DOM)', () => {
+  it('renders a CODE128 barcode as an SVG with bars + the human-readable value', () => {
+    const svg = renderBarcodeSvg('OPS-2026-EXPORT', { format: 'code128' });
+    expect(svg).toContain('<svg class="barcode"');
+    expect(svg).toContain('<rect'); // real bars
+    expect(svg).toContain('OPS-2026-EXPORT'); // displayValue label
+  });
+
+  it('omits the value label when displayValue is false', () => {
+    const svg = renderBarcodeSvg('ABC123', { displayValue: false });
+    expect(svg).toContain('<svg class="barcode"');
+    expect(svg).not.toContain('<text');
+  });
+
+  it('degrades to a text label for an empty value or a non-code128 format', () => {
+    expect(renderBarcodeSvg('')).toContain('barcode-text');
+    const ean = renderBarcodeSvg('5901234123457', { format: 'ean13' });
+    expect(ean).toContain('barcode-text');
+    expect(ean).toContain('5901234123457');
   });
 });

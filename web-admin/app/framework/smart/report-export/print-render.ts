@@ -12,6 +12,7 @@
  * This module is the server-side render entrypoint; it must stay free of
  * browser-only globals so it can run inside a Node renderer process.
  */
+import { createRequire } from 'node:module';
 import * as echarts from 'echarts';
 import {
   isChartSpecType,
@@ -178,5 +179,70 @@ export function renderReportChartSvg(
     return chart.renderToSVGString();
   } finally {
     chart.dispose();
+  }
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+export interface RenderBarcodeOptions {
+  format?: string;
+  /** module (narrow bar) width in px */
+  moduleWidth?: number;
+  height?: number;
+  /** render the human-readable value below the bars (default true) */
+  displayValue?: boolean;
+}
+
+/**
+ * Render a barcode value to a static SVG using jsbarcode's encoder (no DOM), so
+ * the export shows a real scannable barcode instead of the legacy text line.
+ * CODE128 (the default + most common for internal report codes) is drawn
+ * natively; any other format or an invalid value degrades gracefully to a
+ * monospace text label (never throws / never a wrong barcode).
+ */
+export function renderBarcodeSvg(value: string, opts: RenderBarcodeOptions = {}): string {
+  const format = (opts.format ?? 'code128').toLowerCase();
+  const moduleWidth = opts.moduleWidth ?? 2;
+  const height = opts.height ?? 60;
+  const showText = opts.displayValue !== false;
+  const textBlock = (v: string) => `<span class="barcode-text">${escapeXml(v)}</span>`;
+
+  if (!value || format !== 'code128') {
+    return textBlock(value);
+  }
+
+  try {
+    const require = createRequire(import.meta.url);
+    const encoders: {
+      CODE128: new (text: string, options: object) => { encode(): { data: string } };
+    } = require('jsbarcode/bin/barcodes/CODE128/index.js');
+    const binary = new encoders.CODE128(value, {}).encode().data;
+    if (!binary || !/[01]/.test(binary)) {
+      return textBlock(value);
+    }
+
+    const totalWidth = binary.length * moduleWidth;
+    const textHeight = showText ? 18 : 0;
+    let x = 0;
+    let bars = '';
+    for (const bit of binary) {
+      if (bit === '1') {
+        bars += `<rect x="${x}" y="0" width="${moduleWidth}" height="${height}" fill="#000000"/>`;
+      }
+      x += moduleWidth;
+    }
+    const label = showText
+      ? `<text x="${totalWidth / 2}" y="${height + 14}" text-anchor="middle" font-family="monospace" font-size="12" fill="#000000">${escapeXml(value)}</text>`
+      : '';
+    return `<svg class="barcode" xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${height + textHeight}" viewBox="0 0 ${totalWidth} ${height + textHeight}">${bars}${label}</svg>`;
+  } catch {
+    // encoder unavailable or value invalid for the format -> graceful text label
+    return textBlock(value);
   }
 }

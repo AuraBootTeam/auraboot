@@ -77,7 +77,9 @@ class ReportRenderLiveIT {
                                         Map.of("field", "cases", "label", "Cases"))),
                         Map.of("blockType", "cross-tab", "title", "Matrix", "dataSource", "ops",
                                 "rowField", "region", "columnField", "status", "valueField", "cases",
-                                "aggregation", "sum")));
+                                "aggregation", "sum"),
+                        Map.of("blockType", "barcode", "format", "code128",
+                                "staticValue", "OPS-LIVE-2026")));
         Map<String, List<Map<String, Object>>> dataSets = Map.of(
                 // duplicate Jan rows exercise the aggregation path (Jan -> 130) end to end
                 "rev", List.of(
@@ -105,6 +107,8 @@ class ReportRenderLiveIT {
             assertThat(text).contains("Total Cases");
             assertThat(text).contains("Ops-A");
             assertThat(text).contains("Matrix");
+            // barcode rendered with its human-readable value
+            assertThat(text).contains("OPS-LIVE-2026");
         }
     }
 }

@@ -226,3 +226,23 @@ describe('renderReportToPrintDocument — stat-card / grouped-table / cross-tab'
     expect(text).toContain('Total 3 21 24'); // column totals + grand total
   });
 });
+
+describe('renderReportToPrintDocument — barcode block', () => {
+  it('renders a real barcode SVG from staticValue', () => {
+    const { html } = doc({
+      body: [{ blockType: 'barcode', format: 'code128', staticValue: 'OPS-2026-EXPORT' }],
+    });
+    expect(html).toContain('<svg class="barcode"');
+    expect(html).toContain('<rect');
+    expect(html).toContain('OPS-2026-EXPORT');
+  });
+
+  it('resolves the barcode value from the first row field when no staticValue', () => {
+    const { html } = doc(
+      { body: [{ blockType: 'barcode', field: 'sku', dataSource: 'items' }] },
+      { items: [{ sku: 'SKU-9988' }] },
+    );
+    expect(html).toContain('<svg class="barcode"');
+    expect(html).toContain('SKU-9988');
+  });
+});
