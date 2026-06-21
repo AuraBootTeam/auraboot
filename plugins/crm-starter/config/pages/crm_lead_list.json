@@ -133,21 +133,29 @@
         },
         {
           "field": "crm_lead_source",
-          "width": 120,
-          "renderType": "tag",
+          "width": 130,
+          "valueType": "tag",
           "dictCode": "crm_lead_source",
           "editable": true
         },
         {
           "field": "crm_lead_score",
-          "width": 80,
+          "width": 150,
           "sortable": true,
-          "editable": true
+          "valueType": "progress",
+          "render": {
+            "showProgressText": true,
+            "thresholds": [
+              { "max": 60, "tone": "gray" },
+              { "max": 80, "tone": "amber" },
+              { "tone": "green" }
+            ]
+          }
         },
         {
           "field": "crm_lead_status",
           "width": 120,
-          "renderType": "tag",
+          "valueType": "tag",
           "dictCode": "crm_lead_status",
           "editable": true
         },
@@ -155,52 +163,63 @@
           "field": "crm_lead_assigned_to",
           "width": 120,
           "editable": true
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "view",
+          "primary": true,
+          "label": { "zh-CN": "详情", "en-US": "Detail" },
+          "action": { "type": "navigate", "to": "crm_lead_detail" }
         },
         {
-          "field": "actions",
-          "isActionColumn": true,
-          "buttons": [
-            {
-              "code": "view",
-              "label": {
-                "zh-CN": "详情",
-                "en-US": "Detail"
-              },
-              "action": {
-                "type": "navigate",
-                "to": "crm_lead_detail"
-              }
-            },
-            {
-              "code": "edit",
-              "permissionCode": "crm.lead.manage",
-              "label": {
-                "zh-CN": "编辑",
-                "en-US": "Edit"
-              },
-              "action": {
-                "type": "navigate",
-                "to": "crm_lead_form"
-              }
-            },
-            {
-              "code": "delete",
-              "danger": true,
-              "permissionCode": "crm.lead.manage",
-              "label": {
-                "zh-CN": "删除",
-                "en-US": "Delete"
-              },
-              "confirm": "delete.confirm",
-              "action": {
-                "type": "command"
-              }
-            }
-          ],
-          "label": {
-            "zh-CN": "操作",
-            "en-US": "Actions"
-          }
+          "code": "edit",
+          "icon": "Pencil",
+          "permissionCode": "crm.lead.manage",
+          "label": { "zh-CN": "编辑", "en-US": "Edit" },
+          "action": { "type": "navigate", "to": "crm_lead_form" }
+        },
+        {
+          "code": "contact",
+          "icon": "Phone",
+          "permissionCode": "crm.lead.manage",
+          "visibleWhen": "row.crm_lead_status == 'new'",
+          "label": { "zh-CN": "标记已联系", "en-US": "Mark Contacted" },
+          "action": { "type": "command", "command": "crm:contact_lead" }
+        },
+        {
+          "code": "qualify",
+          "icon": "CheckCircle",
+          "permissionCode": "crm.lead.manage",
+          "visibleWhen": "row.crm_lead_status == 'new' || row.crm_lead_status == 'contacted'",
+          "label": { "zh-CN": "标记合格", "en-US": "Qualify" },
+          "action": { "type": "command", "command": "crm:qualify_lead" }
+        },
+        {
+          "code": "convert",
+          "icon": "ArrowRight",
+          "permissionCode": "crm.lead.manage",
+          "visibleWhen": "row.crm_lead_status == 'qualified'",
+          "label": { "zh-CN": "转化", "en-US": "Convert" },
+          "action": { "type": "command", "command": "crm:convert_lead" }
+        },
+        {
+          "code": "lose",
+          "icon": "XCircle",
+          "permissionCode": "crm.lead.manage",
+          "visibleWhen": "row.crm_lead_status == 'new' || row.crm_lead_status == 'contacted' || row.crm_lead_status == 'qualified'",
+          "label": { "zh-CN": "标记流失", "en-US": "Mark Lost" },
+          "action": { "type": "command", "command": "crm:lose_lead" }
+        },
+        {
+          "code": "delete",
+          "icon": "Trash2",
+          "danger": true,
+          "permissionCode": "crm.lead.manage",
+          "visibleWhen": "row.crm_lead_status == 'new' || row.crm_lead_status == 'contacted'",
+          "confirm": "delete.confirm",
+          "label": { "zh-CN": "删除", "en-US": "Delete" },
+          "action": { "type": "command", "command": "crm:delete_lead" }
         }
       ],
       "searchFields": [
