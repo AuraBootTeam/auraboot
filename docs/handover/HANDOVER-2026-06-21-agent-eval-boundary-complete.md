@@ -1,3 +1,10 @@
+---
+type: handover
+status: closed
+created: 2026-06-21
+distilled_to: docs/plugin-development/agent-capabilities-in-plugins.md
+---
+
 # Session Handover - 2026-06-21 (agent-eval OSS boundary, complete)
 
 > Supersedes the earlier M1-only handover `HANDOVER-2026-06-21-agent-eval-boundary-m1.md` (now stale). This is the full session record.

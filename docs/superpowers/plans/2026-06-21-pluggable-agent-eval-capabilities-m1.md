@@ -1,3 +1,10 @@
+---
+type: plan-impl
+status: closed
+created: 2026-06-21
+distilled_to: docs/plugin-development/agent-capabilities-in-plugins.md
+---
+
 # Pluggable Per-Business AI Eval Capabilities — M1 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
