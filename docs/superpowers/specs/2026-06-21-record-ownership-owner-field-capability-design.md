@@ -1,12 +1,14 @@
 ---
-type: design-spec
-status: draft
+type: plan-design
+status: shipped
 owner: diqi
 created: 2026-06-21
 topic: Generic record-ownership (owner_type / owner_id) — assign a record to a user or a team
 ---
 
 # 通用记录归属能力 (Record Ownership: owner_type / owner_id)
+
+> **M1 已交付(2026-06-21)**:`core-ownership` 插件(dict + `owner_type`/`owner_id` 字段)、平台 `OwnerSelect` 组件(`component:"ownerselect"`)、`owner` cell renderer、`crm_lead` 作首个消费者。单测 24/24、import success、跨插件 binding 实证、真浏览器端到端 golden 全过。**M2(ABAC「归属于我或我团队」可见性过滤)按设计仍为独立后续阶段,未实现。** 开发者文档见 `docs/core-concepts/models-and-fields.md` §Record ownership。
 
 ## 1. 目标与背景
 
