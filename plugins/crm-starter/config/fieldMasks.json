@@ -1,0 +1,12 @@
+[
+  {
+    "modelCode": "crm_lead",
+    "fieldCode": "crm_lead_contact_phone",
+    "maskType": "PHONE",
+    "replacementChar": "*",
+    "applyToList": true,
+    "applyToDetail": true,
+    "applyToExport": true,
+    "enabled": true
+  }
+]

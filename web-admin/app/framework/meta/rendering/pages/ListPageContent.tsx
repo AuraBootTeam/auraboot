@@ -1886,7 +1886,15 @@ function ListPageContentInner(props: PageContentProps) {
           const item = dictItems.find((i) => String(i.value) === String(value));
           if (item) {
             // §3 / §1.3: dict-coded status renders as 色点 + 文字, not a filled pill.
-            return <StatusDot tone={resolveStatusTone(item.extension?.color)} label={item.label} />;
+            // A dict item may carry `extension.icon` (category dims like lead source)
+            // to render a leading icon instead of the semantic color dot.
+            return (
+              <StatusDot
+                tone={resolveStatusTone(item.extension?.color)}
+                label={item.label}
+                icon={(item.extension as any)?.icon}
+              />
+            );
           }
         }
         // Dict not loaded or no match — show raw value

@@ -677,7 +677,7 @@ export const ListTable = React.memo(function ListTable({
                               maxWidth: `${actionColumnWidth}px`,
                             }}
                           >
-                            <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
+                            <div className="flex items-center">
                               <RowActionButtons
                                 buttons={actionColumn.buttons || []}
                                 record={record}
@@ -792,7 +792,7 @@ export const ListTable = React.memo(function ListTable({
                               maxWidth: `${actionColumnWidth}px`,
                             }}
                           >
-                            <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
+                            <div className="flex items-center">
                               <RowActionButtons
                                 buttons={actionColumn.buttons || []}
                                 record={record}
@@ -909,7 +909,7 @@ export const ListTable = React.memo(function ListTable({
                             maxWidth: `${actionColumnWidth}px`,
                           }}
                         >
-                          <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
+                          <div className="flex items-center">
                             <RowActionButtons
                               buttons={actionColumn.buttons || []}
                               record={record}
