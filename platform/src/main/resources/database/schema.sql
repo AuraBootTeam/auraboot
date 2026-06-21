@@ -3215,6 +3215,37 @@ COMMENT ON COLUMN ab_automation_log.trigger_payload IS 'Data that triggered the 
 COMMENT ON COLUMN ab_automation_log.action_results IS 'Results from each action in the automation';
 
 -- =====================================================================
+-- SECTION: Report Definitions (Phase 4 report storage graduation)
+-- =====================================================================
+-- First-class low-code report definition table. Mirrors Flyway migration
+-- db/migration/core/V20260621000000__create_ab_report.sql so the consolidated
+-- schema (used by the host-first golden harness / fresh DB bring-up) stays in
+-- sync with the migration. Additive: the report designer still persists via
+-- ab_page_schema (kind:'list') + extension.reportDsl; ab_report is kept as a
+-- shadow by the Phase 4 dual-write until a later slice switches reads to it.
+CREATE TABLE IF NOT EXISTS ab_report (
+    id           BIGINT PRIMARY KEY,
+    pid          VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id    BIGINT NOT NULL,
+    code         VARCHAR(128) NOT NULL,
+    title        VARCHAR(255),
+    profile      VARCHAR(32) NOT NULL DEFAULT 'paged-media',
+    dsl          JSONB NOT NULL DEFAULT '{}',
+    status       VARCHAR(32) NOT NULL DEFAULT 'draft',
+    version      INT NOT NULL DEFAULT 1,
+    created_by   BIGINT,
+    created_at   TIMESTAMP NOT NULL DEFAULT now(),
+    updated_by   BIGINT,
+    updated_at   TIMESTAMP NOT NULL DEFAULT now(),
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT uk_ab_report_tenant_code UNIQUE (tenant_id, code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ab_report_tenant ON ab_report (tenant_id, deleted_flag);
+
+COMMENT ON TABLE ab_report IS 'First-class low-code report definition (Phase 4 storage graduation; replaces the kind:list + extension.reportDsl page shell).';
+
+-- =====================================================================
 -- SECTION: Report Templates (PDF Export)
 -- =====================================================================
 

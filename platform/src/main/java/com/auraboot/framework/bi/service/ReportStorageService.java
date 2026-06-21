@@ -97,6 +97,44 @@ public class ReportStorageService {
     }
 
     /**
+     * Idempotent upsert keyed by the supplied {@code pid}: create a live row with the GIVEN
+     * pid if none exists, else patch the existing live row's title/profile/dsl (+bump version).
+     *
+     * <p>This is the REST-idempotent semantics for {@code PUT /{pid}} — a {@code PUT} to a not-yet
+     * existing resource id MAY create it, so a client that owns the id (here the page pid the report
+     * designer already minted) can sync a shadow without first knowing whether the row exists. The
+     * supplied {@code pid} is honored verbatim (never re-minted), which is what makes
+     * {@code ab_report.pid == page.pid} hold for the Phase 4 transition dual-write.
+     *
+     * <p>{@code code} is required only on the create branch (it is tenant-unique and {@code NOT NULL});
+     * it is ignored when the row already exists, since {@code code} is immutable on update.
+     *
+     * @param report carries the supplied {@code pid}, {@code tenantId}, {@code code} (create only),
+     *               {@code title}, {@code profile}, {@code dsl}, and {@code createdBy/updatedBy}
+     * @return the persisted entity (created or updated)
+     */
+    @Transactional
+    public ReportEntity upsertByPid(ReportEntity report) {
+        ReportEntity existing = findByPid(report.getPid());
+        if (existing == null) {
+            // CREATE branch: honor the supplied pid verbatim (create() only mints when absent).
+            return create(report);
+        }
+        // UPDATE branch: code/tenant/id are immutable; patch the mutable fields + bump version.
+        existing.setTitle(report.getTitle());
+        existing.setProfile(report.getProfile());
+        if (report.getStatus() != null) {
+            existing.setStatus(report.getStatus());
+        }
+        existing.setDsl(report.getDsl());
+        existing.setVersion(existing.getVersion() == null ? 1 : existing.getVersion() + 1);
+        existing.setUpdatedBy(report.getUpdatedBy());
+        existing.setUpdatedAt(Instant.now());
+        reportMapper.updateById(existing);
+        return existing;
+    }
+
+    /**
      * Soft-delete a report by {@code pid}: the standard MyBatis-Plus logic-delete sets
      * {@code deleted_flag = true} via {@code deleteById}. After this, {@link #findByPid} and
      * {@link #listByTenant} no longer return it (the {@code @TableLogic} interceptor excludes it).
