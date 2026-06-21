@@ -123,6 +123,16 @@ public class ReportDefinitionController {
         return ApiResponse.success(toResponse(requireOwned(pid)));
     }
 
+    @GetMapping("/by-code/{code}")
+    @Operation(summary = "Get a report definition by code",
+            description = "Loads one live ab_report row by its tenant-unique code (== the report's pageKey); "
+                    + "404 if not found / soft-deleted. Powers the Phase 4 slice 2b-2 viewer read path that "
+                    + "reads ab_report first and falls back to the page-schema.")
+    @RequirePermission(MetaPermission.REPORT_READ)
+    public ApiResponse<ReportDefinitionResponse> getByCode(@PathVariable String code) {
+        return ApiResponse.success(toResponse(requireOwnedByCode(code)));
+    }
+
     @GetMapping
     @Operation(summary = "List report definitions", description = "Lists the current tenant's live reports (lightweight: no dsl)")
     @RequirePermission(MetaPermission.REPORT_READ)
@@ -153,6 +163,19 @@ public class ReportDefinitionController {
         ReportEntity entity = reportStorageService.findByPid(pid);
         if (entity == null || !MetaContext.getCurrentTenantId().equals(entity.getTenantId())) {
             throw new BusinessException(ResponseCode.NOT_FOUND, "Report not found: " + pid);
+        }
+        return entity;
+    }
+
+    /**
+     * Load a live report by its tenant-unique code, else 404. The storage finder is already
+     * tenant-scoped (it queries by the current tenant id), so a cross-tenant code never resolves;
+     * a soft-deleted row is excluded by the {@code @TableLogic} interceptor.
+     */
+    private ReportEntity requireOwnedByCode(String code) {
+        ReportEntity entity = reportStorageService.findByCode(MetaContext.getCurrentTenantId(), code);
+        if (entity == null) {
+            throw new BusinessException(ResponseCode.NOT_FOUND, "Report not found: " + code);
         }
         return entity;
     }

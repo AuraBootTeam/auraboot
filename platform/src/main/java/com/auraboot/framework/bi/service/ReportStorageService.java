@@ -73,6 +73,24 @@ public class ReportStorageService {
     }
 
     /**
+     * Look up a live report by its tenant-unique {@code code} within a tenant. Soft-deleted rows
+     * are auto-excluded by the global {@code @TableLogic} interceptor. {@code code} is unique per
+     * tenant ({@code uk_ab_report_tenant_code}), so this returns at most one live row.
+     *
+     * <p>This is the Phase 4 slice 2b-2 read path the report viewer needs: {@code ab_report.code}
+     * equals the report's pageKey, so a page-key viewer lookup can read {@code ab_report} first
+     * (with the page-schema as the fallback). The query is explicitly tenant-scoped so a report
+     * cannot be read across tenants by code.
+     *
+     * @return the report, or {@code null} if not found / soft-deleted
+     */
+    public ReportEntity findByCode(Long tenantId, String code) {
+        return reportMapper.selectOne(new LambdaQueryWrapper<ReportEntity>()
+                .eq(ReportEntity::getTenantId, tenantId)
+                .eq(ReportEntity::getCode, code));
+    }
+
+    /**
      * Update an existing (live) report identified by {@code pid}. Bumps {@code updated_at}.
      * Title / profile / dsl / status / version / updatedBy are written; pid / tenant / id are not.
      *
