@@ -144,6 +144,17 @@ function barOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOpt
  * by the renderer-neutral `visual.areaFill` flag (← legacy `areaStyle` prop), NOT by
  * `spec.type` — so a `line`-typed spec with `visual.areaFill` and an `area`-typed spec
  * produce the same area option, matching the single legacy builder.
+ *
+ * This same branch is ALSO the canonical builder for the dedicated SmartAreaChart
+ * (B2d-area). SmartAreaChart is byte-equivalent to a SmartLineChart area-fill EXCEPT for
+ * the per-series area opacity: SmartLineChart has no opacity knob and uses the gradient
+ * `0.3 - index*0.1`, whereas SmartAreaChart exposes a configurable `fillOpacity` prop
+ * (default 0.6) and uses `max(0.1, fillOpacity - index*0.15)`. That single difference is
+ * reconciled by the optional `visual.fillOpacity`: when SET we use the SmartAreaChart
+ * formula, when UNSET we keep the legacy SmartLineChart gradient — a single option shape
+ * satisfying BOTH legacy builders, each pinned by its own equivalence gate
+ * (`chart-spec-echarts-smartlinechart-equivalence.test.ts` and
+ * `chart-spec-echarts-smartareachart-equivalence.test.ts`).
  */
 function lineOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOption {
   const title = titleText(spec);
@@ -153,6 +164,10 @@ function lineOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOp
   // showSymbol defaults to true (legacy SmartLineChart default), only false when set so.
   const showSymbol = spec.visual?.showSymbol ?? true;
   const showLabel = spec.visual?.dataLabels ?? false;
+  // SmartAreaChart's configurable base opacity (its `fillOpacity` prop). When set it
+  // switches the per-series area opacity onto SmartAreaChart's formula; when undefined
+  // the legacy SmartLineChart gradient is used (see areaStyle below).
+  const fillOpacity = spec.visual?.fillOpacity;
   // Series name + values keyed by the measure field, mirroring legacy `data.meta.metrics`.
   const metrics = spec.measures.map((m) => m.field);
 
@@ -181,7 +196,12 @@ function lineOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOp
     symbolSize: 6,
     areaStyle: areaFill
       ? {
-          opacity: 0.3 - index * 0.1, // Gradient opacity for multiple areas
+          // SmartAreaChart (fillOpacity set): max(0.1, fillOpacity - index*0.15).
+          // SmartLineChart area-fill (fillOpacity unset): legacy gradient 0.3 - index*0.1.
+          opacity:
+            fillOpacity !== undefined
+              ? Math.max(0.1, fillOpacity - index * 0.15)
+              : 0.3 - index * 0.1,
         }
       : undefined,
     label: {
