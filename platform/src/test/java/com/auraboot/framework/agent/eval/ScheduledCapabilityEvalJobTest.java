@@ -122,7 +122,7 @@ class ScheduledCapabilityEvalJobTest {
 
         job.runOnce(1L);
 
-        // Verify the swapped wiring: loadRegisteredCases is called (not AgentArchetypeEvalCases.all())
+        // Verify the wiring: loadRegisteredCases is called (DB-backed source)
         verify(evalService, times(1)).loadRegisteredCases(1L);
         // Verify the cases flowed into the 3-arg overload (non-empty case list)
         verify(evalService, times(1)).evaluateToolSelection(eq(1L), eq("keyword"), any());
