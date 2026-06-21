@@ -172,8 +172,12 @@ class DeviceOperationsAgentLiveEvalIT extends BaseIntegrationTest {
         assertNotNull(report);
         assertEquals("llm", report.get("evalMode"),
                 "with a real provider the run must stay in llm mode, not degrade to keyword");
-        assertEquals(deviceOperationsAgentCases().size(),
-                ((Number) report.get("totalCases")).intValue());
+        // D3a: totalCases excludes cases whose expected tools aren't in the tenant catalog
+        // (unavailableCases). Assert every case is accounted for: scored + unavailable = total.
+        int scored = ((Number) report.get("totalCases")).intValue();
+        int unavailable = ((Number) report.getOrDefault("unavailableCases", 0)).intValue();
+        assertEquals(deviceOperationsAgentCases().size(), scored + unavailable,
+                "every eval case must be either scored or marked unavailable");
 
         long countAfter = evalRunMapper.selectCount(
                 new LambdaQueryWrapper<AbCapabilityEvalRun>().eq(AbCapabilityEvalRun::getTenantId, tenantId));
