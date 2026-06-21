@@ -1,3 +1,13 @@
+---
+type: plan-impl
+status: shipped
+created: 2026-06-21
+slug: site-key-anonymous-ingestion-sp2
+relates_to:
+  - docs/superpowers/specs/2026-06-21-site-key-anonymous-ingestion-sp2-design.md
+  - docs/backlog/2026-06-21-mt-dynamic-table-index-creation-analysis.md
+---
+
 # Site-Key Anonymous Ingestion (SP2) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
