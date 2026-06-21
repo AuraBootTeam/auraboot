@@ -114,7 +114,7 @@ public class ScheduledCapabilityEvalJob {
             List<CapabilityEvalCase> cases = new java.util.ArrayList<>(
                     evalService.generateEvalCases(tenantId, null, maxCases));
             if (includeArchetypeCases) {
-                cases.addAll(AgentArchetypeEvalCases.all());
+                cases.addAll(evalService.loadRegisteredCases(tenantId));
             }
             Map<String, Object> report = cases.isEmpty()
                     ? evalService.evaluateToolSelection(tenantId, mode)        // no cases → harness returns no_cases
