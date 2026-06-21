@@ -850,7 +850,10 @@ describe('ReviewDrawerBlockRenderer', () => {
     bom_std_parse_json: '{"profileCode":"JIEJIA_WB_FLEX_MAIN_V1","llm":{"mode":"field_parse"}}',
   };
 
-  function makeReviewDrawerRuntime(line: Record<string, unknown> = selectedLine) {
+  function makeReviewDrawerRuntime(
+    line: Record<string, unknown> = selectedLine,
+    candidatePatch: Record<string, unknown> = {},
+  ) {
     return makeRuntime({
       data: {
         rawItems: [
@@ -878,6 +881,7 @@ describe('ReviewDrawerBlockRenderer', () => {
             bom_me_candidate_snapshot_json:
               '{"materialCode":"D410000006100","materialName":"贴片电阻","specModel":"贴片电阻 240Ω ±1% 0201","brand":"","mpn":"","packageCode":"0201","attributes":{"resistance":"240Ω","tolerance_pct":0.01}}',
             bom_me_evidence_json: '{"matchSource":"mpn_exact"}',
+            ...candidatePatch,
           },
         ],
         exports: [
@@ -1096,7 +1100,10 @@ describe('ReviewDrawerBlockRenderer', () => {
   };
 
   it('renders the selected row in a unified floating review drawer', () => {
-    const runtime = makeReviewDrawerRuntime();
+    const runtime = makeReviewDrawerRuntime(selectedLine, {
+      bom_me_evidence_json:
+        '{"matchSource":"mpn_brand_exact","comparisons":[{"key":"brand","reason":"source and candidate brand differ"}]}',
+    });
 
     render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
 
@@ -1291,7 +1298,7 @@ describe('ReviewDrawerBlockRenderer', () => {
   });
 
   it('selects a candidate and runs candidate/export actions from the drawer', async () => {
-    const runtime = makeReviewDrawerRuntime();
+    const runtime = makeReviewDrawerRuntime(selectedLine);
 
     render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
 
@@ -1458,6 +1465,59 @@ describe('ReviewDrawerBlockRenderer', () => {
 
     expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).toBeDisabled();
     expect(screen.getByTestId('review-drawer-candidate-action-undo_decision')).not.toBeDisabled();
+  });
+
+  it('renders grouped candidate evidence fields so operators can see why a match failed', () => {
+    const runtime = makeReviewDrawerRuntime(selectedLine, {
+      bom_me_evidence_json:
+        '{"matchSource":"mpn_brand_exact","comparisons":[{"key":"brand","reason":"source and candidate brand differ"}]}',
+    });
+    const groupedBlock = {
+      ...reviewDrawerBlock,
+      candidates: {
+        ...(reviewDrawerBlock as any).candidates,
+        selectedFields: [],
+        selectedGroups: [
+          {
+            key: 'brand',
+            label: '品牌',
+            fields: [
+              {
+                key: 'brand_diff',
+                label: '品牌差异',
+                sourceField: 'bom_me_evidence_json',
+                field: 'comparisons',
+                emptyText: '无差异',
+              },
+            ],
+          },
+          {
+            key: 'mpn',
+            label: '型号(MPN)',
+            fields: [
+              {
+                key: 'match_source',
+                label: '匹配来源',
+                sourceField: 'bom_me_evidence_json',
+                field: 'matchSource',
+              },
+            ],
+          },
+        ],
+      },
+    } as BlockConfig;
+    render(<ReviewDrawerBlockRenderer block={groupedBlock} runtime={runtime} />);
+
+    fireEvent.click(screen.getByTestId('review-drawer-candidate-ME-1'));
+
+    expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent('品牌');
+    expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent(
+      'source and candidate brand differ',
+    );
+    expect(screen.getByTestId('review-drawer-selected-group-mpn')).toHaveTextContent('型号(MPN)');
+    expect(screen.getByTestId('review-drawer-selected-group-mpn')).toHaveTextContent(
+      'mpn_brand_exact',
+    );
   });
 
   it('refreshes the selected row from its backing data source after reloads', () => {
