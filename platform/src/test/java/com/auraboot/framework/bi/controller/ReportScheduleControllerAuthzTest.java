@@ -23,9 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * B6 / Q13 authz guard test — every report-schedule REST endpoint must declare a
  * permission check. Discovery found ReportScheduleController exposed 6 unguarded
  * endpoints (no {@code @RequirePermission}); this reflection test pins that every
- * mapped endpoint now requires {@link MetaPermission#REPORT_GENERATE}, so the gap
- * cannot silently regress. (Enforcement of the annotation is covered by the
- * platform PermissionInterceptor; this test guards that the annotation is applied.)
+ * mapped endpoint now requires {@link MetaPermission#REPORT_SCHEDULE_MANAGE}, so the
+ * gap cannot silently regress. (B6-2 flipped the stopgap {@code REPORT_GENERATE}
+ * alias to the clean first-class {@code report.schedule.manage} code.) Enforcement of
+ * the annotation is covered by the platform PermissionInterceptor; this test guards
+ * that the annotation is applied.
  */
 class ReportScheduleControllerAuthzTest {
 
@@ -50,7 +52,7 @@ class ReportScheduleControllerAuthzTest {
     }
 
     @Test
-    void everyEndpointRequiresReportGeneratePermission() {
+    void everyEndpointRequiresReportScheduleManagePermission() {
         boolean classLevel = ReportScheduleController.class.isAnnotationPresent(RequirePermission.class);
         List<Method> endpoints = endpoints();
         assertFalse(endpoints.isEmpty(), "expected report-schedule endpoints");
@@ -62,8 +64,8 @@ class ReportScheduleControllerAuthzTest {
             assertNotNull(rp,
                     "endpoint '" + method.getName()
                             + "' must declare @RequirePermission (Q13 security gap — schedule CRUD was unguarded)");
-            assertEquals(MetaPermission.REPORT_GENERATE, rp.value(),
-                    "endpoint '" + method.getName() + "' should require REPORT_GENERATE");
+            assertEquals(MetaPermission.REPORT_SCHEDULE_MANAGE, rp.value(),
+                    "endpoint '" + method.getName() + "' should require REPORT_SCHEDULE_MANAGE");
         }
     }
 }
