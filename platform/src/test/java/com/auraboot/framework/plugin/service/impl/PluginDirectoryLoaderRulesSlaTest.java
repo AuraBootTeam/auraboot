@@ -2,6 +2,7 @@ package com.auraboot.framework.plugin.service.impl;
 
 import com.auraboot.framework.plugin.dto.imports.BpmRuleDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.AgentDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.FieldMaskDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.auraboot.framework.plugin.dto.imports.SlaConfigDefinitionDTO;
 import com.auraboot.framework.plugin.exception.PluginException;
@@ -116,6 +117,38 @@ class PluginDirectoryLoaderRulesSlaTest {
         SlaConfigDefinitionDTO sla = manifest.getSlaConfigs().get(0);
         assertThat(sla.getName()).isEqualTo("wd_manager_approval_sla");
         assertThat(sla.getDeadlineValue()).isEqualTo("PT30S");
+    }
+
+    @Test
+    @DisplayName("Loader reads fieldMasks.json into FieldMaskDefinitionDTO list")
+    void loadsFieldMasks(@TempDir Path pluginDir) throws IOException {
+        Files.writeString(pluginDir.resolve("fieldMasks.json"), """
+                [
+                  { "modelCode": "crm_account_common",
+                    "fieldCode": "phone",
+                    "maskType": "PHONE",
+                    "applyToList": true,
+                    "applyToDetail": true,
+                    "applyToExport": true,
+                    "exemptPermissionCodes": "crm.account.contact_unmask" }
+                ]
+                """);
+        writeManifest(pluginDir, """
+                { "pluginId": "com.demo",
+                  "namespace": "demo",
+                  "version": "1.0.0",
+                  "resourceDirs": { "fieldMasks": "fieldMasks.json" } }
+                """);
+
+        PluginManifestExtended manifest = loader.loadFromDirectory(pluginDir);
+
+        assertThat(manifest.getFieldMasks()).hasSize(1);
+        FieldMaskDefinitionDTO fm = manifest.getFieldMasks().get(0);
+        assertThat(fm.getModelCode()).isEqualTo("crm_account_common");
+        assertThat(fm.getFieldCode()).isEqualTo("phone");
+        assertThat(fm.getMaskType()).isEqualTo("PHONE");
+        assertThat(fm.getExemptPermissionCodes()).isEqualTo("crm.account.contact_unmask");
+        assertThat(fm.isValid()).isTrue();
     }
 
     @Test

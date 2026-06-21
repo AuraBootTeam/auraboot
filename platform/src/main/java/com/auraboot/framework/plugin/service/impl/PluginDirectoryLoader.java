@@ -232,6 +232,15 @@ public class PluginDirectoryLoader {
             }
         }
 
+        // Load field masks
+        if (resourceDirs.containsKey("fieldMasks")) {
+            List<FieldMaskDefinitionDTO> fieldMasks = loadResourceList(
+                    resourcePath(pluginDir, resourceDirs, "fieldMasks"), FieldMaskDefinitionDTO.class);
+            if (!fieldMasks.isEmpty()) {
+                manifest.setFieldMasks(mergeList(manifest.getFieldMasks(), fieldMasks));
+            }
+        }
+
         // Load pages
         if (resourceDirs.containsKey("pages")) {
             List<PageSchemaDTO> pages = loadResourceList(
@@ -538,6 +547,8 @@ public class PluginDirectoryLoader {
                 manifest::getPermissions, manifest::setPermissions);
         loadSourceResource(source, resourceDirs, "roles", RoleDefinitionDTO.class,
                 manifest::getRoles, manifest::setRoles);
+        loadSourceResource(source, resourceDirs, "fieldMasks", FieldMaskDefinitionDTO.class,
+                manifest::getFieldMasks, manifest::setFieldMasks);
 
         // Pages need conversion
         if (resourceDirs.containsKey("pages")) {
