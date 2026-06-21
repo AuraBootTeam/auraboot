@@ -85,7 +85,7 @@ export function reportChartBlockToChartSpec(block: ReportChartBlock): ChartSpec 
 }
 
 /** Mirror of the backend aggregateNumbers (sum|avg|count|min|max; empty -> 0). */
-function aggregateNumbers(values: number[], aggregation: string): number {
+export function aggregateNumbers(values: number[], aggregation: string): number {
   if (values.length === 0) {
     return 0;
   }

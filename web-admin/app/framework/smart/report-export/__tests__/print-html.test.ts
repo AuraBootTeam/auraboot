@@ -151,3 +151,78 @@ describe('renderReportToPrintDocument — rich-text + document shell', () => {
     expect(html).toContain('月报');
   });
 });
+
+describe('renderReportToPrintDocument — stat-card / grouped-table / cross-tab', () => {
+  const ops = [
+    { region: 'North', status: 'Open', owner: 'Ops-A', cases: 12 },
+    { region: 'North', status: 'Closed', owner: 'Ops-A', cases: 3 },
+    { region: 'South', status: 'Open', owner: 'Ops-B', cases: 9 },
+  ];
+
+  it('stat-card aggregates valueField and shows the label', () => {
+    const { html } = doc(
+      {
+        body: [
+          {
+            blockType: 'stat-card',
+            dataSource: 'ops',
+            valueField: 'cases',
+            aggregation: 'sum',
+            label: 'Total Cases',
+          },
+        ],
+      },
+      { ops },
+    );
+    expect(html).toContain('Total Cases');
+    expect(html).toContain('stat-value');
+    expect(html).toContain('>24<'); // 12 + 3 + 9
+  });
+
+  it('grouped-table renders group headers with counts then the group rows', () => {
+    const { html } = doc(
+      {
+        body: [
+          {
+            blockType: 'grouped-table',
+            dataSource: 'ops',
+            groupByField: 'owner',
+            columns: [
+              { field: 'region', label: 'Region' },
+              { field: 'cases', label: 'Cases' },
+            ],
+          },
+        ],
+      },
+      { ops },
+    );
+    expect(html).toContain('owner: Ops-A (2)');
+    expect(html).toContain('owner: Ops-B (1)');
+    expect(html).toContain('group-header');
+  });
+
+  it('cross-tab pivots row x column with row + column totals', () => {
+    const { html } = doc(
+      {
+        body: [
+          {
+            blockType: 'cross-tab',
+            dataSource: 'ops',
+            rowField: 'region',
+            columnField: 'status',
+            valueField: 'cases',
+            aggregation: 'sum',
+            showRowTotal: true,
+            showColumnTotal: true,
+          },
+        ],
+      },
+      { ops },
+    );
+    expect(html).toContain('region \\ status');
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    expect(text).toContain('North 3 12 15'); // Closed, Open, row total
+    expect(text).toContain('South 0 9 9');
+    expect(text).toContain('Total 3 21 24'); // column totals + grand total
+  });
+});

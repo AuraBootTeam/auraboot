@@ -68,7 +68,16 @@ class ReportRenderLiveIT {
                                 "chartType", "bar", "categoryField", "month", "valueField", "amount",
                                 "aggregation", "sum"),
                         Map.of("blockType", "table", "title", "Detail", "dataSource", "detail",
-                                "columns", List.of(Map.of("field", "name", "label", "Item")))));
+                                "columns", List.of(Map.of("field", "name", "label", "Item"))),
+                        Map.of("blockType", "stat-card", "title", "KPI", "dataSource", "ops",
+                                "valueField", "cases", "aggregation", "sum", "label", "Total Cases"),
+                        Map.of("blockType", "grouped-table", "title", "By Owner", "dataSource", "ops",
+                                "groupByField", "owner", "columns", List.of(
+                                        Map.of("field", "region", "label", "Region"),
+                                        Map.of("field", "cases", "label", "Cases"))),
+                        Map.of("blockType", "cross-tab", "title", "Matrix", "dataSource", "ops",
+                                "rowField", "region", "columnField", "status", "valueField", "cases",
+                                "aggregation", "sum")));
         Map<String, List<Map<String, Object>>> dataSets = Map.of(
                 // duplicate Jan rows exercise the aggregation path (Jan -> 130) end to end
                 "rev", List.of(
@@ -76,7 +85,11 @@ class ReportRenderLiveIT {
                         Map.of("month", "Jan", "amount", 30),
                         Map.of("month", "Feb", "amount", 140),
                         Map.of("month", "Mar", "amount", 120)),
-                "detail", List.of(Map.of("name", "Widget A")));
+                "detail", List.of(Map.of("name", "Widget A")),
+                "ops", List.of(
+                        Map.of("region", "North", "status", "Open", "owner", "Ops-A", "cases", 12),
+                        Map.of("region", "North", "status", "Closed", "owner", "Ops-A", "cases", 3),
+                        Map.of("region", "South", "status", "Open", "owner", "Ops-B", "cases", 9)));
 
         byte[] pdf = client.renderPdf(reportDsl, dataSets);
 
@@ -88,6 +101,10 @@ class ReportRenderLiveIT {
             assertThat(text).contains("Live Golden — AuraBoot");
             // a real vector chart, NOT the legacy "Category | Value" data-table dump
             assertThat(text).doesNotContain("Category");
+            // the data blocks rendered: stat-card label, grouped-table group, cross-tab title
+            assertThat(text).contains("Total Cases");
+            assertThat(text).contains("Ops-A");
+            assertThat(text).contains("Matrix");
         }
     }
 }
