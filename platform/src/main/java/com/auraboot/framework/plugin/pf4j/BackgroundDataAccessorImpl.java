@@ -94,6 +94,12 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
         });
     }
 
+    @Override
+    public long incrementWithinCap(long tenantId, String modelCode, String recordId,
+                                    String counterCode, String capCode, long delta) {
+        return withTenant(tenantId, () -> dynamicDataService.incrementWithinCap(modelCode, recordId, counterCode, capCode, delta));
+    }
+
     /**
      * Bind {@code tenantId} to the current thread, run the supplier, restore
      * whatever tenant (if any) was on the thread before. Always restores,
