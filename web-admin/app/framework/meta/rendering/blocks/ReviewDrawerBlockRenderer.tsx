@@ -56,6 +56,10 @@ function parseJsonValue(value: unknown): unknown {
 
 function formatValue(value: unknown, emptyText = '-'): string {
   if (value === undefined || value === null || value === '') return emptyText;
+  if (Array.isArray(value) && value.length === 0) return emptyText;
+  if (Array.isArray(value) && value.every((item) => typeof item !== 'object' || item === null)) {
+    return value.map((item) => formatValue(item, emptyText)).join(', ');
+  }
   if (typeof value === 'object') return JSON.stringify(value, null, 2);
   return String(value);
 }
@@ -105,6 +109,109 @@ function readFieldValue(record: any, config: any, fallbackRecord?: any): unknown
   return readPath(parseJsonValue(fallbackSource), config.fallbackField);
 }
 
+function isComparisonRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return (
+    Object.prototype.hasOwnProperty.call(value, 'status') ||
+    Object.prototype.hasOwnProperty.call(value, 'sourceValue') ||
+    Object.prototype.hasOwnProperty.call(value, 'candidateValue') ||
+    Object.prototype.hasOwnProperty.call(value, 'reason')
+  );
+}
+
+function isComparisonList(value: unknown): value is Record<string, unknown>[] {
+  return Array.isArray(value) && value.length > 0 && value.every(isComparisonRecord);
+}
+
+function comparisonStatusLabel(
+  status: unknown,
+  locale: string,
+  t: (key: string) => string,
+): string {
+  const text = String(status ?? '');
+  const labels: Record<string, { 'zh-CN': string; en: string }> = {
+    matched: { 'zh-CN': '一致', en: 'Matched' },
+    mismatch: { 'zh-CN': '不一致', en: 'Mismatch' },
+    missing_source: { 'zh-CN': '原始缺失', en: 'Source Missing' },
+    missing_candidate: { 'zh-CN': '候选缺失', en: 'Candidate Missing' },
+    missing_both: { 'zh-CN': '双方缺失', en: 'Both Missing' },
+  };
+  return getLocalizedText(labels[text] || text, locale, t);
+}
+
+function comparisonStatusClass(status: unknown): string {
+  switch (String(status ?? '')) {
+    case 'matched':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    case 'mismatch':
+      return 'border-rose-200 bg-rose-50 text-rose-700';
+    case 'missing_source':
+    case 'missing_candidate':
+    case 'missing_both':
+      return 'border-amber-200 bg-amber-50 text-amber-700';
+    default:
+      return 'border-gray-200 bg-gray-50 text-gray-700';
+  }
+}
+
+function ComparisonList({
+  value,
+  locale,
+  t,
+}: {
+  value: Record<string, unknown>[];
+  locale: string;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="space-y-2">
+      {value.map((comparison, index) => {
+        const key = formatValue(comparison.label ?? comparison.key, `#${index + 1}`);
+        const sourceValue = formatValue(comparison.sourceValue, '');
+        const candidateValue = formatValue(comparison.candidateValue, '');
+        const reason = formatValue(comparison.reason, '');
+        return (
+          <section
+            key={`${key}-${index}`}
+            data-testid={`review-drawer-comparison-${index}`}
+            className="rounded-control border-border bg-panel overflow-hidden border"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-2.5 py-1.5">
+              <span className="text-text min-w-0 break-words text-xs font-semibold">{key}</span>
+              <span
+                className={`rounded-pill shrink-0 border px-2 py-0.5 text-[11px] font-semibold ${comparisonStatusClass(
+                  comparison.status,
+                )}`}
+              >
+                {comparisonStatusLabel(comparison.status, locale, t)}
+              </span>
+            </div>
+            <div className="grid gap-2 px-2.5 py-2 text-xs md:grid-cols-2">
+              <div className="min-w-0">
+                <div className="text-text-2 font-medium">
+                  {localized(locale, t, '原始', 'Source')}
+                </div>
+                <div className="text-text mt-0.5 break-words">{sourceValue || '-'}</div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-text-2 font-medium">
+                  {localized(locale, t, '候选', 'Candidate')}
+                </div>
+                <div className="text-text mt-0.5 break-words">{candidateValue || '-'}</div>
+              </div>
+              {reason && (
+                <div className="text-text-2 min-w-0 break-words md:col-span-2">
+                  {localized(locale, t, '原因', 'Reason')}: {reason}
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function findRelatedRecord(runtime: SchemaRuntime, config: any, selectedRecord: any): any {
   if (!config?.dataSource) return selectedRecord;
   const rows = readDataSourceRows(runtime, config.dataSource);
@@ -152,6 +259,20 @@ type ActionFormState = {
 
 function actionFormFields(actionConfig: any): any[] {
   return Array.isArray(actionConfig?.form?.fields) ? actionConfig.form.fields : [];
+}
+
+function scoreToneClass(color: unknown): string {
+  switch (String(color ?? '').toLowerCase()) {
+    case 'green':
+      return 'bg-emerald-50 text-emerald-700';
+    case 'yellow':
+    case 'amber':
+      return 'bg-amber-50 text-amber-700';
+    case 'red':
+      return 'bg-rose-50 text-rose-700';
+    default:
+      return 'bg-emerald-50 text-emerald-700';
+  }
 }
 
 function initialActionFormValues(
@@ -235,7 +356,9 @@ function FieldRows({
         const label = getLocalizedText(field.label || key, locale, t);
         const rawValue = readFieldValue(record, field, fallbackRecord);
         if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
-        const value = formatConfiguredValue(rawValue, field, locale, t);
+        const mappedValue = applyValueMap(rawValue, field, locale, t);
+        const rendersComparisons = isComparisonList(mappedValue);
+        const value = rendersComparisons ? '' : formatConfiguredValue(rawValue, field, locale, t);
         const isMultiline = value.includes('\n') || value.length > 86;
         return (
           <div key={key} className="grid grid-cols-[118px_minmax(0,1fr)] gap-3 px-3 py-2.5 text-sm">
@@ -245,7 +368,11 @@ function FieldRows({
                 isMultiline ? 'whitespace-pre-wrap' : ''
               }`}
             >
-              {value}
+              {rendersComparisons ? (
+                <ComparisonList value={mappedValue} locale={locale} t={t} />
+              ) : (
+                value
+              )}
             </dd>
           </div>
         );
@@ -987,6 +1114,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   const item = candidatesConfig.item || {};
                   const titleText = formatValue(readPath(candidate, item.titleField), rowKey);
                   const score = item.scoreField ? readPath(candidate, item.scoreField) : undefined;
+                  const scoreColor = item.statusColorField
+                    ? readPath(candidate, item.statusColorField)
+                    : undefined;
                   return (
                     <button
                       key={rowKey}
@@ -1042,7 +1172,11 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           </dl>
                         </div>
                         {score !== undefined && (
-                          <span className="rounded-pill bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
+                          <span
+                            className={`rounded-pill px-1.5 py-0.5 text-xs font-semibold ${scoreToneClass(
+                              scoreColor,
+                            )}`}
+                          >
                             {String(score)}
                           </span>
                         )}
