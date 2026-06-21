@@ -1,0 +1,101 @@
+[
+  {
+    "pageKey": "behavior_analytics",
+    "name:zh-CN": "行为分析",
+    "name:en": "Behavior Analytics",
+    "description": "UV/PV telemetry dashboard — KPI cards for page views, unique visitors, sessions, and total events; plus a top-events table. Backed by /api/analytics/behavior/* endpoints.",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "flow"
+    },
+    "extension": {
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showEdit": false
+    },
+    "dataSources": {
+      "ds_behavior_overview": {
+        "type": "api",
+        "endpoint": "/api/analytics/behavior/overview",
+        "method": "get",
+        "autoFetch": true
+      },
+      "ds_top_events": {
+        "type": "api",
+        "endpoint": "/api/analytics/behavior/top-events",
+        "method": "get",
+        "autoFetch": true
+      }
+    },
+    "blocks": [
+      {
+        "id": "kpi_pv",
+        "blockType": "chart",
+        "chartType": "number-card",
+        "dataSource": "ds_behavior_overview",
+        "title": {
+          "zh-CN": "页面浏览量 (PV)",
+          "en": "Page Views (PV)"
+        },
+        "chartConfig": {
+          "metricField": "pageViews"
+        }
+      },
+      {
+        "id": "kpi_uv",
+        "blockType": "chart",
+        "chartType": "number-card",
+        "dataSource": "ds_behavior_overview",
+        "title": {
+          "zh-CN": "独立访客 (UV)",
+          "en": "Unique Visitors (UV)"
+        },
+        "chartConfig": {
+          "metricField": "uniqueVisitors"
+        }
+      },
+      {
+        "id": "kpi_sessions",
+        "blockType": "chart",
+        "chartType": "number-card",
+        "dataSource": "ds_behavior_overview",
+        "title": {
+          "zh-CN": "会话数",
+          "en": "Sessions"
+        },
+        "chartConfig": {
+          "metricField": "sessions"
+        }
+      },
+      {
+        "id": "kpi_total",
+        "blockType": "chart",
+        "chartType": "number-card",
+        "dataSource": "ds_behavior_overview",
+        "title": {
+          "zh-CN": "事件总数",
+          "en": "Total Events"
+        },
+        "chartConfig": {
+          "metricField": "totalEvents"
+        }
+      },
+      {
+        "id": "tbl_top_events",
+        "blockType": "chart",
+        "chartType": "table",
+        "dataSource": "ds_top_events",
+        "title": {
+          "zh-CN": "热门事件",
+          "en": "Top Events"
+        }
+      }
+    ],
+    "title": {
+      "zh-CN": "行为分析",
+      "en": "Behavior Analytics"
+    }
+  }
+]

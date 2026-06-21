@@ -1,0 +1,19 @@
+[
+  {
+    "code": "behavior_analytics",
+    "parentCode": "dashboards",
+    "name:zh-CN": "行为分析",
+    "name:en": "Behavior Analytics",
+    "path": "/p/c/behavior_analytics",
+    "pageKey": "behavior_analytics",
+    "component": null,
+    "icon": "IconChartLine",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 10,
+    "visible": true,
+    "extension": {
+      "platforms": ["web"]
+    }
+  }
+]
