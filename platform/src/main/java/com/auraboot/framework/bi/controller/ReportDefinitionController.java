@@ -47,10 +47,14 @@ import java.util.stream.Collectors;
  * in this package ships with ZERO guards — a known gap; this controller deliberately does not
  * replicate that.)
  *
- * <p>STOPGAP permissions — reuses the existing template-aliased report codes
- * ({@code REPORT_READ}/{@code REPORT_MANAGE}). B6 will introduce a clean
- * report:view/edit/export/schedule/publish family (see B1 discovery Q11) and these annotations
- * should migrate to it.
+ * <p>Permissions — guarded by the clean first-class {@code report.*} family (B6 complete): this
+ * controller now uses {@link MetaPermission#REPORT_DEFINITION_VIEW} (reads) and
+ * {@link MetaPermission#REPORT_DEFINITION_MANAGE} (mutations), replacing the former
+ * template-aliased STOPGAP codes ({@code REPORT_READ}=meta.template.read,
+ * {@code REPORT_MANAGE}=meta.template.update). B6-1 (#972) introduced these clean codes and granted
+ * them to every existing-tenant role that held the old stopgaps plus registered them for new
+ * tenants, so the B6-2 flip from the stopgaps to this clean family cannot 403 any existing
+ * principal.
  *
  * <p>{@code dsl} is carried as a JSON object ({@link JsonNode}) over the wire and round-trips to the
  * entity's String/jsonb column via the package {@link ObjectMapper} (object in -&gt; object out).
@@ -67,7 +71,7 @@ public class ReportDefinitionController {
 
     @PostMapping
     @Operation(summary = "Create a report definition", description = "Persists a new ab_report row and returns the minted pid")
-    @RequirePermission(MetaPermission.REPORT_MANAGE)
+    @RequirePermission(MetaPermission.REPORT_DEFINITION_MANAGE)
     public ApiResponse<ReportDefinitionResponse> create(@Valid @RequestBody ReportDefinitionCreateRequest request) {
         ReportEntity entity = new ReportEntity();
         entity.setTenantId(MetaContext.getCurrentTenantId());
@@ -85,7 +89,7 @@ public class ReportDefinitionController {
     @Operation(summary = "Upsert a report definition",
             description = "Idempotent upsert by pid: updates an existing ab_report row, or creates one with the "
                     + "supplied pid if it does not exist (REST-idempotent). Enables the Phase 4 dual-write shadow.")
-    @RequirePermission(MetaPermission.REPORT_MANAGE)
+    @RequirePermission(MetaPermission.REPORT_DEFINITION_MANAGE)
     public ApiResponse<ReportDefinitionResponse> upsert(@PathVariable String pid,
                                                         @Valid @RequestBody ReportDefinitionUpdateRequest request) {
         ReportEntity existing = reportStorageService.findByPid(pid);
@@ -118,7 +122,7 @@ public class ReportDefinitionController {
 
     @GetMapping("/{pid}")
     @Operation(summary = "Get a report definition", description = "Loads one live ab_report row (404 if not found / soft-deleted)")
-    @RequirePermission(MetaPermission.REPORT_READ)
+    @RequirePermission(MetaPermission.REPORT_DEFINITION_VIEW)
     public ApiResponse<ReportDefinitionResponse> get(@PathVariable String pid) {
         return ApiResponse.success(toResponse(requireOwned(pid)));
     }
@@ -128,14 +132,14 @@ public class ReportDefinitionController {
             description = "Loads one live ab_report row by its tenant-unique code (== the report's pageKey); "
                     + "404 if not found / soft-deleted. Powers the Phase 4 slice 2b-2 viewer read path that "
                     + "reads ab_report first and falls back to the page-schema.")
-    @RequirePermission(MetaPermission.REPORT_READ)
+    @RequirePermission(MetaPermission.REPORT_DEFINITION_VIEW)
     public ApiResponse<ReportDefinitionResponse> getByCode(@PathVariable String code) {
         return ApiResponse.success(toResponse(requireOwnedByCode(code)));
     }
 
     @GetMapping
     @Operation(summary = "List report definitions", description = "Lists the current tenant's live reports (lightweight: no dsl)")
-    @RequirePermission(MetaPermission.REPORT_READ)
+    @RequirePermission(MetaPermission.REPORT_DEFINITION_VIEW)
     public ApiResponse<List<ReportDefinitionSummary>> list() {
         List<ReportDefinitionSummary> rows = reportStorageService
                 .listByTenant(MetaContext.getCurrentTenantId())
@@ -147,7 +151,7 @@ public class ReportDefinitionController {
 
     @DeleteMapping("/{pid}")
     @Operation(summary = "Soft-delete a report definition", description = "Soft-deletes one live ab_report row (404 if not found)")
-    @RequirePermission(MetaPermission.REPORT_MANAGE)
+    @RequirePermission(MetaPermission.REPORT_DEFINITION_MANAGE)
     public ApiResponse<Void> delete(@PathVariable String pid) {
         requireOwned(pid);
         reportStorageService.softDelete(pid);
