@@ -98,6 +98,19 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         log.info("Role updated successfully: {}", role.getId());
         return role;
     }
+
+    @Override
+    @Transactional
+    public void setDefaultDataScopeType(Long roleId, String scopeType) {
+        // Plain VARCHAR column — a scoped LambdaUpdate set is safe (no typeHandler concern) and
+        // updates only this column (null clears the default, reverting to deny-by-default).
+        lambdaUpdate()
+                .eq(Role::getId, roleId)
+                .set(Role::getDefaultDataScopeType, scopeType)
+                .set(Role::getUpdatedAt, Instant.now())
+                .update();
+        log.info("Set role default data scope: roleId={}, scopeType={}", roleId, scopeType);
+    }
 //
 //    @Override
 //    public Role findByCode(String code) {

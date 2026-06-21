@@ -12,9 +12,7 @@ import DataScopeBar from './DataScopeBar';
 import AdvancedAtomicActions from './AdvancedAtomicActions';
 
 interface CapabilityRoleEditorProps {
-  /** Numeric role id (capability endpoint keys on id). */
-  roleId: string;
-  /** Role pid (matrix / scope endpoints key on pid). */
+  /** Role pid (all role-scoped endpoints key on the PID — role ids exceed JS safe-int range). */
   rolePid: string;
 }
 
@@ -26,7 +24,7 @@ interface CapabilityRoleEditorProps {
  *   ③ advanced atomic actions (collapsed escape hatch) — per-code audit / exceptions.
  * The raw resource×action matrix is folded into ③; ① stays the default surface.
  */
-export default function CapabilityRoleEditor({ roleId, rolePid }: CapabilityRoleEditorProps) {
+export default function CapabilityRoleEditor({ rolePid }: CapabilityRoleEditorProps) {
   const { t } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [groups, setGroups] = useState<CapabilityGroup[]>([]);
@@ -36,11 +34,11 @@ export default function CapabilityRoleEditor({ roleId, rolePid }: CapabilityRole
   const [saving, setSaving] = useState(false);
 
   const loadGroups = useCallback(async () => {
-    const fetched = await capabilityService.getForRole(roleId);
+    const fetched = await capabilityService.getForRole(rolePid);
     setGroups(fetched);
     setSelected(grantedCapabilityCodes(fetched));
     return fetched;
-  }, [roleId]);
+  }, [rolePid]);
 
   const loadMatrix = useCallback(async () => {
     const data = await permissionService.getMatrixForRole(rolePid);
@@ -68,10 +66,11 @@ export default function CapabilityRoleEditor({ roleId, rolePid }: CapabilityRole
   const save = useCallback(async () => {
     setSaving(true);
     try {
-      const refreshed = await capabilityService.applySelection(roleId, selected);
+      const refreshed = await capabilityService.applySelection(rolePid, selected);
       setGroups(refreshed);
       setSelected(grantedCapabilityCodes(refreshed));
-      // capability grants change the underlying atomic codes — keep ③ in sync.
+      // capability grants change the underlying atomic codes (and inherit the role default scope) —
+      // keep ③ in sync.
       await loadMatrix();
       showSuccessToast(t('common.saveSuccess', undefined, 'Saved'));
     } catch {
@@ -79,7 +78,7 @@ export default function CapabilityRoleEditor({ roleId, rolePid }: CapabilityRole
     } finally {
       setSaving(false);
     }
-  }, [roleId, selected, loadMatrix, showSuccessToast, showErrorToast, t]);
+  }, [rolePid, selected, loadMatrix, showSuccessToast, showErrorToast, t]);
 
   // ③ atomic grant toggle — optimistic on the matrix, then resync capability view (an atomic grant
   // may complete/break a capability's all-or-nothing granted state and its coverage).
@@ -101,7 +100,9 @@ export default function CapabilityRoleEditor({ roleId, rolePid }: CapabilityRole
       );
       try {
         await permissionService.batchUpdateRolePermissions(rolePid, [{ permissionId, granted }]);
-        await loadGroups();
+        // Refetch both: a grant may complete/break a capability's all-or-nothing state, and newly-
+        // granted codes inherit the role's default data scope server-side — reload to surface it.
+        await Promise.all([loadGroups(), loadMatrix()]);
       } catch {
         showErrorToast(t('admin.permission.matrix.updateError', undefined, 'Failed to update permission'));
         await loadMatrix();

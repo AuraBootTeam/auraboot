@@ -3,9 +3,13 @@ package com.auraboot.framework.permission.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.permission.entity.RoleDataScope;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.RolePermission;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,6 +51,12 @@ class RolePermissionServiceImplTest {
 
     @Mock
     private UserPermissionService userPermissionService;
+
+    @Mock
+    private RoleMapper roleMapper;
+
+    @Mock
+    private DataScopeService dataScopeService;
 
     @InjectMocks
     private RolePermissionServiceImpl service;
@@ -70,6 +82,66 @@ class RolePermissionServiceImplTest {
         assertThat(captor.getValue().get(0).getRoleId()).isEqualTo(7L);
         assertThat(captor.getValue().get(0).getDeletedFlag()).isFalse();
         verify(userPermissionService).evictRoleUsers(7L);
+    }
+
+    @Test
+    void assignInheritsRoleDefaultScopeForNewGrants() {
+        Role role = new Role();
+        role.setId(7L);
+        role.setDefaultDataScopeType("dept");
+        when(roleMapper.selectById(7L)).thenReturn(role);
+        when(dataScopeService.getScopesByRole(100L, 7L)).thenReturn(List.of());
+        when(permissionMapper.findByIds(anyList())).thenReturn(List.of(
+                perm(50L, "crm.account", "read"),
+                perm(51L, "crm.lead", "manage")));
+
+        service.assignPermissionsToRole(7L, List.of(50L, 51L));
+
+        // each newly-granted (resource, action) inherits the role's default tier
+        verify(dataScopeService).setScope(100L, 7L, "crm.account", "read", "dept", "MAX");
+        verify(dataScopeService).setScope(100L, 7L, "crm.lead", "manage", "dept", "MAX");
+    }
+
+    @Test
+    void assignDoesNotInheritWhenRoleHasNoDefault() {
+        Role role = new Role();
+        role.setId(7L);
+        role.setDefaultDataScopeType(null); // opted out — preserve per-action deny-by-default
+        when(roleMapper.selectById(7L)).thenReturn(role);
+
+        service.assignPermissionsToRole(7L, List.of(50L));
+
+        verify(dataScopeService, never())
+                .setScope(anyLong(), anyLong(), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void assignDoesNotOverwriteExistingScopeOverride() {
+        Role role = new Role();
+        role.setId(7L);
+        role.setDefaultDataScopeType("dept");
+        when(roleMapper.selectById(7L)).thenReturn(role);
+        RoleDataScope override = new RoleDataScope();
+        override.setResourceCode("crm.account");
+        override.setActionCode("read");
+        when(dataScopeService.getScopesByRole(100L, 7L)).thenReturn(List.of(override));
+        when(permissionMapper.findByIds(anyList())).thenReturn(List.of(
+                perm(50L, "crm.account", "read"),   // already has an explicit override
+                perm(51L, "crm.lead", "manage")));   // new -> inherits default
+
+        service.assignPermissionsToRole(7L, List.of(50L, 51L));
+
+        verify(dataScopeService, never())
+                .setScope(eq(100L), eq(7L), eq("crm.account"), eq("read"), anyString(), anyString());
+        verify(dataScopeService).setScope(100L, 7L, "crm.lead", "manage", "dept", "MAX");
+    }
+
+    private Permission perm(Long id, String resourceCode, String action) {
+        Permission p = new Permission();
+        p.setId(id);
+        p.setResourceCode(resourceCode);
+        p.setAction(action);
+        return p;
     }
 
     @Test

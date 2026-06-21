@@ -10,7 +10,10 @@ vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => ({ showSuccessToast: vi.fn(), showErrorToast: vi.fn() }),
 }));
 vi.mock('~/shared/services/permissionService', () => ({
-  permissionService: { updateScope: vi.fn().mockResolvedValue(undefined) },
+  permissionService: {
+    getRoleDefaultScope: vi.fn().mockResolvedValue(null),
+    setRoleDefaultScope: vi.fn().mockResolvedValue(undefined),
+  },
 }));
 
 import { permissionService } from '~/shared/services/permissionService';
@@ -44,20 +47,33 @@ function matrix(actions: Array<{ r: string; a: string; granted: boolean; scope?:
 }
 
 describe('DataScopeBar', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (permissionService.getRoleDefaultScope as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (permissionService.setRoleDefaultScope as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+  });
 
-  it('shows the uniform scope of granted permissions', () => {
+  it('shows the persisted role default scope when set', async () => {
+    (permissionService.getRoleDefaultScope as ReturnType<typeof vi.fn>).mockResolvedValue('dept_and_sub');
+    render(<DataScopeBar rolePid="r1" matrix={matrix([])} onScopeApplied={() => {}} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('data-scope-current').textContent).toContain('admin.permission.scope.dept_and_sub'),
+    );
+  });
+
+  it('falls back to the derived scope when no default is set', async () => {
     render(
       <DataScopeBar
         rolePid="r1"
-        matrix={matrix([{ r: 'crm.account', a: 'read', granted: true, scope: 'dept_and_sub' }])}
+        matrix={matrix([{ r: 'crm.account', a: 'read', granted: true, scope: 'self' }])}
         onScopeApplied={() => {}}
       />,
     );
-    expect(screen.getByTestId('data-scope-current').textContent).toContain('admin.permission.scope.dept_and_sub');
+    await waitFor(() => expect(permissionService.getRoleDefaultScope).toHaveBeenCalledWith('r1'));
+    expect(screen.getByTestId('data-scope-current').textContent).toContain('admin.permission.scope.self');
   });
 
-  it('shows "mixed" when granted permissions use different scopes', () => {
+  it('shows "mixed" when grants differ and no default is set', async () => {
     render(
       <DataScopeBar
         rolePid="r1"
@@ -68,38 +84,21 @@ describe('DataScopeBar', () => {
         onScopeApplied={() => {}}
       />,
     );
-    expect(screen.getByTestId('data-scope-current').textContent).toContain('admin.permission.scope.mixed');
+    await waitFor(() =>
+      expect(screen.getByTestId('data-scope-current').textContent).toContain('admin.permission.scope.mixed'),
+    );
   });
 
-  it('bulk-applies the chosen scope to every granted permission via updateScope', async () => {
+  it('persists the chosen tier as the role default and refreshes', async () => {
     const onApplied = vi.fn();
-    render(
-      <DataScopeBar
-        rolePid="r1"
-        matrix={matrix([
-          { r: 'crm.account', a: 'read', granted: true, scope: 'all' },
-          { r: 'crm.lead', a: 'read', granted: true, scope: 'all' },
-          { r: 'crm.deal', a: 'read', granted: false },
-        ])}
-        onScopeApplied={onApplied}
-      />,
-    );
+    render(<DataScopeBar rolePid="r1" matrix={matrix([])} onScopeApplied={onApplied} />);
+    await waitFor(() => expect(permissionService.getRoleDefaultScope).toHaveBeenCalledWith('r1'));
 
     fireEvent.click(screen.getByTestId('data-scope-modify-btn'));
     fireEvent.click(screen.getByTestId('data-scope-option-dept'));
     fireEvent.click(screen.getByTestId('data-scope-apply'));
 
-    await waitFor(() => expect(permissionService.updateScope).toHaveBeenCalledTimes(2));
-    expect(permissionService.updateScope).toHaveBeenCalledWith('r1', {
-      resourceCode: 'crm.account',
-      actionCode: 'read',
-      scopeType: 'dept',
-    });
-    expect(permissionService.updateScope).toHaveBeenCalledWith('r1', {
-      resourceCode: 'crm.lead',
-      actionCode: 'read',
-      scopeType: 'dept',
-    });
+    await waitFor(() => expect(permissionService.setRoleDefaultScope).toHaveBeenCalledWith('r1', 'dept'));
     await waitFor(() => expect(onApplied).toHaveBeenCalled());
   });
 });

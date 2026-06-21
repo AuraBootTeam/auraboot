@@ -31,6 +31,10 @@ import java.time.Instant;
         @TableField(value = "scope_content", typeHandler = JsonbStringTypeHandler.class)
         private String scopeContent;               // 作用域值,json
 
+        // Default DATA-scope tier (all/dept_and_sub/dept/self/none) inherited by newly-granted
+        // permissions; null = per-action deny-by-default (no inheritance). Distinct from scopeType.
+        private String defaultDataScopeType;
+
         private Integer priority;           // 优先级(数字越小优先级越高)
         private String status;              // 状态：ACTIVE, INACTIVE
 

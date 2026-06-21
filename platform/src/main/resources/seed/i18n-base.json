@@ -793,8 +793,8 @@
   },
   {
     "key": "admin.permission.scope.drawerNote",
-    "zh-CN": "应用到该角色当前已授予的全部权限",
-    "en-US": "Applies to all permissions the role currently holds"
+    "zh-CN": "设为该角色的默认数据范围:新授予的权限自动继承,并应用到当前已授予的权限。",
+    "en-US": "Sets the role's default data scope — newly-granted permissions inherit it, and it is applied to current grants."
   },
   {
     "key": "admin.permission.scope.apply",

@@ -17,6 +17,8 @@ vi.mock('~/shared/services/permissionService', () => ({
     getMatrixForRole: vi.fn(),
     batchUpdateRolePermissions: vi.fn(),
     updateScope: vi.fn(),
+    getRoleDefaultScope: vi.fn().mockResolvedValue(null),
+    setRoleDefaultScope: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -43,10 +45,10 @@ describe('CapabilityRoleEditor', () => {
 
   it('loads capability + matrix views, seeds selection from granted, disables Save until dirty', async () => {
     mockData();
-    render(<CapabilityRoleEditor roleId="5" rolePid="role-pid-5" />);
+    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
 
     await waitFor(() => screen.getByTestId('capability-role-editor'));
-    expect(capabilityService.getForRole).toHaveBeenCalledWith('5');
+    expect(capabilityService.getForRole).toHaveBeenCalledWith('role-pid-5');
     expect(permissionService.getMatrixForRole).toHaveBeenCalledWith('role-pid-5');
     // ② data-scope bar and ③ advanced section both present
     expect(screen.getByTestId('data-scope-bar')).toBeTruthy();
@@ -59,7 +61,7 @@ describe('CapabilityRoleEditor', () => {
   it('enables Save after a toggle and persists the selection via applySelection', async () => {
     mockData();
     (capabilityService.applySelection as ReturnType<typeof vi.fn>).mockResolvedValue(groups);
-    render(<CapabilityRoleEditor roleId="5" rolePid="role-pid-5" />);
+    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
     await waitFor(() => screen.getByTestId('capability-role-editor'));
 
     fireEvent.click(screen.getByTestId('capability-checkbox-crm.cap.lead')); // select lead -> dirty
@@ -67,7 +69,7 @@ describe('CapabilityRoleEditor', () => {
 
     fireEvent.click(screen.getByTestId('capability-save'));
     await waitFor(() =>
-      expect(capabilityService.applySelection).toHaveBeenCalledWith('5', ['crm.cap.account', 'crm.cap.lead']),
+      expect(capabilityService.applySelection).toHaveBeenCalledWith('role-pid-5', ['crm.cap.account', 'crm.cap.lead']),
     );
   });
 
@@ -82,7 +84,7 @@ describe('CapabilityRoleEditor', () => {
       },
     ];
     mockData(tieredGroups);
-    render(<CapabilityRoleEditor roleId="5" rolePid="role-pid-5" />);
+    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
     await waitFor(() => screen.getByTestId('capability-role-editor'));
 
     fireEvent.click(screen.getByTestId('capability-preset-viewer')); // viewer preset -> only the viewer-tier capability

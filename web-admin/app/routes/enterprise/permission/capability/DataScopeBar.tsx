@@ -1,62 +1,68 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { GlobeAltIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { permissionService } from '~/shared/services/permissionService';
 import type { PermissionMatrixDTO } from '../types';
 import { SCOPE_OPTIONS, scopeOption } from '../scopeConfig';
-import { deriveRoleScope, grantedActions } from '../scopeHelpers';
+import { deriveRoleScope } from '../scopeHelpers';
 
 interface DataScopeBarProps {
   rolePid: string;
   matrix: PermissionMatrixDTO | null;
-  /** Called after a bulk scope apply so the parent can refetch the matrix. */
+  /** Called after the role default scope is applied so the parent can refetch the matrix. */
   onScopeApplied: () => void;
 }
 
 /**
  * ② Data-scope dimension, pulled out of the matrix cells into its own top bar + drawer. The bar
- * summarizes the role's data scope (uniform value, or "mixed"); the drawer applies a chosen scope to
- * every permission the role currently holds. Per-permission overrides live in the ③ advanced table.
+ * shows the role's default data scope (persisted role-level field; falls back to the current
+ * effective scope derived from grants when no default is set). The drawer persists the chosen tier
+ * as the role default — newly-granted permissions inherit it — and materializes it onto current
+ * grants. Per-permission overrides live in the ③ advanced table.
  */
 export default function DataScopeBar({ rolePid, matrix, onScopeApplied }: DataScopeBarProps) {
   const { t } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [open, setOpen] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [storedDefault, setStoredDefault] = useState<string | null>(null);
 
-  const current = deriveRoleScope(matrix);
-  const granted = grantedActions(matrix);
-  const isMixed = current === 'mixed';
+  const loadDefault = useCallback(async () => {
+    try {
+      setStoredDefault(await permissionService.getRoleDefaultScope(rolePid));
+    } catch {
+      setStoredDefault(null); // fall back to the derived current scope
+    }
+  }, [rolePid]);
+
+  useEffect(() => {
+    void loadDefault();
+  }, [loadDefault]);
+
+  const derived = deriveRoleScope(matrix);
+  // Role default wins; otherwise show the current effective scope derived from grants.
+  const current = storedDefault ?? derived;
+  const isMixed = !storedDefault && derived === 'mixed';
   const currentLabel = isMixed
     ? t('admin.permission.scope.mixed', undefined, '多种范围')
     : t(scopeOption(current).labelKey, undefined, scopeOption(current).labelFallback);
 
-  const [pending, setPending] = useState<string>(isMixed ? 'dept_and_sub' : current);
+  const [pending, setPending] = useState<string>('all');
 
   const openDrawer = () => {
-    setPending(isMixed ? 'dept_and_sub' : current);
+    setPending(storedDefault ?? (derived === 'mixed' ? 'dept_and_sub' : derived));
     setOpen(true);
   };
 
   const apply = async () => {
-    if (granted.length === 0) {
-      showErrorToast(t('admin.permission.scope.noGrants', undefined, 'Grant permissions first, then set the data scope'));
-      return;
-    }
     setApplying(true);
     try {
-      await Promise.all(
-        granted.map((g) =>
-          permissionService.updateScope(rolePid, {
-            resourceCode: g.resourceCode,
-            actionCode: g.actionCode,
-            scopeType: pending,
-          }),
-        ),
-      );
+      // Persist as the role default (new grants inherit) + materialize onto current grants.
+      await permissionService.setRoleDefaultScope(rolePid, pending);
       showSuccessToast(t('admin.permission.scope.applySuccess', undefined, 'Data scope updated'));
       setOpen(false);
+      await loadDefault();
       onScopeApplied();
     } catch {
       showErrorToast(t('admin.permission.scope.applyError', undefined, 'Failed to update data scope'));
@@ -114,7 +120,7 @@ export default function DataScopeBar({ rolePid, matrix, onScopeApplied }: DataSc
                 {t(
                   'admin.permission.scope.drawerNote',
                   undefined,
-                  'Applies to all permissions the role currently holds.',
+                  "Sets the role's default data scope — newly-granted permissions inherit it, and it is applied to current grants.",
                 )}
               </p>
               <div className="flex flex-col gap-1">

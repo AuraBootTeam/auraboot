@@ -180,6 +180,38 @@ export class PermissionService implements IPermissionService {
     }
   }
 
+  /**
+   * Get the role's default DATA-scope tier (permission v2 ②). null = no default set.
+   */
+  async getRoleDefaultScope(rolePid: string, request?: Request): Promise<string | null> {
+    const result = await get<string>(
+      `${this.baseUrl}/matrix/${rolePid}/default-scope`,
+      undefined,
+      undefined,
+      request,
+    );
+    if (!ResultHelper.isSuccess(result)) {
+      throw new Error((result as any).desc || 'Failed to fetch role default scope');
+    }
+    return result.data ?? null;
+  }
+
+  /**
+   * Set the role's default DATA-scope tier: persists the default (new grants inherit it) and
+   * materializes it onto the role's current grants.
+   */
+  async setRoleDefaultScope(rolePid: string, scopeType: string, request?: Request): Promise<void> {
+    const result = await put<void>(
+      `${this.baseUrl}/matrix/${rolePid}/default-scope`,
+      { scopeType } as unknown as Record<string, any>,
+      undefined,
+      request,
+    );
+    if (!ResultHelper.isSuccess(result)) {
+      throw new Error((result as any).desc || 'Failed to set role default scope');
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Policy API
   // ---------------------------------------------------------------------------

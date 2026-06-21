@@ -377,7 +377,7 @@ export default function PermissionManagement() {
 
           {activeRightTab === 'capabilities' &&
             (selectedRole ? (
-              <CapabilityRoleEditor roleId={String(selectedRole.id)} rolePid={selectedRole.pid} />
+              <CapabilityRoleEditor rolePid={selectedRole.pid} />
             ) : (
               <div className="text-sm text-gray-400">{t('admin.permission.selectRole') || 'Select a role'}</div>
             ))}
