@@ -1,6 +1,6 @@
 ---
-type: design
-status: draft
+type: plan-design
+status: shipped
 created: 2026-06-21
 topic: cs-reply-tool-boundary
 related:

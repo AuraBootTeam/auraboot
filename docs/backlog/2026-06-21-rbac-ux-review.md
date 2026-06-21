@@ -1,8 +1,10 @@
 ---
 title: RBAC / permission-management — UX review (screenshot-verified)
 date: 2026-06-21
+created: 2026-06-21
 type: backlog
-status: resolved
+status: closed
+distilled_to: docs/handover/HANDOVER-2026-06-21-rbac-v2-ui-reorg.md
 area: permission / rbac / org
 ---
 
