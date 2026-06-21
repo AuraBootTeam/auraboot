@@ -1265,6 +1265,46 @@
       "resourceType": "function"
     },
     {
+      "code": "report.definition.view",
+      "name": "Report definition view",
+      "description": "Report definition — view (load / get / list)",
+      "type": "function",
+      "module": "report",
+      "resource": "report:definition",
+      "action": "view",
+      "resourceType": "function"
+    },
+    {
+      "code": "report.definition.manage",
+      "name": "Report definition manage",
+      "description": "Report definition — manage (create / update / delete)",
+      "type": "function",
+      "module": "report",
+      "resource": "report:definition",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "report.export.execute",
+      "name": "Report export execute",
+      "description": "Report export — execute (Excel / PDF / JSON)",
+      "type": "function",
+      "module": "report",
+      "resource": "report:export",
+      "action": "execute",
+      "resourceType": "function"
+    },
+    {
+      "code": "report.schedule.manage",
+      "name": "Report schedule manage",
+      "description": "Report schedule — manage (schedule CRUD + test-send)",
+      "type": "function",
+      "module": "report",
+      "resource": "report:schedule",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
       "code": "meta.state_graph.read",
       "name": "Meta state_graph read",
       "description": "Meta state_graph — read",
