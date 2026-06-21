@@ -27,6 +27,18 @@ describe('reportChartBlockToChartSpec', () => {
     expect(spec.measures[0].field).toBe('sales');
   });
 
+  it('maps canonical report DSL shape C (top-level chartType/categoryField/valueField)', () => {
+    const spec = reportChartBlockToChartSpec({
+      blockType: 'chart',
+      chartType: 'bar',
+      categoryField: 'status',
+      valueField: 'cases',
+    });
+    expect(spec.type).toBe('bar');
+    expect(spec.dimensions[0].field).toBe('status');
+    expect(spec.measures[0].field).toBe('cases');
+  });
+
   it('falls back to bar for an unknown/illegal chartType (never a silently wrong chart)', () => {
     const spec = reportChartBlockToChartSpec({ chartType: 'definitely-not-a-chart' });
     expect(spec.type).toBe('bar');

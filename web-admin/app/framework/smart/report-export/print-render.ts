@@ -34,6 +34,9 @@ export interface ReportChartBlock {
   chartConfig?: { xField?: string; yField?: string; seriesField?: string };
   /** shape B: nested config */
   config?: { chartType?: string; categoryField?: string; valueField?: string };
+  /** shape C (canonical report DSL): top-level category/value fields */
+  categoryField?: string;
+  valueField?: string;
   /** dataSource id (resolved to rows elsewhere; not needed for rendering) */
   dataSource?: string;
 }
@@ -46,8 +49,10 @@ export function reportChartBlockToChartSpec(block: ReportChartBlock): ChartSpec 
   const rawType = block.chartType ?? block.config?.chartType ?? 'bar';
   const type: ChartSpecType = isChartSpecType(rawType) ? rawType : 'bar';
 
-  const categoryField = block.chartConfig?.xField ?? block.config?.categoryField ?? 'category';
-  const valueField = block.chartConfig?.yField ?? block.config?.valueField ?? 'value';
+  const categoryField =
+    block.chartConfig?.xField ?? block.config?.categoryField ?? block.categoryField ?? 'category';
+  const valueField =
+    block.chartConfig?.yField ?? block.config?.valueField ?? block.valueField ?? 'value';
 
   const dimensions: ChartDimension[] = [
     // pie's first dimension is a slice name, every other type is an axis category.

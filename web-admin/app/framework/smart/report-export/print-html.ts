@@ -41,7 +41,9 @@ export interface ReportPrintBlock extends ReportChartBlock {
 
 export interface ReportPrintModel {
   title?: string;
-  blocks: ReportPrintBlock[];
+  /** block list. The canonical report DSL names this `body`; `blocks` is accepted too. */
+  blocks?: ReportPrintBlock[];
+  body?: ReportPrintBlock[];
 }
 
 export interface PrintDocument {
@@ -160,7 +162,7 @@ export function renderReportToPrintDocument(
   let watermark = '';
   const body: string[] = [];
 
-  for (const block of model.blocks ?? []) {
+  for (const block of model.blocks ?? model.body ?? []) {
     switch (block.blockType) {
       case 'chart':
         body.push(renderChart(block, dataSets));

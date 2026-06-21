@@ -103,6 +103,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private final NamedQueryService namedQueryService;
     private final ReportStorageService reportStorageService;
     private final AuditTrailService auditTrailService;
+    private final ReportRenderClient reportRenderClient;
 
     @Override
     public ReportExportFile exportExcel(ReportExportRequest request) {
@@ -146,19 +147,46 @@ public class ReportExportServiceImpl implements ReportExportService {
 
         Map<String, Object> reportDsl = loadReportDsl(request.getReportPid());
         String title = stringValue(reportDsl.get("title"), "report");
+        Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(reportDsl);
 
+        byte[] pdfBytes = renderPdf(reportDsl, dataSets, title);
+        ReportExportFile file = new ReportExportFile(pdfBytes, safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
+        recordExportAudit(request.getReportPid(), "EXPORT_PDF", "pdf", file.getFilename());
+        return file;
+    }
+
+    /**
+     * Phase 3 (DDR-2026-06-21): render the report to a real WYSIWYG PDF (vector
+     * charts + running header/footer/watermark) via the Node renderer, falling
+     * back to the legacy PDFBox text export when the renderer is unavailable or
+     * fails — logged, never silent.
+     */
+    private byte[] renderPdf(Map<String, Object> reportDsl,
+                             Map<String, List<Map<String, Object>>> dataSets,
+                             String title) {
+        try {
+            byte[] rendered = reportRenderClient.renderPdf(reportDsl, dataSets);
+            if (rendered != null && rendered.length > 0) {
+                return rendered;
+            }
+        } catch (ReportRenderException e) {
+            log.warn("WYSIWYG report renderer failed; falling back to PDFBox text export: {}", e.getMessage());
+        }
+        return renderPdfWithPdfBox(reportDsl, dataSets, title);
+    }
+
+    private byte[] renderPdfWithPdfBox(Map<String, Object> reportDsl,
+                                       Map<String, List<Map<String, Object>>> dataSets,
+                                       String title) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(reportDsl);
             List<PdfLine> lines = renderPdfLines(reportDsl, dataSets, title);
             writePdfLines(document, lines, resolvePdfPageSize(reportDsl), resolvePdfMargins(reportDsl));
             document.save(output);
-            ReportExportFile file = new ReportExportFile(output.toByteArray(), safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
-            recordExportAudit(request.getReportPid(), "EXPORT_PDF", "pdf", file.getFilename());
-            return file;
+            return output.toByteArray();
         } catch (ValidationException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Failed to export report as PDF: reportPid={}", request.getReportPid(), e);
+            log.error("Failed to export report as PDF: title={}", title, e);
             throw new ValidationException(ResponseCode.CommonValidationFailed, "PDF export failed: " + e.getMessage());
         }
     }

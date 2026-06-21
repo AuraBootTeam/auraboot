@@ -110,6 +110,35 @@ describe('renderReportToPrintDocument — watermark', () => {
   });
 });
 
+describe('renderReportToPrintDocument — canonical report DSL shape (body + shape-C chart)', () => {
+  it('reads the `body` block list and a top-level categoryField/valueField chart', () => {
+    const { html } = doc(
+      {
+        title: '运营报表',
+        body: [
+          {
+            blockType: 'chart',
+            title: '状态分布',
+            dataSource: 'ops',
+            chartType: 'bar',
+            categoryField: 'status',
+            valueField: 'cases',
+          },
+        ],
+      },
+      {
+        ops: [
+          { status: 'Open', cases: 12 },
+          { status: 'Closed', cases: 3 },
+        ],
+      },
+    );
+    expect(html).toContain('<svg');
+    expect(html).toContain('<path');
+    expect(html).toContain('运营报表');
+  });
+});
+
 describe('renderReportToPrintDocument — rich-text + document shell', () => {
   it('renders rich-text paragraphs and a self-contained html shell', () => {
     const { html } = doc({
