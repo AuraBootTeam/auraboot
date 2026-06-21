@@ -6,6 +6,8 @@ import com.auraboot.framework.bi.dto.ReportExportRequest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.service.ReportStorageService;
 import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
+import com.auraboot.framework.bi.service.impl.ReportRenderClient;
+import com.auraboot.framework.bi.service.impl.ReportRenderException;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.entity.PageSchema;
@@ -67,12 +69,16 @@ class ReportExportServiceTest {
     @Mock
     private AuditTrailService auditTrailService;
 
+    @Mock
+    private ReportRenderClient reportRenderClient;
+
     private ReportExportServiceImpl reportExportService;
 
     @BeforeEach
     void setUp() {
         reportExportService = new ReportExportServiceImpl(pageSchemaMapper, new ObjectMapper(),
-                dynamicDataService, namedQueryService, reportStorageService, auditTrailService);
+                dynamicDataService, namedQueryService, reportStorageService, auditTrailService,
+                reportRenderClient);
         // A successful export records an audit event sourced from MetaContext (set on every real
         // authenticated request, like the controller's MetaContext.getCurrentTenantId()); simulate it.
         MetaContext.setContext(7L, 99L, "user-pid", "tester");
@@ -220,6 +226,45 @@ class ReportExportServiceTest {
             assertThat(text).contains("Region | Cases");
             assertThat(text).contains("North | 12");
             assertThat(text).contains("South | 9");
+        }
+    }
+
+    // ---------- Phase 3: WYSIWYG renderer with PDFBox fallback ----------
+
+    @Test
+    void exportPdf_usesWysiwygRenderer_whenItReturnsPdfBytes() {
+        // The Node renderer (slice 1-2c) produced a real PDF — the export returns it
+        // verbatim, NOT the legacy PDFBox text path.
+        byte[] wysiwyg = "%PDF-1.7 wysiwyg-renderer-output".getBytes();
+        when(reportRenderClient.renderPdf(any(), any())).thenReturn(wysiwyg);
+        stubReportDsl("rpt-wysiwyg");
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-wysiwyg");
+        ReportExportFile file = reportExportService.exportPdf(request);
+
+        assertThat(file.getBytes()).isEqualTo(wysiwyg);
+        assertThat(file.getContentType()).isEqualTo("application/pdf");
+        assertThat(file.getFilename()).isEqualTo("Operations Export.pdf");
+    }
+
+    @Test
+    void exportPdf_fallsBackToPdfBox_whenRendererFails() throws Exception {
+        // Renderer unavailable/failed -> fall back to the legacy PDFBox text export
+        // (logged, never silent), so PDF export never hard-fails on a renderer issue.
+        when(reportRenderClient.renderPdf(any(), any()))
+                .thenThrow(new ReportRenderException("renderer unavailable"));
+        stubReportDsl("rpt-fallback");
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-fallback");
+        ReportExportFile file = reportExportService.exportPdf(request);
+
+        assertThat(file.getBytes()).startsWith((byte) '%', (byte) 'P', (byte) 'D', (byte) 'F', (byte) '-');
+        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(file.getBytes()))) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("Operations Export");
+            assertThat(text).contains("Region | Cases");
         }
     }
 
