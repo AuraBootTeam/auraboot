@@ -5,6 +5,7 @@ import {
   toggleCapability,
   groupSummary,
   isDirty,
+  capabilityCodesForTier,
 } from '../capabilityHelpers';
 
 function cap(code: string, granted: boolean, sensitive = false) {
@@ -39,5 +40,23 @@ describe('capabilityHelpers', () => {
     expect(isDirty(groups, ['crm.cap.account'])).toBe(false);
     expect(isDirty(groups, ['crm.cap.account', 'crm.cap.account_contact_full'])).toBe(true);
     expect(isDirty(groups, [])).toBe(true);
+  });
+
+  it('capabilityCodesForTier selects tiered capabilities at or below the tier (skips untiered)', () => {
+    const tiered: CapabilityGroup[] = [
+      {
+        group: 'g',
+        capabilities: [
+          { code: 'a', group: 'g', label: 'a', sensitive: false, tier: 'viewer', includes: [], granted: false, conventionDerived: false },
+          { code: 'b', group: 'g', label: 'b', sensitive: false, tier: 'editor', includes: [], granted: false, conventionDerived: false },
+          { code: 'c', group: 'g', label: 'c', sensitive: false, tier: 'admin', includes: [], granted: false, conventionDerived: false },
+          { code: 'd', group: 'g', label: 'd', sensitive: false, includes: [], granted: false, conventionDerived: false },
+        ],
+      },
+    ];
+    expect(capabilityCodesForTier(tiered, 'viewer')).toEqual(['a']);
+    expect(capabilityCodesForTier(tiered, 'editor').sort()).toEqual(['a', 'b']);
+    expect(capabilityCodesForTier(tiered, 'admin').sort()).toEqual(['a', 'b', 'c']);
+    expect(capabilityCodesForTier(tiered, 'nope')).toEqual([]);
   });
 });

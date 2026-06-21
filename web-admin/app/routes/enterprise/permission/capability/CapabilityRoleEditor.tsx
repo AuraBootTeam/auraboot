@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import type { CapabilityGroup } from './types';
 import { capabilityService } from './capabilityService';
-import { grantedCapabilityCodes, toggleCapability, isDirty } from './capabilityHelpers';
+import { grantedCapabilityCodes, toggleCapability, isDirty, capabilityCodesForTier } from './capabilityHelpers';
 import CapabilityChecklist from './CapabilityChecklist';
 
 interface CapabilityRoleEditorProps {
@@ -60,6 +60,24 @@ export default function CapabilityRoleEditor({ roleId }: CapabilityRoleEditorPro
 
   return (
     <div data-testid="capability-role-editor" className="flex flex-col gap-3">
+      <div data-testid="capability-presets" className="flex items-center gap-2">
+        <span className="text-xs text-gray-500">{t('permission.capability.preset.label', undefined, '预设')}</span>
+        {[
+          { tier: 'viewer', label: t('permission.capability.preset.viewer', undefined, '查看者') },
+          { tier: 'editor', label: t('permission.capability.preset.editor', undefined, '编辑者') },
+          { tier: 'admin', label: t('permission.capability.preset.admin', undefined, '管理员') },
+        ].map((p) => (
+          <button
+            key={p.tier}
+            type="button"
+            data-testid={`capability-preset-${p.tier}`}
+            onClick={() => setSelected(capabilityCodesForTier(groups, p.tier))}
+            className="h-7 rounded-md border border-gray-200 px-2 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
       <CapabilityChecklist groups={groups} selected={selected} onToggle={onToggle} />
       <div className="flex justify-end">
         <button

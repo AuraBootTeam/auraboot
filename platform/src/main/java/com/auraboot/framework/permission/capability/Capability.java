@@ -21,6 +21,8 @@ public class Capability {
     private String group;
     private String label;
     private boolean sensitive;
+    /** Preset tier this capability belongs to (viewer/editor/admin); null for convention-derived. */
+    private String tier;
     private List<String> includes;
     /** True when every code in {@link #includes} is currently granted to the subject. */
     private boolean granted;

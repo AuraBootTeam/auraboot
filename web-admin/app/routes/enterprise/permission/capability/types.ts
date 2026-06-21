@@ -7,6 +7,8 @@ export interface Capability {
   group: string;
   label: string;
   sensitive: boolean;
+  /** Preset tier (viewer/editor/admin); null for convention-derived capabilities. */
+  tier?: string | null;
   includes: string[];
   granted: boolean;
   conventionDerived: boolean;

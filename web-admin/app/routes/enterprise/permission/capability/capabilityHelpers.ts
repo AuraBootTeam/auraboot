@@ -33,6 +33,18 @@ export function groupSummary(group: CapabilityGroup): { granted: number; total: 
   };
 }
 
+/** Preset tier ordering: a tier preset includes every tiered capability at or below it. */
+const TIER_ORDER: Record<string, number> = { viewer: 0, editor: 1, admin: 2 };
+
+/** Capability codes for a preset tier = all tiered capabilities at or below the given tier. */
+export function capabilityCodesForTier(groups: CapabilityGroup[], tier: string): string[] {
+  const max = TIER_ORDER[tier];
+  if (max === undefined) return [];
+  return allCapabilities(groups)
+    .filter((c) => c.tier != null && TIER_ORDER[c.tier] !== undefined && TIER_ORDER[c.tier] <= max)
+    .map((c) => c.code);
+}
+
 /** True when the current selection differs from the role's granted baseline (enables Save). */
 export function isDirty(groups: CapabilityGroup[], selected: string[]): boolean {
   const baseline = new Set(grantedCapabilityCodes(groups));

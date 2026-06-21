@@ -44,6 +44,7 @@ public class CapabilityResolver {
                             .group(d.getGroup())
                             .label(label(d))
                             .sensitive(Boolean.TRUE.equals(d.getSensitive()))
+                            .tier(d.getTier())
                             .includes(d.getIncludes())
                             .granted(granted.containsAll(d.getIncludes()))
                             .conventionDerived(false)

@@ -47,4 +47,24 @@ describe('CapabilityRoleEditor', () => {
       expect(capabilityService.applySelection).toHaveBeenCalledWith('5', ['crm.cap.account', 'crm.cap.lead']),
     );
   });
+
+  it('applies a tier preset, selecting tiered capabilities and enabling Save', async () => {
+    const tieredGroups: CapabilityGroup[] = [
+      {
+        group: '客户管理',
+        capabilities: [
+          { code: 'crm.cap.account', group: '客户管理', label: '维护客户资料', sensitive: false, tier: 'viewer', includes: [], granted: false, conventionDerived: false },
+          { code: 'crm.cap.lead', group: '客户管理', label: '维护线索', sensitive: false, tier: 'editor', includes: [], granted: false, conventionDerived: false },
+        ],
+      },
+    ];
+    (capabilityService.getForRole as ReturnType<typeof vi.fn>).mockResolvedValue(tieredGroups);
+    render(<CapabilityRoleEditor roleId="5" />);
+    await waitFor(() => screen.getByTestId('capability-role-editor'));
+
+    fireEvent.click(screen.getByTestId('capability-preset-viewer')); // viewer preset -> only the viewer-tier capability
+    expect((screen.getByTestId('capability-checkbox-crm.cap.account') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId('capability-checkbox-crm.cap.lead') as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(false);
+  });
 });

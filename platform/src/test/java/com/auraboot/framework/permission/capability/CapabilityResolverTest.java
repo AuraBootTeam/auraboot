@@ -23,7 +23,7 @@ class CapabilityResolverTest {
     @Test
     void declaredCapabilityIsGrantedWhenAllIncludesHeld() {
         CapabilityDefinitionDTO decl = CapabilityDefinitionDTO.builder()
-                .code("crm.cap.account").group("客户管理").nameZhCN("维护客户资料")
+                .code("crm.cap.account").group("客户管理").nameZhCN("维护客户资料").tier("editor")
                 .includes(List.of("crm.account.read", "crm.account.manage")).build();
 
         List<CapabilityGroup> groups = resolver.resolve(List.of(decl),
@@ -32,6 +32,7 @@ class CapabilityResolverTest {
 
         Capability c = cap(group(groups, "客户管理"), "crm.cap.account");
         assertThat(c.getLabel()).isEqualTo("维护客户资料");
+        assertThat(c.getTier()).isEqualTo("editor");
         assertThat(c.isGranted()).isTrue();
         assertThat(c.isConventionDerived()).isFalse();
     }
