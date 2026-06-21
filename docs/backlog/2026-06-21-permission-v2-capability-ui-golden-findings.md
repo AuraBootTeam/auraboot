@@ -1,5 +1,4 @@
 ---
-title: Permission v2 capability — UI golden findings (env + convention-derive save gap)
 date: 2026-06-21
 created: 2026-06-21
 type: backlog

@@ -1,5 +1,4 @@
 ---
-title: CommandHandlerExtension interface duplication + dslPersistence config-slot cleanup
 created: 2026-06-20
 type: backlog
 status: active

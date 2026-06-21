@@ -1,5 +1,4 @@
 ---
-title: RBAC / permission-management — UX review (screenshot-verified)
 date: 2026-06-21
 created: 2026-06-21
 type: backlog

@@ -1,5 +1,4 @@
 ---
-title: 业务 AI 能力按需注入架构 — Agent 能力评估(eval cases)边界治理
 type: plan-design
 status: active
 created: 2026-06-21

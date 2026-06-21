@@ -1,5 +1,4 @@
 ---
-title: HANDOVER — RBAC permission UI v2 reorg (capability-primary / Feishu-style)
 date: 2026-06-21
 created: 2026-06-21
 type: handover
