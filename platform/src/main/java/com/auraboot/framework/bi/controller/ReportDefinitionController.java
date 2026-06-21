@@ -82,29 +82,38 @@ public class ReportDefinitionController {
     }
 
     @PutMapping("/{pid}")
-    @Operation(summary = "Update a report definition", description = "Updates title/profile/status/dsl of an existing ab_report row")
+    @Operation(summary = "Upsert a report definition",
+            description = "Idempotent upsert by pid: updates an existing ab_report row, or creates one with the "
+                    + "supplied pid if it does not exist (REST-idempotent). Enables the Phase 4 dual-write shadow.")
     @RequirePermission(MetaPermission.REPORT_MANAGE)
-    public ApiResponse<ReportDefinitionResponse> update(@PathVariable String pid,
+    public ApiResponse<ReportDefinitionResponse> upsert(@PathVariable String pid,
                                                         @Valid @RequestBody ReportDefinitionUpdateRequest request) {
-        ReportEntity existing = requireOwned(pid);
-        if (request.getTitle() != null) {
-            existing.setTitle(request.getTitle());
-        }
-        if (request.getProfile() != null) {
-            existing.setProfile(request.getProfile());
-        }
-        if (request.getStatus() != null) {
-            existing.setStatus(request.getStatus());
-        }
-        existing.setDsl(writeDsl(request.getDsl()));
-        existing.setVersion(existing.getVersion() == null ? 1 : existing.getVersion() + 1);
-        existing.setUpdatedBy(MetaContext.getCurrentUserId());
-        boolean updated = reportStorageService.update(existing);
-        if (!updated) {
-            // Lost-update race: the row was soft-deleted between requireOwned and update.
+        ReportEntity existing = reportStorageService.findByPid(pid);
+        if (existing != null && !MetaContext.getCurrentTenantId().equals(existing.getTenantId())) {
+            // A live row with this pid belongs to another tenant — do not leak/overwrite it; behave
+            // as not-found (same as requireOwned), never cross-tenant upsert.
             throw new BusinessException(ResponseCode.NOT_FOUND, "Report not found: " + pid);
         }
-        return ApiResponse.success(toResponse(reportStorageService.findByPid(pid)));
+
+        ReportEntity report = new ReportEntity();
+        report.setPid(pid);
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        // code is consumed only on the create branch (immutable on update); fall back to pid so a
+        // missing-row create still satisfies the NOT NULL, tenant-unique code column.
+        report.setCode(existing != null ? existing.getCode()
+                : (request.getCode() != null && !request.getCode().isBlank() ? request.getCode() : pid));
+        // title/profile patch semantics preserved: keep the existing value when the patch is null.
+        report.setTitle(request.getTitle() != null ? request.getTitle()
+                : (existing != null ? existing.getTitle() : null));
+        report.setProfile(request.getProfile() != null ? request.getProfile()
+                : (existing != null ? existing.getProfile() : null));
+        report.setStatus(request.getStatus());
+        report.setDsl(writeDsl(request.getDsl()));
+        report.setCreatedBy(existing != null ? existing.getCreatedBy() : MetaContext.getCurrentUserId());
+        report.setUpdatedBy(MetaContext.getCurrentUserId());
+
+        ReportEntity saved = reportStorageService.upsertByPid(report);
+        return ApiResponse.success(toResponse(saved));
     }
 
     @GetMapping("/{pid}")
