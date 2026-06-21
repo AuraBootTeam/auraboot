@@ -121,12 +121,32 @@ Beyond the base data types, fields support specialized UI rendering through `ext
 | `cascadeselect` | `string` | Cascading dropdown | Hierarchical categories |
 | `treeselect` | `string` | Tree selector | Department, org hierarchy |
 | `userselect` | `string` | User picker | Assignee, owner |
+| `ownerselect` | `string` | Owner picker (user **or** team) | Record ownership — see [Record ownership](#record-ownership-owner_type--owner_id) |
 | `memberpicker` | `string` | Multi-user picker | Team members |
 | `organizationselect` | `string` | Org unit picker | Department assignment |
 | `timepicker` | `string` | Time picker | Time-of-day values |
 | `daterange` | `string` | Date range picker | Start-end date pairs |
 | `timerangepicker` | `string` | Time range picker | Working hours, shifts |
 | `aifield` | `text` | AI-generated content | Summaries, suggestions |
+
+### Record ownership (owner_type / owner_id)
+
+A platform-generic capability to assign a record to **a user OR a team** (`ab_team`).
+It is shipped by the `core-ownership` plugin as two reusable, un-prefixed field
+definitions that any model can bind — no per-model field codes:
+
+| Field | Type | Notes |
+|---|---|---|
+| `owner_type` | `enum` (dict `owner_type`: `user` \| `team`) | Discriminator; rendered as a dropdown |
+| `owner_id` | `string` | PID of the owning user or team, interpreted per `owner_type` |
+
+To adopt it on a model: bind `owner_type` + `owner_id`, then in the page DSL render
+`owner_type` as a normal dict select and `owner_id` with `component: "ownerselect"`
+(a segmented user/team picker that reads `owner_type` from the form and writes the
+chosen PID). In lists/detail, render the `owner_id` column with `cellRenderer: "owner"`
+to show 👤 *user name* / 👥 *team name*. Two scalar columns keep ownership indexable
+for data-permission filtering ("owned by me or my team"). `crm_lead` is the reference
+consumer.
 
 ## Field Type Details
 

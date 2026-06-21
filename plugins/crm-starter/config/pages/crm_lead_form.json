@@ -98,10 +98,20 @@
       },
       "fields": [
         {
-          "field": "crm_lead_assigned_to",
+          "field": "owner_type",
           "colSpan": 6,
+          "label": { "zh-CN": "分配类型", "en-US": "Assign To" },
           "props": {
-            "placeholder": "负责的销售 / 小组,如 销售一组"
+            "placeholder": "选择 用户 或 团队"
+          }
+        },
+        {
+          "field": "owner_id",
+          "colSpan": 6,
+          "component": "ownerselect",
+          "label": { "zh-CN": "分配给", "en-US": "Assignee" },
+          "props": {
+            "placeholder": "先选分配类型,再选具体对象"
           }
         },
         {
