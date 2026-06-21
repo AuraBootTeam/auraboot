@@ -50,8 +50,10 @@ export async function renderRequestToPdf(
   loadBrowser: () => Promise<ChromiumLike> = loadChromium,
 ): Promise<Buffer> {
   const request = JSON.parse(requestJson) as RenderRequest;
-  if (!request?.model || !Array.isArray(request.model.blocks)) {
-    throw new Error('report-export CLI: request.model.blocks[] is required');
+  // The canonical report DSL names the block list `body`; `blocks` is also accepted.
+  const blockList = request?.model?.blocks ?? request?.model?.body;
+  if (!request?.model || !Array.isArray(blockList)) {
+    throw new Error('report-export CLI: request.model.blocks[] (or body[]) is required');
   }
   const doc = renderReportToPrintDocument(request.model, request.dataSets ?? {});
   const chromium = await loadBrowser();

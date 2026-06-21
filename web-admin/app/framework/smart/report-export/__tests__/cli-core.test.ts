@@ -29,7 +29,15 @@ describe('renderRequestToPdf', () => {
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
 
-  it('rejects a request missing model.blocks[]', async () => {
+  it('accepts the canonical `body` block list (not just `blocks`)', async () => {
+    const req = JSON.stringify({
+      model: { title: 't', body: [{ blockType: 'rich-text', content: 'hi' }] },
+    });
+    const pdf = await renderRequestToPdf(req, loadFake);
+    expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
+
+  it('rejects a request missing both model.blocks[] and model.body[]', async () => {
     await expect(renderRequestToPdf('{"model":{}}', loadFake)).rejects.toThrow(/blocks/);
   });
 
