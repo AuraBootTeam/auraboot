@@ -26,11 +26,17 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     @Override
     public List<CapabilityGroup> resolveForRole(Long roleId) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<String> allCodes = permissionService.findAllActive().stream()
+        List<PermissionDTO> allActive = permissionService.findAllActive();
+        List<String> allCodes = allActive.stream()
                 .map(PermissionDTO::getCode).filter(Objects::nonNull).toList();
+        // code -> localized display name, so convention-derived capabilities render business labels
+        // (e.g. 许可证) instead of the raw resource segment (license).
+        Map<String, String> names = allActive.stream()
+                .filter(p -> p.getCode() != null && p.getName() != null && !p.getName().isBlank())
+                .collect(Collectors.toMap(PermissionDTO::getCode, PermissionDTO::getName, (a, b) -> a));
         Set<String> granted = roleCodes(roleId);
         List<CapabilityDefinitionDTO> declarations = capabilityRegistryService.listDeclarations(tenantId);
-        return capabilityResolver.resolve(declarations, allCodes, granted);
+        return capabilityResolver.resolve(declarations, allCodes, granted, names);
     }
 
     @Override

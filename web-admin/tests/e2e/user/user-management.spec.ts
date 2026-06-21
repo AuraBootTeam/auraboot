@@ -191,35 +191,27 @@ test.describe('User CRUD', () => {
 
 test.describe('Role Assignment', () => {
   /**
-   * UM-006: Assign role to user
-   * Verify that roles can be assigned to users
+   * UM-006: Assign users to a role (v2 IA)
+   * The flat "assignments" tab is retired; users are assigned to a role via the role's Members tab.
    */
-  test('UM-006: should assign role to user', async ({ page }) => {
-    await page.goto('/enterprise/permissions?tab=assignments');
+  test('UM-006: should reach the role members assignment surface', async ({ page }) => {
+    await page.goto('/enterprise/permissions');
     await page.waitForLoadState('domcontentloaded');
-
     await expect(page.locator('[data-testid="permission-page"]')).toBeVisible({ timeout: 8000 });
-    const assignmentTab = page.locator('[data-testid="permission-tab-assignments"]');
-    const assignmentTabVisible = await assignmentTab.isVisible({ timeout: 5000 }).catch(() => false);
-    if (assignmentTabVisible) {
-      await expect(assignmentTab).toBeVisible();
-    }
 
-    const roleCards = page.locator('[data-testid^="assignment-role-"]');
-    await expect.poll(async () => roleCards.count(), { timeout: 10000 }).toBeGreaterThan(0);
-    const roleCount = await roleCards.count();
+    // Select the first role.
+    const roleItems = page.locator('[data-testid^="role-item-"]');
+    await expect(roleItems.first()).toBeVisible({ timeout: 10000 });
+    await roleItems.first().click();
 
-    if (roleCount > 0) {
-      await roleCards.first().click();
-      const assignmentPanel = page
-        .getByTestId('assignment-tab')
-        .or(page.getByText(/请选择一个角色来分配权限|Please select a role|Permissions/i))
-        .first();
-      await expect(assignmentPanel).toBeVisible({ timeout: 5000 });
-      return;
-    }
+    // Members tab → the assignment surface (add members to the role).
+    await page.getByTestId('permission-right-tab-members').click();
+    await expect(page.getByTestId('role-member-tab')).toBeVisible({ timeout: 8000 });
 
-    await expect(page.locator('[data-testid="role-create-btn"]')).toBeVisible({ timeout: 5000 });
+    // The add-member dialog (member list + org tabs) is the role↔user assignment entry point.
+    await page.getByTestId('role-member-add-btn').click();
+    await expect(page.getByTestId('add-member-dialog')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('add-member-tab-list')).toBeVisible();
   });
 
   /**
