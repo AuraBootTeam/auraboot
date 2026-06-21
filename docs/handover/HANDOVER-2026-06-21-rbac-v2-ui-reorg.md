@@ -1,10 +1,14 @@
 ---
 title: HANDOVER — RBAC permission UI v2 reorg (capability-primary / Feishu-style)
 date: 2026-06-21
+created: 2026-06-21
 type: handover
-status: in_progress
+status: shipped
 area: permission / rbac / web-admin
 ---
+
+> **Shipped 2026-06-21** — fully delivered + merged (OSS #989/#993/#994/#1003 + ENT #639).
+> Closeout + reflection: `docs/handover/HANDOVER-2026-06-21-rbac-v2-permission-complete.md`.
 
 # HANDOVER — RBAC 权限页 v2 IA 改造(能力为主 / 飞书风)
 
