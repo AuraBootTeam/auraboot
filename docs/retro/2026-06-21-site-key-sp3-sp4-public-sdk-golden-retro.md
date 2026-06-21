@@ -3,9 +3,9 @@ type: retro
 status: closed
 created: 2026-06-21
 slug: site-key-sp3-sp4-public-sdk-golden-retro
+distilled_to:
+  - auraboot-enterprise/docs/agent-rules/engineering-gotchas/backend-spring-db.md (mt_ index AFTER_COMMIT + non-request-thread MetaContext correction + public-CORS gotcha, ENT #647)
 ---
-
-<!-- no-precipitation: durable lessons precipitated to ENTERPRISE canonical (auraboot-enterprise/docs/agent-rules/engineering-gotchas/backend-spring-db.md + AGENTS speed-table) via ENT PR #647 — a cross-repo distilled_to target is not resolvable by the OSS-only docs gate. The in-repo consolidation is spec §4.5 (linked below). -->
 
 # Retro — site-key SP3 (public SDK) + SP4 (anonymous keyed golden)
 
