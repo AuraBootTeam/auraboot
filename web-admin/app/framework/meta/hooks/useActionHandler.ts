@@ -625,14 +625,17 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             }
             const btnLabel = normalizedButton.label;
             const btnCode = normalizedButton.code;
+            const explicitCommand =
+              typeof actionDef.command === 'string' && actionDef.command ? actionDef.command : '';
+            const semanticActionText = `${btnLabel ?? ''} ${btnCode ?? ''} ${explicitCommand}`.toLowerCase();
             const explicitOperationType = toNonBlankString((actionDef as any).operationType);
             const operationType =
               explicitOperationType ||
-              (btnLabel === 'delete' || btnCode === 'delete'
+              (semanticActionText.includes('delete')
                 ? 'delete'
-                : btnLabel === 'create' || btnCode === 'create'
+                : semanticActionText.includes('create')
                   ? 'create'
-                  : btnLabel === 'update' || btnCode === 'update'
+                  : semanticActionText.includes('update')
                     ? 'update'
                     : targetRecordId
                       ? 'update'
@@ -647,7 +650,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // keyed by the derived operationType (create/update/delete). Explicit
             // command still wins.
             const effectiveCommand =
-              (typeof actionDef.command === 'string' && actionDef.command) ||
+              explicitCommand ||
               (operationType
                 ? runtime?.getSchema?.()?.commands?.[operationType]
                 : undefined) ||

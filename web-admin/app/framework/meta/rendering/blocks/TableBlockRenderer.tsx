@@ -137,6 +137,13 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const rowActions: ButtonConfig[] = Array.isArray(block.rowActions)
     ? (block.rowActions as ButtonConfig[])
     : [];
+  const rowClassRules: Array<{ when?: string; className?: string }> = Array.isArray(
+    (block.table as any)?.rowClassRules,
+  )
+    ? ((block.table as any).rowClassRules as Array<{ when?: string; className?: string }>)
+    : Array.isArray((block as any).rowClassRules)
+      ? ((block as any).rowClassRules as Array<{ when?: string; className?: string }>)
+      : [];
 
   // 字典数据缓存
   const dictDataCache = useRef<Map<string, DictItem[]>>(new Map());
@@ -259,10 +266,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   const renderColumnHeader = (column: ColumnConfig) => {
     const label = getLocalizedText(column.label, locale, t);
+    const key = String(column.field || (column as any).code || label || 'column');
     return (
       <th
-        key={column.field}
-        data-testid={`table-th-${column.field}`}
+        key={key}
+        data-testid={`table-th-${key}`}
         className={`${headerCellClass} text-${column.align || 'left'} text-text-2 text-xs font-medium tracking-wider uppercase`}
         style={{ width: column.width }}
       >
@@ -274,6 +282,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // 渲染单元格内容
   const renderCellContent = (column: ColumnConfig, row: any) => {
+    if (column.isActionColumn) {
+      return renderActionButtons(row, Array.isArray((column as any).buttons) ? (column as any).buttons : []);
+    }
+
     const value = row[column.field];
 
     if (column.valueType === 'link' || column.valueType === 'url') {
@@ -355,10 +367,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   };
 
   // 渲染操作按钮
-  const renderRowActions = (row: any) => {
+  const renderActionButtons = (row: any, actions: ButtonConfig[]) => {
     return (
-      <div className="flex space-x-2">
-        {rowActions.map((button) => {
+      <div className="flex flex-wrap gap-2">
+        {actions.map((button) => {
           // 条件渲染
           if (button.visibleWhen) {
             const visible = evaluator.evaluateCondition(button.visibleWhen, {
@@ -370,6 +382,14 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
             });
             if (!visible) return null;
           }
+          const disabledWhen = (button as any).disabledWhen || button.disableWhen;
+          const disabled = disabledWhen
+            ? evaluator.evaluateCondition(disabledWhen, {
+                ...context,
+                row,
+                record: row,
+              })
+            : false;
 
           const label = getLocalizedText(button.label || button.content || button.code, locale, t);
 
@@ -377,12 +397,16 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
             <button
               key={button.code}
               data-testid={`row-action-${button.code}`}
-              onClick={() => handleAction(button, row)}
+              disabled={disabled}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleAction(button, row);
+              }}
               className={`text-sm ${
-                button.variant === 'danger'
+                button.variant === 'danger' || (button as any).danger
                   ? 'text-status-red hover:text-red-800'
                   : 'text-accent hover:text-blue-800'
-              }`}
+              } disabled:cursor-not-allowed disabled:opacity-50`}
             >
               {label}
             </button>
@@ -391,6 +415,22 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       </div>
     );
   };
+
+  const renderRowActions = (row: any) => renderActionButtons(row, rowActions);
+
+  const rowClassName = (row: any): string =>
+    rowClassRules
+      .filter((rule) => {
+        if (!rule.when) return false;
+        return evaluator.evaluateCondition(rule.when, {
+          ...context,
+          row,
+          record: row,
+        });
+      })
+      .map((rule) => rule.className || '')
+      .filter(Boolean)
+      .join(' ');
 
   // 处理操作按钮点击 - 委托给 useActionHandler
   // Legacy compatibility: bare `button.handler` (not wrapped in events.onClick) is
@@ -461,7 +501,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                   key={rowIdentity}
                   data-testid={`table-row-${rowIdentity}`}
                   onClick={() => handleRowClick(row)}
-                  className={`hover:bg-hover ${isSelected ? 'bg-accent-weak' : ''} ${
+                  className={`hover:bg-hover ${isSelected ? 'bg-accent-weak' : ''} ${rowClassName(row)} ${
                     selectionConfig?.bind ? 'cursor-pointer' : ''
                   }`}
                 >
