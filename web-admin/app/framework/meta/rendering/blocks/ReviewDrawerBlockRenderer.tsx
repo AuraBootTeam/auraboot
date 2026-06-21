@@ -610,7 +610,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
       <div className="bg-subtle min-h-0 max-w-full overflow-hidden p-4">
         <div
           className={`grid h-full min-h-0 min-w-0 gap-3 ${
-            hasLeftRail ? 'xl:grid-cols-[minmax(0,1fr)_380px]' : 'grid-cols-1'
+            hasLeftRail ? 'xl:grid-cols-[minmax(0,1fr)_minmax(380px,440px)]' : 'grid-cols-1'
           }`}
         >
           {hasLeftRail && (
@@ -947,7 +947,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           writeRuntimeState(runtime, candidatesConfig.selection.bind, candidate);
                         }
                       }}
-                      className={`rounded-card block w-full border p-2 text-left ${
+                      className={`rounded-card block w-full border p-3 text-left ${
                         active
                           ? 'bg-accent-weak border-blue-400'
                           : 'border-border bg-panel hover:bg-hover'
@@ -956,12 +956,12 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <div
-                            className="text-text truncate font-mono text-xs font-semibold"
+                            className="text-text whitespace-normal break-words font-mono text-xs font-semibold"
                             title={titleText}
                           >
                             {titleText}
                           </div>
-                          <dl className="mt-1 grid gap-x-2.5 gap-y-0.5 text-[11px] sm:grid-cols-2">
+                          <dl className="mt-2 grid gap-x-3 gap-y-1.5 text-xs sm:grid-cols-2">
                             {(item.detailFields || []).map((field: any) => {
                               const key = String(field.key || field.field || field.label);
                               const label = getLocalizedText(field.label || key, locale, t);
@@ -971,14 +971,18 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                               return (
                                 <div
                                   key={key}
+                                  data-testid={`review-drawer-candidate-${rowKey}-field-${key}`}
                                   className={`min-w-0 ${
                                     field.span === 2 ? 'sm:col-span-2' : ''
-                                  } grid grid-cols-[48px_minmax(0,1fr)] items-baseline gap-1.5`}
+                                  } grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-2`}
                                 >
-                                  <dt className="text-text-2 truncate" title={label}>
+                                  <dt className="text-text-2 min-w-0 break-words" title={label}>
                                     {label}
                                   </dt>
-                                  <dd className="text-text min-w-0 truncate" title={value}>
+                                  <dd
+                                    className="text-text min-w-0 whitespace-normal break-words"
+                                    title={value}
+                                  >
                                     {value}
                                   </dd>
                                 </div>
@@ -997,7 +1001,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                 })
               )}
             </div>
-            <section className="bg-subtle shrink-0 border-t border-gray-100 p-2.5">
+            <section
+              data-testid="review-drawer-decision-panel"
+              className="bg-subtle max-h-[48%] shrink-0 overflow-auto border-t border-gray-100 p-2.5"
+            >
               <h3 className="text-text text-sm font-semibold">
                 {getLocalizedText(
                   candidatesConfig.decisionTitle || { 'zh-CN': '当前决策状态', en: 'Decision' },
