@@ -70,6 +70,28 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void handleResponseStatusException_honorsStatus_429() {
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
+
+        ResponseEntity<ApiResponse<Object>> resp = handler.handleResponseStatusException(ex);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(resp.getBody()).isNotNull();
+    }
+
+    @Test
+    void handleResponseStatusException_honorsStatus_403() {
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "site_key_invalid");
+
+        ResponseEntity<ApiResponse<Object>> resp = handler.handleResponseStatusException(ex);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(resp.getBody()).isNotNull();
+    }
+
+    @Test
     void handleBadCredentials_returns401() {
         ResponseEntity<ApiResponse<Object>> resp =
                 handler.handleBadCredentialsException(new BadCredentialsException("bad"));
