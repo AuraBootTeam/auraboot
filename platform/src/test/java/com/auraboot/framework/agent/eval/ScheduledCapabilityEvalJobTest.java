@@ -105,4 +105,28 @@ class ScheduledCapabilityEvalJobTest {
         verify(evalService, times(1)).evaluateToolSelection(eq(1L), eq("keyword"));
         verify(observationService, never()).publish(anyLong(), anyString(), anyString(), any(), any(), any());
     }
+
+    @Test
+    void includeArchetypeCases_callsLoadRegisteredCases() {
+        // Set includeArchetypeCases=true so the Task-8-changed branch is exercised.
+        ReflectionTestUtils.setField(job, "includeArchetypeCases", true);
+        // generateEvalCases returns empty (per @BeforeEach), so cases list is populated
+        // solely by loadRegisteredCases; making it non-empty forces the 3-arg path.
+        CapabilityEvalCase stubbedCase = CapabilityEvalCase.builder()
+                .taskDescription("what tools list orders?")
+                .expectedToolCodes(List.of("order:list"))
+                .build();
+        when(evalService.loadRegisteredCases(1L)).thenReturn(List.of(stubbedCase));
+        when(evalService.evaluateToolSelection(eq(1L), eq("keyword"), any()))
+                .thenReturn(Map.of("evalMode", "keyword", "toolSelectionAccuracy", 0.92));
+
+        job.runOnce(1L);
+
+        // Verify the swapped wiring: loadRegisteredCases is called (not AgentArchetypeEvalCases.all())
+        verify(evalService, times(1)).loadRegisteredCases(1L);
+        // Verify the cases flowed into the 3-arg overload (non-empty case list)
+        verify(evalService, times(1)).evaluateToolSelection(eq(1L), eq("keyword"), any());
+        // The 2-arg overload must NOT have been called (cases were non-empty)
+        verify(evalService, never()).evaluateToolSelection(eq(1L), eq("keyword"));
+    }
 }
