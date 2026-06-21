@@ -350,6 +350,39 @@ public final class MetaPermission {
      */
     public static final String REPORT_GENERATE = "meta.report.generate";
 
+    // ==================== Clean REPORT family (B6) ====================
+    // First-class report.* permission family (B1 discovery Q11). These are the clean replacements
+    // for the template/report-aliased STOPGAP codes above (REPORT_READ=meta.template.read,
+    // REPORT_MANAGE=meta.template.update, REPORT_GENERATE=meta.report.generate). They are introduced
+    // and granted to every tenant FIRST (B6-1: this slice — additive, zero enforcement change); the
+    // report controllers switch their @RequirePermission to these codes in a LATER slice (B6-2), by
+    // which point every tenant already holds them so the flip cannot 403 anyone.
+    // NO report.*.publish code is defined: the report controllers expose no publish action.
+
+    /**
+     * Report definition view permission (load / get / get-by-code / list a report definition).
+     * Clean replacement for the stopgap {@link #REPORT_READ} on {@code ReportDefinitionController}.
+     */
+    public static final String REPORT_DEFINITION_VIEW = "report.definition.view";
+
+    /**
+     * Report definition manage permission (create / upsert / delete a report definition).
+     * Clean replacement for the stopgap {@link #REPORT_MANAGE} on {@code ReportDefinitionController}.
+     */
+    public static final String REPORT_DEFINITION_MANAGE = "report.definition.manage";
+
+    /**
+     * Report export execute permission (export a report as Excel / PDF / JSON).
+     * Clean replacement for the stopgap {@link #REPORT_GENERATE} on {@code ReportExportController}.
+     */
+    public static final String REPORT_EXPORT_EXECUTE = "report.export.execute";
+
+    /**
+     * Report schedule manage permission (schedule CRUD + test-send).
+     * Clean replacement for the stopgap {@link #REPORT_GENERATE} on {@code ReportScheduleController}.
+     */
+    public static final String REPORT_SCHEDULE_MANAGE = "report.schedule.manage";
+
     // ==================== PRINT permissions ====================
 
     /**
