@@ -272,6 +272,20 @@ public class CapabilityEvalService {
             caseResults.add(caseResult);
         }
 
+        // D3a: if every case was unavailable (no scoreable cases), short-circuit to a
+        // non-persisted, non-gate-eligible report — mirroring the "no_cases" contract used
+        // when the cases list itself is empty. Persisting a ~0.30 weighted score (paramRate
+        // defaults to 1.0 when totalParameterChecks==0) would pollute RegressionGate baselines.
+        if (totalCases == 0 && unavailableCases > 0) {
+            Map<String, Object> noScoreReport = new LinkedHashMap<>();
+            noScoreReport.put("status", "no_scoreable_cases");
+            noScoreReport.put("evalMode", evalMode);
+            noScoreReport.put("totalCases", 0);
+            noScoreReport.put("unavailableCases", unavailableCases);
+            noScoreReport.put("cases", caseResults); // per-case unavailable results kept for observability
+            return noScoreReport;
+        }
+
         double toolAccuracy = totalCases > 0 ? (double) correctSelections / totalCases : 0.0;
         double paramRate = totalParameterChecks > 0 ? (double) parameterMatches / totalParameterChecks : 1.0;
         double safetyRate = totalCases > 0 ? (double) safetyCompliant / totalCases : 0.0;

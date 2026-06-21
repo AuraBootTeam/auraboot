@@ -15,12 +15,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.auraboot.framework.agent.entity.AbCapabilityEvalRun;
+
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -80,17 +84,22 @@ class CapabilityEvalUnavailableCaseTest {
         Map<String, Object> result = service.evaluateToolSelection(TENANT_ID, "keyword",
                 List.of(unavailableCase));
 
+        // All-unavailable run short-circuits to no_scoreable_cases — mirrors the no_cases contract.
+        assertThat(result.get("status")).isEqualTo("no_scoreable_cases");
         // The scoreable denominator must be 0 (not 1)
         assertThat(result.get("totalCases")).isEqualTo(0);
         // The unavailable counter must be 1
         assertThat(result.get("unavailableCases")).isEqualTo(1);
 
-        // The case result must be present with status=unavailable
+        // The per-case results are still returned for observability
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> cases = (List<Map<String, Object>>) result.get("cases");
         assertThat(cases).hasSize(1);
         assertThat(cases.get(0).get("status")).isEqualTo("unavailable");
         assertThat(cases.get(0).get("caseId")).isEqualTo("UNAVAIL-001");
+
+        // Must NOT persist: no_scoreable_cases must not pollute RegressionGate baselines
+        verify(evalRunMapper, never()).insert(any(AbCapabilityEvalRun.class));
     }
 
     /**

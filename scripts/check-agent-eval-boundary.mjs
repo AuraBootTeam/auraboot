@@ -13,8 +13,14 @@
 // All other main-source files must be clean now.
 
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
 
 const ROOT = 'platform/src/main/java/com/auraboot/framework/agent';
+
+if (!fs.existsSync(ROOT)) {
+  console.error(`check-agent-eval-boundary: scan root not found: ${ROOT} (run from the OSS repo root)`);
+  process.exit(2);
+}
 const PREFIXES = ['crm:', 'qc:', 'iot_', 'pe:', 'mfg:'];
 
 // M2-migration-target: AgentArchetypeEvalCases.java intentionally retains cs/pcba/competitive

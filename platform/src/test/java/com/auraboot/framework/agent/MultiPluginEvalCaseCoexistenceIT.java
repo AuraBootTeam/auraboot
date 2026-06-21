@@ -182,10 +182,14 @@ class MultiPluginEvalCaseCoexistenceIT extends BaseIntegrationTest {
                 "Perform an operation that requires a plugin-specific tool not installed",
                 List.of(UNAVAILABLE_TOOL));
 
-        // evaluateToolSelection: keyword mode; the unavailable case must be reported
-        // as unavailable (D3a), not counted as a failed/incorrect selection.
+        // evaluateToolSelection: keyword mode; all-unavailable run must short-circuit to
+        // no_scoreable_cases — NOT persisted, NOT gate-eligible, per the Fix B contract.
         Map<String, Object> report = capabilityEvalService.evaluateToolSelection(
                 tenantId, "keyword", List.of(unavailableCase));
+
+        // Fix B: all-unavailable → no_scoreable_cases (mirrors no_cases contract, not persisted)
+        assertEquals("no_scoreable_cases", report.get("status"),
+                "D3a/Fix-B: all-unavailable run must return status=no_scoreable_cases; report=" + report);
 
         Integer unavailableCases = (Integer) report.get("unavailableCases");
         Integer totalCases       = (Integer) report.get("totalCases");
@@ -199,11 +203,6 @@ class MultiPluginEvalCaseCoexistenceIT extends BaseIntegrationTest {
         assertEquals(0, totalCases,
                 "D3a: unavailable case must NOT be included in the scoreable denominator (totalCases=0); "
                         + "report=" + report);
-
-        // Verify no false failure: correctSelections should also be 0 (no scoreable cases ran)
-        Integer correctSelections = (Integer) report.get("correctSelections");
-        assertEquals(0, correctSelections,
-                "D3a: no scoreable case means correctSelections must be 0; report=" + report);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
