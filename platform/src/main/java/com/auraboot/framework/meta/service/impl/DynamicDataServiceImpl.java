@@ -627,8 +627,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     @Override
     @Transactional
-    public long incrementWithinCap(String modelCode, String recordId,
-                                    String counterCode, String capCode, long delta) {
+    public Optional<Long> incrementWithinCap(String modelCode, String recordId,
+                                              String counterCode, String capCode, long delta) {
         assertWritable(modelCode);
         ModelDefinition model = getModelDefinition(modelCode);
         String counterCol = resolveNumericColumn(model, counterCode);
@@ -637,22 +637,22 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             capCol = resolveNumericColumn(model, capCode);
         }
         String softDeleteClause = buildSoftDeleteClause(model);
-        // pk column is always "pid" for AuraBoot dynamic models
-        String pkColumn = "pid";
-        SqlSafetyUtils.validateIdentifier(pkColumn, "pk column");
+        FieldDefinition pkField = metadataService.getPrimaryKeyField(modelCode);
+        String pkColumn = SqlSafetyUtils.requireIdentifier(
+                pkField.getColumnName(), "primary key column");
         long tenantId = getCurrentTenantId();
         Long currentUserId = getCurrentUserId();
         List<Map<String, Object>> rows = dynamicDataMapper.atomicIncrementReturning(
                 model.getTableName(), counterCol, capCol, pkColumn,
                 softDeleteClause, delta, recordId, tenantId, currentUserId);
         if (rows == null || rows.isEmpty()) {
-            return -1L;
+            return Optional.empty();
         }
         Object val = rows.get(0).get("new_value");
         if (val instanceof Number n) {
-            return n.longValue();
+            return Optional.of(n.longValue());
         }
-        return -1L;
+        return Optional.empty();
     }
 
     private String buildSoftDeleteClause(ModelDefinition modelDefinition) {

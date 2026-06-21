@@ -40,6 +40,9 @@ class DynamicDataServiceAtomicIncrementGuardTest {
     // Model used across tests — has two integer fields and one string field
     private ModelDefinition testModel;
 
+    // PK field definition shared across tests
+    private FieldDefinition pidField;
+
     @BeforeEach
     void setUp() {
         // DynamicDataServiceImpl is @RequiredArgsConstructor over 22 private final fields.
@@ -59,6 +62,13 @@ class DynamicDataServiceAtomicIncrementGuardTest {
                         FieldDefinition.builder().code("cr_cj_followed_count").columnName("cr_cj_followed_count").dataType("integer").build(),
                         FieldDefinition.builder().code("cr_cj_name").columnName("cr_cj_name").dataType("string").build()
                 ))
+                .build();
+
+        pidField = FieldDefinition.builder()
+                .code("pid")
+                .columnName("pid")
+                .dataType("string")
+                .primaryKey(true)
                 .build();
 
         when(metadataService.getModelDefinition("cr_cj_profile")).thenReturn(Optional.of(testModel));
@@ -85,13 +95,16 @@ class DynamicDataServiceAtomicIncrementGuardTest {
 
     @Test
     void increment_passes_null_cap_to_mapper() {
+        when(metadataService.getDefinitionByCode("cr_cj_profile")).thenReturn(testModel);
+        when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
         when(mapper.atomicIncrementReturning(anyString(), anyString(), isNull(), anyString(),
                 anyString(), anyLong(), anyString(), anyLong(), any()))
                 .thenReturn(List.of(Map.of("new_value", 5L)));
 
-        long result = service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_followed_count", null, 1L);
+        Optional<Long> result = service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_followed_count", null, 1L);
 
-        assertEquals(5L, result);
+        assertTrue(result.isPresent());
+        assertEquals(5L, result.get());
         verify(mapper).atomicIncrementReturning(
                 eq("cr_cj_profile"), eq("cr_cj_followed_count"), isNull(),
                 eq("pid"), anyString(), eq(1L), eq("rec-1"), eq(1L), eq(7L));
@@ -99,23 +112,31 @@ class DynamicDataServiceAtomicIncrementGuardTest {
 
     @Test
     void returns_new_value_from_mapper() {
+        when(metadataService.getDefinitionByCode("cr_cj_profile")).thenReturn(testModel);
+        when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
         when(mapper.atomicIncrementReturning(anyString(), anyString(), anyString(), anyString(),
                 anyString(), anyLong(), anyString(), anyLong(), any()))
-                .thenReturn(List.of(Map.of("new_value", 42L)));
+                .thenReturn(List.of(Map.of("new_value", 50L)));
 
-        long result = service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_view_count", "cr_cj_view_count", 1L);
+        // Use distinct counter and cap fields
+        Optional<Long> result = service.incrementWithinCap("cr_cj_profile", "rec-1",
+                "cr_cj_view_count", "cr_cj_followed_count", 1L);
 
-        assertEquals(42L, result);
+        assertTrue(result.isPresent());
+        assertEquals(50L, result.get());
     }
 
     @Test
-    void empty_mapper_result_returns_minus_one() {
+    void empty_mapper_result_returns_empty_optional() {
+        when(metadataService.getDefinitionByCode("cr_cj_profile")).thenReturn(testModel);
+        when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
         when(mapper.atomicIncrementReturning(anyString(), anyString(), anyString(), anyString(),
                 anyString(), anyLong(), anyString(), anyLong(), any()))
                 .thenReturn(List.of());
 
-        long result = service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_view_count", "cr_cj_view_count", 1L);
+        Optional<Long> result = service.incrementWithinCap("cr_cj_profile", "rec-1",
+                "cr_cj_view_count", "cr_cj_followed_count", 1L);
 
-        assertEquals(-1L, result);
+        assertTrue(result.isEmpty());
     }
 }

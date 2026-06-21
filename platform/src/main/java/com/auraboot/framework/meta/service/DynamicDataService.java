@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service;
 import com.auraboot.framework.meta.dto.*;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 动态数据服务
@@ -221,13 +222,14 @@ public interface DynamicDataService {
      * @param counterCode field code of the column to increment (must be a numeric type)
      * @param capCode     field code of the cap column, or {@code null} for unbounded
      * @param delta       increment amount (positive)
-     * @return the new value of {@code counterCode} after the increment,
-     *         or {@code -1} if no row was found (record absent or already at cap)
+     * @return the new value of {@code counterCode} after the increment wrapped in
+     *         {@link Optional}, or {@link Optional#empty()} if the row was not found
+     *         or was already at cap
      * @throws IllegalArgumentException if {@code counterCode} or {@code capCode} is not
      *                                  a known numeric field on {@code modelCode}
      * @since 2.6.0
      */
-    long incrementWithinCap(String modelCode, String recordId, String counterCode, String capCode, long delta);
+    Optional<Long> incrementWithinCap(String modelCode, String recordId, String counterCode, String capCode, long delta);
 
     /**
      * Atomically increment a numeric counter column with no cap (unbounded).
@@ -236,7 +238,7 @@ public interface DynamicDataService {
      *
      * @since 2.6.0
      */
-    default long increment(String modelCode, String recordId, String counterCode, long delta) {
+    default Optional<Long> increment(String modelCode, String recordId, String counterCode, long delta) {
         return incrementWithinCap(modelCode, recordId, counterCode, null, delta);
     }
 }
