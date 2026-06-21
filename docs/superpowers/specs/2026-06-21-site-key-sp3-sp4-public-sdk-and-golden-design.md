@@ -123,9 +123,9 @@ SP4 第一次真 import → `SiteKeyIndexInitializer` → `createFieldIndex` 端
 
 > 印证 AGENTS §2.2「组件间 seam 须 assembled-product 运行时门禁」+ §15「悲观/乐观结论先实证」:`compileJava`+单测+SP2 in-process IT 全绿,但真 import 活路径三处坏。SP2 IT pitfall #5 已诚实标注「live path deferred to SP4」,SP4 兑现并补 3 个 bug。
 
-## 4.6 留作 follow-up(本 SP 不扩范围)
+## 4.6 收尾硬化 / 留作 follow-up
 
-- `recordBatch` 对**超长字段**(如 client `eventId` > `varchar(40)`)抛 `DataIntegrityViolationException` → 500,而非按 malformed skip / 400。真 SDK 发 26 char ULID 不触发;公开端点的 per-field 长度兜底列为 hardening follow-up(与现有 `record` 同档)。
+- [x] **(已修)`recordBatch` 单事件健壮性**:原先单条事件违反列约束(如 client `eventId` > `varchar(40)`,misbehaving/hostile 客户端)抛 `DataIntegrityViolationException` → **整批 500**(且已插入的事件部分落库,不一致)。公开未鉴权端点不应因单条脏输入 500。修:`recordBatch` 在 `DuplicateKeyException` 之外**再 catch `DataIntegrityViolationException` 逐事件跳过**(对齐既有「缺 eventId/eventName 跳过」契约),整批不再 fatal、有效事件照落。回归:`KeyedCollectIT.oversizedEvent_skippedNotBatchFatal`(2 事件批:1 有效+1 超长 → 200/accepted:1/有效落库·超长不落)。两条路径共用 `recordBatch` 故鉴权态同样受益。
 - controller-authz 门禁报 `BehaviorCollectController`(鉴权态 `/api/collect`,#966)/ `TestImBroadcastController` 未 baseline——**非本 PR 引入**(origin/main 既存),留 owner 决定 baseline 或加注解。
 
 ## 4. 非目标
