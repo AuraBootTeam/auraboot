@@ -1,7 +1,11 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import com.auraboot.framework.agent.dto.CapabilityEvalCase;
 import com.auraboot.framework.agent.entity.AgentDefinition;
+import com.auraboot.framework.agent.entity.AgentEvalCase;
+import com.auraboot.framework.agent.eval.EvalCaseStructureValidator;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.auraboot.framework.menu.constant.MenuStatus;
 import com.auraboot.framework.menu.entity.Menu;
@@ -145,6 +149,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final DictMapper dictMapper;
     private final NamedQueryMapper namedQueryMapper;
     private final AgentDefinitionMapper agentDefinitionMapper;
+    private final AgentEvalCaseMapper agentEvalCaseMapper;
 
     /**
      * Tracks menu code → database ID mappings within a single import session.
@@ -2135,6 +2140,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             existing.setDeletedFlag(false);
             agentDefinitionMapper.updateById(existing);
 
+            replaceEvalCases(tenantId, dto, pluginPid);
+
             AgentDefinition updated = findActiveAgentDefinition(tenantId, dto.getAgentCode());
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
                     updated.getPid(), updated.getId(), dto.getAgentCode(), dto.getEffectiveName(),
@@ -2149,6 +2156,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         created.setUpdatedAt(now);
         created.setDeletedFlag(false);
         agentDefinitionMapper.insert(created);
+
+        replaceEvalCases(tenantId, dto, pluginPid);
 
         return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
                 created.getPid(), created.getId(), dto.getAgentCode(), dto.getEffectiveName(),
@@ -2221,6 +2230,49 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         state.put("status", defaultString(dto.getStatus(), "active"));
         state.put("visibility", defaultString(dto.getVisibility(), "private"));
         return state;
+    }
+
+    /**
+     * Replace all eval cases for {@code (tenantId, dto.agentCode)} with the cases
+     * declared in the DTO (physical DELETE + INSERT). This is an overwrite-on-import
+     * sub-resource: the caller's transaction absorbs the DELETE+INSERT atomically with
+     * the agent row write that precedes this call.
+     *
+     * <p>Validates case structure before touching the DB; throws {@link PluginException}
+     * (import fails, {@code success:false}) if any violation is found.
+     */
+    private void replaceEvalCases(Long tenantId, AgentDefinitionDTO dto, String pluginPid) {
+        List<CapabilityEvalCase> cases =
+                dto.getEvalCases() == null ? List.of() : dto.getEvalCases();
+        List<String> violations = EvalCaseStructureValidator.validate(cases);
+        if (!violations.isEmpty()) {
+            throw new PluginException(
+                    "Invalid eval cases for agent " + dto.getAgentCode() + ": " + violations);
+        }
+        // Clean slate for this agent — cases are an overwrite-on-import sub-resource.
+        jdbcTemplate.update(
+                "DELETE FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ?",
+                tenantId, dto.getAgentCode());
+        Instant now = Instant.now();
+        for (CapabilityEvalCase c : cases) {
+            AgentEvalCase row = new AgentEvalCase();
+            row.setPid(UlidGenerator.generate());
+            row.setTenantId(tenantId);
+            row.setAgentCode(dto.getAgentCode());
+            row.setCaseId(c.getCaseId());
+            row.setCategory(c.getCategory());
+            row.setTaskDescription(c.getTaskDescription());
+            row.setExpectedToolCodes(c.getExpectedToolCodes());
+            row.setForbiddenToolCodes(c.getForbiddenToolCodes());
+            row.setExpectedInputKeys(c.getExpectedInputKeys());
+            row.setExpectedRiskLevel(c.getExpectedRiskLevel());
+            row.setExpectsConfirmation(c.isExpectsConfirmation());
+            row.setPluginSource(pluginPid);
+            row.setDeletedFlag(false);
+            row.setCreatedAt(now);
+            row.setUpdatedAt(now);
+            agentEvalCaseMapper.insert(row);
+        }
     }
 
     private String toJsonText(Object value) {
@@ -2366,6 +2418,11 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                             WHERE pid = ?
                             """, resource.getResourcePid());
                 }
+                jdbcTemplate.update("""
+                        UPDATE ab_agent_eval_case
+                        SET deleted_flag = TRUE, updated_at = NOW()
+                        WHERE tenant_id = ? AND agent_code = ?
+                        """, resource.getTenantId(), resource.getResourceCode());
             }
             case PROCESS -> processDefinitionMapper.updateStatus(resource.getResourcePid(), "archived");
             default -> log.warn("Rollback not implemented for resource type: {}", type);
@@ -2374,10 +2431,26 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     @Override
     public void restoreResource(PluginResource resource) {
+        log.info("Restoring resource: {} ({})", logSafe(resource.getResourceCode()), resource.getResourceType());
+        ResourceType type = resource.getResourceTypeEnum();
+        if (type == ResourceType.AGENT_DEFINITION) {
+            if (resource.getResourcePid() != null) {
+                jdbcTemplate.update("""
+                        UPDATE ab_agent_definition
+                        SET deleted_flag = FALSE, updated_at = NOW()
+                        WHERE pid = ?
+                        """, resource.getResourcePid());
+            }
+            jdbcTemplate.update("""
+                    UPDATE ab_agent_eval_case
+                    SET deleted_flag = FALSE, updated_at = NOW()
+                    WHERE tenant_id = ? AND agent_code = ?
+                    """, resource.getTenantId(), resource.getResourceCode());
+            return;
+        }
         if (resource.getPreviousState() == null) {
             return;
         }
-        log.info("Restoring resource: {} ({})", logSafe(resource.getResourceCode()), resource.getResourceType());
     }
 
     // ==================== Helper Methods ====================
