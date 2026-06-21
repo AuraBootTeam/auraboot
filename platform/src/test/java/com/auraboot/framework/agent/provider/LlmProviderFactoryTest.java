@@ -33,7 +33,9 @@ class LlmProviderFactoryTest {
                 List.of(anthropicProvider, stubProvider),
                 mock(CloudConfigService.class),
                 properties,
-                new ObjectMapper());
+                new ObjectMapper(),
+                mock(com.auraboot.framework.agent.trace.GenAiUsageRecorder.class),
+                mock(org.springframework.beans.factory.ObjectProvider.class));
 
         LlmProviderFactory.ProviderResolution resolution = factory.resolveProvider(7L, "anthropic");
 
@@ -54,7 +56,9 @@ class LlmProviderFactoryTest {
                 List.of(anthropicProvider),
                 mock(CloudConfigService.class),
                 new AgentProperties(),
-                new ObjectMapper());
+                new ObjectMapper(),
+                mock(com.auraboot.framework.agent.trace.GenAiUsageRecorder.class),
+                mock(org.springframework.beans.factory.ObjectProvider.class));
 
         assertThat(factory.getProvider("deepseek")).isNull();
     }
@@ -75,7 +79,9 @@ class LlmProviderFactoryTest {
                 List.of(),
                 cloudConfigService,
                 properties,
-                new ObjectMapper());
+                new ObjectMapper(),
+                mock(com.auraboot.framework.agent.trace.GenAiUsageRecorder.class),
+                mock(org.springframework.beans.factory.ObjectProvider.class));
 
         assertThatThrownBy(() -> factory.resolveConfig(7L, "anthropic"))
                 .isInstanceOf(IllegalStateException.class)
@@ -99,7 +105,9 @@ class LlmProviderFactoryTest {
                 List.of(),
                 cloudConfigService,
                 properties,
-                new ObjectMapper());
+                new ObjectMapper(),
+                mock(com.auraboot.framework.agent.trace.GenAiUsageRecorder.class),
+                mock(org.springframework.beans.factory.ObjectProvider.class));
 
         assertThatThrownBy(() -> factory.resolveConfig(7L, null))
                 .isInstanceOf(IllegalStateException.class)

@@ -1,12 +1,31 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.entity.FieldMaskConfig;
+import com.auraboot.framework.meta.mapper.FieldMaskConfigMapper;
+import com.auraboot.framework.permission.service.UserPermissionService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class FieldMaskServiceImplTest {
 
-    private final FieldMaskServiceImpl service = new FieldMaskServiceImpl(null, null);
+    private final FieldMaskServiceImpl service = new FieldMaskServiceImpl(null, null, null);
+
+    @AfterEach
+    void clearContext() {
+        MetaContext.clear();
+    }
 
     @Test
     void customMaskTreatsPatternAsLiteralText() {
@@ -74,5 +93,62 @@ class FieldMaskServiceImplTest {
         assertThat(service.maskValue("keepme", "no_such_type", null, "*")).isEqualTo("keepme");
         assertThat(service.maskValue(null, "phone", null, "*")).isNull();
         assertThat(service.maskValue("", "phone", null, "*")).isEqualTo("");
+    }
+
+    // ==================== exempt-by-permission (capability-driven unmask) ====================
+
+    private FieldMaskServiceImpl serviceWith(FieldMaskConfigMapper maskConfigMapper,
+                                             UserPermissionService userPermissionService) {
+        // tenant context required by getEnabledConfigs; memberId left null so the user has no
+        // roles (isolates the permission-exemption path from the role-exemption path).
+        MetaContext.setContext(1L, 1L, "test-user", "test-user");
+        return new FieldMaskServiceImpl(maskConfigMapper, null, userPermissionService);
+    }
+
+    private FieldMaskConfig phoneMaskExemptByPermission() {
+        FieldMaskConfig config = new FieldMaskConfig();
+        config.setModelCode("crm_account_common");
+        config.setFieldCode("phone");
+        config.setMaskType("phone");
+        config.setApplyToList(true);
+        config.setEnabled(true);
+        config.setExemptPermissionCodes("crm.account.contact_unmask");
+        return config;
+    }
+
+    @Test
+    void userHoldingExemptPermissionSeesUnmaskedPhone() {
+        FieldMaskConfigMapper maskConfigMapper = mock(FieldMaskConfigMapper.class);
+        UserPermissionService userPermissionService = mock(UserPermissionService.class);
+        when(maskConfigMapper.findByModelCode(any(), eq("crm_account_common")))
+                .thenReturn(List.of(phoneMaskExemptByPermission()));
+        when(userPermissionService.getUserPermissionCodes(42L))
+                .thenReturn(Set.of("crm.account.contact_unmask"));
+        FieldMaskServiceImpl svc = serviceWith(maskConfigMapper, userPermissionService);
+
+        Map<String, Object> record = new HashMap<>();
+        record.put("phone", "13812345678");
+        List<Map<String, Object>> result =
+                svc.applyMaskingForList("crm_account_common", List.of(record), 42L);
+
+        assertThat(result.get(0).get("phone")).isEqualTo("13812345678");
+    }
+
+    @Test
+    void userWithoutExemptPermissionSeesMaskedPhone() {
+        FieldMaskConfigMapper maskConfigMapper = mock(FieldMaskConfigMapper.class);
+        UserPermissionService userPermissionService = mock(UserPermissionService.class);
+        when(maskConfigMapper.findByModelCode(any(), eq("crm_account_common")))
+                .thenReturn(List.of(phoneMaskExemptByPermission()));
+        when(userPermissionService.getUserPermissionCodes(7L))
+                .thenReturn(Set.of());
+        FieldMaskServiceImpl svc = serviceWith(maskConfigMapper, userPermissionService);
+
+        Map<String, Object> record = new HashMap<>();
+        record.put("phone", "13812345678");
+        List<Map<String, Object>> result =
+                svc.applyMaskingForList("crm_account_common", List.of(record), 7L);
+
+        assertThat(result.get(0).get("phone")).isEqualTo("138****5678");
     }
 }
