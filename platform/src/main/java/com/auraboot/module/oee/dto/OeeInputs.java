@@ -22,6 +22,14 @@ public class OeeInputs {
     private BigDecimal defectQty;            // defect count (SUM pe_woo_defect_qty)
     private BigDecimal capacityPerHour;      // theoretical capacity per hour (pe_res_capacity_per_hour)
 
+    // Optional telemetry-derived signals (Option A / GreptimeDB convergence, DDR-2026-06-21 D5).
+    // When telemetryOperatingHours != null, the engine sources availability/performance/quality from
+    // these real device signals instead of deriving them from calendar/downtime/actualQty; downtimes
+    // are then used ONLY for the six-big-losses reason breakdown.
+    private BigDecimal telemetryOperatingHours;  // measured run-time (running-signal TWA), hours
+    private BigDecimal telemetryOutputQty;       // measured produced count (counter delta), pieces
+    private BigDecimal telemetryGoodQty;         // measured good count, pieces
+
     @Data
     @Builder
     @NoArgsConstructor
