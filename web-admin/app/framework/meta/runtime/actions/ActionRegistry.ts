@@ -624,7 +624,7 @@ actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) 
  * and `command.execute`'s `inputFields` sugar (which merges them into the command
  * payload). Pre-fetches options for select fields with api/static dataSources.
  */
-async function promptInputForm(
+export async function promptInputForm(
   fields: Array<Record<string, any>>,
   title: any,
   fetchResult?: (url: string, opts: any) => Promise<any>,
