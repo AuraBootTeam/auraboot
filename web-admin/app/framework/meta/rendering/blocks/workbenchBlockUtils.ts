@@ -299,10 +299,25 @@ export async function executeSimpleWorkbenchAction(
       throw new Error('[workbench] command.execute requires args.command');
     }
 
+    // inputFields sugar: pop a FormDialog, collect fields, merge into the command payload.
+    // Same capability as ActionRegistry's command.execute. workbench-action-bar buttons run
+    // THIS path (not ActionRegistry), so the platform inputFields feature must be wired here
+    // too — otherwise a detail-page action with inputFields silently skips the form and fails
+    // (the cr_account "导入凭据" gate-gap, caught by the credential golden).
+    let collectedInputs: Record<string, any> = {};
+    if (Array.isArray(args.inputFields) && args.inputFields.length > 0) {
+      const { promptInputForm } = await import('~/framework/meta/runtime/actions/ActionRegistry');
+      try {
+        collectedInputs = await promptInputForm(args.inputFields, args.inputFieldsTitle, fetchResult);
+      } catch {
+        return; // user cancelled the form — abort without executing the command
+      }
+    }
+
     const params: Record<string, any> = {
       targetRecordId: args.targetRecordId ?? args.targetRecordPid,
       operationType: args.operationType ? String(args.operationType).toUpperCase() : undefined,
-      payload: args.payload || {},
+      payload: { ...(args.payload || {}), ...collectedInputs },
     };
     if (args.targetRecordPid) {
       params.targetRecordPid = args.targetRecordPid;
