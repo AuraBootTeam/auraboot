@@ -5,6 +5,8 @@ import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.bi.service.ReportStorageService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.integration.TestIdGenerator;
+import com.auraboot.framework.meta.entity.AuditTrail;
+import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -80,6 +82,9 @@ class ReportStorageServiceIT extends BaseIntegrationTest {
     private ReportStorageService reportStorageService;
 
     @Autowired
+    private AuditTrailService auditTrailService;
+
+    @Autowired
     private JdbcTemplate jdbc;
 
     private Long tenantId;
@@ -101,6 +106,8 @@ class ReportStorageServiceIT extends BaseIntegrationTest {
     @AfterEach
     void cleanup() {
         jdbc.update("DELETE FROM ab_report WHERE tenant_id IN (?, ?)", tenantId, otherTenantId);
+        // B6: report writes commit audit rows (REQUIRES_NEW) — clean them up too.
+        jdbc.update("DELETE FROM ab_audit_trail WHERE tenant_id IN (?, ?)", tenantId, otherTenantId);
         MetaContext.clear();
     }
 
@@ -288,5 +295,85 @@ class ReportStorageServiceIT extends BaseIntegrationTest {
         assertThat(otherTenantSameCode.getId()).isNotNull();
         assertThat(otherTenantSameCode.getTenantId()).isEqualTo(otherTenantId);
         MetaContext.setCurrentTenantId(tenantId);
+    }
+
+    @Test
+    @DisplayName("B6 / Q15: create then update each commit a REPORT audit row (CREATE then UPDATE)")
+    void reportWritesEmitAuditRows() {
+        // Drive a FULL MetaContext (tenant + user) so the audit captures the actor; the audit
+        // recorder sources tenant from the entity and actor from MetaContext.getCurrentUserId().
+        Long actorId = TestIdGenerator.uniqueUserId();
+        MetaContext.setContext(tenantId, actorId, "user-pid", "tester");
+
+        // CREATE → exactly one audit row, operationType=CREATE
+        ReportEntity created = reportStorageService.create(
+                newReport(tenantId, codeBase + "audit", "Audited", REPORT_DSL_JSON));
+
+        List<AuditTrail> afterCreate =
+                auditTrailService.getAuditTrailByPid(tenantId, "report", created.getPid());
+        assertThat(afterCreate).hasSize(1);
+        AuditTrail createAudit = afterCreate.get(0);
+        assertThat(createAudit.getEventType()).isEqualTo("REPORT");
+        assertThat(createAudit.getEntityType()).isEqualTo("report");
+        assertThat(createAudit.getEntityPid()).isEqualTo(created.getPid());
+        assertThat(createAudit.getEntityId()).isEqualTo(created.getId());
+        assertThat(createAudit.getOperationType()).isEqualTo("CREATE");
+        assertThat(createAudit.getTenantId()).isEqualTo(tenantId);
+        assertThat(createAudit.getActorId()).isEqualTo(actorId);
+
+        // UPDATE → a second audit row, operationType=UPDATE (ordered after CREATE by sequence_no)
+        ReportEntity edit = new ReportEntity();
+        edit.setPid(created.getPid());
+        edit.setTitle("Audited v2");
+        edit.setProfile("paged-media");
+        edit.setStatus("published");
+        edit.setVersion(2);
+        edit.setUpdatedBy(actorId);
+        edit.setDsl("{\"version\":2}");
+        assertThat(reportStorageService.update(edit)).isTrue();
+
+        List<AuditTrail> afterUpdate =
+                auditTrailService.getAuditTrailByPid(tenantId, "report", created.getPid());
+        assertThat(afterUpdate)
+                .extracting(AuditTrail::getOperationType)
+                .containsExactly("CREATE", "UPDATE");
+        assertThat(afterUpdate.get(1).getEntityPid()).isEqualTo(created.getPid());
+        assertThat(afterUpdate.get(1).getActorId()).isEqualTo(actorId);
+    }
+
+    @Test
+    @DisplayName("B6: upsertByPid emits CREATE on first save then UPDATE on the second")
+    void upsertEmitsCreateThenUpdate() {
+        Long actorId = TestIdGenerator.uniqueUserId();
+        MetaContext.setContext(tenantId, actorId, "user-pid", "tester");
+
+        String pid = "RPT" + Long.toString(System.nanoTime() & 0xffffffffL, 36).toUpperCase();
+        ReportEntity first = new ReportEntity();
+        first.setPid(pid);
+        first.setTenantId(tenantId);
+        first.setCode(codeBase + "ups");
+        first.setTitle("Upsert v1");
+        first.setProfile("paged-media");
+        first.setDsl(REPORT_DSL_JSON);
+        first.setCreatedBy(actorId);
+        first.setUpdatedBy(actorId);
+        // first upsert with a not-yet-existing pid → create branch (audits CREATE via create())
+        reportStorageService.upsertByPid(first);
+
+        ReportEntity second = new ReportEntity();
+        second.setPid(pid);
+        second.setTenantId(tenantId);
+        second.setTitle("Upsert v2");
+        second.setProfile("paged-media");
+        second.setDsl("{\"version\":2}");
+        second.setUpdatedBy(actorId);
+        // second upsert with the same pid → update branch (audits UPDATE)
+        reportStorageService.upsertByPid(second);
+
+        List<AuditTrail> audits =
+                auditTrailService.getAuditTrailByPid(tenantId, "report", pid);
+        assertThat(audits)
+                .extracting(AuditTrail::getOperationType)
+                .containsExactly("CREATE", "UPDATE");
     }
 }

@@ -9,6 +9,8 @@ import com.auraboot.framework.bi.service.ReportStorageService;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.integration.TestIdGenerator;
+import com.auraboot.framework.meta.entity.AuditTrail;
+import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -82,6 +85,9 @@ class ReportExportServiceReadSwitchIT extends BaseIntegrationTest {
     private ReportStorageService reportStorageService;
 
     @Autowired
+    private AuditTrailService auditTrailService;
+
+    @Autowired
     private JdbcTemplate jdbc;
 
     private Long tenantId;
@@ -97,6 +103,8 @@ class ReportExportServiceReadSwitchIT extends BaseIntegrationTest {
     @AfterEach
     void cleanup() {
         jdbc.update("DELETE FROM ab_report WHERE tenant_id = ?", tenantId);
+        // B6: a successful export commits an audit row (REQUIRES_NEW) — clean it up too.
+        jdbc.update("DELETE FROM ab_audit_trail WHERE tenant_id = ?", tenantId);
         MetaContext.clear();
     }
 
@@ -135,6 +143,32 @@ class ReportExportServiceReadSwitchIT extends BaseIntegrationTest {
         // PDF export also reads ab_report (and the schedule path shares loadReportDsl)
         ReportExportFile pdf = reportExportService.exportPdf(request);
         assertThat(pdf.getBytes()).startsWith((byte) '%', (byte) 'P', (byte) 'D', (byte) 'F', (byte) '-');
+
+        // B6 / Q15: the same report now carries audit rows from BOTH wirings through the real stack —
+        // a CREATE row from the save (reportStorageService.create above) and one REPORT_EXPORT row per
+        // SUCCESSFUL export (the audit recorder uses REQUIRES_NEW, so under @Commit the rows are
+        // genuinely persisted and re-read here).
+        List<AuditTrail> allAudits =
+                auditTrailService.getAuditTrailByPid(tenantId, "report", created.getPid());
+        assertThat(allAudits)
+                .extracting(AuditTrail::getOperationType)
+                .containsExactlyInAnyOrder("CREATE", "EXPORT_EXCEL", "EXPORT_PDF");
+
+        // the export rows specifically: eventType=REPORT_EXPORT + format/filename metadata
+        List<AuditTrail> exportAudits = allAudits.stream()
+                .filter(audit -> "REPORT_EXPORT".equals(audit.getEventType()))
+                .toList();
+        assertThat(exportAudits)
+                .extracting(AuditTrail::getOperationType)
+                .containsExactlyInAnyOrder("EXPORT_EXCEL", "EXPORT_PDF");
+        assertThat(exportAudits).allSatisfy(audit -> {
+            assertThat(audit.getEntityType()).isEqualTo("report");
+            assertThat(audit.getEntityPid()).isEqualTo(created.getPid());
+            assertThat(audit.getTenantId()).isEqualTo(tenantId);
+            // metadata carries the export format + filename (sensitive-data egress detail)
+            assertThat(audit.getMetadata()).isNotNull();
+            assertThat(audit.getMetadata().get("filename").asText()).isNotBlank();
+        });
     }
 
     @Test

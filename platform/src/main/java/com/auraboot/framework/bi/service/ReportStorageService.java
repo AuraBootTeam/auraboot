@@ -1,8 +1,11 @@
 package com.auraboot.framework.bi.service;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.bi.dao.mapper.ReportMapper;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.meta.dto.AuditTrailEvent;
+import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,6 +32,7 @@ import java.util.List;
 public class ReportStorageService {
 
     private final ReportMapper reportMapper;
+    private final AuditTrailService auditTrailService;
 
     /**
      * Persist a new report. Mints a ULID {@code pid} (if absent) and stamps audit/version/
@@ -58,6 +62,7 @@ public class ReportStorageService {
         report.setCreatedAt(now);
         report.setUpdatedAt(now);
         reportMapper.insert(report);
+        recordReportAudit(report, "CREATE");
         return report;
     }
 
@@ -111,7 +116,11 @@ public class ReportStorageService {
         existing.setUpdatedBy(report.getUpdatedBy());
         existing.setUpdatedAt(Instant.now());
         existing.setDsl(report.getDsl());
-        return reportMapper.updateById(existing) > 0;
+        boolean updated = reportMapper.updateById(existing) > 0;
+        if (updated) {
+            recordReportAudit(existing, "UPDATE");
+        }
+        return updated;
     }
 
     /**
@@ -149,6 +158,7 @@ public class ReportStorageService {
         existing.setUpdatedBy(report.getUpdatedBy());
         existing.setUpdatedAt(Instant.now());
         reportMapper.updateById(existing);
+        recordReportAudit(existing, "UPDATE");
         return existing;
     }
 
@@ -166,6 +176,33 @@ public class ReportStorageService {
             return false;
         }
         return reportMapper.deleteById(existing.getId()) > 0;
+    }
+
+    /**
+     * Emit a tamper-evident audit trail record for a report write (B6 / Q15 — report actions were
+     * previously invisible to the audit subsystem). Mirrors {@code ReportScheduleServiceImpl}'s
+     * {@code recordScheduleAudit}: the tenant comes from the persisted entity (which carries the
+     * tenant-scoped {@code tenant_id}) and the actor from {@link MetaContext} (set on every
+     * authenticated request by the tenant interceptor; all report writes run on the request thread
+     * via {@code ReportDefinitionController}, including the Phase 4 dual-write upsert).
+     *
+     * <p>ADDITIVE: this only records an audit event alongside a completed write; the persistence
+     * itself is unchanged. {@code AuditTrailService.recordAudit} runs in its own
+     * {@code REQUIRES_NEW} transaction, so the audit row is independent of this write's transaction.
+     *
+     * @param report the persisted report (carries the minted {@code pid}, {@code id}, {@code tenantId})
+     * @param operationType {@code CREATE} on insert, {@code UPDATE} on update / upsert-update
+     */
+    private void recordReportAudit(ReportEntity report, String operationType) {
+        auditTrailService.recordAudit(AuditTrailEvent.builder()
+                .tenantId(report.getTenantId())
+                .eventType("REPORT")
+                .entityType("report")
+                .entityId(report.getId())
+                .entityPid(report.getPid())
+                .operationType(operationType)
+                .actorId(MetaContext.exists() ? MetaContext.getCurrentUserId() : null)
+                .build());
     }
 
     /**
