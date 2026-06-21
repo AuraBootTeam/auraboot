@@ -3,9 +3,11 @@ package com.auraboot.framework.bi;
 import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.service.ReportStorageService;
 import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
@@ -15,6 +17,7 @@ import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
+import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -23,6 +26,7 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -60,12 +64,23 @@ class ReportExportServiceTest {
     @Mock
     private ReportStorageService reportStorageService;
 
+    @Mock
+    private AuditTrailService auditTrailService;
+
     private ReportExportServiceImpl reportExportService;
 
     @BeforeEach
     void setUp() {
         reportExportService = new ReportExportServiceImpl(pageSchemaMapper, new ObjectMapper(),
-                dynamicDataService, namedQueryService, reportStorageService);
+                dynamicDataService, namedQueryService, reportStorageService, auditTrailService);
+        // A successful export records an audit event sourced from MetaContext (set on every real
+        // authenticated request, like the controller's MetaContext.getCurrentTenantId()); simulate it.
+        MetaContext.setContext(7L, 99L, "user-pid", "tester");
+    }
+
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
     }
 
     @Test
@@ -449,6 +464,88 @@ class ReportExportServiceTest {
         assertThatThrownBy(() -> reportExportService.exportExcel(request))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("Report DSL not found");
+    }
+
+    // ---------- B6 / Q15: a SUCCESSFUL export records a REPORT_EXPORT audit event ----------
+
+    @Test
+    void exportExcel_recordsExportAudit() throws Exception {
+        stubReportDsl("rpt-audit-xlsx");
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-audit-xlsx");
+        reportExportService.exportExcel(request);
+
+        AuditTrailEvent e = capturedExportAudit();
+        assertThat(e.getEventType()).isEqualTo("REPORT_EXPORT");
+        assertThat(e.getEntityType()).isEqualTo("report");
+        assertThat(e.getEntityPid()).isEqualTo("rpt-audit-xlsx");
+        assertThat(e.getOperationType()).isEqualTo("EXPORT_EXCEL");
+        assertThat(e.getTenantId()).isEqualTo(7L);
+        assertThat(e.getActorId()).isEqualTo(99L);
+        assertThat(e.getMetadata().get("format").asText()).isEqualTo("excel");
+        assertThat(e.getMetadata().get("filename").asText()).isEqualTo("Operations Export.xlsx");
+    }
+
+    @Test
+    void exportPdf_recordsExportAudit() {
+        stubReportDsl("rpt-audit-pdf");
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-audit-pdf");
+        reportExportService.exportPdf(request);
+
+        AuditTrailEvent e = capturedExportAudit();
+        assertThat(e.getEventType()).isEqualTo("REPORT_EXPORT");
+        assertThat(e.getOperationType()).isEqualTo("EXPORT_PDF");
+        assertThat(e.getEntityPid()).isEqualTo("rpt-audit-pdf");
+        assertThat(e.getMetadata().get("format").asText()).isEqualTo("pdf");
+        assertThat(e.getMetadata().get("filename").asText()).isEqualTo("Operations Export.pdf");
+    }
+
+    @Test
+    void exportJson_recordsExportAudit() {
+        stubReportDsl("rpt-audit-json");
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-audit-json");
+        reportExportService.exportJson(request);
+
+        AuditTrailEvent e = capturedExportAudit();
+        assertThat(e.getEventType()).isEqualTo("REPORT_EXPORT");
+        assertThat(e.getOperationType()).isEqualTo("EXPORT_JSON");
+        assertThat(e.getEntityPid()).isEqualTo("rpt-audit-json");
+        assertThat(e.getMetadata().get("format").asText()).isEqualTo("json");
+        assertThat(e.getMetadata().get("filename").asText()).isEqualTo("Operations Export.report.json");
+    }
+
+    @Test
+    void export_withoutReportDsl_recordsNoAudit() {
+        // A failed export (missing dsl) must NOT emit an audit event — audit only fires on success.
+        PageSchema page = new PageSchema();
+        page.setExtension(new ExtensionBean());
+        when(pageSchemaMapper.selectByPid("rpt-no-audit")).thenReturn(page);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-no-audit");
+
+        assertThatThrownBy(() -> reportExportService.exportPdf(request))
+                .isInstanceOf(ValidationException.class);
+        verify(auditTrailService, never()).recordAudit(any());
+    }
+
+    private void stubReportDsl(String reportPid) {
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", reportDsl());
+        page.setExtension(extension);
+        when(pageSchemaMapper.selectByPid(reportPid)).thenReturn(page);
+    }
+
+    private AuditTrailEvent capturedExportAudit() {
+        ArgumentCaptor<AuditTrailEvent> c = ArgumentCaptor.forClass(AuditTrailEvent.class);
+        verify(auditTrailService).recordAudit(c.capture());
+        return c.getValue();
     }
 
     private Map<String, Object> reportDsl() {

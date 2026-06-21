@@ -3,10 +3,12 @@ package com.auraboot.framework.bi.service.impl;
 import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.service.ReportExportService;
 import com.auraboot.framework.bi.service.ReportStorageService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
@@ -16,8 +18,10 @@ import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
+import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -98,6 +102,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private final DynamicDataService dynamicDataService;
     private final NamedQueryService namedQueryService;
     private final ReportStorageService reportStorageService;
+    private final AuditTrailService auditTrailService;
 
     @Override
     public ReportExportFile exportExcel(ReportExportRequest request) {
@@ -122,7 +127,9 @@ public class ReportExportServiceImpl implements ReportExportService {
             }
 
             workbook.write(output);
-            return new ReportExportFile(output.toByteArray(), safeFilename(title) + ".xlsx", XLSX_CONTENT_TYPE);
+            ReportExportFile file = new ReportExportFile(output.toByteArray(), safeFilename(title) + ".xlsx", XLSX_CONTENT_TYPE);
+            recordExportAudit(request.getReportPid(), "EXPORT_EXCEL", "excel", file.getFilename());
+            return file;
         } catch (ValidationException e) {
             throw e;
         } catch (Exception e) {
@@ -145,7 +152,9 @@ public class ReportExportServiceImpl implements ReportExportService {
             List<PdfLine> lines = renderPdfLines(reportDsl, dataSets, title);
             writePdfLines(document, lines, resolvePdfPageSize(reportDsl), resolvePdfMargins(reportDsl));
             document.save(output);
-            return new ReportExportFile(output.toByteArray(), safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
+            ReportExportFile file = new ReportExportFile(output.toByteArray(), safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
+            recordExportAudit(request.getReportPid(), "EXPORT_PDF", "pdf", file.getFilename());
+            return file;
         } catch (ValidationException e) {
             throw e;
         } catch (Exception e) {
@@ -170,13 +179,45 @@ public class ReportExportServiceImpl implements ReportExportService {
             payload.put("reportDsl", reportDsl);
             payload.put("dataSets", resolveDataSets(reportDsl));
             byte[] bytes = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(payload);
-            return new ReportExportFile(bytes, safeFilename(title) + ".report.json", JSON_CONTENT_TYPE);
+            ReportExportFile file = new ReportExportFile(bytes, safeFilename(title) + ".report.json", JSON_CONTENT_TYPE);
+            recordExportAudit(request.getReportPid(), "EXPORT_JSON", "json", file.getFilename());
+            return file;
         } catch (ValidationException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to export report as JSON: reportPid={}", request.getReportPid(), e);
             throw new ValidationException(ResponseCode.CommonValidationFailed, "JSON export failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * Emit a tamper-evident audit trail record for a SUCCESSFUL report export (B6 / Q15 — report
+     * actions were previously invisible to the audit subsystem). Export is the highest-value report
+     * audit: it captures sensitive-data egress (who exported which report, when, in which format).
+     *
+     * <p>ADDITIVE: this only records an audit event alongside a completed export; the export output
+     * itself is unchanged. Tenant + actor are sourced from {@link MetaContext} exactly as the sibling
+     * {@code ReportScheduleServiceImpl} does (set on every authenticated request by the tenant
+     * interceptor) — the export controller runs synchronously on the request thread.
+     *
+     * @param reportPid the exported report's pid (used as {@code entityPid})
+     * @param operationType {@code EXPORT_PDF} / {@code EXPORT_EXCEL} / {@code EXPORT_JSON}
+     * @param format        the export format (recorded in {@code metadata})
+     * @param filename      the generated output filename (recorded in {@code metadata})
+     */
+    private void recordExportAudit(String reportPid, String operationType, String format, String filename) {
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("format", format);
+        metadata.put("filename", filename);
+        auditTrailService.recordAudit(AuditTrailEvent.builder()
+                .tenantId(MetaContext.getCurrentTenantId())
+                .eventType("REPORT_EXPORT")
+                .entityType("report")
+                .entityPid(reportPid)
+                .operationType(operationType)
+                .actorId(MetaContext.getCurrentUserId())
+                .metadata(metadata)
+                .build());
     }
 
     /**
