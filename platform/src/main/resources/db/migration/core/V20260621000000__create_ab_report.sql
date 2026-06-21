@@ -23,7 +23,7 @@ CREATE TABLE ab_report (
     created_at   TIMESTAMP NOT NULL DEFAULT now(),
     updated_by   BIGINT,
     updated_at   TIMESTAMP NOT NULL DEFAULT now(),
-    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT uk_ab_report_tenant_code UNIQUE (tenant_id, code)
 );
 

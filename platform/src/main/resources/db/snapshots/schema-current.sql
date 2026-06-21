@@ -11622,7 +11622,7 @@ CREATE TABLE public.ab_report (
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_by bigint,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    deleted_flag smallint DEFAULT 0 NOT NULL
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 

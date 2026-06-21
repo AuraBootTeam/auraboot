@@ -4,6 +4,7 @@ import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandle
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import org.apache.ibatis.type.JdbcType;
@@ -81,17 +82,15 @@ public class ReportEntity {
     private Instant updatedAt;
 
     /**
-     * Logical delete flag (DDL: {@code SMALLINT NOT NULL DEFAULT 0}; 0 = live, 1 = deleted).
+     * Logical delete flag (DDL: {@code BOOLEAN NOT NULL DEFAULT FALSE}; false = live, true = deleted).
      *
-     * <p>Managed explicitly by {@code ReportStorageService}, NOT via the platform-wide
-     * MyBatis-Plus logic-delete. The global config ({@code logic-delete-field: deletedFlag},
-     * {@code logic-delete-value: true}/{@code logic-not-delete-value: false}) is built for the
-     * platform's BOOLEAN {@code deleted_flag} columns and would inject {@code deleted_flag = false}
-     * into every query — which a SMALLINT column rejects with
-     * "operator does not exist: smallint = boolean". Naming the Java property {@code deletedState}
-     * (instead of {@code deletedFlag}) opts this entity out of that global interceptor while still
-     * mapping to the {@code deleted_flag} column; soft-delete is filtered explicitly in the service.
+     * <p>Standard platform logic-delete: the global MyBatis-Plus config
+     * ({@code logic-delete-field: deletedFlag}, {@code logic-delete-value: true},
+     * {@code logic-not-delete-value: false}) drives this via {@link TableLogic}, so
+     * {@code deleteById} performs a soft delete and every query auto-excludes deleted rows
+     * (no explicit {@code deleted_flag} predicate needed in the service).
      */
+    @TableLogic
     @TableField("deleted_flag")
-    private Integer deletedState;
+    private Boolean deletedFlag;
 }

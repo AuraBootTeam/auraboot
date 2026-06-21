@@ -4,7 +4,6 @@ import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.bi.dao.mapper.ReportMapper;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,17 +18,15 @@ import java.util.List;
  * designer continues to persist via {@code ab_page_schema} + {@code extension.reportDsl};
  * this service is the minimal CRUD spine for the eventual storage graduation.
  *
- * <p>Soft-delete is managed explicitly here (column is {@code deleted_flag SMALLINT}, 0 = live,
- * 1 = deleted) instead of relying on the platform-wide boolean logic-delete, and every finder
- * is tenant-scoped + filters out deleted rows.
+ * <p>Soft-delete uses the standard platform MyBatis-Plus logic-delete: the entity's
+ * {@code @TableLogic deletedFlag} (BOOLEAN {@code deleted_flag}) is driven by the global
+ * interceptor, so {@code deleteById} performs the soft delete and every finder
+ * auto-excludes deleted rows (no explicit {@code deleted_flag} predicate). Finders remain
+ * tenant-scoped.
  */
 @Service
 @RequiredArgsConstructor
 public class ReportStorageService {
-
-    /** Soft-delete sentinel values for the SMALLINT {@code deleted_flag} column. */
-    private static final int LIVE = 0;
-    private static final int DELETED = 1;
 
     private final ReportMapper reportMapper;
 
@@ -54,7 +51,9 @@ public class ReportStorageService {
         if (report.getVersion() == null) {
             report.setVersion(1);
         }
-        report.setDeletedState(LIVE);
+        // Stamp the live state so the returned (un-refreshed) entity mirrors the persisted row;
+        // the @TableLogic interceptor leaves inserts alone, the DB default is also FALSE.
+        report.setDeletedFlag(false);
         Instant now = Instant.now();
         report.setCreatedAt(now);
         report.setUpdatedAt(now);
@@ -63,14 +62,14 @@ public class ReportStorageService {
     }
 
     /**
-     * Look up a live report by its {@code pid}. Excludes soft-deleted rows.
+     * Look up a live report by its {@code pid}. Soft-deleted rows are auto-excluded by the
+     * global {@code @TableLogic} interceptor.
      *
      * @return the report, or {@code null} if not found / soft-deleted
      */
     public ReportEntity findByPid(String pid) {
         return reportMapper.selectOne(new LambdaQueryWrapper<ReportEntity>()
-                .eq(ReportEntity::getPid, pid)
-                .eq(ReportEntity::getDeletedState, LIVE));
+                .eq(ReportEntity::getPid, pid));
     }
 
     /**
@@ -98,27 +97,28 @@ public class ReportStorageService {
     }
 
     /**
-     * Soft-delete a report by {@code pid}: sets {@code deleted_flag = 1}. After this,
-     * {@link #findByPid} and {@link #listByTenant} no longer return it.
+     * Soft-delete a report by {@code pid}: the standard MyBatis-Plus logic-delete sets
+     * {@code deleted_flag = true} via {@code deleteById}. After this, {@link #findByPid} and
+     * {@link #listByTenant} no longer return it (the {@code @TableLogic} interceptor excludes it).
      *
      * @return {@code true} if a live row was soft-deleted
      */
     @Transactional
     public boolean softDelete(String pid) {
-        return reportMapper.update(null, new LambdaUpdateWrapper<ReportEntity>()
-                .eq(ReportEntity::getPid, pid)
-                .eq(ReportEntity::getDeletedState, LIVE)
-                .set(ReportEntity::getDeletedState, DELETED)
-                .set(ReportEntity::getUpdatedAt, Instant.now())) > 0;
+        ReportEntity existing = findByPid(pid);
+        if (existing == null) {
+            return false;
+        }
+        return reportMapper.deleteById(existing.getId()) > 0;
     }
 
     /**
-     * List all live reports for a tenant, newest first. Tenant-scoped + excludes soft-deleted.
+     * List all live reports for a tenant, newest first. Tenant-scoped; soft-deleted rows are
+     * auto-excluded by the global {@code @TableLogic} interceptor.
      */
     public List<ReportEntity> listByTenant(Long tenantId) {
         return reportMapper.selectList(new LambdaQueryWrapper<ReportEntity>()
                 .eq(ReportEntity::getTenantId, tenantId)
-                .eq(ReportEntity::getDeletedState, LIVE)
                 .orderByDesc(ReportEntity::getCreatedAt));
     }
 }

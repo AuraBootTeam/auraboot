@@ -135,7 +135,7 @@ class ReportStorageServiceIT extends BaseIntegrationTest {
         assertThat(created.getId()).isNotNull();
         assertThat(created.getPid()).isNotBlank();
         assertThat(created.getPid()).hasSize(26); // ULID
-        assertThat(created.getDeletedState()).isEqualTo(0);
+        assertThat(created.getDeletedFlag()).isFalse();
         assertThat(created.getCreatedAt()).isNotNull();
         assertThat(created.getUpdatedAt()).isNotNull();
 
@@ -150,7 +150,7 @@ class ReportStorageServiceIT extends BaseIntegrationTest {
         assertThat(found.getStatus()).isEqualTo("draft");
         assertThat(found.getVersion()).isEqualTo(1);
         assertThat(found.getCreatedBy()).isEqualTo(101L);
-        assertThat(found.getDeletedState()).isEqualTo(0);
+        assertThat(found.getDeletedFlag()).isFalse();
         assertThat(found.getCreatedAt()).isNotNull();
         assertThat(found.getUpdatedAt()).isNotNull();
         assertThat(found.getDsl()).isNotBlank();
@@ -226,11 +226,12 @@ class ReportStorageServiceIT extends BaseIntegrationTest {
         boolean deleted = reportStorageService.softDelete(created.getPid());
         assertThat(deleted).isTrue();
 
-        // Logical, not physical: the row still exists with deleted_flag = 1...
-        Integer flag = jdbc.queryForObject(
-                "SELECT deleted_flag FROM ab_report WHERE pid = ?", Integer.class, created.getPid());
-        assertThat(flag).isEqualTo(1);
-        // ...but the service finder excludes it.
+        // Logical, not physical: the row still exists with deleted_flag = true (raw SQL bypasses
+        // the @TableLogic interceptor, so it sees the soft-deleted row)...
+        Boolean flag = jdbc.queryForObject(
+                "SELECT deleted_flag FROM ab_report WHERE pid = ?", Boolean.class, created.getPid());
+        assertThat(flag).isTrue();
+        // ...but the service finder excludes it (standard logic-delete).
         assertThat(reportStorageService.findByPid(created.getPid())).isNull();
     }
 
