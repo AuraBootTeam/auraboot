@@ -60,16 +60,25 @@ describe('chartSpecToEChartsOption', () => {
     expect(opt.series[0].areaStyle).toBeDefined();
   });
 
-  it('encodes interaction.tooltip into option.tooltip', () => {
-    const withTip = chartSpecToEChartsOption(spec({ interaction: { tooltip: true } }), rows) as any;
+  it('encodes interaction.tooltip into option.tooltip (minimal non-bar branch)', () => {
+    // The minimal mapping gates tooltip on interaction. NOTE: the BAR branch is the
+    // legacy-faithful SmartBarChart builder (B2d) which always emits tooltip — its
+    // tooltip contract is pinned by chart-spec-echarts-smartbarchart-equivalence.test.ts.
+    const withTip = chartSpecToEChartsOption(
+      spec({ type: 'line', interaction: { tooltip: true } }),
+      rows,
+    ) as any;
     expect(withTip.tooltip).toBeDefined();
-    const noTip = chartSpecToEChartsOption(spec(), rows) as any;
+    const noTip = chartSpecToEChartsOption(spec({ type: 'line' }), rows) as any;
     expect(noTip.tooltip).toBeUndefined();
   });
 
-  it('encodes visual.legend and visual.stacked', () => {
+  it('encodes visual.legend and visual.stacked (minimal non-bar branch)', () => {
+    // Legend on the minimal branch is gated on visual.legend. The BAR branch instead
+    // emits a legend only for multi-measure (legacy parity), pinned by the B2d
+    // equivalence test — so this case uses 'line' to exercise the minimal mapping.
     const opt = chartSpecToEChartsOption(
-      spec({ visual: { legend: true, stacked: true } }),
+      spec({ type: 'line', visual: { legend: true, stacked: true } }),
       rows,
     ) as any;
     expect(opt.legend).toBeDefined();

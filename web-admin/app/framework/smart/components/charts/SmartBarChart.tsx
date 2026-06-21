@@ -15,6 +15,8 @@ import type {
   LinkageConfig,
   FilterConfig,
 } from '~/framework/smart/types/chart';
+import type { ChartSpec } from '~/framework/smart/charts/chart-spec';
+import { chartSpecToEChartsOption } from '~/framework/smart/charts/chart-spec-echarts';
 import { cn } from '~/utils/cn';
 import { ChartEmptyState } from './ChartEmptyState';
 
@@ -106,12 +108,42 @@ export interface BarOptionProps {
 }
 
 /**
- * Build the ECharts `option` exactly the way SmartBarChart has historically built
- * it inline. Extracted verbatim (no behavior change) as a pure, exported helper so
- * the B2d equivalence/characterization test can compare it against the
- * ChartSpec→ECharts adapter (`chartSpecToEChartsOption`) without rendering.
+ * Build a renderer-agnostic `ChartSpec` from SmartBarChart's runtime data + visual
+ * props. The adapter's bar branch reads only `title`, `visual.{orientation,stacked,
+ * dataLabels}`, `measures[].field` (← `data.meta.metrics`), and the category
+ * dimension (← `data.meta.dimensions[0]`); `dataSource` is required by the ChartSpec
+ * type but unused by the bar option-builder, so a minimal aggregate placeholder is
+ * supplied.
+ */
+function specFromBarChartData(
+  data: BarChartData | null | undefined,
+  props: BarOptionProps,
+): ChartSpec {
+  const { title, orientation = 'vertical', stacked = false, showLabel = false } = props;
+  const dimensions = data?.meta?.dimensions ?? [];
+  const metrics = data?.meta?.metrics ?? [];
+  return {
+    type: 'bar',
+    title,
+    dataSource: { type: 'aggregate', modelCode: '', dimensions, metrics: [] },
+    dimensions: dimensions.map((field, i) => ({
+      field,
+      role: i === 0 ? 'category' : 'series',
+    })),
+    measures: metrics.map((field) => ({ field })),
+    visual: { orientation, stacked, dataLabels: showLabel },
+  };
+}
+
+/**
+ * Build the ECharts `option` exactly the way SmartBarChart historically built it
+ * inline. Extracted verbatim (no behavior change) as a pure, exported helper.
  *
- * Output MUST stay byte-for-byte identical to the previous inline `useMemo`.
+ * As of B2d this is NO LONGER on SmartBarChart's render path — the component now
+ * builds the option via the shared `chartSpecToEChartsOption` adapter (which the
+ * `chart-spec-echarts-smartbarchart-equivalence.test.ts` gate proves byte-equivalent
+ * to this builder's BASE option). This helper is retained as the equivalence test's
+ * ORACLE; its output MUST stay byte-for-byte identical to the pre-B2d inline builder.
  */
 export function buildBarOptionLegacy(
   data: BarChartData | null | undefined,
@@ -281,16 +313,19 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
   );
 
   /**
-   * Build ECharts options from data.
+   * Build ECharts options from data via the shared ChartSpec→ECharts adapter (B2d).
    *
-   * Delegates to the pure, exported `buildBarOptionLegacy` helper so the option
-   * shape can be characterized/compared in tests (B2d). Behavior is identical to
-   * the previous inline builder.
+   * Provably-neutral refactor: `chartSpecToEChartsOption` produces an option
+   * byte-equivalent to the legacy `buildBarOptionLegacy` BASE option (pinned by
+   * chart-spec-echarts-smartbarchart-equivalence.test.ts). The `chartOptions`
+   * renderer-leak is applied HERE at the call site exactly as before — it is NOT
+   * baked into the renderer-agnostic adapter.
    */
-  const options: EChartsOption = useMemo(
-    () => buildBarOptionLegacy(data, { title, orientation, stacked, showLabel, chartOptions }),
-    [data, title, orientation, stacked, showLabel, chartOptions],
-  );
+  const options: EChartsOption = useMemo(() => {
+    const spec = specFromBarChartData(data, { title, orientation, stacked, showLabel });
+    const adapterOption = chartSpecToEChartsOption(spec, data?.rows ?? []) as EChartsOption;
+    return chartOptions ? { ...adapterOption, ...chartOptions } : adapterOption;
+  }, [data, title, orientation, stacked, showLabel, chartOptions]);
 
   /**
    * ECharts event handlers
