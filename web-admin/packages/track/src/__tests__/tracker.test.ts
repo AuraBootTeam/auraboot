@@ -43,6 +43,35 @@ it('flushes pending events when page becomes hidden', async () => {
   });
 });
 
+it('injects anonId into every event when getAnonId is provided (public mode)', async () => {
+  const sent: any[] = [];
+  const post = (url: string, body: any, opts: any) => {
+    sent.push({ url, body, opts });
+    return Promise.resolve({});
+  };
+  const t = createTracker({
+    post,
+    getSessionId: () => 's-anon',
+    getAnonId: () => 'anon-xyz-789',
+    batchSize: 1,
+  });
+  t.pageview('/p/c/public');
+  await Promise.resolve();
+  expect(sent[0].body.events[0].anonId).toBe('anon-xyz-789');
+});
+
+it('omits anonId when getAnonId is not provided (authenticated mode regression)', async () => {
+  const sent: any[] = [];
+  const post = (url: string, body: any, opts: any) => {
+    sent.push({ url, body, opts });
+    return Promise.resolve({});
+  };
+  const t = createTracker({ post, getSessionId: () => 's-auth', batchSize: 1 });
+  t.pageview('/p/c/admin');
+  await Promise.resolve();
+  expect(sent[0].body.events[0].anonId).toBeUndefined();
+});
+
 it('does not throw when post rejects', async () => {
   const post = () => Promise.reject(new Error('network error'));
   const t = createTracker({ post, getSessionId: () => 's3', batchSize: 1 });

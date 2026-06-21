@@ -18,3 +18,24 @@ it('builds a flat camelCase page_view envelope', () => {
 it('sanitizeRoute strips ids and query', () => {
   expect(sanitizeRoute('/p/c/order_list/9182734?tab=x')).toBe('/p/c/order_list/:id');
 });
+
+it('carries anonId into the envelope when provided (public/anonymous mode)', () => {
+  const e = buildEvent({
+    eventName: 'page_view',
+    eventCategory: 'navigation',
+    clientSessionId: 's1',
+    anonId: 'anon-abc-123',
+    props: {},
+  });
+  expect(e.anonId).toBe('anon-abc-123');
+});
+
+it('omits anonId when not provided (authenticated mode unchanged)', () => {
+  const e = buildEvent({
+    eventName: 'page_view',
+    eventCategory: 'navigation',
+    clientSessionId: 's1',
+    props: {},
+  });
+  expect(e.anonId).toBeUndefined();
+});
