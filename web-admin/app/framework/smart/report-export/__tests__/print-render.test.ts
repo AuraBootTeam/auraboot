@@ -1,7 +1,11 @@
 // echarts-SSR (ssr:true) renders to an SVG string without touching the DOM, so it
 // runs fine under the project-default jsdom env (which the shared setup file needs).
 import { describe, it, expect } from 'vitest';
-import { reportChartBlockToChartSpec, renderReportChartSvg } from '../print-render';
+import {
+  aggregateChartRows,
+  reportChartBlockToChartSpec,
+  renderReportChartSvg,
+} from '../print-render';
 
 describe('reportChartBlockToChartSpec', () => {
   it('maps report chart block shape A (chartType + chartConfig.xField/yField)', () => {
@@ -62,5 +66,57 @@ describe('renderReportChartSvg (echarts-SSR via the real frontend renderer)', ()
     expect(svg).toContain('<path');
     // The whole point of Phase 3: this is a real chart, not the "Category | Value" dump.
     expect(svg).not.toContain('Category');
+  });
+});
+
+describe('aggregateChartRows (matches backend aggregateChartMetrics)', () => {
+  const statusChart = {
+    blockType: 'chart',
+    chartType: 'bar',
+    categoryField: 'status',
+    valueField: 'cases',
+    aggregation: 'sum',
+  };
+  const rows = [
+    { region: 'North', status: 'Open', cases: 12 },
+    { region: 'North', status: 'Closed', cases: 3 },
+    { region: 'South', status: 'Open', cases: 9 },
+  ];
+
+  it('sums valueField grouped by category, sorted by category', () => {
+    expect(aggregateChartRows(statusChart, rows)).toEqual([
+      { status: 'Closed', cases: 3 },
+      { status: 'Open', cases: 21 },
+    ]);
+  });
+
+  it('supports avg / count / min / max', () => {
+    expect(aggregateChartRows({ ...statusChart, aggregation: 'avg' }, rows)).toEqual([
+      { status: 'Closed', cases: 3 },
+      { status: 'Open', cases: 10.5 },
+    ]);
+    expect(aggregateChartRows({ ...statusChart, aggregation: 'count' }, rows)).toEqual([
+      { status: 'Closed', cases: 1 },
+      { status: 'Open', cases: 2 },
+    ]);
+    expect(aggregateChartRows({ ...statusChart, aggregation: 'min' }, rows)).toEqual([
+      { status: 'Closed', cases: 3 },
+      { status: 'Open', cases: 9 },
+    ]);
+    expect(aggregateChartRows({ ...statusChart, aggregation: 'max' }, rows)).toEqual([
+      { status: 'Closed', cases: 3 },
+      { status: 'Open', cases: 12 },
+    ]);
+  });
+
+  it('defaults to sum, maps missing category to "Other" and non-number value to 0', () => {
+    const result = aggregateChartRows(
+      { blockType: 'chart', categoryField: 'status', valueField: 'cases' },
+      [{ status: 'Open', cases: 5 }, { cases: 7 }, { status: 'Open', cases: 'n/a' }],
+    );
+    expect(result).toEqual([
+      { status: 'Open', cases: 5 }, // 5 + 0 (non-number 'n/a')
+      { status: 'Other', cases: 7 }, // missing category -> Other
+    ]);
   });
 });

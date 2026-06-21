@@ -15,6 +15,7 @@
  *   - real <table> with column labels (no raw field-code leak), HTML-escaped cells
  */
 import {
+  aggregateChartRows,
   reportChartBlockToChartSpec,
   renderReportChartSvg,
   type ReportChartBlock,
@@ -88,7 +89,10 @@ function renderBlockTitle(title?: string): string {
 
 function renderChart(block: ReportPrintBlock, dataSets: PrintDataSets): string {
   const spec = reportChartBlockToChartSpec(block);
-  const svg = renderReportChartSvg(spec, rowsFor(block, dataSets)); // trusted, self-generated
+  // Aggregate by category (matches the backend) before plotting, so an aggregated
+  // chart over un-aggregated rows renders correct values, not duplicate bars.
+  const rows = aggregateChartRows(block, rowsFor(block, dataSets));
+  const svg = renderReportChartSvg(spec, rows); // trusted, self-generated
   return `<section class="block chart">${renderBlockTitle(block.title)}<div class="chart-canvas">${svg}</div></section>`;
 }
 

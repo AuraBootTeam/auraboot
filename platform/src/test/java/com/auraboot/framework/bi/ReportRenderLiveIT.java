@@ -65,12 +65,15 @@ class ReportRenderLiveIT {
                         Map.of("blockType", "page-footer", "text", "internal-only"),
                         Map.of("blockType", "watermark", "text", "CONFIDENTIAL"),
                         Map.of("blockType", "chart", "title", "Monthly Revenue", "dataSource", "rev",
-                                "chartType", "bar", "categoryField", "month", "valueField", "amount"),
+                                "chartType", "bar", "categoryField", "month", "valueField", "amount",
+                                "aggregation", "sum"),
                         Map.of("blockType", "table", "title", "Detail", "dataSource", "detail",
                                 "columns", List.of(Map.of("field", "name", "label", "Item")))));
         Map<String, List<Map<String, Object>>> dataSets = Map.of(
+                // duplicate Jan rows exercise the aggregation path (Jan -> 130) end to end
                 "rev", List.of(
                         Map.of("month", "Jan", "amount", 100),
+                        Map.of("month", "Jan", "amount", 30),
                         Map.of("month", "Feb", "amount", 140),
                         Map.of("month", "Mar", "amount", 120)),
                 "detail", List.of(Map.of("name", "Widget A")));

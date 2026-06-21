@@ -22,9 +22,9 @@ import {
 import { chartSpecToEChartsOption } from '../charts/chart-spec-echarts';
 
 /**
- * The two legacy report chart-block shapes seen in report DSL (see Phase 3 spec
- * §2). Both carry a chart type, a category/x field and a value/y field — far
- * simpler than a full ChartConfig.
+ * The report chart-block shapes seen in report DSL (see Phase 3 spec §2). All
+ * carry a chart type, a category/x field and a value/y field — far simpler than
+ * a full ChartConfig.
  */
 export interface ReportChartBlock {
   blockType?: string;
@@ -37,8 +37,22 @@ export interface ReportChartBlock {
   /** shape C (canonical report DSL): top-level category/value fields */
   categoryField?: string;
   valueField?: string;
+  /** aggregation over valueField per category (sum|avg|count|min|max; default sum) */
+  aggregation?: string;
   /** dataSource id (resolved to rows elsewhere; not needed for rendering) */
   dataSource?: string;
+}
+
+/** Resolve the category field across the three report chart-block shapes. */
+function categoryFieldOf(block: ReportChartBlock): string {
+  return (
+    block.chartConfig?.xField ?? block.config?.categoryField ?? block.categoryField ?? 'category'
+  );
+}
+
+/** Resolve the value field across the three report chart-block shapes. */
+function valueFieldOf(block: ReportChartBlock): string {
+  return block.chartConfig?.yField ?? block.config?.valueField ?? block.valueField ?? 'value';
 }
 
 /**
@@ -49,10 +63,8 @@ export function reportChartBlockToChartSpec(block: ReportChartBlock): ChartSpec 
   const rawType = block.chartType ?? block.config?.chartType ?? 'bar';
   const type: ChartSpecType = isChartSpecType(rawType) ? rawType : 'bar';
 
-  const categoryField =
-    block.chartConfig?.xField ?? block.config?.categoryField ?? block.categoryField ?? 'category';
-  const valueField =
-    block.chartConfig?.yField ?? block.config?.valueField ?? block.valueField ?? 'value';
+  const categoryField = categoryFieldOf(block);
+  const valueField = valueFieldOf(block);
 
   const dimensions: ChartDimension[] = [
     // pie's first dimension is a slice name, every other type is an axis category.
@@ -70,6 +82,73 @@ export function reportChartBlockToChartSpec(block: ReportChartBlock): ChartSpec 
     measures: [{ field: valueField }],
     visual: { dataLabels: true },
   };
+}
+
+/** Mirror of the backend aggregateNumbers (sum|avg|count|min|max; empty -> 0). */
+function aggregateNumbers(values: number[], aggregation: string): number {
+  if (values.length === 0) {
+    return 0;
+  }
+  switch (aggregation) {
+    case 'avg':
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    case 'count':
+      return values.length;
+    case 'min':
+      return Math.min(...values);
+    case 'max':
+      return Math.max(...values);
+    default:
+      return values.reduce((a, b) => a + b, 0);
+  }
+}
+
+/**
+ * Aggregate report chart rows by category, mirroring the backend
+ * `aggregateChartMetrics` so the WYSIWYG chart matches the legacy data export
+ * (single aggregation contract). Groups by categoryField (missing -> "Other"),
+ * aggregates valueField (non-number -> 0) with the block's aggregation (default
+ * sum), sorted by category. Without this, an aggregated chart (e.g. sum cases by
+ * status over un-aggregated rows) would plot duplicate categories / wrong values.
+ */
+export function aggregateChartRows(
+  block: ReportChartBlock,
+  rows: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const categoryField = categoryFieldOf(block);
+  const valueField = valueFieldOf(block);
+  const aggregation = (block.aggregation ?? 'sum').toLowerCase();
+
+  const groups = new Map<string, number[]>();
+  for (const row of rows) {
+    const rawCategory = row[categoryField];
+    const category =
+      rawCategory === null || rawCategory === undefined || rawCategory === ''
+        ? 'Other'
+        : String(rawCategory);
+    const rawValue = row[valueField];
+    const value = typeof rawValue === 'number' ? rawValue : 0;
+    const bucket = groups.get(category);
+    if (bucket) {
+      bucket.push(value);
+    } else {
+      groups.set(category, [value]);
+    }
+  }
+
+  return (
+    [...groups.entries()]
+      .map(([category, values]) => ({
+        [categoryField]: category,
+        [valueField]: aggregateNumbers(values, aggregation),
+      }))
+      // backend sorts by category label (String.compareTo == UTF-16 code-unit order)
+      .sort((a, b) => {
+        const x = String(a[categoryField]);
+        const y = String(b[categoryField]);
+        return x < y ? -1 : x > y ? 1 : 0;
+      })
+  );
 }
 
 export interface RenderChartSvgOptions {
