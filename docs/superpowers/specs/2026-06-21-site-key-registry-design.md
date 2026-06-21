@@ -95,6 +95,18 @@ site-key **公开非机密** → key 就是个**普通可见列**(不像 webhook
 - **resolve 热路径**:SP2 未鉴权高频调 `resolveTenant`,SP1 即建缓存 + site_key 唯一索引。
 - **JSONB 雷**:`origin_allowlist` 若 jsonb + MyBatis 读写,注意 `JsonbStringTypeHandler`(本仓高频坑,跑 `scripts/check-jsonb-typehandler.sh`)——SP1 只存不读,可先 text[]/jsonb,SP2 用时再定。
 
+## 9.1 Build 实测结论与决策(2026-06-21,取证后定稿)
+
+> §15 纪律:以下推翻了 build 前 spike 的 code-reading 推断,以**真实导入 + 真栈 golden 实测**为准。
+
+- **✅ server-set on create — 走平台 `@Component` handler,非 PF4J 插件 jar**:`SiteKeyCommandHandler`(platform `behavior/sitekey/`)`implements CommandHandlerExtension`,`getCommandType()=behavior_site_key:create`/`disable`,`requiresDslPersistence()=false`(镜像已发布的 `AgentApprovalCommandHandler`)→ 跳过默认 field-map insert,handler 用 `ctx.dataAccessor().create` 注入服务端生成的 `abk_` key。**决策理由**:行为遥测本就 platform-native(`BehaviorCollectService`/`ab_behavior_event`/UV 聚合全在 platform),且 `SiteKeyRegistry.resolveTenant` 必须 platform-side 供 SP2 的 `/api/collect` 调用;config-only 插件(`plugins/core-site-key`)只承载 model/fields/dict/commands/pages/permissions/menu,无 backend jar。命令**不声明 `handler` 字段**,故 import 不触发 `S-EXT-HANDLER`(`ExtensionValidator` 仅在显式 `handler` 时校验),运行时由 `ExtensionRegistry.getCommandHandler` 按 `supports()` 命中。实测:真栈命令管道 create→DB(`active`+server-gen key)、disable→DB(`disabled`)、deny=403(只读用户无写)。
+- **🔴 site_key 的 DB 级唯一索引 — dynamic model 配置层做不到(实测推翻 spike)**:config 层 `constraints.unique:true` / `feature.searchable` **在本平台版本对 `mt_` 动态模型表系统性失效**——字段 `feature` 列在导入路径不被持久化(到表索引生成时 `field.isUnique()/isSearchable()` 读到空),实测本栈 **9 个 `mt_` 表 0 个**有 `_tenant_unique` 或 `_trgm` 索引(唯一的 1 个 trgm 在内置 `ab_` 表)。故 `mt_behavior_site_key.site_key` **无 DB 唯一索引、无 site_key 专用索引**。
+  - **决策:保留 dynamic model**(功能完整:CRUD/命令/双 id/jsonb/DSL 页/权限全部真栈验证通过),**不**退平台表 `ab_behavior_site_key`——§9 的平台表 fallback 假设“注册成 model 即免费 DSL CRUD”,实测该路径需 `skipTableCreation` 模型 + `kind:detail`(非 `kind:list`)+ 自定义读端点(AGENTS gotcha),复杂度/风险更高且削弱 DSL-first,得不偿失。
+  - **唯一性**:由 `SiteKeyCommandHandler` 在 create 前 `registry.existsAnyTenant(key)` 跨租户预检 + 重试保证(190-bit 随机 key 实际碰撞概率 ~0),DB 约束本为 defense-in-depth。
+  - **🟡 SP2 前置(必做,backlog)**:`(tenant_id, site_key)` 唯一索引 + `site_key` resolve 索引留 **SP2**(其建匿名 ingestion 热路径时加;`resolveTenant` 目前对小表 seq-scan,SP1 无线上负载可接受,SP2 上线前必须加索引)。属平台 dynamic-model 索引能力缺口,**不在本 feature PR 修平台**(避免大面 import-path 改动)。
+- **key 字母表定稿**:`abk_` + **32 base62**(`SecureRandom.nextInt` 无偏),~190 bit;`site_key` 字段 `maxLength:64`。
+- **created_at 不可作页面字段**:系统字段(`created_at`/`id`/`pid`)自动建表但**不进 model 绑定**,DSL 页引用为显示列/字段会被 `S-PAGE-FIELD-REF` 拒(validator 实测抓到);仅可用于 `defaultSort`。
+
 ## 10. 非目标(SP2/3/4,不在 SP1)
 
 - `/api/collect` keyed-anonymous 分支 + security 开放 + 滥用防护(限流/origin/payload)= **SP2**。
