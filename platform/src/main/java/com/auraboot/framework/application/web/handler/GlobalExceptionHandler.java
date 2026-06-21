@@ -17,6 +17,8 @@ import jakarta.validation.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -249,6 +251,23 @@ public class GlobalExceptionHandler {
         log.warn("BPMN conversion failed: {}", ex.getMessage());
         ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * Honor a Spring {@link ResponseStatusException}'s own status instead of letting it fall through
+     * to the catch-all 500. Without this, any code raising {@code ResponseStatusException} (the
+     * public keyed-collect guard's 403/429/400, the authenticated collect's 401) was silently
+     * mapped to 500 because the {@code @ExceptionHandler(Exception.class)} catch-all matched first.
+     * The reason phrase is a stable token (e.g. {@code site_key_invalid}) returned as the message.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleResponseStatusException(ResponseStatusException ex) {
+        HttpStatusCode status = ex.getStatusCode();
+        String reason = ex.getReason() != null ? ex.getReason() : ex.getMessage();
+        log.warn("ResponseStatusException {}: {}", status, reason);
+        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BUSINESS_ERROR, reason);
+        return ResponseEntity.status(status).body(response);
     }
 
     @ExceptionHandler(BusinessException.class)

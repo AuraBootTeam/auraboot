@@ -30,7 +30,10 @@ public class BehaviorCollectService {
     private final BehaviorEventMapper behaviorEventMapper;
     private final ObjectMapper objectMapper;
 
-    /** Persist a batch; returns the number accepted (duplicates count as accepted). */
+    /**
+     * Authenticated path (M1): tenant/user from the auth context (never trusts the client).
+     * Returns the number accepted (duplicates count as accepted).
+     */
     public int record(List<BehaviorEventInput> events) {
         if (events == null || events.isEmpty()) {
             return 0;
@@ -39,11 +42,28 @@ public class BehaviorCollectService {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "tenant_required");
         }
-        Long userId = MetaContext.getCurrentUserId();
+        return recordBatch(events, tenantId, MetaContext.getCurrentUserId());
+    }
+
+    /**
+     * Anonymous/keyed path (SP2): the caller has already resolved the owning tenant from the
+     * public site key, so the tenant is passed in explicitly and there is no user — the
+     * client-supplied {@code anonId} is the only identity. Same entity mapping + idempotency
+     * ({@code (tenant_id, event_id)}) as {@link #record}.
+     */
+    public int recordAnonymous(List<BehaviorEventInput> events, long tenantId) {
+        return recordBatch(events, tenantId, null);
+    }
+
+    /** Shared batch persist for both the authenticated and keyed-anonymous paths. */
+    private int recordBatch(List<BehaviorEventInput> events, Long tenantId, Long userId) {
+        if (events == null || events.isEmpty()) {
+            return 0;
+        }
         int accepted = 0;
         for (BehaviorEventInput in : events) {
             if (in == null || in.getEventId() == null || in.getEventName() == null) {
-                continue; // skip malformed; registry validation/quarantine is a follow-up
+                continue; // skip malformed (per-event, not batch-fatal); quarantine is a follow-up
             }
             try {
                 behaviorEventMapper.insert(toEntity(in, tenantId, userId));
