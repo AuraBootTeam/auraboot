@@ -260,6 +260,61 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
         mockMvc.perform(get("/api/report-definitions/" + pid)).andExpect(status().isForbidden());
     }
 
+    // ---------- PERMIT: get by-code (the viewer read path); 404 for unknown; tenant-scoped ----------
+
+    @Test
+    @DisplayName("PERMIT get by-code: REPORT_READ → 200 for live (dsl object), 404 for unknown code")
+    void getByCode_withRead_okForLive_404ForUnknown() throws Exception {
+        grantRead();
+        // ab_report.code == the report's pageKey; seed a live row under a known code.
+        seedReport(getTestTenant().getId(), "report_by_code_key", "By Code", "{\"page\":\"A4\"}");
+
+        mockMvc.perform(get("/api/report-definitions/by-code/report_by_code_key"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.code").value("report_by_code_key"))
+                .andExpect(jsonPath("$.data.title").value("By Code"))
+                // dsl comes back as a real JSON object (the viewer maps {dsl, pid})
+                .andExpect(jsonPath("$.data.dsl.page").value("A4"))
+                .andExpect(jsonPath("$.data.pid").isNotEmpty());
+
+        mockMvc.perform(get("/api/report-definitions/by-code/no-such-code"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("DENY get by-code: no grants → 403")
+    void getByCode_withoutGrants_forbidden() throws Exception {
+        seedReport(getTestTenant().getId(), "by-code-deny", "D", "{}");
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+        mockMvc.perform(get("/api/report-definitions/by-code/by-code-deny"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("get by-code is tenant-scoped: another tenant's code is NOT resolvable (404)")
+    void getByCode_isTenantScoped() throws Exception {
+        grantRead();
+        // Same code value seeded ONLY under a different tenant — the current tenant must not see it.
+        long otherTenantId = getTestTenant().getId() + 999_999L;
+        seedReport(otherTenantId, "cross-tenant-code", "Other", "{\"x\":1}");
+
+        mockMvc.perform(get("/api/report-definitions/by-code/cross-tenant-code"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("get by-code excludes soft-deleted: deleting then by-code is 404")
+    void getByCode_excludesSoftDeleted() throws Exception {
+        grantManage();
+        grantRead();
+        String pid = seedReport(getTestTenant().getId(), "by-code-deleted", "D", "{}");
+
+        // delete by pid, then the by-code lookup must 404 (soft-deleted excluded by @TableLogic)
+        mockMvc.perform(delete("/api/report-definitions/" + pid)).andExpect(status().isOk());
+        mockMvc.perform(get("/api/report-definitions/by-code/by-code-deleted"))
+                .andExpect(status().isNotFound());
+    }
+
     // ---------- PERMIT: delete → subsequent get is 404 ----------
 
     @Test
