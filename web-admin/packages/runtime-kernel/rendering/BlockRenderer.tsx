@@ -29,6 +29,15 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({
   const context = runtime.getContext();
   const profile = useProfileSafe();
 
+  // Conditional rendering via visibleWhen expression
+  const evaluator = runtime.getEvaluator();
+  const visible = useMemo(() => {
+    if (!block.visibleWhen) return true;
+    return evaluator.evaluateCondition(block.visibleWhen, context);
+  }, [block.visibleWhen, context, evaluator]);
+
+  if (!visible) return null;
+
   // Stable telemetry identity — read by deriveUiElement() in @auraboot/track
   // via el.closest('[data-aura-element-id]'). Only stamped when block.id exists.
   const pageKey: string | undefined = block.id
@@ -41,15 +50,6 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({
         ...(pageKey !== undefined ? { 'data-aura-page-id': pageKey } : {}),
       }
     : {};
-
-  // Conditional rendering via visibleWhen expression
-  const evaluator = runtime.getEvaluator();
-  const visible = useMemo(() => {
-    if (!block.visibleWhen) return true;
-    return evaluator.evaluateCondition(block.visibleWhen, context);
-  }, [block.visibleWhen, context, evaluator]);
-
-  if (!visible) return null;
 
   const blockType = block.blockType;
 

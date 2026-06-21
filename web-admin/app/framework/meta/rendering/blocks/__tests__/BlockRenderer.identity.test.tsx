@@ -30,7 +30,7 @@ vi.mock('@auraboot/runtime-kernel', async () => {
 // Stub the block resolver so BlockRenderer can dispatch to a simple renderer
 // without needing the full admin BlockRegistry bootstrap.
 vi.mock(
-  '/Users/ghj/work/auraboot/auraboot-behavior-sdk-dashboard/web-admin/packages/runtime-kernel/rendering/blockResolver',
+  '../../../../../../packages/runtime-kernel/rendering/blockResolver',
   () => ({
     getBlockResolver: () => ({
       get: (_blockType: string) => ({
