@@ -38,6 +38,19 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({
 
   if (!visible) return null;
 
+  // Stable telemetry identity — read by deriveUiElement() in @auraboot/track
+  // via el.closest('[data-aura-element-id]'). Only stamped when block.id exists.
+  const pageKey: string | undefined = block.id
+    ? (runtime.getSchema?.()?.pageKey as string | undefined)
+    : undefined;
+  const identityProps = block.id
+    ? {
+        'data-aura-element-id': block.id,
+        'data-aura-block-id': block.id,
+        ...(pageKey !== undefined ? { 'data-aura-page-id': pageKey } : {}),
+      }
+    : {};
+
   const blockType = block.blockType;
 
   // Guard: reject renamed blockType aliases with a clear error so developers
@@ -126,7 +139,10 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({
   return (
     <BlockErrorBoundary blockType={blockType} blockId={block.id}>
       <Suspense fallback={<div className="bg-muted h-24 animate-pulse rounded" />}>
-        <div className={`block-${blockType} ${block.className || ''}`}>
+        <div
+          className={`block-${blockType} ${block.className || ''}`}
+          {...identityProps}
+        >
           <Renderer block={block} runtime={runtime} />
         </div>
       </Suspense>

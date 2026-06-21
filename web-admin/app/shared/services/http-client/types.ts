@@ -124,6 +124,11 @@ export interface FetchOptions {
    * @default false
    */
   skipAutoToken?: boolean;
+
+  /**
+   * When true, sets RequestInit.keepalive so the request survives page unload (used by telemetry beacons).
+   */
+  keepalive?: boolean;
 }
 
 /**
