@@ -39,6 +39,7 @@ export function buildEvent(input: RawEventInput): BehaviorEventInput {
     source: 'web',
     occurredAt: new Date().toISOString(),
     clientSessionId: input.clientSessionId,
+    anonId: input.anonId,
     uiElementId: input.ui?.uiElementId,
     appId: input.ui?.appId,
     pageId: input.ui?.pageId,
