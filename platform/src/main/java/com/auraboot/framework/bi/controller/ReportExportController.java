@@ -36,7 +36,7 @@ public class ReportExportController {
 
     @PostMapping("/export/excel")
     @Operation(summary = "Export report as Excel", description = "Renders a saved Report Designer DSL as an XLSX artifact")
-    @RequirePermission(MetaPermission.REPORT_GENERATE)
+    @RequirePermission(MetaPermission.REPORT_EXPORT_EXECUTE)
     public ResponseEntity<byte[]> exportExcel(@Valid @RequestBody ReportExportRequest request) {
         ReportExportFile file = reportExportService.exportExcel(request);
         return ResponseEntity.ok()
@@ -51,7 +51,7 @@ public class ReportExportController {
 
     @PostMapping("/export/pdf")
     @Operation(summary = "Export report as PDF", description = "Renders a saved Report Designer DSL as a PDF artifact")
-    @RequirePermission(MetaPermission.REPORT_GENERATE)
+    @RequirePermission(MetaPermission.REPORT_EXPORT_EXECUTE)
     public ResponseEntity<byte[]> exportPdf(@Valid @RequestBody ReportExportRequest request) {
         ReportExportFile file = reportExportService.exportPdf(request);
         return ResponseEntity.ok()
@@ -66,7 +66,7 @@ public class ReportExportController {
 
     @PostMapping("/export/json")
     @Operation(summary = "Export report as JSON", description = "Exports a saved Report Designer DSL and resolved data sets as JSON")
-    @RequirePermission(MetaPermission.REPORT_GENERATE)
+    @RequirePermission(MetaPermission.REPORT_EXPORT_EXECUTE)
     public ResponseEntity<byte[]> exportJson(@Valid @RequestBody ReportExportRequest request) {
         ReportExportFile file = reportExportService.exportJson(request);
         return ResponseEntity.ok()

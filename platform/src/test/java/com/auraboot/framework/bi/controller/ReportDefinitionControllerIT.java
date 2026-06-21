@@ -104,7 +104,7 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
     // ---------- PERMIT: create round-trips dsl as a real object, mints pid ----------
 
     @Test
-    @DisplayName("PERMIT create: REPORT_MANAGE → 201-ish 2xx, mints pid, dsl round-trips as object")
+    @DisplayName("PERMIT create: REPORT_DEFINITION_MANAGE → 201-ish 2xx, mints pid, dsl round-trips as object")
     void create_withManage_mintsPid_andRoundTripsDsl() throws Exception {
         grantManage();
         grantRead();
@@ -135,7 +135,7 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("DENY create: REPORT_READ only (no MANAGE) → 403")
+    @DisplayName("DENY create: REPORT_DEFINITION_VIEW only (no MANAGE) → 403")
     void create_withReadOnly_forbidden() throws Exception {
         grantRead();
         mockMvc.perform(post("/api/report-definitions").contentType(MediaType.APPLICATION_JSON)
@@ -146,7 +146,7 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
     // ---------- PERMIT: update mutates + bumps version ----------
 
     @Test
-    @DisplayName("PERMIT update: REPORT_MANAGE → mutates title/dsl, bumps version")
+    @DisplayName("PERMIT update: REPORT_DEFINITION_MANAGE → mutates title/dsl, bumps version")
     void update_withManage_mutates() throws Exception {
         grantManage();
         grantRead();
@@ -167,7 +167,7 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("DENY update: REPORT_READ only → 403")
+    @DisplayName("DENY update: REPORT_DEFINITION_VIEW only → 403")
     void update_withReadOnly_forbidden() throws Exception {
         grantRead();
         String pid = seedReport(getTestTenant().getId(), "upd-deny", "T", "{}");
@@ -238,7 +238,7 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
     // ---------- PERMIT: get one; not-found is 404 ----------
 
     @Test
-    @DisplayName("PERMIT get: REPORT_READ → 200 for live, 404 for unknown")
+    @DisplayName("PERMIT get: REPORT_DEFINITION_VIEW → 200 for live, 404 for unknown")
     void get_withRead_okForLive_404ForUnknown() throws Exception {
         grantRead();
         String pid = seedReport(getTestTenant().getId(), "get-code", "G", "{\"k\":\"v\"}");
@@ -263,7 +263,7 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
     // ---------- PERMIT: get by-code (the viewer read path); 404 for unknown; tenant-scoped ----------
 
     @Test
-    @DisplayName("PERMIT get by-code: REPORT_READ → 200 for live (dsl object), 404 for unknown code")
+    @DisplayName("PERMIT get by-code: REPORT_DEFINITION_VIEW → 200 for live (dsl object), 404 for unknown code")
     void getByCode_withRead_okForLive_404ForUnknown() throws Exception {
         grantRead();
         // ab_report.code == the report's pageKey; seed a live row under a known code.
@@ -318,7 +318,7 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
     // ---------- PERMIT: delete → subsequent get is 404 ----------
 
     @Test
-    @DisplayName("PERMIT delete: REPORT_MANAGE → soft-deletes, then get is 404")
+    @DisplayName("PERMIT delete: REPORT_DEFINITION_MANAGE → soft-deletes, then get is 404")
     void delete_withManage_softDeletes_thenGet404() throws Exception {
         grantManage();
         grantRead();
@@ -331,7 +331,7 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("DENY delete: REPORT_READ only → 403")
+    @DisplayName("DENY delete: REPORT_DEFINITION_VIEW only → 403")
     void delete_withReadOnly_forbidden() throws Exception {
         grantRead();
         String pid = seedReport(getTestTenant().getId(), "del-deny", "D", "{}");
@@ -389,12 +389,14 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
     }
 
     private void grantManage() {
-        grant(MetaPermission.REPORT_MANAGE, "meta", "template", "update", "Report Manage");
+        // B6-2: controller now guards mutations with the clean report.definition.manage code.
+        grant(MetaPermission.REPORT_DEFINITION_MANAGE, "report", "definition", "manage", "Report Definition Manage");
         userPermissionService.evictUserPermissions(getTestUser().getId());
     }
 
     private void grantRead() {
-        grant(MetaPermission.REPORT_READ, "meta", "template", "read", "Report Read");
+        // B6-2: controller now guards reads with the clean report.definition.view code.
+        grant(MetaPermission.REPORT_DEFINITION_VIEW, "report", "definition", "view", "Report Definition View");
         userPermissionService.evictUserPermissions(getTestUser().getId());
     }
 
