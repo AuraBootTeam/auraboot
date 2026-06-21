@@ -1010,6 +1010,7 @@ describe('ReviewDrawerBlockRenderer', () => {
       item: {
         titleField: 'bom_me_material_code',
         scoreField: 'bom_me_score',
+        statusColorField: 'bom_me_status_color',
         detailFields: [
           {
             key: 'name',
@@ -1469,8 +1470,9 @@ describe('ReviewDrawerBlockRenderer', () => {
 
   it('renders grouped candidate evidence fields so operators can see why a match failed', () => {
     const runtime = makeReviewDrawerRuntime(selectedLine, {
+      bom_me_status_color: 'yellow',
       bom_me_evidence_json:
-        '{"matchSource":"mpn_brand_exact","comparisons":[{"key":"brand","reason":"source and candidate brand differ"}]}',
+        '{"matchSource":"mpn_brand_exact","groups":{"brand":{"status":"mismatch","comparisons":[{"key":"brand","label":"brand","sourceValue":"Murata","candidateValue":"Yageo","status":"mismatch","reason":"source and candidate brand differ"}]},"mpn":{"status":"matched","comparisons":[{"key":"mpn","label":"mpn","sourceValue":"BL-HG034A-TRB","candidateValue":"BL-HG034A-TRB","status":"matched","reason":"exact"}]}}}',
     });
     const groupedBlock = {
       ...reviewDrawerBlock,
@@ -1486,7 +1488,7 @@ describe('ReviewDrawerBlockRenderer', () => {
                 key: 'brand_diff',
                 label: '品牌差异',
                 sourceField: 'bom_me_evidence_json',
-                field: 'comparisons',
+                field: 'groups.brand.comparisons',
                 emptyText: '无差异',
               },
             ],
@@ -1510,10 +1512,14 @@ describe('ReviewDrawerBlockRenderer', () => {
 
     fireEvent.click(screen.getByTestId('review-drawer-candidate-ME-1'));
 
+    expect(screen.getByTestId('review-drawer-candidate-ME-1').querySelector('.bg-amber-50')).toBeTruthy();
     expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent('品牌');
     expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent(
       'source and candidate brand differ',
     );
+    expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent('不一致');
+    expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent('Murata');
+    expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent('Yageo');
     expect(screen.getByTestId('review-drawer-selected-group-mpn')).toHaveTextContent('型号(MPN)');
     expect(screen.getByTestId('review-drawer-selected-group-mpn')).toHaveTextContent(
       'mpn_brand_exact',
