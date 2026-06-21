@@ -49,6 +49,7 @@ public class AgentRunService {
     private final AiTraceService aiTraceService;
     private final ToolLoopService toolLoopService;
     private final DynamicDataMapper dynamicDataMapper;
+    private final DeclaredAgentToolResolver declaredAgentToolResolver;
     private final CommandExecutor commandExecutor;
     private final NamedQueryService namedQueryService;
     private final ObjectMapper objectMapper;
@@ -350,6 +351,36 @@ public class AgentRunService {
                     toolDiscoveryMode = "registry_all";
                 }
             }
+
+            // The bif-derived modelHint only surfaces tools for the model the task text grounds to.
+            // Additively ensure the agent's EXPLICITLY DECLARED tools are always available — declared
+            // commands/queries on other models (e.g. cmd:crm:create_activity on crm_activity_common
+            // while the task is about crm_complaint) would otherwise be undiscovered and rejected by
+            // the plan validator as hallucinated. Only adds declared tools that are missing.
+            List<String> declaredCodes = DeclaredAgentToolResolver.parseDeclaredCodes(agentDef, objectMapper);
+            if (!declaredCodes.isEmpty()) {
+                Long discoveryUserId = MetaContext.exists() ? MetaContext.getCurrentUserId() : null;
+                List<AgentToolDefinition> declaredTools = toAgentToolDefinitions(
+                        declaredAgentToolResolver.resolveDeclaredTools(
+                                tenantId, discoveryUserId, agentCode, declaredCodes));
+                Set<String> presentNames = tools.stream()
+                        .map(AgentToolDefinition::getName)
+                        .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+                List<AgentToolDefinition> merged = new ArrayList<>(tools);
+                int added = 0;
+                for (AgentToolDefinition dt : declaredTools) {
+                    if (dt.getName() != null && presentNames.add(dt.getName())) {
+                        merged.add(dt);
+                        added++;
+                    }
+                }
+                if (added > 0) {
+                    tools = merged;
+                    log.info("Agent {} declared-tool merge added {} tool(s) missing from bif discovery",
+                            agentCode, added);
+                }
+            }
+
             log.info("Agent {} tools: selected={}, d1={}, provider={}, model={}",
                     agentCode, tools.size(),
                     qualityIssue == null ? "active" : "fallback", resolvedProviderCode, model);

@@ -72,6 +72,7 @@ class AgentRunServiceSyncTest {
     @Mock private AiTraceService aiTraceService;
     @Mock private ToolLoopService toolLoopService;
     @Mock private DynamicDataMapper dynamicDataMapper;
+    @Mock private DeclaredAgentToolResolver declaredAgentToolResolver;
     @Mock private CommandExecutor commandExecutor;
     @Mock private NamedQueryService namedQueryService;
     @Mock private LlmProviderFactory providerFactory;
@@ -102,6 +103,7 @@ class AgentRunServiceSyncTest {
                 aiTraceService,
                 toolLoopService,
                 dynamicDataMapper,
+                declaredAgentToolResolver,
                 commandExecutor,
                 namedQueryService,
                 objectMapper,
