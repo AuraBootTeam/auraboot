@@ -92,24 +92,56 @@ public class CapabilityEvalService {
      */
     public List<CapabilityEvalCase> loadRegisteredCases(Long tenantId) {
         List<AgentEvalCase> rows = agentEvalCaseMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AgentEvalCase>()
+                new LambdaQueryWrapper<AgentEvalCase>()
                         .eq(AgentEvalCase::getTenantId, tenantId)
                         .and(w -> w.eq(AgentEvalCase::getDeletedFlag, false)
                                 .or().isNull(AgentEvalCase::getDeletedFlag)));
+        return mapRows(rows);
+    }
+
+    /**
+     * Load all active eval cases for this tenant, grouped by {@code agent_code}.
+     * Enables per-agent regression isolation: each agent's cases are evaluated and
+     * persisted with a scope tag equal to the agent code, so the baseline window query
+     * for agent A never sees runs tagged for agent B.
+     *
+     * @return map keyed by agentCode → list of eval cases for that agent
+     */
+    public Map<String, List<CapabilityEvalCase>> loadRegisteredCasesByAgent(Long tenantId) {
+        List<AgentEvalCase> rows = agentEvalCaseMapper.selectList(
+                new LambdaQueryWrapper<AgentEvalCase>()
+                        .eq(AgentEvalCase::getTenantId, tenantId)
+                        .and(w -> w.eq(AgentEvalCase::getDeletedFlag, false)
+                                .or().isNull(AgentEvalCase::getDeletedFlag)));
+        Map<String, List<CapabilityEvalCase>> result = new LinkedHashMap<>();
+        for (AgentEvalCase r : rows) {
+            String agentCode = r.getAgentCode() != null ? r.getAgentCode() : "__unknown__";
+            result.computeIfAbsent(agentCode, k -> new ArrayList<>())
+                    .add(mapRow(r));
+        }
+        return result;
+    }
+
+    /** Maps a list of DB rows to CapabilityEvalCase DTOs using shared mapping logic. */
+    private List<CapabilityEvalCase> mapRows(List<AgentEvalCase> rows) {
         List<CapabilityEvalCase> out = new ArrayList<>();
         for (AgentEvalCase r : rows) {
-            out.add(CapabilityEvalCase.builder()
-                    .caseId(r.getCaseId())
-                    .category(r.getCategory())
-                    .taskDescription(r.getTaskDescription())
-                    .expectedToolCodes(r.getExpectedToolCodes())
-                    .forbiddenToolCodes(r.getForbiddenToolCodes())
-                    .expectedInputKeys(r.getExpectedInputKeys())
-                    .expectedRiskLevel(r.getExpectedRiskLevel())
-                    .expectsConfirmation(Boolean.TRUE.equals(r.getExpectsConfirmation()))
-                    .build());
+            out.add(mapRow(r));
         }
         return out;
+    }
+
+    private CapabilityEvalCase mapRow(AgentEvalCase r) {
+        return CapabilityEvalCase.builder()
+                .caseId(r.getCaseId())
+                .category(r.getCategory())
+                .taskDescription(r.getTaskDescription())
+                .expectedToolCodes(r.getExpectedToolCodes())
+                .forbiddenToolCodes(r.getForbiddenToolCodes())
+                .expectedInputKeys(r.getExpectedInputKeys())
+                .expectedRiskLevel(r.getExpectedRiskLevel())
+                .expectsConfirmation(Boolean.TRUE.equals(r.getExpectsConfirmation()))
+                .build();
     }
 
     /**
@@ -134,10 +166,30 @@ public class CapabilityEvalService {
     }
 
     /**
+     * Full evaluation with explicit evalMode and a scope tag for per-agent regression isolation.
+     * The scope is stored on the persisted {@link AbCapabilityEvalRun} row so that the baseline
+     * window query for agent A only sees runs tagged {@code scope=agentCode-A}.
+     *
+     * @param scope optional isolation tag (e.g. agentCode). {@code null} → tenant-aggregate run (back-compat).
+     */
+    public Map<String, Object> evaluateToolSelection(Long tenantId, String evalMode,
+                                                      List<CapabilityEvalCase> cases, String scope) {
+        Map<String, Object> report = evaluateToolSelectionInternal(tenantId, evalMode, cases, scope);
+        return report;
+    }
+
+    /**
      * Full evaluation with explicit evalMode, 5-dimension scoring, and persistence.
+     * Back-compat overload: scope = null (tenant-aggregate, no per-agent isolation).
      */
     public Map<String, Object> evaluateToolSelection(Long tenantId, String evalMode,
                                                       List<CapabilityEvalCase> cases) {
+        return evaluateToolSelectionInternal(tenantId, evalMode, cases, null);
+    }
+
+    /** Internal implementation shared by both 3-arg and 4-arg public overloads. */
+    private Map<String, Object> evaluateToolSelectionInternal(Long tenantId, String evalMode,
+                                                               List<CapabilityEvalCase> cases, String scope) {
         // An eval run must never be labeled "llm" when no model was actually
         // consulted — degrade explicitly and persist the truthful mode.
         if ("llm".equals(evalMode) && !llmToolSelectionService.isAvailable(tenantId)) {
@@ -311,8 +363,8 @@ public class CapabilityEvalService {
         report.put("correctSelections", correctSelections);
         report.put("cases", caseResults);
 
-        // Persist result and check for regression
-        persistEvalRun(tenantId, evalMode, report);
+        // Persist result and check for regression (with per-agent scope isolation when scope != null)
+        persistEvalRun(tenantId, evalMode, report, scope);
 
         return report;
     }
@@ -432,14 +484,19 @@ public class CapabilityEvalService {
 
     /**
      * Persists the eval run to ab_capability_eval_run and triggers regression detection.
+     *
+     * @param scope optional per-agent isolation tag; stored on the run row so the baseline
+     *              window query for agent A only sees runs tagged with the same scope.
+     *              {@code null} → tenant-aggregate run (back-compat).
      */
-    private void persistEvalRun(Long tenantId, String evalMode, Map<String, Object> report) {
+    private void persistEvalRun(Long tenantId, String evalMode, Map<String, Object> report, String scope) {
         try {
             AbCapabilityEvalRun run = new AbCapabilityEvalRun();
             run.setPid(UniqueIdGenerator.generate());
             run.setTenantId(tenantId);
             run.setRunAt(Instant.now());
             run.setEvalMode(evalMode);
+            run.setScope(scope);
             run.setTotalCases((Integer) report.get("totalCases"));
             run.setToolSelectionAccuracy((Double) report.get("toolSelectionAccuracy"));
             run.setParameterCompletionRate((Double) report.get("parameterCompletionRate"));
@@ -450,33 +507,37 @@ public class CapabilityEvalService {
             run.setCreatedAt(Instant.now());
             evalRunMapper.insert(run);
 
-            // Regression detection against the previous run
-            checkRegression(tenantId, run, report);
+            // Regression detection using scoped baseline window (per-agent isolation when scope != null)
+            checkRegression(tenantId, run, report, scope);
         } catch (Exception e) {
             log.warn("Failed to persist eval run: {}", e.getMessage());
         }
     }
 
     /**
-     * Compares the current run against the most recent previous run and emits a
-     * warning (plus adds a report field) when tool-selection accuracy drops > 5%.
+     * Compares the current run against the rolling baseline and emits a warning (plus
+     * adds a report field) when any dimension regresses beyond tolerance.
+     *
+     * <p><strong>Per-agent isolation (D3b):</strong> when {@code scope} is non-null the
+     * baseline window query is filtered to {@code scope = agentCode}, so agent A's
+     * declining history never contaminates agent B's baseline.  When {@code scope} is
+     * {@code null} the query falls back to a tenant-aggregate window (back-compat for
+     * legacy unscoped runs).
      */
-    private void checkRegression(Long tenantId, AbCapabilityEvalRun current, Map<String, Object> report) {
+    private void checkRegression(Long tenantId, AbCapabilityEvalRun current,
+                                  Map<String, Object> report, String scope) {
         try {
-            // Unified onto the shared CapabilityEvalRegressionGate (also used by
-            // ScheduledCapabilityEvalJob). This inline check keeps its "relative
-            // regression only" character — it filters to dimensions that *regressed*
-            // against the rolling baseline and ignores absolute-floor findings (the
-            // scheduled job's gate concern) — but now covers all 5 dimensions over a
-            // rolling-median baseline instead of only tool-accuracy vs the single
-            // previous run.
-            List<AbCapabilityEvalRun> window = evalRunMapper.selectList(
-                    new LambdaQueryWrapper<AbCapabilityEvalRun>()
-                            .eq(AbCapabilityEvalRun::getTenantId, tenantId)
-                            .ne(AbCapabilityEvalRun::getPid, current.getPid())
-                            .orderByDesc(AbCapabilityEvalRun::getRunAt)
-                            .last("LIMIT 5")
-            );
+            // Build baseline window query with optional scope filter.
+            LambdaQueryWrapper<AbCapabilityEvalRun> wrapper = new LambdaQueryWrapper<AbCapabilityEvalRun>()
+                    .eq(AbCapabilityEvalRun::getTenantId, tenantId)
+                    .ne(AbCapabilityEvalRun::getPid, current.getPid());
+            if (scope != null) {
+                // D3b: per-agent isolation — only compare against runs for the same agent scope.
+                wrapper.eq(AbCapabilityEvalRun::getScope, scope);
+            }
+            wrapper.orderByDesc(AbCapabilityEvalRun::getRunAt).last("LIMIT 5");
+
+            List<AbCapabilityEvalRun> window = evalRunMapper.selectList(wrapper);
             CapabilityEvalRegressionGate.Verdict verdict = CapabilityEvalRegressionGate.evaluate(
                     current, window, CapabilityEvalRegressionGate.Thresholds.defaults());
             List<CapabilityEvalRegressionGate.Finding> regressions = verdict.findings().stream()
@@ -485,8 +546,8 @@ public class CapabilityEvalService {
             if (!regressions.isEmpty()) {
                 String summary = regressions.stream()
                         .map(CapabilityEvalRegressionGate.Finding::detail)
-                        .collect(java.util.stream.Collectors.joining("; "));
-                log.warn("Capability-eval regression tenant={}: {}", tenantId, summary);
+                        .collect(Collectors.joining("; "));
+                log.warn("Capability-eval regression tenant={} scope={}: {}", tenantId, scope, summary);
                 report.put("regression_warning", summary);
             }
         } catch (Exception e) {
