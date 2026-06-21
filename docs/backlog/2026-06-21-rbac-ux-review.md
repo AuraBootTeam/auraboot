@@ -2,9 +2,18 @@
 title: RBAC / permission-management — UX review (screenshot-verified)
 date: 2026-06-21
 type: backlog
-status: open
+status: resolved
 area: permission / rbac / org
 ---
+
+> **Resolved 2026-06-21** by the v2 capability-primary IA reorg (commit `ef9ef115a`,
+> branch `feat/rbac-ux-and-tests`): P0 i18n leaks fixed (3-arg `t()` + registered keys), the
+> 3-UI redundancy collapsed (assignments tab retired, matrix folded into the ③ advanced escape
+> hatch, capability editor is the default surface), capability labels are now business language
+> (convention-derive uses the representative permission name; module groups localized), and the
+> add-member org picker shows a graceful empty state. Screenshot-verified host-first golden
+> (`tests/e2e/permission/permission-v2-golden.spec.ts`, 4/4). The convention-derive Save no-op
+> (P1) was fixed in the prior foundation commit `611687cd3`.
 
 # RBAC permission-management — UX review
 

@@ -2,9 +2,17 @@
 title: Permission v2 capability — UI golden findings (env + convention-derive save gap)
 date: 2026-06-21
 type: backlog
-status: open
+status: resolved
 area: permission / rbac
 ---
+
+> **Resolved 2026-06-21** (commit `ef9ef115a`, branch `feat/rbac-ux-and-tests`): finding #2
+> (convention-derive Save no-op) was fixed in the foundation commit `611687cd3`
+> (`applyCapabilitySelection` resolves against the full convention-derived universe with a
+> revoke universe bounded to fully-held capabilities). Finding #1 (`@auraboot/track` SSR) is an
+> env/lockfile concern tracked in the handover; the host-first golden stack
+> (`scripts/oss-golden-stack.sh`) handles the symlink at bring-up. The v2 IA reorg ships
+> business-language labels + the ③ advanced escape hatch, screenshot-verified.
 
 # Permission v2 capability management — UI golden findings
 
