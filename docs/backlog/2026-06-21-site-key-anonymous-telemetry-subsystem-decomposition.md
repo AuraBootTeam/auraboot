@@ -37,7 +37,9 @@ related:
 
 **滥用防护**(限流 / origin / 配额)是 SP2 的核心而非附属——公开未鉴权端点没有它就是 DDoS / 脏数据入口。若 SP2 过大可再拆 SP2a(keyed 解析 + 基础校验)/ SP2b(限流 + origin allowlist + 配额),但默认 SP2 含基线防护。
 
-> **SP1 build 实测补充(2026-06-21,SP1 已交付):** SP1 走 dynamic model + DSL + platform `@Component` handler 落地(详见 SP1 spec §9.1)。实测发现**配置层无法给 `mt_` 动态模型表加 `site_key` 唯一/检索索引**(本平台版本对 `mt_` 表 0/9 有 feature 驱动索引)。SP1 已用 handler 跨租户预检保证唯一性,但 **`(tenant_id, site_key)` 唯一索引 + `site_key` resolve 索引是 SP2 的硬前置**:SP2 建匿名 ingestion 热路径(高频 `resolveTenant`)前必须加索引,否则 seq-scan;并复核全局唯一性兜底。
+> **SP1 build 实测补充(2026-06-21,SP1 已交付):** SP1 走 dynamic model + DSL + platform `@Component` handler 落地(详见 SP1 spec §9.1)。实测发现**配置层无法给 `mt_` 动态模型表加 `site_key` 唯一/检索索引**(本平台版本对 `mt_` 表 0/9 有 feature 驱动索引)。SP1 已用 handler 跨租户预检保证唯一性,但 **`site_key` DB 索引是 SP2 的硬前置**:SP2 建匿名 ingestion 热路径(高频 `resolveTenant`)前必须加索引,否则 seq-scan;并复核全局唯一性兜底。
+>
+> **🔧 SP2 纠错(2026-06-21,已实现)**:本段原写 `(tenant_id, site_key)` 唯一索引 —— **错**。`resolveTenant` 跨租户(`WHERE site_key=?`,不带 tenant_id),复合唯一既喂不动查询又允许两租户同 key 串台。正确是**全局 `UNIQUE(site_key)` 单列**(SP2 用平台 `createFieldIndex` 落地,索引名 `uk_mt_behavior_site_key_site_key`)。详见 `docs/backlog/2026-06-21-mt-dynamic-table-index-creation-analysis.md` §3。
 
 ## 执行顺序与会话边界
 

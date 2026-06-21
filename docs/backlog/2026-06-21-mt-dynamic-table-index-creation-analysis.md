@@ -162,7 +162,7 @@ SP1 的 spec / handover / 分解文档都把硬前置写成 **`(tenant_id, site_
 
 > 两触发同一幂等动作:fresh DB 走 ① 在 import 时建;已有 DB 走 ② 在 ready 时补;之后任何 re-import 走 ① no-op。无论哪条路径,系统稳态都保证索引存在。
 
-- **目标 DDL**(由 `createFieldIndex` 生成,无需手写):`CREATE UNIQUE INDEX idx_mt_behavior_site_key_site_key_unique ON mt_behavior_site_key (site_key)`。
+- **目标 DDL**(由 `createFieldIndex` 生成,无需手写;索引名取 `generateIndexName` 规则 `uk_<table>_<col>`):`CREATE UNIQUE INDEX uk_mt_behavior_site_key_site_key ON mt_behavior_site_key (site_key)`。
 - **status 维度**:resolve 查 `status='active'`。是否再加 `(site_key, status)` 或 `WHERE status='active'` 的部分索引,SP2 按 explain 实测决定;**全局唯一必须建在 `site_key` 单列上**(否则唯一性允许同 key 不同 status 重复,破坏完整性),status 只作查询优化的附加索引,不并入唯一键。
 
 ### 5.3 不变量与 defense-in-depth 的分工

@@ -67,7 +67,7 @@ related:
 - `SiteKeyIndexInitializer`(`@Component`):
   - `@EventListener` `PluginImportCompletedEvent`:`"behavior".equals(e.getPluginCode())` → `createFieldIndex("behavior_site_key","site_key",IndexType.UNIQUE)`(镜像 `CapabilitySyncListener`)。
   - `@EventListener` `ApplicationReadyEvent`:`tableExists("mt_behavior_site_key")` 才调同一幂等方法(兜底老部署)。
-- 产出:`CREATE UNIQUE INDEX idx_mt_behavior_site_key_site_key_unique ON mt_behavior_site_key (site_key)`(全局、单列、自带 `indexExists` 幂等)。
+- 产出:`CREATE UNIQUE INDEX uk_mt_behavior_site_key_site_key ON mt_behavior_site_key (site_key)`(全局、单列、自带 `indexExists` 幂等;索引名由平台 `generateIndexName` = `uk_<table>_<col>` 生成)。
 - resolve 是否加 `status` 附加索引按 `EXPLAIN` 实测;**唯一键只在 `site_key` 单列**。
 - 同步纠正 SP1 spec §9.1 / 分解文档 / handover 把 `(tenant_id, site_key)` 措辞改为全局 `UNIQUE(site_key)`(标 SP2 纠错)。
 

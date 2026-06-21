@@ -89,7 +89,8 @@ All merged in #984 (squash `e2c5bc32e`). See PR diff; not duplicated here.
 
 ## Next Steps
 1. **SP2 — 匿名 ingestion 路径(fresh 会话)**:`/api/collect` keyed-anonymous 分支(从 site-key resolve tenant、不走 JWT)+ security 开放 keyed 路径 + 滥用防护基线(限流/origin/payload/key 状态).
-2. **⚠️ SP2 硬前置(必做先于上线)**:给 `mt_behavior_site_key` 加 `(tenant_id, site_key)` 唯一索引 + `site_key` resolve 索引(`resolveTenant` 当前 seq-scan;SP1 仅 handler 跨租户预检兜底)+ 复核全局唯一性.
+2. **⚠️ SP2 硬前置(必做先于上线)**:给 `mt_behavior_site_key` 加 **全局 `UNIQUE(site_key)` 单列索引**（`resolveTenant` 当前 seq-scan;SP1 仅 handler 跨租户预检兜底）。
+   > **🔧 SP2 纠错(2026-06-21,已实现)**:此处原写 `(tenant_id, site_key)` 唯一 —— 错(resolve 跨租户不带 tenant_id,复合唯一喂不动查询且允许跨租户同 key 串台）。SP2 已用平台 `createFieldIndex` 落地全局 `UNIQUE(site_key)`（索引名 `uk_mt_behavior_site_key_site_key`），见 `docs/backlog/2026-06-21-mt-dynamic-table-index-creation-analysis.md`。
 3. SP3(SDK 公开模式)、SP4(端到端匿名采集 golden)按依赖序,各自 fresh 会话.
 
 ## Context for Next Session
