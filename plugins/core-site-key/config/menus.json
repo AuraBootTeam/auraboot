@@ -1,0 +1,29 @@
+[
+  {
+    "code": "site_key_root",
+    "parentCode": null,
+    "name:zh-CN": "遥测管理",
+    "name:en": "Telemetry",
+    "path": null,
+    "component": null,
+    "icon": "IconKey",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 320,
+    "visible": true
+  },
+  {
+    "code": "site_key_list",
+    "parentCode": "site_key_root",
+    "name:zh-CN": "站点密钥",
+    "name:en": "Site Keys",
+    "path": "/p/behavior_site_key",
+    "pageKey": "behavior_site_key_list",
+    "component": null,
+    "icon": "IconKey",
+    "type": 1,
+    "permissionCode": "behavior.site_key.read",
+    "orderNo": 1,
+    "visible": true
+  }
+]

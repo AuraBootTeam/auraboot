@@ -1,0 +1,33 @@
+[
+  {
+    "code": "behavior_site_key:create",
+    "displayName:zh-CN": "新建站点密钥",
+    "displayName:en": "Create Site Key",
+    "type": "create",
+    "modelCode": "behavior_site_key",
+    "inputFields": [
+      "name"
+    ],
+    "permissions": [
+      "behavior.site_key.create"
+    ],
+    "agent_hint": "Create a public site key. Caller provides only the display name; the platform server-generates the public abk_ key and sets status=active. Returns the created record including the generated site_key.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "behavior_site_key:disable",
+    "displayName:zh-CN": "禁用站点密钥",
+    "displayName:en": "Disable Site Key",
+    "type": "custom",
+    "modelCode": "behavior_site_key",
+    "permissions": [
+      "behavior.site_key.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认禁用该站点密钥？禁用后该密钥将停止采集匿名遥测。",
+      "confirmMessage:en": "Disable this site key? Anonymous telemetry collection will stop for it."
+    },
+    "agent_hint": "Disable a site key by record id (pid). Sets status=disabled and evicts the resolver cache so it no longer resolves to its tenant.",
+    "cmd_risk_level": "L2"
+  }
+]

@@ -1,0 +1,52 @@
+{
+  "pageKey": "behavior_site_key_detail",
+  "modelCode": "behavior_site_key",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "behavior_site_key_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "disable",
+          "danger": true,
+          "permissionCode": "behavior.site_key.manage",
+          "label": {
+            "zh-CN": "禁用",
+            "en-US": "Disable"
+          },
+          "confirm": "behavior_site_key.disable.confirm",
+          "action": {
+            "type": "command",
+            "command": "behavior_site_key:disable"
+          }
+        }
+      ]
+    },
+    {
+      "id": "section_basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "站点密钥信息",
+        "en-US": "Site Key Information"
+      },
+      "columns": 2,
+      "fields": [
+        { "field": "name", "readOnly": true },
+        { "field": "status", "readOnly": true },
+        { "field": "site_key", "span": 2, "readOnly": true },
+        { "field": "created_at", "readOnly": true }
+      ]
+    }
+  ],
+  "name:zh-CN": "站点密钥详情",
+  "name:en": "Site Key Detail",
+  "title": {
+    "zh-CN": "站点密钥详情",
+    "en": "Site Key Detail"
+  }
+}
