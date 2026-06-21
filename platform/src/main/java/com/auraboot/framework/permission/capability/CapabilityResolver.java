@@ -1,6 +1,7 @@
 package com.auraboot.framework.permission.capability;
 
 import com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -18,6 +19,7 @@ import java.util.Set;
  * an authoring/display abstraction — it always resolves down to existing permission codes, so the
  * runtime engine is untouched.
  */
+@Component
 public class CapabilityResolver {
 
     public List<CapabilityGroup> resolve(List<CapabilityDefinitionDTO> declarations,
