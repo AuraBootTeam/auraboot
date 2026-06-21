@@ -1,3 +1,4 @@
+import { it, expect } from 'vitest';
 import { createTracker } from '../tracker';
 
 it('batches and flushes via keepalive post at batchSize', async () => {

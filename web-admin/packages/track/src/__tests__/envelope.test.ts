@@ -1,3 +1,4 @@
+import { it, expect } from 'vitest';
 import { buildEvent, sanitizeRoute } from '../envelope';
 
 it('builds a flat camelCase page_view envelope', () => {
