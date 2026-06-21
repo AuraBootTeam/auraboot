@@ -10,11 +10,11 @@ import lombok.Data;
 import java.time.Instant;
 
 /**
- * Persisted capability declaration (ab_capability), imported from a plugin's capabilities.json.
+ * Persisted capability declaration (ab_permission_capability), imported from a plugin's capabilities.json.
  * {@code includes} / {@code unmasksFields} are stored comma-separated.
  */
 @Data
-@TableName("ab_capability")
+@TableName("ab_permission_capability")
 public class CapabilityRecord {
 
     @TableId(type = IdType.AUTO)
@@ -36,8 +36,9 @@ public class CapabilityRecord {
 
     private String description;
 
-    /** Comma-separated permission codes. */
-    private String includes;
+    /** Comma-separated permission codes. Column include_codes (field matches via underscore-to-camel;
+     *  not named 'includes' because that is a jsqlparser keyword and breaks the MP SQL parser). */
+    private String includeCodes;
 
     private String tier;
 

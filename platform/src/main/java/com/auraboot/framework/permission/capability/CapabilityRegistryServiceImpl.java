@@ -1,6 +1,7 @@
 package com.auraboot.framework.permission.capability;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.permission.capability.mapper.CapabilityMapper;
 import com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +43,7 @@ public class CapabilityRegistryServiceImpl implements CapabilityRegistryService 
         r.setName(dto.getNameZhCN());
         r.setNameEn(dto.getNameEn());
         r.setDescription(dto.getDescription());
-        r.setIncludes(joinCsv(dto.getIncludes()));
+        r.setIncludeCodes(joinCsv(dto.getIncludes()));
         r.setTier(dto.getTier());
         r.setSensitive(Boolean.TRUE.equals(dto.getSensitive()));
         r.setUnmasksFields(joinCsv(dto.getUnmasksFields()));
@@ -57,7 +58,7 @@ public class CapabilityRegistryServiceImpl implements CapabilityRegistryService 
                 .nameZhCN(r.getName())
                 .nameEn(r.getNameEn())
                 .description(r.getDescription())
-                .includes(splitCsv(r.getIncludes()))
+                .includes(splitCsv(r.getIncludeCodes()))
                 .tier(r.getTier())
                 .sensitive(Boolean.TRUE.equals(r.getSensitive()))
                 .unmasksFields(splitCsv(r.getUnmasksFields()))
