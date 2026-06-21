@@ -23,6 +23,9 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 
 /**
  * Integration test for the Customer Service Agent end-to-end flow with real LLM.
@@ -267,6 +270,19 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
                     assertThat(status).isIn("completed", "success", "failed");
                 });
 
+        // The reply email must have been sent once the approved send_customer_reply tool resumed.
+        // Guarded on a successful terminal status — a post-approval failure may not reach the send.
+        MetaContext.setSystemTenantContext(tenantId);
+        List<Map<String, Object>> finalRuns = dynamicDataMapper.selectByQuery(
+                "SELECT run_status FROM ab_agent_run WHERE tenant_id = #{params.tenantId} " +
+                        "AND task_id = #{params.taskPid} ORDER BY created_at DESC LIMIT 1",
+                Map.of("tenantId", tenantId, "taskPid", taskPid));
+        String finalStatus = finalRuns.isEmpty() ? null : (String) finalRuns.get(0).get("run_status");
+        if ("completed".equals(finalStatus) || "success".equals(finalStatus)) {
+            verify(emailSender, atLeastOnce()).send(anyString(), anyString(), anyString());
+            log.info("Verified reply email was sent after approval");
+        }
+
         log.info("Agent resumed and completed after approval");
     }
 
@@ -471,6 +487,9 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
                 3. Draft a professional reply email addressing the customer's concerns.
                 4. Use the send_customer_reply tool to send the reply email to the customer.
                    Parameters: recipient_email, reply_subject, reply_body.
+                5. After the reply is sent, log the outreach as a CRM activity using the dsl.command tool
+                   with command code "crm:create_activity" (fields: crm_act_type="email", crm_act_subject,
+                   crm_act_content, crm_act_date, crm_act_status="completed").
 
                 Always be professional, empathetic, and solution-oriented.
                 """;
