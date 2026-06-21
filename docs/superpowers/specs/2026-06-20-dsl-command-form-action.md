@@ -72,7 +72,7 @@ DSL:
 
 ## 测试策略
 
-- **前端单测**（`ActionRegistry` __tests__）:`command.execute` 带 `inputFields` → mock `'dialog:form'` event/promptInputForm → 提交时 payload 含收集的字段值;取消 → 不调 fetchResult。向后兼容:无 inputFields 时行为不变。
+- **前端单测**（`ActionRegistry` **tests**）:`command.execute` 带 `inputFields` → mock `'dialog:form'` event/promptInputForm → 提交时 payload 含收集的字段值;取消 → 不调 fetchResult。向后兼容:无 inputFields 时行为不变。
 - **后端**:`import-directory-sync` 对含 `inputFields` 的 page DSL 返回 `success:true`（host-first golden 里验，或一个 fixture）。
 - **Host-first 真浏览器 golden**（§2.2,零 docker,复用账号池 slice-2 隔离栈 recipe）:爬虫 cr_account detail 页点"录入凭据" → 弹表单 → 填 cookies → 提交 → Redis `cr:acct:cred:{ref}` 有 json material + cred-meta → `cr_acct_cred_present` 刷成真 → **detail 不回显 cookie 明文**。这同时验证了平台能力 + 爬虫消费。
 - **文档**:`auraboot/docs/system-reference/core/09-DSL能力边界完整参考.md` 加 `command.execute` 的 `inputFields` 说明 + DSL 样例。

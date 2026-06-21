@@ -81,7 +81,7 @@ Command (run from `platform/`):
 ```
 - `NlModelingManifestPostProcessingTest` — **tests=22 skipped=0 failures=0 errors=0** (17 prior + 5 new
   V4-normalizer: hoist+version+layout+kind, already-v4 pass-through, flex→stack, missing-layout default
-  + null-safe, end-to-end `buildManifest` normalizes an LLM-emitted V2 page).
+  - null-safe, end-to-end `buildManifest` normalizes an LLM-emitted V2 page).
 - `PageConfigProvenanceTest` — **tests=8 skipped=0 failures=0 errors=0** (tag defaults, preserve explicit
   source/lock, isValidSource, locked-survives-regen, manual-not-overwritten, unlocked-ai-replaced,
   null-existing pass-through, ordering).

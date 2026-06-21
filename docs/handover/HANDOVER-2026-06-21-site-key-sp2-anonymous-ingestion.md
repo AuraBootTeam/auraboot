@@ -82,7 +82,7 @@ All merged in **OSS #995** (squash `4a38ae287`) and **ENT #640** (squash `cf6f08
 - **D**:dispatch/自己写「平台会生成的标识符」(索引名/约束名/表名)前先读生成规则(`generateIndexName` 等),不假设(§15 已有,本会话再触一次)。
 
 ### 已固化 / 待固化(更新文档)
-- [x] 已固化 ENT canonical(**#640 MERGED**):`engineering-gotchas/backend-spring-db.md` §「给动态 mt_ 模型表加 DB 索引」+ `AGENTS.md` 速查表行(动态 mt_ 索引 → createFieldIndex 双触发)。
+- [x] 已固化 ENT canonical(**#640 MERGED**):`engineering-gotchas/backend-spring-db.md` §「给动态 mt_模型表加 DB 索引」+ `AGENTS.md` 速查表行(动态 mt_ 索引 → createFieldIndex 双触发)。
 - [x] 已写 OSS 深度参考(**#995 MERGED**):`docs/backlog/2026-06-21-mt-dynamic-table-index-creation-analysis.md`(用户场景叙事 + 选型 + 红线相容性 + 样板)。
 - [ ] 待固化(owner 决策,单次发生暂留本 handover):**whitelist/安全链后端 IT 用 RANDOM_PORT+TestRestTemplate 而非 MockMvc**(MockMvc `getServletPath()` 空 → `shouldNotFilter` 假 401)。若复发 → 升 `engineering-gotchas/test-infra.md` 或 `e2e-playwright.md` + AGENTS 速查表一行。
 
