@@ -265,10 +265,13 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
 
   const formattedValue = `${prefix || ''}${formatValue(getValue())}${suffix || ''}`;
   const firstRow = data?.rows?.[0] ?? {};
+  // When `metricField` is set the caller targets a single column from a multi-field
+  // response (e.g. four KPI cards each reading one field of the same overview query).
+  // In that case we must NOT auto-expand to a multi-card grid — stay in single-value mode.
   const effectiveCards: NumberCardItem[] | undefined =
     cards?.length
       ? cards
-      : useApiBranch && Object.keys(firstRow).length > 1
+      : useApiBranch && !metricField && Object.keys(firstRow).length > 1
         ? Object.keys(firstRow).slice(0, 6).map((field) => ({ field, label: field }))
         : undefined;
 
