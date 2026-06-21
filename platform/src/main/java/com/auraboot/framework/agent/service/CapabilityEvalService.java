@@ -88,8 +88,7 @@ public class CapabilityEvalService {
     /**
      * Load all active eval cases registered for this tenant from {@code ab_agent_eval_case}.
      * Active = {@code deleted_flag = FALSE} or NULL. Maps each DB row to a {@link CapabilityEvalCase}.
-     * This is the DB-backed source that replaces the hardcoded {@code AgentArchetypeEvalCases.all()}
-     * for tenants that have imported agent definitions with eval cases.
+     * This is the DB-backed source for tenants that have imported agent definitions with eval cases.
      */
     public List<CapabilityEvalCase> loadRegisteredCases(Long tenantId) {
         List<AgentEvalCase> rows = agentEvalCaseMapper.selectList(

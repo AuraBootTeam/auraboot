@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Live-LLM golden for the phase-2 <strong>device operations agent</strong>
- * ({@link AgentArchetypeEvalCases#deviceOperationsAgent()}) against real DeepSeek.
+ * (device_operations archetype) against real DeepSeek.
  * Proves the operations decision contract: diagnose → read; an explicit, confirmed
  * control request → the device-control command; a look/status intent → never an
  * auto-write. (The confirmation <em>gate</em> itself — riskLevel → requiresApproval —
@@ -186,10 +186,9 @@ class DeviceOperationsAgentLiveEvalIT extends BaseIntegrationTest {
 
     /**
      * Test-local fixture: the device operations agent eval cases.
-     * These were previously in {@code AgentArchetypeEvalCases.deviceOperationsAgent()} and have
-     * been migrated to the pcba-manufacturing plugin's agent-definitions.json (loaded from DB via
-     * CapabilityEvalService.loadRegisteredCases). Duplicated here as test fixture data for the
-     * LLM tool-selection assertions; the plugin→DB→engine flow is proven by separate ITs.
+     * These were migrated to the pcba-manufacturing plugin's agent-definitions.json (loaded from
+     * DB via CapabilityEvalService.loadRegisteredCases). Duplicated here as test fixture data for
+     * the LLM tool-selection assertions; the plugin→DB→engine flow is proven by separate ITs.
      * Known tradeoff: mild duplication between this fixture and the plugin JSON.
      */
     private static List<CapabilityEvalCase> deviceOperationsAgentCases() {
