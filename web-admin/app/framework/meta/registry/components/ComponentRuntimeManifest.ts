@@ -51,6 +51,9 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   userselect: runtime('picker', 'UserSelect', {
     aliases: ['SmartUserSelect', 'UserSelect', 'userselect'],
   }),
+  ownerselect: runtime('picker', 'OwnerSelect', {
+    aliases: ['SmartOwnerSelect', 'OwnerSelect', 'ownerselect'],
+  }),
   organizationselect: runtime('picker', 'OrganizationSelect', {
     aliases: ['SmartOrganizationSelect', 'OrganizationSelect', 'organizationselect'],
   }),

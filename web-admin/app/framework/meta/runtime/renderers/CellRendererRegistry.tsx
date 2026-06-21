@@ -16,6 +16,7 @@
 
 import React from 'react';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
+import { OwnerCell } from '~/framework/meta/runtime/renderers/OwnerCell';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
@@ -290,6 +291,15 @@ cellRendererRegistry.register('tag', ({ value, column, locale, t }) => {
 
   const { label, color } = resolveTag(value);
   return <StatusDot tone={resolveStatusTone(color)} label={label} />;
+});
+
+/**
+ * 归属渲染器 - polymorphic owner (owner_type + owner_id) → 👤 user / 👥 team + name.
+ * Reads the sibling owner_type column from the row; resolves the pid to a name.
+ */
+cellRendererRegistry.register('owner', ({ value, record, column }) => {
+  const typeField = (column.render as any)?.ownerTypeField || 'owner_type';
+  return <OwnerCell ownerType={record?.[typeField]} ownerId={value} />;
 });
 
 /**
