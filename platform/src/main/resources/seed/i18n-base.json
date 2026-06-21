@@ -454,6 +454,21 @@
     "en-US": "Permissions"
   },
   {
+    "key": "admin.permission.tab.capabilities",
+    "zh-CN": "能力",
+    "en-US": "Capabilities"
+  },
+  {
+    "key": "admin.permission.selectRole",
+    "zh-CN": "请选择角色",
+    "en-US": "Select a role"
+  },
+  {
+    "key": "permission.capability.sensitive",
+    "zh-CN": "敏感",
+    "en-US": "Sensitive"
+  },
+  {
     "key": "admin.permission.tab.roles",
     "zh-CN": "角色管理",
     "en-US": "Roles"
