@@ -120,6 +120,25 @@ export interface ChartVisualOptions {
 }
 
 /**
+ * Scatter-family options. Renderer-NEUTRAL declarative intent specific to the
+ * scatter/bubble family, which has no dimension→series fan-out (its measures map onto
+ * AXIS ROLES inside a single series: measures[0]→X, measures[1]→Y, measures[2]→size).
+ * These do not fit `ChartVisualOptions` (axis-label text and a numeric size range are
+ * scatter-specific), so they live here. They are NOT renderer-native config — axis
+ * labels and a size range are abstract semantic intents each target draws its own way.
+ */
+export interface ChartScatterOptions {
+  /** Display label for the X (value) axis (defaults to the X measure field). */
+  xAxisLabel?: string;
+  /** Display label for the Y (value) axis (defaults to the Y measure field). */
+  yAxisLabel?: string;
+  /** Size the points by `measures[2]` (bubble chart) instead of a fixed symbol size. */
+  bubbleMode?: boolean;
+  /** [min, max] symbol-size range used when `bubbleMode` is on. */
+  symbolSizeRange?: [number, number];
+}
+
+/**
  * Interaction intent. ALL of these are screen-affordances that print targets must
  * degrade explicitly (see CAPABILITY_MATRIX / validateChartSpecForTarget).
  */
@@ -153,6 +172,8 @@ export interface ChartSpec {
   drilldown?: DrillDownConfig;
   /** Renderer-neutral declarative visual options. */
   visual?: ChartVisualOptions;
+  /** Scatter/bubble-family declarative options (axis labels, bubble sizing). */
+  scatter?: ChartScatterOptions;
 }
 
 // --- render targets ----------------------------------------------------------
