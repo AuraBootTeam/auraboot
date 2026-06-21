@@ -103,7 +103,8 @@ site-key **公开非机密** → key 就是个**普通可见列**(不像 webhook
 - **🔴 site_key 的 DB 级唯一索引 — dynamic model 配置层做不到(实测推翻 spike)**:config 层 `constraints.unique:true` / `feature.searchable` **在本平台版本对 `mt_` 动态模型表系统性失效**——字段 `feature` 列在导入路径不被持久化(到表索引生成时 `field.isUnique()/isSearchable()` 读到空),实测本栈 **9 个 `mt_` 表 0 个**有 `_tenant_unique` 或 `_trgm` 索引(唯一的 1 个 trgm 在内置 `ab_` 表)。故 `mt_behavior_site_key.site_key` **无 DB 唯一索引、无 site_key 专用索引**。
   - **决策:保留 dynamic model**(功能完整:CRUD/命令/双 id/jsonb/DSL 页/权限全部真栈验证通过),**不**退平台表 `ab_behavior_site_key`——§9 的平台表 fallback 假设“注册成 model 即免费 DSL CRUD”,实测该路径需 `skipTableCreation` 模型 + `kind:detail`(非 `kind:list`)+ 自定义读端点(AGENTS gotcha),复杂度/风险更高且削弱 DSL-first,得不偿失。
   - **唯一性**:由 `SiteKeyCommandHandler` 在 create 前 `registry.existsAnyTenant(key)` 跨租户预检 + 重试保证(190-bit 随机 key 实际碰撞概率 ~0),DB 约束本为 defense-in-depth。
-  - **🟡 SP2 前置(必做,backlog)**:`(tenant_id, site_key)` 唯一索引 + `site_key` resolve 索引留 **SP2**(其建匿名 ingestion 热路径时加;`resolveTenant` 目前对小表 seq-scan,SP1 无线上负载可接受,SP2 上线前必须加索引)。属平台 dynamic-model 索引能力缺口,**不在本 feature PR 修平台**(避免大面 import-path 改动)。
+  - **🟡 SP2 前置(必做,backlog)**:**全局 `UNIQUE(site_key)` 单列索引**留 **SP2**(其建匿名 ingestion 热路径时加;`resolveTenant` 目前对小表 seq-scan,SP1 无线上负载可接受,SP2 上线前必须加索引)。属平台 dynamic-model 索引能力缺口,**不在本 feature PR 修平台**(避免大面 import-path 改动)。
+    > **🔧 SP2 纠错(2026-06-21,已实现)**:此处原写 `(tenant_id, site_key)` 唯一 —— 错(resolve 跨租户,复合唯一喂不动查询且允许跨租户同 key 串台)。SP2 已用平台 `createFieldIndex` 落地全局 `UNIQUE(site_key)`(`uk_mt_behavior_site_key_site_key`),见 `docs/backlog/2026-06-21-mt-dynamic-table-index-creation-analysis.md`。
 - **key 字母表定稿**:`abk_` + **32 base62**(`SecureRandom.nextInt` 无偏),~190 bit;`site_key` 字段 `maxLength:64`。
 - **created_at 不可作页面字段**:系统字段(`created_at`/`id`/`pid`)自动建表但**不进 model 绑定**,DSL 页引用为显示列/字段会被 `S-PAGE-FIELD-REF` 拒(validator 实测抓到);仅可用于 `defaultSort`。
 
