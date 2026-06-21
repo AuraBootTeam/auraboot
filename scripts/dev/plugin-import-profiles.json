@@ -19,7 +19,8 @@
     "crm-starter",
     "showcase",
     "agent-control-plane",
-    "workflow-demo"
+    "workflow-demo",
+    "core-dashboard"
   ],
   "e2e": [
     "core-meta",
@@ -51,7 +52,8 @@
     "core-aurabot",
     "page-manager",
     "org-management",
-    "agent-control-plane"
+    "agent-control-plane",
+    "core-dashboard"
   ],
   "pcba-agent": [
     "core-meta",

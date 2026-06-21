@@ -1,0 +1,24 @@
+{
+  "pluginId": "com.auraboot.core-dashboard",
+  "namespace": "core-dashboard",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Core Dashboard Pages",
+  "displayName:zh-CN": "核心仪表板页面",
+  "displayName:en": "Core Dashboard Pages",
+  "description": "Platform-level analytics and telemetry dashboards. Includes UV/PV behavior analytics driven by /api/analytics/behavior/* endpoints.",
+  "author": "AuraBoot Team",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "resourceDirs": {
+    "pages": "config/pages.json",
+    "menus": "config/menus.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": false,
+    "autoPublishPages": true,
+    "createResourcePermissions": false
+  }
+}
