@@ -458,6 +458,27 @@
     "zh-CN": "能力",
     "en-US": "Capabilities"
   },
+  { "key": "admin.permission.members.add", "zh-CN": "添加成员", "en-US": "Add Members" },
+  { "key": "admin.permission.members.addTitle", "zh-CN": "添加成员", "en-US": "Add Members" },
+  { "key": "admin.permission.members.addConfirm", "zh-CN": "添加所选", "en-US": "Add Selected" },
+  { "key": "admin.permission.members.addSuccess", "zh-CN": "已添加 {count} 名成员", "en-US": "{count} member(s) added" },
+  { "key": "admin.permission.members.empty", "zh-CN": "该角色暂无成员", "en-US": "No members in this role" },
+  { "key": "admin.permission.members.totalCount", "zh-CN": "共 {count} 名成员", "en-US": "{count} member(s)" },
+  { "key": "admin.permission.members.selectedCount", "zh-CN": "已选 {count} 项", "en-US": "{count} selected" },
+  { "key": "admin.permission.members.selectRole", "zh-CN": "请选择角色以查看成员", "en-US": "Select a role to view members" },
+  { "key": "admin.permission.members.searchMembers", "zh-CN": "搜索成员…", "en-US": "Search members..." },
+  { "key": "admin.permission.members.noCandidates", "zh-CN": "无可添加的成员", "en-US": "No candidates" },
+  { "key": "admin.permission.members.tabOrg", "zh-CN": "组织架构", "en-US": "Organization" },
+  { "key": "admin.permission.members.tabList", "zh-CN": "成员列表", "en-US": "Member List" },
+  { "key": "admin.permission.members.removeTitle", "zh-CN": "移除成员", "en-US": "Remove Member" },
+  { "key": "admin.permission.members.removeContent", "zh-CN": "确认将该成员从此角色中移除?", "en-US": "Remove this member from the role?" },
+  { "key": "admin.permission.members.removeSuccess", "zh-CN": "已移除成员", "en-US": "Member removed" },
+  { "key": "admin.permission.members.colName", "zh-CN": "姓名", "en-US": "Name" },
+  { "key": "admin.permission.members.colEmail", "zh-CN": "邮箱", "en-US": "Email" },
+  { "key": "admin.permission.members.colDepartment", "zh-CN": "部门", "en-US": "Department" },
+  { "key": "admin.permission.members.colPosition", "zh-CN": "岗位", "en-US": "Position" },
+  { "key": "admin.permission.members.colAssignedAt", "zh-CN": "分配时间", "en-US": "Assigned At" },
+  { "key": "sidebar.noMenus", "zh-CN": "暂无可用菜单", "en-US": "No menus available" },
   {
     "key": "admin.permission.selectRole",
     "zh-CN": "请选择角色",
@@ -744,6 +765,251 @@
     "key": "admin.permission.scope.updateError",
     "zh-CN": "更新数据范围失败",
     "en-US": "Failed to update data scope"
+  },
+  {
+    "key": "admin.permission.scope.barLabel",
+    "zh-CN": "管理范围(数据范围)",
+    "en-US": "Management scope (data scope)"
+  },
+  {
+    "key": "admin.permission.scope.barHint",
+    "zh-CN": "决定能管哪些记录,与“能做什么”分开",
+    "en-US": "Which records can be managed — separate from what can be done"
+  },
+  {
+    "key": "admin.permission.scope.modify",
+    "zh-CN": "修改范围",
+    "en-US": "Modify scope"
+  },
+  {
+    "key": "admin.permission.scope.mixed",
+    "zh-CN": "多种范围",
+    "en-US": "Mixed"
+  },
+  {
+    "key": "admin.permission.scope.drawerTitle",
+    "zh-CN": "修改数据范围",
+    "en-US": "Modify data scope"
+  },
+  {
+    "key": "admin.permission.scope.drawerNote",
+    "zh-CN": "应用到该角色当前已授予的全部权限",
+    "en-US": "Applies to all permissions the role currently holds"
+  },
+  {
+    "key": "admin.permission.scope.apply",
+    "zh-CN": "应用",
+    "en-US": "Apply"
+  },
+  {
+    "key": "admin.permission.scope.applying",
+    "zh-CN": "应用中…",
+    "en-US": "Applying…"
+  },
+  {
+    "key": "admin.permission.scope.applySuccess",
+    "zh-CN": "数据范围已更新",
+    "en-US": "Data scope updated"
+  },
+  {
+    "key": "admin.permission.scope.applyError",
+    "zh-CN": "更新数据范围失败",
+    "en-US": "Failed to update data scope"
+  },
+  {
+    "key": "admin.permission.scope.noGrants",
+    "zh-CN": "请先授予权限,再设置数据范围",
+    "en-US": "Grant permissions first, then set the data scope"
+  },
+  {
+    "key": "admin.permission.advanced.title",
+    "zh-CN": "高级 · 按原子动作配置",
+    "en-US": "Advanced · configure by atomic action"
+  },
+  {
+    "key": "admin.permission.advanced.summary",
+    "zh-CN": "{total} 项原子码 · {exceptions} 项破例",
+    "en-US": "{total} codes · {exceptions} exceptions"
+  },
+  {
+    "key": "admin.permission.advanced.banner",
+    "zh-CN": "这是底层原子权限码 — 日常请用上方“业务能力”,它会自动管理这些。仅用于:① 审计核对某能力包含哪些原子码;② 破例授予尚未被任何能力覆盖的权限。",
+    "en-US": "These are low-level permission codes — for everyday work use the capability checklist above, which manages them automatically. Use this only to audit which codes a capability includes, or to grant an exception not yet covered by any capability."
+  },
+  {
+    "key": "admin.permission.advanced.search",
+    "zh-CN": "搜索权限码 / 名称…",
+    "en-US": "Search code / name…"
+  },
+  {
+    "key": "admin.permission.advanced.onlyGranted",
+    "zh-CN": "只看已授予",
+    "en-US": "Granted only"
+  },
+  {
+    "key": "admin.permission.advanced.onlyUncovered",
+    "zh-CN": "只看未覆盖/破例",
+    "en-US": "Uncovered / exception only"
+  },
+  {
+    "key": "admin.permission.advanced.colCode",
+    "zh-CN": "权限码 / 名称",
+    "en-US": "Code / name"
+  },
+  {
+    "key": "admin.permission.advanced.colSource",
+    "zh-CN": "来源",
+    "en-US": "Source"
+  },
+  {
+    "key": "admin.permission.advanced.empty",
+    "zh-CN": "无匹配的权限码",
+    "en-US": "No matching permission codes"
+  },
+  {
+    "key": "admin.permission.advanced.sourceCapability",
+    "zh-CN": "能力「{name}」",
+    "en-US": "Capability “{name}”"
+  },
+  {
+    "key": "admin.permission.advanced.sourceException",
+    "zh-CN": "未覆盖 · 破例",
+    "en-US": "Uncovered · exception"
+  },
+  {
+    "key": "admin.permission.advanced.legend",
+    "zh-CN": "绿色“能力 X”= 由上方某能力授予,改它请去能力清单;黄色“破例”= 无对应业务能力,在此直接授予(计入破例,留审计)。",
+    "en-US": "Green “Capability X” = granted by a capability above; edit it there. Amber “exception” = no matching business capability; grant directly here (counted as an exception for audit)."
+  },
+  {
+    "key": "admin.permission.advanced.configurePolicy",
+    "zh-CN": "配置策略",
+    "en-US": "Configure policy"
+  },
+  {
+    "key": "admin.permission.effective.summary",
+    "zh-CN": "有效权限 {total} 项 · {exceptions} 项破例",
+    "en-US": "{total} effective permissions · {exceptions} exceptions"
+  },
+  {
+    "key": "admin.permission.members.orgPickerUnavailable",
+    "zh-CN": "组织架构选择需要“组织管理”插件",
+    "en-US": "Organization structure requires the org-management plugin."
+  },
+  {
+    "key": "admin.permission.members.orgPickerUseList",
+    "zh-CN": "请切换到“成员列表”标签添加成员。",
+    "en-US": "Switch to the \"Member List\" tab to add members."
+  },
+  {
+    "key": "permission.module.acp",
+    "zh-CN": "智能体",
+    "en-US": "Agents"
+  },
+  {
+    "key": "permission.module.ai",
+    "zh-CN": "AI",
+    "en-US": "AI"
+  },
+  {
+    "key": "permission.module.audit",
+    "zh-CN": "审计",
+    "en-US": "Audit"
+  },
+  {
+    "key": "permission.module.billing",
+    "zh-CN": "计费",
+    "en-US": "Billing"
+  },
+  {
+    "key": "permission.module.bpm",
+    "zh-CN": "流程",
+    "en-US": "BPM"
+  },
+  {
+    "key": "permission.module.dashboard",
+    "zh-CN": "仪表盘",
+    "en-US": "Dashboard"
+  },
+  {
+    "key": "permission.module.data",
+    "zh-CN": "数据",
+    "en-US": "Data"
+  },
+  {
+    "key": "permission.module.decision",
+    "zh-CN": "决策",
+    "en-US": "Decision"
+  },
+  {
+    "key": "permission.module.iot",
+    "zh-CN": "物联网",
+    "en-US": "IoT"
+  },
+  {
+    "key": "permission.module.meta",
+    "zh-CN": "元数据",
+    "en-US": "Metadata"
+  },
+  {
+    "key": "permission.module.model",
+    "zh-CN": "数据模型",
+    "en-US": "Model"
+  },
+  {
+    "key": "permission.module.system",
+    "zh-CN": "系统",
+    "en-US": "System"
+  },
+  {
+    "key": "permission.module.notification",
+    "zh-CN": "通知",
+    "en-US": "Notification"
+  },
+  {
+    "key": "permission.module.org",
+    "zh-CN": "组织",
+    "en-US": "Organization"
+  },
+  {
+    "key": "permission.module.page",
+    "zh-CN": "页面",
+    "en-US": "Page"
+  },
+  {
+    "key": "permission.module.plugin",
+    "zh-CN": "插件",
+    "en-US": "Plugin"
+  },
+  {
+    "key": "permission.module.report",
+    "zh-CN": "报表",
+    "en-US": "Report"
+  },
+  {
+    "key": "permission.module.sys",
+    "zh-CN": "系统",
+    "en-US": "System"
+  },
+  {
+    "key": "common.save",
+    "zh-CN": "保存",
+    "en-US": "Save"
+  },
+  {
+    "key": "common.saveSuccess",
+    "zh-CN": "保存成功",
+    "en-US": "Saved"
+  },
+  {
+    "key": "common.saveError",
+    "zh-CN": "保存失败",
+    "en-US": "Save failed"
+  },
+  {
+    "key": "common.loading",
+    "zh-CN": "加载中…",
+    "en-US": "Loading…"
   },
   {
     "key": "admin.permission.policy.configure",

@@ -31,7 +31,10 @@ export default function CapabilityChecklist({ groups, selected, onToggle }: Capa
             className="border border-gray-200 rounded-md p-3"
           >
             <legend className="px-1 text-sm font-medium text-gray-900">
-              {group.group}
+              {/* Declared groups carry a business bucket name (e.g. 客户管理) — t() misses and falls
+                  back to it. Convention-derived groups carry the raw module code (billing/ai/iot) —
+                  localized here via the existing permission.module.<code> i18n. */}
+              {t(`permission.module.${group.group}`, undefined, group.group)}
               <span className="ml-2 text-xs font-normal text-gray-400">
                 {t('permission.capability.groupSummary', { granted, total }, `${granted}/${total}`)}
               </span>
