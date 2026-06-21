@@ -7,10 +7,10 @@
 //
 // Complements check-oss-boundary.sh (which catches "import ...enterprise..." Java imports).
 //
-// EXCLUDE: AgentArchetypeEvalCases.java — M2-migration-target (cs/pcba/competitive cases are
-// scheduled to move to plugin JSON in M2; tracked in design doc
-// platform/src/main/java/.../eval/AgentArchetypeEvalCases.java all() javadoc).
-// All other main-source files must be clean now.
+// No exclusions: all vertical archetype eval cases have been migrated out of the OSS core
+// (device → pcba-manufacturing, pcba-quality → quality) or removed (cs/competitive orphans);
+// AgentArchetypeEvalCases.java is deleted. The OSS framework/agent main tree must hold ZERO
+// vertical eval cases — any new one belongs in its plugin's agent-definitions.json evalCases[].
 
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
