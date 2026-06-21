@@ -1,0 +1,26 @@
+[
+  {
+    "code": "behavior_site_key_status",
+    "name": "Site Key Status",
+    "name:zh-CN": "站点密钥状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "启用",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "color": "#10b981" }
+      },
+      {
+        "value": "disabled",
+        "label": "Disabled",
+        "label:zh-CN": "已禁用",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": { "color": "#9ca3af" }
+      }
+    ]
+  }
+]
