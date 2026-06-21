@@ -102,9 +102,9 @@ agent 定义本身就靠这套(`ResourceType.AGENT_DEFINITION`,按 `tenant_id + 
 - **D2 = 暂不支持"插件 B 给插件 A 的 agent 追加 case"(YAGNI)**。
   - 每个 agent 的考卷由定义它的插件出。
   - 演进路径(记录但不实现):未来若出现"平台级通用 agent 安全红线 case 集,适用所有 agent"的需求,按平台 `chainsAfterPrimary`(命令跨插件追加)范式,升级为独立 `ResourceType.AGENT_EVAL_CASE` + additive `eval-cases.json`(引用外部 agentCode)。本方案的数据模型与导入路径不阻断该演进。
-- **D3 = eval 引擎多插件健壮性(必做)**:
-  - **依赖缺失优雅降级**:跑某 case 前,经 `ToolProviderRegistry.discover` 探测其 `expectedToolCodes` 在该 tenant 是否可用;不可用 → **skip 标 `unavailable`,不判 fail**(`forbiddenToolCodes` 缺失无害,本就不该被选)。
-  - **评分隔离**:`CapabilityEvalRegressionGate` 阈值按 **per-agent / per-category** 计,**不全局聚合单一阈值**——否则一个弱插件的 case 拉低全局分,误 block 其他并存插件。
+- **D3 = eval 引擎多插件健壮性**,分两期:
+  - **D3a 依赖缺失优雅降级(M1)**:跑某 case 前,经 `ToolProviderRegistry.discover` 探测其 `expectedToolCodes` 在该 tenant 是否可用;不可用 → **skip 标 `unavailable`,不判 fail**(`forbiddenToolCodes` 缺失无害,本就不该被选)。
+  - **D3b 评分隔离(M2)**:`CapabilityEvalRegressionGate` 阈值按 **per-agent / per-category** 计,**不全局聚合单一阈值**——否则一个弱插件的 case 拉低全局分,误 block 其他并存插件。需给 `ab_capability_eval_run` 加 `agent_code` 维度;M1 只有 1-2 个 device agent、聚合不会被并存污染,故推 M2(多 vertical agent 并跑才痛)。
 
 ### 4.3 废弃方案(留痕)
 
@@ -222,12 +222,12 @@ eval case 与 agent 是 1:N,评估结果已有独立表 `ab_capability_eval_run`
   2. `AgentDefinitionDTO.evalCases` + `importAgentDefinition` 写入 + rollback 连带删
   3. `EvalCaseStructureValidator`(OSS,纯函数)+ import-time gate
   4. `GenericEvalCaseFixture` + OSS 确定性测试改造
-  5. `CapabilityEvalService.loadRegisteredCases` + `ScheduledCapabilityEvalJob` / `RegressionGate` 改 DB 读 + D3 健壮性
+  5. `CapabilityEvalService.loadRegisteredCases` + `ScheduledCapabilityEvalJob` 改 DB 读 + D3a 依赖缺失 skip(`RegressionGate` 保持 run 级聚合 = 不退化)
   6. **迁移 `device*` 两个 archetype 到 pcba-manufacturing `agent-definitions.json`**,删 `AgentArchetypeEvalCases.deviceAgent()/deviceOperationsAgent()`
   7. `check-agent-eval-boundary` 门禁
   8. 多插件并存回归测试
   - **完成判定**:device 两个 live IT 从 DB 读后回归 5/5 绿 + 多插件并存回归绿 + boundary 门禁绿。
-- **M2**:迁移 `pcbaQuality`(quality)、`cs`(crm)、`competitive`(归属定后);删 `AgentArchetypeEvalCases.java`。
+- **M2**:迁移 `pcbaQuality`(quality)、`cs`(crm)、`competitive`(归属定后);删 `AgentArchetypeEvalCases.java`;**D3b** per-agent gate 评分隔离(加 `ab_capability_eval_run.agent_code` 维度)。
 - **之后(不在本方案)**:`framework/rag` 业务知识 ingest(phase 3)、`OeeToolProvider`(phase 1.5)按同一按需注入原则落地,不再碰 OSS 核心。
 
 ---
