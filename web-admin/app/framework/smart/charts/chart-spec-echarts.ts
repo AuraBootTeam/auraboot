@@ -9,19 +9,23 @@
  *
  * Pure: builds a plain option object; it does not import or construct echarts.
  *
- * B2d (backlog 2026-06-18-designer-layout-family-convergence §B2d): the BAR and the
- * LINE/AREA branches are the canonical option-builders for SmartBarChart and
- * SmartLineChart respectively. Each is byte-equivalent to its legacy builder's BASE
- * option (`buildBarOptionLegacy` / `buildLineOptionLegacy`), i.e. before the
- * `chartOptions` renderer-leak prop-merge (which stays a call-site concern). The
- * headline fix vs. the old minimal mapping is identical for both: they now emit ONE
- * SERIES PER MEASURE (the previous code silently dropped every measure after
- * `measures[0]`), plus the legacy layout/cosmetic config (grid margins, the
- * type-specific `tooltip.axisPointer` — `'shadow'` for bar, `'cross'` for line —,
- * `xAxis.axisLabel` rotation/hideOverlap, line's `xAxis.boundaryGap:false` and
- * per-series smooth/showSymbol/areaStyle, multi-measure legend, centered/styled title,
- * and per-series name/label/emphasis). The remaining non-bar/non-line branches stay
- * the deliberately minimal, consolidation-oriented mapping.
+ * B2d (backlog 2026-06-18-designer-layout-family-convergence §B2d): the BAR, the
+ * LINE/AREA and the SCATTER branches are the canonical option-builders for
+ * SmartBarChart, SmartLineChart and SmartScatterChart respectively. Each is equivalent
+ * to its legacy builder's BASE option (`buildBarOptionLegacy` / `buildLineOptionLegacy`
+ * / `buildScatterOptionLegacy`), i.e. before the `chartOptions` renderer-leak prop-merge
+ * (which stays a call-site concern). For bar/line the headline fix vs. the old minimal
+ * mapping is identical: they now emit ONE SERIES PER MEASURE (the previous code silently
+ * dropped every measure after `measures[0]`), plus the legacy layout/cosmetic config
+ * (grid margins, the type-specific `tooltip.axisPointer` — `'shadow'` for bar, `'cross'`
+ * for line —, `xAxis.axisLabel` rotation/hideOverlap, line's `xAxis.boundaryGap:false`
+ * and per-series smooth/showSymbol/areaStyle, multi-measure legend, centered/styled
+ * title, and per-series name/label/emphasis). SCATTER is structurally different: its
+ * measures are AXIS ROLES (X / Y / size) inside a SINGLE series, so there is no
+ * measure-drop bug; the scatter branch instead recovers the legacy value-vs-value axes,
+ * dashed splitLines, item tooltip `formatter`, and bubble-mode `symbolSize` (both
+ * FUNCTIONS reproduced byte-for-byte). The remaining non-bar/non-line/non-scatter
+ * branches stay the deliberately minimal, consolidation-oriented mapping.
  */
 import type { ChartSpec } from './chart-spec';
 
@@ -231,6 +235,109 @@ function lineOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOp
   };
 }
 
+/**
+ * SCATTER / BUBBLE branch — equivalent to SmartScatterChart's legacy
+ * `buildScatterOptionLegacy` BASE option (sans the `chartOptions` prop-merge, which
+ * stays a call-site merge). Covered by the B2d scatter equivalence test.
+ *
+ * Unlike bar/line (one series PER measure), scatter maps measures onto AXIS ROLES in a
+ * SINGLE series: `measures[0]` → X, `measures[1]` → Y (falling back to `measures[0]`),
+ * `measures[2]` → bubble size; the category dimension is the per-point label. So there
+ * is NO multi-measure "drop" to fix — the measures were never independent series.
+ *
+ * The X/Y axes are value-vs-value (`type:'value'`, not category), each carrying a `name`
+ * (← scatter.xAxisLabel/yAxisLabel, defaulting to the measure field) and a dashed
+ * `splitLine`. `tooltip.formatter` and (bubble mode) the series `symbolSize` are
+ * FUNCTIONS that close over the axis labels / data rows — they are reproduced here
+ * byte-for-byte from the legacy source (the equivalence gate compares the non-function
+ * structure deep-equal and proves the closures behave identically).
+ */
+function scatterOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOption {
+  const title = titleText(spec);
+  const xAxisLabel = spec.scatter?.xAxisLabel;
+  const yAxisLabel = spec.scatter?.yAxisLabel;
+  const bubbleMode = spec.scatter?.bubbleMode ?? false;
+  const symbolSizeRange = spec.scatter?.symbolSizeRange ?? [10, 60];
+  // Measure roles, mirroring legacy `data.meta.metrics`.
+  const metrics = spec.measures.map((m) => m.field);
+
+  // Empty data → the legacy degenerate option (title carries fontSize ONLY, no
+  // fontWeight; both axes are bare value axes; the series is a single empty scatter —
+  // NOT an empty series[] array, unlike bar/line).
+  if (!rows.length) {
+    return {
+      title: title ? { text: title, left: 'center', textStyle: { fontSize: 14 } } : undefined,
+      xAxis: { type: 'value' },
+      yAxis: { type: 'value' },
+      series: [{ type: 'scatter', data: [] }],
+    };
+  }
+
+  const dimensions = spec.dimensions.map((d) => d.field);
+  const xKey = metrics[0];
+  const yKey = metrics[1] || metrics[0];
+  const sizeKey = metrics[2];
+  const labelKey = dimensions[0];
+
+  // Calculate size range for bubble mode
+  let maxSize = 1;
+  if (bubbleMode && sizeKey) {
+    maxSize = Math.max(...rows.map((r) => Number(r[sizeKey]) || 0), 1);
+  }
+
+  const scatterData = rows.map((row) => {
+    const point: (number | string)[] = [Number(row[xKey]) || 0, Number(row[yKey]) || 0];
+    if (labelKey) point.push(String(row[labelKey] ?? ''));
+    return point;
+  });
+
+  return {
+    title: title
+      ? { text: title, left: 'center', textStyle: { fontSize: 14, fontWeight: 500 } }
+      : undefined,
+    tooltip: {
+      trigger: 'item',
+      formatter: (params: unknown) => {
+        const p = params as { data?: (number | string)[] };
+        if (!p.data) return '';
+        const label = p.data[2] ? `${p.data[2]}<br/>` : '';
+        return `${label}${xAxisLabel || xKey}: ${p.data[0]}<br/>${yAxisLabel || yKey}: ${p.data[1]}`;
+      },
+    },
+    xAxis: {
+      type: 'value',
+      name: xAxisLabel || xKey,
+      splitLine: { show: true, lineStyle: { type: 'dashed' } },
+    },
+    yAxis: {
+      type: 'value',
+      name: yAxisLabel || yKey,
+      splitLine: { show: true, lineStyle: { type: 'dashed' } },
+    },
+    series: [
+      {
+        type: 'scatter',
+        data: scatterData,
+        symbolSize:
+          bubbleMode && sizeKey
+            ? (val: number[]) => {
+                const size =
+                  Number(
+                    rows.find((r) => Number(r[xKey]) === val[0] && Number(r[yKey]) === val[1])?.[
+                      sizeKey
+                    ],
+                  ) || 0;
+                return (
+                  symbolSizeRange[0] + (size / maxSize) * (symbolSizeRange[1] - symbolSizeRange[0])
+                );
+              }
+            : 14,
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } },
+      },
+    ],
+  };
+}
+
 export function chartSpecToEChartsOption(
   spec: ChartSpec,
   rows: Record<string, unknown>[],
@@ -243,6 +350,11 @@ export function chartSpecToEChartsOption(
   // LINE / AREA is the canonical SmartLineChart builder (B2d): legacy-equivalent base.
   if (spec.type === 'line' || spec.type === 'area') {
     return lineOption(spec, rows);
+  }
+
+  // SCATTER is the canonical SmartScatterChart builder (B2d): legacy-equivalent base.
+  if (spec.type === 'scatter') {
+    return scatterOption(spec, rows);
   }
 
   const labelField = dimField(spec, spec.type === 'pie' ? 'name' : 'category');
@@ -271,9 +383,10 @@ export function chartSpecToEChartsOption(
     return opt;
   }
 
-  // Remaining minimal series (scatter/...) are always category-x / value-y here;
-  // bar (the only type with an `orientation` swap) is handled by `barOption`, and
-  // line/area by `lineOption`, above — so `spec.type` here is neither bar nor line/area.
+  // Remaining minimal series (radar/funnel/heatmap/...) are always category-x /
+  // value-y here; bar (the only type with an `orientation` swap) is handled by
+  // `barOption`, line/area by `lineOption`, and scatter by `scatterOption`, above — so
+  // `spec.type` here is none of bar / line / area / scatter / pie.
   opt.xAxis = { type: 'category', data: labels };
   opt.yAxis = { type: 'value' };
 

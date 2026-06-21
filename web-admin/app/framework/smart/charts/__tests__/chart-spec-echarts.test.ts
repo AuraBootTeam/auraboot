@@ -64,26 +64,28 @@ describe('chartSpecToEChartsOption', () => {
     expect(opt.series[0].areaStyle).toBeDefined();
   });
 
-  it('encodes interaction.tooltip into option.tooltip (minimal non-bar/non-line branch)', () => {
-    // The minimal mapping gates tooltip on interaction. NOTE: the BAR and LINE/AREA
-    // branches are the legacy-faithful SmartBarChart / SmartLineChart builders (B2d)
-    // which ALWAYS emit tooltip — their tooltip contracts are pinned by their own
-    // equivalence tests. So this case uses 'scatter' to exercise the minimal mapping.
+  it('encodes interaction.tooltip into option.tooltip (minimal non-bar/non-line/non-scatter branch)', () => {
+    // The minimal mapping gates tooltip on interaction. NOTE: the BAR, LINE/AREA and
+    // SCATTER branches are now the legacy-faithful Smart{Bar,Line,Scatter}Chart builders
+    // (B2d) which ALWAYS emit tooltip — their tooltip contracts are pinned by their own
+    // equivalence tests. This case formerly used 'scatter'; since scatter became
+    // legacy-faithful it is retargeted to 'radar' (still on the minimal mapping).
     const withTip = chartSpecToEChartsOption(
-      spec({ type: 'scatter', interaction: { tooltip: true } }),
+      spec({ type: 'radar', interaction: { tooltip: true } }),
       rows,
     ) as any;
     expect(withTip.tooltip).toBeDefined();
-    const noTip = chartSpecToEChartsOption(spec({ type: 'scatter' }), rows) as any;
+    const noTip = chartSpecToEChartsOption(spec({ type: 'radar' }), rows) as any;
     expect(noTip.tooltip).toBeUndefined();
   });
 
-  it('encodes visual.legend and visual.stacked (minimal non-bar/non-line branch)', () => {
-    // Legend on the minimal branch is gated on visual.legend. The BAR and LINE/AREA
-    // branches instead emit a legend only for multi-measure (legacy parity), pinned by
-    // their B2d equivalence tests — so this case uses 'scatter' for the minimal mapping.
+  it('encodes visual.legend and visual.stacked (minimal non-bar/non-line/non-scatter branch)', () => {
+    // Legend on the minimal branch is gated on visual.legend. The BAR, LINE/AREA and
+    // SCATTER branches instead follow their legacy builders (legend only for multi-measure
+    // on bar/line; item tooltip for scatter), pinned by their B2d equivalence tests — so
+    // this case (formerly 'scatter') is retargeted to 'radar' for the minimal mapping.
     const opt = chartSpecToEChartsOption(
-      spec({ type: 'scatter', visual: { legend: true, stacked: true } }),
+      spec({ type: 'radar', visual: { legend: true, stacked: true } }),
       rows,
     ) as any;
     expect(opt.legend).toBeDefined();
