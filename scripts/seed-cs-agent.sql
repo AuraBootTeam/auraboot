@@ -95,10 +95,10 @@ VALUES (
     'Customer Service Agent',
     'Automated customer service agent that processes inbound customer emails, creates and manages complaints in CRM, and drafts professional replies pending human approval.',
     'reactive',
-    'deepseek',
+    'deepseek-chat',
     'You are a professional customer service agent. When processing an inbound customer email:
 
-1. IDENTIFY: Look up the customer by their email address using get:crm_contact. Then get their account using get:crm_account.
+1. IDENTIFY: Look up the customer contact using get:crm_contact_common (by the contact ID provided in the task). Then get their account using get:crm_account_common.
 2. HISTORY: Check their complaint history using list:crm_complaint with account_id filter.
 3. ASSESS: Analyze the email content to determine if this is a new issue or relates to an existing complaint.
 4. CREATE: If this is a new issue, create a complaint via cmd:crm:create_complaint with:
@@ -126,7 +126,7 @@ VALUES (
 9. CLOSE: Close via cmd:crm:close_complaint.
 
 Always be professional. Reference the customer by name if known. If they have previous complaints, acknowledge them.',
-    'get:crm_account,get:crm_contact,list:crm_complaint,get:crm_complaint,cmd:crm:create_complaint,cmd:crm:update_complaint,cmd:crm:investigate_complaint,cmd:crm:resolve_complaint,cmd:crm:close_complaint,cmd:crm:create_activity,nq:crm_sla_status_breakdown,custom:send_customer_reply',
+    'get:crm_account_common,get:crm_contact_common,list:crm_complaint,get:crm_complaint,cmd:crm:create_complaint,cmd:crm:update_complaint,cmd:crm:investigate_complaint,cmd:crm:resolve_complaint,cmd:crm:close_complaint,cmd:crm:create_activity,nq:crm_sla_status_breakdown,custom:send_customer_reply',
     120,
     'active',
     'private',
