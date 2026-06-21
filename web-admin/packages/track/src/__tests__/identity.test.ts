@@ -1,3 +1,4 @@
+import { it, expect } from 'vitest';
 import { deriveUiElement } from '../identity';
 
 it('derives stable identity from data-aura-element-id ancestor', () => {

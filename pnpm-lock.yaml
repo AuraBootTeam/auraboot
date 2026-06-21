@@ -131,6 +131,9 @@ importers:
       '@auraboot/runtime-kernel':
         specifier: workspace:*
         version: link:packages/runtime-kernel
+      '@auraboot/track':
+        specifier: workspace:*
+        version: link:packages/track
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -578,6 +581,8 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.6
+
+  web-admin/packages/track: {}
 
 packages:
 
