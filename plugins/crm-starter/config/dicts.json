@@ -88,7 +88,7 @@
         "sortNo": 10,
         "status": "enabled",
         "extension": {
-          "color": "#3b82f6"
+          "color": "#71717A"
         }
       },
       {
@@ -98,7 +98,7 @@
         "sortNo": 20,
         "status": "enabled",
         "extension": {
-          "color": "#06b6d4"
+          "color": "#2563EB"
         }
       },
       {
@@ -108,7 +108,7 @@
         "sortNo": 30,
         "status": "enabled",
         "extension": {
-          "color": "#8b5cf6"
+          "color": "#C2750A"
         }
       },
       {
@@ -118,7 +118,7 @@
         "sortNo": 40,
         "status": "enabled",
         "extension": {
-          "color": "#10b981",
+          "color": "#15A34A",
           "terminal": "won"
         }
       },
@@ -129,7 +129,7 @@
         "sortNo": 50,
         "status": "enabled",
         "extension": {
-          "color": "#9ca3af",
+          "color": "#DC2626",
           "terminal": "lost"
         }
       }
@@ -146,42 +146,60 @@
         "label": "Exhibition",
         "label:zh-CN": "展会",
         "sortNo": 10,
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "icon": "Presentation"
+        }
       },
       {
         "value": "website",
         "label": "Website",
         "label:zh-CN": "网站",
         "sortNo": 20,
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "icon": "Globe"
+        }
       },
       {
         "value": "referral",
         "label": "Referral",
         "label:zh-CN": "推荐",
         "sortNo": 30,
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "icon": "Share2"
+        }
       },
       {
         "value": "cold_call",
         "label": "Cold Call",
         "label:zh-CN": "陌拜",
         "sortNo": 40,
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "icon": "PhoneCall"
+        }
       },
       {
         "value": "social_media",
         "label": "Social Media",
         "label:zh-CN": "社交媒体",
         "sortNo": 50,
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "icon": "MessageCircle"
+        }
       },
       {
         "value": "other",
         "label": "Other",
         "label:zh-CN": "其他",
         "sortNo": 60,
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "icon": "MoreHorizontal"
+        }
       }
     ]
   },
