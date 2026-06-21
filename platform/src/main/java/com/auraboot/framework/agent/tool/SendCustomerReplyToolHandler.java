@@ -2,7 +2,6 @@ package com.auraboot.framework.agent.tool;
 
 import com.auraboot.framework.notification.service.EmailSender;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
-import com.auraboot.framework.common.util.UniqueIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -60,7 +59,8 @@ public class SendCustomerReplyToolHandler {
     private void logSend(Long tenantId, String recipient, String subject, String body,
                          String status, String errorMessage) {
         Map<String, Object> logData = new HashMap<>();
-        logData.put("id", UniqueIdGenerator.generate());
+        // ab_notification_send_log.id is a bigint IDENTITY column — let it auto-generate.
+        // (Do not set it to a ULID string; that fails the INSERT with a type mismatch.)
         logData.put("tenant_id", tenantId);
         logData.put("template_code", "cs_agent_reply");
         logData.put("channel", "email");
