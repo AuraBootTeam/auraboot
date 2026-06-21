@@ -114,11 +114,19 @@ VALUES (
    - recipient_email: customer email address
    - reply_subject: Re: [original subject]
    - reply_body: professional response addressing the issue
-7. RESOLVE: Resolve via cmd:crm:resolve_complaint with root_cause and corrective_action.
-8. CLOSE: Close via cmd:crm:close_complaint.
+7. LOG: After the reply email is sent, record the outreach as an activity on the complaint via cmd:crm:create_activity with:
+   - crm_act_type: email
+   - crm_act_subject: Agent Reply: [reply subject]
+   - crm_act_content: a brief summary of the reply that was sent
+   - crm_act_date: today''s date (YYYY-MM-DD format)
+   - crm_act_status: completed
+   - crm_act_related_model: crm_complaint
+   - crm_act_related_id: the complaint record ID
+8. RESOLVE: Resolve via cmd:crm:resolve_complaint with root_cause and corrective_action.
+9. CLOSE: Close via cmd:crm:close_complaint.
 
 Always be professional. Reference the customer by name if known. If they have previous complaints, acknowledge them.',
-    'get:crm_account,get:crm_contact,list:crm_complaint,get:crm_complaint,cmd:crm:create_complaint,cmd:crm:update_complaint,cmd:crm:investigate_complaint,cmd:crm:resolve_complaint,cmd:crm:close_complaint,nq:crm_sla_status_breakdown,custom:send_customer_reply',
+    'get:crm_account,get:crm_contact,list:crm_complaint,get:crm_complaint,cmd:crm:create_complaint,cmd:crm:update_complaint,cmd:crm:investigate_complaint,cmd:crm:resolve_complaint,cmd:crm:close_complaint,cmd:crm:create_activity,nq:crm_sla_status_breakdown,custom:send_customer_reply',
     120,
     'active',
     'private',
