@@ -1,5 +1,5 @@
 ---
-type: design
+type: plan-design
 status: active
 created: 2026-06-21
 slug: behavior-sdk-uvpv-dashboard
