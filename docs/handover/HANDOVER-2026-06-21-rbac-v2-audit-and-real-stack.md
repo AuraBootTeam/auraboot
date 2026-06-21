@@ -1,5 +1,4 @@
 ---
-title: HANDOVER — RBAC v2 completeness audit + real-stack test run
 date: 2026-06-21
 created: 2026-06-21
 type: handover
