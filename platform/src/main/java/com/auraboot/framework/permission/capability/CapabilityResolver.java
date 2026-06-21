@@ -25,9 +25,26 @@ public class CapabilityResolver {
     public List<CapabilityGroup> resolve(List<CapabilityDefinitionDTO> declarations,
                                          List<String> allPermissionCodes,
                                          Set<String> grantedCodes) {
+        return resolve(declarations, allPermissionCodes, grantedCodes, Map.of());
+    }
+
+    /**
+     * Resolve the capability view, deriving business-language labels for convention-derived
+     * capabilities from {@code permissionNames} (permission code -&gt; localized display name).
+     * The bundle label for a {@code module.resource} resource is the common stem of its action
+     * names (e.g. {@code 查看许可证 / 新增许可证} -&gt; {@code 许可证}); failing that the most
+     * representative action name; failing that the raw resource segment (legacy behaviour). The
+     * module group stays the raw module code — the frontend localizes it via {@code
+     * permission.module.<code>} i18n so no server-side i18n lookup is needed here.
+     */
+    public List<CapabilityGroup> resolve(List<CapabilityDefinitionDTO> declarations,
+                                         List<String> allPermissionCodes,
+                                         Set<String> grantedCodes,
+                                         Map<String, String> permissionNames) {
         List<CapabilityDefinitionDTO> decls = declarations == null ? List.of() : declarations;
         List<String> allCodes = allPermissionCodes == null ? List.of() : allPermissionCodes;
         Set<String> granted = grantedCodes == null ? Set.of() : grantedCodes;
+        Map<String, String> names = permissionNames == null ? Map.of() : permissionNames;
 
         // group name -> capabilities (preserve first-seen order: declared groups before derived)
         LinkedHashMap<String, List<Capability>> byGroup = new LinkedHashMap<>();
@@ -72,7 +89,7 @@ public class CapabilityResolver {
             Capability cap = Capability.builder()
                     .code(moduleResource)
                     .group(module)
-                    .label(resource)
+                    .label(conventionLabel(includes, names, resource))
                     .sensitive(false)
                     .includes(includes)
                     .granted(granted.containsAll(includes))
@@ -104,6 +121,78 @@ public class CapabilityResolver {
             }
         }
         return result;
+    }
+
+    /**
+     * The full capability -&gt; permission-code map the {@link #resolve} view presents: declared
+     * capabilities plus convention-derived ones ({@code module.resource} -&gt; that resource's
+     * {@code module.resource.action} codes). This is the authority for writes: the capability
+     * checklist is the only grant surface, so every capability it renders — declared OR
+     * convention-derived — must resolve to the codes its checkbox grants/revokes. Callers feed the
+     * role's COMPLETE desired selection (the editor seeds from what's granted), so applying it is a
+     * full-state replace within this universe.
+     */
+    public Map<String, Set<String>> capabilityCodeMap(List<CapabilityDefinitionDTO> declarations,
+                                                       List<String> allPermissionCodes) {
+        List<CapabilityDefinitionDTO> decls = declarations == null ? List.of() : declarations;
+        List<String> allCodes = allPermissionCodes == null ? List.of() : allPermissionCodes;
+
+        LinkedHashMap<String, Set<String>> map = new LinkedHashMap<>();
+        Set<String> covered = new HashSet<>();
+        decls.stream()
+                .filter(CapabilityDefinitionDTO::isValid)
+                .forEach(d -> {
+                    map.put(d.getCode(), new LinkedHashSet<>(d.getIncludes()));
+                    covered.addAll(d.getIncludes());
+                });
+        for (String code : allCodes) {
+            if (code == null || covered.contains(code)) {
+                continue;
+            }
+            int firstDot = code.indexOf('.');
+            int secondDot = firstDot < 0 ? -1 : code.indexOf('.', firstDot + 1);
+            if (firstDot < 0 || secondDot < 0) {
+                continue;
+            }
+            map.computeIfAbsent(code.substring(0, secondDot), k -> new LinkedHashSet<>()).add(code);
+        }
+        return map;
+    }
+
+    /** Action codes preferred (in order) when picking a representative permission name for a label. */
+    private static final List<String> LABEL_ACTION_PRIORITY = List.of("manage", "admin", "read", "view", "use");
+
+    /**
+     * Business label for a convention-derived {@code module.resource} bundle: the localized name of
+     * its most representative action (manage &gt; admin &gt; read &gt; …), else the raw resource
+     * segment. Uses a whole real permission name (e.g. {@code Webhook管理}) rather than a
+     * common-substring "noun", which is fragile across mixed-case / inconsistent names (e.g.
+     * {@code Webhook管理} + {@code System webhook update} share only the fragment {@code ebhook}).
+     */
+    private String conventionLabel(List<String> includes, Map<String, String> names, String rawResource) {
+        return representativeName(includes, names, rawResource);
+    }
+
+    /** Name of the highest-priority action that has a name, else the first available name. */
+    private String representativeName(List<String> includes, Map<String, String> names, String rawResource) {
+        String chosen = null;
+        int bestRank = Integer.MAX_VALUE;
+        for (String code : includes) {
+            String name = names.get(code);
+            if (name == null || name.isBlank()) {
+                continue;
+            }
+            String action = code.substring(code.lastIndexOf('.') + 1);
+            int rank = LABEL_ACTION_PRIORITY.indexOf(action);
+            if (rank < 0) {
+                rank = LABEL_ACTION_PRIORITY.size();
+            }
+            if (rank < bestRank) {
+                bestRank = rank;
+                chosen = name.trim();
+            }
+        }
+        return chosen != null ? chosen : rawResource;
     }
 
     private String label(CapabilityDefinitionDTO d) {

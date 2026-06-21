@@ -1,61 +1,58 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Permission Matrix — Smoke', () => {
+/**
+ * Permission v2 smoke — the raw resource×action matrix is retired as a standalone tab; it now lives
+ * inside the capability editor as the ③ "advanced · atomic actions" escape hatch. This smoke covers:
+ * the page loads with the capability editor as the default surface, the retired tabs are gone, and a
+ * grant toggle in ③ hits the batch API.
+ */
+test.describe('Permission v2 — Smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/enterprise/permissions');
-    // Wait for the page container to appear (domcontentloaded is enough;
-    // networkidle may never settle due to SSE / polling on this page).
     await expect(page.getByTestId('permission-page')).toBeVisible({ timeout: 10000 });
   });
 
-  test('page loads with role list and matrix tab', async ({ page }) => {
-    // Role list should load and show at least one item
+  test('page loads with the capability editor as the default surface', async ({ page }) => {
     const roleItems = page.locator('[data-testid^="role-item-"]');
     await expect(roleItems.first()).toBeVisible({ timeout: 10000 });
 
-    // Right-panel tab bar must be present
-    await expect(page.getByTestId('permission-right-tab-permissions')).toBeVisible();
+    // v2 right-panel: capabilities (default) + members; the standalone matrix tab is retired.
+    await expect(page.getByTestId('permission-right-tab-capabilities')).toBeVisible();
     await expect(page.getByTestId('permission-right-tab-members')).toBeVisible();
+    await expect(page.getByTestId('permission-right-tab-permissions')).toHaveCount(0);
+    await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 10000 });
   });
 
-  test('matrix shows module sections with independent action columns', async ({ page }) => {
-    // Wait for a role item to auto-select and the matrix to load
-    const roleItems = page.locator('[data-testid^="role-item-"]');
-    await expect(roleItems.first()).toBeVisible({ timeout: 10000 });
+  test('③ advanced atomic table is collapsed by default and reveals resource-grouped codes', async ({ page }) => {
+    await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 10000 });
 
-    // Wait for the matrix to appear (a role should be auto-selected on load)
-    await expect(page.getByTestId('permission-matrix')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('advanced-atomic-body')).toHaveCount(0);
+    await page.getByTestId('advanced-atomic-toggle').click();
+    await expect(page.getByTestId('advanced-atomic-body')).toBeVisible();
 
-    // Must have at least one module section
-    const modules = page.locator('[data-testid^="matrix-module-"]');
-    const moduleCount = await modules.count();
-    expect(moduleCount).toBeGreaterThan(0);
-
-    // Each module has a toggle button
-    const firstModuleToggle = page.locator('[data-testid^="matrix-module-toggle-"]').first();
-    await expect(firstModuleToggle).toBeVisible();
+    const sources = page.locator('[data-testid^="atomic-source-"]');
+    await expect(sources.first()).toBeVisible({ timeout: 10000 });
+    expect(await sources.count()).toBeGreaterThan(0);
   });
 
   test('i18n labels render correctly (no raw keys)', async ({ page }) => {
-    // Both tabs must show translated text, not raw i18n keys
-    const permTab = page.getByTestId('permission-right-tab-permissions');
-    await expect(permTab).toBeVisible();
-    const permText = await permTab.textContent();
-    expect(permText).not.toContain('admin.permission.');
+    const capTab = page.getByTestId('permission-right-tab-capabilities');
+    await expect(capTab).toBeVisible();
+    expect(await capTab.textContent()).not.toContain('admin.permission.');
 
     const memberTab = page.getByTestId('permission-right-tab-members');
-    const memberText = await memberTab.textContent();
-    expect(memberText).not.toContain('admin.permission.');
+    expect(await memberTab.textContent()).not.toContain('admin.permission.');
   });
 
-  test('toggling a permission shows toast feedback', async ({ page }) => {
-    // Wait for matrix to load with a role auto-selected
-    await expect(page.getByTestId('permission-matrix')).toBeVisible({ timeout: 10000 });
+  test('toggling an atomic permission in ③ hits the batch API', async ({ page }) => {
+    await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('advanced-atomic-toggle').click();
+    await expect(page.getByTestId('advanced-atomic-body')).toBeVisible();
 
-    const checkbox = page.locator('[data-testid^="matrix-checkbox-"]').first();
-    await expect(checkbox).toBeVisible();
+    const checkbox = page.locator('[data-testid^="atomic-checkbox-"]').first();
+    await expect(checkbox).toBeVisible({ timeout: 10000 });
+    const wasChecked = await checkbox.isChecked();
 
-    // Intercept the batch update API call to verify it succeeds
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/api/permissions/matrix/') && resp.url().includes('/batch'),
       { timeout: 5000 },
@@ -64,16 +61,14 @@ test.describe('Permission Matrix — Smoke', () => {
     const response = await responsePromise;
     expect(response.status()).toBe(200);
 
-    // The custom Toast component renders with role="alert"
-    await expect(page.locator('[role="alert"]')).toBeVisible({ timeout: 3000 });
-
-    // Restore original state and wait for the rollback request to settle.
-    const restoreResponsePromise = page.waitForResponse(
+    // Restore original state (and settle the rollback request).
+    const restorePromise = page.waitForResponse(
       (resp) => resp.url().includes('/api/permissions/matrix/') && resp.url().includes('/batch'),
       { timeout: 5000 },
     );
     await checkbox.click();
-    const restoreResponse = await restoreResponsePromise;
-    expect(restoreResponse.status()).toBe(200);
+    const restore = await restorePromise;
+    expect(restore.status()).toBe(200);
+    expect(await checkbox.isChecked()).toBe(wasChecked);
   });
 });

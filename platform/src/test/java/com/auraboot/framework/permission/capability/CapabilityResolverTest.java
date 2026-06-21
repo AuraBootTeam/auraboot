@@ -4,6 +4,7 @@ import com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -90,6 +91,58 @@ class CapabilityResolverTest {
         assertThat(accountDerived).isFalse();
         // crm.lead.read is uncovered -> convention-derived under "crm"
         assertThat(cap(group(groups, "crm"), "crm.lead").getIncludes()).containsExactly("crm.lead.read");
+    }
+
+    @Test
+    void conventionLabelPrefersManageActionName() {
+        // sys.webhook.* — bundle label should be the manage action's full localized name, not a
+        // fragile common-substring of mixed-case names (which produced "ebhook").
+        Map<String, String> names = Map.of(
+                "sys.webhook.manage", "Webhook管理",
+                "sys.webhook.update", "System webhook update");
+
+        List<CapabilityGroup> groups = resolver.resolve(List.of(),
+                List.of("sys.webhook.manage", "sys.webhook.update"), Set.of(), names);
+
+        Capability webhook = cap(group(groups, "sys"), "sys.webhook");
+        assertThat(webhook.getLabel()).isEqualTo("Webhook管理");
+        assertThat(webhook.isConventionDerived()).isTrue();
+    }
+
+    @Test
+    void conventionLabelFallsBackToReadWhenNoManage() {
+        // No manage/admin -> read action's name wins (next in priority).
+        Map<String, String> names = Map.of(
+                "billing.license.read", "查看许可证",
+                "billing.license.create", "新增许可证",
+                "billing.license.delete", "删除许可证");
+
+        List<CapabilityGroup> groups = resolver.resolve(List.of(),
+                List.of("billing.license.read", "billing.license.create", "billing.license.delete"),
+                Set.of(), names);
+
+        assertThat(cap(group(groups, "billing"), "billing.license").getLabel()).isEqualTo("查看许可证");
+    }
+
+    @Test
+    void conventionLabelFallsBackToRawResourceWhenNoNames() {
+        // 3-arg overload (no names) preserves the original raw-resource label behaviour.
+        List<CapabilityGroup> groups = resolver.resolve(List.of(),
+                List.of("crm.lead.read", "crm.lead.manage"), Set.of());
+
+        assertThat(cap(group(groups, "crm"), "crm.lead").getLabel()).isEqualTo("lead");
+    }
+
+    @Test
+    void declaredCapabilityLabelUnaffectedByPermissionNames() {
+        CapabilityDefinitionDTO decl = CapabilityDefinitionDTO.builder()
+                .code("crm.cap.account").group("客户管理").nameZhCN("维护客户资料")
+                .includes(List.of("crm.account.read")).build();
+
+        List<CapabilityGroup> groups = resolver.resolve(List.of(decl),
+                List.of("crm.account.read"), Set.of(), Map.of("crm.account.read", "查看客户"));
+
+        assertThat(cap(group(groups, "客户管理"), "crm.cap.account").getLabel()).isEqualTo("维护客户资料");
     }
 
     @Test
