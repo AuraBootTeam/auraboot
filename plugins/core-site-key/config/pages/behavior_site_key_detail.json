@@ -38,8 +38,7 @@
       "fields": [
         { "field": "name", "readOnly": true },
         { "field": "status", "readOnly": true },
-        { "field": "site_key", "span": 2, "readOnly": true },
-        { "field": "created_at", "readOnly": true }
+        { "field": "site_key", "span": 2, "readOnly": true }
       ]
     }
   ],

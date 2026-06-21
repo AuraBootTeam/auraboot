@@ -69,11 +69,6 @@
           "dictCode": "behavior_site_key_status"
         },
         {
-          "field": "created_at",
-          "width": 180,
-          "sortable": true
-        },
-        {
           "field": "actions",
           "isActionColumn": true,
           "label": {
