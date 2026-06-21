@@ -1,7 +1,21 @@
 [
   {
+    "code": "analytics_root",
+    "parentCode": null,
+    "name:zh-CN": "数据分析",
+    "name:en": "Analytics",
+    "path": "/analytics",
+    "component": null,
+    "icon": "IconChartLine",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 900,
+    "visible": true,
+    "extension": { "platforms": ["web"] }
+  },
+  {
     "code": "behavior_analytics",
-    "parentCode": "dashboards",
+    "parentCode": "analytics_root",
     "name:zh-CN": "行为分析",
     "name:en": "Behavior Analytics",
     "path": "/p/c/behavior_analytics",
@@ -12,8 +26,6 @@
     "permissionCode": null,
     "orderNo": 10,
     "visible": true,
-    "extension": {
-      "platforms": ["web"]
-    }
+    "extension": { "platforms": ["web"] }
   }
 ]
