@@ -1,6 +1,7 @@
 ---
 type: handover
-status: closed
+status: shipped
+created: 2026-06-21
 ---
 
 # Session Handover - 2026-06-21 报表终局(设计器收敛 / 报表BI)
