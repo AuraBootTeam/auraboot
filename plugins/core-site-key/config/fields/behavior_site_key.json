@@ -1,0 +1,33 @@
+[
+  {
+    "code": "site_key",
+    "displayName:zh-CN": "站点密钥",
+    "displayName:en": "Site Key",
+    "dataType": "string",
+    "constraints": { "unique": true, "maxLength": 64 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "name",
+    "displayName:zh-CN": "名称",
+    "displayName:en": "Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "behavior_site_key_status",
+    "defaultValue": "active",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "origin_allowlist",
+    "displayName:zh-CN": "来源白名单",
+    "displayName:en": "Origin Allowlist",
+    "dataType": "json"
+  }
+]

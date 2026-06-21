@@ -1,0 +1,13 @@
+[
+  {
+    "code": "site_key_admin",
+    "name:zh-CN": "站点密钥管理员",
+    "name:en": "Site Key Administrator",
+    "description": "Full access to the site-key registry (view, create, disable)",
+    "permissions": [
+      "behavior.site_key.read",
+      "behavior.site_key.create",
+      "behavior.site_key.manage"
+    ]
+  }
+]
