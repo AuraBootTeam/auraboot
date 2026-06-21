@@ -257,6 +257,7 @@ CREATE TABLE IF NOT EXISTS ab_role (
     type VARCHAR(20) DEFAULT 'custom',
     scope_content jsonb,
     scope_type VARCHAR(20),
+    default_data_scope_type VARCHAR(32),
     priority INTEGER DEFAULT 100,
     status VARCHAR(20) DEFAULT 'active',
     is_default BOOLEAN DEFAULT FALSE,

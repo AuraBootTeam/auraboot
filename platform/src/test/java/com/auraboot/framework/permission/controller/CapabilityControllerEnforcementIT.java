@@ -76,7 +76,7 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
     }
 
     private String url() {
-        return "/api/permission/capabilities?roleId=" + getTestRole().getId();
+        return "/api/permission/capabilities?rolePid=" + getTestRole().getPid();
     }
 
     @Test
