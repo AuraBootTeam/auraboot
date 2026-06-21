@@ -111,6 +111,23 @@ related:
 - 静态门禁:`check-oss-boundary` / `validate-permission-codes`(本 SP 不新增权限码,验无漂移)/ `check-jsonb-typehandler`(若读 origin_allowlist,SP2 已处理)。
 - 收口:memory「统一遥测与分析平台」条目更新 SP3/SP4 MERGED + 下一步;handover + retro;若有新坑升 canonical。
 
+## 4.5 SP4 真栈 golden 抓出的真 bug(SP2 IT 够不到的活路径)
+
+SP4 第一次真 import → `SiteKeyIndexInitializer` → `createFieldIndex` 端到端跑通,当场抓出 **3 个 production bug**(全部已在本 PR 修复 + 回归覆盖):
+
+| # | 现象 | 根因 | 修复 | 回归 |
+|---|------|------|------|------|
+| B1 | import 后全局唯一索引**没建**(只剩默认 tenant-prefixed 索引);日志 `createFieldIndex` 抛 `Table does not exist` | import 用 `@EventListener`(同步)在**未提交的 import 事务内**发事件,`createFieldIndex` 的表存在性检查走另一连接看不到未提交的 `CREATE TABLE` | 改 `@TransactionalEventListener(AFTER_COMMIT, fallbackExecution=true)`——提交后表可见、请求线程的 tenant context 仍在 | SP4 AK-00(真 import 后断言索引)+ `SiteKeyIndexInitializerTest` |
+| B2 | app-ready backstop 每次启动 `ERROR: Tenant context is required but not found`,索引永不收敛 | 启动主线程无 MetaContext,`createFieldIndex→getModelDefinition` 的日志路径读 tenant id 抛异常 | backstop 先查模型 owning tenant 设入 `MetaContext`、`finally` clear | `SiteKeyIndexInitializerTest`(owning-tenant 设置 + 无 tenant 跳过)+ 实测 drop 索引重启自愈 |
+| B3 | 跨域 published-app 调 `/api/collect/keyed` preflight **403**(公开 SDK 跨域形同虚设) | 全局 `/api/**` CORS 只放行 admin 自家 origin + 不含 `X-Site-Key` 头 + allowCredentials | 为该公开端点单独注册 GA 式 CORS(任意 origin、POST/OPTIONS、`X-Site-Key`、无凭据),registered before `/api/**` | SP4 AK-01 + `KeyedCollectIT.corsPreflightAllowsPublicCrossOrigin` |
+
+> 印证 AGENTS §2.2「组件间 seam 须 assembled-product 运行时门禁」+ §15「悲观/乐观结论先实证」:`compileJava`+单测+SP2 in-process IT 全绿,但真 import 活路径三处坏。SP2 IT pitfall #5 已诚实标注「live path deferred to SP4」,SP4 兑现并补 3 个 bug。
+
+## 4.6 留作 follow-up(本 SP 不扩范围)
+
+- `recordBatch` 对**超长字段**(如 client `eventId` > `varchar(40)`)抛 `DataIntegrityViolationException` → 500,而非按 malformed skip / 400。真 SDK 发 26 char ULID 不触发;公开端点的 per-field 长度兜底列为 hardening follow-up(与现有 `record` 同档)。
+- controller-authz 门禁报 `BehaviorCollectController`(鉴权态 `/api/collect`,#966)/ `TestImBroadcastController` 未 baseline——**非本 PR 引入**(origin/main 既存),留 owner 决定 baseline 或加注解。
+
 ## 4. 非目标
 
 - 不做鉴权态 SDK app 接线改动(已 #966 交付)。

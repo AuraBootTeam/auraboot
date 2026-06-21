@@ -159,7 +159,22 @@ public class SecurityConfig {
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
+        // Public anonymous telemetry ingestion (anonymous-telemetry SP2/SP4): the keyed
+        // endpoint is embedded in customers' PUBLISHED low-code apps on arbitrary origins
+        // (GA measurementId style). It is keyed by the public X-Site-Key header — NOT by
+        // cookies/JWT — so credentials are off and any origin is allowed. Tenant authority
+        // and abuse protection live in the application layer (SiteKeyRegistry + KeyedCollectGuard
+        // origin allowlist + rate limit), not in CORS. Registered before "/api/**" so the
+        // public config wins for this exact path.
+        CorsConfiguration keyedCollect = new CorsConfiguration();
+        keyedCollect.setAllowedOriginPatterns(List.of("*"));
+        keyedCollect.setAllowedMethods(Arrays.asList("POST", "OPTIONS"));
+        keyedCollect.setAllowedHeaders(Arrays.asList("Content-Type", "X-Site-Key"));
+        keyedCollect.setAllowCredentials(false);
+        keyedCollect.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/collect/keyed", keyedCollect);
         source.registerCorsConfiguration("/api/**", configuration);
         return source;
     }
