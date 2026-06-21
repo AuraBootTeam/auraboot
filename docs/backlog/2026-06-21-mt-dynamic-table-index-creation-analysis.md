@@ -143,11 +143,25 @@ SP1 的 spec / handover / 分解文档都把硬前置写成 **`(tenant_id, site_
 3. **改动面极小**:不新增 DDL 管道、不改 import-path、不动 `MultiTenantIndexManager`。只加一个监听"site-key 模型表已就绪"的小组件 + 一行 `createFieldIndex` 调用。
 4. **不是平台级冒进**:只对 SP2 自己的模型负责,不改全平台动态模型的索引行为(那是 B 的范畴,留独立 backlog)。
 
-### 5.2 落地接缝(SP2 spec 承接)
+### 5.2 落地接缝与**调用时机**(已取证,SP2 spec 承接)
 
-- **触发点**:`MetaModelServiceImpl` 在 import 时调 `schemaManagementService.createTableByModel(modelCode)` 建表。SP2 需要一个**在该模型表建好之后**运行的幂等收敛点。两种候选,SP2 build 第一步取证后定:
-  - (i) **应用就绪后的一次性幂等收敛**(`ApplicationReadyEvent` 或模型注册完成事件监听):只针对 `behavior_site_key` 一个模型,判 `tableExists` 后调 `createFieldIndex`。**注意**:这要论证它属于"幂等 schema 收敛"而非 §4.1 禁止的"startup 数据 repair"——见 §6。
-  - (ii) **import 路径事件钩子**:若平台在 `createTableByModel` 后发布了模型表创建事件,监听它对 `behavior_site_key` 收敛索引(更贴生命周期,最干净)。SP2 build 先 grep 确认是否有此事件(本文未确认到现成的 model-table-created ApplicationEvent,§需实测)。
+核心问题:`createFieldIndex` 要求表已存在(内置 `tableExists` 守卫),所以索引收敛**必须在 `mt_behavior_site_key` 表被建出来之后**触发。而这张表在**插件 import 时**(`MetaModelServiceImpl:2173` → `createTableByModel`)才建。取证后确定**双触发**(都调同一个幂等 `createFieldIndex`,叠加安全):
+
+**① 主触发 — 监听 `PluginImportCompletedEvent`(最贴生命周期,零 startup-repair 味道)**
+
+- 平台在每次插件 import 成功后发布 `PluginImportCompletedEvent(source, tenantId, pluginCode)`(`PluginImportServiceImpl:1298`,`pluginCode` = 插件 manifest namespace)。site-key 插件 `plugin.json` 的 `namespace = "behavior"`。
+- 现成先例:`agent/service/CapabilitySyncListener` 就是 `@Component` + `@EventListener public void onPluginImportCompleted(PluginImportCompletedEvent e)`,读 `e.getPluginCode()` 决定是否同步。SP2 **镜像**它。
+- 设计:一个 `@Component` listener,`@EventListener` `PluginImportCompletedEvent`,当 `"behavior".equals(e.getPluginCode())` → 调 `createFieldIndex("behavior_site_key","site_key",IndexType.UNIQUE)`(幂等,已存在即 no-op)。
+- **时机 = 每次 `behavior` 插件 import / re-import 完成的那一刻**:reset/init 的 import、bootstrap 首次 import、管理员后台手动 re-import 都覆盖。此刻表刚被确保建好,紧接着补索引——挂在 import 生命周期上,不是一段独立的 startup 数据 repair。
+
+**② 兜底触发 — `ApplicationReadyEvent` 一次性幂等收敛(覆盖"老部署:表早已存在但本次部署未 re-import")**
+
+- 主触发只在"有 import 发生"时点火。对于一个**已经跑过、表早已存在**的环境,部署 SP2 代码后若没有触发任何 re-import,主触发不会点火 → 索引补不上。
+- 兜底:一个 `@EventListener(ApplicationReadyEvent.class)`,若 `tableExists("mt_behavior_site_key")` 则调同一个幂等 `createFieldIndex`;表不存在(真正 fresh、插件还没 import)则干净跳过,留给主触发在 import 时补。
+- 这条是 production 健壮性兜底;§6 论证了它属"幂等 schema 收敛"而非 §4.1 禁止的"startup 数据 repair"(对象是索引 schema、靠 `indexExists` 幂等、限定单一模型、不写任何业务数据行)。
+
+> 两触发同一幂等动作:fresh DB 走 ① 在 import 时建;已有 DB 走 ② 在 ready 时补;之后任何 re-import 走 ① no-op。无论哪条路径,系统稳态都保证索引存在。
+
 - **目标 DDL**(由 `createFieldIndex` 生成,无需手写):`CREATE UNIQUE INDEX idx_mt_behavior_site_key_site_key_unique ON mt_behavior_site_key (site_key)`。
 - **status 维度**:resolve 查 `status='active'`。是否再加 `(site_key, status)` 或 `WHERE status='active'` 的部分索引,SP2 按 explain 实测决定;**全局唯一必须建在 `site_key` 单列上**(否则唯一性允许同 key 不同 status 重复,破坏完整性),status 只作查询优化的附加索引,不并入唯一键。
 
