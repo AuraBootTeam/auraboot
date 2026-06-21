@@ -82,13 +82,6 @@
     "constraints": { "maxLength": 200 }
   },
   {
-    "code": "crm_lead_assigned_to",
-    "displayName:zh-CN": "分配给",
-    "displayName:en": "Assigned To",
-    "dataType": "string",
-    "constraints": { "maxLength": 100 }
-  },
-  {
     "code": "crm_lead_lost_reason",
     "displayName:zh-CN": "丢失原因",
     "displayName:en": "Lost Reason",

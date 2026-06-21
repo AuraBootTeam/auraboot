@@ -160,9 +160,10 @@
           "editable": true
         },
         {
-          "field": "crm_lead_assigned_to",
-          "width": 120,
-          "editable": true
+          "field": "owner_id",
+          "width": 150,
+          "cellRenderer": "owner",
+          "label": { "zh-CN": "分配给", "en-US": "Assignee" }
         }
       ],
       "rowActions": [
