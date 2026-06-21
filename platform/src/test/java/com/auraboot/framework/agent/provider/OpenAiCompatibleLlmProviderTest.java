@@ -258,4 +258,44 @@ class OpenAiCompatibleLlmProviderTest {
         Map<String, Object> valid = Map.of("type", "object", "properties", Map.of());
         assertThat(OpenAiCompatibleLlmProvider.normalizeToolParameters(valid)).isSameAs(valid);
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void multipleToolResultsInOneMessageBecomeSeparateOpenAiToolMessages() throws Exception {
+        // StepLoopService packs ALL tool results of one round into a single role:user message
+        // (Anthropic style). OpenAI-compatible providers (DeepSeek) require a separate role:tool
+        // message per tool_call_id; emitting only the first → 400 "tool_calls must be followed by
+        // tool messages responding to each tool_call_id".
+        OpenAiCompatibleLlmProvider provider = createProvider();
+
+        LlmChatRequest.Message assistant = LlmChatRequest.Message.builder()
+                .role("assistant")
+                .content(List.of(
+                        Map.of("type", "tool_use", "id", "call-1", "name", "get_a", "input", Map.of()),
+                        Map.of("type", "tool_use", "id", "call-2", "name", "get_b", "input", Map.of())))
+                .build();
+        LlmChatRequest.Message toolResults = LlmChatRequest.Message.builder()
+                .role("user")
+                .content(List.of(
+                        Map.of("type", "tool_result", "tool_use_id", "call-1", "content", "result-A"),
+                        Map.of("type", "tool_result", "tool_use_id", "call-2", "content", "result-B")))
+                .build();
+
+        LlmChatRequest req = LlmChatRequest.builder()
+                .model("deepseek-chat").maxTokens(256)
+                .messages(List.of(assistant, toolResults))
+                .build();
+
+        Method m = OpenAiCompatibleLlmProvider.class.getDeclaredMethod(
+                "buildOpenAiRequestBody", LlmChatRequest.class);
+        m.setAccessible(true);
+        Map<String, Object> body = (Map<String, Object>) m.invoke(provider, req);
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) body.get("messages");
+
+        List<Object> toolCallIds = messages.stream()
+                .filter(x -> "tool".equals(x.get("role")))
+                .map(x -> x.get("tool_call_id"))
+                .toList();
+        assertThat(toolCallIds).containsExactly("call-1", "call-2");
+    }
 }
