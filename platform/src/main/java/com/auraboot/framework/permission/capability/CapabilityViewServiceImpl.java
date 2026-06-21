@@ -38,22 +38,36 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<CapabilityDefinitionDTO> declarations = capabilityRegistryService.listDeclarations(tenantId);
 
-        Set<String> desired = capabilityResolver.expandToPermissionCodes(selectedCapabilityCodes, declarations);
-        Set<String> universe = declarations.stream()
-                .filter(d -> d.getIncludes() != null)
-                .flatMap(d -> d.getIncludes().stream())
-                .collect(Collectors.toSet());
+        // Resolve against the full capability set the (now sole) capability view presents — declared
+        // AND convention-derived — so every capability the checklist renders is actually grantable.
+        // The caller sends the role's COMPLETE desired selection, so this is a full-state replace
+        // within the capability universe (codes outside the universe are never touched).
+        List<PermissionDTO> all = permissionService.findAllActive();
+        List<String> allCodes = all.stream().map(PermissionDTO::getCode).filter(Objects::nonNull).toList();
+        Map<String, Set<String>> capabilityCodes = capabilityResolver.capabilityCodeMap(declarations, allCodes);
+
         Set<String> current = roleCodes(roleId);
+        Set<String> desired = selectedCapabilityCodes == null ? Set.of() : selectedCapabilityCodes.stream()
+                .flatMap(c -> capabilityCodes.getOrDefault(c, Set.of()).stream())
+                .collect(Collectors.toSet());
+
+        // Revoke ONLY within capabilities the role currently holds in FULL (i.e. that render as
+        // granted). A resource the role holds only partially (e.g. just *.read, granted via the raw
+        // matrix) is not a "granted capability", so it stays outside the revoke universe and is never
+        // stripped by a capability save. This is what makes the all-or-nothing convention-derived
+        // capabilities safe to save.
+        Set<String> revokableUniverse = capabilityCodes.values().stream()
+                .filter(current::containsAll)
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
 
         Set<String> toGrant = desired.stream()
                 .filter(c -> !current.contains(c))
                 .collect(Collectors.toSet());
-        Set<String> toRevoke = universe.stream()
-                .filter(current::contains)
+        Set<String> toRevoke = revokableUniverse.stream()
                 .filter(c -> !desired.contains(c))
                 .collect(Collectors.toSet());
 
-        List<PermissionDTO> all = permissionService.findAllActive();
         Map<String, Long> codeToId = all.stream()
                 .filter(p -> p.getCode() != null && p.getId() != null)
                 .collect(Collectors.toMap(PermissionDTO::getCode, PermissionDTO::getId, (a, b) -> a));

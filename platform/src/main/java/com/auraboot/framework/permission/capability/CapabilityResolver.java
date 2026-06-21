@@ -106,6 +106,42 @@ public class CapabilityResolver {
         return result;
     }
 
+    /**
+     * The full capability -&gt; permission-code map the {@link #resolve} view presents: declared
+     * capabilities plus convention-derived ones ({@code module.resource} -&gt; that resource's
+     * {@code module.resource.action} codes). This is the authority for writes: the capability
+     * checklist is the only grant surface, so every capability it renders — declared OR
+     * convention-derived — must resolve to the codes its checkbox grants/revokes. Callers feed the
+     * role's COMPLETE desired selection (the editor seeds from what's granted), so applying it is a
+     * full-state replace within this universe.
+     */
+    public Map<String, Set<String>> capabilityCodeMap(List<CapabilityDefinitionDTO> declarations,
+                                                       List<String> allPermissionCodes) {
+        List<CapabilityDefinitionDTO> decls = declarations == null ? List.of() : declarations;
+        List<String> allCodes = allPermissionCodes == null ? List.of() : allPermissionCodes;
+
+        LinkedHashMap<String, Set<String>> map = new LinkedHashMap<>();
+        Set<String> covered = new HashSet<>();
+        decls.stream()
+                .filter(CapabilityDefinitionDTO::isValid)
+                .forEach(d -> {
+                    map.put(d.getCode(), new LinkedHashSet<>(d.getIncludes()));
+                    covered.addAll(d.getIncludes());
+                });
+        for (String code : allCodes) {
+            if (code == null || covered.contains(code)) {
+                continue;
+            }
+            int firstDot = code.indexOf('.');
+            int secondDot = firstDot < 0 ? -1 : code.indexOf('.', firstDot + 1);
+            if (firstDot < 0 || secondDot < 0) {
+                continue;
+            }
+            map.computeIfAbsent(code.substring(0, secondDot), k -> new LinkedHashSet<>()).add(code);
+        }
+        return map;
+    }
+
     private String label(CapabilityDefinitionDTO d) {
         if (d.getNameZhCN() != null && !d.getNameZhCN().isBlank()) {
             return d.getNameZhCN();
