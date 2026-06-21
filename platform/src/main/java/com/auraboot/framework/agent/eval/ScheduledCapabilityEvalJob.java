@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,17 +109,30 @@ public class ScheduledCapabilityEvalJob {
             MetaContext.setSystemTenantContext(tenantId);
         }
         try {
-            // Auto-generated breadth cases + curated agent-archetype cases (item ③):
-            // the auto generator covers the capability catalog, the curated set covers
-            // the production agents' real NL tasks + "must not do" guardrails.
-            List<CapabilityEvalCase> cases = new java.util.ArrayList<>(
-                    evalService.generateEvalCases(tenantId, null, maxCases));
+            // --- Per-agent isolated runs (D3b) ---
+            // When includeArchetypeCases is enabled, evaluate each agent's cases as a
+            // separate run tagged with scope=agentCode. This ensures the regression
+            // baseline for agent A only compares against prior runs for agent A.
             if (includeArchetypeCases) {
-                cases.addAll(evalService.loadRegisteredCases(tenantId));
+                Map<String, List<CapabilityEvalCase>> byAgent =
+                        evalService.loadRegisteredCasesByAgent(tenantId);
+                for (Map.Entry<String, List<CapabilityEvalCase>> entry : byAgent.entrySet()) {
+                    String agentCode = entry.getKey();
+                    List<CapabilityEvalCase> agentCases = entry.getValue();
+                    if (!agentCases.isEmpty()) {
+                        evalService.evaluateToolSelection(tenantId, mode, agentCases, agentCode);
+                    }
+                }
             }
-            Map<String, Object> report = cases.isEmpty()
-                    ? evalService.evaluateToolSelection(tenantId, mode)        // no cases → harness returns no_cases
-                    : evalService.evaluateToolSelection(tenantId, mode, cases);
+
+            // --- Aggregate generated-breadth run (scope = "generated") ---
+            // Auto-generated cases cover the capability catalog; run as a separate
+            // aggregate baseline so they don't mix with per-agent registered baselines.
+            List<CapabilityEvalCase> generatedCases = new ArrayList<>(
+                    evalService.generateEvalCases(tenantId, null, maxCases));
+            Map<String, Object> report = generatedCases.isEmpty()
+                    ? evalService.evaluateToolSelection(tenantId, mode)           // no caps → no_cases shortcut
+                    : evalService.evaluateToolSelection(tenantId, mode, generatedCases, "generated");
 
             Verdict verdict = gateLatest(tenantId);
             Map<String, Object> result = new LinkedHashMap<>(report);
