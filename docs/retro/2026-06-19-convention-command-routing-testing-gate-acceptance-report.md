@@ -105,7 +105,7 @@ allowed_claim: targeted pass (Phase 0 showcase slice fully verified end-to-end; 
 
 ---
 
-# 验收报告补遗 — Phase 1 OSS 插件页面清扫(2026-06-19)
+## 验收报告补遗 — Phase 1 OSS 插件页面清扫(2026-06-19)
 
 > 前提:Phase 0 已 merge(#874,`e8e3c9129`),约定机制对**任意模型**已生效(page-schema 端点对所有 model 挂 `commands`,`FormPageContent` 对所有 model 按模式解析)。Phase 1 = 把 OSS authored 插件页面里**冗余的** create/update 命令清掉,让它们走约定 → 干净 URL。
 
@@ -145,7 +145,7 @@ Phase 0 机制全平台生效 + Phase 1 OSS authored 页面清扫完成并抽样
 
 ---
 
-# 验收报告补遗 — Phase 2 删除命令约定 + enterprise 范围核实(2026-06-19)
+## 验收报告补遗 — Phase 2 删除命令约定 + enterprise 范围核实(2026-06-19)
 
 > 完成 OSS「标准页零配置」全 CRUD 闭环:删除按钮也由约定路由(`commands.delete`),无需配置。
 
@@ -187,7 +187,7 @@ Phase 0 机制全平台生效 + Phase 1 OSS authored 页面清扫完成并抽样
 
 ---
 
-# 验收报告补遗 — 存量残余清理(2026-06-19)
+## 验收报告补遗 — 存量残余清理(2026-06-19)
 
 > 回答「存量 DSL 是否需要清理」:对所有 OSS 插件页面做了完整审计(按模型约定命令逐按钮比对)。
 

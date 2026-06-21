@@ -1,5 +1,4 @@
 ---
-title: HANDOVER — RBAC permission v2 (IA reorg + role default scope + precision fix) — COMPLETE
 date: 2026-06-21
 created: 2026-06-21
 type: handover

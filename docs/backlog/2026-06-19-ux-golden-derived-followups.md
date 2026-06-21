@@ -1,5 +1,4 @@
 ---
-title: Follow-ups surfaced by the UX design-system golden verification
 created: 2026-06-19
 type: backlog
 status: active

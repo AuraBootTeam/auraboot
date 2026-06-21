@@ -1,5 +1,4 @@
 ---
-title: DynamicData relation/sub-table methods are unreachable (loadModelRelations is a stub)
 created: 2026-06-19
 type: backlog
 status: shipped

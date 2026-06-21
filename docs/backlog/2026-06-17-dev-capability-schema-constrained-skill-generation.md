@@ -95,7 +95,7 @@ blockType/dataType 白名单(`DslRegistry` 真源:29 blockType / 13 dataType / k
 > ⚠️ **不再建议"优先重写 NlModeling"**——它实测可用(§3)。建议改为:**新增能力(dashboard 生成、
 > 一键部署编排)直接用 schema 约束 skill 一步到位**(避免重蹈自由生成);**已可用的 NlModeling 暂不动**,
 > 大规模对抗扩量验证后再定是否升级(§9 P2-可选)。下面的"两条腿"是**新增能力的实现范式**,不是改造令。
-
+>
 > 范式:**把 NL→dashboard / 一键部署 的生成做成「schema 约束的 native tool-use + skill 分解组合」。
 > 资产(schemas + skill 体系)都在。**
 
