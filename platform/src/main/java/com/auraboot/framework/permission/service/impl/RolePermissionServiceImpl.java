@@ -3,9 +3,12 @@ package com.auraboot.framework.permission.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
+import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.RolePermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -58,6 +61,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
     private final UserPermissionService userPermissionService;
+    private final RoleMapper roleMapper;
+    private final DataScopeService dataScopeService;
     
     @Override
     @Transactional
@@ -89,11 +94,15 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             if (!bindings.isEmpty()) {
                 rolePermissionMapper.batchInsert(bindings);
                 log.info("成功分配{}个Permission到角色: roleId={}", bindings.size(), roleId);
+                // ② role-level default data scope: newly-granted permissions inherit the role's
+                // default tier (materialized as explicit scope rows). No-op when the role has no
+                // default (preserves per-action, deny-by-default behaviour).
+                inheritDefaultDataScope(tenantId, roleId, permissionIds);
             }
-            
+
             // 清除用户Permission缓存
             userPermissionService.evictRoleUsers(roleId);
-            
+
             return true;
             
         } catch (Exception e) {
@@ -102,6 +111,35 @@ public class RolePermissionServiceImpl implements RolePermissionService {
         }
     }
     
+    /**
+     * Materialize the role's default data-scope tier onto newly-granted permissions. For each granted
+     * (resourceCode, actionCode) that has no explicit scope row yet, inserts one with the role
+     * default — so new grants inherit it. Existing rows (per-code overrides, or previously-inherited
+     * defaults) are never touched. No-op when the role has no default.
+     */
+    private void inheritDefaultDataScope(Long tenantId, Long roleId, List<Long> permissionIds) {
+        Role role = roleMapper.selectById(roleId);
+        String defaultScope = role != null ? role.getDefaultDataScopeType() : null;
+        if (defaultScope == null || defaultScope.isBlank()) {
+            return;
+        }
+        Set<String> existing = dataScopeService.getScopesByRole(tenantId, roleId).stream()
+                .map(s -> s.getResourceCode() + ":" + s.getActionCode())
+                .collect(Collectors.toSet());
+        List<Permission> perms = permissionMapper.findByIds(new ArrayList<>(permissionIds));
+        for (Permission p : perms) {
+            if (p.getResourceCode() == null || p.getAction() == null) {
+                continue;
+            }
+            String key = p.getResourceCode() + ":" + p.getAction();
+            if (existing.contains(key)) {
+                continue; // keep explicit overrides / already-inherited rows
+            }
+            dataScopeService.setScope(tenantId, roleId, p.getResourceCode(), p.getAction(), defaultScope, "MAX");
+            existing.add(key); // avoid duplicate inserts within this batch
+        }
+    }
+
     @Override
     @Transactional
     public boolean removePermission(Long roleId, Long permissionId) {

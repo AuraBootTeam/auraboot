@@ -27,6 +27,12 @@ public interface RoleService extends IService<Role> {
      */
     Role findByPid(String pid);
 
+    /**
+     * Set the role's default DATA-scope tier (all/dept_and_sub/dept/self/none), inherited by
+     * newly-granted permissions. Pass null to clear (revert to per-action deny-by-default).
+     */
+    void setDefaultDataScopeType(Long roleId, String scopeType);
+
 
 
     /**

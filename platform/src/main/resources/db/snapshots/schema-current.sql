@@ -12038,7 +12038,8 @@ CREATE TABLE public.ab_role (
     deleted_flag boolean DEFAULT false NOT NULL,
     created_by bigint,
     updated_by bigint,
-    plugin_pid character varying(26)
+    plugin_pid character varying(26),
+    default_data_scope_type character varying(32)
 );
 
 
@@ -12054,6 +12055,13 @@ COMMENT ON TABLE public.ab_role IS '角色表';
 --
 
 COMMENT ON COLUMN public.ab_role.plugin_pid IS 'Reference to plugin that created this role';
+
+
+--
+-- Name: COLUMN ab_role.default_data_scope_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_role.default_data_scope_type IS 'Default data-scope tier inherited by newly-granted permissions (all/dept_and_sub/dept/self/none); NULL = per-action, deny-by-default (no inheritance).';
 
 
 --

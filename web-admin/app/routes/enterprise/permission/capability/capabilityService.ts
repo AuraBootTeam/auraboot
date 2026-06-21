@@ -10,15 +10,17 @@ function unwrap<T>(result: { code: string | number; desc?: string; data: T | nul
 }
 
 /**
- * Client for the permission v2 capability endpoints. roleId is a query param; for applySelection the
- * selected capability codes are the request body (http-client passes the 2nd arg as the body for PUT).
+ * Client for the permission v2 capability endpoints. Keyed on the role PID (string) — role ids are
+ * snowflakes beyond JS safe-integer range, so a numeric id would round-trip lossily and resolve to
+ * the wrong role. For applySelection the selected capability codes are the request body (http-client
+ * passes the 2nd arg as the body for PUT).
  */
 export class CapabilityService {
   private baseUrl = '/api/permission/capabilities';
 
-  async getForRole(roleId: string, request?: Request): Promise<CapabilityGroup[]> {
+  async getForRole(rolePid: string, request?: Request): Promise<CapabilityGroup[]> {
     const result = await get<CapabilityGroup[]>(
-      `${this.baseUrl}?roleId=${encodeURIComponent(roleId)}`,
+      `${this.baseUrl}?rolePid=${encodeURIComponent(rolePid)}`,
       undefined,
       undefined,
       request,
@@ -27,12 +29,12 @@ export class CapabilityService {
   }
 
   async applySelection(
-    roleId: string,
+    rolePid: string,
     selectedCapabilityCodes: string[],
     request?: Request,
   ): Promise<CapabilityGroup[]> {
     const result = await put<CapabilityGroup[]>(
-      `${this.baseUrl}?roleId=${encodeURIComponent(roleId)}`,
+      `${this.baseUrl}?rolePid=${encodeURIComponent(rolePid)}`,
       selectedCapabilityCodes,
       undefined,
       request,
