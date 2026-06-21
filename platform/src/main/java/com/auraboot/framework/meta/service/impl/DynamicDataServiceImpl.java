@@ -16,6 +16,7 @@ import com.auraboot.framework.meta.service.executor.ModelDataExecutor;
 import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
+import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.permission.service.FieldPermissionService;
@@ -591,6 +592,67 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     private String resolveSystemTable(String modelCode) {
         return SYSTEM_TABLE_MAP.get(modelCode);
+    }
+
+    // ==================== Atomic counter ====================
+
+    private static final Set<String> NUMERIC_DATA_TYPES = Set.of(
+            "integer", "int", "long", "bigint", "decimal", "numeric", "float", "double");
+
+    /**
+     * Resolve a field code to its physical column name, asserting it is numeric.
+     * Throws {@link IllegalArgumentException} (NOT {@link MetaServiceException}) so the
+     * caller can distinguish a programming error (bad field code) from a runtime model error.
+     */
+    private String resolveNumericColumn(ModelDefinition model, String fieldCode) {
+        if (model.getFields() == null) {
+            throw new IllegalArgumentException(
+                    "Model " + model.getCode() + " has no fields defined");
+        }
+        FieldDefinition fd = model.getFields().stream()
+                .filter(f -> fieldCode.equals(f.getCode()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Unknown field '" + fieldCode + "' on model " + model.getCode()));
+        String dataType = fd.getDataType();
+        if (dataType == null || !NUMERIC_DATA_TYPES.contains(dataType.toLowerCase(java.util.Locale.ROOT))) {
+            throw new IllegalArgumentException(
+                    "Field '" + fieldCode + "' on model " + model.getCode()
+                            + " is not numeric (dataType=" + dataType + ")");
+        }
+        String col = fd.getColumnName() != null ? fd.getColumnName() : fd.getCode();
+        SqlSafetyUtils.validateIdentifier(col, "counter column");
+        return col;
+    }
+
+    @Override
+    @Transactional
+    public Optional<Long> incrementWithinCap(String modelCode, String recordId,
+                                              String counterCode, long delta, String capCode) {
+        assertWritable(modelCode);
+        ModelDefinition model = getModelDefinition(modelCode);
+        String counterCol = resolveNumericColumn(model, counterCode);
+        String capCol = null;
+        if (capCode != null) {
+            capCol = resolveNumericColumn(model, capCode);
+        }
+        String softDeleteClause = buildSoftDeleteClause(model);
+        FieldDefinition pkField = metadataService.getPrimaryKeyField(modelCode);
+        String pkColumn = SqlSafetyUtils.requireIdentifier(
+                pkField.getColumnName(), "primary key column");
+        long tenantId = getCurrentTenantId();
+        Long currentUserId = getCurrentUserId();
+        List<Map<String, Object>> rows = dynamicDataMapper.atomicIncrementReturning(
+                model.getTableName(), counterCol, capCol, pkColumn,
+                softDeleteClause, delta, recordId, tenantId, currentUserId);
+        if (rows == null || rows.isEmpty()) {
+            return Optional.empty();
+        }
+        Object val = rows.get(0).get("new_value");
+        if (val instanceof Number n) {
+            return Optional.of(n.longValue());
+        }
+        return Optional.empty();
     }
 
     private String buildSoftDeleteClause(ModelDefinition modelDefinition) {
