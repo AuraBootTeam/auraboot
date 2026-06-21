@@ -1,9 +1,10 @@
 package com.auraboot.module.oee.adapter;
 
+import com.auraboot.framework.plugin.extension.OeeTelemetrySourceExtension;
+import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
 import com.auraboot.module.oee.dto.OeeEquipmentRef;
 import com.auraboot.module.oee.dto.OeeInputs;
 import com.auraboot.module.oee.dto.OeeRequest;
-import com.auraboot.module.oee.port.OeeTelemetrySource;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -21,6 +22,7 @@ import static org.mockito.Mockito.when;
 class TelemetryEnrichingOeeDataQueryPortTest {
 
     private final DynamicTableOeeAdapter delegate = mock(DynamicTableOeeAdapter.class);
+    private final AuraPluginManager pluginManager = mock(AuraPluginManager.class);
 
     private OeeInputs postgresBase() {
         return OeeInputs.builder()
@@ -38,28 +40,30 @@ class TelemetryEnrichingOeeDataQueryPortTest {
     }
 
     @Test
-    void telemetryPresent_populatesTelemetryBlock_keepsPostgresLossInputs() {
+    void telemetryExtensionPresent_populatesTelemetryBlock_keepsPostgresLossInputs() {
         when(delegate.fetch(any())).thenReturn(postgresBase());
-        OeeTelemetrySource src = (t, eq, s, e) ->
-            Optional.of(new OeeTelemetrySource.OeeTelemetry(new BigDecimal("6"), new BigDecimal("540"), new BigDecimal("513")));
+        // functional ExtensionPoint -> lambda
+        OeeTelemetrySourceExtension ext = (t, eq, s, e) -> Optional.of(
+            new OeeTelemetrySourceExtension.OeeTelemetry(new BigDecimal("6"), new BigDecimal("540"), new BigDecimal("513")));
+        when(pluginManager.getExtensionsOfType(OeeTelemetrySourceExtension.class)).thenReturn(List.of(ext));
 
-        OeeInputs out = new TelemetryEnrichingOeeDataQueryPort(delegate, src).fetch(req());
+        OeeInputs out = new TelemetryEnrichingOeeDataQueryPort(delegate, pluginManager).fetch(req());
 
-        // telemetry block populated -> engine will source A/P/Q from these:
+        // telemetry block populated -> engine sources A/P/Q from these:
         assertEquals(0, new BigDecimal("6").compareTo(out.getTelemetryOperatingHours()));
         assertEquals(0, new BigDecimal("540").compareTo(out.getTelemetryOutputQty()));
         assertEquals(0, new BigDecimal("513").compareTo(out.getTelemetryGoodQty()));
-        // Postgres loss inputs preserved untouched (still drive six-big-losses):
+        // Postgres loss inputs preserved (still drive six-big-losses):
         assertEquals(1, out.getDowntimes().size());
         assertEquals(0, new BigDecimal("10").compareTo(out.getCalendarHours()));
     }
 
     @Test
-    void telemetryAbsent_noOp_leavesInputsUnchanged() {
+    void noTelemetryExtension_leavesInputsUnchanged() {
         when(delegate.fetch(any())).thenReturn(postgresBase());
-        OeeTelemetrySource noop = (t, eq, s, e) -> Optional.empty();
+        when(pluginManager.getExtensionsOfType(OeeTelemetrySourceExtension.class)).thenReturn(List.of());
 
-        OeeInputs out = new TelemetryEnrichingOeeDataQueryPort(delegate, noop).fetch(req());
+        OeeInputs out = new TelemetryEnrichingOeeDataQueryPort(delegate, pluginManager).fetch(req());
 
         assertNull(out.getTelemetryOperatingHours());
         assertNull(out.getTelemetryOutputQty());
@@ -67,12 +71,23 @@ class TelemetryEnrichingOeeDataQueryPortTest {
     }
 
     @Test
+    void telemetryExtensionReturnsEmpty_fallsBackToPostgres() {
+        when(delegate.fetch(any())).thenReturn(postgresBase());
+        OeeTelemetrySourceExtension empty = (t, eq, s, e) -> Optional.empty();
+        when(pluginManager.getExtensionsOfType(OeeTelemetrySourceExtension.class)).thenReturn(List.of(empty));
+
+        OeeInputs out = new TelemetryEnrichingOeeDataQueryPort(delegate, pluginManager).fetch(req());
+
+        assertNull(out.getTelemetryOperatingHours());
+    }
+
+    @Test
     void listEquipment_delegatesToPostgresAdapter() {
         when(delegate.listEquipment(1L))
             .thenReturn(List.of(OeeEquipmentRef.builder().equipmentId("EQ-1").code("C1").name("N1").build()));
 
-        List<OeeEquipmentRef> refs = new TelemetryEnrichingOeeDataQueryPort(delegate, (t, eq, s, e) -> Optional.empty())
-            .listEquipment(1L);
+        List<OeeEquipmentRef> refs =
+            new TelemetryEnrichingOeeDataQueryPort(delegate, pluginManager).listEquipment(1L);
 
         assertEquals(1, refs.size());
         verify(delegate).listEquipment(1L);
