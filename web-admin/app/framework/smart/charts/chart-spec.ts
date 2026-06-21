@@ -103,6 +103,18 @@ export interface ChartVisualOptions {
   legend?: boolean | { position?: 'top' | 'right' | 'bottom' | 'left' };
   dataLabels?: boolean;
   smooth?: boolean;
+  /**
+   * Fill the area under a line (line/area family). Renderer-neutral intent; the
+   * echarts adapter maps it to a per-series `areaStyle`, the SVG adapter to a filled
+   * polygon. SmartLineChart's `areaStyle` prop maps here.
+   */
+  areaFill?: boolean;
+  /**
+   * Show the data-point symbols on a line series (line/area family). Renderer-neutral
+   * intent; SmartLineChart's `showSymbol` prop maps here. Defaults to shown when
+   * unset (matching the legacy SmartLineChart default).
+   */
+  showSymbol?: boolean;
   /** Design-token names (e.g. 'accent', 'chart-1'), NOT hex. */
   colorTokens?: string[];
 }
