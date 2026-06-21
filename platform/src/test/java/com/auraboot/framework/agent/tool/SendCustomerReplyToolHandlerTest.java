@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.tool;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.notification.service.EmailSender;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -77,5 +78,23 @@ class SendCustomerReplyToolHandlerTest {
 
         verify(emailSender, never()).send(any(), any(), any());
         assertThat(result).containsEntry("success", false);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_sendLog_doesNotSetAutoIdentityIdColumn() {
+        // ab_notification_send_log.id is `bigint GENERATED ... AS IDENTITY` (auto-assigned, no pid
+        // column). Setting it to a ULID string makes the INSERT fail with
+        // "column id is of type bigint but expression is of type character varying" at runtime,
+        // which breaks the tool. Mocked-mapper tests can't see column types, so this asserts the
+        // log row never carries an "id" key — letting the identity column auto-generate.
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+
+        handler.execute(validParams(), 7L);
+
+        verify(dynamicDataMapper).insert(eq("ab_notification_send_log"), captor.capture());
+        assertThat(captor.getValue()).doesNotContainKey("id");
+        // sanity: the row still carries the real send-log fields
+        assertThat(captor.getValue()).containsKeys("tenant_id", "template_code", "recipient", "status");
     }
 }
