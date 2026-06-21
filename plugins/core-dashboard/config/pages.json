@@ -7,7 +7,7 @@
     "kind": "detail",
     "schemaVersion": 4,
     "layout": {
-      "type": "flow"
+      "type": "grid"
     },
     "extension": {
       "showShare": false,
