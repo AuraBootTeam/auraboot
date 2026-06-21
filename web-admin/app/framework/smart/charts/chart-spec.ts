@@ -110,6 +110,17 @@ export interface ChartVisualOptions {
    */
   areaFill?: boolean;
   /**
+   * Base opacity of the area fill (line/area family). Renderer-neutral intent for the
+   * dedicated SmartAreaChart, whose `fillOpacity` prop maps here. When SET, the echarts
+   * adapter derives the per-series area opacity as `max(0.1, fillOpacity - index*0.15)`
+   * (the SmartAreaChart formula). When UNSET — the SmartLineChart area-fill case, which
+   * has no `fillOpacity` knob — the adapter falls back to the legacy SmartLineChart
+   * gradient `0.3 - index*0.1`. The two builders are therefore byte-equivalent on their
+   * own inputs (each pinned by its own B2d equivalence gate), differing only because
+   * SmartAreaChart exposes this configurable base opacity and SmartLineChart does not.
+   */
+  fillOpacity?: number;
+  /**
    * Show the data-point symbols on a line series (line/area family). Renderer-neutral
    * intent; SmartLineChart's `showSymbol` prop maps here. Defaults to shown when
    * unset (matching the legacy SmartLineChart default).
