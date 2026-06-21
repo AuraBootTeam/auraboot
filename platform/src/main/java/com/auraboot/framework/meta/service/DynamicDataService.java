@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service;
 import com.auraboot.framework.meta.dto.*;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 动态数据服务
@@ -209,4 +210,35 @@ public interface DynamicDataService {
      * @return 联合保存结果，包含主表ID和各子表保存数量
      */
     JointSubTableSaveResponse saveWithRelations(String modelCode, JointSubTableSaveRequest request);
+
+    // ==================== 原子计数器操作 ====================
+
+    /**
+     * Atomically increment a numeric counter column, optionally bounded by a cap column.
+     * Uses UPDATE … RETURNING for lock-free single-row semantics.
+     *
+     * @param modelCode   model containing the counter
+     * @param recordId    primary key value of the target row
+     * @param counterCode field code of the column to increment (must be a numeric type)
+     * @param delta       increment amount (positive)
+     * @param capCode     field code of the cap column, or {@code null} for unbounded
+     * @return the new value of {@code counterCode} after the increment wrapped in
+     *         {@link Optional}, or {@link Optional#empty()} if the row was not found
+     *         or was already at cap
+     * @throws IllegalArgumentException if {@code counterCode} or {@code capCode} is not
+     *                                  a known numeric field on {@code modelCode}
+     * @since 2.6.0
+     */
+    Optional<Long> incrementWithinCap(String modelCode, String recordId, String counterCode, long delta, String capCode);
+
+    /**
+     * Atomically increment a numeric counter column with no cap (unbounded).
+     * Equivalent to {@link #incrementWithinCap(String, String, String, long, String)}
+     * with {@code capCode = null}.
+     *
+     * @since 2.6.0
+     */
+    default Optional<Long> increment(String modelCode, String recordId, String counterCode, long delta) {
+        return incrementWithinCap(modelCode, recordId, counterCode, delta, null);
+    }
 }
