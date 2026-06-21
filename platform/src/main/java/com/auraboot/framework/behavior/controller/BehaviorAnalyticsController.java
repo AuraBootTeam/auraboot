@@ -1,10 +1,12 @@
 package com.auraboot.framework.behavior.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.behavior.dto.BehaviorAnalyticsRecords;
 import com.auraboot.framework.behavior.dto.BehaviorDailyPoint;
 import com.auraboot.framework.behavior.dto.BehaviorEventCount;
 import com.auraboot.framework.behavior.dto.BehaviorOverview;
 import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
+import com.auraboot.framework.common.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,14 +28,16 @@ public class BehaviorAnalyticsController {
 
     /** PV / UV / sessions / total events for the current tenant. */
     @GetMapping("/overview")
-    public BehaviorOverview overview() {
-        return behaviorEventMapper.overview(MetaContext.getCurrentTenantId());
+    public ApiResponse<BehaviorAnalyticsRecords<BehaviorOverview>> overview() {
+        return ApiResponse.success(new BehaviorAnalyticsRecords<>(
+                List.of(behaviorEventMapper.overview(MetaContext.getCurrentTenantId()))));
     }
 
     /** Top events by name for the current tenant. */
     @GetMapping("/top-events")
-    public List<BehaviorEventCount> topEvents() {
-        return behaviorEventMapper.topEvents(MetaContext.getCurrentTenantId());
+    public ApiResponse<BehaviorAnalyticsRecords<BehaviorEventCount>> topEvents() {
+        return ApiResponse.success(new BehaviorAnalyticsRecords<>(
+                behaviorEventMapper.topEvents(MetaContext.getCurrentTenantId())));
     }
 
     /** Daily PV/UV/total time series for the current tenant (dashboard trend). */
