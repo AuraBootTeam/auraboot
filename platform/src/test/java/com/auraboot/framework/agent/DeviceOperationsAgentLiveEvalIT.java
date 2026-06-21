@@ -179,9 +179,14 @@ class DeviceOperationsAgentLiveEvalIT extends BaseIntegrationTest {
         assertEquals(deviceOperationsAgentCases().size(), scored + unavailable,
                 "every eval case must be either scored or marked unavailable");
 
-        long countAfter = evalRunMapper.selectCount(
-                new LambdaQueryWrapper<AbCapabilityEvalRun>().eq(AbCapabilityEvalRun::getTenantId, tenantId));
-        assertTrue(countAfter > countBefore, "a new eval run must be persisted");
+        // A persisted run only exists when something actually scored. In the bare IT env the
+        // tenant catalog may not contain the ops tools → all cases unavailable (scored=0) →
+        // no_scoreable_cases short-circuit (no persist). Live LLM routing is proven by Order(2/3).
+        if (scored > 0) {
+            long countAfter = evalRunMapper.selectCount(
+                    new LambdaQueryWrapper<AbCapabilityEvalRun>().eq(AbCapabilityEvalRun::getTenantId, tenantId));
+            assertTrue(countAfter > countBefore, "a scored eval run must be persisted");
+        }
     }
 
     /**

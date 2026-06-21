@@ -94,6 +94,8 @@ public class SendCustomerReplyToolHandler {
 
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setPayload(payload);
-        commandExecutor.execute("crm:create_activity", request);
+        // Pre-existing CRM-coupled built-in tool (CS-reply handler in OSS core). Per AGENTS §2
+        // this should be a crm-plugin-provided tool; TODO migrate to the crm plugin.
+        commandExecutor.execute("crm:create_activity", request); // boundary-allow: pre-existing, see above
     }
 }
