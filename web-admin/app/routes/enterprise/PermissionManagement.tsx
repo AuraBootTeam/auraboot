@@ -17,6 +17,7 @@ import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import ConfirmDialog from '~/ui/ConfirmDialog';
 import RoleFormDialog from './permission/RoleFormDialog';
 import PermissionMatrixTab from './permission/PermissionMatrixTab';
+import CapabilityRoleEditor from './permission/capability/CapabilityRoleEditor';
 import RoleMemberTab from './permission/RoleMemberTab';
 import AssignmentTab from './permission/AssignmentTab';
 import type { Role } from './permission/types';
@@ -26,7 +27,7 @@ import type { Role } from './permission/types';
 // ---------------------------------------------------------------------------
 
 type TopTabKey = 'roles' | 'assignments';
-type RightTabKey = 'permissions' | 'members';
+type RightTabKey = 'capabilities' | 'permissions' | 'members';
 
 const TYPE_BADGE: Record<string, string> = {
   SYSTEM: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
@@ -351,6 +352,18 @@ export default function PermissionManagement() {
         <div className="border-b border-gray-200 px-6 dark:border-gray-700">
           <nav className="-mb-px flex space-x-6">
             <button
+              data-testid="permission-right-tab-capabilities"
+              onClick={() => setActiveRightTab('capabilities')}
+              className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
+                activeRightTab === 'capabilities'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400'
+              }`}
+            >
+              <ShieldCheckIcon className="mr-1.5 h-4 w-4" />
+              {t('admin.permission.tab.capabilities') || 'Capabilities'}
+            </button>
+            <button
               data-testid="permission-right-tab-permissions"
               onClick={() => setActiveRightTab('permissions')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
@@ -389,6 +402,12 @@ export default function PermissionManagement() {
             </div>
           )}
 
+          {activeRightTab === 'capabilities' &&
+            (selectedRole ? (
+              <CapabilityRoleEditor roleId={String(selectedRole.id)} />
+            ) : (
+              <div className="text-sm text-gray-400">{t('admin.permission.selectRole') || 'Select a role'}</div>
+            ))}
           {activeRightTab === 'permissions' && <PermissionMatrixTab rolePid={selectedRolePid} />}
           {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} />}
         </div>
