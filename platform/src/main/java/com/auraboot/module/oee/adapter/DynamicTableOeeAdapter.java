@@ -7,7 +7,6 @@ import com.auraboot.module.oee.dto.OeeRequest;
 import com.auraboot.module.oee.port.OeeDataQueryPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -17,9 +16,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Primary {@link OeeDataQueryPort} implementation that reads the PCBA manufacturing
+ * Postgres-backed {@link OeeDataQueryPort} implementation that reads the PCBA manufacturing
  * dynamic tables ({@code mt_pe_*}) to assemble the raw OEE inputs for one equipment
- * over a time window.
+ * over a time window. Wrapped by {@link TelemetryEnrichingOeeDataQueryPort} (the {@code @Primary}
+ * port) which overlays telemetry-derived A/P/Q signals when an {@code OeeTelemetrySource} is present.
  *
  * <p>Pattern mirrors {@code ApsSchedulingService}: {@link DynamicDataMapper#selectByQueryWithoutTenant}
  * with tenant isolation written into the SQL ({@code WHERE tenant_id = #{params.tenantId}}) and a
@@ -55,7 +55,6 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-@Primary
 @RequiredArgsConstructor
 public class DynamicTableOeeAdapter implements OeeDataQueryPort {
 
