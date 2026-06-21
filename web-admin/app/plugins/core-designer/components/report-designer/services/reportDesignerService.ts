@@ -6,6 +6,7 @@
 import type { ReportDsl } from '../types';
 
 const PAGES_API = '/api/pages';
+const REPORT_DEFINITIONS_API = '/api/report-definitions';
 
 interface ApiResponse<T> {
   code: number | string;
@@ -59,6 +60,30 @@ function parseReportDsl(record: PageSchemaRecord): ReportDsl {
   return typeof stored === 'string' ? (JSON.parse(stored) as ReportDsl) : stored;
 }
 
+/**
+ * Best-effort dual-write of the report into the `ab_report` shadow table, keyed by the page `pid`
+ * (Phase 4 slice 2b-1). NEVER throws — a failure is logged and swallowed so the canonical
+ * page-schema save the caller already completed still succeeds (a later backfill reconciles drift).
+ * `PUT /api/report-definitions/{pid}` is an idempotent upsert, so the same pid can be synced whether
+ * or not the shadow row exists yet.
+ */
+async function syncReportShadow(pid: string, code: string, report: ReportDsl): Promise<void> {
+  try {
+    await request<unknown>(`${REPORT_DEFINITIONS_API}/${pid}`, {
+      method: 'put',
+      body: JSON.stringify({
+        code,
+        title: report.title,
+        profile: 'paged-media',
+        dsl: report as unknown as Record<string, unknown>,
+      }),
+    });
+  } catch (error) {
+    // Best-effort shadow: do NOT surface to the user; page-schema remains the source of truth.
+    console.warn('[reportDesignerService] ab_report shadow dual-write failed (non-fatal):', error);
+  }
+}
+
 export const reportDesignerService = {
   /**
    * Load report by page key
@@ -104,19 +129,29 @@ export const reportDesignerService = {
       semver: '0.1.0',
     };
 
+    let pid: string;
     if (existingPid) {
       const result = await request<PageSchemaRecord>(`${PAGES_API}/${existingPid}`, {
         method: 'put',
         body: JSON.stringify(payload),
       });
-      return result.pid;
+      pid = result.pid;
     } else {
       const result = await request<PageSchemaRecord>(PAGES_API, {
         method: 'post',
         body: JSON.stringify(payload),
       });
-      return result.pid;
+      pid = result.pid;
     }
+
+    // Phase 4 transition dual-write — ab_report shadow, reads still use /api/pages until slice 2b-2
+    // switches them. The page-schema store above is canonical; ab_report is kept in sync as a shadow
+    // keyed by the SAME pid (PUT /api/report-definitions/{pid} is an idempotent upsert). This is
+    // best-effort: a shadow-write failure must NOT fail the user's save (a later backfill reconciles
+    // any drift), so syncReportShadow swallows and only warns on errors.
+    await syncReportShadow(pid, pageKey, report);
+
+    return pid;
   },
 
   /**

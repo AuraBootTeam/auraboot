@@ -176,6 +176,65 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    // ---------- PERMIT: PUT is an idempotent upsert (creates when the pid is missing) ----------
+
+    @Test
+    @DisplayName("PERMIT upsert: PUT to a missing pid CREATES the row, honoring the supplied pid")
+    void upsert_putMissingPid_createsHonoringSuppliedPid() throws Exception {
+        grantManage();
+        grantRead();
+
+        // A page-minted pid the frontend dual-write would sync a shadow under; no ab_report row yet.
+        String suppliedPid = UniqueIdGenerator.generate();
+        assertThat(reportStorageService.findByPid(suppliedPid)).isNull();
+
+        mockMvc.perform(put("/api/report-definitions/" + suppliedPid)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"shadow-code\",\"title\":\"Shadow Report\",\"profile\":\"paged-media\","
+                                + "\"dsl\":{\"sections\":[{\"type\":\"table\"}],\"page\":\"A4\"}}"))
+                .andExpect(status().isOk())
+                // the supplied pid is honored verbatim (NOT re-minted)
+                .andExpect(jsonPath("$.data.pid").value(suppliedPid))
+                .andExpect(jsonPath("$.data.code").value("shadow-code"))
+                .andExpect(jsonPath("$.data.title").value("Shadow Report"))
+                .andExpect(jsonPath("$.data.profile").value("paged-media"))
+                .andExpect(jsonPath("$.data.dsl.page").value("A4"));
+
+        // the row is now retrievable under the SAME pid, dsl round-trips as an object
+        mockMvc.perform(get("/api/report-definitions/" + suppliedPid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pid").value(suppliedPid))
+                .andExpect(jsonPath("$.data.code").value("shadow-code"))
+                .andExpect(jsonPath("$.data.dsl.sections[0].type").value("table"));
+    }
+
+    @Test
+    @DisplayName("PERMIT upsert: PUT to an existing pid UPDATES in place (no new row, no pid re-mint)")
+    void upsert_putExistingPid_updatesInPlace() throws Exception {
+        grantManage();
+        grantRead();
+        String pid = seedReport(getTestTenant().getId(), "upsert-existing", "Old Title", "{\"v\":1}");
+
+        mockMvc.perform(put("/api/report-definitions/" + pid).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Updated Title\",\"dsl\":{\"v\":2}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pid").value(pid))
+                // code is immutable on the update branch — the seeded code is preserved
+                .andExpect(jsonPath("$.data.code").value("upsert-existing"))
+                .andExpect(jsonPath("$.data.title").value("Updated Title"))
+                .andExpect(jsonPath("$.data.version").value(2))
+                .andExpect(jsonPath("$.data.dsl.v").value(2));
+
+        // exactly one row for this tenant+code (upsert updated in place, did not create a duplicate).
+        // The request filter cleared MetaContext on the way out, so re-apply it before this direct
+        // storage read (listByTenant runs a tenant-scoped query off the thread-local context).
+        applyTestMetaContext();
+        long matching = reportStorageService.listByTenant(getTestTenant().getId()).stream()
+                .filter(r -> "upsert-existing".equals(r.getCode()))
+                .count();
+        assertThat(matching).isEqualTo(1);
+    }
+
     // ---------- PERMIT: get one; not-found is 404 ----------
 
     @Test
