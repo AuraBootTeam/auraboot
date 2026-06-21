@@ -3,6 +3,7 @@ package com.auraboot.framework.agent;
 import com.auraboot.framework.agent.dto.CapabilityEvalCase;
 import com.auraboot.framework.agent.entity.AgentEvalCase;
 import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
+import com.auraboot.framework.agent.service.CapabilityEvalService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.plugin.dto.imports.AgentDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
@@ -42,6 +43,7 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
     @Autowired private PluginResourceImporter resourceImporter;
     @Autowired private AgentEvalCaseMapper evalCaseMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private CapabilityEvalService capabilityEvalService;
 
     private Long tenantId;
 
@@ -190,5 +192,41 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
                 Integer.class, tenantId, AGENT_CODE);
         assertEquals(1, activeAfterRestore,
                 "after restore, eval cases must be active again (deleted_flag = FALSE)");
+    }
+
+    @Test
+    @DisplayName("loadRegisteredCases returns eval case imported via importAgentDefinition")
+    void loadRegisteredCasesReturnsImportedCases() {
+        // Import agent with caseId "eval-it-1" and expectedToolCodes ["dsl.query"]
+        CapabilityEvalCase evalCase = CapabilityEvalCase.builder()
+                .caseId(CASE_ID)
+                .taskDescription("Query current alarms for device A")
+                .expectedToolCodes(List.of("dsl.query"))
+                .forbiddenToolCodes(List.of("x:write"))
+                .category("test")
+                .build();
+
+        AgentDefinitionDTO dto = AgentDefinitionDTO.builder()
+                .agentCode(AGENT_CODE)
+                .name("Eval IT Agent")
+                .description("Eval case import integration test agent")
+                .agentType("reactive")
+                .status("active")
+                .evalCases(List.of(evalCase))
+                .build();
+
+        resourceImporter.importAgentDefinition(
+                dto, PLUGIN_PID, "load-1", tenantId, ImportRequest.ConflictStrategy.OVERWRITE);
+
+        // Load via CapabilityEvalService.loadRegisteredCases
+        List<CapabilityEvalCase> loaded = capabilityEvalService.loadRegisteredCases(tenantId);
+
+        // Assert the imported case is present with correct expectedToolCodes
+        boolean found = loaded.stream()
+                .anyMatch(c -> CASE_ID.equals(c.getCaseId())
+                        && List.of("dsl.query").equals(c.getExpectedToolCodes()));
+        org.junit.jupiter.api.Assertions.assertTrue(found,
+                "loadRegisteredCases must return case 'eval-it-1' with expectedToolCodes [\"dsl.query\"]; "
+                        + "loaded=" + loaded.stream().map(CapabilityEvalCase::getCaseId).toList());
     }
 }

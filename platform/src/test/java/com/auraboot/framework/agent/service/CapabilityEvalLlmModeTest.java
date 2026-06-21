@@ -2,6 +2,7 @@ package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.dto.CapabilityEvalCase;
 import com.auraboot.framework.agent.mapper.AbCapabilityEvalRunMapper;
+import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -44,13 +45,16 @@ class CapabilityEvalLlmModeTest {
     private AbCapabilityEvalRunMapper evalRunMapper;
     @Mock
     private LlmToolSelectionService llmToolSelectionService;
+    @Mock
+    private AgentEvalCaseMapper agentEvalCaseMapper;
 
     private CapabilityEvalService service;
 
     @BeforeEach
     void setUp() {
         service = new CapabilityEvalService(capabilityViewService, toolProviderRegistry,
-                dynamicDataMapper, new ObjectMapper(), evalRunMapper, llmToolSelectionService);
+                dynamicDataMapper, new ObjectMapper(), evalRunMapper, llmToolSelectionService,
+                agentEvalCaseMapper);
         lenient().when(evalRunMapper.selectList(any())).thenReturn(List.of());
     }
 

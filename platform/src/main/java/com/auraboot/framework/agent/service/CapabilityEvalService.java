@@ -3,6 +3,8 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.CapabilityEvalCase;
 import com.auraboot.framework.agent.dto.CapabilityView;
+import com.auraboot.framework.agent.entity.AgentEvalCase;
+import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
@@ -48,6 +50,7 @@ public class CapabilityEvalService {
     private final ObjectMapper objectMapper;
     private final AbCapabilityEvalRunMapper evalRunMapper;
     private final LlmToolSelectionService llmToolSelectionService;
+    private final AgentEvalCaseMapper agentEvalCaseMapper;
 
     /**
      * Auto-generate evaluation cases from published capabilities.
@@ -80,6 +83,34 @@ public class CapabilityEvalService {
         }
 
         return cases;
+    }
+
+    /**
+     * Load all active eval cases registered for this tenant from {@code ab_agent_eval_case}.
+     * Active = {@code deleted_flag = FALSE} or NULL. Maps each DB row to a {@link CapabilityEvalCase}.
+     * This is the DB-backed source that replaces the hardcoded {@code AgentArchetypeEvalCases.all()}
+     * for tenants that have imported agent definitions with eval cases.
+     */
+    public List<CapabilityEvalCase> loadRegisteredCases(Long tenantId) {
+        List<AgentEvalCase> rows = agentEvalCaseMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AgentEvalCase>()
+                        .eq(AgentEvalCase::getTenantId, tenantId)
+                        .and(w -> w.eq(AgentEvalCase::getDeletedFlag, false)
+                                .or().isNull(AgentEvalCase::getDeletedFlag)));
+        List<CapabilityEvalCase> out = new ArrayList<>();
+        for (AgentEvalCase r : rows) {
+            out.add(CapabilityEvalCase.builder()
+                    .caseId(r.getCaseId())
+                    .category(r.getCategory())
+                    .taskDescription(r.getTaskDescription())
+                    .expectedToolCodes(r.getExpectedToolCodes())
+                    .forbiddenToolCodes(r.getForbiddenToolCodes())
+                    .expectedInputKeys(r.getExpectedInputKeys())
+                    .expectedRiskLevel(r.getExpectedRiskLevel())
+                    .expectsConfirmation(Boolean.TRUE.equals(r.getExpectsConfirmation()))
+                    .build());
+        }
+        return out;
     }
 
     /**
@@ -116,7 +147,7 @@ public class CapabilityEvalService {
             evalMode = "keyword";
         }
 
-        int totalCases = cases.size();
+        int totalCases = 0; // counts only scoreable cases (excludes unavailable)
 
         int correctSelections = 0;
         int safetyCompliant = 0;
@@ -124,13 +155,46 @@ public class CapabilityEvalService {
         int hallucinationCount = 0;
         int parameterMatches = 0;
         int totalParameterChecks = 0;
+        int unavailableCases = 0;
 
         List<Map<String, Object>> caseResults = new ArrayList<>();
 
-        // LLM mode: discover the candidate catalog once for the whole run.
-        List<ToolDefinition> llmCatalog = "llm".equals(evalMode) ? discoverTools(tenantId) : List.of();
+        // Discover the candidate catalog once for the whole run.
+        // For keyword mode we discover on each case already (via selectToolsByRelevance),
+        // but we also need the full catalog set here for D3a availability checks.
+        List<ToolDefinition> runCatalog = discoverTools(tenantId);
+        Set<String> catalogCodes = runCatalog.stream()
+                .map(ToolDefinition::getToolCode)
+                .collect(Collectors.toSet());
+
+        // LLM mode: reuse the same discovered catalog list.
+        List<ToolDefinition> llmCatalog = "llm".equals(evalMode) ? runCatalog : List.of();
 
         for (CapabilityEvalCase evalCase : cases) {
+            // D3a: dependency-aware skip — if ALL expected tools are absent from the tenant's
+            // catalog, this case cannot be scored (plugin not installed). Mark it unavailable
+            // and exclude it from all accuracy denominators so missing plugins don't inflate
+            // failure rates. This is observable (not silent) via the "status=unavailable" field.
+            List<String> expectedCodes = evalCase.getExpectedToolCodes() != null
+                    ? evalCase.getExpectedToolCodes() : List.of();
+            if (!expectedCodes.isEmpty() && catalogCodes.stream().noneMatch(expectedCodes::contains)) {
+                Map<String, Object> unavailableResult = new LinkedHashMap<>();
+                unavailableResult.put("caseId", evalCase.getCaseId());
+                unavailableResult.put("category", evalCase.getCategory());
+                unavailableResult.put("taskDescription", evalCase.getTaskDescription());
+                unavailableResult.put("expectedTools", expectedCodes);
+                unavailableResult.put("status", "unavailable");
+                unavailableResult.put("unavailableReason",
+                        "expected tool(s) not registered in tenant catalog: " + expectedCodes);
+                caseResults.add(unavailableResult);
+                unavailableCases++;
+                log.debug("Eval case {} skipped (unavailable): expected tools {} not in catalog",
+                        evalCase.getCaseId(), expectedCodes);
+                continue;
+            }
+
+            totalCases++; // only scoreable cases increment the denominator
+
             List<String> selectedTools;
             List<String> hallucinatedTools = List.of();
             String llmError = null;
@@ -148,7 +212,7 @@ public class CapabilityEvalService {
                     llmError = e.getMessage();
                 }
             } else {
-                selectedTools = selectToolsByRelevance(tenantId, evalCase.getTaskDescription());
+                selectedTools = selectToolsByRelevance(evalCase.getTaskDescription(), runCatalog);
             }
 
             Map<String, Object> caseResult = new LinkedHashMap<>();
@@ -223,7 +287,8 @@ public class CapabilityEvalService {
 
         Map<String, Object> report = new LinkedHashMap<>();
         report.put("evalMode", evalMode);
-        report.put("totalCases", totalCases);
+        report.put("totalCases", totalCases);             // scoreable cases (denominators)
+        report.put("unavailableCases", unavailableCases); // D3a: tool not in tenant catalog
         report.put("toolSelectionAccuracy", toolAccuracy);
         report.put("parameterCompletionRate", paramRate);
         report.put("safetyComplianceRate", safetyRate);
