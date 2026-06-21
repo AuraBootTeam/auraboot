@@ -101,6 +101,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.meta.service.MetaFieldService metaFieldService;
     private final com.auraboot.framework.meta.service.CommandService commandService;
     private final com.auraboot.framework.meta.service.FieldMaskService fieldMaskService;
+    private final com.auraboot.framework.permission.capability.CapabilityRegistryService capabilityRegistryService;
     private final SchemaManagementService schemaManagementService;
     private final PermissionService permissionService;
     private final UserPermissionService userPermissionService;
@@ -431,6 +432,14 @@ public class PluginImportServiceImpl implements PluginImportService {
                 List<FieldMaskDefinitionDTO> fieldMasks = loadResourceListFromZip(files, resourceDirs.get("fieldMasks"), FieldMaskDefinitionDTO.class);
                 if (!fieldMasks.isEmpty()) {
                     manifest.setFieldMasks(mergeResourceList(manifest.getFieldMasks(), fieldMasks));
+                }
+            }
+
+            // Load capabilities
+            if (resourceDirs.containsKey("capabilities")) {
+                List<CapabilityDefinitionDTO> capabilities = loadResourceListFromZip(files, resourceDirs.get("capabilities"), CapabilityDefinitionDTO.class);
+                if (!capabilities.isEmpty()) {
+                    manifest.setCapabilities(mergeResourceList(manifest.getCapabilities(), capabilities));
                 }
             }
 
@@ -1493,6 +1502,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         importRules(manifest);
         importSlaConfigs(manifest);
         importFieldMasks(manifest);
+        importCapabilities(manifest);
 
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
         autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace(), tenantId);
@@ -2222,6 +2232,27 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
         if (created > 0) {
             log.info("Imported {} field-mask config(s) for plugin {}", created, logSafe(manifest.getPluginId()));
+        }
+    }
+
+    /**
+     * Import capability declarations (config/capabilities.json) into ab_capability via the
+     * capability registry. Upserts by (tenant, code), so re-import is additive/idempotent.
+     */
+    private void importCapabilities(PluginManifestExtended manifest) {
+        if (manifest.getCapabilities() == null || manifest.getCapabilities().isEmpty()) return;
+        int created = 0;
+        for (CapabilityDefinitionDTO dto : manifest.getCapabilities()) {
+            if (!dto.isValid()) {
+                log.warn("Skipping invalid capability (missing code/includes): index={}",
+                        manifest.getCapabilities().indexOf(dto));
+                continue;
+            }
+            capabilityRegistryService.saveDefinition(dto);
+            created++;
+        }
+        if (created > 0) {
+            log.info("Imported {} capability declaration(s) for plugin {}", created, logSafe(manifest.getPluginId()));
         }
     }
 
