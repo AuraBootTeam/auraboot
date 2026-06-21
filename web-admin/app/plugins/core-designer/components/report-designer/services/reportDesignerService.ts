@@ -29,6 +29,20 @@ interface PageSchemaRecord {
   status?: string;
 }
 
+/**
+ * Shape of `GET /api/report-definitions/{pid}` and `.../by-code/{code}` (Phase 4 slice 2b-2 read
+ * path). `dsl` is returned as a JSON OBJECT (the whole ReportDsl), not an escaped string.
+ */
+interface ReportDefinitionRecord {
+  pid: string;
+  code?: string;
+  title?: string;
+  profile?: string;
+  status?: string;
+  version?: number;
+  dsl?: ReportDsl;
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...options,
@@ -61,6 +75,19 @@ function parseReportDsl(record: PageSchemaRecord): ReportDsl {
 }
 
 /**
+ * Normalize a `ReportDefinitionRecord` (the ab_report read path) into the existing `{dsl, pid}`
+ * return shape. The report-definitions GET returns `dsl` as a JSON object that is the SAME ReportDsl
+ * the page-schema holds in `extension.reportDsl`, so callers see an identical shape from either
+ * source. Throws if the record carries no dsl so the caller can fall back to the page-schema path.
+ */
+function fromReportDefinition(record: ReportDefinitionRecord): { dsl: ReportDsl; pid: string } {
+  if (!record.dsl) {
+    throw new Error(`Report DSL not found for report-definition: ${record.pid}`);
+  }
+  return { dsl: record.dsl, pid: record.pid };
+}
+
+/**
  * Best-effort dual-write of the report into the `ab_report` shadow table, keyed by the page `pid`
  * (Phase 4 slice 2b-1). NEVER throws — a failure is logged and swallowed so the canonical
  * page-schema save the caller already completed still succeeds (a later backfill reconciles drift).
@@ -86,21 +113,44 @@ async function syncReportShadow(pid: string, code: string, report: ReportDsl): P
 
 export const reportDesignerService = {
   /**
-   * Load report by page key
+   * Load report by page key (the runtime viewer read path).
+   *
+   * Phase 4 slice 2b-2: read the first-class `ab_report` store FIRST via
+   * `GET /api/report-definitions/by-code/{pageKey}` (ab_report.code == the report's pageKey).
+   * On a 404 (report not yet in ab_report) or ANY error, fall back to the legacy page-schema
+   * read (`GET /api/pages/key/{pageKey}`) UNCHANGED, so no report becomes unreadable.
    */
   async loadByPageKey(pageKey: string): Promise<{ dsl: ReportDsl; pid: string }> {
-    const record = await request<PageSchemaRecord>(`${PAGES_API}/key/${pageKey}`);
-    const dsl = parseReportDsl(record);
-    return { dsl, pid: record.pid };
+    try {
+      const record = await request<ReportDefinitionRecord>(
+        `${REPORT_DEFINITIONS_API}/by-code/${pageKey}`,
+      );
+      return fromReportDefinition(record);
+    } catch {
+      // Fallback: legacy page-schema viewer read (unchanged behavior).
+      const record = await request<PageSchemaRecord>(`${PAGES_API}/key/${pageKey}`);
+      const dsl = parseReportDsl(record);
+      return { dsl, pid: record.pid };
+    }
   },
 
   /**
-   * Load report by PID
+   * Load report by PID (the designer open path).
+   *
+   * Phase 4 slice 2b-2: read the first-class `ab_report` store FIRST via
+   * `GET /api/report-definitions/{pid}`. On a 404 (report not yet in ab_report) or ANY error,
+   * fall back to the legacy page-schema read (`GET /api/pages/{pid}`) UNCHANGED.
    */
   async loadByPid(pid: string): Promise<{ dsl: ReportDsl; pid: string }> {
-    const record = await request<PageSchemaRecord>(`${PAGES_API}/${pid}`);
-    const dsl = parseReportDsl(record);
-    return { dsl, pid: record.pid };
+    try {
+      const record = await request<ReportDefinitionRecord>(`${REPORT_DEFINITIONS_API}/${pid}`);
+      return fromReportDefinition(record);
+    } catch {
+      // Fallback: legacy page-schema read by pid (unchanged behavior).
+      const record = await request<PageSchemaRecord>(`${PAGES_API}/${pid}`);
+      const dsl = parseReportDsl(record);
+      return { dsl, pid: record.pid };
+    }
   },
 
   /**

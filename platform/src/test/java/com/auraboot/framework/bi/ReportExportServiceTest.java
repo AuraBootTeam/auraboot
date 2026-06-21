@@ -1,7 +1,9 @@
 package com.auraboot.framework.bi;
 
+import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
+import com.auraboot.framework.bi.service.ReportStorageService;
 import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.entity.PageSchema;
@@ -39,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,12 +57,15 @@ class ReportExportServiceTest {
     @Mock
     private NamedQueryService namedQueryService;
 
+    @Mock
+    private ReportStorageService reportStorageService;
+
     private ReportExportServiceImpl reportExportService;
 
     @BeforeEach
     void setUp() {
         reportExportService = new ReportExportServiceImpl(pageSchemaMapper, new ObjectMapper(),
-                dynamicDataService, namedQueryService);
+                dynamicDataService, namedQueryService, reportStorageService);
     }
 
     @Test
@@ -92,6 +98,86 @@ class ReportExportServiceTest {
             assertThat(sheet.getRow(3).getCell(0).getStringCellValue()).isEqualTo("South");
             assertThat(sheet.getRow(3).getCell(1).getNumericCellValue()).isEqualTo(9.0);
         }
+    }
+
+    // ---------- Phase 4 slice 2b-2: read ab_report first, fall back to page-schema ----------
+
+    @Test
+    void loadReportDsl_readsAbReportFirst_whenShadowRowPresent() throws Exception {
+        // ab_report has the report (the dual-write shadow): the export must read it from there and
+        // must NOT touch the page-schema for the dsl.
+        ReportEntity shadow = new ReportEntity();
+        shadow.setPid("rpt-shadow");
+        shadow.setDsl(new ObjectMapper().writeValueAsString(reportDsl()));
+        when(reportStorageService.findByPid("rpt-shadow")).thenReturn(shadow);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-shadow");
+
+        ReportExportFile file = reportExportService.exportExcel(request);
+
+        // same export content as the page-schema path produces — proves the ab_report dsl shape
+        // is structurally identical to the page-schema reportDsl shape.
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file.getBytes()))) {
+            assertThat(workbook.getSheetName(0)).isEqualTo("Orders Export");
+            var sheet = workbook.getSheetAt(0);
+            assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("Region");
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("North");
+            assertThat(sheet.getRow(2).getCell(1).getNumericCellValue()).isEqualTo(12.0);
+        }
+
+        // the page-schema mapper was never consulted for the dsl (ab_report won)
+        verify(pageSchemaMapper, never()).selectByPid(any());
+    }
+
+    @Test
+    void loadReportDsl_fallsBackToPageSchema_whenNoShadowRow() throws Exception {
+        // ab_report has NO row for this pid (pre-dual-write report): export must fall back to the
+        // legacy page-schema extension.reportDsl, unchanged.
+        when(reportStorageService.findByPid("rpt-legacy")).thenReturn(null);
+
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", reportDsl());
+        page.setExtension(extension);
+        when(pageSchemaMapper.selectByPid("rpt-legacy")).thenReturn(page);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-legacy");
+
+        ReportExportFile file = reportExportService.exportExcel(request);
+
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file.getBytes()))) {
+            assertThat(workbook.getSheetName(0)).isEqualTo("Orders Export");
+            var sheet = workbook.getSheetAt(0);
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("North");
+            assertThat(sheet.getRow(2).getCell(1).getNumericCellValue()).isEqualTo(12.0);
+        }
+    }
+
+    @Test
+    void loadReportDsl_fallsBackToPageSchema_whenShadowRowHasBlankDsl() throws Exception {
+        // Defensive: a shadow row exists but its dsl is blank (never legitimately happens since the
+        // create() default is "{}", but guard the read path) → fall back to page-schema.
+        ReportEntity blankShadow = new ReportEntity();
+        blankShadow.setPid("rpt-blank");
+        blankShadow.setDsl("");
+        when(reportStorageService.findByPid("rpt-blank")).thenReturn(blankShadow);
+
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", reportDsl());
+        page.setExtension(extension);
+        when(pageSchemaMapper.selectByPid("rpt-blank")).thenReturn(page);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-blank");
+
+        ReportExportFile file = reportExportService.exportJson(request);
+
+        Map<String, Object> payload = new ObjectMapper().readValue(file.getBytes(), new TypeReference<>() {});
+        Map<String, Object> exportedDsl = castMap(payload.get("reportDsl"));
+        assertThat(exportedDsl.get("title")).isEqualTo("Operations Export");
     }
 
     @Test

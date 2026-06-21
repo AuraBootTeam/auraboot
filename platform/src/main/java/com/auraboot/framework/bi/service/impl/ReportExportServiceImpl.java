@@ -1,8 +1,10 @@
 package com.auraboot.framework.bi.service.impl;
 
+import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
 import com.auraboot.framework.bi.service.ReportExportService;
+import com.auraboot.framework.bi.service.ReportStorageService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
@@ -95,6 +97,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private final ObjectMapper objectMapper;
     private final DynamicDataService dynamicDataService;
     private final NamedQueryService namedQueryService;
+    private final ReportStorageService reportStorageService;
 
     @Override
     public ReportExportFile exportExcel(ReportExportRequest request) {
@@ -176,7 +179,49 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
     }
 
+    /**
+     * Load the ReportDsl for a report, preferring the first-class {@code ab_report} store and
+     * falling back to the legacy page-schema {@code extension.reportDsl} (Phase 4 slice 2b-2).
+     *
+     * <p>Since slice 2b-1 the report designer dual-writes every save into {@code ab_report} keyed
+     * by the SAME pid, so a report saved after that slice is in both stores and the {@code dsl}
+     * stored in {@code ab_report} is the EXACT same ReportDsl JSON the page-schema holds — the
+     * parsed map is structurally identical regardless of source. Reports created before the
+     * dual-write (not yet backfilled into {@code ab_report}) are read from the page-schema; that
+     * fallback is preserved verbatim so no report becomes unreadable. The page-schema read is
+     * removed in a later slice after the backfill.
+     */
     private Map<String, Object> loadReportDsl(String reportPid) {
+        ReportEntity report = reportStorageService.findByPid(reportPid);
+        if (report != null && StringUtils.hasText(report.getDsl())) {
+            return parseAbReportDsl(report.getDsl(), reportPid);
+        }
+        return loadReportDslFromPageSchema(reportPid);
+    }
+
+    /**
+     * Parse the {@code ab_report.dsl} jsonb String into the same {@code Map<String,Object>} shape
+     * {@code loadReportDsl} returns from the page-schema path. The stored value is the exact
+     * ReportDsl JSON written by the dual-write, so the parsed map mirrors the page-schema read.
+     */
+    private Map<String, Object> parseAbReportDsl(String dsl, String reportPid) {
+        try {
+            return objectMapper.readValue(dsl, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            // ab_report.dsl is a jsonb column, so it is always syntactically valid JSON; a parse
+            // failure here is a server fault, not a client validation error.
+            log.error("Failed to parse ab_report dsl: reportPid={}", reportPid, e);
+            throw new ValidationException(ResponseCode.SystemError,
+                    "Stored report dsl is not valid JSON: " + reportPid);
+        }
+    }
+
+    /**
+     * Legacy read path: the report's DSL lives in the page-schema {@code extension.reportDsl}.
+     * Unchanged from before slice 2b-2; retained as the fallback for reports not yet in
+     * {@code ab_report}.
+     */
+    private Map<String, Object> loadReportDslFromPageSchema(String reportPid) {
         PageSchema page = pageSchemaMapper.selectByPid(reportPid);
         if (page == null) {
             throw new ValidationException(ResponseCode.NOT_FOUND, "Report not found: " + reportPid);
