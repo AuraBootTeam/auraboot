@@ -962,6 +962,49 @@ ALTER SEQUENCE public.ab_agent_dry_run_support_id_seq OWNED BY public.ab_agent_d
 
 
 --
+-- Name: ab_agent_eval_case; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_agent_eval_case (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    agent_code character varying(100) NOT NULL,
+    case_id character varying(150) NOT NULL,
+    category character varying(100),
+    task_description text NOT NULL,
+    expected_tool_codes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    forbidden_tool_codes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    expected_input_keys jsonb DEFAULT '{}'::jsonb NOT NULL,
+    expected_risk_level character varying(20),
+    expects_confirmation boolean DEFAULT false NOT NULL,
+    plugin_source character varying(100),
+    deleted_flag boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: ab_agent_eval_case_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_agent_eval_case_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_agent_eval_case_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_agent_eval_case_id_seq OWNED BY public.ab_agent_eval_case.id;
+
+
+--
 -- Name: ab_agent_interrupt_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -14634,6 +14677,13 @@ ALTER TABLE ONLY public.ab_agent_dry_run_support ALTER COLUMN id SET DEFAULT nex
 
 
 --
+-- Name: ab_agent_eval_case id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_eval_case ALTER COLUMN id SET DEFAULT nextval('public.ab_agent_eval_case_id_seq'::regclass);
+
+
+--
 -- Name: ab_agent_interrupt_log id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -15438,6 +15488,22 @@ ALTER TABLE ONLY public.ab_agent_dry_run_support
 
 ALTER TABLE ONLY public.ab_agent_dry_run_support
     ADD CONSTRAINT ab_agent_dry_run_support_tenant_id_tool_ref_pattern_key UNIQUE (tenant_id, tool_ref_pattern);
+
+
+--
+-- Name: ab_agent_eval_case ab_agent_eval_case_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_eval_case
+    ADD CONSTRAINT ab_agent_eval_case_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_agent_eval_case ab_agent_eval_case_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_eval_case
+    ADD CONSTRAINT ab_agent_eval_case_pkey PRIMARY KEY (id);
 
 
 --
@@ -20714,6 +20780,13 @@ CREATE INDEX idx_agent_def_tenant ON public.ab_agent_definition USING btree (ten
 
 
 --
+-- Name: idx_agent_eval_case_tenant_agent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_eval_case_tenant_agent ON public.ab_agent_eval_case USING btree (tenant_id, agent_code) WHERE (deleted_flag = false);
+
+
+--
 -- Name: idx_agent_mcp_server_tenant; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -24750,6 +24823,13 @@ CREATE UNIQUE INDEX uq_ab_team_tenant_code ON public.ab_team USING btree (tenant
 --
 
 CREATE UNIQUE INDEX uq_agent_def_tenant_code ON public.ab_agent_definition USING btree (tenant_id, agent_code) WHERE (deleted_flag = false);
+
+
+--
+-- Name: uq_agent_eval_case; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_agent_eval_case ON public.ab_agent_eval_case USING btree (tenant_id, agent_code, case_id) WHERE (deleted_flag = false);
 
 
 --
