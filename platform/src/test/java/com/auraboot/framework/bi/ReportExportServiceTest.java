@@ -28,6 +28,9 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -399,6 +402,34 @@ class ReportExportServiceTest {
             assertThat(textSheet.getRow(3).getCell(1).getStringCellValue()).isEqualTo("CONFIDENTIAL");
             assertThat(textSheet.getRow(4).getCell(0).getStringCellValue()).isEqualTo("Page Footer");
             assertThat(textSheet.getRow(4).getCell(1).getStringCellValue()).isEqualTo("Operations Footer");
+        }
+    }
+
+    @Test
+    void exportExcel_chartBlock_embedsNativeChart() throws Exception {
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", nonTableReportDsl());
+        page.setExtension(extension);
+        when(pageSchemaMapper.selectByPid("rpt-chart-native")).thenReturn(page);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-chart-native");
+
+        ReportExportFile file = reportExportService.exportExcel(request);
+
+        try (XSSFWorkbook workbook =
+                (XSSFWorkbook) WorkbookFactory.create(new ByteArrayInputStream(file.getBytes()))) {
+            XSSFSheet chartSheet = workbook.getSheet("Status Chart");
+            assertThat(chartSheet).isNotNull();
+            // the Category/Value data (the chart's source) is still present
+            assertThat(chartSheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("Category");
+            // a REAL native Excel chart is embedded over that data — not just a data sheet
+            XSSFDrawing drawing = chartSheet.getDrawingPatriarch();
+            assertThat(drawing).as("chart sheet must carry a drawing").isNotNull();
+            assertThat(drawing.getCharts())
+                    .as("a native XSSF chart must be embedded over the data")
+                    .hasSize(1);
         }
     }
 

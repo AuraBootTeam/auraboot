@@ -35,7 +35,23 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.WorkbookUtil;
+import org.apache.poi.xddf.usermodel.chart.AxisCrosses;
+import org.apache.poi.xddf.usermodel.chart.AxisPosition;
+import org.apache.poi.xddf.usermodel.chart.BarDirection;
+import org.apache.poi.xddf.usermodel.chart.ChartTypes;
+import org.apache.poi.xddf.usermodel.chart.XDDFBarChartData;
+import org.apache.poi.xddf.usermodel.chart.XDDFCategoryAxis;
+import org.apache.poi.xddf.usermodel.chart.XDDFChartData;
+import org.apache.poi.xddf.usermodel.chart.XDDFDataSource;
+import org.apache.poi.xddf.usermodel.chart.XDDFDataSourcesFactory;
+import org.apache.poi.xddf.usermodel.chart.XDDFNumericalDataSource;
+import org.apache.poi.xddf.usermodel.chart.XDDFValueAxis;
+import org.apache.poi.xssf.usermodel.XSSFChart;
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -1100,9 +1116,63 @@ public class ReportExportServiceImpl implements ReportExportService {
                 row.createCell(0).setCellValue(metric.label());
                 writeCell(row.createCell(1), metric.value());
             }
+            // Phase 3 (DDR-2026-06-21): embed a real native chart over the data
+            // (XSSF/XDDF) so Excel exports show a visualization, not just a data sheet.
+            addNativeChart(sheet, block, title, 2, 1 + metrics.size());
         }
         sheet.autoSizeColumn(0);
         sheet.autoSizeColumn(1);
+    }
+
+    /**
+     * Draw a native Excel chart (bar / line / pie, matching the block's chartType) over the
+     * Category/Value data already written to this sheet. No-op when the sheet is not an
+     * {@code XSSFSheet}. The data range is column A (categories) + B (values), rows
+     * {@code firstDataRow..lastDataRow}.
+     */
+    private void addNativeChart(Sheet sheet, Map<String, Object> block, String title,
+                                int firstDataRow, int lastDataRow) {
+        if (!(sheet instanceof XSSFSheet xssfSheet) || lastDataRow < firstDataRow) {
+            return;
+        }
+        String chartType = stringValue(block.get("chartType"), "bar").toLowerCase(Locale.ROOT);
+
+        XSSFDrawing drawing = xssfSheet.createDrawingPatriarch();
+        // anchor to the right of the data: cols D..N, rows 1..19
+        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 1, 14, 19);
+        XSSFChart chart = drawing.createChart(anchor);
+        chart.setTitleText(title);
+        chart.setTitleOverlay(false);
+
+        XDDFDataSource<String> categories = XDDFDataSourcesFactory.fromStringCellRange(
+                xssfSheet, new CellRangeAddress(firstDataRow, lastDataRow, 0, 0));
+        XDDFNumericalDataSource<Double> values = XDDFDataSourcesFactory.fromNumericCellRange(
+                xssfSheet, new CellRangeAddress(firstDataRow, lastDataRow, 1, 1));
+
+        if ("pie".equals(chartType)) {
+            XDDFChartData data = chart.createData(ChartTypes.PIE, null, null);
+            data.setVaryColors(true);
+            data.addSeries(categories, values).setTitle(title, null);
+            chart.plot(data);
+            return;
+        }
+
+        XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
+        XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
+        leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
+
+        ChartTypes type = switch (chartType) {
+            case "line", "area" -> ChartTypes.LINE;
+            default -> ChartTypes.BAR;
+        };
+        XDDFChartData data = chart.createData(type, bottomAxis, leftAxis);
+        data.setVaryColors(false);
+        XDDFChartData.Series series = data.addSeries(categories, values);
+        series.setTitle(title, null);
+        if (data instanceof XDDFBarChartData bar) {
+            bar.setBarDirection(BarDirection.COL);
+        }
+        chart.plot(data);
     }
 
     private void writeTextArtifactsSheet(Workbook workbook,
