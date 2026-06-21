@@ -5,6 +5,8 @@ created: 2026-06-21
 slug: site-key-sp3-sp4-public-sdk-golden-retro
 ---
 
+<!-- no-precipitation: durable lessons precipitated to ENTERPRISE canonical (auraboot-enterprise/docs/agent-rules/engineering-gotchas/backend-spring-db.md + AGENTS speed-table) via ENT PR #647 — a cross-repo distilled_to target is not resolvable by the OSS-only docs gate. The in-repo consolidation is spec §4.5 (linked below). -->
+
 # Retro — site-key SP3 (public SDK) + SP4 (anonymous keyed golden)
 
 > 配套 OSS PR #1013(SP3 SDK + SP4 golden + 3 fixes)+ ENT PR #647(canonical 纠错)。
