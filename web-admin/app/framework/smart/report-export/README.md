@@ -78,3 +78,81 @@ renderer deps are absent. Run from `platform/`:
 ./gradlew :test --tests "com.auraboot.framework.bi.ReportRenderLiveIT" \
                 --tests "com.auraboot.framework.bi.ReportExportServiceLiveIT"
 ```
+
+## Test coverage matrix
+
+Report export has 10 block types × 4 export paths. Every cell below is exercised
+(audited 2026-06-21 by grepping the test tree, not asserted).
+
+| Block | TS unit | WYSIWYG PDF (real Chromium) | PDFBox PDF (fallback) | Excel (POI) | JSON |
+|-------|:---:|:---:|:---:|:---:|:---:|
+| chart | ✅ | ✅ | ✅ | ✅ + native chart | ✅ |
+| table | ✅ | ✅ | ✅ | ✅ | ✅ |
+| grouped-table | ✅ | ✅ | ✅ | ✅ | ✅ |
+| cross-tab | ✅ | ✅ | ✅ | ✅ | ✅ |
+| stat-card | ✅ | ✅ | ✅ | ✅ | ✅ |
+| rich-text | ✅ | ✅ | ✅ | ✅ | ✅ |
+| barcode | ✅ | ✅ | ✅ | ✅ | ✅ |
+| page-header | ✅ | ✅ | ✅ | ✅ | ✅ |
+| page-footer | ✅ | ✅ | ✅ | ✅ | ✅ |
+| watermark | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+### Cross-cutting scenarios (beyond per-block)
+
+- **Aggregation** sum / avg / count / min / max; chart shapes A/B/C; chart types
+  bar/line/pie/area; illegal type → bar fallback — `print-render.test.ts`.
+- **Barcode** CODE128 + non-128/empty → text fallback — `print-render.test.ts`.
+- **WYSIWYG ↔ PDFBox fallback** switch — `ReportExportServiceTest`
+  (`exportPdf_usesWysiwygRenderer`, `exportPdf_fallsBackToPdfBox`).
+- **Subprocess pipeline** stub / non-zero exit / timeout / non-PDF — `ReportRenderClientTest`.
+- **§5 PDF golden** %PDF + per-page running header + `第 N / M 页` page numbers +
+  CJK + zero "Category" — `ReportRenderLiveIT`.
+- **Data sources** static / model / namedQuery / api — `ReportExportServiceTest`.
+- **Storage read-switch** ab_report-first / page-schema fallback / backfill —
+  `ReportExportServiceReadSwitchIT`, `ReportStorageServiceIT`, `ReportBackfillIT`.
+- **Audit** export PDF/Excel/JSON, schedule, storage — `ReportExportServiceTest`,
+  `ReportScheduleAuditTest`, `ReportStorageAuditTest`.
+- **Permissions (authz)** export / schedule / definition — `ReportExportControllerAuthzTest`,
+  `ReportScheduleControllerAuthzTest`, `ReportDefinitionControllerIT`,
+  `ReportPermissionFamilyGrantIT`.
+- **Scheduled delivery (B7)** renders the real report as a PDF attachment —
+  `ReportDeliveryServiceTest`, `ReportDeliveryLiveIT`.
+- **Error/empty states** missing DSL → ValidationException, no data, empty
+  recipients skip, mail failure wraps — `ReportExportServiceTest`, `ReportDeliveryServiceTest`.
+- **Real warm stack** `@SpringBootTest` + real DB — `ReportExportServiceReadSwitchIT`
+  (run against an isolated DB, never the shared one — see below).
+
+### Counts (2026-06-21, all green)
+
+- TS (vitest, `web-admin/app/framework/smart/report-export/`): **33** —
+  cli-core 4 / print-html 14 / print-render 11 / render-pdf 4.
+- Java non-DB (`platform/`): **51** — RenderLiveIT 1 / RenderClientTest 5 /
+  ExportServiceTest 18 / ExportServiceLiveIT 1 / DeliveryServiceTest 9 /
+  DeliveryLiveIT 1 / Export+ScheduleControllerAuthz 2+2 / ScheduleServiceTest 9 /
+  ScheduleAuditTest 3.
+- Java DB ITs: ReadSwitchIT 2 + ReportBackfillIT / ReportStorageServiceIT /
+  ReportStorageAuditTest / ReportPermissionFamilyGrantIT.
+
+### Generating the reports
+
+Reports are generated on demand (not committed):
+
+```bash
+# Java → platform/build/reports/tests/test/index.html (+ build/test-results/test/TEST-*.xml)
+cd platform && ./gradlew :test --tests "com.auraboot.framework.bi.Report*"
+# TS → vitest html/json report
+cd web-admin && pnpm exec vitest run app/framework/smart/report-export/ --reporter=html
+```
+
+The DB-backed ITs (`ReadSwitchIT` etc.) use `@ActiveProfiles("integration-test")`
+which points at the shared `localhost:5432/aura_boot`. To run them without
+disrupting other sessions, build a throwaway DB and override the URL:
+
+```bash
+createdb aura_boot_rsit
+flyway -url=jdbc:postgresql://localhost:5432/aura_boot_rsit -user=$(whoami) \
+  -locations=filesystem:platform/src/main/resources/db/migration/core migrate
+SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5432/aura_boot_rsit?charSet=UTF8' \
+  ./gradlew -p platform :test --tests "com.auraboot.framework.bi.ReportExportServiceReadSwitchIT"
+dropdb aura_boot_rsit
+```
