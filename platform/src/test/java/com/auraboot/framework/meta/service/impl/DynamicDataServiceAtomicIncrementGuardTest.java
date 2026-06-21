@@ -84,13 +84,13 @@ class DynamicDataServiceAtomicIncrementGuardTest {
     @Test
     void unknown_counter_field_throws_illegal_argument() {
         assertThrows(IllegalArgumentException.class,
-                () -> service.incrementWithinCap("cr_cj_profile", "rec-1", "no_such_field", null, 1L));
+                () -> service.incrementWithinCap("cr_cj_profile", "rec-1", "no_such_field", 1L, null));
     }
 
     @Test
     void non_numeric_field_throws_illegal_argument() {
         assertThrows(IllegalArgumentException.class,
-                () -> service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_name", null, 1L));
+                () -> service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_name", 1L, null));
     }
 
     @Test
@@ -101,7 +101,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
                 anyString(), anyLong(), anyString(), anyLong(), any()))
                 .thenReturn(List.of(Map.of("new_value", 5L)));
 
-        Optional<Long> result = service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_followed_count", null, 1L);
+        Optional<Long> result = service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_followed_count", 1L, null);
 
         assertTrue(result.isPresent());
         assertEquals(5L, result.get());
@@ -120,7 +120,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
 
         // Use distinct counter and cap fields
         Optional<Long> result = service.incrementWithinCap("cr_cj_profile", "rec-1",
-                "cr_cj_view_count", "cr_cj_followed_count", 1L);
+                "cr_cj_view_count", 1L, "cr_cj_followed_count");
 
         assertTrue(result.isPresent());
         assertEquals(50L, result.get());
@@ -135,7 +135,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
                 .thenReturn(List.of());
 
         Optional<Long> result = service.incrementWithinCap("cr_cj_profile", "rec-1",
-                "cr_cj_view_count", "cr_cj_followed_count", 1L);
+                "cr_cj_view_count", 1L, "cr_cj_followed_count");
 
         assertTrue(result.isEmpty());
     }

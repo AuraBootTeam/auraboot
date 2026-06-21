@@ -220,8 +220,8 @@ public interface DynamicDataService {
      * @param modelCode   model containing the counter
      * @param recordId    primary key value of the target row
      * @param counterCode field code of the column to increment (must be a numeric type)
-     * @param capCode     field code of the cap column, or {@code null} for unbounded
      * @param delta       increment amount (positive)
+     * @param capCode     field code of the cap column, or {@code null} for unbounded
      * @return the new value of {@code counterCode} after the increment wrapped in
      *         {@link Optional}, or {@link Optional#empty()} if the row was not found
      *         or was already at cap
@@ -229,16 +229,16 @@ public interface DynamicDataService {
      *                                  a known numeric field on {@code modelCode}
      * @since 2.6.0
      */
-    Optional<Long> incrementWithinCap(String modelCode, String recordId, String counterCode, String capCode, long delta);
+    Optional<Long> incrementWithinCap(String modelCode, String recordId, String counterCode, long delta, String capCode);
 
     /**
      * Atomically increment a numeric counter column with no cap (unbounded).
-     * Equivalent to {@link #incrementWithinCap(String, String, String, String, long)}
+     * Equivalent to {@link #incrementWithinCap(String, String, String, long, String)}
      * with {@code capCode = null}.
      *
      * @since 2.6.0
      */
     default Optional<Long> increment(String modelCode, String recordId, String counterCode, long delta) {
-        return incrementWithinCap(modelCode, recordId, counterCode, null, delta);
+        return incrementWithinCap(modelCode, recordId, counterCode, delta, null);
     }
 }

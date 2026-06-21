@@ -628,7 +628,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public Optional<Long> incrementWithinCap(String modelCode, String recordId,
-                                              String counterCode, String capCode, long delta) {
+                                              String counterCode, long delta, String capCode) {
         assertWritable(modelCode);
         ModelDefinition model = getModelDefinition(modelCode);
         String counterCol = resolveNumericColumn(model, counterCode);

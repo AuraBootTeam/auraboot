@@ -83,8 +83,8 @@ public interface BackgroundDataAccessor {
      * @param modelCode   model containing the counter
      * @param recordId    primary key value of the target row
      * @param counterCode field code of the column to increment (must be numeric)
-     * @param capCode     field code of the cap column, or {@code null} for unbounded
      * @param delta       increment amount (positive)
+     * @param capCode     field code of the cap column, or {@code null} for unbounded
      * @return the new counter value wrapped in {@link Optional}, or {@link Optional#empty()}
      *         if the row was not found or was already at cap
      * @throws IllegalArgumentException if {@code counterCode} or {@code capCode} is unknown
@@ -92,7 +92,7 @@ public interface BackgroundDataAccessor {
      * @since 2.6.0
      */
     Optional<Long> incrementWithinCap(long tenantId, String modelCode, String recordId,
-                                      String counterCode, String capCode, long delta);
+                                      String counterCode, long delta, String capCode);
 
     /**
      * Atomically increment a numeric counter column with no cap (unbounded).
@@ -101,6 +101,6 @@ public interface BackgroundDataAccessor {
      */
     default Optional<Long> increment(long tenantId, String modelCode, String recordId,
                                      String counterCode, long delta) {
-        return incrementWithinCap(tenantId, modelCode, recordId, counterCode, null, delta);
+        return incrementWithinCap(tenantId, modelCode, recordId, counterCode, delta, null);
     }
 }

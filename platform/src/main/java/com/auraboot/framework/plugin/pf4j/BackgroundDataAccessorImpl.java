@@ -96,8 +96,8 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
 
     @Override
     public Optional<Long> incrementWithinCap(long tenantId, String modelCode, String recordId,
-                                              String counterCode, String capCode, long delta) {
-        return withTenant(tenantId, () -> dynamicDataService.incrementWithinCap(modelCode, recordId, counterCode, capCode, delta));
+                                              String counterCode, long delta, String capCode) {
+        return withTenant(tenantId, () -> dynamicDataService.incrementWithinCap(modelCode, recordId, counterCode, delta, capCode));
     }
 
     /** Synthetic user id for background-context writes. ab_data_change_log
