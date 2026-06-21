@@ -4255,6 +4255,7 @@ CREATE TABLE IF NOT EXISTS ab_field_mask_config (
     apply_to_detail     BOOLEAN NOT NULL DEFAULT FALSE,
     enabled             BOOLEAN NOT NULL DEFAULT TRUE,
     exempt_roles        TEXT,                           -- comma-separated role codes that can see unmasked data
+    exempt_permission_codes TEXT,                       -- comma-separated permission codes; holder sees unmasked data (capability-driven unmask, in addition to exempt_roles)
     created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_field_mask_config UNIQUE (tenant_id, model_code, field_code)

@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.entity.FieldMaskConfig;
 import com.auraboot.framework.meta.mapper.FieldMaskConfigMapper;
 import com.auraboot.framework.meta.service.FieldMaskService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class FieldMaskServiceImpl implements FieldMaskService {
 
     private final FieldMaskConfigMapper maskConfigMapper;
     private final RoleMapper roleMapper;
+    private final UserPermissionService userPermissionService;
 
     // ==================== Configuration CRUD ====================
 
@@ -177,13 +179,20 @@ public class FieldMaskServiceImpl implements FieldMaskService {
             return records;
         }
 
-        // Check user role exemptions
+        // Check user role + permission exemptions. Permission codes are only fetched when at least
+        // one applicable config opts into permission-based exemption (avoids an extra permission
+        // lookup on the common masking path).
         Set<String> userRoleCodes = getUserRoleCodes(userId);
+        boolean anyPermissionExempt = applicable.stream()
+                .anyMatch(c -> c.getExemptPermissionCodes() != null && !c.getExemptPermissionCodes().isBlank());
+        Set<String> userPermissionCodes = anyPermissionExempt
+                ? getUserPermissionCodes(userId)
+                : Collections.emptySet();
 
         // Build field → config map, excluding exempt fields
         Map<String, FieldMaskConfig> fieldMasks = new HashMap<>();
         for (FieldMaskConfig config : applicable) {
-            if (!isExempt(config, userRoleCodes)) {
+            if (!isExempt(config, userRoleCodes, userPermissionCodes)) {
                 fieldMasks.put(config.getFieldCode(), config);
             }
         }
@@ -232,20 +241,40 @@ public class FieldMaskServiceImpl implements FieldMaskService {
     }
 
     /**
-     * Check if the user is exempt from masking for a given config.
+     * Check if the user is exempt from masking for a given config. A user is exempt when they hold
+     * ANY of the config's exempt role codes OR ANY of its exempt permission codes. The latter
+     * enables capability-driven field unmasking (e.g. {@code crm.account.contact_unmask}).
      */
-    private boolean isExempt(FieldMaskConfig config, Set<String> userRoleCodes) {
-        String exemptRoles = config.getExemptRoles();
-        if (exemptRoles == null || exemptRoles.isBlank()) {
+    private boolean isExempt(FieldMaskConfig config, Set<String> userRoleCodes, Set<String> userPermissionCodes) {
+        return matchesAny(config.getExemptRoles(), userRoleCodes)
+                || matchesAny(config.getExemptPermissionCodes(), userPermissionCodes);
+    }
+
+    /**
+     * True when any comma-separated code in {@code commaSeparated} is present in {@code userCodes}.
+     */
+    private boolean matchesAny(String commaSeparated, Set<String> userCodes) {
+        if (commaSeparated == null || commaSeparated.isBlank()) {
             return false;
         }
-
-        Set<String> exempt = Arrays.stream(exemptRoles.split(","))
+        return Arrays.stream(commaSeparated.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
-                .collect(Collectors.toSet());
+                .anyMatch(userCodes::contains);
+    }
 
-        return exempt.stream().anyMatch(userRoleCodes::contains);
+    /**
+     * Get the set of permission codes for a user. Fail-secure: on any error returns an empty set
+     * (no exemption → value stays masked).
+     */
+    private Set<String> getUserPermissionCodes(Long userId) {
+        try {
+            Set<String> codes = userPermissionService.getUserPermissionCodes(userId);
+            return codes != null ? codes : Collections.emptySet();
+        } catch (Exception e) {
+            log.warn("Failed to load user permission codes for masking exemption check: userId={}", userId, e);
+            return Collections.emptySet();
+        }
     }
 
     /**
