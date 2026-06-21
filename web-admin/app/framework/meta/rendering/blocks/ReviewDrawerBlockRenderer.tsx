@@ -254,6 +254,49 @@ function FieldRows({
   );
 }
 
+function FieldGroups({
+  groups,
+  record,
+  fallbackRecord,
+  locale,
+  t,
+}: {
+  groups: any[];
+  record: any;
+  fallbackRecord?: any;
+  locale: string;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="space-y-3 p-3">
+      {groups.map((group, index) => {
+        const key = String(group.key || group.code || group.id || index);
+        const label = getLocalizedText(group.label || group.title || key, locale, t);
+        const fields = Array.isArray(group.fields) ? group.fields : [];
+        if (fields.length === 0) return null;
+        return (
+          <section
+            key={key}
+            data-testid={`review-drawer-selected-group-${key}`}
+            className="rounded-control border-border bg-subtle overflow-hidden border"
+          >
+            <header className="border-border bg-panel text-text border-b px-3 py-2 text-xs font-semibold">
+              {label}
+            </header>
+            <FieldRows
+              fields={fields}
+              record={record}
+              fallbackRecord={fallbackRecord}
+              locale={locale}
+              t={t}
+            />
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps> = ({
   block,
   runtime,
@@ -279,6 +322,14 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const candidateDataSource = candidatesConfig.dataSource;
   const exportDataSource = exportConfig.dataSource;
   const contextStateBinding = stateBindingFromExpression(contextExpression);
+  const selectedCandidateFields = Array.isArray(candidatesConfig.selectedFields)
+    ? candidatesConfig.selectedFields
+    : [];
+  const selectedCandidateGroups = Array.isArray(candidatesConfig.selectedGroups)
+    ? candidatesConfig.selectedGroups
+    : Array.isArray(candidatesConfig.groups)
+      ? candidatesConfig.groups
+      : [];
 
   const [selectedCandidateKey, setSelectedCandidateKey] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
@@ -1056,7 +1107,8 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   </>
                 )}
               </dl>
-              {selectedCandidate && (candidatesConfig.selectedFields || []).length > 0 && (
+              {selectedCandidate &&
+                (selectedCandidateFields.length > 0 || selectedCandidateGroups.length > 0) && (
                 <section className="rounded-control border-border bg-panel mt-3 border">
                   <header className="border-border text-text-2 border-b px-3 py-1.5 text-xs font-semibold">
                     {getLocalizedText(
@@ -1068,14 +1120,23 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       t,
                     )}
                   </header>
-                  <FieldRows
-                    fields={candidatesConfig.selectedFields || []}
-                    record={selectedCandidate}
-                    locale={locale}
-                    t={t}
-                  />
+                  {selectedCandidateGroups.length > 0 ? (
+                    <FieldGroups
+                      groups={selectedCandidateGroups}
+                      record={selectedCandidate}
+                      locale={locale}
+                      t={t}
+                    />
+                  ) : (
+                    <FieldRows
+                      fields={selectedCandidateFields}
+                      record={selectedCandidate}
+                      locale={locale}
+                      t={t}
+                    />
+                  )}
                 </section>
-              )}
+                )}
               {(candidatesConfig.actions || []).length > 0 && (
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
                   {candidatesConfig.actions.filter(isActionVisible).map((actionConfig: any) => {
