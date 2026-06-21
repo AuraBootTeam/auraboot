@@ -1,8 +1,5 @@
 import type { RawEventInput } from './types';
 
-// Allowlisted safe aria attributes — never include value/innerHTML/textContent/href.
-const SAFE_ARIA = new Set(['aria-label', 'aria-labelledby', 'role']);
-
 /**
  * Derives a privacy-safe UI element identity from the given DOM element.
  *

@@ -32,9 +32,9 @@ it('includes appId and elementCode when present on host', () => {
   }));
 });
 
-it('returns undefined for null element', () => {
-  // null should be handled gracefully — return undefined
-  // (call with a valid element that has no tracking ancestor or self)
+it('heuristic path never leaks textContent', () => {
+  // Element with visible text content but no tracking ancestor —
+  // the heuristic branch must not capture any textContent.
   document.body.innerHTML = `<div id="bare">text</div>`;
   const ui = deriveUiElement(document.getElementById('bare')!);
   // heuristic path — must not throw and must not leak textContent
