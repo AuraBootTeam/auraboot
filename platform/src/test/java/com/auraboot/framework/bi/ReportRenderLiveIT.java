@@ -88,7 +88,9 @@ class ReportRenderLiveIT {
                                 "rowField", "region", "columnField", "status", "valueField", "cases",
                                 "aggregation", "sum"),
                         Map.of("blockType", "barcode", "format", "code128",
-                                "staticValue", "OPS-LIVE-2026")));
+                                "staticValue", "OPS-LIVE-2026"),
+                        Map.of("blockType", "rich-text", "title", "摘要",
+                                "content", "运营摘要第一行\n运营摘要第二行")));
         Map<String, List<Map<String, Object>>> dataSets = Map.of(
                 // duplicate Jan rows exercise the aggregation path (Jan -> 130) end to end
                 "rev", List.of(
@@ -132,6 +134,7 @@ class ReportRenderLiveIT {
             assertThat(text).contains("Ops-A"); // grouped-table
             assertThat(text).contains("Matrix"); // cross-tab
             assertThat(text).contains("OPS-LIVE-2026"); // barcode value
+            assertThat(text).contains("运营摘要第一行"); // rich-text paragraph (CJK)
         }
     }
 
