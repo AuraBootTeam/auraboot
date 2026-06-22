@@ -303,13 +303,23 @@
       "type": "object",
       "description": "Backend plugin configuration",
       "properties": {
+        "jarPath": {
+          "type": "string",
+          "description": "Canonical path to the PF4J JAR file relative to package root"
+        },
+        "entryClass": {
+          "type": "string",
+          "description": "Canonical fully qualified class name of the plugin entry class"
+        },
         "jarFile": {
           "type": "string",
-          "description": "Path to the PF4J JAR file relative to package root"
+          "deprecated": true,
+          "description": "Deprecated alias for jarPath"
         },
         "entryPoint": {
           "type": "string",
-          "description": "Fully qualified class name of the plugin entry point"
+          "deprecated": true,
+          "description": "Deprecated alias for entryClass"
         }
       },
       "additionalProperties": false
