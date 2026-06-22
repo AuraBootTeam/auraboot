@@ -38,8 +38,7 @@ public class TelemetryEnrichingOeeDataQueryPort implements OeeDataQueryPort {
         OeeInputs inputs = delegate.fetch(req);
         for (OeeTelemetrySourceExtension src :
                 pluginManager.getExtensionsOfType(OeeTelemetrySourceExtension.class)) {
-            Optional<OeeTelemetrySourceExtension.OeeTelemetry> t =
-                src.fetch(req.getTenantId(), req.getEquipmentId(), req.getWindowStart(), req.getWindowEnd());
+            Optional<OeeTelemetrySourceExtension.OeeTelemetry> t = fetchTelemetry(src, req);
             if (t.isPresent()) {
                 inputs.setTelemetryOperatingHours(t.get().operatingHours());
                 inputs.setTelemetryOutputQty(t.get().outputQty());
@@ -53,5 +52,21 @@ public class TelemetryEnrichingOeeDataQueryPort implements OeeDataQueryPort {
     @Override
     public List<OeeEquipmentRef> listEquipment(Long tenantId) {
         return delegate.listEquipment(tenantId);
+    }
+
+    private Optional<OeeTelemetrySourceExtension.OeeTelemetry> fetchTelemetry(
+            OeeTelemetrySourceExtension src,
+            OeeRequest req) {
+        Optional<OeeTelemetrySourceExtension.OeeTelemetry> byId =
+                src.fetch(req.getTenantId(), req.getEquipmentId(), req.getWindowStart(), req.getWindowEnd());
+        if (byId.isPresent() || isBlank(req.getEquipmentCode())
+                || req.getEquipmentCode().equals(req.getEquipmentId())) {
+            return byId;
+        }
+        return src.fetch(req.getTenantId(), req.getEquipmentCode(), req.getWindowStart(), req.getWindowEnd());
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }
