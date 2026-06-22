@@ -78,8 +78,11 @@ test.describe('Site Key Registry — Admin DSL Page Golden', () => {
     await page.screenshot({ path: 'test-results/sitekey-02-form.png', fullPage: true });
     await page.getByTestId('form-btn-submit').click();
 
+    await expect.poll(
+      () => psql(`SELECT COUNT(*) FROM mt_behavior_site_key WHERE name='${unique.replace(/'/g, "''")}'`),
+      { timeout: 15_000, message: 'created site-key row persisted' },
+    ).toBe('1');
     // Form redirects back to the list on success; navigate explicitly to be safe.
-    await page.waitForTimeout(1500);
     await page.goto(LIST_URL, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle').catch(() => null);
 
@@ -98,7 +101,10 @@ test.describe('Site Key Registry — Admin DSL Page Golden', () => {
 
     // ── STEP 5: disable via row action → confirm → status flips ────────────────
     await disableRow(page, row);
-    await page.waitForTimeout(1000);
+    await expect.poll(
+      () => psql(`SELECT status FROM mt_behavior_site_key WHERE name='${unique.replace(/'/g, "''")}'`),
+      { timeout: 15_000, message: 'site-key row disabled in DB' },
+    ).toBe('disabled');
     await page.goto(LIST_URL, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle').catch(() => null);
     const rowAfter = page.getByRole('row').filter({ hasText: unique });
