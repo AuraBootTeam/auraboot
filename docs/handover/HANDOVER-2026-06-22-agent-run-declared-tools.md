@@ -13,7 +13,7 @@ relates_to:
 
 This session finished the agent dispatch/run-path declared-tool fix and proved the customer-service
 approval flow on a host-first DeepSeek live stack. The branch is functionally complete but still
-needs normal git收口: review diff, commit, push, and PR.
+has a pre-existing clean-CI dependency blocker unrelated to the agent changes.
 
 ## Tasks Completed
 
@@ -26,6 +26,7 @@ needs normal git收口: review diff, commit, push, and PR.
 - [x] Proved live gold: inbound email -> agent -> approval -> `send_customer_reply` -> sent log ->
   `crm:create_activity` -> `mt_crm_activity`.
 - [x] Destroyed the temporary live runtime `cs-inbound-gold-77`; port `6477` is no longer listening.
+- [x] Opened PR #1021: <https://github.com/AuraBootTeam/auraboot/pull/1021>.
 
 ## Key Decisions
 
@@ -117,6 +118,8 @@ needs normal git收口: review diff, commit, push, and PR.
   chat and dispatch/run paths, and approval resume replays approved input.
 - [x] 已写入 `docs/backlog/2026-06-22-agent-run-path-declared-tool-discovery.md`: root cause,
   resolution, verification, and gold evidence.
+- [x] 已写入 `docs/backlog/2026-06-22-ci-smartengine-402-mavenlocal.md`: clean CI cannot resolve
+  SmartEngine 4.0.2 artifacts because they only exist in `mavenLocal()`.
 - [ ] 待 owner 拍板 `markdownlint` MD025 config: consider `MD025: { front_matter_title: "" }`
   to stop frontmatter title from counting as a duplicate H1.
 
@@ -125,12 +128,16 @@ needs normal git收口: review diff, commit, push, and PR.
 ### 分支 / Worktree / PR
 
 - **当前分支**: `fix/agent-run-declared-tools`
-- **相对 main**: `origin/main...HEAD` = ahead `1`, behind `1`
+- **相对 main**: rebased onto `origin/main`; use `git rev-list --left-right --count origin/main...HEAD`
+  for the current ahead count after this handover update
 - **Worktree**: `/Users/ghj/work/auraboot/auraboot-declfix`
-- **PR**: no PR for `fix/agent-run-declared-tools` as of this handover
+- **PR**: #1021 OPEN, ready, base `main`, head branch `fix/agent-run-declared-tools`
 - **Stash**: existing unrelated stashes remain untouched:
   `billing-meta-permission-constants`, `oss pre-existing changes`, `wip workbench backlog`
-- **未提交改动**: backend/tests/scripts/docs are dirty; nothing staged
+- **CI status**: local gates pass; GitHub `Build & Quality Gate (Java 21)` fails on a pre-existing
+  clean-CI dependency resolution issue: `smart-engine-extension-storage-mysql:4.0.2` and
+  `smart-engine-extension-storage-custom:4.0.2` are declared on `main` and only available from
+  `mavenLocal()`. Recent `main` backend workflow runs fail the same way.
 
 ### Runtime / 端口
 
@@ -150,8 +157,7 @@ needs normal git收口: review diff, commit, push, and PR.
 
 ## Next Steps
 
-1. Run document gates after these doc edits.
-2. Review `git diff`, especially the production changes in `StepLoopService` and
-   `DeclaredAgentToolResolver`.
-3. Run the targeted Java/doc gates after rebasing if files change.
-4. Push and open PR.
+1. Decide whether to fix the SmartEngine 4.0.2 clean-CI dependency issue in a separate CI/dependency
+   PR or temporarily waive the backend check for #1021 as pre-existing.
+2. Continue watching #1021 checks after any dependency fix lands.
+3. Merge #1021 after required checks/review are satisfied.
