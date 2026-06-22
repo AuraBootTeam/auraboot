@@ -78,3 +78,9 @@ relates_to:
 | Frontend typecheck | `pnpm typecheck` | PASS | React Router typegen + `tsc` 通过 |
 | Frontend unit/component | `pnpm test:unit:run app/framework/meta/rendering/pages/__tests__/ListPageContent.test.ts app/framework/meta/rendering/pages/list/__tests__/quickFilterPresets.test.ts app/framework/meta/rendering/pages/list/__tests__/PresetViewBar.test.tsx app/framework/meta/rendering/pages/list/__tests__/dsl-list-i18n-resources.test.ts app/framework/smart/utils/__tests__/savedViewCapability.test.ts` | 5 files / 110 tests passed | 覆盖 quick preset request、save-as-personal 按钮、已有 preset personal view 幂等匹配、i18n、timeline capability、URL view restore |
 | SavedView scoped E2E | `IMPORT_TEST_FIXTURES=true PW_PROFILE=oss PW_WORKERS=1 pnpm playwright test -c playwright.noweb.config.ts tests/api/setup/03-import-test-fixtures.spec.ts tests/api/setup/04-import-oss-plugins.spec.ts --project=setup --no-deps --reporter=line` + `PW_PROFILE=fast PW_WORKERS=1 pnpm playwright test -c playwright.noweb.config.ts tests/e2e/saved-view/saved-view-quick-filters.spec.ts tests/e2e/saved-view/saved-view-timeline.spec.ts --project=chromium --no-deps --reporter=line` | setup import 2/2 passed; target 13/13 passed | 隔离 runtime `saved-view-p2-e2e-79` 上验证。首轮 target 暴露 `e2et_order_list` 未导入导致页面不存在;显式导入 `test-fixtures` 后通过。后续复跑暴露 quick preset 重复保存同名失败、timeline 测试视图触达 personal 10 个上限;已改为 quick preset 已存在则切换个人视图、timeline 达上限时复用同配置历史视图,最终 13/13 passed |
+
+## Follow-up Backlog
+
+P0/P1/P2 收口后的后续成熟化 gap 统一迁入:
+
+`docs/backlog/2026-06-23-saved-view-post-pr-follow-up-gaps.md`
