@@ -69,6 +69,10 @@ import {
 } from '~/framework/meta/utils/promptUpload';
 import type { AsyncTask } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
 import { useAsyncTaskModalSink } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
+import {
+  buildCommandTargetParams,
+  getLegacyCompatibleRecordPid,
+} from '~/framework/meta/utils/publicRecordId';
 
 // Navigate function type (compatible with react-router v7)
 import type { NavigateFunction as RouterNavigateFunction } from 'react-router';
@@ -118,10 +122,8 @@ function resolveCommandTargetRecordId(
   );
   return (
     toNonBlankString(explicitTarget) ||
-    toNonBlankString(record?.pid) ||
-    toNonBlankString(record?.id) ||
-    toNonBlankString(context.data?.pid) ||
-    toNonBlankString(context.data?.id)
+    getLegacyCompatibleRecordPid(record) ||
+    getLegacyCompatibleRecordPid(context.data)
   );
 }
 
@@ -443,7 +445,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       }
 
       const body: Record<string, any> = {
-        targetRecordId,
+        ...buildCommandTargetParams(targetRecordId),
         payload: payload || {},
       };
       if (normalizedOp) {
@@ -497,7 +499,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         console.error('[useActionHandler] navigate action is missing both "to" and "url" fields');
         return '';
       }
-      const recordId = record?.pid || record?.id;
+      const recordId = getLegacyCompatibleRecordPid(record);
 
       // Absolute path with template variables — OCP compliant
       // DSL can write navigateTo: "/dashboard-designer/{pid}" or "/bpmn-designer?pid={pid}"

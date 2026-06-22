@@ -76,7 +76,6 @@ describe('ActionRegistry record navigation', () => {
         method: 'post',
         params: {
           targetRecordPid: 'PUB-APP-001',
-          targetRecordId: 'PUB-APP-001',
           operationType: 'APPROVE',
           payload: {
             mkt_pa_review_notes: 'Looks ready',

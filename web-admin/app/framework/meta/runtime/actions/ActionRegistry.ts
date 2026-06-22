@@ -19,6 +19,10 @@ import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/D
 import { confirmDialog, type ConfirmOptions } from '~/utils/confirmDialog';
 import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 import { ResultHelper } from '~/utils/type';
+import {
+  buildCommandTargetParams,
+  getLegacyCompatibleRecordPid,
+} from '~/framework/meta/utils/publicRecordId';
 
 /**
  * 动作执行上下文
@@ -250,8 +254,8 @@ actionRegistry.register('edit', ({ navigate, tableName, record }) => {
     console.error('[ActionRegistry] edit: missing record');
     return;
   }
-  const id = record.pid || record.id;
-  navigate(`/p/${tableName}/edit/${id}`);
+  const pid = getLegacyCompatibleRecordPid(record);
+  navigate(`/p/${tableName}/edit/${pid}`);
 });
 
 /**
@@ -266,8 +270,8 @@ actionRegistry.register('view', ({ navigate, tableName, record }) => {
     console.error('[ActionRegistry] view: missing record');
     return;
   }
-  const id = record.pid || record.id;
-  navigate(`/p/${tableName}/view/${id}`);
+  const pid = getLegacyCompatibleRecordPid(record);
+  navigate(`/p/${tableName}/view/${pid}`);
 });
 
 /**
@@ -312,9 +316,9 @@ actionRegistry.register(
     }
 
     try {
-      const id = record.pid || record.id;
-      if (!id) {
-        console.error('[ActionRegistry] delete: missing record id/pid');
+      const pid = getLegacyCompatibleRecordPid(record);
+      if (!pid) {
+        console.error('[ActionRegistry] delete: missing record public pid');
         return;
       }
       const commandCode = typeof button?.commandCode === 'string' ? button.commandCode : undefined;
@@ -322,13 +326,13 @@ actionRegistry.register(
         ? await fetchResult(`/api/meta/commands/execute/${commandCode}`, {
             method: 'post',
             params: {
-              targetRecordId: id,
+              ...buildCommandTargetParams(pid),
               payload: record,
               operationType: 'delete',
             },
             token: token || undefined,
           })
-        : await fetchResult(`${buildApiEndpoint(tableName)}/${id}`, {
+        : await fetchResult(`${buildApiEndpoint(tableName)}/${pid}`, {
             method: 'delete',
             token: token || undefined,
           });
@@ -987,8 +991,7 @@ actionRegistry.register(
     }
 
     const body: Record<string, any> = {
-      targetRecordPid,
-      targetRecordId,
+      ...buildCommandTargetParams(targetRecordPid ?? targetRecordId),
       payload,
     };
     if (operationType) {

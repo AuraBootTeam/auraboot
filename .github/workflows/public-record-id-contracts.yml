@@ -1,0 +1,50 @@
+name: Public Record ID Contracts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'platform/src/main/java/**'
+      - 'web-admin/app/**'
+      - 'plugins/**/config/**'
+      - 'scripts/validate-public-record-id-contracts.mjs'
+      - 'scripts/validate-public-record-id-contracts.test.mjs'
+      - 'scripts/public-record-id-baseline.json'
+      - 'scripts/check-public-record-id-contracts.sh'
+      - '.github/workflows/public-record-id-contracts.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'platform/src/main/java/**'
+      - 'web-admin/app/**'
+      - 'plugins/**/config/**'
+      - 'scripts/validate-public-record-id-contracts.mjs'
+      - 'scripts/validate-public-record-id-contracts.test.mjs'
+      - 'scripts/public-record-id-baseline.json'
+      - 'scripts/check-public-record-id-contracts.sh'
+      - '.github/workflows/public-record-id-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-record-id-contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  public-record-id-contracts:
+    name: Public record id contract gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Run public record id contract gate
+        run: bash scripts/check-public-record-id-contracts.sh

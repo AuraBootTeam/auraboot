@@ -14,6 +14,7 @@ import { dynamicService } from '~/shared/services/dynamicService';
 import { fetchResult } from '~/shared/services/http-client/HttpClient';
 import { DataLimitBanner, ViewDiagnostics, ViewEmptyState } from './shared';
 import { cn } from '~/utils/cn';
+import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 
 /**
  * Props for GanttView component
@@ -147,9 +148,8 @@ export const GanttView: React.FC<GanttViewProps> = ({
         const titleVal = String(
           record[titleField] ?? record['name'] ?? record['pid'] ?? 'Untitled',
         );
-        const recordPid = String(record.pid ?? record.id ?? '');
-        const internalRecordId = String(record.id ?? record.pid ?? '');
-        nextTaskRecordPidMap[internalRecordId] = recordPid;
+        const recordPid = getLegacyCompatibleRecordPid(record) || '';
+        nextTaskRecordPidMap[recordPid] = recordPid;
 
         if (!hasStart && !hasEnd) {
           nextDiagnostics.missingBoth += 1;
@@ -219,12 +219,11 @@ export const GanttView: React.FC<GanttViewProps> = ({
           }
         }
 
-        const isCritical =
-          criticalPathIds.has(String(record.id)) || criticalPathIds.has(String(record.pid));
+        const isCritical = criticalPathIds.has(recordPid);
         nextDiagnostics.validRecords += 1;
 
         ganttTasks.push({
-          id: internalRecordId,
+          id: recordPid,
           name: titleVal,
           type: 'task',
           start: startVal,

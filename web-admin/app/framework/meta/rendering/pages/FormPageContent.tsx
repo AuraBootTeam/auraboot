@@ -42,6 +42,7 @@ import { checkKindCompatibility } from '~/shared/utils/kindCapability';
 import type { ComputedFieldDef } from '~/framework/meta/runtime/computed/types';
 import { useFormDraft } from '~/framework/meta/rendering/pages/form/useFormDraft';
 import { RestoreDraftBanner } from '~/framework/meta/rendering/pages/form/RestoreDraftBanner';
+import { buildCommandTargetParams } from '~/framework/meta/utils/publicRecordId';
 
 /**
  * Map field dataType to Smart component name.
@@ -1476,7 +1477,7 @@ export function FormPageContent(props: PageContentProps) {
         fetchResult(`/api/meta/commands/execute/${effectiveCommandCode}`, {
           method: 'post',
           params: {
-            targetRecordId,
+            ...buildCommandTargetParams(targetRecordId),
             payload: commandPayload,
             operationType,
           },

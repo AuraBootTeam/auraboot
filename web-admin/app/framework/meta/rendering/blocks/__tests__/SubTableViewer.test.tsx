@@ -390,7 +390,7 @@ describe('SubTableViewer', () => {
         expect.objectContaining({
           method: 'post',
           params: expect.objectContaining({
-            targetRecordId: 'task-1',
+            targetRecordPid: 'task-1',
             operationType: 'UPDATE',
             payload: expect.objectContaining({
               pid: 'task-1',
