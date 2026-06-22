@@ -1,16 +1,21 @@
 ---
 type: plan-design
-status: active
+status: shipped
 created: 2026-06-21
+shipped: 2026-06-22
 slug: behavior-kafka-decouple-ingestion-design
 related:
   - docs/backlog/2026-06-19-unified-telemetry-analytics-platform-architecture.md
   - docs/backlog/2026-06-21-site-key-anonymous-telemetry-subsystem-decomposition.md
   - docs/superpowers/specs/2026-06-21-site-key-sp3-sp4-public-sdk-and-golden-design.md
+  - docs/operations/behavior-kafka-ingest-runbook.md
+  - docs/backlog/2026-06-22-behavior-kafka-post-merge-followups.md
 ---
 
 # 行为采集 Kafka 解耦层(`aura.behavior.events.v1`)— 设计方案
 
+> **状态更新(2026-06-22)**:本设计已随 OSS PR #1023 合并到 `main`(merge commit `4e2bef61e875edc0366e002cc5f92c2f93c8fde4`)。实现包含 `record`/`recordAnonymous` enqueue、memory 与 native Kafka 两档 round-trip、`ab_behavior_quarantine` sink、quarantine golden、tenant ignore-list、host-first 验证脚本修正。收口记录见 `docs/handover/HANDOVER-2026-06-22-behavior-kafka-decouple-closeout.md`; 运维入口见 `docs/operations/behavior-kafka-ingest-runbook.md`; 后续增强项见 `docs/backlog/2026-06-22-behavior-kafka-post-merge-followups.md`。
+>
 > 遥测平台**下一线**。统一遥测 SoT(`2026-06-19-...-architecture.md`)§12 M1「行为采集底座」backlog 中,除本切片外其余全部 ✅ 已交付:`/api/collect`(M1)+ UV/PV 分析 API + `@auraboot/track` SDK(#966)+ **公开/匿名 ingestion 全链(SP1-SP4,本会话)**+ UV/PV dashboard。**唯一剩**:`aura.behavior.events.v1` Kafka 解耦层(+ 独立的 server-outcome outbox 线,非本切片)。代码已自标:`BehaviorCollectService` javadoc「The Kafka decoupling layer (aura.behavior.events.v1) is the production ingestion path (follow-up)」。
 
 ## 0. 用户/系统场景
@@ -73,6 +78,16 @@ related:
 - [ ] keyed guard 仍在端点**同步**拒滥用(入队前;SP2 防护不被解耦削弱)。
 - [ ] `MqProperties.type=memory` 本地/golden 全绿(零行为回归);`=kafka` host-first 原生 broker 真异步 IT 绿。
 - [ ] host-first 零 docker;静态门禁绿。
+
+### 5.1 Shipped Evidence(2026-06-22)
+
+- [x] `/api/collect` + `/api/collect/keyed` 内部改为校验 + enqueue;端点契约保持 `{accepted:n}`。
+- [x] `BehaviorIngestConsumer` 异步落 `ab_behavior_event`;PG `unique(tenant_id,event_id)` 保持重投幂等。
+- [x] malformed / 约束违规进入 `aura.behavior.quarantine.v1`,由 `BehaviorQuarantineConsumer` 持久化到 `ab_behavior_quarantine`。
+- [x] `ab_behavior_event` 与 `ab_behavior_quarantine` 加入 MyBatis tenant ignore-list,consumer/replay 路径显式携带 `tenant_id`。
+- [x] memory 档:targeted IT 和 SP4 行为 golden 通过;本地 `aura.mq.type=memory` 仍是 host-first/golden 默认。
+- [x] Kafka 档:原生 broker `localhost:9092` 可用时 `BehaviorIngestKafkaIT` 验证 async round-trip、幂等、malformed quarantine、constraint quarantine。
+- [x] post-merge 非 Docker 回归:2026-06-22 在 merge commit `4e2bef61e` 的临时 worktree 上通过 schema、Gradle 编译/测试、9 个 behavior Playwright golden、track SDK vitest/build/env-lint。
 
 ## 6. 非目标(不在本切片)
 
