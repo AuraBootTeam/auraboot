@@ -151,6 +151,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         onCreateNew?.();
         return;
       }
+      if (newValue === '' && field.value != null && String(field.value) !== '') {
+        return;
+      }
       field.setValue(newValue);
     };
 
@@ -220,11 +223,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                   key={CREATE_NEW_VALUE}
                   value={CREATE_NEW_VALUE}
                   data-testid={`select-create-new-${name}`}
-                  className="text-[var(--accent,#2563eb)] font-medium"
+                  className="font-medium text-[var(--accent,#2563eb)]"
                 >
-                  {createNewLabel ?? (t('action.createNew') !== 'action.createNew'
-                    ? t('action.createNew')
-                    : locale === 'zh-CN' ? '+ 新建' : '+ New')}
+                  {createNewLabel ??
+                    (t('action.createNew') !== 'action.createNew'
+                      ? t('action.createNew')
+                      : locale === 'zh-CN'
+                        ? '+ 新建'
+                        : '+ New')}
                 </SelectItem>
               )}
             </SelectContent>
@@ -297,7 +303,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 iconOnly
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
                 </svg>
               </FieldActionButton>
             )}

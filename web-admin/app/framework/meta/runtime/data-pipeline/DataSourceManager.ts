@@ -75,7 +75,9 @@ function isLikelyDynamicFieldParam(key: string): boolean {
   return key === 'pid' || key === 'id' || key.includes('_');
 }
 
-function existingFilters(value: unknown): Array<{ fieldName: string; operator: string; value: unknown }> {
+function existingFilters(
+  value: unknown,
+): Array<{ fieldName: string; operator: string; value: unknown }> {
   if (!value) {
     return [];
   }
@@ -92,9 +94,11 @@ function existingFilters(value: unknown): Array<{ fieldName: string; operator: s
       );
     });
   if (Array.isArray(value)) {
-    return removeBlankFilters([
-      ...value,
-    ] as Array<{ fieldName: string; operator: string; value: unknown }>);
+    return removeBlankFilters([...value] as Array<{
+      fieldName: string;
+      operator: string;
+      value: unknown;
+    }>);
   }
   if (typeof value !== 'string') {
     return [];
@@ -674,6 +678,7 @@ export class DataSourceManager {
     this.dataSourceStates.delete(id);
     this.subscriptions.delete(id);
     this.fetchVersions.delete(id);
+    this.dataSourceModelCodes.delete(id);
     this.cleanupDependency(id);
   }
 

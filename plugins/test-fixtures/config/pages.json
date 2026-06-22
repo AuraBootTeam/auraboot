@@ -359,7 +359,11 @@
           },
           {
             "field": "e2et_order_customer",
-            "span": 1
+            "span": 1,
+            "allowCreate": true,
+            "createCommand": "e2et:create_customer",
+            "createPageKey": "e2et_customer_form",
+            "createPermission": "e2et.customer.manage"
           },
           {
             "field": "e2et_order_date",

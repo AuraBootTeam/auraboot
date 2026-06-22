@@ -5,10 +5,28 @@ import { useDslForm } from '~/framework/meta/hooks/useDslForm';
 import { DslFormRenderer } from '~/framework/meta/rendering/DslFormRenderer';
 import { useI18n } from '~/contexts/I18nContext';
 
+function pickCreatedRecord(result: any): Record<string, any> | undefined {
+  const candidates = [
+    result?.data?.data,
+    result?.data?.record,
+    result?.data?.result,
+    result?.data,
+    result,
+  ];
+  return candidates.find(
+    (candidate) =>
+      candidate &&
+      typeof candidate === 'object' &&
+      (candidate.pid !== undefined || candidate.recordId !== undefined),
+  );
+}
+
 export interface ReferenceCreateDialogProps {
   open: boolean;
-  /** target model code, e.g. "customer" — drives pageKey `${targetModel}_new` */
+  /** target model code, e.g. "customer" — defaults pageKey to `${targetModel}_new` */
   targetModel: string;
+  /** DSL form page key to use for quick create. Defaults to `${targetModel}_new`. */
+  createPageKey?: string;
   /** create command code, e.g. "customer:create" */
   createCommand: string;
   /** display field used to compute the selected option label */
@@ -29,6 +47,7 @@ export interface ReferenceCreateDialogProps {
 export function ReferenceCreateDialog({
   open,
   targetModel,
+  createPageKey,
   createCommand,
   displayField,
   executeCommand,
@@ -39,7 +58,7 @@ export function ReferenceCreateDialog({
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const form = useDslForm({
-    pageKey: `${targetModel}_new`,
+    pageKey: createPageKey || `${targetModel}_new`,
     enabled: open,
     onSubmit: async ({ values }) => {
       // Errors are caught here so they don't propagate as unhandled rejections.
@@ -47,11 +66,12 @@ export function ReferenceCreateDialog({
       try {
         setSubmitError(null);
         const result = await executeCommand(createCommand, undefined, values, 'create');
-        // executeCommand returns CommandExecuteResult; its `.data` holds the record map.
-        const record = (result?.data ?? result) as Record<string, any> | undefined;
-        const pid = record?.pid;
+        const record = pickCreatedRecord(result);
+        const pid = record?.pid ?? record?.recordId;
         if (!pid) {
-          throw new Error(`[ReferenceCreateDialog] create command ${createCommand} returned no pid`);
+          throw new Error(
+            `[ReferenceCreateDialog] create command ${createCommand} returned no pid`,
+          );
         }
         const label =
           (displayField && record?.[displayField]) ?? values?.[displayField ?? ''] ?? String(pid);
@@ -76,7 +96,12 @@ export function ReferenceCreateDialog({
         : 'New';
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -87,7 +112,9 @@ export function ReferenceCreateDialog({
           </div>
         )}
         {form.loading ? (
-          <div className="py-8 text-center text-sm text-gray-500">{t('common.loading') || '...'}</div>
+          <div className="py-8 text-center text-sm text-gray-500">
+            {t('common.loading') || '...'}
+          </div>
         ) : (
           <DslFormRenderer form={form} />
         )}

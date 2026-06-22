@@ -84,13 +84,13 @@ The manifest declares your plugin's identity, dependencies, and where to find ea
   "minPlatformVersion": "1.0.0",
   "dependencies": [],
   "provides": [
-    {"type": "model", "code": "tt_task"},
-    {"type": "command", "code": "tt:create_task"},
-    {"type": "command", "code": "tt:update_task"},
-    {"type": "command", "code": "tt:delete_task"},
-    {"type": "command", "code": "tt:start_task"},
-    {"type": "command", "code": "tt:complete_task"},
-    {"type": "command", "code": "tt:archive_task"}
+    { "type": "model", "code": "tt_task" },
+    { "type": "command", "code": "tt:create_task" },
+    { "type": "command", "code": "tt:update_task" },
+    { "type": "command", "code": "tt:delete_task" },
+    { "type": "command", "code": "tt:start_task" },
+    { "type": "command", "code": "tt:complete_task" },
+    { "type": "command", "code": "tt:archive_task" }
   ],
   "requires": [],
   "resourceDirs": {
@@ -120,14 +120,14 @@ The manifest declares your plugin's identity, dependencies, and where to find ea
 
 **Key fields explained:**
 
-| Field | Value | Why |
-|-------|-------|-----|
-| `pluginId` | `com.example.task-tracker` | Reverse domain name, globally unique |
-| `namespace` | `tt` | Short prefix for all resources. Models become `tt_task`, commands become `tt:create_task` |
-| `pluginType` | `config` | No backend JAR or frontend code |
-| `resourceDirs` | (object) | Maps resource types to file paths, relative to plugin root |
-| `importOptions.conflictStrategy` | `overwrite` | Re-importing overwrites existing resources |
-| `importOptions.autoPublishModels` | `true` | Models are published (not left in draft) after import |
+| Field                             | Value                      | Why                                                                                       |
+| --------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------- |
+| `pluginId`                        | `com.example.task-tracker` | Reverse domain name, globally unique                                                      |
+| `namespace`                       | `tt`                       | Short prefix for all resources. Models become `tt_task`, commands become `tt:create_task` |
+| `pluginType`                      | `config`                   | No backend JAR or frontend code                                                           |
+| `resourceDirs`                    | (object)                   | Maps resource types to file paths, relative to plugin root                                |
+| `importOptions.conflictStrategy`  | `overwrite`                | Re-importing overwrites existing resources                                                |
+| `importOptions.autoPublishModels` | `true`                     | Models are published (not left in draft) after import                                     |
 
 ---
 
@@ -158,19 +158,19 @@ Models describe your data entities. Each model becomes a database table.
 
 **Field reference:**
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `code` | Yes | Unique model code. Must start with namespace prefix (`tt_`) |
-| `displayName:en` | Yes | English display name |
-| `displayName:zh-CN` | No | Chinese display name |
-| `modelType` | Yes | Always `"entity"` for business models |
-| `extension.icon` | No | Icon name from the icon library |
-| `extension.titleField` | No | Field used as the record title in lists/cards |
-| `extension.subtitleField` | No | Field used as subtitle |
+| Field                     | Required | Description                                                 |
+| ------------------------- | -------- | ----------------------------------------------------------- |
+| `code`                    | Yes      | Unique model code. Must start with namespace prefix (`tt_`) |
+| `displayName:en`          | Yes      | English display name                                        |
+| `displayName:zh-CN`       | No       | Chinese display name                                        |
+| `modelType`               | Yes      | Always `"entity"` for business models                       |
+| `extension.icon`          | No       | Icon name from the icon library                             |
+| `extension.titleField`    | No       | Field used as the record title in lists/cards               |
+| `extension.subtitleField` | No       | Field used as subtitle                                      |
 
 ---
 
-## Step 4: Define Fields (fields/*.json)
+## Step 4: Define Fields (fields/\*.json)
 
 Fields define the columns of your model's database table. Create one JSON file per model.
 
@@ -277,50 +277,50 @@ Fields define the columns of your model's database table. Create one JSON file p
 
 **Supported data types:**
 
-| Data Type | Description | DB Column Type |
-|-----------|-------------|---------------|
-| `string` | Short text (up to maxLength) | VARCHAR |
-| `text` | Long text, multiline | TEXT |
-| `integer` | Whole number | BIGINT |
-| `decimal` | Decimal number (precision, scale) | DECIMAL |
-| `boolean` | True/false | BOOLEAN |
-| `date` | Date without time | DATE |
-| `datetime` | Date with time | TIMESTAMP |
-| `enum` | Enumerated value (backed by dictionary) | VARCHAR |
-| `reference` | Foreign key to another model | VARCHAR |
-| `json` | Arbitrary JSON data | JSONB |
-| `computed` | SpEL expression computed field | VARCHAR |
+| Data Type   | Description                             | DB Column Type |
+| ----------- | --------------------------------------- | -------------- |
+| `string`    | Short text (up to maxLength)            | VARCHAR        |
+| `text`      | Long text, multiline                    | TEXT           |
+| `integer`   | Whole number                            | BIGINT         |
+| `decimal`   | Decimal number (precision, scale)       | DECIMAL        |
+| `boolean`   | True/false                              | BOOLEAN        |
+| `date`      | Date without time                       | DATE           |
+| `datetime`  | Date with time                          | TIMESTAMP      |
+| `enum`      | Enumerated value (backed by dictionary) | VARCHAR        |
+| `reference` | Foreign key to another model            | VARCHAR        |
+| `json`      | Arbitrary JSON data                     | JSONB          |
+| `computed`  | SpEL expression computed field          | VARCHAR        |
 
 **Field options:**
 
-| Option | Description |
-|--------|-------------|
-| `constraints.required` | Field is required |
-| `constraints.maxLength` | Max string length |
-| `constraints.min` / `constraints.max` | Numeric range |
-| `feature.searchable` | Included in keyword search |
-| `feature.sortable` | Column can be sorted |
-| `dictCode` | Links enum field to a dictionary |
-| `defaultValue` | Default value for new records |
-| `extension.readOnly` | Field cannot be edited by user |
-| `extension.precision` / `extension.scale` | Decimal precision |
-| `extension.renderComponent` | Custom render component (`multiselect`, `richtext`, etc.) |
+| Option                                    | Description                                               |
+| ----------------------------------------- | --------------------------------------------------------- |
+| `constraints.required`                    | Field is required                                         |
+| `constraints.maxLength`                   | Max string length                                         |
+| `constraints.min` / `constraints.max`     | Numeric range                                             |
+| `feature.searchable`                      | Included in keyword search                                |
+| `feature.sortable`                        | Column can be sorted                                      |
+| `dictCode`                                | Links enum field to a dictionary                          |
+| `defaultValue`                            | Default value for new records                             |
+| `extension.readOnly`                      | Field cannot be edited by user                            |
+| `extension.precision` / `extension.scale` | Decimal precision                                         |
+| `extension.renderComponent`               | Custom render component (`multiselect`, `richtext`, etc.) |
 
 ---
 
 ## Step 5: Define Commands and Bindings
 
-### Commands (commands/*.json)
+### Commands (commands/\*.json)
 
 Commands define the operations users can perform on records. AuraBoot supports several command types:
 
-| Type | Purpose |
-|------|---------|
-| `create` | Create a new record |
-| `update` | Edit an existing record |
-| `delete` | Delete a record |
+| Type               | Purpose                 |
+| ------------------ | ----------------------- |
+| `create`           | Create a new record     |
+| `update`           | Edit an existing record |
+| `delete`           | Delete a record         |
 | `state_transition` | Change the status field |
-| `query` | Read-only query |
+| `query`            | Read-only query         |
 
 **`plugins/task-tracker/config/commands/tt_task.json`**:
 
@@ -499,32 +499,32 @@ Commands define the operations users can perform on records. AuraBoot supports s
 
 **Command fields explained:**
 
-| Field | Description |
-|-------|-------------|
-| `code` | Must follow `{namespace}:{action}` format |
-| `type` | One of: `create`, `update`, `delete`, `state_transition`, `query` |
-| `modelCode` | The model this command operates on |
-| `inputFields` | Fields the user can fill in (for create/update) |
-| `autoSetFields` | Fields automatically set by the system |
-| `stateField` | The enum field used as the state machine field (for state_transition) |
-| `fromStates` | Valid current states to execute this transition |
-| `toState` | Target state after transition |
-| `preconditions` | Conditions that must be true before the command can execute |
-| `validation.rules` | Additional validation rules |
-| `permissions` | Permission codes required to execute |
-| `cmd_risk_level` | L0 (read-only) to L4 (destructive) |
+| Field              | Description                                                           |
+| ------------------ | --------------------------------------------------------------------- |
+| `code`             | Must follow `{namespace}:{action}` format                             |
+| `type`             | One of: `create`, `update`, `delete`, `state_transition`, `query`     |
+| `modelCode`        | The model this command operates on                                    |
+| `inputFields`      | Fields the user can fill in (for create/update)                       |
+| `autoSetFields`    | Fields automatically set by the system                                |
+| `stateField`       | The enum field used as the state machine field (for state_transition) |
+| `fromStates`       | Valid current states to execute this transition                       |
+| `toState`          | Target state after transition                                         |
+| `preconditions`    | Conditions that must be true before the command can execute           |
+| `validation.rules` | Additional validation rules                                           |
+| `permissions`      | Permission codes required to execute                                  |
+| `cmd_risk_level`   | L0 (read-only) to L4 (destructive)                                    |
 
 **Auto-set strategies:**
 
-| Strategy | Description | Example |
-|----------|-------------|---------|
-| `auto_generate` | Generate value from pattern | `TT-{yyyyMMdd}-{seq}` |
-| `current_datetime` | Current timestamp | -- |
-| `current_date` | Current date | -- |
-| `current_user` | Current user ID | -- |
-| `fixed_value` | Constant value | `"draft"` |
+| Strategy           | Description                 | Example               |
+| ------------------ | --------------------------- | --------------------- |
+| `auto_generate`    | Generate value from pattern | `TT-{yyyyMMdd}-{seq}` |
+| `current_datetime` | Current timestamp           | --                    |
+| `current_date`     | Current date                | --                    |
+| `current_user`     | Current user ID             | --                    |
+| `fixed_value`      | Constant value              | `"draft"`             |
 
-### Bindings (bindings/*.json)
+### Bindings (bindings/\*.json)
 
 Bindings connect fields to a model and define their order and editability.
 
@@ -532,24 +532,108 @@ Bindings connect fields to a model and define their order and editability.
 
 ```json
 [
-  { "modelCode": "tt_task", "fieldCode": "tt_title", "sequence": 1, "required": true, "visible": true, "editable": true },
-  { "modelCode": "tt_task", "fieldCode": "tt_code", "sequence": 2, "required": true, "visible": true, "editable": false },
-  { "modelCode": "tt_task", "fieldCode": "tt_description", "sequence": 3, "required": false, "visible": true, "editable": true },
-  { "modelCode": "tt_task", "fieldCode": "tt_status", "sequence": 4, "required": false, "visible": true, "editable": false },
-  { "modelCode": "tt_task", "fieldCode": "tt_priority", "sequence": 5, "required": false, "visible": true, "editable": true },
-  { "modelCode": "tt_task", "fieldCode": "tt_assignee", "sequence": 6, "required": false, "visible": true, "editable": true },
-  { "modelCode": "tt_task", "fieldCode": "tt_due_date", "sequence": 7, "required": false, "visible": true, "editable": true },
-  { "modelCode": "tt_task", "fieldCode": "tt_estimated_hours", "sequence": 8, "required": false, "visible": true, "editable": true },
-  { "modelCode": "tt_task", "fieldCode": "tt_is_urgent", "sequence": 9, "required": false, "visible": true, "editable": true },
-  { "modelCode": "tt_task", "fieldCode": "tt_created_at", "sequence": 10, "required": false, "visible": true, "editable": false },
-  { "modelCode": "tt_task", "fieldCode": "tt_completed_at", "sequence": 11, "required": false, "visible": true, "editable": false },
-  { "modelCode": "tt_task", "fieldCode": "tt_tags", "sequence": 12, "required": false, "visible": true, "editable": true }
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_title",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_code",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_description",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_status",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_priority",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_assignee",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_due_date",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_estimated_hours",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_is_urgent",
+    "sequence": 9,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_created_at",
+    "sequence": 10,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_completed_at",
+    "sequence": 11,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tt_task",
+    "fieldCode": "tt_tags",
+    "sequence": 12,
+    "required": false,
+    "visible": true,
+    "editable": true
+  }
 ]
 ```
 
 ---
 
-## Step 6: Define Pages (pages/*.json)
+## Step 6: Define Pages (pages/\*.json)
 
 Pages define the UI layout for list, form, and detail views. AuraBoot uses a block-based page schema (v4 flat format).
 
@@ -587,17 +671,29 @@ Pages define the UI layout for list, form, and detail views. AuraBoot uses a blo
         {
           "key": "in_progress",
           "label": { "en": "In Progress", "zh-CN": "In Progress" },
-          "filter": { "field": "tt_status", "value": "in_progress", "operator": "EQ" }
+          "filter": {
+            "field": "tt_status",
+            "value": "in_progress",
+            "operator": "EQ"
+          }
         },
         {
           "key": "completed",
           "label": { "en": "Completed", "zh-CN": "Completed" },
-          "filter": { "field": "tt_status", "value": "completed", "operator": "EQ" }
+          "filter": {
+            "field": "tt_status",
+            "value": "completed",
+            "operator": "EQ"
+          }
         },
         {
           "key": "archived",
           "label": { "en": "Archived", "zh-CN": "Archived" },
-          "filter": { "field": "tt_status", "value": "archived", "operator": "EQ" }
+          "filter": {
+            "field": "tt_status",
+            "value": "archived",
+            "operator": "EQ"
+          }
         }
       ]
     },
@@ -625,8 +721,18 @@ Pages define the UI layout for list, form, and detail views. AuraBoot uses a blo
       "columns": [
         { "field": "tt_code", "width": 150, "sortable": true },
         { "field": "tt_title", "width": 250, "sortable": true },
-        { "field": "tt_status", "width": 120, "renderType": "tag", "dictCode": "tt_status_dict" },
-        { "field": "tt_priority", "width": 100, "renderType": "tag", "dictCode": "tt_priority_dict" },
+        {
+          "field": "tt_status",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "tt_status_dict"
+        },
+        {
+          "field": "tt_priority",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "tt_priority_dict"
+        },
         { "field": "tt_assignee", "width": 120 },
         { "field": "tt_due_date", "width": 120, "sortable": true },
         { "field": "tt_estimated_hours", "width": 100 },
@@ -667,11 +773,19 @@ Pages define the UI layout for list, form, and detail views. AuraBoot uses a blo
 
 **Page schema concepts:**
 
-| Concept | Description | Values |
-|---------|-------------|--------|
-| `kind` | Page type | `list`, `form`, `detail` (dashboards use the Dashboard Designer, not `pages.json`) |
-| `blockType` | Content block type | `table`, `tabs`, `toolbar`, `form-section`, `form-buttons` |
-| `layout.type` | Layout engine | `grid` (12-column) or `stack` (vertical) |
+| Concept       | Description        | Values                                                                             |
+| ------------- | ------------------ | ---------------------------------------------------------------------------------- |
+| `kind`        | Page type          | `list`, `form`, `detail` (dashboards use the Dashboard Designer, not `pages.json`) |
+| `blockType`   | Content block type | `table`, `tabs`, `toolbar`, `form-section`, `form-buttons`                         |
+| `layout.type` | Layout engine      | `grid` (12-column) or `stack` (vertical)                                           |
+
+> **Reference inline create:** In a form page, a model-backed `reference` field can
+> declare `allowCreate: true` on its page field entry. Add `createCommand`,
+> `createPageKey`, and `createPermission` when the defaults are not enough. The picker
+> opens a quick-create modal, creates the target record through the command pipeline,
+> and selects the new `pid`. See
+> [Pages & Layouts: Reference Inline Create](../core-concepts/pages-and-layouts.md#reference-inline-create)
+> for the full contract.
 
 ### Form Page
 
@@ -761,7 +875,10 @@ Pages define the UI layout for list, form, and detail views. AuraBoot uses a blo
             {
               "id": "section_basic",
               "blockType": "form-section",
-              "title": { "en-US": "Basic Information", "zh-CN": "Basic Information" },
+              "title": {
+                "en-US": "Basic Information",
+                "zh-CN": "Basic Information"
+              },
               "columns": 2,
               "fields": [
                 { "field": "tt_code", "readOnly": true },
@@ -832,19 +949,14 @@ Pages define the UI layout for list, form, and detail views. AuraBoot uses a blo
     "name:zh-CN": "Task Tracker Admin",
     "name:en": "Task Tracker Admin",
     "description": "Full access to Task Tracker",
-    "permissions": [
-      "tt.task.manage",
-      "tt.task.read"
-    ]
+    "permissions": ["tt.task.manage", "tt.task.read"]
   },
   {
     "code": "tt_viewer",
     "name:zh-CN": "Task Tracker Viewer",
     "name:en": "Task Tracker Viewer",
     "description": "Read-only access to Task Tracker",
-    "permissions": [
-      "tt.task.read"
-    ]
+    "permissions": ["tt.task.read"]
   }
 ]
 ```
@@ -887,16 +999,16 @@ Pages define the UI layout for list, form, and detail views. AuraBoot uses a blo
 
 **Menu fields:**
 
-| Field | Description |
-|-------|-------------|
-| `code` | Unique menu code |
-| `parentCode` | Parent menu code (`null` for top-level) |
-| `type` | `0` = directory (folder), `1` = page link |
-| `path` | URL path. Use `/p/{pageKey}` for DSL pages |
-| `icon` | Icon name from Tabler Icons (prefixed with `Icon`) |
-| `permissionCode` | Permission required to see this menu |
-| `pageKey` | Links to a page schema |
-| `orderNo` | Sort order within parent |
+| Field            | Description                                        |
+| ---------------- | -------------------------------------------------- |
+| `code`           | Unique menu code                                   |
+| `parentCode`     | Parent menu code (`null` for top-level)            |
+| `type`           | `0` = directory (folder), `1` = page link          |
+| `path`           | URL path. Use `/p/{pageKey}` for DSL pages         |
+| `icon`           | Icon name from Tabler Icons (prefixed with `Icon`) |
+| `permissionCode` | Permission required to see this menu               |
+| `pageKey`        | Links to a page schema                             |
+| `orderNo`        | Sort order within parent                           |
 
 ---
 
@@ -908,43 +1020,181 @@ i18n entries provide multilingual labels for models, fields, dictionaries, and c
 
 ```json
 [
-  { "key": "model.tt_task._meta.label", "zh-CN": "Task", "en-US": "Task", "source": "import", "refType": "model" },
+  {
+    "key": "model.tt_task._meta.label",
+    "zh-CN": "Task",
+    "en-US": "Task",
+    "source": "import",
+    "refType": "model"
+  },
 
-  { "key": "model.tt_task.tt_title.label", "zh-CN": "Title", "en-US": "Title", "source": "import", "refType": "field" },
-  { "key": "model.tt_task.tt_code.label", "zh-CN": "Code", "en-US": "Code", "source": "import", "refType": "field" },
-  { "key": "model.tt_task.tt_description.label", "zh-CN": "Description", "en-US": "Description", "source": "import", "refType": "field" },
-  { "key": "model.tt_task.tt_status.label", "zh-CN": "Status", "en-US": "Status", "source": "import", "refType": "field" },
-  { "key": "model.tt_task.tt_priority.label", "zh-CN": "Priority", "en-US": "Priority", "source": "import", "refType": "field" },
-  { "key": "model.tt_task.tt_assignee.label", "zh-CN": "Assignee", "en-US": "Assignee", "source": "import", "refType": "field" },
-  { "key": "model.tt_task.tt_due_date.label", "zh-CN": "Due Date", "en-US": "Due Date", "source": "import", "refType": "field" },
-  { "key": "model.tt_task.tt_estimated_hours.label", "zh-CN": "Estimated Hours", "en-US": "Estimated Hours", "source": "import", "refType": "field" },
-  { "key": "model.tt_task.tt_is_urgent.label", "zh-CN": "Urgent", "en-US": "Urgent", "source": "import", "refType": "field" },
-  { "key": "model.tt_task.tt_created_at.label", "zh-CN": "Created At", "en-US": "Created At", "source": "import", "refType": "field" },
-  { "key": "model.tt_task.tt_completed_at.label", "zh-CN": "Completed At", "en-US": "Completed At", "source": "import", "refType": "field" },
-  { "key": "model.tt_task.tt_tags.label", "zh-CN": "Tags", "en-US": "Tags", "source": "import", "refType": "field" },
+  {
+    "key": "model.tt_task.tt_title.label",
+    "zh-CN": "Title",
+    "en-US": "Title",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.tt_task.tt_code.label",
+    "zh-CN": "Code",
+    "en-US": "Code",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.tt_task.tt_description.label",
+    "zh-CN": "Description",
+    "en-US": "Description",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.tt_task.tt_status.label",
+    "zh-CN": "Status",
+    "en-US": "Status",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.tt_task.tt_priority.label",
+    "zh-CN": "Priority",
+    "en-US": "Priority",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.tt_task.tt_assignee.label",
+    "zh-CN": "Assignee",
+    "en-US": "Assignee",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.tt_task.tt_due_date.label",
+    "zh-CN": "Due Date",
+    "en-US": "Due Date",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.tt_task.tt_estimated_hours.label",
+    "zh-CN": "Estimated Hours",
+    "en-US": "Estimated Hours",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.tt_task.tt_is_urgent.label",
+    "zh-CN": "Urgent",
+    "en-US": "Urgent",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.tt_task.tt_created_at.label",
+    "zh-CN": "Created At",
+    "en-US": "Created At",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.tt_task.tt_completed_at.label",
+    "zh-CN": "Completed At",
+    "en-US": "Completed At",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.tt_task.tt_tags.label",
+    "zh-CN": "Tags",
+    "en-US": "Tags",
+    "source": "import",
+    "refType": "field"
+  },
 
-  { "key": "dict.tt_status_dict.label", "zh-CN": "Task Status", "en-US": "Task Status", "source": "import", "refType": "dict" },
-  { "key": "dict.tt_status_dict.DRAFT", "zh-CN": "Draft", "en-US": "Draft", "source": "import", "refType": "dict_item" },
-  { "key": "dict.tt_status_dict.IN_PROGRESS", "zh-CN": "In Progress", "en-US": "In Progress", "source": "import", "refType": "dict_item" },
-  { "key": "dict.tt_status_dict.COMPLETED", "zh-CN": "Completed", "en-US": "Completed", "source": "import", "refType": "dict_item" },
-  { "key": "dict.tt_status_dict.ARCHIVED", "zh-CN": "Archived", "en-US": "Archived", "source": "import", "refType": "dict_item" },
+  {
+    "key": "dict.tt_status_dict.label",
+    "zh-CN": "Task Status",
+    "en-US": "Task Status",
+    "source": "import",
+    "refType": "dict"
+  },
+  {
+    "key": "dict.tt_status_dict.DRAFT",
+    "zh-CN": "Draft",
+    "en-US": "Draft",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.tt_status_dict.IN_PROGRESS",
+    "zh-CN": "In Progress",
+    "en-US": "In Progress",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.tt_status_dict.COMPLETED",
+    "zh-CN": "Completed",
+    "en-US": "Completed",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.tt_status_dict.ARCHIVED",
+    "zh-CN": "Archived",
+    "en-US": "Archived",
+    "source": "import",
+    "refType": "dict_item"
+  },
 
-  { "key": "dict.tt_priority_dict.label", "zh-CN": "Priority", "en-US": "Priority", "source": "import", "refType": "dict" },
-  { "key": "dict.tt_priority_dict.LOW", "zh-CN": "Low", "en-US": "Low", "source": "import", "refType": "dict_item" },
-  { "key": "dict.tt_priority_dict.MEDIUM", "zh-CN": "Medium", "en-US": "Medium", "source": "import", "refType": "dict_item" },
-  { "key": "dict.tt_priority_dict.HIGH", "zh-CN": "High", "en-US": "High", "source": "import", "refType": "dict_item" },
-  { "key": "dict.tt_priority_dict.CRITICAL", "zh-CN": "Critical", "en-US": "Critical", "source": "import", "refType": "dict_item" }
+  {
+    "key": "dict.tt_priority_dict.label",
+    "zh-CN": "Priority",
+    "en-US": "Priority",
+    "source": "import",
+    "refType": "dict"
+  },
+  {
+    "key": "dict.tt_priority_dict.LOW",
+    "zh-CN": "Low",
+    "en-US": "Low",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.tt_priority_dict.MEDIUM",
+    "zh-CN": "Medium",
+    "en-US": "Medium",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.tt_priority_dict.HIGH",
+    "zh-CN": "High",
+    "en-US": "High",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.tt_priority_dict.CRITICAL",
+    "zh-CN": "Critical",
+    "en-US": "Critical",
+    "source": "import",
+    "refType": "dict_item"
+  }
 ]
 ```
 
 **i18n key format:**
 
-| Pattern | Example | Description |
-|---------|---------|-------------|
-| `model.{modelCode}._meta.label` | `model.tt_task._meta.label` | Model display name |
-| `model.{modelCode}.{fieldCode}.label` | `model.tt_task.tt_title.label` | Field label |
-| `dict.{dictCode}.label` | `dict.tt_status_dict.label` | Dictionary name |
-| `dict.{dictCode}.{VALUE}` | `dict.tt_status_dict.DRAFT` | Dictionary item label |
+| Pattern                               | Example                        | Description           |
+| ------------------------------------- | ------------------------------ | --------------------- |
+| `model.{modelCode}._meta.label`       | `model.tt_task._meta.label`    | Model display name    |
+| `model.{modelCode}.{fieldCode}.label` | `model.tt_task.tt_title.label` | Field label           |
+| `dict.{dictCode}.label`               | `dict.tt_status_dict.label`    | Dictionary name       |
+| `dict.{dictCode}.{VALUE}`             | `dict.tt_status_dict.DRAFT`    | Dictionary item label |
 
 ---
 
@@ -1049,14 +1299,14 @@ Dictionaries define the allowed values for enum fields.
 
 **Dictionary fields:**
 
-| Field | Description |
-|-------|-------------|
-| `code` | Unique dictionary code (referenced by field's `dictCode`) |
-| `dictType` | `"static"` for predefined values |
-| `items[].value` | Stored value (lowercase) |
-| `items[].label` | Display label |
-| `items[].sortNo` | Sort order |
-| `items[].color` | Hex color for UI rendering |
+| Field                     | Description                                                          |
+| ------------------------- | -------------------------------------------------------------------- |
+| `code`                    | Unique dictionary code (referenced by field's `dictCode`)            |
+| `dictType`                | `"static"` for predefined values                                     |
+| `items[].value`           | Stored value (lowercase)                                             |
+| `items[].label`           | Display label                                                        |
+| `items[].sortNo`          | Sort order                                                           |
+| `items[].color`           | Hex color for UI rendering                                           |
 | `items[].extension.color` | Named color for tag rendering (`gray`, `blue`, `green`, `red`, etc.) |
 
 ---
@@ -1091,6 +1341,7 @@ aura plugin validate plugins/task-tracker
 ```
 
 The validator checks:
+
 - **Structural**: JSON syntax, manifest schema, resource file existence
 - **Semantic**: Cross-references (commands reference valid models, fields reference valid dictionaries, menus reference valid permissions)
 - **Namespace consistency**: Model codes start with `tt_`, command codes start with `tt:`
@@ -1109,6 +1360,7 @@ aura plugin publish plugins/task-tracker --yes
 ```
 
 This single command:
+
 1. Parses all JSON files
 2. Creates dictionaries, fields, models, bindings, commands, pages in the database
 3. Publishes all resources (models, commands, pages)
@@ -1122,21 +1374,25 @@ This single command:
 After publishing, verify everything works:
 
 1. **Check platform status:**
+
    ```bash
    aura status
    ```
 
 2. **Verify the model exists:**
+
    ```bash
    aura dsl show tt_task
    ```
 
 3. **Create a test record via CLI:**
+
    ```bash
    aura exec tt:create_task --set tt_title="My First Task" --set tt_priority="high"
    ```
 
 4. **Query records:**
+
    ```bash
    aura query tt_task
    ```
@@ -1154,20 +1410,21 @@ After publishing, verify everything works:
 
 You built a complete plugin with:
 
-| Resource | Count | File |
-|----------|-------|------|
-| Models | 1 | `config/models.json` |
-| Fields | 12 | `config/fields/tt_task.json` |
-| Bindings | 12 | `config/bindings/tt_task.json` |
-| Commands | 8 | `config/commands/tt_task.json` |
-| Pages | 3 | `config/pages/*.json` |
-| Dictionaries | 2 | `config/dicts.json` |
-| Permissions | 2 | `config/permissions.json` |
-| Roles | 2 | `config/roles.json` |
-| Menus | 2 | `config/menus.json` |
-| i18n entries | 23 | `config/i18n.json` |
+| Resource     | Count | File                           |
+| ------------ | ----- | ------------------------------ |
+| Models       | 1     | `config/models.json`           |
+| Fields       | 12    | `config/fields/tt_task.json`   |
+| Bindings     | 12    | `config/bindings/tt_task.json` |
+| Commands     | 8     | `config/commands/tt_task.json` |
+| Pages        | 3     | `config/pages/*.json`          |
+| Dictionaries | 2     | `config/dicts.json`            |
+| Permissions  | 2     | `config/permissions.json`      |
+| Roles        | 2     | `config/roles.json`            |
+| Menus        | 2     | `config/menus.json`            |
+| i18n entries | 23    | `config/i18n.json`             |
 
 **Next steps:**
+
 - Add more models (e.g., `tt_project` to group tasks)
 - Add REFERENCE fields to link models together
 - Add sub-table blocks to detail pages
