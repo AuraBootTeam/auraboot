@@ -228,6 +228,25 @@ class OeeCalculationEngineTest {
     }
 
     @Test
+    void telemetryOperatingHoursAboveLoading_capsAvailabilityAtOne() {
+        // Real run-time signals can be noisy at the window boundary; cap measured operating time at
+        // loading time so dashboard rates never exceed 100%.
+        OeeInputs in = OeeInputs.builder()
+            .calendarHours(new BigDecimal("8"))
+            .downtimes(List.of())
+            .actualQty(BigDecimal.ZERO).defectQty(BigDecimal.ZERO)
+            .capacityPerHour(new BigDecimal("100"))
+            .telemetryOperatingHours(new BigDecimal("10"))
+            .telemetryOutputQty(new BigDecimal("800"))
+            .telemetryGoodQty(new BigDecimal("760"))
+            .build();
+        OeeResult r = engine.calculate(in);
+        assertEquals(0, BigDecimal.ONE.compareTo(r.getAvailability()));
+        assertEquals(0, BigDecimal.ONE.compareTo(r.getPerformance()));
+        assertEquals(0, new BigDecimal("0.9500").compareTo(r.getQuality().setScale(4, RoundingMode.HALF_UP)));
+    }
+
+    @Test
     void telemetryAbsent_fallsBackToDowntimeDerivation_backwardCompatible() {
         // No telemetry block -> engine behaves exactly as before (downtime-derived A/P/Q).
         // Same downtimes as above: loading 8, operating = 8 - breakdown 1 = 7, availability = 7/8 = 0.875.
