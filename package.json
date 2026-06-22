@@ -8,7 +8,8 @@
     "typecheck:packages": "pnpm -r --filter './packages/*' typecheck",
     "validate:plugins": "node scripts/validate-plugin-i18n.mjs && node scripts/validate-plugin-dashboards.mjs && node scripts/validate-permission-codes.mjs",
     "validate:dashboards": "node scripts/validate-plugin-dashboards.mjs",
-    "validate:permissions": "node scripts/validate-permission-codes.mjs"
+    "validate:permissions": "node scripts/validate-permission-codes.mjs",
+    "test:oee-host-golden": "bash scripts/host-oee-dashboard-golden.sh all"
   },
   "devDependencies": {
     "typescript": "^5.4.0"
