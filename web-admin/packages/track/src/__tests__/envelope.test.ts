@@ -1,5 +1,5 @@
-import { it, expect } from 'vitest';
-import { buildEvent, sanitizeRoute } from '../envelope';
+import { it, expect, vi } from 'vitest';
+import { buildEvent, generateEventId, sanitizeRoute } from '../envelope';
 
 it('builds a flat camelCase page_view envelope', () => {
   const e = buildEvent({
@@ -13,6 +13,18 @@ it('builds a flat camelCase page_view envelope', () => {
   expect(e.source).toBe('web');
   expect(e.eventId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/); // ULID
   expect(e.occurredAt).toBeTruthy();
+});
+
+it('generates ULID entropy without Math.random', () => {
+  const randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => {
+    throw new Error('Math.random must not be used for event ids');
+  });
+  try {
+    expect(generateEventId()).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(randomSpy).not.toHaveBeenCalled();
+  } finally {
+    randomSpy.mockRestore();
+  }
 });
 
 it('sanitizeRoute strips ids and query', () => {
