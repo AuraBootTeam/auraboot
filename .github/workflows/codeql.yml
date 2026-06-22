@@ -43,7 +43,7 @@ jobs:
 
       - name: Install SmartEngine fork into Maven local
         if: matrix.language == 'java-kotlin'
-        run: bash scripts/install-smartengine-local.sh
+        run: scripts/install-smartengine-maven-local.sh
 
       - name: Initialize CodeQL (Java)
         if: matrix.language == 'java-kotlin'

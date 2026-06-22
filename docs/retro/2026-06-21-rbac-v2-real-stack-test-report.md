@@ -1,5 +1,4 @@
 ---
-title: RBAC permission v2 — real-stack test report (measured re-run)
 date: 2026-06-21
 created: 2026-06-21
 type: retro

@@ -2,6 +2,24 @@ package com.auraboot.workflow_demo;
 
 import java.util.Map;
 
+function double numberValue(Object value) {
+    if (value == null) {
+        return 0.0;
+    }
+    if (value instanceof Number) {
+        return ((Number) value).doubleValue();
+    }
+    try {
+        return Double.parseDouble(String.valueOf(value));
+    } catch (NumberFormatException e) {
+        return 0.0;
+    }
+}
+
+function int intValue(Object value) {
+    return (int) numberValue(value);
+}
+
 // Pre-flight leave request validation.
 // Fact is a java.util.Map<String, Object> with the following keys:
 //   - type             : String  ("annual" | "sick" | "personal" | "comp")
@@ -15,10 +33,8 @@ import java.util.Map;
 
 rule "reject_insufficient_annual_balance"
     when
-        $req: Map(
-            this["type"] == "annual",
-            ((Number) this["days"]).doubleValue() > ((Number) this["balanceRemaining"]).doubleValue()
-        )
+        $req: Map(this["type"] == "annual")
+        eval(numberValue($req.get("days")) > numberValue($req.get("balanceRemaining")))
     then
         Map result = (Map) $req.get("_ruleResult");
         result.put("valid", Boolean.FALSE);
@@ -27,11 +43,8 @@ end
 
 rule "reject_sick_without_attachment"
     when
-        $req: Map(
-            this["type"] == "sick",
-            ((Number) this["days"]).doubleValue() > 2.0,
-            ((Number) this["attachmentCount"]).intValue() == 0
-        )
+        $req: Map(this["type"] == "sick")
+        eval(numberValue($req.get("days")) > 2.0 && intValue($req.get("attachmentCount")) == 0)
     then
         Map result = (Map) $req.get("_ruleResult");
         result.put("valid", Boolean.FALSE);

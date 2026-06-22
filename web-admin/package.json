@@ -54,6 +54,7 @@
     "test:page-designer:deep": "NO_PROXY=localhost PW_WORKERS=1 playwright test --timeout=120000 tests/e2e/page-designer/designer-deep-operations.spec.ts tests/e2e/page-designer/custom-page-designer.spec.ts tests/e2e/studio/ai-page-gen.spec.ts",
     "test:ui": "PW_PROFILE=full PW_ROLE_PROJECTS=1 playwright test --ui",
     "test:fast": "PW_PROFILE=fast playwright test",
+    "test:workflow-demo": "NO_PROXY=localhost playwright test -c playwright.workflow-demo.config.ts",
     "test:bpm-regression": "NO_PROXY=localhost playwright test -c playwright.bpm-regression.config.ts",
     "test:debug": "PW_PROFILE=full PW_ROLE_PROJECTS=1 playwright test --debug",
     "test:report": "playwright show-report",

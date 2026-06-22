@@ -168,10 +168,11 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             messages.add(Map.of("role", "system", "content", request.getSystemPrompt()));
         }
 
-        // Convert unified messages to OpenAI format
+        // Convert unified messages to OpenAI format. A single tool-result message can expand to
+        // multiple role:tool messages (one per tool_call_id), so flatten rather than 1:1 add.
         if (request.getMessages() != null) {
             for (LlmChatRequest.Message msg : request.getMessages()) {
-                messages.add(convertMessageToOpenAi(msg));
+                messages.addAll(convertMessageToOpenAiMessages(msg));
             }
         }
         body.put("messages", messages);
@@ -330,26 +331,56 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                 return result;
             }
 
-            // User message with tool_result blocks → multiple tool messages
-            // OpenAI expects separate messages per tool result
-            // Return the first tool result; caller handles multi-tool via message splitting
+            // User message with tool_result blocks → a tool message. This single-message variant
+            // returns the FIRST tool result; full multi-tool splitting is done by
+            // convertMessageToOpenAiMessages (which buildOpenAiRequestBody uses).
             for (Object block : blocks) {
                 Map<String, Object> bMap = toBlockMap(block);
-                if (bMap != null) {
-                    String type = (String) bMap.get("type");
-                    if ("tool_result".equals(type)) {
-                        result.put("role", "tool");
-                        Object toolUseId = bMap.get("tool_use_id") != null ? bMap.get("tool_use_id") : bMap.get("toolUseId");
-                        result.put("tool_call_id", toolUseId);
-                        Object toolContent = bMap.get("content") != null ? bMap.get("content") : bMap.get("result");
-                        result.put("content", serializeToolContent(toolContent));
-                        return result;
-                    }
+                if (bMap != null && "tool_result".equals(bMap.get("type"))) {
+                    return toToolMessage(bMap);
                 }
             }
         }
 
         result.put("content", String.valueOf(content));
+        return result;
+    }
+
+    /**
+     * Convert one unified message into one or more OpenAI-format messages.
+     *
+     * <p>The agent batches every tool result of a round into a single Anthropic-style
+     * {@code role:"user"} message. OpenAI-compatible providers (OpenAI, DeepSeek, …) require a
+     * separate {@code role:"tool"} message per {@code tool_call_id}; emitting only the first makes
+     * DeepSeek reject the request with "An assistant message with 'tool_calls' must be followed by
+     * tool messages responding to each 'tool_call_id'". So tool-result messages are split here;
+     * every other message maps 1:1.
+     */
+    List<Map<String, Object>> convertMessageToOpenAiMessages(LlmChatRequest.Message msg) {
+        Object content = msg.getContent();
+        if (!"assistant".equals(msg.getRole()) && content instanceof List<?> blocks) {
+            List<Map<String, Object>> toolMessages = new ArrayList<>();
+            for (Object block : blocks) {
+                Map<String, Object> bMap = toBlockMap(block);
+                if (bMap != null && "tool_result".equals(bMap.get("type"))) {
+                    toolMessages.add(toToolMessage(bMap));
+                }
+            }
+            if (!toolMessages.isEmpty()) {
+                return toolMessages;
+            }
+        }
+        return List.of(convertMessageToOpenAi(msg));
+    }
+
+    /** Build one OpenAI {@code role:"tool"} message from a tool_result block map. */
+    private Map<String, Object> toToolMessage(Map<String, Object> bMap) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("role", "tool");
+        Object toolUseId = bMap.get("tool_use_id") != null ? bMap.get("tool_use_id") : bMap.get("toolUseId");
+        result.put("tool_call_id", toolUseId);
+        Object toolContent = bMap.get("content") != null ? bMap.get("content") : bMap.get("result");
+        result.put("content", serializeToolContent(toolContent));
         return result;
     }
 
