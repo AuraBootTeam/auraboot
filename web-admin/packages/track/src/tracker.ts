@@ -18,6 +18,12 @@ export interface Tracker {
 export function createTracker(opts: {
   post: PostFn;
   getSessionId: () => string;
+  /**
+   * Optional persistent anonymous visitor id provider. When present, every event
+   * carries `anonId` (public/anonymous mode). When absent, no `anonId` is emitted
+   * and the server enriches identity from the JWT (authenticated mode — unchanged).
+   */
+  getAnonId?: () => string;
   endpoint?: string;
   batchSize?: number;
 }): Tracker {
@@ -52,6 +58,7 @@ export function createTracker(opts: {
           eventName: 'page_view',
           eventCategory: 'navigation',
           clientSessionId: opts.getSessionId(),
+          anonId: opts.getAnonId?.(),
           props: { routeTemplate: path },
         }),
       );
@@ -64,6 +71,7 @@ export function createTracker(opts: {
           eventName: 'element_click',
           eventCategory: 'ui_interaction',
           clientSessionId: opts.getSessionId(),
+          anonId: opts.getAnonId?.(),
           ui,
           props: {},
         }),

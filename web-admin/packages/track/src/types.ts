@@ -10,6 +10,7 @@ export interface BehaviorEventInput {
   source: string;                 // "web"
   occurredAt: string;             // ISO8601
   clientSessionId: string;
+  anonId?: string;                // public/anonymous mode: client-generated persistent visitor id
   uiElementId?: string;
   appId?: string;
   pageId?: string;
@@ -23,6 +24,7 @@ export interface RawEventInput {
   eventName: string;
   eventCategory: string;
   clientSessionId: string;
+  anonId?: string;
   ui?: {
     uiElementId: string;
     appId?: string;

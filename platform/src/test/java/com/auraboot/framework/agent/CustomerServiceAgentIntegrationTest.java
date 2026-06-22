@@ -100,7 +100,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         accountData.put("crm_acc_status", "active");
         accountData.put("created_at", LocalDateTime.now());
         accountData.put("updated_at", LocalDateTime.now());
-        dynamicDataMapper.insert("mt_crm_account", accountData);
+        dynamicDataMapper.insert("mt_crm_account_common", accountData);
         accountRecordId = accountPid;
         log.info("Created test CRM Account: {}", accountRecordId);
         assertThat(accountRecordId).isNotNull();
@@ -115,7 +115,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         contactData.put("crm_ct_account_id", accountRecordId);
         contactData.put("created_at", LocalDateTime.now());
         contactData.put("updated_at", LocalDateTime.now());
-        dynamicDataMapper.insert("mt_crm_contact", contactData);
+        dynamicDataMapper.insert("mt_crm_contact_common", contactData);
         contactRecordId = contactPid;
         log.info("Created test CRM Contact: {}", contactRecordId);
         assertThat(contactRecordId).isNotNull();
@@ -388,7 +388,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         agentDef.put("name", "Customer Service Agent");
         agentDef.put("description", "Automated customer service agent for processing inbound emails");
         agentDef.put("agent_type", "reactive");
-        agentDef.put("model", "claude-sonnet-4-6");
+        agentDef.put("model", "deepseek-chat");
         agentDef.put("system_prompt", buildCsAgentSystemPrompt());
         agentDef.put("tools", "[\"dsl.command\", \"dsl.query\", \"send_customer_reply\"]");
         agentDef.put("max_tools", 20);
@@ -419,7 +419,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         agentDef.put("name", "CS Agent Timeout Test");
         agentDef.put("description", "Agent with very short timeout for testing graceful failure");
         agentDef.put("agent_type", "reactive");
-        agentDef.put("model", "claude-sonnet-4-6");
+        agentDef.put("model", "deepseek-chat");
         agentDef.put("system_prompt", "You are a test agent. Analyze the request thoroughly.");
         agentDef.put("tools", "[\"dsl.query\"]");
         agentDef.put("max_tools", 5);

@@ -9,12 +9,16 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.meta.service.impl.pipeline.PreActionConstants;
+import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +75,7 @@ public class PreActionsPhase implements CommandPhase {
 
     private final DroolsEngineService droolsEngineService;
     private final DynamicDataService dynamicDataService;
+    private final RecordSnapshotReader snapshotReader;
 
     @Override
     public String name() {
@@ -91,6 +96,9 @@ public class PreActionsPhase implements CommandPhase {
 
         Map<String, Object> payload = ctx.getPayload() != null ? ctx.getPayload() : Map.of();
         Map<String, Object> currentRecord = ctx.getBeforeSnapshot();
+        if (currentRecord == null) {
+            currentRecord = loadTargetRecordSnapshot(ctx);
+        }
 
         for (Object entry : list) {
             if (!(entry instanceof Map<?, ?> rawMap)) {
@@ -105,6 +113,23 @@ public class PreActionsPhase implements CommandPhase {
                 log.warn("Unknown preAction type: {}", type);
             }
         }
+    }
+
+    private Map<String, Object> loadTargetRecordSnapshot(CommandPipelineContext ctx) {
+        if (ctx == null || ctx.getRequest() == null || ctx.getCommand() == null) {
+            return null;
+        }
+        String targetRecordId = ctx.getRequest().getTargetRecordId();
+        String modelCode = ctx.getCommand().getModelCode();
+        if (!StringUtils.hasText(targetRecordId) || !StringUtils.hasText(modelCode)) {
+            return null;
+        }
+        Map<String, Object> snapshot = snapshotReader.readRecordSnapshot(
+                ctx.getTenantId(), modelCode, targetRecordId);
+        if (snapshot != null) {
+            ctx.setBeforeSnapshot(snapshot);
+        }
+        return snapshot;
     }
 
     @SuppressWarnings("unchecked")
@@ -227,10 +252,44 @@ public class PreActionsPhase implements CommandPhase {
         String scopeKey = expr.substring(0, dot);
         String field = expr.substring(dot + 1);
         Object scopeObj = scope.get(scopeKey);
-        if (scopeObj instanceof Map<?, ?> m) {
-            return m.get(field);
+        return resolvePath(scopeObj, field);
+    }
+
+    private Object resolvePath(Object value, String path) {
+        Object current = value;
+        for (String part : path.split("\\.")) {
+            current = resolvePathPart(current, part);
+        }
+        return current;
+    }
+
+    private Object resolvePathPart(Object value, String part) {
+        if ("size".equals(part)) {
+            return sizeOf(value);
+        }
+        if (value instanceof Map<?, ?> m) {
+            return m.get(part);
         }
         return null;
+    }
+
+    private int sizeOf(Object value) {
+        if (value == null) {
+            return 0;
+        }
+        if (value instanceof Collection<?> collection) {
+            return collection.size();
+        }
+        if (value instanceof Map<?, ?> map) {
+            return map.size();
+        }
+        if (value.getClass().isArray()) {
+            return Array.getLength(value);
+        }
+        if (value instanceof CharSequence sequence) {
+            return sequence.toString().isBlank() ? 0 : 1;
+        }
+        return 1;
     }
 
     private String asString(Object v) {
