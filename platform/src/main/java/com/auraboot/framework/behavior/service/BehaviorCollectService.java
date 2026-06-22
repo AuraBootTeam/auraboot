@@ -7,6 +7,7 @@ import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -70,6 +71,13 @@ public class BehaviorCollectService {
                 accepted++;
             } catch (DuplicateKeyException dup) {
                 accepted++; // client retry with same eventId — already stored, idempotent
+            } catch (DataIntegrityViolationException bad) {
+                // A single event that violates a column/constraint (e.g. an over-long field from a
+                // misbehaving or hostile client on this PUBLIC unauthenticated endpoint) is skipped,
+                // not fatal — never 500 the whole batch on one bad event. Same per-event resilience
+                // as the malformed skip above; the rest of the batch still persists.
+                log.warn("Skipping behavior event violating a DB constraint (eventId={}): {}",
+                        in.getEventId(), bad.getMostSpecificCause().getMessage());
             }
         }
         return accepted;

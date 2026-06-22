@@ -202,6 +202,54 @@ class KeyedCollectIT {
     }
 
     @Test
+    @DisplayName("CORS: cross-origin preflight from any origin allows POST + X-Site-Key (public, no credentials)")
+    void corsPreflightAllowsPublicCrossOrigin() {
+        // A published low-code app embeds the SDK on the customer's own domain (arbitrary origin)
+        // and sends X-Site-Key, which triggers a browser preflight. The public keyed endpoint must
+        // allow it (SP4) — the global /api/** CORS config only allows the admin app's own origins.
+        HttpHeaders h = new HttpHeaders();
+        h.set(HttpHeaders.ORIGIN, "https://customer-app.example.com");
+        h.set(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST");
+        h.set(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "x-site-key,content-type");
+        ResponseEntity<String> resp = restTemplate.exchange("/api/collect/keyed", HttpMethod.OPTIONS,
+                new HttpEntity<>(h), String.class);
+
+        assertThat(resp.getStatusCode().is2xxSuccessful())
+                .as("preflight not rejected: %s", resp.getStatusCode()).isTrue();
+        assertThat(resp.getHeaders().getAccessControlAllowOrigin())
+                .as("allows the requesting origin").isNotNull();
+        assertThat(resp.getHeaders().getAccessControlAllowMethods()).contains(HttpMethod.POST);
+        assertThat(String.valueOf(resp.getHeaders().getAccessControlAllowHeaders()).toLowerCase())
+                .as("allows the X-Site-Key request header").contains("x-site-key");
+    }
+
+    @Test
+    @DisplayName("over-long field on one event → skipped, batch still 200 (public endpoint stays resilient, no 500)")
+    void oversizedEvent_skippedNotBatchFatal() {
+        // event_id is VARCHAR(40); a misbehaving/hostile client sending a 60-char id must not 500
+        // the whole batch — the bad event is skipped (like a malformed one) and valid events persist.
+        String longId = "e".repeat(60);
+        String body = "{\"events\":["
+                + "{\"eventId\":\"e-ok-resilient\",\"eventName\":\"page_view\",\"anonId\":\"anon-it\"},"
+                + "{\"eventId\":\"" + longId + "\",\"eventName\":\"page_view\",\"anonId\":\"anon-it\"}"
+                + "]}";
+        HttpHeaders h = new HttpHeaders();
+        h.setContentType(MediaType.APPLICATION_JSON);
+        h.set("X-Site-Key", KEY_A);
+        ResponseEntity<String> resp = restTemplate.exchange("/api/collect/keyed", HttpMethod.POST,
+                new HttpEntity<>(body, h), String.class);
+
+        assertThat(resp.getStatusCode()).as("batch not 500'd by one bad event").isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).as("only the valid event accepted").contains("\"accepted\":1");
+        assertThat(jdbc.queryForObject(
+                "SELECT count(1) FROM ab_behavior_event WHERE tenant_id=? AND event_id='e-ok-resilient'",
+                Integer.class, TENANT_A)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(1) FROM ab_behavior_event WHERE tenant_id=? AND event_id=?",
+                Integer.class, TENANT_A, longId)).as("over-long event not stored").isZero();
+    }
+
+    @Test
     @DisplayName("index: global UNIQUE(site_key), single column, no tenant prefix")
     void indexIsGlobalUniqueSingleColumn() {
         String def = jdbc.queryForObject(

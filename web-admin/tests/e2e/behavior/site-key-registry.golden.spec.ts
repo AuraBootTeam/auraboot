@@ -23,10 +23,12 @@ import type { Page } from '@playwright/test';
 import { execSync } from 'node:child_process';
 import { PSQL_BASE, PG_ENV } from '../../helpers/environments';
 
+const E2E_PG_ENV = { ...PG_ENV, PGPASSWORD: PG_ENV.PGPASSWORD ?? 'auraboot' };
+
 function psql(sql: string): string {
   return execSync(`${PSQL_BASE} -P pager=off -t -A -c "${sql.replace(/"/g, '\\"')}"`, {
     encoding: 'utf-8',
-    env: PG_ENV,
+    env: E2E_PG_ENV,
     timeout: 10_000,
   }).trim();
 }
@@ -76,8 +78,11 @@ test.describe('Site Key Registry — Admin DSL Page Golden', () => {
     await page.screenshot({ path: 'test-results/sitekey-02-form.png', fullPage: true });
     await page.getByTestId('form-btn-submit').click();
 
+    await expect.poll(
+      () => psql(`SELECT COUNT(*) FROM mt_behavior_site_key WHERE name='${unique.replace(/'/g, "''")}'`),
+      { timeout: 15_000, message: 'created site-key row persisted' },
+    ).toBe('1');
     // Form redirects back to the list on success; navigate explicitly to be safe.
-    await page.waitForTimeout(1500);
     await page.goto(LIST_URL, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle').catch(() => null);
 
@@ -96,7 +101,10 @@ test.describe('Site Key Registry — Admin DSL Page Golden', () => {
 
     // ── STEP 5: disable via row action → confirm → status flips ────────────────
     await disableRow(page, row);
-    await page.waitForTimeout(1000);
+    await expect.poll(
+      () => psql(`SELECT status FROM mt_behavior_site_key WHERE name='${unique.replace(/'/g, "''")}'`),
+      { timeout: 15_000, message: 'site-key row disabled in DB' },
+    ).toBe('disabled');
     await page.goto(LIST_URL, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle').catch(() => null);
     const rowAfter = page.getByRole('row').filter({ hasText: unique });
