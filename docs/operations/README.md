@@ -4,6 +4,9 @@ Observability assets for AuraBoot platform operators.
 
 ## Host-First Goldens
 
+- [Behavior Kafka Ingest Runbook](behavior-kafka-ingest-runbook.md) — local
+  validation and operations notes for `/api/collect` / `/api/collect/keyed`
+  enqueue, native Kafka IT, and quarantine sink checks without Docker.
 - [OEE Host Golden](oee-host-golden.md) — repeatable local validation for the
   PCBA OEE dashboard using host PostgreSQL, Greptime, backend, BFF, and Vite
   without Docker.
