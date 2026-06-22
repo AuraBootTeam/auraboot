@@ -44,7 +44,34 @@ common:
   created_today: 今日新建
   modified_this_week: 本周修改
   preset_views: 预设视图
-  view_saved: 已保存到当前视图
+  view_saved: 已保存到我的视图
+  saved_view_select: 选择视图
+  saved_view_personal_group: 个人视图
+  saved_view_team_group: 团队共享
+  saved_view_global_group: 全员视图
+  saved_view_scope_personal: 我的
+  saved_view_scope_team: 团队
+  saved_view_scope_global: 全员
+  saved_view_default: 默认
+  saved_view_new: 新建视图
+  saved_view_manage: 管理视图
+  saved_view_empty: 暂无保存视图
+  saved_view_locked_preset: 预置
+  saved_view_capability_blocked: 需要配置
+  saved_view_shared_draft: 共享视图已产生本地改动
+  saved_view_save_shared: 保存到共享视图
+  saved_view_save_shared_disabled_reason: 你可以调整当前视图，但暂不能保存给团队或全员
+  saved_view_locked_preset_reason: 插件预置视图不能直接保存，请先复制为我的视图
+  saved_view_save_shared_confirm_title: 保存到共享视图？
+  saved_view_save_shared_confirm_content: 这会更新 {target} 可见的共享视图。变更：{changes}。
+  saved_view_shared_changes: 视图配置
+  saved_view_shared_saved: 共享视图已更新
+  saved_view_shared_save_failed: 保存共享视图失败
+  saved_view_copy_to_personal: 复制为我的视图
+  saved_view_dismiss_draft: 放弃变更
+  saved_view_copied_to_personal: 已复制为个人视图
+  saved_view_copy_failed: 复制视图失败
+  saved_view_copy_disabled_reason: 此视图不允许复制
   options_load_failed: 选项加载失败
   retry: 重试
 

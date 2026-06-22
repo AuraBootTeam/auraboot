@@ -23,7 +23,7 @@
  *   00-bootstrap → 01-multi-role-users → 02-test-pages → 03-import-test-fixtures
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -50,6 +50,96 @@ const SHOULD_IMPORT =
   IMPORT_TEST_FIXTURES.toLowerCase() === 'true' ||
   PW_PROFILE === 'oss' ||
   PW_PROFILE === 'full';
+
+type RoleRecord = { code?: string; pid?: string };
+type MemberRecord = {
+  pid?: string;
+  user?: { email?: string };
+};
+
+async function loadRoleCodes(
+  request: APIRequestContext,
+  token: string,
+  codes: string[],
+): Promise<Set<string>> {
+  const rolesRes = await request.get(`${BACKEND_URL}/api/roles/all`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(rolesRes.ok(), `roles/all failed: ${rolesRes.status()} ${await rolesRes.text()}`).toBe(
+    true,
+  );
+  const rolesBody = (await rolesRes.json()) as { data?: RoleRecord[] };
+  const roles = Array.isArray(rolesBody?.data) ? rolesBody.data : [];
+  const roleCodes = new Set<string>();
+  for (const role of roles) {
+    if (!role.code || !codes.includes(role.code)) continue;
+    expect(role.pid, `role ${role.code} response missing pid`).toBeTruthy();
+    roleCodes.add(role.code);
+  }
+  return roleCodes;
+}
+
+async function findMemberPidByEmail(
+  request: APIRequestContext,
+  token: string,
+  email: string,
+): Promise<string> {
+  const membersRes = await request.post(`${BACKEND_URL}/api/tenant/members/search`, {
+    data: { keyword: email, pageNum: 1, pageSize: 20 },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  expect(
+    membersRes.ok(),
+    `member search failed for ${email}: ${membersRes.status()} ${await membersRes.text()}`,
+  ).toBe(true);
+  const membersBody = (await membersRes.json()) as {
+    data?: { records?: MemberRecord[] };
+  };
+  const records = Array.isArray(membersBody?.data?.records) ? membersBody.data.records : [];
+  const member = records.find((item) => item.user?.email === email) ?? records[0];
+  const memberPid = member?.pid ?? '';
+  expect(memberPid, `member not found for ${email}`).toBeTruthy();
+  return memberPid;
+}
+
+async function assignFixtureRole(
+  request: APIRequestContext,
+  token: string,
+  email: string,
+  roleCode: string,
+): Promise<void> {
+  const memberPid = await findMemberPidByEmail(request, token, email);
+  const assignRes = await request.post(`${BACKEND_URL}/api/user-roles/assign-by-code`, {
+    data: { memberPid, roleCodes: [roleCode] },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  expect(
+    assignRes.ok(),
+    `assign ${roleCode} to ${email} failed: ${assignRes.status()} ${await assignRes.text()}`,
+  ).toBe(true);
+}
+
+async function ensureFixtureUserRoles(
+  request: APIRequestContext,
+  token: string,
+): Promise<void> {
+  const roleCodes = await loadRoleCodes(request, token, ['e2et_operator', 'e2et_viewer']);
+  expect(roleCodes.has('e2et_operator'), 'e2et_operator role missing after test-fixtures import').toBe(
+    true,
+  );
+  expect(roleCodes.has('e2et_viewer'), 'e2et_viewer role missing after test-fixtures import').toBe(
+    true,
+  );
+
+  await assignFixtureRole(request, token, 'e2e-operator@test.com', 'e2et_operator');
+  await assignFixtureRole(request, token, 'e2e-viewer@test.com', 'e2et_viewer');
+}
 
 test.describe.configure({ mode: 'serial' });
 
@@ -93,7 +183,12 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
       data?: Array<{ code?: string }>;
     };
     const commands = Array.isArray(existingCommandsBody?.data) ? existingCommandsBody.data : [];
-    if (commands.some((command) => command?.code === 'e2et:create_order')) {
+    const roleCodes = await loadRoleCodes(request, token, ['e2et_viewer']);
+    if (
+      commands.some((command) => command?.code === 'e2et:create_order') &&
+      roleCodes.has('e2et_viewer')
+    ) {
+      await ensureFixtureUserRoles(request, token);
       return;
     }
   }
@@ -135,4 +230,6 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
       result?.errorMessage ?? '?'
     })`,
   ).toBe(true);
+
+  await ensureFixtureUserRoles(request, token);
 });
