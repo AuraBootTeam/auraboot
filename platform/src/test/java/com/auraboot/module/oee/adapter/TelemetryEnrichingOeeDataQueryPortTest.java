@@ -39,12 +39,21 @@ class TelemetryEnrichingOeeDataQueryPortTest {
             .windowEnd(LocalDateTime.parse("2026-06-02T00:00:00")).build();
     }
 
+    private OeeTelemetrySourceExtension.OeeTelemetry telemetry(
+            String operatingHours,
+            String outputQty,
+            String goodQty) {
+        return new OeeTelemetrySourceExtension.OeeTelemetry(
+                new BigDecimal(operatingHours),
+                new BigDecimal(outputQty),
+                new BigDecimal(goodQty));
+    }
+
     @Test
     void telemetryExtensionPresent_populatesTelemetryBlock_keepsPostgresLossInputs() {
         when(delegate.fetch(any())).thenReturn(postgresBase());
         // functional ExtensionPoint -> lambda
-        OeeTelemetrySourceExtension ext = (t, eq, s, e) -> Optional.of(
-            new OeeTelemetrySourceExtension.OeeTelemetry(new BigDecimal("6"), new BigDecimal("540"), new BigDecimal("513")));
+        OeeTelemetrySourceExtension ext = (t, eq, s, e) -> Optional.of(telemetry("6", "540", "513"));
         when(pluginManager.getExtensionsOfType(OeeTelemetrySourceExtension.class)).thenReturn(List.of(ext));
 
         OeeInputs out = new TelemetryEnrichingOeeDataQueryPort(delegate, pluginManager).fetch(req());
@@ -85,12 +94,10 @@ class TelemetryEnrichingOeeDataQueryPortTest {
     void multipleTelemetryExtensions_usesFirstSourceWithData() {
         when(delegate.fetch(any())).thenReturn(postgresBase());
         OeeTelemetrySourceExtension empty = (t, eq, s, e) -> Optional.empty();
-        OeeTelemetrySourceExtension present = (t, eq, s, e) -> Optional.of(
-            new OeeTelemetrySourceExtension.OeeTelemetry(new BigDecimal("5"), new BigDecimal("450"), new BigDecimal("405")));
-        OeeTelemetrySourceExtension later = (t, eq, s, e) -> Optional.of(
-            new OeeTelemetrySourceExtension.OeeTelemetry(new BigDecimal("9"), new BigDecimal("999"), new BigDecimal("999")));
+        OeeTelemetrySourceExtension present = (t, eq, s, e) -> Optional.of(telemetry("5", "450", "405"));
+        OeeTelemetrySourceExtension later = (t, eq, s, e) -> Optional.of(telemetry("9", "999", "999"));
         when(pluginManager.getExtensionsOfType(OeeTelemetrySourceExtension.class))
-            .thenReturn(List.of(empty, present, later));
+                .thenReturn(List.of(empty, present, later));
 
         OeeInputs out = new TelemetryEnrichingOeeDataQueryPort(delegate, pluginManager).fetch(req());
 
@@ -100,12 +107,37 @@ class TelemetryEnrichingOeeDataQueryPortTest {
     }
 
     @Test
+    void telemetryFallsBackToEquipmentCodeWhenPidHasNoData() {
+        when(delegate.fetch(any())).thenReturn(postgresBase());
+        OeeTelemetrySourceExtension ext = (tenantId, equipmentKey, start, end) -> {
+            if ("EQ-CODE-1".equals(equipmentKey)) {
+                return Optional.of(telemetry("6", "540", "513"));
+            }
+            return Optional.empty();
+        };
+        when(pluginManager.getExtensionsOfType(OeeTelemetrySourceExtension.class)).thenReturn(List.of(ext));
+
+        OeeInputs out = new TelemetryEnrichingOeeDataQueryPort(delegate, pluginManager).fetch(
+                OeeRequest.builder()
+                        .tenantId(1L)
+                        .equipmentId("pcba-equipment-pid")
+                        .equipmentCode("EQ-CODE-1")
+                        .windowStart(LocalDateTime.parse("2026-06-01T00:00:00"))
+                        .windowEnd(LocalDateTime.parse("2026-06-02T00:00:00"))
+                        .build());
+
+        assertEquals(0, new BigDecimal("6").compareTo(out.getTelemetryOperatingHours()));
+        assertEquals(0, new BigDecimal("540").compareTo(out.getTelemetryOutputQty()));
+        assertEquals(0, new BigDecimal("513").compareTo(out.getTelemetryGoodQty()));
+    }
+
+    @Test
     void listEquipment_delegatesToPostgresAdapter() {
         when(delegate.listEquipment(1L))
-            .thenReturn(List.of(OeeEquipmentRef.builder().equipmentId("EQ-1").code("C1").name("N1").build()));
+                .thenReturn(List.of(OeeEquipmentRef.builder().equipmentId("EQ-1").code("C1").name("N1").build()));
 
         List<OeeEquipmentRef> refs =
-            new TelemetryEnrichingOeeDataQueryPort(delegate, pluginManager).listEquipment(1L);
+                new TelemetryEnrichingOeeDataQueryPort(delegate, pluginManager).listEquipment(1L);
 
         assertEquals(1, refs.size());
         verify(delegate).listEquipment(1L);

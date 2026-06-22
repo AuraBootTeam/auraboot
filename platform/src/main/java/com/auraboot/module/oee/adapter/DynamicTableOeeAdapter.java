@@ -17,8 +17,9 @@ import java.util.Map;
 
 /**
  * Postgres-backed {@link OeeDataQueryPort} implementation that reads the PCBA manufacturing
- * dynamic tables ({@code mt_pe_*}) to assemble the raw OEE inputs for one equipment
- * over a time window. Wrapped by {@link TelemetryEnrichingOeeDataQueryPort} (the {@code @Primary}
+ * dynamic tables to assemble the raw OEE inputs for one equipment over a time window.
+ * Current PCBA plugins publish {@code mt_mfg_*} tables; legacy {@code mt_pe_*} tables are still
+ * supported as a compatibility fallback. Wrapped by {@link TelemetryEnrichingOeeDataQueryPort} (the {@code @Primary}
  * port) which overlays telemetry-derived A/P/Q signals when an {@code OeeTelemetrySource} is present.
  *
  * <p>Pattern mirrors {@code ApsSchedulingService}: {@link DynamicDataMapper#selectByQueryWithoutTenant}
@@ -60,15 +61,57 @@ public class DynamicTableOeeAdapter implements OeeDataQueryPort {
 
     private final DynamicDataMapper db;
 
-    private static final String TABLE_DOWNTIME = "mt_pe_eq_downtime";
-    private static final String TABLE_EQUIPMENT = "mt_pe_equipment";
-    private static final String TABLE_RESOURCE_CALENDAR = "mt_pe_resource_calendar";
-    private static final String TABLE_WORK_ORDER_OP = "mt_pe_work_order_op";
+    private static final PcbaSchema CURRENT_MFG = new PcbaSchema(
+            "current-mfg",
+            "mt_mfg_equipment_downtime_pcba_asset",
+            "mt_mfg_equipment_pcba_asset",
+            "mt_mfg_resource_calendar_pcba_capacity",
+            "mt_mfg_work_order_operation_pcba_execution",
+            "mt_mfg_resource_pcba_capacity",
+            "mfg_dt_equipment_id",
+            "mfg_dt_type",
+            "mfg_dt_duration_hours",
+            "mfg_dt_start_time",
+            "mfg_eq_resource_id",
+            "mfg_eq_code",
+            "mfg_eq_name",
+            "mfg_rc_resource_id",
+            "mfg_rc_date",
+            "mfg_rc_available_hours",
+            "mfg_wop_resource_id",
+            "mfg_wop_actual_qty",
+            "mfg_wop_defect_qty",
+            "mfg_wop_actual_start",
+            "mfg_res_capacity_per_hour");
+
+    private static final PcbaSchema LEGACY_PE = new PcbaSchema(
+            "legacy-pe",
+            "mt_pe_eq_downtime",
+            "mt_pe_equipment",
+            "mt_pe_resource_calendar",
+            "mt_pe_work_order_op",
+            "mt_pe_resource",
+            "pe_dt_equipment_id",
+            "pe_dt_type",
+            "pe_dt_duration_hours",
+            "pe_dt_start_time",
+            "pe_eq_resource_id",
+            "pe_eq_code",
+            "pe_eq_name",
+            "pe_rc_resource_id",
+            "pe_rc_date",
+            "pe_rc_available_hours",
+            "pe_woo_resource_id",
+            "pe_woo_actual_qty",
+            "pe_woo_defect_qty",
+            "pe_woo_actual_start",
+            "pe_res_capacity_per_hour");
 
     @Override
     public OeeInputs fetch(OeeRequest req) {
+        PcbaSchema schema = activeSchema();
         // Plugin not imported -> zero inputs (the engine treats no-data as 0, never an error).
-        if (!exists(TABLE_DOWNTIME) || !exists(TABLE_EQUIPMENT)) {
+        if (schema == null) {
             log.info("OEE source tables not found (PCBA manufacturing plugin not imported). Returning zero inputs.");
             return zero();
         }
@@ -79,10 +122,10 @@ public class DynamicTableOeeAdapter implements OeeDataQueryPort {
         p.put("start", req.getWindowStart());
         p.put("end", req.getWindowEnd());
 
-        Output output = fetchOutput(p);
+        Output output = fetchOutput(schema, p);
         return OeeInputs.builder()
-            .calendarHours(fetchCalendarHours(p))
-            .downtimes(fetchDowntimes(p))
+            .calendarHours(fetchCalendarHours(schema, p))
+            .downtimes(fetchDowntimes(schema, p))
             .actualQty(output.actualQty)
             .defectQty(output.defectQty)
             .capacityPerHour(output.capacityPerHour)
@@ -91,8 +134,9 @@ public class DynamicTableOeeAdapter implements OeeDataQueryPort {
 
     @Override
     public List<OeeEquipmentRef> listEquipment(Long tenantId) {
+        PcbaSchema schema = equipmentSchema();
         // Plugin not imported -> no equipment (fleet roll-up degrades to empty, never an error).
-        if (!exists(TABLE_EQUIPMENT)) {
+        if (schema == null) {
             log.info("OEE equipment table not found (PCBA manufacturing plugin not imported). Returning no equipment.");
             return List.of();
         }
@@ -100,36 +144,38 @@ public class DynamicTableOeeAdapter implements OeeDataQueryPort {
         p.put("tenantId", tenantId);
         // No soft-delete filter: the pe_equipment dynamic table has no deleted_flag column (the
         // platform's mt_pe_* tables do not carry one), matching the other OEE adapter queries.
-        String sql = "SELECT pid, pe_eq_code AS code, pe_eq_name AS name "
-            + "FROM " + TABLE_EQUIPMENT + " "
-            + "WHERE tenant_id = #{params.tenantId} "
-            + "ORDER BY pe_eq_code";
+        String sql = "SELECT pid, " + schema.equipmentCodeColumn + " AS code, "
+                + schema.equipmentNameColumn + " AS name "
+                + "FROM " + schema.equipmentTable + " "
+                + "WHERE tenant_id = #{params.tenantId} "
+                + "ORDER BY " + schema.equipmentCodeColumn;
         List<OeeEquipmentRef> refs = new ArrayList<>();
         for (Map<String, Object> row : query(sql, p)) {
             refs.add(OeeEquipmentRef.builder()
-                .equipmentId(str(row.get("pid")))
-                .code(str(row.get("code")))
-                .name(str(row.get("name")))
-                .build());
+                    .equipmentId(str(row.get("pid")))
+                    .code(str(row.get("code")))
+                    .name(str(row.get("name")))
+                    .build());
         }
         return refs;
     }
 
     /** Downtime hours grouped by type for the equipment within the window. */
-    private List<OeeInputs.Downtime> fetchDowntimes(Map<String, Object> p) {
-        String sql = "SELECT pe_dt_type AS type, COALESCE(SUM(pe_dt_duration_hours), 0) AS hours "
-            + "FROM " + TABLE_DOWNTIME + " "
-            + "WHERE tenant_id = #{params.tenantId} "
-            + "AND pe_dt_equipment_id = #{params.eq} "
-            + "AND pe_dt_start_time >= #{params.start} "
-            + "AND pe_dt_start_time < #{params.end} "
-            + "GROUP BY pe_dt_type";
+    private List<OeeInputs.Downtime> fetchDowntimes(PcbaSchema schema, Map<String, Object> p) {
+        String sql = "SELECT " + schema.downtimeTypeColumn + " AS type, COALESCE(SUM("
+                + schema.downtimeHoursColumn + "), 0) AS hours "
+                + "FROM " + schema.downtimeTable + " "
+                + "WHERE tenant_id = #{params.tenantId} "
+                + "AND " + schema.downtimeEquipmentColumn + " = #{params.eq} "
+                + "AND " + schema.downtimeStartColumn + " >= #{params.start} "
+                + "AND " + schema.downtimeStartColumn + " < #{params.end} "
+                + "GROUP BY " + schema.downtimeTypeColumn;
         List<OeeInputs.Downtime> downtimes = new ArrayList<>();
         for (Map<String, Object> row : query(sql, p)) {
             downtimes.add(OeeInputs.Downtime.builder()
-                .type(str(row.get("type")))
-                .hours(bd(row.get("hours")))
-                .build());
+                    .type(str(row.get("type")))
+                    .hours(bd(row.get("hours")))
+                    .build());
         }
         return downtimes;
     }
@@ -138,14 +184,15 @@ public class DynamicTableOeeAdapter implements OeeDataQueryPort {
      * Calendar (planned) hours = sum of the equipment's resource's available calendar hours in the window.
      * equipment.pid = #{eq} -> equipment.pe_eq_resource_id (resource pid) -> resource_calendar.pe_rc_resource_id.
      */
-    private BigDecimal fetchCalendarHours(Map<String, Object> p) {
-        String sql = "SELECT COALESCE(SUM(c.pe_rc_available_hours), 0) AS h "
-            + "FROM " + TABLE_RESOURCE_CALENDAR + " c "
-            + "JOIN " + TABLE_EQUIPMENT + " e ON e.pe_eq_resource_id = c.pe_rc_resource_id "
-            + "WHERE e.tenant_id = #{params.tenantId} "
-            + "AND e.pid = #{params.eq} "
-            + "AND c.pe_rc_date >= #{params.start}::date "
-            + "AND c.pe_rc_date < #{params.end}::date";
+    private BigDecimal fetchCalendarHours(PcbaSchema schema, Map<String, Object> p) {
+        String sql = "SELECT COALESCE(SUM(c." + schema.calendarAvailableHoursColumn + "), 0) AS h "
+                + "FROM " + schema.resourceCalendarTable + " c "
+                + "JOIN " + schema.equipmentTable + " e ON e." + schema.equipmentResourceColumn
+                + " = c." + schema.calendarResourceColumn + " "
+                + "WHERE e.tenant_id = #{params.tenantId} "
+                + "AND e.pid = #{params.eq} "
+                + "AND c." + schema.calendarDateColumn + " >= #{params.start}::date "
+                + "AND c." + schema.calendarDateColumn + " < #{params.end}::date";
         return firstBd(query(sql, p), "h");
     }
 
@@ -153,18 +200,20 @@ public class DynamicTableOeeAdapter implements OeeDataQueryPort {
      * Output + capacity for the equipment's resource within the window.
      * equipment.pid = #{eq} -> resource (pe_eq_resource_id) -> ops where pe_woo_resource_id = that resource pid.
      */
-    private Output fetchOutput(Map<String, Object> p) {
-        String sql = "SELECT COALESCE(SUM(wo.pe_woo_actual_qty), 0) AS act, "
-            + "COALESCE(SUM(wo.pe_woo_defect_qty), 0) AS def, "
-            + "COALESCE(MAX(r.pe_res_capacity_per_hour), 0) AS cap "
-            + "FROM " + TABLE_EQUIPMENT + " e "
-            + "JOIN mt_pe_resource r ON r.pid = e.pe_eq_resource_id AND r.tenant_id = #{params.tenantId} "
-            + "LEFT JOIN " + TABLE_WORK_ORDER_OP + " wo ON wo.pe_woo_resource_id = e.pe_eq_resource_id "
-            + "AND wo.tenant_id = #{params.tenantId} "
-            + "AND wo.pe_woo_actual_start >= #{params.start} "
-            + "AND wo.pe_woo_actual_start < #{params.end} "
-            + "WHERE e.tenant_id = #{params.tenantId} "
-            + "AND e.pid = #{params.eq}";
+    private Output fetchOutput(PcbaSchema schema, Map<String, Object> p) {
+        String sql = "SELECT COALESCE(SUM(wo." + schema.workOrderActualQtyColumn + "), 0) AS act, "
+                + "COALESCE(SUM(wo." + schema.workOrderDefectQtyColumn + "), 0) AS def, "
+                + "COALESCE(MAX(r." + schema.resourceCapacityColumn + "), 0) AS cap "
+                + "FROM " + schema.equipmentTable + " e "
+                + "JOIN " + schema.resourceTable + " r ON r.pid = e." + schema.equipmentResourceColumn
+                + " AND r.tenant_id = #{params.tenantId} "
+                + "LEFT JOIN " + schema.workOrderOperationTable + " wo ON wo." + schema.workOrderResourceColumn
+                + " = e." + schema.equipmentResourceColumn + " "
+                + "AND wo.tenant_id = #{params.tenantId} "
+                + "AND wo." + schema.workOrderActualStartColumn + " >= #{params.start} "
+                + "AND wo." + schema.workOrderActualStartColumn + " < #{params.end} "
+                + "WHERE e.tenant_id = #{params.tenantId} "
+                + "AND e.pid = #{params.eq}";
         List<Map<String, Object>> rows = query(sql, p);
         if (rows.isEmpty()) {
             return new Output(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
@@ -193,6 +242,26 @@ public class DynamicTableOeeAdapter implements OeeDataQueryPort {
             log.warn("Error checking table existence for {}: {}", table, e.getMessage());
             return false;
         }
+    }
+
+    private PcbaSchema activeSchema() {
+        if (exists(CURRENT_MFG.equipmentTable) && exists(CURRENT_MFG.downtimeTable)) {
+            return CURRENT_MFG;
+        }
+        if (exists(LEGACY_PE.equipmentTable) && exists(LEGACY_PE.downtimeTable)) {
+            return LEGACY_PE;
+        }
+        return null;
+    }
+
+    private PcbaSchema equipmentSchema() {
+        if (exists(CURRENT_MFG.equipmentTable)) {
+            return CURRENT_MFG;
+        }
+        if (exists(LEGACY_PE.equipmentTable)) {
+            return LEGACY_PE;
+        }
+        return null;
     }
 
     private OeeInputs zero() {
@@ -232,5 +301,29 @@ public class DynamicTableOeeAdapter implements OeeDataQueryPort {
 
     /** Small value holder for the single output query (actual / defect / capacity). */
     private record Output(BigDecimal actualQty, BigDecimal defectQty, BigDecimal capacityPerHour) {
+    }
+
+    private record PcbaSchema(
+            String label,
+            String downtimeTable,
+            String equipmentTable,
+            String resourceCalendarTable,
+            String workOrderOperationTable,
+            String resourceTable,
+            String downtimeEquipmentColumn,
+            String downtimeTypeColumn,
+            String downtimeHoursColumn,
+            String downtimeStartColumn,
+            String equipmentResourceColumn,
+            String equipmentCodeColumn,
+            String equipmentNameColumn,
+            String calendarResourceColumn,
+            String calendarDateColumn,
+            String calendarAvailableHoursColumn,
+            String workOrderResourceColumn,
+            String workOrderActualQtyColumn,
+            String workOrderDefectQtyColumn,
+            String workOrderActualStartColumn,
+            String resourceCapacityColumn) {
     }
 }
