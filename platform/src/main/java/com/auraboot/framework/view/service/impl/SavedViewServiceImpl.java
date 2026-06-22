@@ -64,6 +64,9 @@ public class SavedViewServiceImpl implements SavedViewService {
     private static final String CAPABILITY_AVAILABLE = "available";
     private static final String CAPABILITY_BLOCKED = "blocked";
     private static final String REASON_MISSING_REQUIRED_FIELD = "MISSING_REQUIRED_FIELD";
+    private static final int PERSONAL_VIEW_LIMIT = 10;
+    private static final int TEAM_VIEW_LIMIT = 20;
+    private static final int GLOBAL_VIEW_LIMIT = 20;
 
     private final SavedViewMapper savedViewMapper;
     private final PageSchemaMapper pageSchemaMapper;
@@ -98,6 +101,7 @@ public class SavedViewServiceImpl implements SavedViewService {
         }
 
         String scope = StringUtils.hasText(request.getScope()) ? request.getScope() : "personal";
+        validateViewCountLimit(request, scope, currentUserPid);
 
         SavedView savedView = new SavedView();
         savedView.setPid(UniqueIdGenerator.generate());
@@ -543,6 +547,35 @@ public class SavedViewServiceImpl implements SavedViewService {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Team ID is required for TEAM scope views");
         }
+    }
+
+    private void validateViewCountLimit(SavedViewCreateRequest request, String scope, String currentUserPid) {
+        int limit = viewLimitForScope(scope);
+        if (limit <= 0) {
+            return;
+        }
+
+        String ownerId = "personal".equals(scope) ? currentUserPid : null;
+        String teamId = "team".equals(scope) ? request.getTeamId() : null;
+        int currentCount = savedViewMapper.countActiveNonImplicitViewsForScope(
+                request.getModelCode(),
+                request.getPageKey(),
+                scope,
+                ownerId,
+                teamId);
+        if (currentCount >= limit) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Saved view limit reached for " + scope + " scope: " + limit);
+        }
+    }
+
+    private int viewLimitForScope(String scope) {
+        return switch (scope) {
+            case "personal" -> PERSONAL_VIEW_LIMIT;
+            case "team" -> TEAM_VIEW_LIMIT;
+            case "global" -> GLOBAL_VIEW_LIMIT;
+            default -> 0;
+        };
     }
 
     private void validateViewTypeConfig(String viewType, ViewConfig config) {
