@@ -2,7 +2,6 @@
 type: plan-design
 status: active
 created: 2026-06-21
-title: 表单引用字段「inline 新建 + 回填自动选中」设计
 date: 2026-06-21
 scope: oss/web-admin (platform field renderer)
 owner: diqi
