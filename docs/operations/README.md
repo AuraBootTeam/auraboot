@@ -2,6 +2,12 @@
 
 Observability assets for AuraBoot platform operators.
 
+## Host-First Goldens
+
+- [OEE Host Golden](oee-host-golden.md) — repeatable local validation for the
+  PCBA OEE dashboard using host PostgreSQL, Greptime, backend, BFF, and Vite
+  without Docker.
+
 ## Learning Loop (ACP, PR-49/51)
 
 Two Micrometer counters are exported by `LearningLoopMetrics` and scraped via

@@ -49,6 +49,20 @@ class OeeFleetServiceTest {
             .build();
     }
 
+    private OeeInputs telemetryEqInputs() {
+        return OeeInputs.builder()
+            .calendarHours(new BigDecimal("10"))
+            .downtimes(List.of(
+                OeeInputs.Downtime.builder().type("planned").hours(new BigDecimal("2")).build(),
+                OeeInputs.Downtime.builder().type("breakdown").hours(new BigDecimal("1")).build()))
+            .actualQty(new BigDecimal("999")).defectQty(new BigDecimal("999"))
+            .capacityPerHour(new BigDecimal("100"))
+            .telemetryOperatingHours(new BigDecimal("6"))
+            .telemetryOutputQty(new BigDecimal("540"))
+            .telemetryGoodQty(new BigDecimal("513"))
+            .build();
+    }
+
     private OeeDataQueryPort fakePort() {
         return new OeeDataQueryPort() {
             @Override
@@ -108,6 +122,34 @@ class OeeFleetServiceTest {
 
         // losses summed across the fleet (eqB contributes 0)
         assertEquals(0, expectedA.getLosses().getBreakdownHours().compareTo(s.getBreakdownHours()));
+    }
+
+    @Test
+    void fleet_withTelemetryInputs_returnsDashboardPercentagesAndDowntimeLosses() {
+        OeeDataQueryPort telemetryPort = new OeeDataQueryPort() {
+            @Override
+            public OeeInputs fetch(OeeRequest req) {
+                return telemetryEqInputs();
+            }
+
+            @Override
+            public List<OeeEquipmentRef> listEquipment(Long tenantId) {
+                return List.of(OeeEquipmentRef.builder().equipmentId("eqT").code("EQ-T").name("Telemetry Line").build());
+            }
+        };
+        OeeFleetService svc = new OeeFleetService(engine, telemetryPort);
+
+        OeeFleetRow row = svc.fleet(1L, start, end).get(0);
+
+        assertEquals("Telemetry Line", row.getName());
+        assertEquals(0, new BigDecimal("75.0").compareTo(row.getAvailabilityPct()));
+        assertEquals(0, new BigDecimal("90.0").compareTo(row.getPerformancePct()));
+        assertEquals(0, new BigDecimal("95.0").compareTo(row.getQualityPct()));
+        assertEquals(0, new BigDecimal("64.1").compareTo(row.getOeePct()));
+        assertEquals(0, new BigDecimal("1").compareTo(row.getBreakdownHours()));
+        assertEquals(0, new BigDecimal("2").compareTo(row.getSetupHours()));
+        assertEquals(0, new BigDecimal("60").compareTo(row.getSpeedLossUnits()));
+        assertEquals(0, new BigDecimal("27").compareTo(row.getProcessDefectUnits()));
     }
 
     @Test

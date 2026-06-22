@@ -43,20 +43,34 @@ public class OeeCalculationEngine {
             }
         }
         BigDecimal loading = calendar.subtract(planned).max(BigDecimal.ZERO);     // loading time = calendar - planned downtime
-        BigDecimal availLoss = unplanned.add(breakdown);
-        BigDecimal operating = loading.subtract(availLoss).max(BigDecimal.ZERO);  // operating time
+
+        // Option A / GreptimeDB convergence (DDR-2026-06-21 D5): when telemetry signals are present,
+        // source availability/performance/quality from the real device run-time/output/good; downtimes
+        // are then used ONLY for the six-big-losses reason breakdown below. Absent telemetry -> legacy
+        // downtime-derived path (backward compatible).
+        boolean telemetry = in.getTelemetryOperatingHours() != null;
+        BigDecimal operating;
+        if (telemetry) {
+            operating = nz(in.getTelemetryOperatingHours()).min(loading);          // measured run-time, capped at loading (<=100%)
+        } else {
+            BigDecimal availLoss = unplanned.add(breakdown);
+            operating = loading.subtract(availLoss).max(BigDecimal.ZERO);          // operating time
+        }
         BigDecimal availability = safeDiv(operating, loading);
 
         BigDecimal theoretical = operating.multiply(nz(in.getCapacityPerHour()));   // theoretical output
-        BigDecimal actual = nz(in.getActualQty());
+        BigDecimal actual = telemetry ? nz(in.getTelemetryOutputQty()) : nz(in.getActualQty());
         BigDecimal performance = safeDiv(actual, theoretical).min(ONE);             // cap 1.0
         BigDecimal speedLoss = theoretical.subtract(actual).max(BigDecimal.ZERO);   // speed loss (pieces)
 
         // setupHours this period = planned downtime (dictionary has no changeover split, see grounding note 5);
         // when pe_downtime_type adds "changeover", split it out here.
 
-        BigDecimal good = actual.subtract(nz(in.getDefectQty())).max(BigDecimal.ZERO);
+        BigDecimal good = telemetry
+            ? nz(in.getTelemetryGoodQty())
+            : actual.subtract(nz(in.getDefectQty())).max(BigDecimal.ZERO);
         BigDecimal quality = safeDiv(good, actual);
+        BigDecimal processDefect = telemetry ? actual.subtract(good).max(BigDecimal.ZERO) : nz(in.getDefectQty());
         BigDecimal oee = availability.multiply(performance).multiply(quality).setScale(SCALE, RoundingMode.HALF_UP);
         BigDecimal teep = oee.multiply(safeDiv(loading, calendar)).setScale(SCALE, RoundingMode.HALF_UP);
 
@@ -65,7 +79,7 @@ public class OeeCalculationEngine {
             .performance(performance).quality(quality).oee(oee).teep(teep)
             .losses(OeeResult.SixBigLosses.builder()
                 .breakdownHours(breakdown).setupHours(planned).minorStopHours(BigDecimal.ZERO)
-                .speedLossUnits(speedLoss).startupDefectUnits(BigDecimal.ZERO).processDefectUnits(nz(in.getDefectQty())).build())
+                .speedLossUnits(speedLoss).startupDefectUnits(BigDecimal.ZERO).processDefectUnits(processDefect).build())
             .build();
     }
 }
