@@ -20,15 +20,15 @@ A **model** represents a business entity. When you define a model and publish it
 
 Every dynamic table includes these columns automatically. You do not define them as fields:
 
-| Column | Type | Purpose |
-|---|---|---|
-| `id` | `BIGINT` | Internal primary key (auto-increment) |
-| `pid` | `VARCHAR(32)` | Public ID (UUID-based, used in APIs and URLs) |
-| `tenant_id` | `BIGINT` | Tenant isolation (auto-injected by the framework) |
-| `created_by` | `VARCHAR(64)` | User who created the record |
-| `created_at` | `TIMESTAMP` | Creation timestamp |
-| `updated_by` | `VARCHAR(64)` | User who last updated the record |
-| `updated_at` | `TIMESTAMP` | Last update timestamp |
+| Column       | Type          | Purpose                                           |
+| ------------ | ------------- | ------------------------------------------------- |
+| `id`         | `BIGINT`      | Internal primary key (auto-increment)             |
+| `pid`        | `VARCHAR(32)` | Public ID (UUID-based, used in APIs and URLs)     |
+| `tenant_id`  | `BIGINT`      | Tenant isolation (auto-injected by the framework) |
+| `created_by` | `VARCHAR(64)` | User who created the record                       |
+| `created_at` | `TIMESTAMP`   | Creation timestamp                                |
+| `updated_by` | `VARCHAR(64)` | User who last updated the record                  |
+| `updated_at` | `TIMESTAMP`   | Last update timestamp                             |
 
 > **Note:** Dynamic tables (`mt_*`) do not have a `deleted_flag` column. AuraBoot uses hard deletes for dynamic models.
 
@@ -57,34 +57,34 @@ Define models in `config/models.json`. Here is the complete schema:
 
 ### Model properties
 
-| Property | Type | Required | Description |
-|---|---|---|---|
-| `code` | `string` | Yes | Unique model identifier. Convention: `{plugin_prefix}_{entity}`. Becomes the table name as `mt_{code}`. |
-| `displayName:zh-CN` | `string` | Yes | Chinese display name for the UI. |
-| `displayName:en` | `string` | Yes | English display name for the UI. |
-| `description` | `string` | No | Human-readable description of the model's purpose. |
-| `modelType` | `string` | Yes | `"entity"` for standard business entities. |
-| `modelCategory` | `string` | Yes | Controls system behavior. See table below. |
-| `extension` | `object` | No | Additional configuration. |
+| Property            | Type     | Required | Description                                                                                             |
+| ------------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| `code`              | `string` | Yes      | Unique model identifier. Convention: `{plugin_prefix}_{entity}`. Becomes the table name as `mt_{code}`. |
+| `displayName:zh-CN` | `string` | Yes      | Chinese display name for the UI.                                                                        |
+| `displayName:en`    | `string` | Yes      | English display name for the UI.                                                                        |
+| `description`       | `string` | No       | Human-readable description of the model's purpose.                                                      |
+| `modelType`         | `string` | Yes      | `"entity"` for standard business entities.                                                              |
+| `modelCategory`     | `string` | Yes      | Controls system behavior. See table below.                                                              |
+| `extension`         | `object` | No       | Additional configuration.                                                                               |
 
 ### Model categories
 
-| Category | Description | System Behavior |
-|---|---|---|
-| `entity` | Standard business entity (Contract, Task) | Basic CRUD, no special behavior |
-| `document` | Document-style entity (Invoice, Order) | Auto-injects activity timeline in detail pages |
-| `master` | Master data (Product, Customer) | Auto-injects activity timeline; typically long-lived records |
-| `config` | Configuration data (Settings, Template) | Used for system configuration |
-| `relation` | Join/bridge table (Many-to-many relations) | Lightweight, no standalone pages |
+| Category   | Description                                | System Behavior                                              |
+| ---------- | ------------------------------------------ | ------------------------------------------------------------ |
+| `entity`   | Standard business entity (Contract, Task)  | Basic CRUD, no special behavior                              |
+| `document` | Document-style entity (Invoice, Order)     | Auto-injects activity timeline in detail pages               |
+| `master`   | Master data (Product, Customer)            | Auto-injects activity timeline; typically long-lived records |
+| `config`   | Configuration data (Settings, Template)    | Used for system configuration                                |
+| `relation` | Join/bridge table (Many-to-many relations) | Lightweight, no standalone pages                             |
 
 ### Extension properties
 
-| Property | Type | Description |
-|---|---|---|
-| `icon` | `string` | Icon name for sidebar menus and headers (e.g., `"Star"`, `"FileText"`) |
-| `category` | `string` | Logical grouping for the model |
-| `titleField` | `string` | Field code displayed as the record's title in lists and references |
-| `subtitleField` | `string` | Field code displayed as a secondary label |
+| Property        | Type     | Description                                                            |
+| --------------- | -------- | ---------------------------------------------------------------------- |
+| `icon`          | `string` | Icon name for sidebar menus and headers (e.g., `"Star"`, `"FileText"`) |
+| `category`      | `string` | Logical grouping for the model                                         |
+| `titleField`    | `string` | Field code displayed as the record's title in lists and references     |
+| `subtitleField` | `string` | Field code displayed as a secondary label                              |
 
 ## Field Types Reference
 
@@ -92,42 +92,42 @@ AuraBoot supports a rich set of field types. Each field type determines the data
 
 ### Quick reference table
 
-| Data Type | DB Column | UI Component | Use Case |
-|---|---|---|---|
-| `string` | `VARCHAR(n)` | Text input | Names, codes, short text |
-| `text` | `TEXT` | Textarea | Descriptions, long content |
-| `integer` | `INTEGER` | Number input | Quantities, counts |
-| `decimal` | `NUMERIC(p,s)` | Number input | Prices, amounts, percentages |
-| `boolean` | `BOOLEAN` | Switch / Checkbox | Toggles, flags |
-| `date` | `DATE` | Date picker | Dates without time |
-| `datetime` | `TIMESTAMP` | DateTime picker | Timestamps with time |
-| `enum` | `VARCHAR` | Select dropdown | Status, priority, category |
-| `reference` | `VARCHAR(32)` | Reference picker | Foreign key to another model |
-| `json` | `JSONB` | Varies | Attachments, structured data |
+| Data Type   | DB Column      | UI Component      | Use Case                     |
+| ----------- | -------------- | ----------------- | ---------------------------- |
+| `string`    | `VARCHAR(n)`   | Text input        | Names, codes, short text     |
+| `text`      | `TEXT`         | Textarea          | Descriptions, long content   |
+| `integer`   | `INTEGER`      | Number input      | Quantities, counts           |
+| `decimal`   | `NUMERIC(p,s)` | Number input      | Prices, amounts, percentages |
+| `boolean`   | `BOOLEAN`      | Switch / Checkbox | Toggles, flags               |
+| `date`      | `DATE`         | Date picker       | Dates without time           |
+| `datetime`  | `TIMESTAMP`    | DateTime picker   | Timestamps with time         |
+| `enum`      | `VARCHAR`      | Select dropdown   | Status, priority, category   |
+| `reference` | `VARCHAR(32)`  | Reference picker  | Foreign key to another model |
+| `json`      | `JSONB`        | Varies            | Attachments, structured data |
 
 ### Render components
 
 Beyond the base data types, fields support specialized UI rendering through `extension.renderComponent`:
 
-| Render Component | Base Type | UI Component | Use Case |
-|---|---|---|---|
-| `richtext` | `text` | Rich text editor (TipTap) | Formatted content with images |
-| `fileattachment` | `json` | File upload widget | Documents, images |
-| `progress` | `integer` | Progress bar | Task completion percentage |
-| `rating` | `integer` | Star rating | Review scores (0-5) |
-| `colorpicker` | `string` | Color swatch picker | Color labels, category colors |
-| `multiselect` | `string` | Multi-select tags | Tags, labels (comma-separated) |
-| `moneyinput` | `decimal` | Currency input | Financial amounts |
-| `cascadeselect` | `string` | Cascading dropdown | Hierarchical categories |
-| `treeselect` | `string` | Tree selector | Department, org hierarchy |
-| `userselect` | `string` | User picker | Assignee, owner |
-| `ownerselect` | `string` | Owner picker (user **or** team) | Record ownership — see [Record ownership](#record-ownership-owner_type--owner_id) |
-| `memberpicker` | `string` | Multi-user picker | Team members |
-| `organizationselect` | `string` | Org unit picker | Department assignment |
-| `timepicker` | `string` | Time picker | Time-of-day values |
-| `daterange` | `string` | Date range picker | Start-end date pairs |
-| `timerangepicker` | `string` | Time range picker | Working hours, shifts |
-| `aifield` | `text` | AI-generated content | Summaries, suggestions |
+| Render Component     | Base Type | UI Component                    | Use Case                                                                          |
+| -------------------- | --------- | ------------------------------- | --------------------------------------------------------------------------------- |
+| `richtext`           | `text`    | Rich text editor (TipTap)       | Formatted content with images                                                     |
+| `fileattachment`     | `json`    | File upload widget              | Documents, images                                                                 |
+| `progress`           | `integer` | Progress bar                    | Task completion percentage                                                        |
+| `rating`             | `integer` | Star rating                     | Review scores (0-5)                                                               |
+| `colorpicker`        | `string`  | Color swatch picker             | Color labels, category colors                                                     |
+| `multiselect`        | `string`  | Multi-select tags               | Tags, labels (comma-separated)                                                    |
+| `moneyinput`         | `decimal` | Currency input                  | Financial amounts                                                                 |
+| `cascadeselect`      | `string`  | Cascading dropdown              | Hierarchical categories                                                           |
+| `treeselect`         | `string`  | Tree selector                   | Department, org hierarchy                                                         |
+| `userselect`         | `string`  | User picker                     | Assignee, owner                                                                   |
+| `ownerselect`        | `string`  | Owner picker (user **or** team) | Record ownership — see [Record ownership](#record-ownership-owner_type--owner_id) |
+| `memberpicker`       | `string`  | Multi-user picker               | Team members                                                                      |
+| `organizationselect` | `string`  | Org unit picker                 | Department assignment                                                             |
+| `timepicker`         | `string`  | Time picker                     | Time-of-day values                                                                |
+| `daterange`          | `string`  | Date range picker               | Start-end date pairs                                                              |
+| `timerangepicker`    | `string`  | Time range picker               | Working hours, shifts                                                             |
+| `aifield`            | `text`    | AI-generated content            | Summaries, suggestions                                                            |
 
 ### Record ownership (owner_type / owner_id)
 
@@ -135,16 +135,16 @@ A platform-generic capability to assign a record to **a user OR a team** (`ab_te
 It is shipped by the `core-ownership` plugin as two reusable, un-prefixed field
 definitions that any model can bind — no per-model field codes:
 
-| Field | Type | Notes |
-|---|---|---|
-| `owner_type` | `enum` (dict `owner_type`: `user` \| `team`) | Discriminator; rendered as a dropdown |
-| `owner_id` | `string` | PID of the owning user or team, interpreted per `owner_type` |
+| Field        | Type                                         | Notes                                                        |
+| ------------ | -------------------------------------------- | ------------------------------------------------------------ |
+| `owner_type` | `enum` (dict `owner_type`: `user` \| `team`) | Discriminator; rendered as a dropdown                        |
+| `owner_id`   | `string`                                     | PID of the owning user or team, interpreted per `owner_type` |
 
 To adopt it on a model: bind `owner_type` + `owner_id`, then in the page DSL render
 `owner_type` as a normal dict select and `owner_id` with `component: "ownerselect"`
 (a segmented user/team picker that reads `owner_type` from the form and writes the
 chosen PID). In lists/detail, render the `owner_id` column with `cellRenderer: "owner"`
-to show 👤 *user name* / 👥 *team name*. Two scalar columns keep ownership indexable
+to show 👤 _user name_ / 👥 _team name_. Two scalar columns keep ownership indexable
 for data-permission filtering ("owned by me or my team"). `crm_lead` is the reference
 consumer.
 
@@ -369,8 +369,18 @@ Stores a value from a predefined dictionary. Maps to `VARCHAR` in PostgreSQL; th
   "dictType": "tree",
   "items": [
     { "value": "electronics", "label": "Electronics", "sortNo": 10 },
-    { "value": "electronics_phone", "label": "Phone", "parentValue": "electronics", "sortNo": 1 },
-    { "value": "electronics_phone_smart", "label": "Smartphone", "parentValue": "electronics_phone", "sortNo": 1 }
+    {
+      "value": "electronics_phone",
+      "label": "Phone",
+      "parentValue": "electronics",
+      "sortNo": 1
+    },
+    {
+      "value": "electronics_phone_smart",
+      "label": "Smartphone",
+      "parentValue": "electronics_phone",
+      "sortNo": 1
+    }
   ]
 }
 ```
@@ -397,13 +407,53 @@ Creates a relationship to another model. Stores the target record's `pid` as a `
 
 **Properties:**
 
-| Property | Description |
-|---|---|
-| `refTarget.targetModel` | The model code of the referenced entity |
-| `refTarget.targetField` | The field to display when rendering the reference (e.g., the name field) |
-| `referenceModelCode` | Alternative shorthand (just the target model code, without display field config) |
+| Property                                          | Description                                                                      |
+| ------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `refTarget.targetModel`                           | The model code of the referenced entity                                          |
+| `refTarget.targetField`                           | The field to display when rendering the reference (e.g., the name field)         |
+| `refTarget.displayField` / `refTarget.labelField` | Optional aliases for the field used as the reference option label                |
+| `referenceModelCode`                              | Alternative shorthand (just the target model code, without display field config) |
 
 **UI:** Renders as a reference picker -- a searchable dropdown that queries the target model. The displayed value comes from `targetField`.
+
+#### Inline create for reference fields
+
+Form pages can opt a `reference` field into inline create. This adds a localized `+ New`
+affordance to the reference picker, opens a quick-create modal for the target model,
+submits through the standard command pipeline, and selects the newly created record
+by `pid`.
+
+Inline create is configured on the **form page field entry**, not in `fields/*.json`:
+
+```json
+{
+  "field": "so_customer_id",
+  "allowCreate": true,
+  "createCommand": "cust:create_customer",
+  "createPageKey": "customer_form",
+  "createPermission": "cust.customer.manage"
+}
+```
+
+Runtime behavior:
+
+- `allowCreate: true` is the feature switch. Existing reference fields are unchanged
+  until a form page field explicitly declares it.
+- `createCommand` defaults to `{targetModel}:create` when omitted.
+- `createPageKey` overrides the target model's quick-create form page. When omitted,
+  the runtime uses `${targetModel}_new`.
+- `createPermission` controls whether the `+ New` affordance is visible. When omitted,
+  the runtime checks the create command code.
+- The modal renders the configured target-model DSL form and executes `createCommand`.
+  On success, the created record's `pid` is written back to the reference field and the
+  target-model option data source is refreshed.
+- `createFields` is reserved for a future trimmed quick-create form. In the current
+  runtime it is accepted by the schema/type layer but **does not filter** the rendered
+  fields; the full configured target-model form is shown.
+
+Inline create applies only to standard model-backed `reference` fields. It is not
+enabled for enum dictionaries, static options, named-query/external API options, or
+reference-like fields that declare an explicit `dataSource`.
 
 **Alternative format:**
 
@@ -433,6 +483,7 @@ Stores structured data as PostgreSQL `JSONB`. Use this for attachments, coordina
 ```
 
 **UI:** The default rendering shows raw JSON. Use render components to provide specialized UIs:
+
 - `fileattachment` -- file upload/download widget
 
 ### TAGS (via multiselect)
@@ -546,11 +597,11 @@ An AI-assisted auto-generated field. Implemented as a `text` field with `renderC
 
 **Extension properties:**
 
-| Property | Description |
-|---|---|
-| `operation` | AI operation type: `"summarize"`, `"translate"`, `"extract"` |
-| `sourceFields` | Array of field codes whose values are sent as context |
-| `maxTokens` | Maximum token limit for the AI response |
+| Property       | Description                                                  |
+| -------------- | ------------------------------------------------------------ |
+| `operation`    | AI operation type: `"summarize"`, `"translate"`, `"extract"` |
+| `sourceFields` | Array of field codes whose values are sent as context        |
+| `maxTokens`    | Maximum token limit for the AI response                      |
 
 ### Specialized Selectors
 
@@ -672,29 +723,29 @@ AuraBoot includes several domain-specific selector components:
 
 The `extension` object on a field provides additional configuration beyond the base data type:
 
-| Extension Property | Type | Description |
-|---|---|---|
-| `renderComponent` | `string` | Override the default UI component (see render components table above) |
-| `readOnly` | `boolean` | Field is display-only, cannot be edited |
-| `precision` | `integer` | For `decimal` fields: total digits (default 14) |
-| `scale` | `integer` | For `decimal` fields: decimal places (default 2) |
-| `currencySymbol` | `string` | For `moneyinput`: currency symbol prefix |
-| `placeholder` | `string` | Input placeholder text |
-| `placeholder:zh-CN` | `string` | Localized placeholder |
-| `multiple` | `boolean` | Allow selecting multiple values |
-| `searchable` | `boolean` | Enable search within the selector |
-| `clearable` | `boolean` | Allow clearing the selection |
-| `allowClear` | `boolean` | Alias for `clearable` |
-| `showHierarchy` | `boolean` | Show hierarchical path in org selectors |
-| `format` | `string` | Display format (e.g., `"HH:mm"` for time pickers) |
-| `minuteStep` | `integer` | Minute increment for time pickers |
-| `levels` | `integer` | Number of cascade levels |
-| `levelLabels` | `string[]` | Labels for each cascade level |
-| `dictCode` | `string` | Dictionary code for cascade/tree selectors |
-| `operation` | `string` | AI field operation type |
-| `sourceFields` | `string[]` | AI field source fields for context |
-| `maxTokens` | `integer` | AI field max response tokens |
-| `defaultZoom` | `integer` | Default zoom level for map pickers |
+| Extension Property  | Type       | Description                                                           |
+| ------------------- | ---------- | --------------------------------------------------------------------- |
+| `renderComponent`   | `string`   | Override the default UI component (see render components table above) |
+| `readOnly`          | `boolean`  | Field is display-only, cannot be edited                               |
+| `precision`         | `integer`  | For `decimal` fields: total digits (default 14)                       |
+| `scale`             | `integer`  | For `decimal` fields: decimal places (default 2)                      |
+| `currencySymbol`    | `string`   | For `moneyinput`: currency symbol prefix                              |
+| `placeholder`       | `string`   | Input placeholder text                                                |
+| `placeholder:zh-CN` | `string`   | Localized placeholder                                                 |
+| `multiple`          | `boolean`  | Allow selecting multiple values                                       |
+| `searchable`        | `boolean`  | Enable search within the selector                                     |
+| `clearable`         | `boolean`  | Allow clearing the selection                                          |
+| `allowClear`        | `boolean`  | Alias for `clearable`                                                 |
+| `showHierarchy`     | `boolean`  | Show hierarchical path in org selectors                               |
+| `format`            | `string`   | Display format (e.g., `"HH:mm"` for time pickers)                     |
+| `minuteStep`        | `integer`  | Minute increment for time pickers                                     |
+| `levels`            | `integer`  | Number of cascade levels                                              |
+| `levelLabels`       | `string[]` | Labels for each cascade level                                         |
+| `dictCode`          | `string`   | Dictionary code for cascade/tree selectors                            |
+| `operation`         | `string`   | AI field operation type                                               |
+| `sourceFields`      | `string[]` | AI field source fields for context                                    |
+| `maxTokens`         | `integer`  | AI field max response tokens                                          |
+| `defaultZoom`       | `integer`  | Default zoom level for map pickers                                    |
 
 ## Field Constraints
 
@@ -713,16 +764,17 @@ Constraints enforce data integrity at both the API and UI levels:
 }
 ```
 
-| Constraint | Applies To | Description |
-|---|---|---|
-| `required` | All types | Field must have a non-null, non-empty value |
-| `maxLength` | `string`, `text` | Maximum character count |
-| `minLength` | `string`, `text` | Minimum character count |
-| `min` | `integer`, `decimal` | Minimum numeric value |
-| `max` | `integer`, `decimal` | Maximum numeric value |
-| `pattern` | `string` | Regular expression the value must match |
+| Constraint  | Applies To           | Description                                 |
+| ----------- | -------------------- | ------------------------------------------- |
+| `required`  | All types            | Field must have a non-null, non-empty value |
+| `maxLength` | `string`, `text`     | Maximum character count                     |
+| `minLength` | `string`, `text`     | Minimum character count                     |
+| `min`       | `integer`, `decimal` | Minimum numeric value                       |
+| `max`       | `integer`, `decimal` | Maximum numeric value                       |
+| `pattern`   | `string`             | Regular expression the value must match     |
 
 Constraints are validated in two places:
+
 1. **Frontend:** Form fields show validation errors inline before submission
 2. **Backend:** The command pipeline's `SCHEMA_VALIDATE` stage rejects invalid data with error messages
 
@@ -739,10 +791,10 @@ The `feature` object controls search and sort behavior:
 }
 ```
 
-| Feature | Description |
-|---|---|
+| Feature      | Description                                                      |
+| ------------ | ---------------------------------------------------------------- |
 | `searchable` | Field appears in filter panels and is included in keyword search |
-| `sortable` | Column header is clickable for sort-by in list views |
+| `sortable`   | Column header is clickable for sort-by in list views             |
 
 ## Field Bindings
 
@@ -769,14 +821,14 @@ Bindings connect fields to models and control their presentation order, visibili
 ]
 ```
 
-| Property | Type | Description |
-|---|---|---|
-| `modelCode` | `string` | The model this binding belongs to |
-| `fieldCode` | `string` | The field being bound |
-| `sequence` | `integer` | Display order (lower = first) |
-| `required` | `boolean` | Override the field's required constraint for this model |
-| `visible` | `boolean` | Whether the field appears in default views |
-| `editable` | `boolean` | Whether the field can be edited (set `false` for auto-generated fields like `sc_code`) |
+| Property    | Type      | Description                                                                            |
+| ----------- | --------- | -------------------------------------------------------------------------------------- |
+| `modelCode` | `string`  | The model this binding belongs to                                                      |
+| `fieldCode` | `string`  | The field being bound                                                                  |
+| `sequence`  | `integer` | Display order (lower = first)                                                          |
+| `required`  | `boolean` | Override the field's required constraint for this model                                |
+| `visible`   | `boolean` | Whether the field appears in default views                                             |
+| `editable`  | `boolean` | Whether the field can be edited (set `false` for auto-generated fields like `sc_code`) |
 
 ## Relations
 
@@ -896,12 +948,12 @@ Commands can automatically set field values during execution:
 }
 ```
 
-| Strategy | Description | Config |
-|---|---|---|
-| `auto_generate` | Generate a sequential code | `pattern`: template with `{yyyyMMdd}` (date), `{seq}` (auto-increment) |
-| `current_datetime` | Set to the current timestamp | None |
-| `current_user` | Set to the current user's ID | None |
-| `fixed_value` | Set to a constant value | `value`: the constant |
+| Strategy           | Description                  | Config                                                                 |
+| ------------------ | ---------------------------- | ---------------------------------------------------------------------- |
+| `auto_generate`    | Generate a sequential code   | `pattern`: template with `{yyyyMMdd}` (date), `{seq}` (auto-increment) |
+| `current_datetime` | Set to the current timestamp | None                                                                   |
+| `current_user`     | Set to the current user's ID | None                                                                   |
+| `fixed_value`      | Set to a constant value      | `value`: the constant                                                  |
 
 ## Best Practices
 
@@ -913,26 +965,26 @@ Commands can automatically set field values during execution:
 
 ### Choosing the right field type
 
-| Scenario | Recommended Type |
-|---|---|
-| Short text (< 500 chars) | `string` |
-| Long text, descriptions | `text` |
-| Formatted content (HTML) | `text` + `renderComponent: "richtext"` |
-| Whole numbers | `integer` |
-| Currency, prices | `decimal` + `renderComponent: "moneyinput"` |
-| Percentages, progress | `integer` + `renderComponent: "progress"` |
-| Yes/No toggles | `boolean` |
-| Dates | `date` |
-| Timestamps | `datetime` |
-| Fixed set of options | `enum` + dictionary |
-| Foreign key to another entity | `reference` |
-| File uploads | `json` + `renderComponent: "fileattachment"` |
-| Tags / multi-select labels | `string` + `renderComponent: "multiselect"` |
-| Star ratings (1-5) | `integer` + `renderComponent: "rating"` |
-| Color codes | `string` + `renderComponent: "colorpicker"` |
-| People assignment | `string` + `renderComponent: "userselect"` |
-| Department/org | `string` + `renderComponent: "organizationselect"` |
-| Hierarchical categories | `string` + `renderComponent: "cascadeselect"` |
+| Scenario                      | Recommended Type                                   |
+| ----------------------------- | -------------------------------------------------- |
+| Short text (< 500 chars)      | `string`                                           |
+| Long text, descriptions       | `text`                                             |
+| Formatted content (HTML)      | `text` + `renderComponent: "richtext"`             |
+| Whole numbers                 | `integer`                                          |
+| Currency, prices              | `decimal` + `renderComponent: "moneyinput"`        |
+| Percentages, progress         | `integer` + `renderComponent: "progress"`          |
+| Yes/No toggles                | `boolean`                                          |
+| Dates                         | `date`                                             |
+| Timestamps                    | `datetime`                                         |
+| Fixed set of options          | `enum` + dictionary                                |
+| Foreign key to another entity | `reference`                                        |
+| File uploads                  | `json` + `renderComponent: "fileattachment"`       |
+| Tags / multi-select labels    | `string` + `renderComponent: "multiselect"`        |
+| Star ratings (1-5)            | `integer` + `renderComponent: "rating"`            |
+| Color codes                   | `string` + `renderComponent: "colorpicker"`        |
+| People assignment             | `string` + `renderComponent: "userselect"`         |
+| Department/org                | `string` + `renderComponent: "organizationselect"` |
+| Hierarchical categories       | `string` + `renderComponent: "cascadeselect"`      |
 
 ### Indexing tips
 

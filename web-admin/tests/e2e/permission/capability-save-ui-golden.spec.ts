@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { BASE_URL } from '../../helpers/environments';
 
 /**
  * Regression guard for the snowflake-id precision bug (fixed in #993): capability save must work when
@@ -10,7 +11,7 @@ import { test, expect, type Page } from '@playwright/test';
  */
 
 const SHOTS = 'test-results/rbac-capability-save';
-const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5158';
+const BASE = BASE_URL;
 
 async function createRole(page: Page) {
   const code = `e2e_capsave_${Date.now()}`;

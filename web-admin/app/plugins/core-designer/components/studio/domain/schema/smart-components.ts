@@ -124,6 +124,12 @@ export interface SelectProps extends FormFieldProps {
   variant?: 'default' | 'outline' | 'filled';
   maxTagCount?: number;
   allowCreate?: boolean;
+  /** When true, render a "+ create" affordance that calls onCreateNew (single-select: sentinel item; multi-select: action button). */
+  canCreateNew?: boolean;
+  /** Override label for the create affordance. Defaults to a translated "+ 新建". */
+  createNewLabel?: string;
+  /** Called when the user activates the create affordance. */
+  onCreateNew?: () => void;
 }
 
 // SmartRadio 属性

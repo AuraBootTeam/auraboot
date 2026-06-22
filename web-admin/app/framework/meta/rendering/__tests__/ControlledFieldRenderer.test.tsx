@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const capturedPropsSpy = vi.fn();
@@ -143,6 +143,7 @@ describe('ControlledFieldRenderer', () => {
     expect(capturedPropsSpy).toHaveBeenCalledTimes(1);
     expect(capturedPropsSpy.mock.calls[0]?.[0]?.props?.dataSource).toEqual({
       type: 'api',
+      modelCode: 'sys_user',
       endpoint: '/api/admin/users/search',
       method: 'get',
       params: { size: 200 },
@@ -198,6 +199,7 @@ describe('ControlledFieldRenderer', () => {
 
     expect(capturedPropsSpy.mock.calls[0]?.[0]?.props?.dataSource).toEqual({
       type: 'api',
+      modelCode: 'crm_account',
       endpoint: '/api/dynamic/crm_account/list',
       method: 'get',
       params: { pageNum: 1, pageSize: 200 },
@@ -255,6 +257,7 @@ describe('ControlledFieldRenderer', () => {
 
     expect(capturedPropsSpy.mock.calls[0]?.[0]?.props?.dataSource).toEqual({
       type: 'api',
+      modelCode: 'bom_manufacturer_part',
       endpoint: '/api/dynamic/bom_manufacturer_part/list',
       method: 'get',
       params: { pageNum: 1, pageSize: 500, sortField: 'created_at', sortOrder: 'desc' },
@@ -263,6 +266,126 @@ describe('ControlledFieldRenderer', () => {
       labelField: 'bom_mp_mpn',
       autoFetch: true,
     });
+  });
+
+  it('wires permitted reference inline-create through controlled form fields', async () => {
+    vi.resetModules();
+    const onChange = vi.fn();
+    const setFormFieldValue = vi.fn();
+    const executeCommand = vi.fn();
+    const manager = {
+      getDataSourceIdsByModel: vi.fn(() => ['ds_customer_options']),
+      getState: vi.fn(() => ({ data: [{ value: 'OLD', label: 'Old Customer' }] })),
+      setData: vi.fn(),
+      reload: vi.fn().mockResolvedValue(undefined),
+    };
+    const dialogProps: Record<string, any> = {};
+
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return (
+          <button
+            data-testid="open-create"
+            onClick={() => (props.onCreateNew as (() => void) | undefined)?.()}
+          >
+            open
+          </button>
+        );
+      },
+    }));
+    vi.doMock('~/contexts/AuthContext', () => ({
+      usePermission: (code: string) => code === 'e2et.customer.manage',
+    }));
+    vi.doMock('~/framework/meta/hooks/useActionHandler', () => ({
+      useActionHandler: () => ({ executeCommand }),
+    }));
+    vi.doMock('~/framework/meta/contexts/DataSourceContext', () => ({
+      useDataSourceManagerOptional: () => manager,
+    }));
+    vi.doMock('~/framework/meta/runtime/reference-create/ReferenceCreateDialog', () => ({
+      ReferenceCreateDialog: (props: Record<string, any>) => {
+        Object.assign(dialogProps, props);
+        return props.open ? (
+          <button
+            data-testid="complete-create"
+            onClick={() => props.onCreated({ value: 'CUST-1', label: 'Acme' })}
+          >
+            complete
+          </button>
+        ) : null;
+      },
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'e2et_order_customer',
+            component: 'SmartSelect',
+            dataType: 'reference',
+            allowCreate: true,
+            createCommand: 'e2et:create_customer',
+            createPageKey: 'e2et_customer_form',
+            createPermission: 'e2et.customer.manage',
+            refTarget: {
+              targetModel: 'e2et_customer',
+              targetField: 'e2et_cust_name',
+            },
+          } as any
+        }
+        value={undefined}
+        onChange={onChange}
+        context={
+          {
+            locale: 'zh-CN',
+            t: (key: string) => key,
+            __setFormFieldValue: setFormFieldValue,
+          } as any
+        }
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('open-create')).toBeInTheDocument();
+    });
+
+    const props = capturedPropsSpy.mock.calls[0]?.[0]?.props;
+    expect(props?.canCreateNew).toBe(true);
+    expect(props?.dataSource).toMatchObject({
+      modelCode: 'e2et_customer',
+      endpoint: '/api/dynamic/e2et_customer/list',
+      labelField: 'e2et_cust_name',
+    });
+
+    act(() => {
+      (props?.onCreateNew as () => void)();
+    });
+    fireEvent.click(screen.getByTestId('complete-create'));
+
+    expect(dialogProps).toMatchObject({
+      targetModel: 'e2et_customer',
+      createPageKey: 'e2et_customer_form',
+      createCommand: 'e2et:create_customer',
+      displayField: 'e2et_cust_name',
+      executeCommand,
+    });
+    expect(onChange).toHaveBeenCalledWith('CUST-1');
+    expect(setFormFieldValue).toHaveBeenCalledWith('e2et_order_customer', 'CUST-1');
+    expect(manager.getDataSourceIdsByModel).toHaveBeenCalledWith('e2et_customer');
+    expect(manager.setData).toHaveBeenCalledWith('ds_customer_options', [
+      { value: 'CUST-1', label: 'Acme' },
+      { value: 'OLD', label: 'Old Customer' },
+    ]);
+    expect(manager.reload).toHaveBeenCalledWith(['ds_customer_options']);
   });
 
   it('rehydrates stringified daterange values for edit mode', async () => {

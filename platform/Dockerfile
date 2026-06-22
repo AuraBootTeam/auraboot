@@ -7,10 +7,17 @@ FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /app
 
+# SmartEngine fork artifacts only exist in Maven local. The Docker build runs
+# in a clean image, so install the tagged fork before Gradle resolves deps.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates git maven && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy Gradle wrapper and config (cache dependencies layer)
 COPY gradlew gradlew
 COPY gradle gradle
 COPY build.gradle settings.gradle gradle.properties ./
+COPY scripts/install-smartengine-maven-local.sh scripts/install-smartengine-maven-local.sh
 
 # Copy subproject build files for dependency resolution
 COPY platform-plugin-api/build.gradle platform-plugin-api/build.gradle
@@ -20,11 +27,15 @@ COPY platform-storage-oss/build.gradle platform-storage-oss/build.gradle
 COPY platform-mq-kafka/build.gradle platform-mq-kafka/build.gradle
 COPY platform-mq-rabbitmq/build.gradle platform-mq-rabbitmq/build.gradle
 
-RUN chmod +x gradlew
+RUN chmod +x gradlew scripts/install-smartengine-maven-local.sh
+
+RUN --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
+    ./scripts/install-smartengine-maven-local.sh
 
 # Download dependencies (cached unless build files change)
 RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
+    --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
     ./gradlew dependencies --no-daemon || true
 
 # Copy source code
@@ -37,6 +48,7 @@ COPY vendor* ./vendor/
 # Build the application (skip tests for faster builds)
 RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
+    --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
     ./gradlew bootJar --no-daemon -x test
 
 # ── Stage 2: Runtime ────────────────────────────────────────
