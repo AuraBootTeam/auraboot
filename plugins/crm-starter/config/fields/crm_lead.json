@@ -82,6 +82,29 @@
     "constraints": { "maxLength": 200 }
   },
   {
+    "code": "owner_type",
+    "displayName:zh-CN": "分配类型",
+    "displayName:en": "Assign To",
+    "dataType": "enum",
+    "dictCode": "owner_type",
+    "defaultValue": "user"
+  },
+  {
+    "code": "owner_id",
+    "displayName:zh-CN": "分配给",
+    "displayName:en": "Assignee",
+    "dataType": "reference",
+    "refTarget": {
+      "targetModel": "ab_user",
+      "targetField": "user_name"
+    },
+    "extension": {
+      "renderComponent": "ownerselect",
+      "placeholder:zh-CN": "请选择负责人",
+      "placeholder:en": "Select assignee"
+    }
+  },
+  {
     "code": "crm_lead_lost_reason",
     "displayName:zh-CN": "丢失原因",
     "displayName:en": "Lost Reason",
