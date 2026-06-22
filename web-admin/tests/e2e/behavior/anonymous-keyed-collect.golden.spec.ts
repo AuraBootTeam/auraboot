@@ -33,11 +33,12 @@ import { PSQL_BASE, PG_ENV, BACKEND_URL } from '../../helpers/environments';
 
 const DIST = path.resolve(process.cwd(), 'packages/track/dist/aura-track.global.js');
 const KEYED_URL = `${BACKEND_URL}/api/collect/keyed`;
+const E2E_PG_ENV = { ...PG_ENV, PGPASSWORD: PG_ENV.PGPASSWORD ?? 'auraboot' };
 
 function psql(sql: string): string {
   return execSync(`${PSQL_BASE} -P pager=off -t -A -c "${sql.replace(/"/g, '\\"')}"`, {
     encoding: 'utf-8',
-    env: { ...PG_ENV, PGPASSWORD: process.env.PGPASSWORD ?? 'auraboot' },
+    env: E2E_PG_ENV,
     timeout: 10_000,
   }).trim();
 }
@@ -125,7 +126,7 @@ test.describe.serial('Anonymous Keyed Collect — End-to-End Golden (SP4)', () =
       '../platform/src/main/resources/db/migration/core/V20260620000200__behavior_event_store.sql',
     );
     execSync(`${PSQL_BASE} -P pager=off -q -f '${migration}'`, {
-      env: { ...PG_ENV, PGPASSWORD: process.env.PGPASSWORD ?? 'auraboot' },
+      env: E2E_PG_ENV,
       timeout: 15_000,
     });
 
