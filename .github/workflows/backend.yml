@@ -47,7 +47,7 @@ jobs:
           fi
 
           if git diff --name-only "$base" "$head" \
-            | grep -E '^(platform/|\.github/workflows/backend\.yml)' >/dev/null; then
+            | grep -E '^(platform/|scripts/install-smartengine-local\.sh|\.github/workflows/backend\.yml)' >/dev/null; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -81,6 +81,10 @@ jobs:
       - name: schema.sql syntax + apply gate
         if: steps.changes.outputs.run == 'true'
         run: scripts/check-schema-sql.sh
+
+      - name: Install SmartEngine fork into Maven local
+        if: steps.changes.outputs.run == 'true'
+        run: bash scripts/install-smartengine-local.sh
 
       - name: Compile (main + test sources)
         if: steps.changes.outputs.run == 'true'
