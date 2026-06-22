@@ -16,6 +16,7 @@ import { execSync } from 'node:child_process';
 import { PSQL_BASE, PG_ENV, BACKEND_URL } from '../../helpers/environments';
 
 const KEYED_URL = `${BACKEND_URL}/api/collect/keyed`;
+const E2E_PG_ENV = { ...PG_ENV, PGPASSWORD: PG_ENV.PGPASSWORD ?? 'auraboot' };
 
 function sh(command: string): string {
   return execSync(command, { encoding: 'utf-8', timeout: 15_000 }).trim();
@@ -24,7 +25,7 @@ function sh(command: string): string {
 function psql(sql: string): string {
   return execSync(`${PSQL_BASE} -P pager=off -t -A -c "${sql.replace(/"/g, '\\"')}"`, {
     encoding: 'utf-8',
-    env: { ...PG_ENV, PGPASSWORD: process.env.PGPASSWORD ?? 'auraboot' },
+    env: E2E_PG_ENV,
     timeout: 10_000,
   }).trim();
 }
