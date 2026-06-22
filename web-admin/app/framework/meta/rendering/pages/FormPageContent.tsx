@@ -838,8 +838,43 @@ export function FormPageContent(props: PageContentProps) {
       t: (key: string) => t(key),
       fetchResult,
       __dataSourceManager: dataSourceManager,
+      __pageKey: (schema as any)?.pageKey,
+      __modelCode: (schema as any)?.modelCode || tableName,
+      __setFormFieldValue: (fieldCode: string, value: unknown) => {
+        dirtyFieldsRef.current.add(fieldCode);
+        setFormData((prev) => {
+          if (prev[fieldCode] === value) return prev;
+          return {
+            ...prev,
+            [fieldCode]: value,
+          };
+        });
+      },
     });
   }, [locale, t, formData, dataSourceManager, user, permissions, mode]);
+
+  useEffect(() => {
+    const expectedPageKey = (schema as any)?.pageKey;
+    const expectedModelCode = (schema as any)?.modelCode || tableName;
+    const handleReferenceCreated = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail || {};
+      if (detail.pageKey && detail.pageKey !== expectedPageKey) return;
+      if (detail.modelCode && detail.modelCode !== expectedModelCode) return;
+      if (!detail.fieldCode) return;
+      dirtyFieldsRef.current.add(String(detail.fieldCode));
+      setFormData((prev) => {
+        if (prev[detail.fieldCode] === detail.value) return prev;
+        return {
+          ...prev,
+          [detail.fieldCode]: detail.value,
+        };
+      });
+    };
+    window.addEventListener('aura:reference-field-created', handleReferenceCreated);
+    return () => {
+      window.removeEventListener('aura:reference-field-created', handleReferenceCreated);
+    };
+  }, [schema, tableName]);
 
   const [mainRecordLoaded, setMainRecordLoaded] = useState(!isEditMode);
   const fieldDataTypesRef = useRef<Record<string, string>>({});

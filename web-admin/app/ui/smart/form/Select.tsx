@@ -35,6 +35,8 @@ const variantStyles = fieldVariantStyles;
 
 const EMPTY_OPTIONS: SelectProps['options'] = [];
 
+export const CREATE_NEW_VALUE = '__aura_create_new__';
+
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   (
     {
@@ -63,6 +65,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       onChange,
       onBlur,
       onClear,
+      canCreateNew = false,
+      createNewLabel,
+      onCreateNew,
       className,
       ...restProps
     },
@@ -142,6 +147,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 
     // Radix Select value change handler (single-select mode)
     const handleRadixValueChange = (newValue: string) => {
+      if (newValue === CREATE_NEW_VALUE) {
+        onCreateNew?.();
+        return;
+      }
+      if (newValue === '' && field.value != null && String(field.value) !== '') {
+        return;
+      }
       field.setValue(newValue);
     };
 
@@ -206,6 +218,21 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                   {option.label}
                 </SelectItem>
               ))}
+              {canCreateNew && (
+                <SelectItem
+                  key={CREATE_NEW_VALUE}
+                  value={CREATE_NEW_VALUE}
+                  data-testid={`select-create-new-${name}`}
+                  className="font-medium text-[var(--accent,#2563eb)]"
+                >
+                  {createNewLabel ??
+                    (t('action.createNew') !== 'action.createNew'
+                      ? t('action.createNew')
+                      : locale === 'zh-CN'
+                        ? '+ 新建'
+                        : '+ New')}
+                </SelectItem>
+              )}
             </SelectContent>
           </BaseSelect>
           {/* Clear button overlaid on trigger */}
@@ -264,6 +291,23 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                     strokeLinejoin="round"
                     strokeWidth={2}
                     d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </FieldActionButton>
+            )}
+            {canCreateNew && !disabledValue && !loading && (
+              <FieldActionButton
+                type="button"
+                onClick={() => onCreateNew?.()}
+                data-testid={`select-create-new-${name}`}
+                iconOnly
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
                   />
                 </svg>
               </FieldActionButton>

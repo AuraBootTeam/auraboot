@@ -185,8 +185,13 @@ export function useFieldDataSource({
       ...dataSource,
     };
 
-    // 注册数据源
-    manager.register(dsId, dsConfig);
+    // Register model-scoped inline sources so same-model mutations can reload them.
+    const modelCode = (dsConfig as any).modelCode;
+    if (modelCode && typeof (manager as any).registerWithModel === 'function') {
+      (manager as any).registerWithModel(dsId, dsConfig, String(modelCode));
+    } else {
+      manager.register(dsId, dsConfig);
+    }
 
     // 订阅数据源变化
     const unsubscribe = manager.subscribe(dsId, (state: any) => {
