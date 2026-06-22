@@ -34,10 +34,7 @@ import { PSQL_BASE, PG_ENV, BACKEND_URL } from '../../helpers/environments';
 function psql(sql: string): string {
   return execSync(`${PSQL_BASE} -P pager=off -t -A -c "${sql.replace(/"/g, '\\"')}"`, {
     encoding: 'utf-8',
-    env: {
-      ...PG_ENV,
-      PGPASSWORD: process.env.PGPASSWORD ?? 'auraboot',
-    },
+    env: PG_ENV,
     timeout: 10_000,
   }).trim();
 }

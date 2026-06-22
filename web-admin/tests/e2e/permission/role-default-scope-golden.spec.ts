@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { BASE_URL } from '../../helpers/environments';
 
 /**
  * Permission v2 ② — role-level default data scope golden.
@@ -10,7 +11,7 @@ import { test, expect, type Page } from '@playwright/test';
  */
 
 const SHOTS = 'test-results/rbac-default-scope';
-const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5158';
+const BASE = BASE_URL;
 
 async function createRole(page: Page) {
   const code = `e2e_defscope_${Date.now()}`;
