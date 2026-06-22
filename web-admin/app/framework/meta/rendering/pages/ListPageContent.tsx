@@ -93,6 +93,11 @@ import {
 import { savedViewService } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
+import {
+  buildCommandTargetParams,
+  getLegacyCompatibleRecordPid,
+  getPublicRecordKey,
+} from '~/framework/meta/utils/publicRecordId';
 
 // Dict data item type
 interface DictItem {
@@ -524,7 +529,7 @@ function ListPageContentInner(props: PageContentProps) {
   // T9 — ids of the rows currently loaded on this page (cross-page selection
   // accumulates across these as the user pages).
   const pageRowIds = useMemo(
-    () => data.map((r) => r.pid || r.id || '').filter(Boolean) as string[],
+    () => data.map((row) => getPublicRecordKey(row) || '').filter(Boolean) as string[],
     [data],
   );
   const allMatchingSelected = selectionIsAllMatching(selectionState);
@@ -1724,7 +1729,7 @@ function ListPageContentInner(props: PageContentProps) {
             const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
               method: 'post',
               params: {
-                targetRecordId: id,
+                ...buildCommandTargetParams(id),
                 payload: {},
                 operationType: 'UPDATE',
               },
@@ -1954,8 +1959,8 @@ function ListPageContentInner(props: PageContentProps) {
   // Inline edit: save a single field value via dynamic data PUT API
   const handleInlineSave = useCallback(
     async (field: string, value: any, record: Record<string, any>) => {
-      const pid = record.pid || record.id;
-      if (!pid) throw new Error('Record has no pid/id');
+      const pid = getLegacyCompatibleRecordPid(record);
+      if (!pid) throw new Error('Record has no public pid');
       const slug = schema?.modelCode || tableName;
       const result = await fetchResult<any>(`/api/dynamic/${slug}/${pid}`, {
         method: 'put',
@@ -3762,7 +3767,7 @@ function ListPageContentInner(props: PageContentProps) {
               onGanttTaskClick={navigateToRecordView}
               onOpenViewConfig={() => setViewManageOpen(true)}
               onSwitchToTableView={() => setActiveViewType('table')}
-              onCardClick={(card) => navigateToRecordView((card as any).pid || (card as any).id)}
+              onCardClick={(card) => navigateToRecordView(getLegacyCompatibleRecordPid(card))}
               onEventClick={navigateToRecordView}
               onGalleryCardClick={navigateToRecordView}
               onTreeNodeClick={navigateToRecordView}

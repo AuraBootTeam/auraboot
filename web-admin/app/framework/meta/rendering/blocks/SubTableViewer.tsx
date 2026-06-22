@@ -39,6 +39,10 @@ import {
   type DateTimeFormatPreferences,
 } from '~/shared/services/dateTimeFormatService';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from '~/framework/meta/rendering/pages/utils/visibleWhen';
+import {
+  buildCommandTargetParams,
+  getLegacyCompatibleRecordPid,
+} from '~/framework/meta/utils/publicRecordId';
 
 export interface SubTableViewerProps {
   config: SubTableConfig;
@@ -490,7 +494,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
         const result = await fetchResult(`/api/meta/commands/execute/${config.commands.delete}`, {
           method: 'post',
           params: {
-            targetRecordId: rowPid,
+            ...buildCommandTargetParams(rowPid),
             operationType: 'delete',
           },
           token,
@@ -541,7 +545,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   }, []);
 
   const interpolateRowPath = useCallback((raw: string, row: Record<string, any>): string => {
-    const rowId = row.pid || row.id || '';
+    const rowId = getLegacyCompatibleRecordPid(row) || '';
     let value = raw.replace(/\{(\w+)\}/g, (_: string, field: string) => {
       if (field === 'pid' || field === 'id') return encodeURIComponent(String(rowId));
       return encodeURIComponent(String(row[field] ?? ''));
@@ -558,7 +562,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   const resolveNavigatePath = useCallback(
     (target: string, row: Record<string, any>): string => {
-      const rowId = row.pid || row.id;
+      const rowId = getLegacyCompatibleRecordPid(row);
       if (target.startsWith('/')) return interpolateRowPath(target, row);
 
       const lastUnderscoreIdx = target.lastIndexOf('_');
@@ -610,7 +614,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   const handleRowAction = useCallback(
     async (button: ButtonConfig, row: Record<string, any>, rowIndex: number) => {
-      const rowPid = row.pid || row.id;
+      const rowPid = getLegacyCompatibleRecordPid(row);
       const actionDef = button.action && typeof button.action === 'object' ? button.action : null;
       const actionType = (actionDef as any)?.type || (button.commandCode ? 'command' : null);
       if (actionType === 'navigate') {
@@ -644,7 +648,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
         const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
           method: 'post',
           params: {
-            targetRecordId: rowPid,
+            ...buildCommandTargetParams(rowPid),
             payload: row,
             operationType: actionType === 'state_transition' ? 'UPDATE' : 'update',
           },
@@ -672,7 +676,8 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   const handleStartEdit = useCallback(
     (row: Record<string, any>) => {
       if (!canInlineEdit) return;
-      const rowId = row.pid || String(row.id);
+      const rowId = getLegacyCompatibleRecordPid(row);
+      if (!rowId) return;
       const values: Record<string, any> = {};
       for (const col of config.columns) {
         values[col.field] = row[col.field] ?? '';
@@ -714,7 +719,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     // Cross-row validation (merge edited row into full dataset)
     if (config.crossRowRules && config.crossRowRules.length > 0) {
       const mergedRows = rows.map((r) => {
-        if ((r.pid || String(r.id)) === editingRowId) {
+        if (getLegacyCompatibleRecordPid(r) === editingRowId) {
           return { ...r, ...editingValues };
         }
         return r;
@@ -745,7 +750,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       const result = await fetchResult(`/api/meta/commands/execute/${config.commands.update}`, {
         method: 'post',
         params: {
-          targetRecordId: editingRowId,
+          ...buildCommandTargetParams(editingRowId),
           payload: changed,
           operationType: 'update',
         },
@@ -1103,7 +1108,8 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                                 return isRowActionVisible(button, row);
                               })
                               .map((button) => {
-                                const loadingKey = `${row.pid || row.id}:${button.code}:${rowIndex}`;
+                                const rowPid = getLegacyCompatibleRecordPid(row);
+                                const loadingKey = `${rowPid || rowIndex}:${button.code}:${rowIndex}`;
                                 const isLoading = rowActionLoadingKey === loadingKey;
                                 const disabled =
                                   !!editingRowId || isLoading || isRowActionDisabled(button, row);
@@ -1151,12 +1157,14 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                             )}
                             {config.commands?.delete && (
                               <button
-                                onClick={() => handleDeleteRow(row.pid)}
-                                disabled={deletingId === row.pid || !!editingRowId}
+                                onClick={() => handleDeleteRow(getLegacyCompatibleRecordPid(row) || '')}
+                                disabled={
+                                  deletingId === getLegacyCompatibleRecordPid(row) || !!editingRowId
+                                }
                                 data-testid={`subtable-delete-${rowIndex}`}
                                 className="text-status-red text-xs hover:text-red-700 disabled:opacity-50"
                               >
-                                {deletingId === row.pid
+                                {deletingId === getLegacyCompatibleRecordPid(row)
                                   ? '...'
                                   : t('common.delete') !== 'common.delete'
                                     ? t('common.delete')
