@@ -32,6 +32,9 @@ function psql(sql: string): string {
     timeout: 10_000,
   }).trim();
 }
+function sqlLit(s: string): string {
+  return s.replace(/'/g, "''");
+}
 
 function isDevNoise(text: string): boolean {
   return /Outdated Optimize Dep|Failed to fetch dynamically imported module|504 |Loading chunk|entry\.client|Importing a module script failed|HMR|[Vv]ite|websocket|favicon/i.test(text);
@@ -78,11 +81,11 @@ test.describe('Site Key Registry — Admin DSL Page Golden', () => {
     await page.screenshot({ path: 'test-results/sitekey-02-form.png', fullPage: true });
     await page.getByTestId('form-btn-submit').click();
 
+    // Form redirects back to the list on success; navigate explicitly to be safe.
     await expect.poll(
-      () => psql(`SELECT COUNT(*) FROM mt_behavior_site_key WHERE name='${unique.replace(/'/g, "''")}'`),
+      () => psql(`SELECT COUNT(*) FROM mt_behavior_site_key WHERE name='${sqlLit(unique)}'`),
       { timeout: 15_000, message: 'created site-key row persisted' },
     ).toBe('1');
-    // Form redirects back to the list on success; navigate explicitly to be safe.
     await page.goto(LIST_URL, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle').catch(() => null);
 
@@ -94,15 +97,15 @@ test.describe('Site Key Registry — Admin DSL Page Golden', () => {
     await page.screenshot({ path: 'test-results/sitekey-03-created.png', fullPage: true });
 
     // ── STEP 4: DB proof — row persisted with a non-null abk_ key ──────────────
-    const dbKey = psql(`SELECT site_key FROM mt_behavior_site_key WHERE name='${unique.replace(/'/g, "''")}'`);
+    const dbKey = psql(`SELECT site_key FROM mt_behavior_site_key WHERE name='${sqlLit(unique)}'`);
     expect(dbKey, 'DB row has a server-generated abk_ key the user never typed').toMatch(/^abk_[0-9A-Za-z]{20,}$/);
-    const dbStatus1 = psql(`SELECT status FROM mt_behavior_site_key WHERE name='${unique.replace(/'/g, "''")}'`);
+    const dbStatus1 = psql(`SELECT status FROM mt_behavior_site_key WHERE name='${sqlLit(unique)}'`);
     expect(dbStatus1).toBe('active');
 
     // ── STEP 5: disable via row action → confirm → status flips ────────────────
     await disableRow(page, row);
     await expect.poll(
-      () => psql(`SELECT status FROM mt_behavior_site_key WHERE name='${unique.replace(/'/g, "''")}'`),
+      () => psql(`SELECT status FROM mt_behavior_site_key WHERE name='${sqlLit(unique)}'`),
       { timeout: 15_000, message: 'site-key row disabled in DB' },
     ).toBe('disabled');
     await page.goto(LIST_URL, { waitUntil: 'domcontentloaded' });
@@ -113,7 +116,7 @@ test.describe('Site Key Registry — Admin DSL Page Golden', () => {
     await page.screenshot({ path: 'test-results/sitekey-04-disabled.png', fullPage: true });
 
     // ── STEP 6: DB proof — status disabled ─────────────────────────────────────
-    const dbStatus2 = psql(`SELECT status FROM mt_behavior_site_key WHERE name='${unique.replace(/'/g, "''")}'`);
+    const dbStatus2 = psql(`SELECT status FROM mt_behavior_site_key WHERE name='${sqlLit(unique)}'`);
     expect(dbStatus2).toBe('disabled');
 
     // ── STEP 7: zero product console errors ────────────────────────────────────

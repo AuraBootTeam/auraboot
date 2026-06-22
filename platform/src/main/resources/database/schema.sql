@@ -1589,13 +1589,19 @@ CREATE TABLE IF NOT EXISTS ab_command_audit_log (
     phase_reached TEXT,
     phase_timings JSONB,
     ip_address TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    trace_id VARCHAR(36),
+    span_id VARCHAR(36)
 );
+
+COMMENT ON COLUMN ab_command_audit_log.trace_id IS 'OTel W3C traceId (32-hex) of the request; correlates audit -> distributed trace';
 
 CREATE INDEX IF NOT EXISTS idx_cmd_audit_tenant_code
     ON ab_command_audit_log(tenant_id, command_code, created_at);
 CREATE INDEX IF NOT EXISTS idx_cmd_audit_success
     ON ab_command_audit_log(tenant_id, success, created_at);
+CREATE INDEX IF NOT EXISTS idx_ab_command_audit_log_trace_id
+    ON ab_command_audit_log(trace_id) WHERE trace_id IS NOT NULL;
 
 -- =====================================================================
 -- Outbox Pattern (P1-4)
@@ -5362,6 +5368,78 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_rule_tenant_code
 CREATE INDEX IF NOT EXISTS idx_notification_rule_tenant
     ON ab_notification_rule (tenant_id);
 COMMENT ON TABLE ab_notification_rule IS 'Notification rules — trigger + condition + action configuration';
+
+-- =========================================================================
+-- Behavior Analytics Event Store
+-- =========================================================================
+
+CREATE TABLE IF NOT EXISTS ab_behavior_event (
+    id                   BIGSERIAL PRIMARY KEY,
+    event_id             VARCHAR(40) NOT NULL,
+    schema_version       VARCHAR(16),
+    event_name           VARCHAR(120) NOT NULL,
+    event_category       VARCHAR(32),
+    source               VARCHAR(24),
+    identity_quality     VARCHAR(16),
+    occurred_at          TIMESTAMPTZ,
+    received_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    tenant_id            BIGINT NOT NULL,
+    user_id              BIGINT,
+    anon_id              VARCHAR(64),
+    client_session_id    VARCHAR(64),
+    interaction_id       VARCHAR(64),
+    caused_by_event_id   VARCHAR(40),
+    trace_id             VARCHAR(36),
+    source_span_id       VARCHAR(36),
+    run_id               VARCHAR(64),
+    ui_element_id        VARCHAR(80),
+    app_id               VARCHAR(64),
+    page_id              VARCHAR(64),
+    block_id             VARCHAR(64),
+    element_code         VARCHAR(64),
+    props                JSONB,
+    consent_state        VARCHAR(24),
+    consent_version      VARCHAR(16),
+    sampling_unit        VARCHAR(16),
+    sampling_probability NUMERIC(6,5),
+    producer_name        VARCHAR(48),
+    producer_version     VARCHAR(24),
+    created_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE ab_behavior_event IS 'Behavior analytics event store (M1, SoT §5.5) — event-first, ui_element_id stable join key';
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ab_behavior_event_tenant_eventid
+    ON ab_behavior_event (tenant_id, event_id);
+CREATE INDEX IF NOT EXISTS idx_ab_behavior_event_tenant_session
+    ON ab_behavior_event (tenant_id, client_session_id, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_ab_behavior_event_tenant_name
+    ON ab_behavior_event (tenant_id, event_name, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_ab_behavior_event_interaction
+    ON ab_behavior_event (interaction_id) WHERE interaction_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_ab_behavior_event_trace
+    ON ab_behavior_event (trace_id) WHERE trace_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS ab_behavior_quarantine (
+    id             BIGSERIAL PRIMARY KEY,
+    tenant_id      BIGINT NOT NULL,
+    user_id        BIGINT,
+    anon_id        TEXT,
+    event_id       TEXT,
+    event_name     TEXT,
+    reason         VARCHAR(64) NOT NULL,
+    detail         TEXT,
+    raw_event      JSONB,
+    quarantined_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE ab_behavior_quarantine IS 'Behavior ingest DLQ sink (SoT §2.7 quarantine.v1) — observable + replayable bad-event store';
+
+CREATE INDEX IF NOT EXISTS idx_ab_behavior_quarantine_tenant_time
+    ON ab_behavior_quarantine (tenant_id, quarantined_at);
+CREATE INDEX IF NOT EXISTS idx_ab_behavior_quarantine_reason
+    ON ab_behavior_quarantine (reason);
 
 -- =========================================================================
 -- AI Trace System

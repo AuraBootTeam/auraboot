@@ -11,7 +11,6 @@
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -3045,6 +3044,51 @@ CREATE SEQUENCE public.ab_behavior_event_id_seq
 --
 
 ALTER SEQUENCE public.ab_behavior_event_id_seq OWNED BY public.ab_behavior_event.id;
+
+
+--
+-- Name: ab_behavior_quarantine; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_behavior_quarantine (
+    id bigint NOT NULL,
+    tenant_id bigint NOT NULL,
+    user_id bigint,
+    anon_id text,
+    event_id text,
+    event_name text,
+    reason character varying(64) NOT NULL,
+    detail text,
+    raw_event jsonb,
+    quarantined_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: TABLE ab_behavior_quarantine; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_behavior_quarantine IS 'Behavior ingest DLQ sink (SoT §2.7 quarantine.v1) — observable + replayable bad-event store';
+
+
+--
+-- Name: ab_behavior_quarantine_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_behavior_quarantine_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_behavior_quarantine_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_behavior_quarantine_id_seq OWNED BY public.ab_behavior_quarantine.id;
 
 
 --
@@ -14902,6 +14946,13 @@ ALTER TABLE ONLY public.ab_behavior_event ALTER COLUMN id SET DEFAULT nextval('p
 
 
 --
+-- Name: ab_behavior_quarantine id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_behavior_quarantine ALTER COLUMN id SET DEFAULT nextval('public.ab_behavior_quarantine_id_seq'::regclass);
+
+
+--
 -- Name: ab_bitemporal_record id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -16072,6 +16123,14 @@ ALTER TABLE ONLY public.ab_automation
 
 ALTER TABLE ONLY public.ab_behavior_event
     ADD CONSTRAINT ab_behavior_event_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_behavior_quarantine ab_behavior_quarantine_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_behavior_quarantine
+    ADD CONSTRAINT ab_behavior_quarantine_pkey PRIMARY KEY (id);
 
 
 --
@@ -19805,6 +19864,20 @@ CREATE INDEX idx_ab_behavior_event_tenant_session ON public.ab_behavior_event US
 --
 
 CREATE INDEX idx_ab_behavior_event_trace ON public.ab_behavior_event USING btree (trace_id) WHERE (trace_id IS NOT NULL);
+
+
+--
+-- Name: idx_ab_behavior_quarantine_reason; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_behavior_quarantine_reason ON public.ab_behavior_quarantine USING btree (reason);
+
+
+--
+-- Name: idx_ab_behavior_quarantine_tenant_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_behavior_quarantine_tenant_time ON public.ab_behavior_quarantine USING btree (tenant_id, quarantined_at);
 
 
 --
@@ -25444,5 +25517,4 @@ ALTER TABLE ONLY public.ab_user_role
 --
 -- PostgreSQL database dump complete
 --
-
 
