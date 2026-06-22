@@ -17,13 +17,17 @@
  * ```
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { FieldConfig, DataSourceConfig } from '~/framework/meta/schemas/types';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
 import { FieldError } from '~/ui/ui/field-meta';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { usePermission } from '~/contexts/AuthContext';
+import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import { useDataSourceManagerOptional } from '~/framework/meta/contexts/DataSourceContext';
+import { ReferenceCreateDialog } from '~/framework/meta/runtime/reference-create/ReferenceCreateDialog';
 
 export interface ControlledFieldRendererProps {
   field: FieldConfig;
@@ -250,6 +254,99 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     return onChange;
   }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, onChange]);
 
+  const fieldKind = String((field as any).dataType || field.type || '').toLowerCase();
+  const refTarget = {
+    ...(((field as any).props?.refTarget || {}) as Record<string, any>),
+    ...(((field as any).refTarget || {}) as Record<string, any>),
+  };
+  const refTargetModel =
+    refTarget?.targetModel ||
+    refTarget?.modelCode ||
+    refTarget?.targetEntity ||
+    (field as any).referenceModelCode;
+  const refDisplayField =
+    refTarget?.displayField || refTarget?.labelField || refTarget?.targetField;
+  const createCommandCode =
+    field.createCommand || (refTargetModel ? `${refTargetModel}:create` : '');
+  const createPermissionCode = field.createPermission || createCommandCode;
+  const hasCreatePerm = usePermission(createPermissionCode);
+  const allowCreate =
+    Boolean(field.allowCreate) &&
+    fieldKind === 'reference' &&
+    !field.dataSource &&
+    !!refTargetModel &&
+    hasCreatePerm;
+  const [createOpen, setCreateOpen] = useState(false);
+  const dataSourceManager = useDataSourceManagerOptional();
+  const { executeCommand } = useActionHandler({
+    runtime: null,
+    navigate: (() => undefined) as any,
+    tableName: refTargetModel || field.field,
+    dataSourceManager,
+    locale: context.locale || 'zh-CN',
+    t,
+    token: (context as any).token,
+  });
+
+  const handleCreated = (selected: { value: string; label: string }) => {
+    const nextValue = Array.isArray(value)
+      ? value.some((item) => String(item) === String(selected.value))
+        ? value
+        : [...value, selected.value]
+      : selected.value;
+
+    const ids =
+      refTargetModel && typeof (dataSourceManager as any)?.getDataSourceIdsByModel === 'function'
+        ? (dataSourceManager as any).getDataSourceIdsByModel(refTargetModel)
+        : [];
+    const pinCreatedOption = () => {
+      if (
+        typeof (dataSourceManager as any)?.getState !== 'function' ||
+        typeof (dataSourceManager as any)?.setData !== 'function'
+      ) {
+        return;
+      }
+      const createdOption = { value: selected.value, label: selected.label };
+      ids.forEach((dsId: string) => {
+        const currentData = (dataSourceManager as any).getState(dsId)?.data;
+        const options = Array.isArray(currentData) ? currentData : [];
+        const exists = options.some(
+          (option: any) => String(option?.value) === String(selected.value),
+        );
+        if (!exists) {
+          (dataSourceManager as any).setData(dsId, [createdOption, ...options]);
+        }
+      });
+    };
+    if (ids.length > 0) {
+      pinCreatedOption();
+    }
+
+    onChange(nextValue);
+
+    const setFormFieldValue = (context as any).__setFormFieldValue;
+    if (typeof setFormFieldValue === 'function') {
+      setFormFieldValue(field.field, nextValue);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('aura:reference-field-created', {
+          detail: {
+            pageKey: (context as any).__pageKey,
+            modelCode: (context as any).__modelCode,
+            fieldCode: field.field,
+            value: nextValue,
+          },
+        }),
+      );
+    }
+
+    if (ids.length > 0 && typeof (dataSourceManager as any)?.reload === 'function') {
+      void Promise.resolve((dataSourceManager as any).reload(ids)).then(pinCreatedOption);
+    }
+    setCreateOpen(false);
+  };
+
   if (!visible) return null;
 
   const componentProps: Record<string, any> = {
@@ -278,25 +375,15 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       autoFetch: true,
     };
     componentProps.dataSource = dictDataSource;
-  } else if (
-    String((field as any).dataType || '').toLowerCase() === 'reference' &&
-    !field.dataSource
-  ) {
-    const refTarget = {
-      ...(((field as any).props?.refTarget || {}) as Record<string, any>),
-      ...(((field as any).refTarget || {}) as Record<string, any>),
-    };
-    const targetModelCode =
-      refTarget?.targetModel ||
-      refTarget?.modelCode ||
-      refTarget?.targetEntity ||
-      (field as any).referenceModelCode;
-    const labelField = refTarget?.displayField || refTarget?.labelField || refTarget?.targetField;
+  } else if (fieldKind === 'reference' && !field.dataSource) {
+    const targetModelCode = refTargetModel;
+    const labelField = refDisplayField;
     if (targetModelCode) {
       const systemModel = SYSTEM_MODEL_ENDPOINTS[targetModelCode];
       if (systemModel) {
         componentProps.dataSource = {
           type: 'api',
+          modelCode: targetModelCode,
           endpoint: systemModel.endpoint,
           method: 'get',
           params: { size: 200 },
@@ -318,6 +405,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
         }
         const referenceDataSource: DataSourceConfig = {
           type: 'api',
+          modelCode: targetModelCode,
           endpoint: `/api/dynamic/${targetModelCode}/list`,
           method: 'get',
           params,
@@ -346,6 +434,11 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     componentProps.validationRules = field.validation;
   }
 
+  if (allowCreate) {
+    componentProps.canCreateNew = true;
+    componentProps.onCreateNew = () => setCreateOpen(true);
+  }
+
   // 处理布局
   const colSpan = field.layout?.colSpan || 6;
   const isFullWidth = colSpan >= 12;
@@ -367,27 +460,41 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     value !== '';
 
   return (
-    <div
-      className={`controlled-field-renderer ${isFullWidth ? 'col-span-full' : ''}`}
-      data-testid={`field-${field.field}`}
-    >
-      {resolvedLabel && (
-        <label htmlFor={field.field} className="text-text-2 mb-1 block text-sm font-medium">
-          {resolvedLabel}
-          {isRequired && <span className="text-status-red ml-0.5">*</span>}
-        </label>
+    <>
+      <div
+        className={`controlled-field-renderer ${isFullWidth ? 'col-span-full' : ''}`}
+        data-testid={`field-${field.field}`}
+      >
+        {resolvedLabel && (
+          <label htmlFor={field.field} className="text-text-2 mb-1 block text-sm font-medium">
+            {resolvedLabel}
+            {isRequired && <span className="text-status-red ml-0.5">*</span>}
+          </label>
+        )}
+        {shouldRenderAsText ? (
+          <div className="text-text py-2 text-sm">
+            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+          </div>
+        ) : (
+          <>
+            <ComponentLoader componentName={componentName} props={componentProps} />
+            <FieldError message={error} />
+          </>
+        )}
+      </div>
+      {allowCreate && (
+        <ReferenceCreateDialog
+          open={createOpen}
+          targetModel={refTargetModel}
+          createPageKey={field.createPageKey}
+          createCommand={createCommandCode}
+          displayField={refDisplayField}
+          executeCommand={executeCommand}
+          onCreated={handleCreated}
+          onClose={() => setCreateOpen(false)}
+        />
       )}
-      {shouldRenderAsText ? (
-        <div className="text-text py-2 text-sm">
-          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-        </div>
-      ) : (
-        <>
-          <ComponentLoader componentName={componentName} props={componentProps} />
-          <FieldError message={error} />
-        </>
-      )}
-    </div>
+    </>
   );
 };
 
