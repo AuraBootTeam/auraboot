@@ -57,4 +57,28 @@ describe('dashboard chart empty states', () => {
     expect(screen.getByText(/This KPI is ready\./)).toBeInTheDocument();
     expect(screen.getByText('0')).toBeInTheDocument();
   });
+
+  it('lets a single configured number card fill the widget grid', () => {
+    mockUseChartData.mockReturnValue({
+      data: { rows: [{ count: 2 }], summary: {}, meta: { dimensions: [], metrics: ['count'] } },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(
+      <SmartNumberCard
+        title="Equipment"
+        dataSource={aggregateSource}
+        cards={[{ field: 'count', label: '设备数' }]}
+      />,
+    );
+
+    const card = screen.getByText('设备数').parentElement;
+    const grid = card?.parentElement;
+
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(grid).toHaveClass('grid-cols-1');
+    expect(grid).not.toHaveClass('xl:grid-cols-6');
+  });
 });
