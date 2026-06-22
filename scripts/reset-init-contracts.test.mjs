@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import test from 'node:test';
 
 function read(path) {
@@ -181,7 +181,115 @@ test('plugin import profiles use explicit semantic names and deprecate default',
         `${profile} must import platform-admin before core-decisionops because DecisionOps webhooks reuse admin_webhook permission`,
       );
     }
+    const ownershipIndex = plugins.indexOf('core-ownership');
+    const crmStarterIndex = plugins.indexOf('crm-starter');
+    if (crmStarterIndex >= 0) {
+      assert.ok(
+        ownershipIndex >= 0 && ownershipIndex < crmStarterIndex,
+        `${profile} must import core-ownership before crm-starter because CRM bindings reference owner_type/owner_id`,
+      );
+    }
   }
+});
+
+test('seeded CS agent declares only OSS CRM starter tools that can be imported', () => {
+  const seed = read('scripts/seed-cs-agent.sql');
+  for (const staleReference of [
+    'crm_account_common',
+    'crm_contact_common',
+    'crm_complaint',
+    'crm_sla_status_breakdown',
+  ]) {
+    assert.doesNotMatch(seed, new RegExp(staleReference), `${staleReference} is not provided by OSS crm-starter`);
+  }
+
+  const models = JSON.parse(read('plugins/crm-starter/config/models.json'));
+  const modelCodes = new Set(models.map((model) => model.code));
+
+  const commandCodes = new Set();
+  for (const file of readdirSync('plugins/crm-starter/config/commands')) {
+    if (!file.endsWith('.json')) continue;
+    for (const command of JSON.parse(read(`plugins/crm-starter/config/commands/${file}`))) {
+      commandCodes.add(command.code);
+    }
+  }
+
+  const namedQueryCodes = new Set();
+  for (const file of readdirSync('plugins/crm-starter/config/named-queries')) {
+    if (!file.endsWith('.json')) continue;
+    const query = JSON.parse(read(`plugins/crm-starter/config/named-queries/${file}`));
+    namedQueryCodes.add(query.code);
+  }
+
+  const toolsMatch = seed.match(/'([^']*custom:send_customer_reply[^']*)',\s*\n\s*120,/);
+  assert.ok(toolsMatch, 'seed-cs-agent.sql must define the cs_agent tools list');
+  const declaredTools = toolsMatch[1].split(',').map((tool) => tool.trim()).filter(Boolean);
+
+  for (const tool of declaredTools) {
+    if (tool.startsWith('cmd:')) {
+      assert.ok(commandCodes.has(tool.slice(4)), `${tool} must exist in crm-starter commands`);
+    } else if (tool.startsWith('get:') || tool.startsWith('list:')) {
+      assert.ok(modelCodes.has(tool.slice(tool.indexOf(':') + 1)), `${tool} must reference a crm-starter model`);
+    } else if (tool.startsWith('nq:')) {
+      assert.ok(namedQueryCodes.has(tool.slice(3)), `${tool} must exist in crm-starter named queries`);
+    } else if (tool === 'custom:send_customer_reply') {
+      assert.match(seed, /'send_customer_reply'/);
+    } else {
+      assert.fail(`Unexpected cs_agent tool declaration: ${tool}`);
+    }
+  }
+
+  assert.match(
+    seed,
+    /\[\{"type":"role","roleCode":"tenant_admin"\}\]/,
+    'cs_agent approval policy must use the bootstrap role code tenant_admin',
+  );
+});
+
+test('customer service agent integration scenario follows OSS CRM starter activity flow', () => {
+  const integrationTest = read('platform/src/test/java/com/auraboot/framework/agent/CustomerServiceAgentIntegrationTest.java');
+  for (const staleReference of [
+    'crm_account_common',
+    'crm_contact_common',
+    'crm_complaint',
+    'create_complaint',
+    'mt_crm_account_common',
+    'mt_crm_contact_common',
+    'mt_crm_complaint',
+  ]) {
+    assert.doesNotMatch(
+      integrationTest,
+      new RegExp(staleReference),
+      `${staleReference} belongs to the old complaint/common CRM scenario, not OSS crm-starter`,
+    );
+  }
+
+  assert.match(integrationTest, /mt_crm_account/);
+  assert.match(integrationTest, /mt_crm_contact/);
+  assert.match(integrationTest, /mt_crm_activity/);
+  assert.match(integrationTest, /cmd:crm:create_activity/);
+  assert.match(integrationTest, /custom:send_customer_reply/);
+});
+
+test('direct schema init includes agent observability and command audit correlation tables', () => {
+  const schema = read('platform/src/main/resources/database/schema.sql');
+  const commandAudit = schema.slice(
+    schema.indexOf('CREATE TABLE IF NOT EXISTS ab_command_audit_log'),
+    schema.indexOf('CREATE INDEX IF NOT EXISTS idx_cmd_audit_tenant_code'),
+  );
+  assert.match(commandAudit, /trace_id\s+VARCHAR\(36\)/);
+  assert.match(commandAudit, /span_id\s+VARCHAR\(36\)/);
+
+  const aiTrace = schema.slice(
+    schema.indexOf('CREATE TABLE IF NOT EXISTS ab_ai_trace'),
+    schema.indexOf('CREATE INDEX IF NOT EXISTS idx_ai_trace_tenant'),
+  );
+  assert.match(aiTrace, /otel_trace_id\s+VARCHAR\(32\)/);
+  assert.match(schema, /CREATE INDEX IF NOT EXISTS idx_ab_ai_trace_otel_trace_id/);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS ab_gen_ai_usage/);
+  assert.match(schema, /CREATE INDEX IF NOT EXISTS idx_ab_gen_ai_usage_tenant_created/);
+  assert.match(schema, /CREATE INDEX IF NOT EXISTS idx_ab_gen_ai_usage_trace/);
 });
 
 test('plugin import retries each plugin before importing dependents', () => {

@@ -1,8 +1,10 @@
 ---
 created: 2026-06-22
 type: backlog
-status: active
+status: closed
 area: framework/agent
+distilled_to:
+  - docs/core-concepts/agent-readiness.md
 ---
 
 # Agent dispatch run path ignores the agent's declared cross-model tools
@@ -40,22 +42,48 @@ commands `WHERE model_code = :modelHint` (returns nothing without a hint).
 So the run path's available-tool set depends only on what the task text grounds to, not on what the
 agent declared. Cross-model agents lose tools.
 
-## Fix direction
+## Resolution
 
-In `AgentRunService`, make declared tools always available: after building the bif-based tool set,
-also resolve each explicitly-declared tool code (agent `tools` column) to its model hint and
-discover it, then merge any missing ones (dedupe by name). Reuse the chat path's logic
-(`resolveExplicitToolModelHint` / `loadCommandModelCode`) rather than duplicating — e.g. extract a
-shared `DeclaredToolResolver` used by both paths. The merge must be additive (only ever adds
-declared tools) to keep the change low-risk. Mind `AgentToolDefinition.name` vs the raw command
-code and the OpenAI tool-name sanitization when deduping.
+Fixed in `fix/agent-run-declared-tools`.
 
-## Verification when fixed
+- `DeclaredAgentToolResolver` is now the shared resolver for declared agent tools. It resolves each
+  explicit tool with its own provider/model hint and merges the resulting tool definitions
+  additively into the run path's grounded tool set.
+- `AgentRunService` now includes explicitly declared cross-model tools in dispatch/run tool
+  discovery, deduped by the effective tool name.
+- `CustomToolProvider.discover()` now includes `input_schema`, `requires_approval`, and
+  `risk_level`, so custom tools are discovered with their real approval/schema metadata.
+- Generic `get:` / `list:` DSL read tools now execute through the provider registry, not the named
+  query path.
+- Approval pause/resume now preserves the exact approved tool input and replays that input after
+  approval instead of asking the LLM to regenerate the step.
 
-Host-first isolated stack + crm imported + seeded `cs_agent` (deepseek-chat) → dispatch an
-inbound-email task → the agent reaches `cmd:crm:create_activity` and an
-`mt_crm_activity_common` "Agent Reply" row is written (linked to the complaint). Recipe: this
-session's cs-gold2 stack on slot 72.
+## Gold evidence
+
+Host-first isolated stack `cs-inbound-gold-77` (backend `6477`, DB `auraboot_77`) verified the full
+support-agent path on `deepseek-chat`:
+
+- inbound event `01KVQ67W9WATQ9DK35AT894AC7`
+- original run `01KVQ67WA6W89R3DXR0NJWYGTZ` paused for approval
+- approval `01KVQ689497S675WW20NBVP8T2` approved by `327350679712698368`
+- resumed run `01KVQ68T789G0218TJMPZWX73M` completed with status `success`
+- `ab_notification_send_log` row `id=1`, `status=sent`, subject `Re: Gold inbound approval flow 77e`
+- `ab_agent_action` recorded both `custom:send_customer_reply.provider` and `crm_activity.create`
+  as `success`
+- `mt_crm_activity` row `id=4`, pid `01KVQ6918WMPGPJWE5WTZDG6D9`, type `email`, subject
+  `Agent Reply: Gold inbound approval flow 77e`
+
+The isolated runtime was destroyed after verification.
+
+## Verification
+
+- `bash scripts/check-reset-init-contracts.sh`
+- `node scripts/check-agent-eval-boundary.mjs`
+- `bash scripts/check-oss-boundary.sh`
+- `git diff --check`
+- `cd platform && ./gradlew :test --tests com.auraboot.framework.agent.provider.CustomToolProviderTest --tests com.auraboot.framework.agent.service.StepLoopServiceLlmResponseGuardTest --tests com.auraboot.framework.agent.service.ToolLoopServiceSafetyTest --tests com.auraboot.framework.agent.service.DeclaredAgentToolResolverTest --tests com.auraboot.framework.agent.service.AgentRunServiceSyncTest --no-daemon`
+- `cd platform && ./gradlew :test --tests com.auraboot.framework.agent.CustomerServiceAgentIntegrationTest --no-daemon`
+- `cd platform && ./gradlew bootJar -x test --no-daemon`
 
 ## Also surfaced (separate, lower priority)
 

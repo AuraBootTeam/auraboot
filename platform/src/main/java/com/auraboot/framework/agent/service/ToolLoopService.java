@@ -257,6 +257,8 @@ public class ToolLoopService {
             String result;
             if ("dsl_command".equals(toolType)) {
                 result = executeDslCommandWithAction(toolDef.getSourceCode(), input, tenantId, runPid, toolDef);
+            } else if ("dsl_query".equals(toolType) && isGenericModelReadTool(toolName)) {
+                result = executeProviderToolByCode(toolDef, input, tenantId, toolName);
             } else if ("dsl_query".equals(toolType)) {
                 result = executeDslQueryWithAction(toolDef.getSourceCode(), input, tenantId, runPid, toolDef);
             } else if ("AURABOT_SKILL".equals(toolType)) {
@@ -601,11 +603,21 @@ public class ToolLoopService {
                 || toolCode.startsWith("mcp:"));
     }
 
+    private boolean isGenericModelReadTool(String toolCode) {
+        return toolCode != null && (toolCode.startsWith("get:") || toolCode.startsWith("list:"));
+    }
+
     private String executeProviderTool(AgentToolDefinition toolDef, Map<String, Object> input, Long tenantId)
             throws com.fasterxml.jackson.core.JsonProcessingException {
         String toolCode = toolDef.getSourceCode() != null && !toolDef.getSourceCode().isBlank()
                 ? toolDef.getSourceCode()
                 : toolDef.getName();
+        return executeProviderToolByCode(toolDef, input, tenantId, toolCode);
+    }
+
+    private String executeProviderToolByCode(AgentToolDefinition toolDef, Map<String, Object> input, Long tenantId,
+                                             String toolCode)
+            throws com.fasterxml.jackson.core.JsonProcessingException {
         ProviderExecutionResult providerResult = toolProviderRegistry.execute(
                 tenantId, toolCode, input != null ? input : Map.of());
 

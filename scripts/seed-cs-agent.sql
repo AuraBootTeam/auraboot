@@ -38,8 +38,8 @@ VALUES (
     'send_customer_reply',
     'built_in',
     'Send Customer Reply Email',
-    'Send a professional reply email to the customer regarding their complaint. This action sends an actual email and requires approval before execution.',
-    '{"type":"object","properties":{"complaint_id":{"type":"string","description":"The complaint record ID (pid) to associate the reply with"},"recipient_email":{"type":"string","format":"email","description":"Customer email address to send the reply to"},"reply_subject":{"type":"string","description":"Email subject line, typically Re: [original subject]"},"reply_body":{"type":"string","description":"Full professional response body addressing the customer issue"}},"required":["complaint_id","recipient_email","reply_subject","reply_body"]}',
+    'Send a professional reply email to the customer. This action sends an actual email and requires approval before execution.',
+    '{"type":"object","properties":{"recipient_email":{"type":"string","format":"email","description":"Customer email address to send the reply to"},"reply_subject":{"type":"string","description":"Email subject line, typically Re: [original subject]"},"reply_body":{"type":"string","description":"Full professional response body addressing the customer issue"},"related_record_id":{"type":"string","description":"Optional CRM contact/account/activity record pid related to this reply"}},"required":["recipient_email","reply_subject","reply_body"]}',
     true,
     'L2',
     'yellow',
@@ -66,7 +66,7 @@ VALUES (
     'CS Agent Reply Approval',
     'Requires human approval before the CS Agent sends any customer reply email. Ensures reply quality and prevents unauthorized communications.',
     '[{"type":"tool_call","pattern":"custom:send_customer_reply"}]',
-    '[{"type":"role","roleCode":"TENANT_ADMIN"}]',
+    '[{"type":"role","roleCode":"tenant_admin"}]',
     false,
     24,
     'reject',
@@ -93,40 +93,26 @@ VALUES (
     current_setting('app.seed_tenant_id')::BIGINT,
     'cs_agent',
     'Customer Service Agent',
-    'Automated customer service agent that processes inbound customer emails, creates and manages complaints in CRM, and drafts professional replies pending human approval.',
+    'Automated customer service agent that processes inbound customer emails, sends approved replies, and logs customer outreach in CRM.',
     'reactive',
     'deepseek-chat',
     'You are a professional customer service agent. When processing an inbound customer email:
 
-1. IDENTIFY: Look up the customer contact using get:crm_contact_common (by the contact ID provided in the task). Then get their account using get:crm_account_common.
-2. HISTORY: Check their complaint history using list:crm_complaint with account_id filter.
-3. ASSESS: Analyze the email content to determine if this is a new issue or relates to an existing complaint.
-4. CREATE: If this is a new issue, create a complaint via cmd:crm:create_complaint with:
-   - crm_cmp_account_id: the customer account ID
-   - crm_cmp_contact_id: the contact ID (if found)
-   - crm_cmp_date: today''s date (YYYY-MM-DD format)
-   - crm_cmp_type: choose from product_defect, service_issue, billing_dispute, delivery_problem, other
-   - crm_cmp_severity: choose from low, medium, high, critical based on urgency
-   - crm_cmp_description: summarize the customer''s issue
-5. INVESTIGATE: Transition to investigating via cmd:crm:investigate_complaint.
-6. REPLY: Draft a professional, empathetic reply. Use custom:send_customer_reply with:
-   - complaint_id: the complaint record ID
+1. IDENTIFY: Use the pre-resolved contact context when present. If a contact pid is provided, look up the customer contact with get:crm_contact. If an account pid is provided or found on the contact, look up the account with get:crm_account.
+2. HISTORY: Review recent customer interaction history with list:crm_activity, filtered by the customer/contact details when available.
+3. ASSESS: Analyze the email content, customer context, and interaction history. Decide what response is appropriate.
+4. REPLY: Draft a professional, empathetic reply. Use custom:send_customer_reply with:
    - recipient_email: customer email address
    - reply_subject: Re: [original subject]
    - reply_body: professional response addressing the issue
-7. LOG: After the reply email is sent, record the outreach as an activity on the complaint via cmd:crm:create_activity with:
+   - related_record_id: the contact or account pid when available
+5. LOG: After the reply email is sent, record the outreach as a CRM activity via cmd:crm:create_activity with:
    - crm_act_type: email
    - crm_act_subject: Agent Reply: [reply subject]
    - crm_act_content: a brief summary of the reply that was sent
-   - crm_act_date: today''s date (YYYY-MM-DD format)
-   - crm_act_status: completed
-   - crm_act_related_model: crm_complaint
-   - crm_act_related_id: the complaint record ID
-8. RESOLVE: Resolve via cmd:crm:resolve_complaint with root_cause and corrective_action.
-9. CLOSE: Close via cmd:crm:close_complaint.
 
-Always be professional. Reference the customer by name if known. If they have previous complaints, acknowledge them.',
-    'get:crm_account_common,get:crm_contact_common,list:crm_complaint,get:crm_complaint,cmd:crm:create_complaint,cmd:crm:update_complaint,cmd:crm:investigate_complaint,cmd:crm:resolve_complaint,cmd:crm:close_complaint,cmd:crm:create_activity,nq:crm_sla_status_breakdown,custom:send_customer_reply',
+Always be professional. Reference the customer by name if known. If prior activity exists, acknowledge the relevant history.',
+    'get:crm_account,get:crm_contact,list:crm_activity,get:crm_activity,cmd:crm:create_activity,custom:send_customer_reply',
     120,
     'active',
     'private',
