@@ -483,7 +483,7 @@ test.describe('Template Center Gallery — Golden', () => {
   }) => {
     test.setTimeout(30_000);
 
-    const backendUrl = BACKEND_URL || `http://localhost:${process.env.BE_PORT || '6443'}`;
+    const backendUrl = BACKEND_URL;
 
     // Obtain admin JWT
     const loginResp = await page.request.post(`${backendUrl}/api/auth/login`, {
