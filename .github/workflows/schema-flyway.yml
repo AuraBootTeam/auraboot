@@ -42,14 +42,14 @@ jobs:
       PG_PORT: "5432"
       PG_USER: auraboot
       PG_PASSWORD: auraboot
-      FLYWAY_VERSION: "11.10.1"
+      FLYWAY_VERSION: "11.2.0"
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Flyway CLI
         run: |
           set -euo pipefail
-          url="https://repo1.maven.org/maven2/org/flywaydb/flyway/flyway-commandline/${FLYWAY_VERSION}/flyway-commandline-${FLYWAY_VERSION}-linux-x64.tar.gz"
+          url="https://repo.maven.apache.org/maven2/org/flywaydb/flyway-commandline/${FLYWAY_VERSION}/flyway-commandline-${FLYWAY_VERSION}-linux-x64.tar.gz"
           curl -fsSL "$url" -o /tmp/flyway.tgz
           sudo mkdir -p /opt/flyway
           sudo tar -xzf /tmp/flyway.tgz -C /opt/flyway --strip-components=1
