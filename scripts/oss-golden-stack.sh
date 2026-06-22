@@ -15,7 +15,8 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--no-frontend] [--ttl 6h]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--no-frontend] [--ttl 6h] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh import <name> [--plugin-profile P|--plugin X]
 #   ./scripts/oss-golden-stack.sh warm <name>          # re-run setup→auth→pre-warm (up does this)
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
 #   ./scripts/oss-golden-stack.sh status <name>
@@ -56,6 +57,9 @@ log() { printf '\033[36m[golden-stack]\033[0m %s\n' "$*"; }
 die() { printf '\033[31m[golden-stack] FATAL:\033[0m %s\n' "$*" >&2; exit 1; }
 
 state_dir() { echo "$WORKSPACE/.workspace/golden/$1"; }
+shell_quote() { printf "%q" "$1"; }
+safe_name() { printf '%s' "$1" | tr -c 'A-Za-z0-9_-' '_'; }
+tmux_session_name() { printf 'aura_golden_%s_%s' "$(safe_name "$1")" "$2"; }
 
 # Read a key from the runtime env file.
 runtime_env() {
@@ -64,10 +68,24 @@ runtime_env() {
   grep -E "^${key}=" "$f" | head -1 | cut -d= -f2-
 }
 
+web_admin_node_modules_seed() {
+  local candidate
+  for candidate in "$CANONICAL/web-admin/node_modules" "$REPO_ROOT/web-admin/node_modules"; do
+    [ -d "$candidate" ] && { echo "$candidate"; return 0; }
+  done
+
+  while IFS= read -r candidate; do
+    candidate="$candidate/web-admin/node_modules"
+    [ -d "$candidate" ] && { echo "$candidate"; return 0; }
+  done < <(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0,10)}')
+
+  return 1
+}
+
 poll_http() {  # poll_http <url> <pattern> <timeout-s> <label>
   local url="$1" pat="$2" timeout="$3" label="$4" i=0
   while [ "$i" -lt "$timeout" ]; do
-    if curl -s -m 3 "$url" 2>/dev/null | grep -q "$pat"; then return 0; fi
+    if curl --noproxy '*' -s -m 3 "$url" 2>/dev/null | grep -q "$pat"; then return 0; fi
     i=$((i+3)); sleep 3
   done
   return 1
@@ -79,8 +97,8 @@ poll_http() {  # poll_http <url> <pattern> <timeout-s> <label>
 poll_http_up() {  # poll_http_up <url> <timeout-s>
   local url="$1" timeout="$2" i=0 code
   while [ "$i" -lt "$timeout" ]; do
-    code="$(curl -s -m 3 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || echo 000)"
-    [ "$code" != "000" ] && return 0
+    code="$(curl --noproxy '*' -s -m 3 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
+    case "$code" in ""|000) ;; *) return 0;; esac
     i=$((i+3)); sleep 3
   done
   return 1
@@ -90,10 +108,20 @@ poll_http_up() {  # poll_http_up <url> <timeout-s>
 cmd_up() {
   local name="$1"; shift
   local slot="" ttl="6h" frontend=1
+  local plugin_profile="" import_plugins=()
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
     --ttl) ttl="$2"; shift 2;;
     --no-frontend) frontend=0; shift;;
+    --plugin-profile) plugin_profile="$2"; shift 2;;
+    --plugin) import_plugins+=("$2"); shift 2;;
+    --plugins)
+      IFS=',' read -r -a plugin_items <<< "$2"
+      for plugin_item in "${plugin_items[@]}"; do
+        [ -n "$plugin_item" ] && import_plugins+=("$plugin_item")
+      done
+      shift 2
+      ;;
     *) die "unknown arg: $1";;
   esac; done
   [ -n "$slot" ] || die "--slot N is required for 'up' (pick a free slot: $DEV runtime list)"
@@ -138,46 +166,71 @@ cmd_up() {
   local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
   [ -n "$jar" ] || die "boot jar not found after build"
 
+  command -v tmux >/dev/null 2>&1 || die "tmux is required to keep host-first services alive after this script exits"
+
   log "5/9 start backend (java -jar) on $server_port"
-  ( SERVER_PORT="$server_port" \
-    SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
-    SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
-    SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
-    SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
-    AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
-    nohup java -jar "$jar" >"$sd/backend.log" 2>&1 & echo $! >"$sd/backend.pid" )
+  local backend_session backend_cmd
+  backend_session="$(tmux_session_name "$name" backend)"
+  tmux has-session -t "$backend_session" 2>/dev/null && tmux kill-session -t "$backend_session" || true
+  mkdir -p "$sd/pf4j-plugins"
+  backend_cmd="SERVER_PORT=$(shell_quote "$server_port") "
+  backend_cmd+="SPRING_DATASOURCE_URL=$(shell_quote "jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8") "
+  backend_cmd+="SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot "
+  backend_cmd+="SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE=$(shell_quote "$redis_db") "
+  backend_cmd+="SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 "
+  backend_cmd+="AURA_PLUGINS_DIR=$(shell_quote "$sd/pf4j-plugins") "
+  backend_cmd+="AURA_BUILTIN_PLUGINS_DIR=$(shell_quote "$REPO_ROOT/plugins") "
+  backend_cmd+="exec java -jar $(shell_quote "$jar") >$(shell_quote "$sd/backend.log") 2>&1"
+  tmux new-session -d -s "$backend_session" "$backend_cmd" \
+    || die "failed to start backend tmux session $backend_session"
+  echo "$backend_session" >"$sd/backend.tmux"
+  tmux display-message -p -t "$backend_session" '#{pane_pid}' >"$sd/backend.pid" 2>/dev/null || true
   echo "$server_port $vite_port $bff_port" >"$sd/ports"
   poll_http "http://127.0.0.1:$server_port/actuator/health" '"status":"UP"' 150 backend \
     || die "backend did not become healthy — see $sd/backend.log"
   log "    backend UP (pid $(cat "$sd/backend.pid"))"
 
   log "6/9 bootstrap (minimal admin + tenant; idempotent)"
-  if ! curl -s -m 10 "http://127.0.0.1:$server_port/api/bootstrap/status" 2>/dev/null | grep -q '"initialized":true'; then
-    curl -s -m 60 -X POST "http://127.0.0.1:$server_port/api/bootstrap/setup" -H 'Content-Type: application/json' \
+  if ! curl --noproxy '*' -s -m 10 "http://127.0.0.1:$server_port/api/bootstrap/status" 2>/dev/null | grep -q '"initialized":true'; then
+    curl --noproxy '*' -s -m 60 -X POST "http://127.0.0.1:$server_port/api/bootstrap/setup" -H 'Content-Type: application/json' \
       -d "{\"companyName\":\"AuraBoot Dev\",\"adminEmail\":\"$ADMIN_EMAIL\",\"adminPassword\":\"$ADMIN_PASSWORD\",\"adminDisplayName\":\"Admin\",\"systemMode\":\"single\",\"seedDemoData\":false}" \
       | grep -q '"success":true' || die "bootstrap failed"
   fi
-  curl -s -m 15 -X POST "http://127.0.0.1:$server_port/api/auth/login" -H 'Content-Type: application/json' \
+  curl --noproxy '*' -s -m 15 -X POST "http://127.0.0.1:$server_port/api/auth/login" -H 'Content-Type: application/json' \
     -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" | grep -q '"jwt"' \
     || die "login round-trip failed after bootstrap"
   log "    bootstrap OK ($ADMIN_EMAIL / $ADMIN_PASSWORD)"
 
+  if [ -n "$plugin_profile" ] || [ "${#import_plugins[@]}" -gt 0 ]; then
+    cmd_import "$name" --plugin-profile "${plugin_profile:-none}" "${import_plugins[@]/#/--plugin=}"
+  fi
+
   if [ "$frontend" -eq 1 ]; then
     log "7/9 frontend: symlink node_modules (if missing) + start Vite+BFF"
-    [ -e "$REPO_ROOT/web-admin/node_modules" ] || ln -sfn "$CANONICAL/web-admin/node_modules" "$REPO_ROOT/web-admin/node_modules"
-    ( cd "$REPO_ROOT/web-admin" && \
-      VITE_PORT="$vite_port" BFF_PORT="$bff_port" SPRING_BOOT_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
-      exec nohup pnpm dev:full >"$sd/frontend.log" 2>&1 ) &
-    # $! here is the real supervisor (pnpm dev:full) — the subshell `exec`s into
-    # it, so we record the actual process group leader, not a transient wrapper.
-    echo $! >"$sd/frontend.pid"
+    if [ ! -e "$REPO_ROOT/web-admin/node_modules" ]; then
+      local node_modules_seed
+      node_modules_seed="$(web_admin_node_modules_seed)" \
+        || die "web-admin/node_modules not found in canonical checkout or existing worktrees"
+      ln -sfn "$node_modules_seed" "$REPO_ROOT/web-admin/node_modules"
+    fi
+    local frontend_session frontend_cmd
+    frontend_session="$(tmux_session_name "$name" frontend)"
+    tmux has-session -t "$frontend_session" 2>/dev/null && tmux kill-session -t "$frontend_session" || true
+    frontend_cmd="cd $(shell_quote "$REPO_ROOT/web-admin") && "
+    frontend_cmd+="VITE_PORT=$(shell_quote "$vite_port") BFF_PORT=$(shell_quote "$bff_port") "
+    frontend_cmd+="SPRING_BOOT_URL=$(shell_quote "http://127.0.0.1:$server_port") NODE_ENV=development "
+    frontend_cmd+="exec pnpm dev:full >$(shell_quote "$sd/frontend.log") 2>&1"
+    tmux new-session -d -s "$frontend_session" "$frontend_cmd" \
+      || die "failed to start frontend tmux session $frontend_session"
+    echo "$frontend_session" >"$sd/frontend.tmux"
+    tmux display-message -p -t "$frontend_session" '#{pane_pid}' >"$sd/frontend.pid" 2>/dev/null || true
     # Wait for Vite to start accepting connections (302 → /login is fine). Poll
     # on HTTP status, not body — a 302 has an empty body that a grep-poll would
     # never match (it would stall the full timeout before warm could start).
     poll_http_up "http://127.0.0.1:$vite_port/" 120 || true
-    local code; code="$(curl -s -m 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$vite_port/" 2>/dev/null || echo 000)"
-    [ "$code" != "000" ] || die "Vite did not come up on $vite_port — see $sd/frontend.log"
-    log "    frontend UP (supervisor pid $(cat "$sd/frontend.pid"), vite http=$code)"
+    local code; code="$(curl --noproxy '*' -s -m 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$vite_port/" 2>/dev/null || true)"
+    case "$code" in ""|000) die "Vite did not come up on $vite_port — see $sd/frontend.log";; esac
+    log "    frontend UP (tmux $frontend_session, vite http=$code)"
   else
     log "7/9 frontend: skipped (--no-frontend)"
   fi
@@ -192,6 +245,73 @@ cmd_up() {
   log "9/9 ready ✓"
   echo
   cmd_env "$name"
+}
+
+# ---- import plugins into a running host-first stack ----------------------------------
+cmd_import() {
+  local name="$1"; shift
+  local sd; sd="$(state_dir "$name")"
+  [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
+  read -r server_port _vite_port _bff_port <"$sd/ports"
+
+  local plugin_profile="core" profile_explicit=0
+  local plugins=()
+  while [ $# -gt 0 ]; do case "$1" in
+    --plugin-profile) plugin_profile="$2"; profile_explicit=1; shift 2;;
+    --plugin-profile=*) plugin_profile="${1#--plugin-profile=}"; profile_explicit=1; shift;;
+    --profile) plugin_profile="$2"; profile_explicit=1; shift 2;;
+    --profile=*) plugin_profile="${1#--profile=}"; profile_explicit=1; shift;;
+    --plugin) plugins+=("$2"); shift 2;;
+    --plugin=*) plugins+=("${1#--plugin=}"); shift;;
+    --plugins)
+      IFS=',' read -r -a plugin_items <<< "$2"
+      for plugin_item in "${plugin_items[@]}"; do
+        [ -n "$plugin_item" ] && plugins+=("$plugin_item")
+      done
+      shift 2
+      ;;
+    --plugins=*)
+      IFS=',' read -r -a plugin_items <<< "${1#--plugins=}"
+      for plugin_item in "${plugin_items[@]}"; do
+        [ -n "$plugin_item" ] && plugins+=("$plugin_item")
+      done
+      shift
+      ;;
+    *) die "unknown import arg: $1";;
+  esac; done
+
+  if [ "$profile_explicit" -eq 1 ] && [ "$plugin_profile" = "none" ] && [ "${#plugins[@]}" -eq 0 ]; then
+    die "--plugin-profile none requires at least one --plugin"
+  fi
+
+  local pg_host pg_port pg_user pg_db pg_pass
+  if [ -f "$sd/pgenv" ]; then
+    read -r pg_host pg_port pg_user pg_db pg_pass <"$sd/pgenv"
+  fi
+
+  local args=("--backend-url=http://127.0.0.1:$server_port" "--edition=oss" "--plugin-root=$REPO_ROOT/plugins")
+  if [ "${#plugins[@]}" -gt 0 ]; then
+    args+=("${plugins[@]}")
+    log "6.5/9 import plugins (host-first): ${plugins[*]}"
+  else
+    args+=("--profile=$plugin_profile")
+    log "6.5/9 import plugin profile '$plugin_profile' (host-first)"
+  fi
+
+  (
+    export PGHOST="${pg_host:-127.0.0.1}"
+    export PGPORT="${pg_port:-5432}"
+    export PGUSER="${pg_user:-auraboot}"
+    export PGDATABASE="${pg_db:-aura_boot}"
+    export PGPASSWORD="${pg_pass:-auraboot}"
+    export PG_HOST="$PGHOST"
+    export PG_PORT="$PGPORT"
+    export PG_USER="$PGUSER"
+    export PG_DB="$PGDATABASE"
+    export PG_PASSWORD="$PGPASSWORD"
+    "$SCRIPT_DIR/import-plugins.sh" "${args[@]}"
+  ) >"$sd/import.log" 2>&1 || die "plugin import failed — see $sd/import.log"
+  log "    plugin import OK — see $sd/import.log"
 }
 
 # ---- warm (setup → auth storageState → pre-warm heavy routes) ------------------------
@@ -298,7 +418,7 @@ export PG_DB=${pg_db:-aura_boot}
 #       /report-designer + /dashboard), and web-admin/vite.config.ts pre-bundles the
 #       heavy lazy-route deps (optimizeDeps.include, #947). The FIRST golden run after
 #       'up' is therefore reliable. Fallback if a brand-new route ever cold-reopts:
-#       curl -s \$PLAYWRIGHT_BASE_URL/<route> once before running.
+#       curl --noproxy '*' -s \$PLAYWRIGHT_BASE_URL/<route> once before running.
 EOF
 }
 
@@ -308,8 +428,9 @@ cmd_status() {
   [ -f "$sd/ports" ] || { echo "no stack for '$name'"; return 1; }
   read -r server_port vite_port bff_port <"$sd/ports"
   local be vi
-  be="$(curl -s -m 3 "http://127.0.0.1:$server_port/actuator/health" 2>/dev/null | grep -o '"status":"UP"' || echo DOWN)"
-  vi="$(curl -s -m 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$vite_port/" 2>/dev/null || echo 000)"
+  be="$(curl --noproxy '*' -s -m 3 "http://127.0.0.1:$server_port/actuator/health" 2>/dev/null | grep -o '"status":"UP"' || echo DOWN)"
+  vi="$(curl --noproxy '*' -s -m 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$vite_port/" 2>/dev/null || true)"
+  vi="${vi:-000}"
   echo "backend($server_port)=$be  vite($vite_port)=$vi  bff=$bff_port"
 }
 
@@ -330,28 +451,42 @@ kill_tree() {
 # dies too. Scoped to a single exact port → never touches another slot's stack.
 kill_listener_supervisor() {
   local port="$1" pid ppid cmd
-  pid="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
-  [ -n "$pid" ] || return 0
-  # Walk up to (and including) the concurrently restart-loop leader, then kill
-  # that whole subtree. Cap the walk at 6 hops to avoid runaway.
-  local cur="$pid" sup="$pid" i=0
-  while [ "$i" -lt 6 ]; do
-    cmd="$(ps -o command= -p "$cur" 2>/dev/null || true)"
-    case "$cmd" in *concurrently*) sup="$cur"; break;; esac
-    ppid="$(ps -o ppid= -p "$cur" 2>/dev/null | tr -d ' ')"
-    [ -n "$ppid" ] && [ "$ppid" != "1" ] && [ "$ppid" != "0" ] || break
-    cur="$ppid"; i=$((i+1))
+  for pid in $(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true); do
+    [ -n "$pid" ] || continue
+    # Walk up to (and including) the concurrently restart-loop leader, then kill
+    # that whole subtree. If tmux has already detached/reparented the tree, keep
+    # the highest repo/frontend-related ancestor as the kill target.
+    local cur="$pid" sup="$pid" i=0
+    while [ "$i" -lt 12 ]; do
+      cmd="$(ps -o command= -p "$cur" 2>/dev/null || true)"
+      case "$cmd" in
+        *concurrently*) sup="$cur"; break;;
+        *"$REPO_ROOT/web-admin"*|*"pnpm dev:"*) sup="$cur";;
+      esac
+      ppid="$(ps -o ppid= -p "$cur" 2>/dev/null | tr -d ' ')"
+      [ -n "$ppid" ] && [ "$ppid" != "1" ] && [ "$ppid" != "0" ] || break
+      cur="$ppid"; i=$((i+1))
+    done
+    kill_tree "$sup"
+    kill_tree "$pid"
   done
-  kill_tree "$sup"
 }
 
 # ---- down (stop processes, keep runtime/DB) ------------------------------------------
 cmd_down() {
   local name="$1" sd; sd="$(state_dir "$name")"
   [ -d "$sd" ] || { echo "no stack for '$name'"; return 0; }
-  # kill recorded supervisor tree first (pnpm dev:full → concurrently → web+bff)
+  # Kill recorded supervisor trees while tmux still owns the pane processes.
+  # If we close tmux first, pnpm/concurrently/vite/bff can be reparented and the
+  # recorded pane pid is no longer enough to reach the listeners.
   if [ -f "$sd/frontend.pid" ]; then local fp; fp="$(cat "$sd/frontend.pid")"; kill_tree "$fp"; fi
   if [ -f "$sd/backend.pid" ]; then kill_tree "$(cat "$sd/backend.pid")"; fi
+  if [ -f "$sd/frontend.tmux" ]; then
+    tmux kill-session -t "$(cat "$sd/frontend.tmux")" 2>/dev/null || true
+  fi
+  if [ -f "$sd/backend.tmux" ]; then
+    tmux kill-session -t "$(cat "$sd/backend.tmux")" 2>/dev/null || true
+  fi
   sleep 2
   # Belt: kill anything still bound to THIS runtime's exact ports only (never a
   # shared/other-slot port). For the frontend ports, walk up to the concurrently
@@ -374,7 +509,7 @@ cmd_down() {
       sleep 1
     done
   fi
-  rm -f "$sd/backend.pid" "$sd/frontend.pid"
+  rm -f "$sd/backend.pid" "$sd/frontend.pid" "$sd/backend.tmux" "$sd/frontend.tmux"
   log "stopped '$name' processes (runtime/DB kept; 'destroy' to remove)"
 }
 
@@ -396,10 +531,11 @@ cmd_destroy() {
 sub="$1"; name="$2"; shift 2
 case "$sub" in
   up) cmd_up "$name" "$@";;
+  import) cmd_import "$name" "$@";;
   warm) cmd_warm "$name";;
   env) cmd_env "$name";;
   status) cmd_status "$name";;
   down) cmd_down "$name";;
   destroy) cmd_destroy "$name";;
-  *) die "unknown subcommand: $sub (up|warm|env|status|down|destroy)";;
+  *) die "unknown subcommand: $sub (up|import|warm|env|status|down|destroy)";;
 esac

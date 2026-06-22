@@ -379,6 +379,8 @@ public class MybatisPlusConfigTest {
                 "ab_i18n_resource",
                 "ab_async_task",
                 "ab_notification_digest",
+                "ab_behavior_event",
+                "ab_behavior_quarantine",
                 "ab_invariant_definition",
                 "ab_decision_definition"
         };
@@ -394,7 +396,7 @@ public class MybatisPlusConfigTest {
 
             for (String tableName : schedulerTables) {
                 assertTrue(handler.ignoreTable(tableName),
-                        "Scheduler table '" + tableName + "' must be ignored (no MetaContext in scheduler threads)");
+                        "Background table '" + tableName + "' must be ignored (no MetaContext in worker threads)");
             }
         } catch (Exception e) {
             fail("Failed to test scheduler tables: " + e.getMessage());

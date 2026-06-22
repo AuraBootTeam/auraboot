@@ -257,6 +257,7 @@ dependencies {
     // or kafka-clients inside a plugin causes split-package classloader errors.
     implementation "org.springframework.kafka:spring-kafka:${springKafkaVersion}"
     implementation "org.apache.kafka:kafka-clients:${kafkaClientsVersion}"
+    runtimeOnly project(':platform-mq-kafka')
 
     // ULID
     implementation 'de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0'
