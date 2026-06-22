@@ -178,6 +178,26 @@ The catalog the agent sees is **the intersection of**:
 
 This intersection is computed when the agent's tool list is materialized. The agent never sees a tool it could not, in principle, call. The corollary is that you can shrink an agent's effective surface by **changing the user's permissions** rather than by maintaining a parallel agent allow-list.
 
+### Declared agent tools in runtime paths
+
+Agent definitions may also declare an explicit tool allow-list, such as `cmd:expense.report.submit`
+or `nq:customer_open_items`. That declaration is part of the runtime contract, not merely a prompt
+hint. Both the chat path and the dispatch/run path materialize declared tools in addition to the
+tools inferred from the task's grounded business object.
+
+This matters for cross-model agents. A customer-support agent may ground an inbound email to a
+`crm_complaint` object while still declaring a follow-up activity command on
+`crm_activity_common`. The runtime resolves each explicitly declared tool with its own provider and
+model hint, discovers the matching descriptor, then merges it additively into the available-tool set.
+Grounding can narrow the catalog, but it must not make a declared cross-model tool disappear.
+
+Approval metadata travels with the descriptor. Custom tools and DSL commands expose their
+`inputSchema`, `requiresApproval`, and `riskLevel` during discovery so the runtime can pause before
+high-risk or external-effect tools. When a paused run resumes after approval, it replays the exact
+approved tool input rather than asking the LLM to regenerate arguments. That preserves the human
+approval boundary and prevents duplicate external effects such as sending the same customer reply
+twice.
+
 ### What an MCP tool descriptor looks like
 
 ```json
