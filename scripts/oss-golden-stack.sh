@@ -79,11 +79,48 @@ poll_http() {  # poll_http <url> <pattern> <timeout-s> <label>
 poll_http_up() {  # poll_http_up <url> <timeout-s>
   local url="$1" timeout="$2" i=0 code
   while [ "$i" -lt "$timeout" ]; do
-    code="$(curl -s -m 3 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || echo 000)"
+    code="$(curl -s -m 3 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
+    [ -n "$code" ] || code=000
     [ "$code" != "000" ] && return 0
     i=$((i+3)); sleep 3
   done
   return 1
+}
+
+spawn_detached() {  # spawn_detached <pid-file> <work-dir> <log-file> <cmd> [args...]
+  local pid_file="$1" work_dir="$2" log_file="$3"; shift 3
+  local py; py="$(command -v python3 2>/dev/null || true)"
+  if [ -n "$py" ]; then
+    "$py" - "$pid_file" "$work_dir" "$log_file" "$@" <<'PY'
+import os
+import sys
+
+pid_file, work_dir, log_file, *cmd = sys.argv[1:]
+pid = os.fork()
+if pid:
+    with open(pid_file, "w", encoding="utf-8") as fh:
+        fh.write(f"{pid}\n")
+    os._exit(0)
+
+os.setsid()
+os.chdir(work_dir)
+
+devnull = os.open(os.devnull, os.O_RDONLY)
+os.dup2(devnull, 0)
+if devnull > 2:
+    os.close(devnull)
+
+log_fd = os.open(log_file, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o644)
+os.dup2(log_fd, 1)
+os.dup2(log_fd, 2)
+if log_fd > 2:
+    os.close(log_fd)
+
+os.execvp(cmd[0], cmd)
+PY
+  else
+    ( cd "$work_dir" && nohup "$@" >"$log_file" 2>&1 & echo $! >"$pid_file" )
+  fi
 }
 
 # ---- up ------------------------------------------------------------------------------
@@ -139,13 +176,14 @@ cmd_up() {
   [ -n "$jar" ] || die "boot jar not found after build"
 
   log "5/9 start backend (java -jar) on $server_port"
-  ( SERVER_PORT="$server_port" \
-    SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
-    SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
-    SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
-    SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
-    AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
-    nohup java -jar "$jar" >"$sd/backend.log" 2>&1 & echo $! >"$sd/backend.pid" )
+  spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
+    env SERVER_PORT="$server_port" \
+      SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
+      SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
+      SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
+      SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
+      AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
+      java -jar "$jar"
   echo "$server_port $vite_port $bff_port" >"$sd/ports"
   poll_http "http://127.0.0.1:$server_port/actuator/health" '"status":"UP"' 150 backend \
     || die "backend did not become healthy — see $sd/backend.log"
@@ -165,17 +203,15 @@ cmd_up() {
   if [ "$frontend" -eq 1 ]; then
     log "7/9 frontend: symlink node_modules (if missing) + start Vite+BFF"
     [ -e "$REPO_ROOT/web-admin/node_modules" ] || ln -sfn "$CANONICAL/web-admin/node_modules" "$REPO_ROOT/web-admin/node_modules"
-    ( cd "$REPO_ROOT/web-admin" && \
-      VITE_PORT="$vite_port" BFF_PORT="$bff_port" SPRING_BOOT_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
-      exec nohup pnpm dev:full >"$sd/frontend.log" 2>&1 ) &
-    # $! here is the real supervisor (pnpm dev:full) — the subshell `exec`s into
-    # it, so we record the actual process group leader, not a transient wrapper.
-    echo $! >"$sd/frontend.pid"
+    spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/frontend.log" \
+      env VITE_PORT="$vite_port" BFF_PORT="$bff_port" SPRING_BOOT_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
+      pnpm dev:full
     # Wait for Vite to start accepting connections (302 → /login is fine). Poll
     # on HTTP status, not body — a 302 has an empty body that a grep-poll would
     # never match (it would stall the full timeout before warm could start).
     poll_http_up "http://127.0.0.1:$vite_port/" 120 || true
-    local code; code="$(curl -s -m 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$vite_port/" 2>/dev/null || echo 000)"
+    local code; code="$(curl -s -m 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$vite_port/" 2>/dev/null || true)"
+    [ -n "$code" ] || code=000
     [ "$code" != "000" ] || die "Vite did not come up on $vite_port — see $sd/frontend.log"
     log "    frontend UP (supervisor pid $(cat "$sd/frontend.pid"), vite http=$code)"
   else

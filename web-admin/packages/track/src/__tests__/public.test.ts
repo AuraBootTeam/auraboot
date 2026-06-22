@@ -7,10 +7,13 @@ import {
   SESSION_ID_KEY,
   type AnonIdStore,
 } from '../public';
+import { init as initGlobalTracker } from '../global';
 
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
+  document.body.innerHTML = '';
+  window.history.replaceState({}, '', '/');
   // Clear all cookies
   document.cookie.split(';').forEach((c) => {
     const name = c.split('=')[0].trim();
@@ -160,4 +163,48 @@ it('generates and persists a session id in sessionStorage', async () => {
   expect(sid).toBeTruthy();
   const body = JSON.parse(fetchImpl.mock.calls[0][1].body);
   expect(body.events[0].clientSessionId).toBe(sid);
+});
+
+it('global init default auto mode fires an initial pageview and captures clicks', async () => {
+  window.history.replaceState({}, '', '/landing?utm=campaign');
+  document.body.innerHTML =
+    '<button data-aura-element-id="cta_signup" data-aura-app-id="pub1">Sign up</button>';
+
+  const fetchImpl = vi.fn().mockResolvedValue({ ok: true });
+  initGlobalTracker({
+    siteKey: 'abk_auto',
+    batchSize: 1,
+    fetchImpl: fetchImpl as unknown as typeof fetch,
+    anonIdStore: memStore('anon-auto'),
+    generateId: () => 'session-auto',
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+
+  document.querySelector('button')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(fetchImpl).toHaveBeenCalledTimes(2);
+  for (const [url, init] of fetchImpl.mock.calls) {
+    expect(url).toBe('/api/collect/keyed');
+    expect(init.headers['X-Site-Key']).toBe('abk_auto');
+    expect(init.keepalive).toBe(true);
+  }
+
+  const events = fetchImpl.mock.calls.flatMap(([, init]) => JSON.parse(init.body).events);
+  expect(events[0]).toMatchObject({
+    eventName: 'page_view',
+    anonId: 'anon-auto',
+    clientSessionId: 'session-auto',
+    props: { routeTemplate: '/landing' },
+  });
+  expect(events[1]).toMatchObject({
+    eventName: 'element_click',
+    anonId: 'anon-auto',
+    clientSessionId: 'session-auto',
+    uiElementId: 'cta_signup',
+    appId: 'pub1',
+    identityQuality: 'stable',
+  });
 });
