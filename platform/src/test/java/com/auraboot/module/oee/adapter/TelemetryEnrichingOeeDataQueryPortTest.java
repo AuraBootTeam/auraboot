@@ -82,6 +82,24 @@ class TelemetryEnrichingOeeDataQueryPortTest {
     }
 
     @Test
+    void multipleTelemetryExtensions_usesFirstSourceWithData() {
+        when(delegate.fetch(any())).thenReturn(postgresBase());
+        OeeTelemetrySourceExtension empty = (t, eq, s, e) -> Optional.empty();
+        OeeTelemetrySourceExtension present = (t, eq, s, e) -> Optional.of(
+            new OeeTelemetrySourceExtension.OeeTelemetry(new BigDecimal("5"), new BigDecimal("450"), new BigDecimal("405")));
+        OeeTelemetrySourceExtension later = (t, eq, s, e) -> Optional.of(
+            new OeeTelemetrySourceExtension.OeeTelemetry(new BigDecimal("9"), new BigDecimal("999"), new BigDecimal("999")));
+        when(pluginManager.getExtensionsOfType(OeeTelemetrySourceExtension.class))
+            .thenReturn(List.of(empty, present, later));
+
+        OeeInputs out = new TelemetryEnrichingOeeDataQueryPort(delegate, pluginManager).fetch(req());
+
+        assertEquals(0, new BigDecimal("5").compareTo(out.getTelemetryOperatingHours()));
+        assertEquals(0, new BigDecimal("450").compareTo(out.getTelemetryOutputQty()));
+        assertEquals(0, new BigDecimal("405").compareTo(out.getTelemetryGoodQty()));
+    }
+
+    @Test
     void listEquipment_delegatesToPostgresAdapter() {
         when(delegate.listEquipment(1L))
             .thenReturn(List.of(OeeEquipmentRef.builder().equipmentId("EQ-1").code("C1").name("N1").build()));
