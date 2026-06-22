@@ -50,15 +50,29 @@ class DynamicTableOeeAdapterCurrentSchemaIntegrationTest {
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
-        String host = env("OEE_IT_PG_HOST", "localhost");
-        String port = env("OEE_IT_PG_PORT", "5501");
-        String dbName = env("OEE_IT_PG_DB", "aura_boot");
-        String user = env("OEE_IT_PG_USER", "ghj");
-        String password = env("OEE_IT_PG_PASSWORD", "oeeit");
-        registry.add("spring.datasource.url",
-                () -> "jdbc:postgresql://" + host + ":" + port + "/" + dbName + "?charSet=UTF8");
+        String datasourceUrl = firstEnv("SPRING_DATASOURCE_URL", "DATABASE_URL");
+        if (datasourceUrl == null) {
+            String host = env("OEE_IT_PG_HOST", "localhost");
+            String port = env("OEE_IT_PG_PORT", "5501");
+            String dbName = env("OEE_IT_PG_DB", "aura_boot");
+            datasourceUrl = "jdbc:postgresql://" + host + ":" + port + "/" + dbName + "?charSet=UTF8";
+        }
+        String user = env("SPRING_DATASOURCE_USERNAME", env("OEE_IT_PG_USER", "ghj"));
+        String password = env("SPRING_DATASOURCE_PASSWORD", env("OEE_IT_PG_PASSWORD", ""));
+        String resolvedDatasourceUrl = datasourceUrl;
+        registry.add("spring.datasource.url", () -> resolvedDatasourceUrl);
         registry.add("spring.datasource.username", () -> user);
         registry.add("spring.datasource.password", () -> password);
+    }
+
+    private static String firstEnv(String... keys) {
+        for (String key : keys) {
+            String value = System.getenv(key);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private static String env(String key, String def) {

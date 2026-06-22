@@ -1,6 +1,8 @@
 package com.auraboot.framework.integration.agent;
 
 import com.auraboot.framework.application.bootstrap.seeder.AgentTemplateSeeder;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.agent.service.SkillAutoGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,9 +31,18 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private AgentTemplateSeeder agentTemplateSeeder;
 
+    @Autowired
+    private SkillAutoGenerator skillAutoGenerator;
+
     @BeforeEach
     void ensureSeeded() {
         agentTemplateSeeder.seed();
+        try {
+            MetaContext.setSystemTenantContext(SYSTEM_TENANT_ID);
+            skillAutoGenerator.syncSkills(SYSTEM_TENANT_ID);
+        } finally {
+            MetaContext.clear();
+        }
     }
 
     // =========================================================================

@@ -66,7 +66,7 @@ public final class PageSchemaBlockStructureValidator {
     );
 
     /**
-     * Union of the backend {@link DslRegistry.BlockType} codes (30) and the
+     * Union of the backend {@link DslRegistry.BlockType} codes (35) and the
      * front-end v4 structural block types (14). A {@code blockType} outside this
      * set triggers a soft warning only — never a hard reject.
      */

@@ -131,13 +131,13 @@ class DashboardGenerationLiveIT extends BaseIntegrationTest {
                         + "total, bar/line/pie for aggregations, table for row lists). Give each widget a clear title.")
                 .messages(List.of(LlmChatRequest.Message.text("user", task)))
                 .tools(List.of(tool))
-                .toolChoice("auto")
+                .toolChoice("required")
                 .maxTokens(1500)
                 .build();
 
         LlmChatResponse resp = provider.chat(req, cfg.getApiKey(), cfg.getBaseUrl());
         Map<String, Object> args = firstToolInput(resp, "create_dashboard");
-        assertTrue(args != null, "model must call create_dashboard");
+        assertTrue(args != null, () -> "model must call create_dashboard; response=" + summarizeResponse(resp));
 
         JsonNode gen = objectMapper.valueToTree(args);
         StringBuilder report = new StringBuilder("\n===== NL → DASHBOARD GENERATION (DeepSeek, single sample) =====\n");
@@ -188,5 +188,20 @@ class DashboardGenerationLiveIT extends BaseIntegrationTest {
             }
         }
         return null;
+    }
+
+    private static String summarizeResponse(LlmChatResponse resp) {
+        if (resp == null) return "null";
+        if (resp.getContent() == null) return "{stopReason=" + resp.getStopReason() + ", content=null}";
+        return "{stopReason=" + resp.getStopReason() + ", content="
+                + resp.getContent().stream()
+                .map(b -> b.getType() + ":" + (b.getName() != null ? b.getName() : trim(b.getText())))
+                .toList()
+                + "}";
+    }
+
+    private static String trim(String text) {
+        if (text == null) return "";
+        return text.length() <= 80 ? text : text.substring(0, 80) + "...";
     }
 }

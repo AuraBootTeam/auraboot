@@ -7,10 +7,14 @@ import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.Model;
+import com.auraboot.framework.meta.entity.ModelFieldBinding;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
+import com.auraboot.framework.meta.mapper.MetaFieldMapper;
+import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.CommandExecutor;
@@ -61,6 +65,12 @@ class ScheduledTaskCommandHardeningIntegrationTest extends BaseIntegrationTest {
     private MetaModelMapper metaModelMapper;
 
     @Autowired
+    private MetaFieldMapper metaFieldMapper;
+
+    @Autowired
+    private MetaModelFieldBindingMapper fieldBindingMapper;
+
+    @Autowired
     private MetaModelService metaModelService;
 
     private static final String CREATE_CMD = "admin:create_scheduled_task";
@@ -69,6 +79,7 @@ class ScheduledTaskCommandHardeningIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void ensureScheduledTaskCommands() {
         ensureScheduledTaskModel();
+        ensureScheduledTaskFields();
         ensureCommand(CREATE_CMD,
                 "{\"type\":\"create\",\"inputFields\":[\"name\",\"description\",\"task_type\",\"cron_expression\",\"interval_ms\",\"handler_bean\",\"handler_method\",\"params\",\"max_retries\",\"timeout_ms\",\"enabled\"]}");
         ensureCommand(DELETE_CMD, "{\"type\":\"delete\"}");
@@ -252,5 +263,71 @@ class ScheduledTaskCommandHardeningIntegrationTest extends BaseIntegrationTest {
             metaModelMapper.updateById(model);
         }
         metaModelService.refreshModelCache("scheduled_task");
+    }
+
+    private void ensureScheduledTaskFields() {
+        Model model = metaModelMapper.findCurrentByCode("scheduled_task");
+        assertNotNull(model, "scheduled_task model fixture should exist before binding fields");
+
+        int order = 1;
+        ensureFieldBound(model, "name", "string", order++);
+        ensureFieldBound(model, "description", "text", order++);
+        ensureFieldBound(model, "task_type", "string", order++);
+        ensureFieldBound(model, "cron_expression", "string", order++);
+        ensureFieldBound(model, "interval_ms", "long", order++);
+        ensureFieldBound(model, "handler_bean", "string", order++);
+        ensureFieldBound(model, "handler_method", "string", order++);
+        ensureFieldBound(model, "params", "jsonb", order++);
+        ensureFieldBound(model, "max_retries", "integer", order++);
+        ensureFieldBound(model, "timeout_ms", "integer", order++);
+        ensureFieldBound(model, "enabled", "boolean", order);
+        metaModelService.refreshModelCache("scheduled_task");
+    }
+
+    private void ensureFieldBound(Model model, String code, String dataType, int order) {
+        Field field = metaFieldMapper.findCurrentByCode(code);
+        if (field == null) {
+            field = new Field();
+            field.setPid(UniqueIdGenerator.generate());
+            field.setTenantId(getTestTenant().getId());
+            field.setCode(code);
+            field.setDataType(dataType);
+            field.setVersion(1);
+            field.setIsCurrent(true);
+            field.setRowVersion(1);
+            field.setStatus("published");
+            field.setDeletedFlag(false);
+            field.setCreatedAt(Instant.now());
+            field.setUpdatedAt(Instant.now());
+
+            ExtensionBean extension = new ExtensionBean();
+            Map<String, Object> extensionMap = new HashMap<>();
+            extensionMap.put("displayName", code);
+            extension.setExtension(extensionMap);
+            field.setExtension(extension);
+            metaFieldMapper.insert(field);
+            field = metaFieldMapper.findCurrentByCode(code);
+        }
+        assertNotNull(field, "scheduled_task field fixture should exist: " + code);
+
+        ModelFieldBinding existing = fieldBindingMapper.selectByModelAndField(model.getId(), field.getId());
+        if (existing == null) {
+            ModelFieldBinding binding = new ModelFieldBinding();
+            binding.setTenantId(getTestTenant().getId());
+            binding.setModelId(model.getId());
+            binding.setFieldId(field.getId());
+            binding.setFieldOrder(order);
+            binding.setRequired(false);
+            binding.setVisible(true);
+            binding.setEditable(true);
+            binding.setCreatedAt(Instant.now());
+            binding.setUpdatedAt(Instant.now());
+            fieldBindingMapper.insert(binding);
+        } else if (!Boolean.TRUE.equals(existing.getEditable()) || !Boolean.TRUE.equals(existing.getVisible())) {
+            existing.setVisible(true);
+            existing.setEditable(true);
+            existing.setUpdatedAt(Instant.now());
+            fieldBindingMapper.updateById(existing);
+        }
     }
 }

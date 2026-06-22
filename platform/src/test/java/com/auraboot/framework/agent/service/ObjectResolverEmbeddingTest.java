@@ -1,8 +1,11 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,6 +20,28 @@ class ObjectResolverEmbeddingTest extends BaseIntegrationTest {
 
     @Autowired(required = false)
     private ModelEmbeddingService modelEmbeddingService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @BeforeEach
+    void seedModelIndexFixture() {
+        Long tenantId = getTestTenant().getId();
+        jdbcTemplate.update("""
+                INSERT INTO ab_meta_model (
+                    pid, tenant_id, code, table_name, extension, capabilities,
+                    version, is_current, status, deleted_flag
+                )
+                SELECT ?, ?, 'crm_account', 'mt_crm_account',
+                       '{"displayName":"客户"}'::jsonb, '{}'::jsonb,
+                       1, TRUE, 'published', FALSE
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM ab_meta_model
+                    WHERE tenant_id = ? AND code = 'crm_account' AND deleted_flag = FALSE
+                )
+                """, UniqueIdGenerator.generate(), tenantId, tenantId);
+        objectResolver.rebuildIndex();
+    }
 
     @Test
     void resolve_unknownTerm_doesNotThrowWithEmbeddingFallback() {

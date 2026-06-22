@@ -66,7 +66,8 @@ class StartProcessE2EIntegrationTest extends BaseIntegrationTest {
         deploymentService.deploy(def.getPid());
 
         String code = "it_sp_pol_" + System.nanoTime();
-        definitionService.create(code, "StartProcess E2E", "FORM_SUBMITTED", "FORM", "complaint");
+        String targetKey = code + "_form";
+        definitionService.create(code, "StartProcess E2E", "FORM_SUBMITTED", "FORM", targetKey);
         JsonNode rules = mapper.readTree(("""
             [{"ruleCode":"R-SP","ruleName":"open flow","priority":100,"enabled":true,
               "condition":{"type":"compare",
@@ -84,8 +85,8 @@ class StartProcessE2EIntegrationTest extends BaseIntegrationTest {
 
         // unique recordId per run so the idempotency key differs (NOT_SUPPORTED commits exec logs)
         String recordId = "CMP-SP-" + System.nanoTime();
-        var result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", "complaint",
-                Map.of("record", Map.of("entityCode", "complaint", "recordId", recordId,
+        var result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
+                Map.of("record", Map.of("entityCode", targetKey, "recordId", recordId,
                         "data", Map.of("priority", "HIGH"))));
 
         // The action SUCCEEDED against the REAL deployed definition: the production handler invoked the

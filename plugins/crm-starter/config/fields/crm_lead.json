@@ -82,6 +82,24 @@
     "constraints": { "maxLength": 200 }
   },
   {
+    "code": "owner_type",
+    "displayName:zh-CN": "分配类型",
+    "displayName:en": "Owner Type",
+    "dataType": "string",
+    "constraints": { "maxLength": 32 },
+    "description": "Whether the lead is assigned to a user or a team.",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "owner_id",
+    "displayName:zh-CN": "分配对象",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "constraints": { "maxLength": 64 },
+    "description": "PID of the assigned user or team.",
+    "feature": { "searchable": true }
+  },
+  {
     "code": "crm_lead_lost_reason",
     "displayName:zh-CN": "丢失原因",
     "displayName:en": "Lost Reason",

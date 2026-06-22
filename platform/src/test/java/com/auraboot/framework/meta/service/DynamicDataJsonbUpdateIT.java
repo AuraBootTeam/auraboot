@@ -75,6 +75,8 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
 
     // Unique per test-run to avoid cross-test contamination
     private String modelCode;
+    private String nameField;
+    private String configField;
     private boolean modelReady = false;
     private final List<String> createdPids = Collections.synchronizedList(new ArrayList<>());
 
@@ -82,7 +84,10 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
 
     @BeforeAll
     void initModelCode() {
-        modelCode = "jb_upd_" + System.currentTimeMillis();
+        String suffix = Long.toString(System.currentTimeMillis(), 36);
+        modelCode = "jb_upd_" + suffix;
+        nameField = "jb_name_" + suffix;
+        configField = "jb_config_" + suffix;
     }
 
     @BeforeEach
@@ -122,8 +127,8 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
     @DisplayName("create with jsonb array field — no PSQLException")
     void create_with_jsonb_array_field_succeeds() {
         Map<String, Object> data = new HashMap<>();
-        data.put("name", "create-jsonb-test");
-        data.put("config", List.of("https://a.example.com", "https://b.example.com"));
+        data.put(nameField, "create-jsonb-test");
+        data.put(configField, List.of("https://a.example.com", "https://b.example.com"));
 
         Map<String, Object> created = dynamicDataService.create(modelCode, data);
 
@@ -149,8 +154,8 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
     void update_jsonb_column_via_dynamicDataService_persists() {
         // Create a row with an initial jsonb value
         Map<String, Object> initialData = new HashMap<>();
-        initialData.put("name", "update-jsonb-test");
-        initialData.put("config", List.of("https://initial.example.com"));
+        initialData.put(nameField, "update-jsonb-test");
+        initialData.put(configField, List.of("https://initial.example.com"));
         Map<String, Object> created = dynamicDataService.create(modelCode, initialData);
         String pid = Objects.toString(created.get("pid"));
         createdPids.add(pid);
@@ -158,7 +163,7 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         // Update: replace the jsonb array — must not throw PSQLException
         List<String> newUrls = List.of("https://new1.example.com", "https://new2.example.com");
         Map<String, Object> patch = new HashMap<>();
-        patch.put("config", newUrls);
+        patch.put(configField, newUrls);
 
         assertThatCode(() -> dynamicDataService.update(modelCode, pid, patch))
                 .as("DynamicDataService.update must not throw PSQLException for jsonb column")
@@ -167,7 +172,7 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         // Verify the new value is actually persisted (not the old one)
         Map<String, Object> reloaded = dynamicDataService.getById(modelCode, pid);
         assertThat(reloaded).isNotNull();
-        Object rawConfig = reloaded.get("config");
+        Object rawConfig = reloaded.get(configField);
         assertThat(rawConfig).isNotNull();
         // The persisted value may come back as List<String> or String depending on JSONB projection
         String configStr = rawConfig instanceof String s ? s : rawConfig.toString();
@@ -192,8 +197,8 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
 
         // Create row
         Map<String, Object> initialData = new HashMap<>();
-        initialData.put("name", "bg-accessor-jsonb-test");
-        initialData.put("config", Map.of("qps", 2, "concurrency", 4));
+        initialData.put(nameField, "bg-accessor-jsonb-test");
+        initialData.put(configField, Map.of("qps", 2, "concurrency", 4));
         Map<String, Object> created = dynamicDataService.create(modelCode, initialData);
         String pid = Objects.toString(created.get("pid"));
         createdPids.add(pid);
@@ -201,7 +206,7 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         // Update via BackgroundDataAccessor (the exact path used by JobLifecycleWatcher)
         Map<String, Object> newConfig = Map.of("qps", 5, "concurrency", 8, "burst", 20);
         Map<String, Object> patch = new HashMap<>();
-        patch.put("config", newConfig);
+        patch.put(configField, newConfig);
 
         assertThatCode(() -> backgroundDataAccessor.update(tenantId, modelCode, pid, patch))
                 .as("BackgroundDataAccessor.update must not throw PSQLException for jsonb column")
@@ -210,7 +215,7 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         // Verify value persisted
         Map<String, Object> reloaded = dynamicDataService.getById(modelCode, pid);
         assertThat(reloaded).isNotNull();
-        Object rawConfig = reloaded.get("config");
+        Object rawConfig = reloaded.get(configField);
         assertThat(rawConfig).isNotNull();
         String configStr = rawConfig instanceof String s ? s : rawConfig.toString();
         assertThat(configStr)
@@ -227,20 +232,20 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
     @DisplayName("update non-jsonb column when model has jsonb fields — succeeds")
     void update_non_jsonb_column_on_jsonb_model_succeeds() {
         Map<String, Object> initialData = new HashMap<>();
-        initialData.put("name", "plain-field-update-test");
-        initialData.put("config", List.of("https://example.com"));
+        initialData.put(nameField, "plain-field-update-test");
+        initialData.put(configField, List.of("https://example.com"));
         Map<String, Object> created = dynamicDataService.create(modelCode, initialData);
         String pid = Objects.toString(created.get("pid"));
         createdPids.add(pid);
 
-        Map<String, Object> patch = Map.of("name", "updated-name");
+        Map<String, Object> patch = Map.of(nameField, "updated-name");
 
         assertThatCode(() -> dynamicDataService.update(modelCode, pid, patch))
                 .as("Non-jsonb field update on model with jsonb fields must not throw")
                 .doesNotThrowAnyException();
 
         Map<String, Object> reloaded = dynamicDataService.getById(modelCode, pid);
-        assertThat(reloaded.get("name")).isEqualTo("updated-name");
+        assertThat(reloaded.get(nameField)).isEqualTo("updated-name");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -253,17 +258,14 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         }
         try {
             Long tenantId = getTestTenant().getId();
-            // Remove bindings first (FK), then fields orphaned by those bindings, then the model
+            // Remove bindings first (FK), then this test's unique fields, then the model.
             jdbcTemplate.update(
                     "DELETE FROM ab_meta_model_field_binding WHERE model_id IN "
                     + "(SELECT id FROM ab_meta_model WHERE code = ? AND tenant_id = ?)",
                     modelCode, tenantId);
-            // Remove the field entities whose codes are exclusively used by this test model
-            // Use the model code prefix to scope deletion safely
             jdbcTemplate.update(
-                    "DELETE FROM ab_meta_field WHERE tenant_id = ? "
-                    + "AND id NOT IN (SELECT field_id FROM ab_meta_model_field_binding)",
-                    tenantId);
+                    "DELETE FROM ab_meta_field WHERE tenant_id = ? AND code IN (?, ?)",
+                    tenantId, nameField, configField);
             jdbcTemplate.update(
                     "DELETE FROM ab_meta_model WHERE code = ? AND tenant_id = ?",
                     modelCode, tenantId);
@@ -293,12 +295,10 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
     }
 
     private void createFields() {
-        // Standard primary-key field
-        bindField("pid", "string", true, false, -1);
         // Plain string field
-        bindField("name", "string", false, false, 1);
+        bindField(nameField, "string", false, false, 1);
         // JSONB host column — this is the bug target
-        bindField("config", "jsonb", false, false, 2);
+        bindField(configField, "jsonb", false, false, 2);
     }
 
     private void bindField(String code, String dataType, boolean primaryKey, boolean required, int order) {

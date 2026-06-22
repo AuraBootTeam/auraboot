@@ -135,13 +135,13 @@ class PageSchemaBlockStructureValidatorTest {
     // ── union whitelist contract ───────────────────────────────────────────────
 
     @Test
-    @DisplayName("union whitelist = 30 backend enum codes + 14 front-end v4 structural blocks")
+    @DisplayName("union whitelist = 35 backend enum codes + 14 front-end v4 structural blocks")
     void unionWhitelist_containsBackendEnumAndFrontendStructural() {
         var known = PageSchemaBlockStructureValidator.knownBlockTypes();
 
-        // all 30 backend enum codes present
+        // all 35 backend enum codes present
         assertThat(known).containsAll(DslRegistry.BlockType.codes());
-        assertThat(DslRegistry.BlockType.codes()).hasSize(30);
+        assertThat(DslRegistry.BlockType.codes()).hasSize(35);
 
         // all 14 front-end v4 structural blocks present
         List<String> frontendV4 = Arrays.asList(
@@ -150,7 +150,7 @@ class PageSchemaBlockStructureValidatorTest {
                 "columns", "tab", "repeater", "subform");
         assertThat(known).containsAll(frontendV4);
 
-        // union size: 30 + 14 (no overlap between the two sets)
-        assertThat(known).hasSize(30 + 14);
+        // union size: 35 + 14 (no overlap between the two sets)
+        assertThat(known).hasSize(35 + 14);
     }
 }

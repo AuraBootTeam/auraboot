@@ -65,8 +65,8 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
-    private String publishNotifyPolicy(String code) throws Exception {
-        definitionService.create(code, "Run+Exec IT", "FORM_SUBMITTED", "FORM", "complaint");
+    private String publishNotifyPolicy(String code, String targetKey) throws Exception {
+        definitionService.create(code, "Run+Exec IT", "FORM_SUBMITTED", "FORM", targetKey);
 
         String rules = """
             [{"ruleCode":"R-NOTIFY","ruleName":"notify high","priority":100,"enabled":true,
@@ -86,8 +86,8 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
         return code;
     }
 
-    private Map<String, Map<String, Object>> ctx(String priority) {
-        return Map.of("record", Map.of("entityCode", "complaint", "recordId", "CMP-RX-1",
+    private Map<String, Map<String, Object>> ctx(String targetKey, String priority) {
+        return Map.of("record", Map.of("entityCode", targetKey, "recordId", "CMP-RX-1",
                 "data", Map.of("priority", priority)));
     }
 
@@ -95,9 +95,10 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
     void runAndExecute_dispatchesToHandler_andLogsIdempotency() throws Exception {
         int before = NOTIFY_INVOCATIONS.get();
         String code = "it_runexec_" + System.nanoTime();
-        publishNotifyPolicy(code);
+        String targetKey = code + "_form";
+        publishNotifyPolicy(code, targetKey);
 
-        EventPolicyExecutionResult r = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", "complaint", ctx("HIGH"));
+        EventPolicyExecutionResult r = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey, ctx(targetKey, "HIGH"));
 
         // decision half matched + resolved one NOTIFY plan
         assertThat(r.policy().status()).isEqualTo(EventPolicyResult.Status.MATCHED);
@@ -117,8 +118,9 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
     @Test
     void runAndExecute_noMatch_nothingToDo() throws Exception {
         String code = "it_runexec_nm_" + System.nanoTime();
-        publishNotifyPolicy(code);
-        EventPolicyExecutionResult r = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", "complaint", ctx("LOW"));
+        String targetKey = code + "_form";
+        publishNotifyPolicy(code, targetKey);
+        EventPolicyExecutionResult r = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey, ctx(targetKey, "LOW"));
         assertThat(r.policy().status()).isEqualTo(EventPolicyResult.Status.NOT_MATCHED);
         assertThat(r.execution().overallStatus()).isEqualTo(PolicyExecutionResult.OverallStatus.NOTHING_TO_DO);
     }

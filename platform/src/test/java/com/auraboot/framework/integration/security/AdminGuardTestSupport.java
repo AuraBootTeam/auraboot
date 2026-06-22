@@ -1,9 +1,13 @@
 package com.auraboot.framework.integration.security;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import jakarta.servlet.Filter;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -31,11 +35,32 @@ public final class AdminGuardTestSupport {
     public static MockMvc buildMockMvc(WebApplicationContext ctx,
                                        Long tenantId, Long userId,
                                        String userPid, String userName) {
+        return buildMockMvc(ctx, tenantId, userId, userPid, userName, null);
+    }
+
+    public static MockMvc buildMockMvc(WebApplicationContext ctx,
+                                       Long tenantId, Long userId,
+                                       String userPid, String userName,
+                                       Long memberId) {
         Filter metaFilter = (request, response, chain) -> {
             try {
                 MetaContext.setContext(tenantId, userId, userPid, userName);
+                if (memberId != null) {
+                    MetaContext.setMemberId(memberId);
+                }
+                CustomUserDetails userDetails = new CustomUserDetails(
+                        userName,
+                        "test-password",
+                        userId,
+                        userPid,
+                        AuthorityUtils.createAuthorityList("role_admin"),
+                        true, true, true, true
+                );
+                SecurityContextHolder.getContext().setAuthentication(
+                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
                 chain.doFilter(request, response);
             } finally {
+                SecurityContextHolder.clearContext();
                 MetaContext.clear();
             }
         };
@@ -107,8 +132,46 @@ public final class AdminGuardTestSupport {
         return roleId;
     }
 
+    public static Long findActiveMemberId(JdbcTemplate jdbc, Long tenantId, Long userId) {
+        return jdbc.query(
+                "SELECT id FROM ab_tenant_member "
+                        + "WHERE tenant_id = ? AND user_id = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL) "
+                        + "LIMIT 1",
+                (rs, rowNum) -> rs.getLong("id"),
+                tenantId, userId
+        ).stream().findFirst().orElse(null);
+    }
+
+    public static long grantPermissionToRole(JdbcTemplate jdbc, Long tenantId, long roleId,
+                                             String permissionCode, String permissionName,
+                                             String resourceType, String resourceCode, String action) {
+        Long permissionId = jdbc.query(
+                "SELECT id FROM ab_permission "
+                        + "WHERE tenant_id = ? AND code = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL) "
+                        + "LIMIT 1",
+                (rs, rowNum) -> rs.getLong("id"),
+                tenantId, permissionCode
+        ).stream().findFirst().orElse(null);
+        if (permissionId == null) {
+            permissionId = (System.nanoTime() ^ 0xcafeL) & 0x7fffffffffffffffL;
+            jdbc.update("INSERT INTO ab_permission "
+                            + "(id, pid, tenant_id, code, name, resource_type, resource_code, action, source, status, deleted_flag) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual', 'active', FALSE)",
+                    permissionId, UniqueIdGenerator.generate(), tenantId, permissionCode, permissionName,
+                    resourceType, resourceCode, action);
+        }
+        jdbc.update("INSERT INTO ab_role_permission "
+                        + "(id, pid, tenant_id, role_id, permission_id, grant_type, status, deleted_flag) "
+                        + "VALUES (?, ?, ?, ?, ?, 'grant', 'active', FALSE)",
+                System.nanoTime() & 0x7fffffffffffffffL,
+                UniqueIdGenerator.generate(), tenantId, roleId, permissionId);
+        return permissionId;
+    }
+
     public static void cleanupTenant(JdbcTemplate jdbc, Long tenantId) {
         jdbc.update("DELETE FROM ab_user_role WHERE tenant_id = ?", tenantId);
+        jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id = ?", tenantId);
+        jdbc.update("DELETE FROM ab_permission WHERE tenant_id = ? AND source = 'manual'", tenantId);
         jdbc.update("DELETE FROM ab_role WHERE tenant_id = ?", tenantId);
         jdbc.update("DELETE FROM ab_tenant_member WHERE tenant_id = ?", tenantId);
         jdbc.update("DELETE FROM ab_tenant WHERE id = ? AND name LIKE 'guard_test_%'", tenantId);
