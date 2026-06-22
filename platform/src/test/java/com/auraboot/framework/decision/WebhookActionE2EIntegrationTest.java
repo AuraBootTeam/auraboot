@@ -65,6 +65,7 @@ class WebhookActionE2EIntegrationTest extends BaseIntegrationTest {
     void webhookAction_fansOutToSubscription_andLogsDeliveryAttempt() throws Exception {
         tid = getTestTenant().getId();
         String eventType = "drt.webhook.test." + System.nanoTime();
+        String targetKey = "complaint_wh_" + System.nanoTime();
         subPid = UniqueIdGenerator.generate();
 
         WebhookSubscription sub = new WebhookSubscription();
@@ -77,7 +78,7 @@ class WebhookActionE2EIntegrationTest extends BaseIntegrationTest {
         subscriptionMapper.insert(sub);
 
         String code = "it_wh_pol_" + System.nanoTime();
-        definitionService.create(code, "Webhook E2E", "FORM_SUBMITTED", "FORM", "complaint");
+        definitionService.create(code, "Webhook E2E", "FORM_SUBMITTED", "FORM", targetKey);
         JsonNode rules = mapper.readTree(("""
             [{"ruleCode":"R-WH","ruleName":"webhook high","priority":100,"enabled":true,
               "condition":{"type":"compare",
@@ -93,8 +94,8 @@ class WebhookActionE2EIntegrationTest extends BaseIntegrationTest {
         versionService.validate(draft.getPid());
         versionService.publish(draft.getPid());
 
-        var result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", "complaint",
-                Map.of("record", Map.of("entityCode", "complaint", "recordId", "CMP-WH-1",
+        var result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
+                Map.of("record", Map.of("entityCode", targetKey, "recordId", "CMP-WH-1",
                         "data", Map.of("priority", "HIGH"))));
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");
         assertThat(result.execution().actions().get(0).status().name()).isEqualTo("SUCCESS");

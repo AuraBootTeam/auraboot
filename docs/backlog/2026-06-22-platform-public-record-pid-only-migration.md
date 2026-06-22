@@ -2,6 +2,7 @@
 type: backlog
 status: active
 created: 2026-06-22
+updated: 2026-06-23
 relates_to:
   - docs/backlog/2026-06-22-saved-view-feishu-parity-gaps.md
 ---
@@ -52,27 +53,47 @@ Enterprise scan in this phase only covers plugin config JSON, not enterprise bac
 
 ## Verification Status
 
-Passing checks in this phase:
+Passing checks in the final repair pass:
 
-- `bash scripts/check-public-record-id-contracts.sh`
-- `./gradlew --no-daemon :test --tests 'com.auraboot.framework.meta.controller.DynamicControllerPublicRecordSanitizerTest' --tests 'com.auraboot.framework.meta.util.PublicRecordSanitizerTest' --tests 'com.auraboot.framework.meta.dto.CommandExecuteRequestDryRunTest'`
-- `pnpm exec vitest run app/framework/meta/utils/__tests__/publicRecordId.test.ts app/framework/meta/rendering/pages/list/rowTree.test.ts app/framework/smart/components/kanban/__tests__/useKanbanData.persistence.test.ts`
-- `pnpm run typecheck`
-- `pnpm run test:unit` in `web-admin`: 1723 suites / 4688 tests passed
-- `pnpm run typecheck:packages`
-- `pnpm run validate:plugins`
-- `pnpm run build:packages`
-- `git diff --check`
+- OSS backend full test:
+  `AURA_ENV=test IMPORT_TEST_FIXTURES=true ./gradlew --no-daemon test`
+  over a freshly recreated `aura_public_record_pid_oss_test` database after OSS Flyway migrate.
+  XML summary: 1486 files / 11882 tests / 0 failures / 0 errors / 43 skipped.
+- OSS frontend gate:
+  `web-admin pnpm run check`.
+  This ran `typecheck`, plugin route verification, datetime display check, and design-token check.
+- OSS schema gate:
+  `PG_HOST=localhost PG_PORT=5432 PG_USER=ghj PG_PASSWORD='' scripts/check-schema-sql.sh --local`.
+  Result: `schema.sql` applies cleanly; 311 tables created.
+- OSS public-record-id contract gate:
+  `scripts/check-public-record-id-contracts.sh`.
+  Result: 611 findings, 611 accepted, 0 new; Node test runner 4/4 passing.
+- Enterprise backend full test:
+  `AURA_ENV=test IMPORT_TEST_FIXTURES=true ./gradlew --no-daemon test -Dmaven.repo.local=<oss-worktree>/platform/.m2/repository`
+  over a freshly recreated `aura_public_record_pid_ent_test` database after enterprise Flyway migrate with the OSS core worktree.
+  XML summary: 166 files / 986 tests / 0 failures / 0 errors / 48 skipped.
 
 Inventory-only evidence:
 
 - `node scripts/validate-public-record-id-contracts.mjs --include-enterprise --enterprise=/Users/ghj/work/auraboot/auraboot-enterprise --no-baseline --quiet` reported 617 OSS + enterprise plugin config findings. This is intentionally not a passing gate because `--no-baseline` reports the full inventory.
 
-Merge gate is still blocked:
+The merge gate is no longer blocked by the previously observed OSS backend, `web-admin`, schema, public-record-id contract, or enterprise backend failures.
 
-- OSS full backend `./gradlew --no-daemon test` failed: 11870 tests completed, 121 failed, 43 skipped. The newly added public-record backend tests passed inside this run, but the suite has unrelated existing failures in plugin lifecycle, metering/quota, audit log, DB schema drift, Docker-dependent smoke tests, ArchUnit, and provider submodule JUnit discovery.
-- `web-admin pnpm run check` failed on the existing design-token gate: raw hex in `app/ui/smart/form/Select.tsx:226`, and palette utility count `1227 > 1211` baseline.
-- Enterprise platform `./gradlew --no-daemon -Dmaven.repo.local=/tmp/auraboot-public-record-pid-m2 test` failed: 923 tests completed, 119 failed, 27 skipped. Failures are dominated by missing enterprise plugin directories (`asset-management`, `project-management`), missing enterprise schema objects such as `ab_qr_label_template` / billing tables, org fixture assumptions, and existing business assertions. No failure XML contained `targetRecordPid`, `targetRecordId`, or `PublicRecord`.
+## Repair Gap List From Final Verification
+
+These gaps were discovered while turning the original inventory into a mergeable PR:
+
+1. NL modeling generated v4 page schemas could still contain raw non-ASCII labels such as table column `label` values instead of `$i18n:*` keys. Fixed by normalizing page title/description and nested block text into generated i18n resources.
+2. `RecordCapabilityIntegrationTest` seeded dynamic records without audit columns, while the current schema creates `created_by` and `updated_by` as varchar system columns. Fixed test fixtures to seed varchar audit values.
+3. `AutomationRunStreamControllerIntegrationTest` asserted SSE body contents before async chunk delivery was observable, causing a race. Fixed by polling the response body for expected chunk events before publishing completion.
+4. `DashboardGenerationLiveIT` used automatic tool choice while asserting a required tool call, so the live model could validly answer in text. Fixed by requiring tool choice and adding a diagnostic response summary.
+5. Enterprise asset plugin install expectations counted only 12 page resources after the dashboard page was also imported. Fixed the assertion to require 12 pages plus 1 dashboard page resource.
+6. Enterprise OSS-to-enterprise CRM overwrite upgrade tests assumed a single plugin root and missed platform permissions and command handlers needed by imported resources. Fixed path resolution, fixture permissions, handler registration, and table/column assertions.
+7. Enterprise `InsightType` only recognized the new `_common` CRM model codes, while some mobile/AI callers still send legacy CRM codes. Fixed by keeping `_common` primary codes and accepting legacy aliases.
+8. Enterprise mobile config tests expected old CRM pinned model codes. Fixed expected pinned models to `crm_lead_common`, `crm_account_common`, and `crm_opportunity_common`.
+9. Enterprise FX revaluation test was double-applying enterprise schema SQL on top of Flyway-managed schema. Fixed the redundant SQL fixture.
+10. Enterprise lead normalization tests still targeted the old CRM lead table and lacked the minimal required current columns. Fixed the table target and fixture setup.
+11. Enterprise template controller tests referenced template ids that no longer match the current template catalog. Fixed list/preview/install expectations to current template ids.
 
 ## Complete Gap List
 

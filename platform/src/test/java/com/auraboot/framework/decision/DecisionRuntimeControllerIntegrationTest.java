@@ -7,6 +7,10 @@ import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.bpm.entity.SlaConfigEntity;
 import com.auraboot.framework.bpm.mapper.SlaConfigMapper;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.decision.ast.ConditionNode;
+import com.auraboot.framework.decision.ast.DataType;
+import com.auraboot.framework.decision.ast.Operand;
+import com.auraboot.framework.decision.ast.Operator;
 import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.decision.entity.DecisionImpactAckEntity;
 import com.auraboot.framework.decision.entity.DecisionUsageRefEntity;
@@ -14,6 +18,7 @@ import com.auraboot.framework.decision.entity.DrtLogEntity;
 import com.auraboot.framework.decision.mapper.DecisionImpactAckMapper;
 import com.auraboot.framework.decision.mapper.DecisionUsageRefMapper;
 import com.auraboot.framework.decision.mapper.DrtLogMapper;
+import com.auraboot.framework.decision.rule.ConditionSpec;
 import com.auraboot.framework.decision.rule.DecisionBinding;
 import com.auraboot.framework.decision.rule.DecisionVersionPolicy;
 import com.auraboot.framework.decision.rule.RuleBindingKind;
@@ -242,7 +247,7 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                 {"id":"amount","label":"Amount","scope":"record","path":"data.amount","dataType":"decimal"}],
               "outputs":[{"id":"route","label":"Route","dataType":"string"}],
               "rules":[
-                {"ruleId":"date-fn","when":{"dueDate":{"operator":"EQ","value":"","feel":"date(2026, 06, 10)"}},"then":{"route":"director"}}] }
+                {"ruleId":"date-fn","when":{"dueDate":{"operator":"EQ","value":"","feel":"if true then \\"2026-06-10\\" else \\"2026-06-11\\""}},"then":{"route":"director"}}] }
             """;
 
         String body = mockMvc.perform(post("/api/decision/tables/analyze").contentType(MediaType.APPLICATION_JSON)
@@ -1310,6 +1315,11 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                 .modelCode("complaint")
                 .decisionRef(code)
                 .decisionBinding("LATEST")
+                .ruleBinding(fieldRuleBinding(
+                        "AUTOMATION",
+                        "impact-automation",
+                        "trigger",
+                        "data.amount"))
                 .build());
         automation.setEnabled(true);
         automation.setActions(List.of());
@@ -1329,6 +1339,11 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                 .targetKey("complaint_process")
                 .deadlineMode("RULE")
                 .deadlineValue(code)
+                .ruleBinding(fieldRuleBinding(
+                        "SLA_RULE",
+                        "impact-sla",
+                        "deadline",
+                        "data.amount"))
                 .enabled(true)
                 .deletedFlag(false)
                 .createdAt(Instant.now())
@@ -1370,6 +1385,11 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                   "id": "rule-decision-ref",
                   "label": "Decision ref rule",
                   "decisionRef": "%s",
+                  "conditions": [{
+                    "type": "path",
+                    "scope": "record",
+                    "path": "data.amount"
+                  }],
                   "actions": [{
                     "type": "NOTIFY",
                     "target": "ops",
@@ -1384,6 +1404,22 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         policyVersionMapper.insert(policyVersion);
 
         return new ImpactFixture(code, pid, automation.getPid(), sla.getPid(), policyVersion.getPid());
+    }
+
+    private RuleConsumerBinding fieldRuleBinding(
+            String consumerType, String consumerCode, String consumerNodeId, String fieldPath) {
+        ConditionNode.CompareNode condition = ConditionNode.CompareNode.of(
+                new Operand.PathOperand(Scope.RECORD, fieldPath, DataType.DECIMAL),
+                Operator.GT,
+                new Operand.LiteralOperand(0, DataType.DECIMAL));
+        return new RuleConsumerBinding(
+                consumerType,
+                consumerCode,
+                consumerNodeId,
+                RuleBindingKind.CONDITION,
+                ConditionSpec.of(condition),
+                null,
+                true);
     }
 
     private void createDefinition(String code) throws Exception {

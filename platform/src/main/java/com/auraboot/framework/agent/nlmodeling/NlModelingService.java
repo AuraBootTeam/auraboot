@@ -784,6 +784,8 @@ public class NlModelingService {
         manifest.put("commands", lowercaseStringKey(commands, "type"));
         List<Map<String, Object>> pages =
                 synthesizePages(pluginCode, res.getModels(), fields, res.getPages());
+        List<Map<String, Object>> i18nResources = mutableI18nResources(res.getI18n());
+        conformPageTextToI18n(pages, fields, i18nResources);
         // Config-as-product provenance (FR-E4): tag every generated block source=ai /
         // unlocked so a later hand-edit/lock can be preserved across re-generation.
         for (Map<String, Object> page : pages) {
@@ -792,7 +794,7 @@ public class NlModelingService {
         manifest.put("pages", pages);
         manifest.put("menus", deriveDynamicMenuPageKeys(
                 synthesizeMenus(res.getModels(), res.getMenus())));
-        manifest.put("i18nResources", res.getI18n() != null ? res.getI18n() : List.of());
+        manifest.put("i18nResources", i18nResources);
         manifest.put("permissions", synthesizePermissions(res.getModels(), res.getPermissions()));
         manifest.put("dicts", res.getDicts() != null ? res.getDicts() : List.of());
 
@@ -1099,6 +1101,201 @@ public class NlModelingService {
         }
         return fields;
     }
+
+    private static final Set<String> PAGE_TEXT_FIELDS = Set.of("title", "description");
+    private static final Set<String> DSL_TEXT_FIELDS = Set.of(
+            "title", "label", "placeholder", "description",
+            "emptyText", "tooltip", "buttonText", "helpText",
+            "headerTitle", "confirmMessage", "cancelText", "okText");
+    private static final Set<String> DSL_TEXT_SUB_LISTS = Set.of(
+            "columns", "fields", "actions", "tabs", "filters", "items", "children", "buttons");
+
+    static void conformPageTextToI18n(List<Map<String, Object>> pages,
+                                      List<Map<String, Object>> fields,
+                                      List<Map<String, Object>> i18nResources) {
+        if (pages == null || pages.isEmpty()) {
+            return;
+        }
+        Map<String, Map<String, String>> fieldLabels = fieldLabelsByCode(fields);
+        Set<String> existingKeys = new HashSet<>();
+        if (i18nResources != null) {
+            for (Map<String, Object> entry : i18nResources) {
+                if (entry != null && entry.get("key") instanceof String key && !key.isBlank()) {
+                    existingKeys.add(key);
+                }
+            }
+        }
+        for (Map<String, Object> page : pages) {
+            if (page == null) {
+                continue;
+            }
+            String pageKey = stringOrDefault(page.get("pageKey"), "generated_page");
+            String modelCode = stringOrDefault(page.get("modelCode"), "model");
+            rewriteTextFields(page, PAGE_TEXT_FIELDS, pageKey, modelCode, "page", fieldLabels,
+                    i18nResources, existingKeys);
+            if (page.get("blocks") instanceof List<?> blocks) {
+                rewriteNestedTextList(blocks, pageKey, modelCode, "block", fieldLabels,
+                        i18nResources, existingKeys);
+            }
+        }
+    }
+
+    private static List<Map<String, Object>> mutableI18nResources(List<Map<String, Object>> i18n) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (i18n != null) {
+            for (Map<String, Object> entry : i18n) {
+                if (entry != null) {
+                    out.add(new LinkedHashMap<>(entry));
+                }
+            }
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void rewriteNestedTextList(List<?> items,
+                                              String pageKey,
+                                              String modelCode,
+                                              String path,
+                                              Map<String, Map<String, String>> fieldLabels,
+                                              List<Map<String, Object>> i18nResources,
+                                              Set<String> existingKeys) {
+        for (int i = 0; i < items.size(); i++) {
+            Object item = items.get(i);
+            if (!(item instanceof Map<?, ?> raw)) {
+                continue;
+            }
+            Map<String, Object> map = (Map<String, Object>) raw;
+            String childPath = path + "." + i;
+            rewriteTextFields(map, DSL_TEXT_FIELDS, pageKey, modelCode, childPath, fieldLabels,
+                    i18nResources, existingKeys);
+            for (String subList : DSL_TEXT_SUB_LISTS) {
+                Object sub = map.get(subList);
+                if (sub instanceof List<?> nested) {
+                    rewriteNestedTextList(nested, pageKey, modelCode, childPath + "." + subList,
+                            fieldLabels, i18nResources, existingKeys);
+                }
+            }
+        }
+    }
+
+    private static void rewriteTextFields(Map<String, Object> owner,
+                                          Set<String> textFields,
+                                          String pageKey,
+                                          String modelCode,
+                                          String path,
+                                          Map<String, Map<String, String>> fieldLabels,
+                                          List<Map<String, Object>> i18nResources,
+                                          Set<String> existingKeys) {
+        for (String textField : textFields) {
+            Object value = owner.get(textField);
+            if (!(value instanceof String label) || label.isBlank()
+                    || label.startsWith("$i18n:") || isPureAscii(label)) {
+                continue;
+            }
+            I18nTextKey key = deriveI18nKey(owner, textField, pageKey, modelCode, path, fieldLabels);
+            String zh = label;
+            String en = key.enFallback();
+            if (owner.get("field") instanceof String fieldCode) {
+                Map<String, String> labels = fieldLabels.get(fieldCode);
+                if (labels == null) {
+                    labels = Map.of();
+                }
+                zh = nonBlank(labels.get("zh-CN"), zh);
+                en = nonBlank(labels.get("en-US"), en);
+            }
+            addI18nResource(i18nResources, existingKeys, key.key(), zh, en, key.refType());
+            owner.put(textField, "$i18n:" + key.key());
+        }
+    }
+
+    private static I18nTextKey deriveI18nKey(Map<String, Object> owner,
+                                            String textField,
+                                            String pageKey,
+                                            String modelCode,
+                                            String path,
+                                            Map<String, Map<String, String>> fieldLabels) {
+        if (owner.get("field") instanceof String fieldCode && !fieldCode.isBlank()) {
+            Map<String, String> labels = fieldLabels.getOrDefault(fieldCode, Map.of());
+            String en = nonBlank(labels.get("en-US"), humanize(fieldCode));
+            return new I18nTextKey("model." + modelCode + "." + fieldCode + "." + textField, en, "field");
+        }
+        String code = owner.get("code") instanceof String c && !c.isBlank() ? c : path;
+        String normalized = sanitizeI18nSegment(code);
+        String en = humanize(normalized.replace('.', '_'));
+        return new I18nTextKey("page." + pageKey + "." + normalized + "." + textField, en, "page");
+    }
+
+    private static Map<String, Map<String, String>> fieldLabelsByCode(List<Map<String, Object>> fields) {
+        Map<String, Map<String, String>> labelsByCode = new HashMap<>();
+        if (fields == null) {
+            return labelsByCode;
+        }
+        for (Map<String, Object> field : fields) {
+            if (field == null || !(field.get("code") instanceof String code) || code.isBlank()) {
+                continue;
+            }
+            Map<String, String> labels = new HashMap<>();
+            String zh = firstString(field, "displayName:zh-CN", "displayName");
+            String en = firstString(field, "displayName:en-US", "displayName:en", "displayName");
+            labels.put("zh-CN", nonBlank(zh, humanize(code)));
+            labels.put("en-US", nonBlank(en, humanize(code)));
+            labelsByCode.put(code, labels);
+        }
+        return labelsByCode;
+    }
+
+    private static void addI18nResource(List<Map<String, Object>> i18nResources,
+                                        Set<String> existingKeys,
+                                        String key,
+                                        String zhCN,
+                                        String enUS,
+                                        String refType) {
+        if (i18nResources == null || !existingKeys.add(key)) {
+            return;
+        }
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("key", key);
+        entry.put("zh-CN", zhCN);
+        entry.put("en-US", enUS);
+        entry.put("source", "import");
+        entry.put("refType", refType);
+        i18nResources.add(entry);
+    }
+
+    private static String firstString(Map<String, Object> map, String... keys) {
+        for (String key : keys) {
+            if (map.get(key) instanceof String value && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private static String nonBlank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private static boolean isPureAscii(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) > 127) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String stringOrDefault(Object value, String fallback) {
+        return value instanceof String s && !s.isBlank() ? s : fallback;
+    }
+
+    private static String sanitizeI18nSegment(String value) {
+        String sanitized = value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_\\-.]+", "_");
+        sanitized = sanitized.replaceAll("_+", "_").replaceAll("^[_.-]+|[_.-]+$", "");
+        return sanitized.isBlank() ? "text" : sanitized;
+    }
+
+    private record I18nTextKey(String key, String enFallback, String refType) {}
 
     private static boolean hasBusinessLabel(Map<String, Object> field, String code) {
         for (String key : List.of("displayName", "displayName:en", "displayName:zh-CN")) {

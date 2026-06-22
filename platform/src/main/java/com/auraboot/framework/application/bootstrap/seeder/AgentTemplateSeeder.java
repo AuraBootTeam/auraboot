@@ -371,10 +371,13 @@ public class AgentTemplateSeeder {
      * Idempotent: re-runs safely, existing bindings are skipped.
      */
     private void bindAgentSystemUsers() {
-        // Load all agent templates that don't yet have a system_user_id
+        // Load agent templates that don't yet have a system_user_id, plus stale
+        // bindings whose user row was removed by reset/test cleanup.
         var agentsToProcess = jdbcTemplate.queryForList(
-                "SELECT id, agent_code, name FROM ab_agent_definition " +
-                "WHERE tenant_id = ? AND deleted_flag = FALSE AND system_user_id IS NULL",
+                "SELECT a.id, a.agent_code, a.name FROM ab_agent_definition a " +
+                "LEFT JOIN ab_user u ON u.id = a.system_user_id " +
+                "WHERE a.tenant_id = ? AND a.deleted_flag = FALSE " +
+                "AND (a.system_user_id IS NULL OR u.id IS NULL)",
                 SYSTEM_TENANT_ID);
 
         if (agentsToProcess.isEmpty()) {
@@ -412,7 +415,16 @@ public class AgentTemplateSeeder {
         var rows = jdbcTemplate.queryForList(
                 "SELECT id FROM ab_user WHERE email = ? LIMIT 1", email);
         if (!rows.isEmpty()) {
-            return ((Number) rows.get(0).get("id")).longValue();
+            Long userId = ((Number) rows.get(0).get("id")).longValue();
+            jdbcTemplate.update("""
+                    UPDATE ab_user
+                       SET nick_name = ?,
+                           is_enabled = FALSE,
+                           user_type = 'system_agent',
+                           updated_at = NOW()
+                     WHERE id = ?
+                    """, displayName, userId);
+            return userId;
         }
 
         // Generate Snowflake ID consistent with MyBatis Plus ASSIGN_ID strategy

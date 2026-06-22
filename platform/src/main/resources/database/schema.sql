@@ -6499,7 +6499,9 @@ CREATE TABLE IF NOT EXISTS ab_admin_event_log (
     success         BOOLEAN         NOT NULL,
     reason          TEXT,
     payload         JSONB,
-    created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    trace_id        VARCHAR(36),
+    span_id         VARCHAR(36)
 );
 CREATE INDEX IF NOT EXISTS idx_ab_admin_event_log_tenant_created
     ON ab_admin_event_log (tenant_id, created_at);
@@ -6507,6 +6509,8 @@ CREATE INDEX IF NOT EXISTS idx_ab_admin_event_log_resource
     ON ab_admin_event_log (tenant_id, resource_type, resource_pid, created_at);
 CREATE INDEX IF NOT EXISTS idx_ab_admin_event_log_action_type
     ON ab_admin_event_log (tenant_id, action_type, created_at);
+CREATE INDEX IF NOT EXISTS idx_ab_admin_event_log_trace_id
+    ON ab_admin_event_log (trace_id) WHERE trace_id IS NOT NULL;
 
 COMMENT ON TABLE ab_admin_event_log IS 'Cross-cutting administrative-action audit log';
 COMMENT ON COLUMN ab_admin_event_log.actor_type IS 'user | system | api — non-user-initiated actions tag accordingly';
@@ -6515,6 +6519,7 @@ COMMENT ON COLUMN ab_admin_event_log.resource_type IS 'environment | promotion |
 COMMENT ON COLUMN ab_admin_event_log.resource_pid IS 'Domain pid of the resource being acted on (e.g. environment.pid)';
 COMMENT ON COLUMN ab_admin_event_log.reason IS 'Short reason text — the lock reason for environment.lock; error message on failure';
 COMMENT ON COLUMN ab_admin_event_log.payload IS 'Structured before/after diff or extra context (JSONB)';
+COMMENT ON COLUMN ab_admin_event_log.trace_id IS 'OTel W3C traceId (32-hex) of the request; correlates audit -> distributed trace';
 
 
 -- ============================================================
