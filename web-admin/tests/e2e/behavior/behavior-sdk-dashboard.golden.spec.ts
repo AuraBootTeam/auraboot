@@ -30,14 +30,12 @@ import { execSync } from 'node:child_process';
 import { PSQL_BASE, PG_ENV, BACKEND_URL } from '../../helpers/environments';
 
 // ─── psql helper (env-aware, uses PGHOST/PGPORT/PGUSER/PGDATABASE/PGPASSWORD) ─
+const E2E_PG_ENV = { ...PG_ENV, PGPASSWORD: PG_ENV.PGPASSWORD ?? 'auraboot' };
 
 function psql(sql: string): string {
   return execSync(`${PSQL_BASE} -P pager=off -t -A -c "${sql.replace(/"/g, '\\"')}"`, {
     encoding: 'utf-8',
-    env: {
-      ...PG_ENV,
-      PGPASSWORD: process.env.PGPASSWORD ?? 'auraboot',
-    },
+    env: E2E_PG_ENV,
     timeout: 10_000,
   }).trim();
 }

@@ -35,9 +35,13 @@ class SiteKeyIndexInitializerTest {
     }
 
     @Test
-    void appReady_whenTableExists_createsIndex() {
+    void appReady_whenTableExists_createsIndexUnderOwningTenant() {
         when(jdbc.queryForObject(contains("to_regclass"), eq(String.class)))
                 .thenReturn("mt_behavior_site_key");
+        // Backstop must resolve the model's owning tenant so the createFieldIndex logging path
+        // (getModelDefinition → getCurrentTenantId) does not throw on the bare startup thread.
+        when(jdbc.queryForObject(contains("ab_meta_model"), eq(Long.class), eq("behavior_site_key")))
+                .thenReturn(42L);
         init.onApplicationReady();
         verify(schema).createFieldIndex("behavior_site_key", "site_key", IndexType.UNIQUE);
     }
@@ -45,6 +49,16 @@ class SiteKeyIndexInitializerTest {
     @Test
     void appReady_whenTableMissing_noop() {
         when(jdbc.queryForObject(contains("to_regclass"), eq(String.class))).thenReturn(null);
+        init.onApplicationReady();
+        verifyNoInteractions(schema);
+    }
+
+    @Test
+    void appReady_whenNoOwningTenant_skipsToAvoidTenantlessLoggingCrash() {
+        when(jdbc.queryForObject(contains("to_regclass"), eq(String.class)))
+                .thenReturn("mt_behavior_site_key");
+        when(jdbc.queryForObject(contains("ab_meta_model"), eq(Long.class), eq("behavior_site_key")))
+                .thenReturn(null);
         init.onApplicationReady();
         verifyNoInteractions(schema);
     }

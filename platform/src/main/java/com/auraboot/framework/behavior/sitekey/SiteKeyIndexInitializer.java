@@ -1,5 +1,6 @@
 package com.auraboot.framework.behavior.sitekey;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.IndexType;
 import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.auraboot.framework.plugin.event.PluginImportCompletedEvent;
@@ -8,6 +9,8 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Converges the global {@code UNIQUE(site_key)} index on the dynamic {@code mt_behavior_site_key}
@@ -24,8 +27,14 @@ import org.springframework.stereotype.Component;
  *
  * <p>Dual trigger, both calling the same idempotent path:
  * <ul>
- *   <li><b>On {@code behavior} plugin import</b> — the table has just been (re)created, so converge
- *       the index immediately. This is the primary, lifecycle-tied trigger.</li>
+ *   <li><b>On {@code behavior} plugin import (after commit)</b> — the table has just been created
+ *       by the import. This is the primary, lifecycle-tied trigger. It MUST run
+ *       {@link TransactionPhase#AFTER_COMMIT}: the import publishes the event from inside its own
+ *       (still-open) transaction, and {@code createFieldIndex} checks table existence on a separate
+ *       connection that cannot see the uncommitted {@code CREATE TABLE} — a plain {@code @EventListener}
+ *       fails with "Table does not exist" and the index never converges until the next restart
+ *       (caught by SP4's real import golden; SP2's in-process IT could not exercise this path).
+ *       {@code fallbackExecution = true} keeps it working if a future import path runs without a tx.</li>
  *   <li><b>On app-ready</b> — a one-time backstop for an already-imported deployment whose table
  *       predates this code and that ships without a re-import. Guarded by table existence so a
  *       truly fresh DB (plugin not yet imported) is skipped and left to the import trigger.</li>
@@ -51,7 +60,7 @@ public class SiteKeyIndexInitializer {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onPluginImportCompleted(PluginImportCompletedEvent event) {
         if (PLUGIN.equals(event.getPluginCode())) {
             ensureIndex();
@@ -60,8 +69,35 @@ public class SiteKeyIndexInitializer {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
-        if (tableExists()) {
+        if (!tableExists()) {
+            return;
+        }
+        // createFieldIndex → getModelDefinition logs the meta operation, which reads the current
+        // tenant id and fails on a bare startup thread ("Tenant context is required but not found").
+        // The index DDL itself is global (single column, no tenant prefix); borrow the model's
+        // owning tenant only to satisfy the logging path, then restore the previous context.
+        Long owningTenant = modelOwningTenant();
+        if (owningTenant == null) {
+            log.warn("site_key index backstop skipped: no owning tenant for model {} (leaving to import trigger)", MODEL);
+            return;
+        }
+        // The startup thread has no MetaContext (reading it throws "not initialized"), so there is
+        // no caller context to preserve — set the owning tenant, converge, then clear unconditionally.
+        try {
+            MetaContext.setCurrentTenantId(owningTenant);
             ensureIndex();
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    private Long modelOwningTenant() {
+        try {
+            return jdbcTemplate.queryForObject(
+                    "SELECT tenant_id FROM ab_meta_model WHERE code = ? ORDER BY id LIMIT 1",
+                    Long.class, MODEL);
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 

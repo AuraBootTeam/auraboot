@@ -582,7 +582,11 @@ importers:
         specifier: ^19.0.0
         version: 19.2.6
 
-  web-admin/packages/track: {}
+  web-admin/packages/track:
+    devDependencies:
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@22.19.18)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4)(yaml@2.8.3)
 
 packages:
 
