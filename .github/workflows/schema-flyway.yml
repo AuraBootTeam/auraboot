@@ -53,6 +53,7 @@ jobs:
           curl -fsSL "$url" -o /tmp/flyway.tgz
           sudo mkdir -p /opt/flyway
           sudo tar -xzf /tmp/flyway.tgz -C /opt/flyway --strip-components=1
+          sudo chmod +x /opt/flyway/flyway
           echo "/opt/flyway" >> "$GITHUB_PATH"
 
       - name: Fresh database
