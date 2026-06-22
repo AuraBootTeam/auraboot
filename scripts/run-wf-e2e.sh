@@ -7,7 +7,7 @@
 # Suites:
 #   smoke     - tests/e2e/bpm-smoke
 #   designer  - tests/e2e/bpm-designer
-#   runtime   - tests/e2e/workflow-demo
+#   runtime   - focused workflow-demo runtime suite
 #   all       - all three suites above
 #
 # Environment:
@@ -38,16 +38,16 @@ fi
 
 case "$SUITE" in
   smoke)
-    GLOBS=("tests/e2e/bpm-smoke")
+    OSS_TEST_ARGS=("tests/e2e/bpm-smoke")
     ;;
   designer)
-    GLOBS=("tests/e2e/bpm-designer")
+    OSS_TEST_ARGS=("tests/e2e/bpm-designer")
     ;;
   runtime)
-    GLOBS=("tests/e2e/workflow-demo")
+    OSS_TEST_ARGS=("--workflow-demo")
     ;;
   all)
-    GLOBS=("tests/e2e/bpm-smoke" "tests/e2e/bpm-designer" "tests/e2e/workflow-demo")
+    OSS_TEST_ARGS=("tests/e2e/bpm-smoke" "tests/e2e/bpm-designer" "--workflow-demo")
     ;;
   *)
     echo "ERROR: unknown suite '$SUITE'" >&2
@@ -63,6 +63,6 @@ if [[ "$SKIP_RESET" != "true" ]]; then
   echo ""
 fi
 
-echo "=== Delegating to oss-test.sh | suite=$SUITE globs=${GLOBS[*]} ==="
+echo "=== Delegating to oss-test.sh | suite=$SUITE args=${OSS_TEST_ARGS[*]} ==="
 export OSS_TEST_SKIP_DEEP="${OSS_TEST_SKIP_DEEP:-true}"
-exec bash "$SCRIPT_DIR/oss-test.sh" "${GLOBS[@]}"
+exec bash "$SCRIPT_DIR/oss-test.sh" "${OSS_TEST_ARGS[@]}"

@@ -56,6 +56,7 @@ const ROOTS = [
   'playwright.oss.config.ts',
   'playwright.seed.config.ts',
   'playwright.bpm-regression.config.ts',
+  'playwright.workflow-demo.config.ts',
   'playwright.init.config.ts',
   'playwright.noweb.config.ts',
   'playwright.quick.config.ts',
