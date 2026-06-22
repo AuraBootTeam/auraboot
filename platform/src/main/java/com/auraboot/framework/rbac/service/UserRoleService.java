@@ -35,6 +35,11 @@ public interface UserRoleService extends IService<UserRole> {
     boolean removeRolesFromMember(Long memberId, List<Long> roleIds, Long tenantId);
 
     /**
+     * Remove roles from a member using public member and role PIDs.
+     */
+    boolean removeRolesFromMemberByRolePids(String memberPid, List<String> rolePids, Long tenantId);
+
+    /**
      * Remove a single role from a member
      */
     boolean removeMemberRole(Long memberId, Long roleId, Long tenantId);
@@ -103,6 +108,11 @@ public interface UserRoleService extends IService<UserRole> {
     int batchRemoveRoles(List<Long> userRoleIds);
 
     /**
+     * Batch remove role assignments by public user-role PIDs.
+     */
+    int batchRemoveRolesByPids(List<String> userRolePids, Long tenantId);
+
+    /**
      * Copy roles from one member to another
      */
     boolean copyMemberRoles(Long sourceMemberId, Long targetMemberId, Long tenantId);
@@ -111,6 +121,11 @@ public interface UserRoleService extends IService<UserRole> {
      * Sync member roles
      */
     boolean syncMemberRoles(Long memberId, List<Long> roleIds, Long tenantId, Long operatorId);
+
+    /**
+     * Sync member roles using public member and role PIDs.
+     */
+    boolean syncMemberRolesByRolePids(String memberPid, List<String> rolePids, Long tenantId, Long operatorId);
 
     /**
      * Get role IDs for a member in a tenant

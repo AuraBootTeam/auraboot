@@ -13,6 +13,7 @@
  * and i18n-labelled per the UX design system.
  */
 import React from 'react';
+import { LockClosedIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
 import { cn } from '~/utils/cn';
 import {
@@ -27,15 +28,23 @@ export interface PresetViewBarProps {
   activePreset: QuickFilterPresetKey | null;
   /** Toggle a preset on/off. */
   onSelectPreset: (key: QuickFilterPresetKey) => void;
+  /** Save the active system preset as a personal SavedView. */
+  onSaveActivePreset?: () => void;
   className?: string;
 }
 
 export const PresetViewBar: React.FC<PresetViewBarProps> = ({
   activePreset,
   onSelectPreset,
+  onSaveActivePreset,
   className,
 }) => {
   const { t } = useI18n();
+  const savePresetLabel = t(
+    'common.saved_view_save_preset_to_personal',
+    undefined,
+    'Save preset as my view',
+  );
 
   return (
     <div
@@ -49,14 +58,7 @@ export const PresetViewBar: React.FC<PresetViewBarProps> = ({
         className="text-text-3 hidden items-center gap-1 text-xs font-medium select-none sm:inline-flex"
         data-testid="preset-view-label"
       >
-        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-          />
-        </svg>
+        <LockClosedIcon className="h-3 w-3" aria-hidden />
         {t('common.preset_views', undefined, 'Preset Views')}
       </span>
       {QUICK_FILTER_PRESET_KEYS.map((key) => {
@@ -80,6 +82,18 @@ export const PresetViewBar: React.FC<PresetViewBarProps> = ({
           </button>
         );
       })}
+      {activePreset && onSaveActivePreset && (
+        <button
+          type="button"
+          onClick={onSaveActivePreset}
+          data-testid="preset-view-save-as-personal"
+          aria-label={savePresetLabel}
+          title={savePresetLabel}
+          className="rounded-control text-text-2 hover:bg-hover hover:text-text focus-visible:shadow-focus inline-flex h-7 w-7 items-center justify-center transition-colors focus:outline-none"
+        >
+          <PlusIcon className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      )}
     </div>
   );
 };

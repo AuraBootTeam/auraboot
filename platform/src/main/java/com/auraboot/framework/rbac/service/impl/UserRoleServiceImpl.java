@@ -146,6 +146,16 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
 
     @Override
     @Transactional
+    public boolean removeRolesFromMemberByRolePids(String memberPid, List<String> rolePids, Long tenantId) {
+        if (CollectionUtils.isEmpty(rolePids)) {
+            return true;
+        }
+        TenantMember member = resolveMember(memberPid, tenantId);
+        return removeRolesFromMember(member.getId(), resolveRolePids(rolePids, tenantId), tenantId);
+    }
+
+    @Override
+    @Transactional
     public boolean removeAllRolesFromMemberInTenant(Long memberId, Long tenantId) {
         return userRoleMapper.deleteByMemberIdAndTenantId(memberId, tenantId) >= 0;
     }
@@ -269,6 +279,37 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
 
     @Override
     @Transactional
+    public int batchRemoveRolesByPids(List<String> userRolePids, Long tenantId) {
+        if (CollectionUtils.isEmpty(userRolePids)) {
+            return 0;
+        }
+
+        List<String> normalizedPids = userRolePids.stream()
+                .filter(StringUtils::hasText)
+                .toList();
+        if (normalizedPids.isEmpty()) {
+            return 0;
+        }
+
+        QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
+        wrapper.in("pid", normalizedPids);
+        if (tenantId != null) {
+            wrapper.eq("tenant_id", tenantId);
+        }
+        List<UserRole> records = list(wrapper);
+        if (CollectionUtils.isEmpty(records)) {
+            return 0;
+        }
+
+        List<Long> ids = records.stream()
+                .map(UserRole::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        return removeByIds(ids) ? ids.size() : 0;
+    }
+
+    @Override
+    @Transactional
     public boolean copyMemberRoles(Long sourceMemberId, Long targetMemberId, Long tenantId) {
         List<UserRole> sourceRoles = findByMemberIdAndTenantId(sourceMemberId, tenantId);
         if (CollectionUtils.isEmpty(sourceRoles)) {
@@ -316,6 +357,16 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         }
 
         return true;
+    }
+
+    @Override
+    @Transactional
+    public boolean syncMemberRolesByRolePids(String memberPid, List<String> rolePids, Long tenantId, Long operatorId) {
+        TenantMember member = resolveMember(memberPid, tenantId);
+        List<Long> roleIds = CollectionUtils.isEmpty(rolePids)
+                ? List.of()
+                : resolveRolePids(rolePids, tenantId);
+        return syncMemberRoles(member.getId(), roleIds, tenantId, operatorId);
     }
 
     @Override
@@ -521,6 +572,24 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             return role.getId();
         }
         return legacyRoleId;
+    }
+
+    private List<Long> resolveRolePids(List<String> rolePids, Long tenantId) {
+        if (CollectionUtils.isEmpty(rolePids)) {
+            return List.of();
+        }
+        List<Long> roleIds = new ArrayList<>();
+        for (String rolePid : rolePids) {
+            if (!StringUtils.hasText(rolePid)) {
+                throw new BusinessException("Role PID is required");
+            }
+            Role role = roleMapper.findByTenantIdAndPid(tenantId, rolePid);
+            if (role == null) {
+                throw new BusinessException("Role not found for pid: " + rolePid);
+            }
+            roleIds.add(role.getId());
+        }
+        return roleIds;
     }
 
     private UserRoleResponse toResponse(UserRole userRole, Long tenantId) {

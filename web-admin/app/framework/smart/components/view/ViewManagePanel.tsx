@@ -65,7 +65,8 @@ const VIEW_TYPE_REQUIRED_FIELDS: Record<string, Array<{
   ],
   timeline: [
     { key: 'timelineStartField', label: 'Start Date', required: true },
-    { key: 'timelineEndField', label: 'End Date', required: true },
+    { key: 'timelineResourceField', label: 'Resource Field', required: true },
+    { key: 'timelineEndField', label: 'End Date', required: false },
     { key: 'timelineTitleField', label: 'Title Field', required: false },
   ],
 };
@@ -1342,7 +1343,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                 <div className="space-y-2">
                   {auditEvents.map((event, index) => (
                     <div
-                      key={`${event.id ?? event.timestamp ?? index}`}
+                      key={`${event.sequenceNo ?? event.entityPid ?? event.timestamp ?? index}`}
                       className="rounded-md border border-gray-200 bg-white px-3 py-2"
                       data-testid="saved-view-audit-event"
                     >

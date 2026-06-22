@@ -15,6 +15,7 @@ const ZH = {
     created_today: '今日新建',
     modified_this_week: '本周修改',
     preset_views: '预设视图',
+    saved_view_save_preset_to_personal: '保存为我的视图',
   },
 };
 
@@ -61,5 +62,34 @@ describe('PresetViewBar', () => {
     renderBar({ onSelectPreset });
     fireEvent.click(screen.getByTestId('preset-view-modified_this_week'));
     expect(onSelectPreset).toHaveBeenCalledWith('modified_this_week');
+  });
+
+  it('renders save-as-personal action only for the active preset', () => {
+    const onSaveActivePreset = vi.fn();
+    const { rerender } = render(
+      <I18nProvider initialData={ZH} initialLocale="zh-CN">
+        <PresetViewBar
+          activePreset={null}
+          onSelectPreset={() => {}}
+          onSaveActivePreset={onSaveActivePreset}
+        />
+      </I18nProvider>,
+    );
+    expect(screen.queryByTestId('preset-view-save-as-personal')).toBeNull();
+
+    rerender(
+      <I18nProvider initialData={ZH} initialLocale="zh-CN">
+        <PresetViewBar
+          activePreset="created_today"
+          onSelectPreset={() => {}}
+          onSaveActivePreset={onSaveActivePreset}
+        />
+      </I18nProvider>,
+    );
+
+    const saveButton = screen.getByTestId('preset-view-save-as-personal');
+    expect(saveButton.getAttribute('aria-label')).toBe('保存为我的视图');
+    fireEvent.click(saveButton);
+    expect(onSaveActivePreset).toHaveBeenCalledTimes(1);
   });
 });

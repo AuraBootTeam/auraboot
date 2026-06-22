@@ -11,6 +11,8 @@ import { describe, expect, it } from 'vitest';
 import {
   QUICK_FILTER_PRESET_KEYS,
   buildQuickFilterPreset,
+  buildQuickFilterPresetViewFilters,
+  buildQuickFilterPresetViewRequest,
   isQuickFilterPresetKey,
 } from '../quickFilterPresets';
 
@@ -64,6 +66,57 @@ describe('buildQuickFilterPreset', () => {
       // @ts-expect-error — intentionally passing an invalid key
       expect(buildQuickFilterPreset('not_a_preset', { userId: 1, now: NOW })).toBeNull();
     });
+  });
+});
+
+describe('buildQuickFilterPresetViewFilters', () => {
+  it('converts scalar, array, and range preset filters to SavedView filters', () => {
+    expect(
+      buildQuickFilterPresetViewFilters({
+        created_by: '42',
+        status: ['open', 'won'],
+        created_at: { start: '2026-06-17', end: '2026-06-17T23:59:59' },
+      }),
+    ).toEqual([
+      { fieldCode: 'created_by', operator: 'eq', value: '42' },
+      { fieldCode: 'status', operator: 'in', value: ['open', 'won'] },
+      {
+        fieldCode: 'created_at',
+        operator: 'between',
+        value: { start: '2026-06-17', end: '2026-06-17T23:59:59' },
+      },
+    ]);
+  });
+});
+
+describe('buildQuickFilterPresetViewRequest', () => {
+  it('builds a personal SavedView create request from a preset', () => {
+    const request = buildQuickFilterPresetViewRequest(
+      'created_today',
+      { userId: 1, now: NOW },
+      { modelCode: 'e2et_order', pageKey: 'e2et_order', name: '今日新建' },
+    );
+
+    expect(request).toMatchObject({
+      name: '今日新建',
+      modelCode: 'e2et_order',
+      pageKey: 'e2et_order',
+      scope: 'personal',
+      viewType: 'table',
+      viewConfig: {
+        meta: {
+          managedBy: 'user',
+          originPresetKey: 'created_today',
+        },
+      },
+    });
+    expect(request?.viewConfig?.filters).toEqual([
+      {
+        fieldCode: 'created_at',
+        operator: 'between',
+        value: { start: '2026-06-17', end: '2026-06-17T23:59:59' },
+      },
+    ]);
   });
 });
 

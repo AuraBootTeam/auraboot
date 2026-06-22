@@ -28,6 +28,7 @@ export interface SavedViewTeamOption {
  * Audit trail entry for shared/global SavedView changes.
  */
 export interface SavedViewAuditEvent {
+  sequenceNo?: number;
   eventType?: string;
   entityType?: string;
   entityPid?: string;
@@ -203,8 +204,21 @@ export interface ViewConfigMeta {
   allowUserOverride?: boolean;
   /** Source view pid when copied from a shared/plugin preset */
   originViewPid?: string;
+  /** Built-in quick-filter preset key when a preset is saved as a personal view */
+  originPresetKey?: string;
   /** Optional capability state captured at import/build time */
   capabilityStatus?: string;
+  /** Per-view collaborator ACL for shared team views */
+  collaborators?: ViewCollaboratorAcl[];
+}
+
+export interface ViewCollaboratorAcl {
+  /** Principal kind; currently user is supported */
+  principalType?: 'user' | string;
+  /** Public principal PID */
+  principalPid: string;
+  /** Permission granted on the view */
+  permission: 'view' | 'save' | 'manage' | string;
 }
 
 /**
@@ -530,11 +544,11 @@ export const VIEW_TYPE_FIELD_REQUIREMENTS: Record<string, ViewFieldRequirement[]
       autoCreateConfig: { code: 'start_date', dataType: 'date' },
     },
     {
-      key: 'timelineEndField',
-      label: 'End Date',
-      acceptedTypes: ['date', 'datetime'],
+      key: 'timelineResourceField',
+      label: 'Resource Field',
+      acceptedTypes: ['text', 'dict', 'enum', 'reference', 'status', 'user'],
       required: true,
-      autoCreateConfig: { code: 'end_date', dataType: 'date' },
+      autoCreateConfig: { code: 'resource', dataType: 'text' },
     },
   ],
 };

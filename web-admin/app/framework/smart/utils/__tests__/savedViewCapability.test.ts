@@ -83,4 +83,42 @@ describe('savedViewCapability', () => {
     expect(result.suggestedConfig.treeTitleField).toBe('name');
     expect(result.reasons.join(' ')).toContain('Reorder');
   });
+
+  it('blocks timeline creation when no date fields exist', () => {
+    const result = checkSavedViewCapability('timeline', [
+      { code: 'assignee', name: 'Assignee', dataType: 'user' },
+      { code: 'name', name: 'Name', dataType: 'text' },
+    ]);
+
+    expect(result.status).toBe('blocked');
+    expect(result.reasons[0]).toContain('date');
+    expect(result.fieldOptions.timelineStartField).toHaveLength(0);
+    expect(result.fieldOptions.timelineResourceField).toHaveLength(2);
+  });
+
+  it('blocks timeline creation when no resource field exists', () => {
+    const result = checkSavedViewCapability('timeline', [
+      { code: 'startDate', name: 'Start Date', dataType: 'date' },
+    ]);
+
+    expect(result.status).toBe('blocked');
+    expect(result.reasons[0]).toContain('resource');
+    expect(result.fieldOptions.timelineStartField).toHaveLength(1);
+    expect(result.fieldOptions.timelineResourceField).toHaveLength(0);
+  });
+
+  it('suggests timeline date, resource, and title mappings', () => {
+    const result = checkSavedViewCapability('timeline', [
+      { code: 'startDate', name: 'Start Date', dataType: 'date' },
+      { code: 'endDate', name: 'End Date', dataType: 'datetime' },
+      { code: 'assignee', name: 'Assignee', dataType: 'user' },
+      { code: 'name', name: 'Name', dataType: 'text' },
+    ]);
+
+    expect(result.status).toBe('available');
+    expect(result.suggestedConfig.timelineStartField).toBe('startDate');
+    expect(result.suggestedConfig.timelineEndField).toBe('endDate');
+    expect(result.suggestedConfig.timelineResourceField).toBe('assignee');
+    expect(result.suggestedConfig.timelineTitleField).toBe('name');
+  });
 });

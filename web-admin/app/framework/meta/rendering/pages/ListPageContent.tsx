@@ -48,6 +48,7 @@ import {
   DEFAULT_ROW_HEIGHT,
   type ViewFilterConfig,
   type RowHeight,
+  type SavedView,
   type SavedViewCreateRequest,
   type ColumnConfig as ViewColumnConfig,
   type ViewType,
@@ -73,7 +74,10 @@ import { areSortsEqual, encodeSorts, decodeSorts } from './list/useListUrlState'
 import {
   type QuickFilterPresetKey,
   buildQuickFilterPreset,
+  buildQuickFilterPresetViewRequest,
   isQuickFilterPresetKey,
+  QUICK_FILTER_PRESET_FALLBACK,
+  QUICK_FILTER_PRESET_I18N_KEY,
 } from './list/quickFilterPresets';
 import { resolveListRowClickMode } from './list/rowClickNavigation';
 import { SelectAllMatchingBanner } from './list/SelectAllMatchingBanner';
@@ -126,6 +130,17 @@ export interface ListReferenceDisplayConfig {
 
 export function buildListReferenceDisplayCacheKey(config: ListReferenceDisplayConfig): string {
   return `${config.field}|${config.modelCode}|${config.valueField}|${config.displayField}`;
+}
+
+export function findPersonalPresetSavedView(
+  savedViews: Array<Pick<SavedView, 'pid' | 'scope' | 'viewConfig' | 'viewType'>>,
+  presetKey: QuickFilterPresetKey,
+): Pick<SavedView, 'pid' | 'scope' | 'viewConfig' | 'viewType'> | undefined {
+  return savedViews.find(
+    (view) =>
+      String(view.scope).toLowerCase() === 'personal' &&
+      view.viewConfig?.meta?.originPresetKey === presetKey,
+  );
 }
 
 export function resolveListSavedViewPageKey(
@@ -3088,6 +3103,85 @@ function ListPageContentInner(props: PageContentProps) {
     [activeQuickFilter, user, setFilters, syncPresetToUrl, loadData, pagination.pageSize],
   );
 
+  const handleSaveActivePreset = useCallback(async () => {
+    if (!activeQuickFilter) return;
+
+    const existingPresetView = findPersonalPresetSavedView(savedViews, activeQuickFilter);
+    if (existingPresetView) {
+      selectView(existingPresetView.pid);
+      setActiveViewType((existingPresetView.viewType as ViewType) || 'table');
+      setActiveQuickFilter(null);
+      syncPresetToUrl(null);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set('view', existingPresetView.pid);
+          p.delete('preset');
+          p.delete('sort');
+          p.delete('keyword');
+          p.delete('filters');
+          return p;
+        },
+        { replace: true },
+      );
+      showSuccessToast(
+        translateCommon('common.saved_view_preset_saved_to_personal', 'Saved as personal view'),
+      );
+      return;
+    }
+
+    const presetName = translateCommon(
+      QUICK_FILTER_PRESET_I18N_KEY[activeQuickFilter],
+      QUICK_FILTER_PRESET_FALLBACK[activeQuickFilter],
+    );
+    const request = buildQuickFilterPresetViewRequest(
+      activeQuickFilter,
+      { userId: user?.id, now: new Date() },
+      { modelCode, pageKey, name: presetName },
+    );
+    if (!request) return;
+
+    try {
+      const view = await createView(request);
+      setActiveQuickFilter(null);
+      syncPresetToUrl(null);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set('view', view.pid);
+          p.delete('preset');
+          p.delete('sort');
+          p.delete('keyword');
+          p.delete('filters');
+          return p;
+        },
+        { replace: true },
+      );
+      showSuccessToast(
+        translateCommon('common.saved_view_preset_saved_to_personal', 'Saved as personal view'),
+      );
+    } catch (err) {
+      showErrorToast(
+        err instanceof Error
+          ? err.message
+          : translateCommon('common.saved_view_preset_save_failed', 'Failed to save preset'),
+      );
+    }
+  }, [
+    activeQuickFilter,
+    createView,
+    modelCode,
+    pageKey,
+    savedViews,
+    selectView,
+    setSearchParams,
+    showErrorToast,
+    showSuccessToast,
+    syncPresetToUrl,
+    translateCommon,
+    user?.id,
+  ]);
+
   // Save current filters to SavedView
   const handleSaveFilters = useCallback(async () => {
     const viewFilters = Object.entries(filters)
@@ -3435,6 +3529,7 @@ function ListPageContentInner(props: PageContentProps) {
             onExport={handleExport}
             activePreset={activeQuickFilter}
             onSelectPreset={handleQuickFilter}
+            onSaveActivePreset={handleSaveActivePreset}
             hidePresetViews={hideQuickFilters}
             exportFilters={exportFilterConditions}
             isTenantMemberPage={isTenantMemberPage}

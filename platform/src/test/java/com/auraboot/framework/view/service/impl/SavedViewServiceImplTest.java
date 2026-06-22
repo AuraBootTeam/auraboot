@@ -236,6 +236,22 @@ class SavedViewServiceImplTest {
     }
 
     @Test
+    void create_timelineViewWithoutStartAndResourceFields_fails() {
+        PageSchema page = new PageSchema();
+        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(page);
+        when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
+                .thenReturn(0);
+
+        SavedViewCreateRequest timeline = createReq("personal", null);
+        timeline.setViewType("timeline");
+        timeline.setViewConfig(new ViewConfig());
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.create(timeline));
+        assertThat(ex.getMessage()).contains("timelineStartField", "timelineResourceField");
+        verify(savedViewMapper, never()).insertSavedView(any());
+    }
+
+    @Test
     void checkCapability_reportsMissingRequiredFieldsWithStableReasonCode() {
         SavedViewCapabilityCheckRequest request = new SavedViewCapabilityCheckRequest();
         request.setViewType("gallery");
@@ -249,6 +265,22 @@ class SavedViewServiceImplTest {
         assertThat(response.getReasons()).hasSize(1);
         assertThat(response.getReasons().get(0).getCode()).isEqualTo("MISSING_REQUIRED_FIELD");
         assertThat(response.getReasons().get(0).getField()).isEqualTo("galleryImageField");
+    }
+
+    @Test
+    void checkCapability_blocksTimelineWithoutDateAndResourceMappings() {
+        SavedViewCapabilityCheckRequest request = new SavedViewCapabilityCheckRequest();
+        request.setViewType("timeline");
+        request.setViewConfig(new ViewConfig());
+
+        SavedViewCapabilityCheckResponse response = service.checkCapability(request);
+
+        assertEquals("timeline", response.getViewType());
+        assertEquals("blocked", response.getStatus());
+        assertThat(response.getMissingFields()).containsExactly("timelineStartField", "timelineResourceField");
+        assertThat(response.getReasons())
+                .extracting(SavedViewCapabilityCheckResponse.Reason::getCode)
+                .containsOnly("MISSING_REQUIRED_FIELD");
     }
 
     @Test
@@ -355,6 +387,91 @@ class SavedViewServiceImplTest {
 
         assertEquals("manage", dto.getEffectivePermission());
         assertThat(dto.getActions()).contains("view", "copy", "save", "manage", "delete", "setDefault", "share");
+    }
+
+    @Test
+    void findByPid_teamSaveCollaborator_canSaveButCannotManageSharedView() {
+        SavedView v = new SavedView();
+        v.setPid("team1");
+        v.setScope("team");
+        v.setTeamId("teamA");
+        v.setCreatedBy("owner_pid");
+        ViewConfig config = new ViewConfig();
+        config.setMeta(ViewConfig.Meta.builder()
+                .collaborators(List.of(ViewConfig.CollaboratorAcl.builder()
+                        .principalType("user")
+                        .principalPid("user_pid")
+                        .permission("save")
+                        .build()))
+                .build());
+        v.setViewConfig(config);
+        when(savedViewMapper.findByPid("team1")).thenReturn(v);
+        when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of("teamA"));
+        when(userPermissionService.hasPermission(7L, MetaPermission.VIEW_TEAM_MANAGE)).thenReturn(false);
+        when(userPermissionService.hasPermission(7L, MetaPermission.VIEW_MANAGE)).thenReturn(false);
+
+        SavedViewDTO dto = service.findByPid("team1");
+
+        assertEquals("save", dto.getEffectivePermission());
+        assertThat(dto.getActions()).contains("view", "copy", "save", "setDefault");
+        assertThat(dto.getActions()).doesNotContain("manage", "delete", "share");
+    }
+
+    @Test
+    void update_teamSaveCollaboratorCanUpdateConfigButCannotRename() {
+        SavedView v = new SavedView();
+        v.setId(21L);
+        v.setPid("team1");
+        v.setTenantId(100L);
+        v.setScope("team");
+        v.setTeamId("teamA");
+        v.setCreatedBy("owner_pid");
+        v.setName("Team View");
+        v.setModelCode("m");
+        v.setPageKey("k");
+        v.setViewType("table");
+        ViewConfig config = new ViewConfig();
+        config.setMeta(ViewConfig.Meta.builder()
+                .collaborators(List.of(ViewConfig.CollaboratorAcl.builder()
+                        .principalType("user")
+                        .principalPid("user_pid")
+                        .permission("save")
+                        .build()))
+                .build());
+        v.setViewConfig(config);
+        when(savedViewMapper.findByPid("team1")).thenReturn(v);
+        when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of("teamA"));
+        when(userPermissionService.hasPermission(7L, MetaPermission.VIEW_TEAM_MANAGE)).thenReturn(false);
+        when(userPermissionService.hasPermission(7L, MetaPermission.VIEW_MANAGE)).thenReturn(false);
+
+        SavedViewUpdateRequest configUpdate = new SavedViewUpdateRequest();
+        ViewConfig updatedConfig = new ViewConfig();
+        updatedConfig.setRowHeight("tall");
+        updatedConfig.setMeta(ViewConfig.Meta.builder()
+                .managedBy("plugin")
+                .locked(true)
+                .collaborators(List.of(ViewConfig.CollaboratorAcl.builder()
+                        .principalType("user")
+                        .principalPid("user_pid")
+                        .permission("manage")
+                        .build()))
+                .build());
+        configUpdate.setViewConfig(updatedConfig);
+
+        service.update("team1", configUpdate);
+        ArgumentCaptor<SavedView> updateCaptor = ArgumentCaptor.forClass(SavedView.class);
+        verify(savedViewMapper).updateSavedView(updateCaptor.capture());
+        SavedView saved = updateCaptor.getValue();
+        assertThat(saved.getViewConfig().getRowHeight()).isEqualTo("tall");
+        assertThat(saved.getViewConfig().getMeta()).isSameAs(config.getMeta());
+        assertThat(saved.getViewConfig().getMeta().getCollaborators())
+                .extracting(ViewConfig.CollaboratorAcl::getPermission)
+                .containsExactly("save");
+
+        SavedViewUpdateRequest rename = new SavedViewUpdateRequest();
+        rename.setName("Renamed");
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update("team1", rename));
+        assertThat(ex.getMessage()).contains("manage");
     }
 
     @Test

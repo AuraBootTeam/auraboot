@@ -43,6 +43,8 @@ export interface ListPageHeaderProps {
   activePreset?: QuickFilterPresetKey | null;
   /** Toggle a preset view on/off */
   onSelectPreset?: (key: QuickFilterPresetKey) => void;
+  /** Save the active preset view as a personal SavedView */
+  onSaveActivePreset?: () => void;
   /** Hide the preset-view bar (e.g. config-only pages) */
   hidePresetViews?: boolean;
   /** Current filter conditions for export */
@@ -78,6 +80,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   onExport,
   activePreset,
   onSelectPreset,
+  onSaveActivePreset,
   hidePresetViews,
   exportFilters,
   isTenantMemberPage,
@@ -110,7 +113,11 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
           {!hidePresetViews && onSelectPreset && (
             <>
               <div className="bg-border hidden h-5 w-px sm:block" aria-hidden />
-              <PresetViewBar activePreset={activePreset ?? null} onSelectPreset={onSelectPreset} />
+              <PresetViewBar
+                activePreset={activePreset ?? null}
+                onSelectPreset={onSelectPreset}
+                onSaveActivePreset={onSaveActivePreset}
+              />
             </>
           )}
         </div>

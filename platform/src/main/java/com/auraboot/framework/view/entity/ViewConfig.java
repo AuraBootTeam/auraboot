@@ -337,7 +337,24 @@ public class ViewConfig {
         private Boolean allowUserCopy;
         private Boolean allowUserOverride;
         private String originViewPid;
+        private String originPresetKey;
         private String capabilityStatus;
+        private List<CollaboratorAcl> collaborators;
+    }
+
+    /**
+     * Per-view collaborator ACL stored inside viewConfig.meta.
+     *
+     * principalType is currently "user"; permission is one of view/save/manage.
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CollaboratorAcl {
+        private String principalType;
+        private String principalPid;
+        private String permission;
     }
 
     /**

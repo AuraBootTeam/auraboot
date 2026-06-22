@@ -64,6 +64,9 @@ const REQUIRED_COMMON_KEYS = [
   'saved_view_copied_to_personal',
   'saved_view_copy_failed',
   'saved_view_copy_disabled_reason',
+  'saved_view_save_preset_to_personal',
+  'saved_view_preset_saved_to_personal',
+  'saved_view_preset_save_failed',
   // System audit field column headers (#2)
   'created_at',
   'updated_at',

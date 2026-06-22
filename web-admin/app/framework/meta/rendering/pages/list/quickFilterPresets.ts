@@ -9,6 +9,10 @@
  *
  * Spec: T8 — "快捷筛选 → 真预设视图" (UX design-system backlog).
  */
+import type {
+  SavedViewCreateRequest,
+  ViewFilterConfig,
+} from '~/framework/smart/types/savedView';
 
 /** Keys of the built-in preset views, in display order. */
 export const QUICK_FILTER_PRESET_KEYS = [
@@ -38,6 +42,12 @@ export interface BuildQuickFilterPresetContext {
   userId?: string | number;
   /** Reference clock — pass `new Date()` in production, a fixed Date in tests. */
   now: Date;
+}
+
+export interface BuildQuickFilterPresetViewRequestOptions {
+  modelCode: string;
+  pageKey?: string;
+  name?: string;
 }
 
 /** Type guard: is `key` one of the known preset keys? */
@@ -85,4 +95,67 @@ export function buildQuickFilterPreset(
     default:
       return null;
   }
+}
+
+function isRangeFilterValue(value: unknown): value is { start?: unknown; end?: unknown } {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    ('start' in value || 'end' in value)
+  );
+}
+
+export function buildQuickFilterPresetViewFilters(
+  filters: Record<string, unknown> | null,
+): ViewFilterConfig[] {
+  if (!filters) return [];
+  return Object.entries(filters)
+    .filter(([, value]) => value != null && value !== '')
+    .map(([fieldCode, value]) => {
+      if (isRangeFilterValue(value)) {
+        return {
+          fieldCode,
+          operator: 'between',
+          value,
+        };
+      }
+      if (Array.isArray(value)) {
+        return {
+          fieldCode,
+          operator: 'in',
+          value,
+        };
+      }
+      return {
+        fieldCode,
+        operator: 'eq',
+        value,
+      };
+    });
+}
+
+export function buildQuickFilterPresetViewRequest(
+  key: QuickFilterPresetKey,
+  ctx: BuildQuickFilterPresetContext,
+  options: BuildQuickFilterPresetViewRequestOptions,
+): SavedViewCreateRequest | null {
+  if (!isQuickFilterPresetKey(key)) return null;
+  const presetFilters = buildQuickFilterPreset(key, ctx);
+  if (!presetFilters) return null;
+
+  return {
+    name: options.name || QUICK_FILTER_PRESET_FALLBACK[key],
+    modelCode: options.modelCode,
+    pageKey: options.pageKey,
+    scope: 'personal',
+    viewType: 'table',
+    viewConfig: {
+      filters: buildQuickFilterPresetViewFilters(presetFilters),
+      meta: {
+        managedBy: 'user',
+        originPresetKey: key,
+      },
+    },
+  };
 }

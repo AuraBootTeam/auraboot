@@ -159,7 +159,15 @@ public class SavedViewServiceImpl implements SavedViewService {
             throw new ValidationException(ResponseCode.NOT_FOUND, "Saved view not found: " + pid);
         }
 
-        validateWriteAccess(savedView);
+        boolean manageAccessRequired = requiresManageAccess(request);
+        boolean hasManageAccess;
+        if (manageAccessRequired) {
+            validateManageAccess(savedView);
+            hasManageAccess = true;
+        } else {
+            validateWriteAccess(savedView);
+            hasManageAccess = canManage(savedView);
+        }
 
         String currentUserPid = MetaContext.getCurrentUserPid();
         Set<String> changedFields = new LinkedHashSet<>();
@@ -188,7 +196,10 @@ public class SavedViewServiceImpl implements SavedViewService {
             changedFields.add("teamId");
         }
         if (request.getViewConfig() != null) {
-            savedView.setViewConfig(request.getViewConfig());
+            ViewConfig nextConfig = hasManageAccess
+                    ? request.getViewConfig()
+                    : preserveManagedMetaForSaveAccess(savedView.getViewConfig(), request.getViewConfig());
+            savedView.setViewConfig(nextConfig);
             changedFields.add("viewConfig");
         }
         if (request.getAllowFullModel() != null) {
@@ -239,7 +250,7 @@ public class SavedViewServiceImpl implements SavedViewService {
             throw new ValidationException(ResponseCode.NOT_FOUND, "Saved view not found: " + pid);
         }
 
-        validateWriteAccess(savedView);
+        validateManageAccess(savedView);
 
         savedViewMapper.deleteById(savedView.getId());
         recordSharedAudit(savedView, "DELETE", Set.of("deletedFlag"));
@@ -605,6 +616,9 @@ public class SavedViewServiceImpl implements SavedViewService {
                     new RequiredConfigField("galleryImageField", cfg.getGalleryImageField()));
             case "tree" -> missingConfigFields(
                     new RequiredConfigField("treeParentField", cfg.getTreeParentField()));
+            case "timeline" -> missingConfigFields(
+                    new RequiredConfigField("timelineStartField", cfg.getTimelineStartField()),
+                    new RequiredConfigField("timelineResourceField", cfg.getTimelineResourceField()));
             default -> List.of();
         };
     }
@@ -630,6 +644,15 @@ public class SavedViewServiceImpl implements SavedViewService {
         return merged;
     }
 
+    private ViewConfig preserveManagedMetaForSaveAccess(ViewConfig currentConfig, ViewConfig requestedConfig) {
+        if (requestedConfig == null) {
+            return null;
+        }
+        ViewConfig.Meta currentMeta = currentConfig != null ? currentConfig.getMeta() : null;
+        requestedConfig.setMeta(currentMeta);
+        return requestedConfig;
+    }
+
     private ViewConfig buildUserOwnedCopyConfig(SavedView sourceView, ViewConfig sourceConfig) {
         ViewConfig copiedConfig = mergeViewConfig(sourceConfig, null);
         ViewConfig.Meta sourceMeta = sourceConfig != null ? sourceConfig.getMeta() : null;
@@ -639,6 +662,7 @@ public class SavedViewServiceImpl implements SavedViewService {
                 .allowUserCopy(true)
                 .allowUserOverride(true)
                 .originViewPid(sourceView != null ? sourceView.getPid() : null)
+                .originPresetKey(sourceMeta != null ? sourceMeta.getOriginPresetKey() : null)
                 .capabilityStatus(sourceMeta != null ? sourceMeta.getCapabilityStatus() : null)
                 .build());
         return copiedConfig;
@@ -703,7 +727,41 @@ public class SavedViewServiceImpl implements SavedViewService {
     }
 
     private boolean canManage(SavedView savedView) {
-        return canSave(savedView);
+        if (savedView == null || isLockedView(savedView)) {
+            return false;
+        }
+
+        String currentUserPid = MetaContext.getCurrentUserPid();
+        if (savedView.isPersonal()) {
+            return currentUserPid != null && currentUserPid.equals(savedView.getOwnerId());
+        }
+
+        if (savedView.isTeam()) {
+            if (!getCurrentUserTeamIds().contains(savedView.getTeamId())) {
+                return false;
+            }
+            if (currentUserPid != null && currentUserPid.equals(savedView.getCreatedBy())) {
+                return true;
+            }
+            if (hasCollaboratorPermission(savedView, "manage")) {
+                return true;
+            }
+            Long currentUserId = MetaContext.getCurrentUserId();
+            return currentUserId != null
+                    && (userPermissionService.hasPermission(currentUserId, MetaPermission.VIEW_TEAM_MANAGE)
+                    || userPermissionService.hasPermission(currentUserId, MetaPermission.VIEW_MANAGE));
+        }
+
+        if (savedView.isGlobal()) {
+            if (currentUserPid != null && currentUserPid.equals(savedView.getCreatedBy())) {
+                return true;
+            }
+            Long currentUserId = MetaContext.getCurrentUserId();
+            return currentUserId != null
+                    && userPermissionService.hasPermission(currentUserId, MetaPermission.VIEW_MANAGE);
+        }
+
+        return false;
     }
 
     private boolean canSave(SavedView savedView) {
@@ -721,6 +779,9 @@ public class SavedViewServiceImpl implements SavedViewService {
                 return false;
             }
             if (currentUserPid != null && currentUserPid.equals(savedView.getCreatedBy())) {
+                return true;
+            }
+            if (hasCollaboratorPermission(savedView, "save", "manage")) {
                 return true;
             }
             Long currentUserId = MetaContext.getCurrentUserId();
@@ -857,6 +918,9 @@ public class SavedViewServiceImpl implements SavedViewService {
             if (currentUserPid.equals(savedView.getCreatedBy())) {
                 return;
             }
+            if (hasCollaboratorPermission(savedView, "save", "manage")) {
+                return;
+            }
             Long currentUserId = MetaContext.getCurrentUserId();
             boolean hasTeamManagePermission = currentUserId != null
                     && (userPermissionService.hasPermission(currentUserId, MetaPermission.VIEW_TEAM_MANAGE)
@@ -881,6 +945,91 @@ public class SavedViewServiceImpl implements SavedViewService {
                         "You don't have permission to modify this global view");
             }
         }
+    }
+
+    private void validateManageAccess(SavedView savedView) {
+        String currentUserPid = MetaContext.getCurrentUserPid();
+        if (isLockedView(savedView)) {
+            throw new ValidationException(ResponseCode.FORBIDDEN,
+                    "This view is managed by a plugin. Copy it before editing");
+        }
+
+        if (savedView.isPersonal()) {
+            if (!StringUtils.hasText(currentUserPid) || !currentUserPid.equals(savedView.getOwnerId())) {
+                throw new ValidationException(ResponseCode.FORBIDDEN,
+                        "You can only manage your own views");
+            }
+            return;
+        }
+
+        if (savedView.isTeam()) {
+            validateCurrentUserInTeam(savedView.getTeamId());
+            if (StringUtils.hasText(currentUserPid) && currentUserPid.equals(savedView.getCreatedBy())) {
+                return;
+            }
+            if (hasCollaboratorPermission(savedView, "manage")) {
+                return;
+            }
+            Long currentUserId = MetaContext.getCurrentUserId();
+            boolean hasTeamManagePermission = currentUserId != null
+                    && (userPermissionService.hasPermission(currentUserId, MetaPermission.VIEW_TEAM_MANAGE)
+                    || userPermissionService.hasPermission(currentUserId, MetaPermission.VIEW_MANAGE));
+            if (!hasTeamManagePermission) {
+                throw new ValidationException(ResponseCode.FORBIDDEN,
+                        "You don't have permission to manage this team view");
+            }
+            return;
+        }
+
+        if (savedView.isGlobal()) {
+            if (StringUtils.hasText(currentUserPid) && currentUserPid.equals(savedView.getCreatedBy())) {
+                return;
+            }
+
+            Long currentUserId = MetaContext.getCurrentUserId();
+            boolean hasGlobalManagePermission = currentUserId != null
+                    && userPermissionService.hasPermission(currentUserId, MetaPermission.VIEW_MANAGE);
+            if (!hasGlobalManagePermission) {
+                throw new ValidationException(ResponseCode.FORBIDDEN,
+                        "You don't have permission to manage this global view");
+            }
+        }
+    }
+
+    private boolean requiresManageAccess(SavedViewUpdateRequest request) {
+        return request.getName() != null
+                || request.getDescription() != null
+                || request.getScope() != null
+                || request.getTeamId() != null
+                || request.getAllowFullModel() != null
+                || request.getSortOrder() != null;
+    }
+
+    private boolean hasCollaboratorPermission(SavedView savedView, String... acceptedPermissions) {
+        ViewConfig.Meta meta = getViewMeta(savedView);
+        if (meta == null || meta.getCollaborators() == null || meta.getCollaborators().isEmpty()) {
+            return false;
+        }
+        String currentUserPid = MetaContext.getCurrentUserPid();
+        if (!StringUtils.hasText(currentUserPid)) {
+            return false;
+        }
+        Set<String> accepted = java.util.Arrays.stream(acceptedPermissions)
+                .filter(StringUtils::hasText)
+                .map(String::toLowerCase)
+                .collect(Collectors.toSet());
+        return meta.getCollaborators().stream().anyMatch(collaborator -> {
+            if (collaborator == null) {
+                return false;
+            }
+            String principalType = collaborator.getPrincipalType();
+            String principalPid = collaborator.getPrincipalPid();
+            String permission = collaborator.getPermission();
+            return ("user".equalsIgnoreCase(principalType) || !StringUtils.hasText(principalType))
+                    && currentUserPid.equals(principalPid)
+                    && StringUtils.hasText(permission)
+                    && accepted.contains(permission.toLowerCase());
+        });
     }
 
     private void validateCurrentUserInTeam(String teamId) {

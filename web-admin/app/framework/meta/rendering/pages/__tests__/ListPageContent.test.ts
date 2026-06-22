@@ -4,6 +4,7 @@ import {
   buildListReferenceDisplayCacheKey,
   buildViewManageFieldOptions,
   collectListReferenceDisplayConfigs,
+  findPersonalPresetSavedView,
   resolveColumnCapabilityDataType,
   resolveFieldMetaDataType,
   resolveFieldMetaDisplayName,
@@ -68,8 +69,58 @@ describe('resolveListSavedViewPageKey', () => {
   });
 });
 
+describe('findPersonalPresetSavedView', () => {
+  it('finds an existing personal SavedView created from a system preset', () => {
+    const match = findPersonalPresetSavedView(
+      [
+        {
+          pid: 'team-preset',
+          scope: 'team',
+          viewType: 'table',
+          viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+        },
+        {
+          pid: 'personal-preset',
+          scope: 'personal',
+          viewType: 'table',
+          viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+        },
+      ],
+      'modified_this_week',
+    );
+
+    expect(match?.pid).toBe('personal-preset');
+  });
+
+  it('ignores non-matching or non-personal preset views', () => {
+    const match = findPersonalPresetSavedView(
+      [
+        {
+          pid: 'created-today',
+          scope: 'personal',
+          viewType: 'table',
+          viewConfig: { meta: { originPresetKey: 'created_today' } },
+        },
+        {
+          pid: 'team-modified',
+          scope: 'team',
+          viewType: 'table',
+          viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+        },
+      ],
+      'modified_this_week',
+    );
+
+    expect(match).toBeUndefined();
+  });
+});
+
 describe('useRestoreSavedViewFromUrl', () => {
   it('restores selection again when URL view pid changes after views are loaded', () => {
+    type RestoreHookProps = {
+      urlViewPid: string | null;
+      savedViews: Array<{ pid: string; viewType?: 'table' | null }>;
+    };
     const sourceView = {
       pid: 'source-view',
       name: 'Global View',
@@ -86,7 +137,7 @@ describe('useRestoreSavedViewFromUrl', () => {
     const setActiveViewType = vi.fn();
 
     const { rerender } = renderHook(
-      ({ urlViewPid, savedViews }) =>
+      ({ urlViewPid, savedViews }: RestoreHookProps) =>
         useRestoreSavedViewFromUrl({
           urlViewPid,
           savedViews,
