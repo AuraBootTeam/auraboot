@@ -6,6 +6,7 @@
 #   ./scripts/oss-test.sh --smoke            # run with PW_PROFILE=smoke (tags @smoke as resolved by base playwright.config.ts profile)
 #   ./scripts/oss-test.sh --bpm-regression   # run the aggregated spec-1 BPM regression suite
 #                                            #   (all specs tagged @bpm-regression — see web-admin/tests/e2e/bpm/README.md)
+#   ./scripts/oss-test.sh --workflow-demo    # run the focused workflow-demo runtime suite
 #   NOTE: positional spec globs do NOT reliably filter (the oss config builds its
 #   own testMatch from oss-scope.json — see comment below). For a targeted single
 #   spec run use playwright directly with the oss config + full env contract:
@@ -38,6 +39,10 @@ for arg in "$@"; do
     --bpm-regression)
       CONFIG_OVERRIDE="playwright.bpm-regression.config.ts"
       SUITE_LABEL="bpm-regression"
+      ;;
+    --workflow-demo)
+      CONFIG_OVERRIDE="playwright.workflow-demo.config.ts"
+      SUITE_LABEL="workflow-demo"
       ;;
     --smoke)
       export PW_PROFILE=smoke

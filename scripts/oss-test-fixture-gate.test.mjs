@@ -9,6 +9,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 const SCRIPT = resolve(REPO_ROOT, 'scripts/oss-test.sh');
 const SCRIPT_SRC = readFileSync(SCRIPT, 'utf8');
+const WF_SCRIPT = resolve(REPO_ROOT, 'scripts/run-wf-e2e.sh');
+const WF_SCRIPT_SRC = readFileSync(WF_SCRIPT, 'utf8');
 
 // We assert by parsing the script and running it dry. The full script runs
 // playwright which needs a backend. So we extract just the preflight gate
@@ -21,6 +23,16 @@ test('oss-test.sh defaults PW_PROFILE=oss so setup project auto-imports fixtures
 test('--smoke also exports IMPORT_TEST_FIXTURES=true (smoke specs touch e2et_*)', () => {
   // Verify the --smoke branch wires both env vars
   assert.match(SCRIPT_SRC, /--smoke\)[\s\S]{0,400}IMPORT_TEST_FIXTURES=true/);
+});
+
+test('--workflow-demo runs the focused workflow-demo Playwright config', () => {
+  assert.match(SCRIPT_SRC, /--workflow-demo\)[\s\S]{0,300}playwright\.workflow-demo\.config\.ts/);
+  assert.match(SCRIPT_SRC, /--workflow-demo\)[\s\S]{0,300}SUITE_LABEL="workflow-demo"/);
+});
+
+test('run-wf-e2e runtime delegates to the stable workflow-demo suite flag', () => {
+  assert.match(WF_SCRIPT_SRC, /runtime\)[\s\S]{0,300}OSS_TEST_ARGS=\("--workflow-demo"\)/);
+  assert.doesNotMatch(WF_SCRIPT_SRC, /runtime\)[\s\S]{0,300}tests\/e2e\/workflow-demo/);
 });
 
 test('preflight recognizes all four fixture auto-import gates', () => {
