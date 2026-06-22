@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: pgvector/pgvector:pg17
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: auraboot
           POSTGRES_PASSWORD: auraboot
@@ -42,17 +42,18 @@ jobs:
       PG_PORT: "5432"
       PG_USER: auraboot
       PG_PASSWORD: auraboot
-      FLYWAY_VERSION: "11.10.1"
+      FLYWAY_VERSION: "11.2.0"
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Flyway CLI
         run: |
           set -euo pipefail
-          url="https://repo1.maven.org/maven2/org/flywaydb/flyway/flyway-commandline/${FLYWAY_VERSION}/flyway-commandline-${FLYWAY_VERSION}-linux-x64.tar.gz"
+          url="https://repo.maven.apache.org/maven2/org/flywaydb/flyway-commandline/${FLYWAY_VERSION}/flyway-commandline-${FLYWAY_VERSION}-linux-x64.tar.gz"
           curl -fsSL "$url" -o /tmp/flyway.tgz
           sudo mkdir -p /opt/flyway
           sudo tar -xzf /tmp/flyway.tgz -C /opt/flyway --strip-components=1
+          sudo chmod +x /opt/flyway/flyway
           echo "/opt/flyway" >> "$GITHUB_PATH"
 
       - name: Fresh database

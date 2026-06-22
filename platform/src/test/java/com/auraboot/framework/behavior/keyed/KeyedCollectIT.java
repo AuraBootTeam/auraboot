@@ -64,13 +64,17 @@ class KeyedCollectIT {
 
     /** POST the keyed-collect endpoint over a real servlet container (so the whitelist applies). */
     private ResponseEntity<String> postKeyed(String siteKey, String eventId) {
+        return postKeyedBody(siteKey, body(eventId));
+    }
+
+    private ResponseEntity<String> postKeyedBody(String siteKey, String body) {
         HttpHeaders h = new HttpHeaders();
         h.setContentType(MediaType.APPLICATION_JSON);
         if (siteKey != null) {
             h.set("X-Site-Key", siteKey);
         }
         return restTemplate.exchange("/api/collect/keyed", HttpMethod.POST,
-                new HttpEntity<>(body(eventId), h), String.class);
+                new HttpEntity<>(body, h), String.class);
     }
 
     @BeforeAll
@@ -122,6 +126,23 @@ class KeyedCollectIT {
             )""");
         jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_ab_behavior_event_tenant_eventid "
                 + "ON ab_behavior_event (tenant_id, event_id)");
+        jdbc.execute("""
+            CREATE TABLE IF NOT EXISTS ab_behavior_quarantine (
+                id BIGSERIAL PRIMARY KEY,
+                tenant_id BIGINT NOT NULL,
+                user_id BIGINT,
+                anon_id TEXT,
+                event_id TEXT,
+                event_name TEXT,
+                reason VARCHAR(64) NOT NULL,
+                detail TEXT,
+                raw_event JSONB,
+                quarantined_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )""");
+        jdbc.execute("ALTER TABLE ab_behavior_quarantine ALTER COLUMN anon_id TYPE TEXT");
+        jdbc.execute("ALTER TABLE ab_behavior_quarantine ALTER COLUMN event_id TYPE TEXT");
+        jdbc.execute("ALTER TABLE ab_behavior_quarantine ALTER COLUMN event_name TYPE TEXT");
         cleanup();
         insertKey("p_a", TENANT_A, KEY_A, "active");
         insertKey("p_b", TENANT_B, KEY_B, "active");
@@ -144,15 +165,34 @@ class KeyedCollectIT {
     private void cleanup() {
         jdbc.update("DELETE FROM mt_behavior_site_key WHERE site_key LIKE 'abk_it_%'");
         jdbc.update("DELETE FROM ab_behavior_event WHERE tenant_id IN (?,?)", TENANT_A, TENANT_B);
+        jdbc.update("DELETE FROM ab_behavior_quarantine WHERE tenant_id IN (?,?)", TENANT_A, TENANT_B);
     }
 
     private String body(String eventId) {
         return "{\"events\":[{\"eventId\":\"" + eventId + "\",\"eventName\":\"page_view\",\"anonId\":\"anon-it\"}]}";
     }
 
+    private String body(String eventId, String eventName, String anonId) {
+        return "{\"events\":[{\"eventId\":\"" + eventId + "\",\"eventName\":\"" + eventName
+                + "\",\"anonId\":\"" + anonId + "\"}]}";
+    }
+
     private int eventCount(long tenant) {
         Integer n = jdbc.queryForObject("SELECT count(1) FROM ab_behavior_event WHERE tenant_id = ?",
                 Integer.class, tenant);
+        return n == null ? 0 : n;
+    }
+
+    private int quarantineCount(long tenant) {
+        Integer n = jdbc.queryForObject("SELECT count(1) FROM ab_behavior_quarantine WHERE tenant_id = ?",
+                Integer.class, tenant);
+        return n == null ? 0 : n;
+    }
+
+    private int eventCountById(long tenant, String eventId) {
+        Integer n = jdbc.queryForObject(
+                "SELECT count(1) FROM ab_behavior_event WHERE tenant_id=? AND event_id=?",
+                Integer.class, tenant, eventId);
         return n == null ? 0 : n;
     }
 
@@ -178,6 +218,60 @@ class KeyedCollectIT {
         assertThat(jdbc.queryForObject(
                 "SELECT count(1) FROM ab_behavior_event WHERE tenant_id=? AND event_id='e-iso-1'",
                 Integer.class, TENANT_B)).isZero();
+    }
+
+    @Test
+    @DisplayName("duplicate event_id → both accepted, one durable behavior event")
+    void duplicateEventId_idempotentSingleRow() {
+        ResponseEntity<String> first = postKeyed(KEY_A, "e-dup-1");
+        ResponseEntity<String> second = postKeyed(KEY_A, "e-dup-1");
+
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(first.getBody()).contains("\"accepted\":1");
+        assertThat(second.getBody()).contains("\"accepted\":1");
+        assertThat(eventCountById(TENANT_A, "e-dup-1")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("malformed event → accepted by endpoint, quarantined, not stored as behavior event")
+    void malformedEvent_quarantinedNotStored() {
+        int quarantineBefore = quarantineCount(TENANT_A);
+        ResponseEntity<String> resp = postKeyedBody(KEY_A,
+                "{\"events\":[{\"eventName\":\"page_view\",\"anonId\":\"anon-bad\"}]}");
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).contains("\"accepted\":1");
+        assertThat(jdbc.queryForObject(
+                "SELECT count(1) FROM ab_behavior_event WHERE tenant_id=? AND anon_id='anon-bad'",
+                Integer.class, TENANT_A)).isZero();
+        assertThat(quarantineCount(TENANT_A)).isEqualTo(quarantineBefore + 1);
+        assertThat(jdbc.queryForObject(
+                "SELECT reason FROM ab_behavior_quarantine WHERE tenant_id=? AND anon_id='anon-bad'",
+                String.class, TENANT_A)).isEqualTo("malformed_missing_event_id");
+    }
+
+    @Test
+    @DisplayName("constraint violation → accepted by endpoint, quarantined with raw over-long field")
+    void constraintViolation_quarantinedNotStored() {
+        String eventId = "e-overlong-" + "x".repeat(80);
+        String anonId = "anon-overlong";
+        int quarantineBefore = quarantineCount(TENANT_A);
+
+        ResponseEntity<String> resp = postKeyedBody(KEY_A, body(eventId, "page_view", anonId));
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).contains("\"accepted\":1");
+        assertThat(jdbc.queryForObject(
+                "SELECT count(1) FROM ab_behavior_event WHERE tenant_id=? AND anon_id=?",
+                Integer.class, TENANT_A, anonId)).isZero();
+        assertThat(quarantineCount(TENANT_A)).isEqualTo(quarantineBefore + 1);
+        assertThat(jdbc.queryForObject(
+                "SELECT reason FROM ab_behavior_quarantine WHERE tenant_id=? AND anon_id=?",
+                String.class, TENANT_A, anonId)).isEqualTo("constraint_violation");
+        assertThat(jdbc.queryForObject(
+                "SELECT event_id FROM ab_behavior_quarantine WHERE tenant_id=? AND anon_id=?",
+                String.class, TENANT_A, anonId)).isEqualTo(eventId);
     }
 
     @Test
@@ -224,11 +318,12 @@ class KeyedCollectIT {
     }
 
     @Test
-    @DisplayName("over-long field on one event → skipped, batch still 200 (public endpoint stays resilient, no 500)")
-    void oversizedEvent_skippedNotBatchFatal() {
+    @DisplayName("over-long field on one event → quarantined, batch still 200 (public endpoint stays resilient, no 500)")
+    void oversizedEvent_quarantinedNotBatchFatal() {
         // event_id is VARCHAR(40); a misbehaving/hostile client sending a 60-char id must not 500
-        // the whole batch — the bad event is skipped (like a malformed one) and valid events persist.
+        // the whole batch — the bad event is quarantined and valid events persist.
         String longId = "e".repeat(60);
+        int quarantineBefore = quarantineCount(TENANT_A);
         String body = "{\"events\":["
                 + "{\"eventId\":\"e-ok-resilient\",\"eventName\":\"page_view\",\"anonId\":\"anon-it\"},"
                 + "{\"eventId\":\"" + longId + "\",\"eventName\":\"page_view\",\"anonId\":\"anon-it\"}"
@@ -240,13 +335,17 @@ class KeyedCollectIT {
                 new HttpEntity<>(body, h), String.class);
 
         assertThat(resp.getStatusCode()).as("batch not 500'd by one bad event").isEqualTo(HttpStatus.OK);
-        assertThat(resp.getBody()).as("only the valid event accepted").contains("\"accepted\":1");
+        assertThat(resp.getBody()).as("both events accepted for durable async handling").contains("\"accepted\":2");
         assertThat(jdbc.queryForObject(
                 "SELECT count(1) FROM ab_behavior_event WHERE tenant_id=? AND event_id='e-ok-resilient'",
                 Integer.class, TENANT_A)).isEqualTo(1);
         assertThat(jdbc.queryForObject(
                 "SELECT count(1) FROM ab_behavior_event WHERE tenant_id=? AND event_id=?",
                 Integer.class, TENANT_A, longId)).as("over-long event not stored").isZero();
+        assertThat(quarantineCount(TENANT_A)).isEqualTo(quarantineBefore + 1);
+        assertThat(jdbc.queryForObject(
+                "SELECT reason FROM ab_behavior_quarantine WHERE tenant_id=? AND event_id=?",
+                String.class, TENANT_A, longId)).isEqualTo("constraint_violation");
     }
 
     @Test
