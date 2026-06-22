@@ -12,8 +12,11 @@ relates_to:
 ## Session Summary
 
 This session finished the agent dispatch/run-path declared-tool fix and proved the customer-service
-approval flow on a host-first DeepSeek live stack. The branch is functionally complete but still
-has a pre-existing clean-CI dependency blocker unrelated to the agent changes.
+approval flow on a host-first DeepSeek live stack. After SmartEngine 4.0.2 was published to Maven
+Central, the branch also fixed the clean-CI repository ordering issue so SmartEngine artifacts resolve
+from Maven Central before the incomplete Aliyun mirror. After rebasing onto latest `main`, it also
+adds Maven Central-first Gradle plugin marker resolution to avoid clean Gradle homes depending only
+on Gradle Plugin Portal availability.
 
 ## Tasks Completed
 
@@ -25,6 +28,10 @@ has a pre-existing clean-CI dependency blocker unrelated to the agent changes.
 - [x] Fixed seeded CS-agent approval policy role drift from `TENANT_ADMIN` to `tenant_admin`.
 - [x] Proved live gold: inbound email -> agent -> approval -> `send_customer_reply` -> sent log ->
   `crm:create_activity` -> `mt_crm_activity`.
+- [x] Fixed clean CI dependency resolution for SmartEngine 4.0.2 by routing
+  `com.auraboot.smart.framework` to Maven Central before Aliyun mirrors.
+- [x] Fixed clean Gradle plugin marker resolution by adding `pluginManagement.repositories` with
+  Maven Central before Gradle Plugin Portal.
 - [x] Destroyed the temporary live runtime `cs-inbound-gold-77`; port `6477` is no longer listening.
 - [x] Opened PR #1021: <https://github.com/AuraBootTeam/auraboot/pull/1021>.
 
@@ -36,6 +43,8 @@ has a pre-existing clean-CI dependency blocker unrelated to the agent changes.
 | Approval resume | Replay the exact approved tool input | Preserves the human approval boundary and avoids LLM drift on resume | Re-enter the LLM after approval |
 | Custom tool metadata | Include schema, approval, and risk in discovery SQL/mapping | Prevents approved custom tools from executing with `{}` or bypassing approval | Infer metadata later during execution |
 | CS-agent integration assertion | Assert run terminal state and log send/action rows as diagnostics | Real LLM routing is nondeterministic; deterministic contract is approval resume and no duplicate effect | Hard assert every LLM-selected side effect in the Spring IT |
+| SmartEngine repository order | Resolve `com.auraboot.smart.framework` from Maven Central before Aliyun | Maven Central has 4.0.2 while the mirror can be partially synced; content filters avoid Gradle repository stickiness | Wait for mirror sync or rely on `mavenLocal()` |
+| Gradle plugin marker order | Resolve plugin markers from Maven Central before Gradle Plugin Portal | Spring Boot/dependency-management markers are on Maven Central; clean builds should tolerate plugin portal edge failures | Rely on default plugin portal only |
 
 ## Files Changed
 
@@ -52,6 +61,9 @@ has a pre-existing clean-CI dependency blocker unrelated to the agent changes.
 - `platform/src/main/java/com/auraboot/framework/agent/provider/CustomToolProvider.java` - discovery
   includes `input_schema`, `requires_approval`, and `risk_level`.
 - `platform/src/main/resources/database/schema.sql` - schema support for seeded/runtime contracts.
+- `platform/build.gradle` - content-filtered Maven Central repository for SmartEngine fork artifacts
+  before Aliyun mirrors.
+- `platform/settings.gradle` - Maven Central-first plugin marker repository configuration.
 
 ### Tests / Scripts
 
@@ -91,6 +103,19 @@ has a pre-existing clean-CI dependency blocker unrelated to the agent changes.
    - **Solution**: Update seed and add reset-init contract coverage.
    - **Prevention**: `bash scripts/check-reset-init-contracts.sh` now covers this contract.
 
+4. **SmartEngine 4.0.2 resolved from a partially synced mirror**
+   - **Root Cause**: after 4.0.2 publication, Aliyun still lacked part of the artifact set and was
+     listed before Maven Central.
+   - **Solution**: add a content-filtered Maven Central repository for `com.auraboot.smart.framework`
+     before Aliyun, and exclude that group from Aliyun repositories.
+   - **Prevention**: `scripts/reset-init-contracts.test.mjs` now asserts this repository contract.
+
+5. **Clean Gradle homes depended only on Gradle Plugin Portal for plugin markers**
+   - **Root Cause**: `settings.gradle` had no `pluginManagement.repositories`, so a clean Gradle
+     home used the default plugin portal only before project repositories were available.
+   - **Solution**: add Maven Central before Gradle Plugin Portal in `pluginManagement`.
+   - **Prevention**: `scripts/reset-init-contracts.test.mjs` now asserts this repository contract.
+
 ## Reflection & Codify
 
 ### 本会话弯路 / 返工 / 翻车
@@ -100,17 +125,28 @@ has a pre-existing clean-CI dependency blocker unrelated to the agent changes.
    `[A 门禁质量, D 验证纪律]`
 2. **审批 resume 初版没有固定 approved input** - 代价:多一轮 StepLoop 重构和 RED/GREEN - 本可如何更早避免:
    把 approval 当作 durable checkpoint 设计,不是 transient exception - 根因:`[D 验证纪律]`
+3. **SmartEngine 发布后仍让 Gradle 先碰残缺镜像** - 代价:CI rerun 后又红一次 - 本可如何更早避免:
+   用干净 `GRADLE_USER_HOME` + 干净 `maven.repo.local` 复现,并检查各仓库 HTTP 状态 - 根因:
+   `[A 门禁质量, D 验证纪律]`
+4. **rebase 后干净 Gradle 又暴露 plugin marker 单点** - 代价:多一轮 settings.gradle 合约修复 -
+   本可如何更早避免:干净 Gradle home 验证要覆盖 plugin resolution,不只看 project repositories - 根因:
+   `[A 门禁质量, D 验证纪律]`
 
 ### 为什么会发生
 
 本会话主要卡在 provider metadata 和 approval checkpoint 的测试粒度不够细。单纯发现 tool name
-不等于运行时可安全执行,审批 pending 也不等于审批后能以同一语义继续。
+不等于运行时可安全执行,审批 pending 也不等于审批后能以同一语义继续。CI 侧还暴露了
+仓库镜像部分同步时的 Gradle repository stickiness,不能只以本机缓存或单仓库成功解析判断清洁环境可用。
 
 ### 应该有哪些改进
 
 - Provider discovery 相关改动必须断言完整工具描述符: name、schema、approval、risk。
 - 审批/人工确认路径的测试必须覆盖 resume 后使用的精确输入,不能只测 pending 状态。
 - Live gold 证据要同时查 action log 和业务表,避免只用 run status 当完成判据。
+- Maven 依赖发布后,对 CI 阻塞要用干净 Gradle home / Maven local 做验证,并在镜像前后顺序敏感时加
+  repository contract 测试。
+- Gradle plugin marker resolution 属于 settings 层,不能靠 project `repositories` 修复;清洁环境验证要覆盖
+  settings/pluginManagement。
 
 ### 已固化 / 待固化
 
@@ -119,7 +155,7 @@ has a pre-existing clean-CI dependency blocker unrelated to the agent changes.
 - [x] 已写入 `docs/backlog/2026-06-22-agent-run-path-declared-tool-discovery.md`: root cause,
   resolution, verification, and gold evidence.
 - [x] 已写入 `docs/backlog/2026-06-22-ci-smartengine-402-mavenlocal.md`: clean CI cannot resolve
-  SmartEngine 4.0.2 artifacts because they only exist in `mavenLocal()`.
+  SmartEngine 4.0.2 artifacts without routing the SmartEngine group to Maven Central before mirrors.
 - [ ] 待 owner 拍板 `markdownlint` MD025 config: consider `MD025: { front_matter_title: "" }`
   to stop frontmatter title from counting as a duplicate H1.
 
@@ -134,10 +170,9 @@ has a pre-existing clean-CI dependency blocker unrelated to the agent changes.
 - **PR**: #1021 OPEN, ready, base `main`, head branch `fix/agent-run-declared-tools`
 - **Stash**: existing unrelated stashes remain untouched:
   `billing-meta-permission-constants`, `oss pre-existing changes`, `wip workbench backlog`
-- **CI status**: local gates pass; GitHub `Build & Quality Gate (Java 21)` fails on a pre-existing
-  clean-CI dependency resolution issue: `smart-engine-extension-storage-mysql:4.0.2` and
-  `smart-engine-extension-storage-custom:4.0.2` are declared on `main` and only available from
-  `mavenLocal()`. Recent `main` backend workflow runs fail the same way.
+- **CI status**: local gates pass; clean-cache dependency resolution is fixed locally by preferring
+  Maven Central for SmartEngine 4.0.2 and Gradle plugin markers. GitHub checks still need to run on
+  the force-pushed rebased commit.
 
 ### Runtime / 端口
 
@@ -154,10 +189,19 @@ has a pre-existing clean-CI dependency blocker unrelated to the agent changes.
 - `cd platform && ./gradlew :test --tests com.auraboot.framework.agent.provider.CustomToolProviderTest --tests com.auraboot.framework.agent.service.StepLoopServiceLlmResponseGuardTest --tests com.auraboot.framework.agent.service.ToolLoopServiceSafetyTest --tests com.auraboot.framework.agent.service.DeclaredAgentToolResolverTest --tests com.auraboot.framework.agent.service.AgentRunServiceSyncTest --no-daemon`
 - `cd platform && ./gradlew :test --tests com.auraboot.framework.agent.CustomerServiceAgentIntegrationTest --no-daemon`
 - `cd platform && ./gradlew bootJar -x test --no-daemon`
+- `cd platform && GRADLE_USER_HOME=/tmp/auraboot-smartengine-402-gradle-fix ./gradlew --no-daemon --refresh-dependencies clean compileJava -Dmaven.repo.local=/tmp/auraboot-smartengine-402-m2-fix`
+- `cd platform && GRADLE_USER_HOME=/tmp/auraboot-smartengine-402-gradle-fix ./gradlew --no-daemon compileTestJava -Dmaven.repo.local=/tmp/auraboot-smartengine-402-m2-fix`
+- `cd platform && ./gradlew --no-daemon compileJava compileTestJava compileIntegrationTestJava checkstyleMain pmdMain jar`
+- `node --test scripts/reset-init-contracts.test.mjs` (22/22)
+
+### Verification Limits
+
+- `scripts/check-schema-sql.sh` could not run locally because this machine has no Docker binary.
+- A post-rebase fresh `GRADLE_USER_HOME` / fresh `maven.repo.local` run got past plugin marker and
+  SmartEngine resolution, then failed on transient TLS handshakes to Maven Central while fetching
+  unrelated Spring Boot/AWS artifacts.
 
 ## Next Steps
 
-1. Decide whether to fix the SmartEngine 4.0.2 clean-CI dependency issue in a separate CI/dependency
-   PR or temporarily waive the backend check for #1021 as pre-existing.
-2. Continue watching #1021 checks after any dependency fix lands.
-3. Merge #1021 after required checks/review are satisfied.
+1. Push the SmartEngine repository-order fix and watch #1021 checks on the new commit.
+2. Merge #1021 after required checks/review are satisfied.

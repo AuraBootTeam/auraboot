@@ -192,6 +192,35 @@ test('plugin import profiles use explicit semantic names and deprecate default',
   }
 });
 
+test('Gradle resolves SmartEngine artifacts from Maven Central before Aliyun mirrors', () => {
+  const build = read('platform/build.gradle');
+  const smartEngineCentral = build.indexOf("name = 'Maven Central SmartEngine'");
+  const aliyunPublic = build.indexOf("https://maven.aliyun.com/repository/public");
+
+  assert.ok(smartEngineCentral >= 0, 'SmartEngine artifacts need a dedicated Maven Central repository block');
+  assert.ok(aliyunPublic >= 0, 'Aliyun public mirror repository should still be declared');
+  assert.ok(
+    smartEngineCentral < aliyunPublic,
+    'SmartEngine artifacts must resolve from Maven Central before Aliyun mirror stickiness can cache partial syncs',
+  );
+  assert.match(build, /includeGroup ['"]com\.auraboot\.smart\.framework['"]/);
+});
+
+test('Gradle plugin markers resolve from Maven Central before Gradle Plugin Portal', () => {
+  const settings = read('platform/settings.gradle');
+  const pluginManagement = settings.indexOf('pluginManagement');
+  const mavenCentral = settings.indexOf('mavenCentral()');
+  const gradlePluginPortal = settings.indexOf('gradlePluginPortal()');
+
+  assert.ok(pluginManagement >= 0, 'settings.gradle must declare pluginManagement repositories');
+  assert.ok(mavenCentral >= 0, 'pluginManagement should include Maven Central for plugin markers');
+  assert.ok(gradlePluginPortal >= 0, 'pluginManagement should keep Gradle Plugin Portal as fallback');
+  assert.ok(
+    mavenCentral < gradlePluginPortal,
+    'Maven Central should be checked before Gradle Plugin Portal for resilient clean Gradle homes',
+  );
+});
+
 test('seeded CS agent declares only OSS CRM starter tools that can be imported', () => {
   const seed = read('scripts/seed-cs-agent.sql');
   for (const staleReference of [

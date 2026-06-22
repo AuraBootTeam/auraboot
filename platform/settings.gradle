@@ -1,3 +1,13 @@
+pluginManagement {
+    repositories {
+        // Spring Boot and dependency-management plugin markers are available
+        // from Maven Central; keep it before Gradle Plugin Portal so clean CI
+        // is not blocked by plugin portal edge/network flakiness.
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 rootProject.name = 'AuraBoot'
 
 include 'platform-plugin-api'

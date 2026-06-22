@@ -1,13 +1,15 @@
 ---
 created: 2026-06-22
 type: backlog
-status: active
+status: closed
 area: ci/backend
 relates_to:
   - docs/handover/HANDOVER-2026-06-22-agent-run-declared-tools.md
+distilled_to:
+  - docs/handover/HANDOVER-2026-06-22-agent-run-declared-tools.md
 ---
 
-# Backend CI cannot resolve SmartEngine 4.0.2 in a clean checkout
+# Backend CI SmartEngine 4.0.2 clean resolution
 
 ## Symptom
 
@@ -36,13 +38,14 @@ implementation ('com.auraboot.smart.framework:smart-engine-extension-storage-mys
 implementation ('com.auraboot.smart.framework:smart-engine-extension-storage-custom:4.0.2')
 ```
 
-The repository list starts with `mavenLocal()` and comments that SmartEngine fork jars only exist
-there. In a clean GitHub Actions runner, `mavenLocal()` is empty and there is no workflow step that
-publishes or downloads these 4.0.2 artifacts before Gradle resolves `compileClasspath`.
+The first CI failure happened before the 4.0.2 fork artifacts were available from a clean remote
+repository. After publication to Maven Central, a second failure mode remained: the Aliyun public
+mirror still returned partial or missing SmartEngine 4.0.2 artifacts, and Gradle could stick the
+`com.auraboot.smart.framework` group to that incomplete mirror because it appeared before Maven
+Central in the repository list.
 
-Local builds can pass when the developer machine already has the jars in `~/.m2/repository`. The
-local resolver marker for these artifacts has no remote repository id, confirming they are locally
-installed artifacts.
+Local builds can pass when the developer machine already has the jars in `~/.m2/repository` or in
+Gradle cache. That is not a valid CI completion signal.
 
 ## Why this is not PR #1021's agent regression
 
@@ -50,16 +53,52 @@ PR #1021 changes agent runtime code, tests, seed data, and docs. It does not mod
 `platform/build.gradle`, SmartEngine dependency versions, or backend workflow dependency setup.
 The same backend workflow failure is already present on `main`.
 
-## Fix directions
+## Resolution
 
-Pick one durable path:
+PR #1021 now adds a content-filtered Maven Central repository before the Aliyun mirrors:
 
-1. Publish the SmartEngine 4.0.2 artifacts to a repository that CI can read, then add that repository
-   to Gradle with documented credentials if needed.
-2. Add a CI pre-step that builds/publishes the SmartEngine fork into the job-local Maven repository
-   before `compileJava`.
-3. If 4.0.2 should not be required in OSS CI, split the SmartEngine fork dependency behind a profile
-   or substitute a CI-available artifact without regressing the BPM countersign fixes that required
-   4.0.2.
+- `mavenCentral { name = 'Maven Central SmartEngine'; content { includeGroup
+  'com.auraboot.smart.framework' } }`
+- Aliyun `public` and `spring` repositories explicitly exclude `com.auraboot.smart.framework`.
+- The normal fallback `mavenCentral()` remains after the mirrors for non-SmartEngine dependencies.
+- `platform/settings.gradle` also declares `pluginManagement.repositories` with `mavenCentral()`
+  before `gradlePluginPortal()`, because the Spring Boot and dependency-management plugin markers
+  are available from Maven Central and clean Gradle homes should not depend on plugin portal edge
+  availability.
+
+This keeps SmartEngine fork resolution on Maven Central while preserving the existing mirror order
+for the rest of the build, and gives Gradle plugin marker resolution the same Maven Central-first
+fallback.
+
+## Verification
+
+Clean remote artifact checks:
+
+- Maven Central returns HTTP 200 for `smart-engine-extension-storage-mysql:4.0.2`.
+- Maven Central returns HTTP 200 for `smart-engine-extension-storage-custom:4.0.2`.
+- Maven Central returns HTTP 200 for `smart-engine-extension-storage-common:4.0.2`.
+- Aliyun still returned 404 for at least part of the same artifact set during verification, which
+  proves repository order/content filters are still required while the mirror catches up.
+- Maven Central returns HTTP 200 for the Spring Boot `3.5.14` and dependency-management `1.1.7`
+  Gradle plugin markers when retried through transient TLS failures.
+
+Local clean-cache Gradle verification before rebasing onto the latest `main`:
+
+```bash
+rm -rf /tmp/auraboot-smartengine-402-m2-fix /tmp/auraboot-smartengine-402-gradle-fix
+cd platform
+GRADLE_USER_HOME=/tmp/auraboot-smartengine-402-gradle-fix \
+  ./gradlew --no-daemon --refresh-dependencies clean compileJava \
+  -Dmaven.repo.local=/tmp/auraboot-smartengine-402-m2-fix
+GRADLE_USER_HOME=/tmp/auraboot-smartengine-402-gradle-fix \
+  ./gradlew --no-daemon compileTestJava \
+  -Dmaven.repo.local=/tmp/auraboot-smartengine-402-m2-fix
+```
+
+After rebasing onto `main`, a fresh Gradle home with only the wrapper distribution copied no longer
+failed on SmartEngine or plugin marker discovery. The run progressed into normal dependency
+downloads and then failed on transient Maven Central TLS handshakes while fetching unrelated Spring
+Boot/AWS artifacts. That is a local network availability limit, not the original missing
+SmartEngine 4.0.2 failure.
 
 Do not rely on developer-machine `~/.m2` state as the completion criterion for backend CI.
