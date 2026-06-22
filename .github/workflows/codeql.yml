@@ -41,6 +41,10 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Install SmartEngine fork into Maven local
+        if: matrix.language == 'java-kotlin'
+        run: scripts/install-smartengine-maven-local.sh
+
       - name: Initialize CodeQL (Java)
         if: matrix.language == 'java-kotlin'
         uses: github/codeql-action/init@v4

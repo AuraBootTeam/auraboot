@@ -365,10 +365,8 @@ describe('GerberViewerBlockRenderer', () => {
       });
     });
     expect(createObjectURL).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('img', { name: 'Top Gerber board render' })).toHaveAttribute(
-      'src',
-      objectUrl,
-    );
+    const topRender = await screen.findByRole('img', { name: 'Top Gerber board render' });
+    expect(topRender).toHaveAttribute('src', objectUrl);
     expect(screen.getByTestId('gerber-marker-C4')).toBeInTheDocument();
   });
 
@@ -654,10 +652,8 @@ describe('GerberViewerBlockRenderer', () => {
       });
     });
     expect(screen.queryByTestId('gerber-svg-unavailable')).toBeNull();
-    expect(screen.getByRole('img', { name: 'Top Gerber board render' })).toHaveAttribute(
-      'src',
-      objectUrl,
-    );
+    const topRender = await screen.findByRole('img', { name: 'Top Gerber board render' });
+    expect(topRender).toHaveAttribute('src', objectUrl);
   });
 
   it('unwraps dynamic list jsonb envelopes before reading persisted board SVGs', () => {
