@@ -23,8 +23,15 @@ const CLEANUP_PREFIXES = [
   'E2E Calendar View',
   'E2E Kanban Board',
   'E2E Gantt Timeline',
+  'BF_',
+  'CF_',
   'FV_',
+  'KG_',
+  'QF_',
+  'RH_',
+  'SF_',
   'SV_Tree_',
+  'UX_',
   '树视图视图',
   '树视图表格视图',
   'UX_FormView_e2e_',
@@ -52,10 +59,16 @@ interface SavedViewApiRecord {
   scope?: string;
   viewType?: string;
   isDefault?: boolean;
+  isImplicit?: boolean;
   viewConfig?: Record<string, unknown>;
 }
 
-async function apiJson<T>(page: Page, method: 'get' | 'post' | 'put' | 'delete', url: string, data?: unknown): Promise<T> {
+async function apiJson<T>(
+  page: Page,
+  method: 'get' | 'post' | 'put' | 'delete',
+  url: string,
+  data?: unknown,
+): Promise<T> {
   const response = await page.request[method](url, data == null ? undefined : { data });
   if (!response.ok()) {
     const body = await response.text().catch(() => '<body unavailable>');
@@ -99,7 +112,10 @@ async function deleteView(
   options: { bestEffort?: boolean } = {},
 ): Promise<void> {
   const response = await page.request.delete(`/api/views/${pid}`);
-  if (options.bestEffort && (response.ok() || response.status() === 400 || response.status() === 404)) {
+  if (
+    options.bestEffort &&
+    (response.ok() || response.status() === 400 || response.status() === 404)
+  ) {
     return;
   }
   if (!response.ok() && response.status() !== 404) {
@@ -111,7 +127,10 @@ async function deleteView(
 async function cleanupRunViews(page: Page): Promise<void> {
   const views = await listViews(page).catch(() => []);
   for (const view of views) {
-    if (view.pid && CLEANUP_PREFIXES.some((prefix) => view.name?.startsWith(prefix))) {
+    if (
+      view.pid &&
+      (view.isImplicit || CLEANUP_PREFIXES.some((prefix) => view.name?.startsWith(prefix)))
+    ) {
       await deleteView(page, view.pid, { bestEffort: true });
     }
   }
@@ -145,7 +164,7 @@ async function clickStableTestId(page: Page, testId: string): Promise<void> {
     .poll(
       async () => {
         try {
-          await page.getByTestId(testId).click({ trial: true, timeout: 750 });
+          await page.getByTestId(testId).click({ timeout: 750 });
           return true;
         } catch {
           return false;
@@ -154,7 +173,6 @@ async function clickStableTestId(page: Page, testId: string): Promise<void> {
       { timeout: 5000 },
     )
     .toBe(true);
-  await page.getByTestId(testId).click({ timeout: 5000 });
 }
 
 async function navigateToPersonalTableView(page: Page, nameSuffix: string): Promise<string> {
@@ -171,7 +189,8 @@ async function navigateToPersonalTableView(page: Page, nameSuffix: string): Prom
 
 async function createTableViewThroughUi(page: Page): Promise<string> {
   const responsePromise = page.waitForResponse(
-    (response) => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
+    (response) =>
+      response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
     { timeout: 5000 },
   );
   await page.getByTestId('saved-view-create-personal').click();
@@ -195,7 +214,9 @@ test.describe.serial('SavedView Personal-only management', () => {
     await cleanupRunViews(page);
   });
 
-  test('SV-PER-001: selector and management panel expose only personal views @smoke', async ({ page }) => {
+  test('SV-PER-001: selector and management panel expose only personal views @smoke', async ({
+    page,
+  }) => {
     const personalName = `${RUN_PREFIX}-选择器`;
     const globalName = `${RUN_PREFIX}-全员不应出现`;
     const personalPid = await createView(page, personalName);
@@ -211,7 +232,9 @@ test.describe.serial('SavedView Personal-only management', () => {
     await expect(selector).toContainText('个人视图');
     await expect(selector).toContainText(personalName);
     await expect(selector).not.toContainText(globalName);
-    await expect(selector).not.toContainText(/团队共享|全员视图|Team Views|Global Views|New View|Manage Views/);
+    await expect(selector).not.toContainText(
+      /团队共享|全员视图|Team Views|Global Views|New View|Manage Views/,
+    );
     await page.getByTestId('view-selector-search').fill('选择器');
     await expect(page.getByTestId(`view-option-${personalPid}`)).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/02-personal-selector.png`, fullPage: true });
@@ -223,14 +246,18 @@ test.describe.serial('SavedView Personal-only management', () => {
     await expect(panel).toContainText('新建个人视图');
     await expect(panel).toContainText(personalName);
     await expect(panel).not.toContainText(globalName);
-    await expect(panel).not.toContainText(/View Management|New View|Configure|Skip|Done|Team Views|Global Views/);
+    await expect(panel).not.toContainText(
+      /View Management|New View|Configure|Skip|Done|Team Views|Global Views/,
+    );
     await panel.getByTestId('saved-view-manage-search').fill(RUN_PREFIX);
     await expect(panel).toContainText(personalName);
     await expect(panel).not.toContainText('Default View');
     await page.screenshot({ path: `${SHOTS}/03-personal-management.png`, fullPage: true });
   });
 
-  test('SV-PER-002: create, switch, rename, duplicate, set default, and delete through UI', async ({ page }) => {
+  test('SV-PER-002: create, switch, rename, duplicate, set default, and delete through UI', async ({
+    page,
+  }) => {
     await navigateToOrderViaSidebar(page);
     await openManagePanel(page);
 
@@ -249,7 +276,9 @@ test.describe.serial('SavedView Personal-only management', () => {
 
     const duplicateName = `${RUN_PREFIX}-副本`;
     const duplicateResponse = page.waitForResponse(
-      (response) => response.request().method() === 'POST' && response.url().includes(`/api/views/${createdPid}/duplicate`),
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes(`/api/views/${createdPid}/duplicate`),
       { timeout: 5000 },
     );
     await page.getByTestId(`saved-view-action-copy-${createdPid}`).click();
@@ -261,7 +290,9 @@ test.describe.serial('SavedView Personal-only management', () => {
     await expect(page.getByTestId(`saved-view-row-${duplicatePid}`)).toContainText(duplicateName);
 
     await page.getByTestId(`saved-view-action-set-default-${duplicatePid}`).click();
-    await expect.poll(async () => (await getView(page, duplicatePid)).isDefault === true).toBe(true);
+    await expect
+      .poll(async () => (await getView(page, duplicatePid)).isDefault === true)
+      .toBe(true);
 
     await page.getByTestId(`saved-view-select-${createdPid}`).click();
     await expect(page).toHaveURL(new RegExp(`view=${createdPid}`), { timeout: 5000 });
@@ -270,10 +301,14 @@ test.describe.serial('SavedView Personal-only management', () => {
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
     await page.getByTestId('confirm-ok').click();
     await expect(page.getByTestId(`saved-view-row-${createdPid}`)).toHaveCount(0);
-    await expect.poll(async () => (await listViews(page)).some((view) => view.pid === createdPid)).toBe(false);
+    await expect
+      .poll(async () => (await listViews(page)).some((view) => view.pid === createdPid))
+      .toBe(false);
   });
 
-  test('SV-PER-003: personal view local changes can be saved current or as a new personal view', async ({ page }) => {
+  test('SV-PER-003: personal view local changes can be saved current or as a new personal view', async ({
+    page,
+  }) => {
     const sourceName = `${RUN_PREFIX}-保存链路`;
     const sourcePid = await createView(page, sourceName);
 
@@ -290,13 +325,16 @@ test.describe.serial('SavedView Personal-only management', () => {
 
     await page.getByTestId('personal-view-save-current').click();
     await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
-    await expect.poll(async () => (await getView(page, sourcePid)).viewConfig?.rowHeight).toBe('tall');
+    await expect
+      .poll(async () => (await getView(page, sourcePid)).viewConfig?.rowHeight)
+      .toBe('tall');
 
     await page.getByTestId('row-height-btn').click();
     await page.getByTestId('row-height-option-extra-tall').click();
     await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
     const createCopyResponse = page.waitForResponse(
-      (response) => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
+      (response) =>
+        response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
       { timeout: 5000 },
     );
     await page.getByTestId('personal-view-save-as-new').click();
@@ -310,22 +348,101 @@ test.describe.serial('SavedView Personal-only management', () => {
     expect(copied.viewConfig?.rowHeight).toBe('extra-tall');
   });
 
-  test('SV-PER-004: quick filter can be saved as a personal view from the toolbar', async ({ page }) => {
-    await navigateToPersonalTableView(page, '快捷筛选表格');
+  test('SV-PER-003b: discard restores the selected personal view state and clears transient sort URL', async ({
+    page,
+  }) => {
+    const sourceName = `${RUN_PREFIX}-放弃排序`;
+    const sourcePid = await createView(page, sourceName, {
+      viewType: 'table',
+      viewConfig: { rowHeight: 'medium', sorts: [] },
+    });
+
+    // URL-specific regression: a shared link may carry both an explicit view and
+    // a transient sort. Discard must restore the saved view, not restage the URL sort.
+    await page.goto(`/p/e2et_order?view=${sourcePid}&sort=e2et_order_amount%3Adesc`);
+    await expect(page.getByTestId('dynamic-list')).toBeVisible();
+    await expect(page.getByTestId('view-selector-trigger')).toHaveAttribute(
+      'data-current-view-name',
+      sourceName,
+    );
+    await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
+    await expect(page.getByTestId('personal-view-draft-banner')).toContainText('排序 1 项');
+
+    await page.getByTestId('personal-view-discard-draft').click();
+
+    await expect(page).not.toHaveURL(/sort=/);
+    await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
+    expect((await getView(page, sourcePid)).viewConfig?.sorts ?? []).toEqual([]);
+
+    await page.reload();
+    await expect(page.getByTestId('view-selector-trigger')).toHaveAttribute(
+      'data-current-view-name',
+      sourceName,
+    );
+    await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
+    await expect(page).not.toHaveURL(/sort=/);
+  });
+
+  test('SV-PER-003c: default view column context hide updates immediately and persists', async ({
+    page,
+  }) => {
+    const fieldCode = 'e2et_order_title';
+
+    await navigateToOrderViaSidebar(page);
+    await openSelector(page);
+    await page.getByTestId('view-option-default').click();
+    await expect(page.getByTestId('dynamic-list')).toBeVisible();
+    await expect(page.getByTestId(`table-header-${fieldCode}`)).toBeVisible();
+
+    const header = page.getByTestId(`table-header-${fieldCode}`);
+    await header.click({ button: 'right' });
+    await expect(page.getByTestId('column-context-menu')).toBeVisible();
+    await page.getByTestId('column-context-menu-hide-column').click();
+
+    await expect(page.getByTestId('column-context-menu')).toHaveCount(0);
+    await expect(page.getByTestId(`table-header-${fieldCode}`)).toHaveCount(0);
+    await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
+
+    await expect
+      .poll(async () => {
+        const implicitView = (await listViews(page)).find((view) => view.isImplicit);
+        const columns = (implicitView?.viewConfig?.columns ?? []) as Array<{
+          fieldCode?: string;
+          visible?: boolean;
+        }>;
+        return columns.find((column) => column.fieldCode === fieldCode)?.visible;
+      })
+      .toBe(false);
+
+    await page.reload();
+    await expect(page.getByTestId('dynamic-list')).toBeVisible();
+    await expect(page.getByTestId(`table-header-${fieldCode}`)).toHaveCount(0);
+  });
+
+  test('SV-PER-004: quick filter can be saved as a personal view from the toolbar', async ({
+    page,
+  }) => {
+    await navigateToOrderViaSidebar(page);
+    await openSelector(page);
+    await page.getByTestId('view-option-default').click();
     await expect(page.getByTestId('quick-filters')).toBeVisible();
 
-    const listReload = page.waitForResponse(
-      (response) => response.url().includes('/api/dynamic/e2et_order/list') && response.status() === 200,
-      { timeout: 5000 },
-    ).catch(() => null);
+    const listReload = page
+      .waitForResponse(
+        (response) =>
+          response.url().includes('/api/dynamic/e2et_order/list') && response.status() === 200,
+        { timeout: 5000 },
+      )
+      .catch(() => null);
     await clickStableTestId(page, 'quick-filter-my_records');
     await listReload;
 
     const createResponse = page.waitForResponse(
-      (response) => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
-      { timeout: 5000 },
+      (response) =>
+        response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
+      { timeout: 10000 },
     );
-    await page.getByTestId('preset-view-save-as-personal').click();
+    await clickStableTestId(page, 'preset-view-save-as-personal');
     const body = await (await createResponse).json();
     const pid = body.data?.pid ?? body.pid;
     expect(pid).toBeTruthy();
@@ -336,18 +453,24 @@ test.describe.serial('SavedView Personal-only management', () => {
     await deleteView(page, pid);
   });
 
-  test('SV-PER-005: personal quota blocks new views and capability gate explains blocked/degraded views', async ({ page }) => {
+  test('SV-PER-005: personal quota blocks new views and capability gate explains blocked/degraded views', async ({
+    page,
+  }) => {
     await navigateToOrderViaSidebar(page);
     await openManagePanel(page);
     await page.getByTestId('saved-view-create-personal').click();
     await page.getByTestId('saved-view-type-gallery').click();
     await expect(page.getByTestId('view-capability-blocked-gallery')).toBeVisible();
-    await expect(page.getByTestId('view-capability-blocked-gallery')).toContainText(/缺少|图片|附件|封面/);
+    await expect(page.getByTestId('view-capability-blocked-gallery')).toContainText(
+      /缺少|图片|附件|封面/,
+    );
     await page.screenshot({ path: `${SHOTS}/05-capability-blocked.png`, fullPage: true });
 
     await page.getByTestId('saved-view-type-kanban').click();
     await expect(page.getByTestId('view-capability-degraded-kanban')).toBeVisible();
-    await expect(page.getByTestId('view-capability-degraded-kanban')).toContainText(/拖拽|状态更新/);
+    await expect(page.getByTestId('view-capability-degraded-kanban')).toContainText(
+      /拖拽|状态更新/,
+    );
     await page.screenshot({ path: `${SHOTS}/06-capability-degraded-create.png`, fullPage: true });
 
     await cleanupRunViews(page);

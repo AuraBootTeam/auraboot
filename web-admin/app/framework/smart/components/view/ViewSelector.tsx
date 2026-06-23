@@ -17,7 +17,10 @@ import {
 } from 'lucide-react';
 import { type SavedView, type ViewScope, type ViewType } from '~/framework/smart/types/savedView';
 import type { ViewRecommendation } from '~/framework/smart/hooks/useViewRecommendations';
-import { isSavedViewLockedPreset } from '~/framework/smart/utils/savedViewPersistence';
+import {
+  isImplicitSavedView,
+  isSavedViewLockedPreset,
+} from '~/framework/smart/utils/savedViewPersistence';
 import { useI18n } from '~/contexts/I18nContext';
 import { cn } from '~/utils/cn';
 
@@ -31,6 +34,8 @@ export interface ViewSelectorProps {
   currentView: SavedView | null;
   /** Callback when a view is selected */
   onSelectView: (pid: string) => void;
+  /** Callback when the user returns to the implicit default baseline */
+  onSelectDefaultView?: () => void;
   /** Callback to open view management panel */
   onManageViews?: () => void;
   /** Callback to create a new view */
@@ -213,6 +218,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   views,
   currentView,
   onSelectView,
+  onSelectDefaultView,
   onManageViews,
   onCreateView,
   activeViewType,
@@ -226,6 +232,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const selectViewLabel = t('common.saved_view_select', undefined, '选择视图');
   const defaultLabel = t('common.saved_view_default', undefined, '默认');
+  const defaultViewLabel = t('common.saved_view_default_view', undefined, '默认视图');
   const newViewLabel = t('common.saved_view_new_personal', undefined, '新建个人视图');
   const manageLabel = t('common.saved_view_manage', undefined, '管理视图');
   const emptyLabel = t('common.saved_view_empty', undefined, '暂无保存视图');
@@ -240,7 +247,9 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
     undefined,
     '需配置',
   );
-  const displayCurrentView = currentView?.scope === 'personal' ? currentView : null;
+  const displayCurrentView =
+    currentView?.scope === 'personal' && !isImplicitSavedView(currentView) ? currentView : null;
+  const isDefaultBaselineActive = !displayCurrentView;
   const currentScopeConfig = getScopeConfig(displayCurrentView?.scope ?? 'personal');
   const CurrentScopeIcon = currentScopeConfig.Icon;
   const isCurrentViewLockedPreset = isSavedViewLockedPreset(displayCurrentView);
@@ -307,6 +316,11 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
     [onSelectView],
   );
 
+  const handleSelectDefaultView = useCallback(() => {
+    onSelectDefaultView?.();
+    setIsOpen(false);
+  }, [onSelectDefaultView]);
+
   /**
    * Handle create view click
    */
@@ -333,7 +347,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
       ...config,
       label: t(config.labelKey, undefined, config.fallback),
       views: views
-        .filter((v) => v.scope === 'personal')
+        .filter((v) => v.scope === 'personal' && !isImplicitSavedView(v))
         .filter((v) => {
           if (!normalizedSearch) return true;
           const haystack = `${v.name} ${v.description ?? ''} ${v.viewType ?? ''}`.toLowerCase();
@@ -405,7 +419,13 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
             )}
           </>
         ) : (
-          <span className="text-gray-400">{selectViewLabel}</span>
+          <>
+            <ViewTypeIcon
+              type="table-cells"
+              className="h-3.5 w-3.5 flex-shrink-0 text-gray-400"
+            />
+            <span className="flex-1 truncate text-left text-gray-900">{defaultViewLabel}</span>
+          </>
         )}
         <ChevronDown
           className={cn(
@@ -428,6 +448,28 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
         >
           {/* View Groups */}
           <div className="max-h-64 overflow-y-auto py-1">
+            <button
+              type="button"
+              onClick={handleSelectDefaultView}
+              data-testid="view-option-default"
+              className={cn(
+                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
+                'hover:bg-gray-100 focus:bg-gray-100 focus:outline-none',
+                'transition-colors duration-100',
+                isDefaultBaselineActive && 'bg-blue-50 text-blue-700',
+              )}
+              role="option"
+              aria-selected={isDefaultBaselineActive}
+            >
+              <ViewTypeIcon
+                type="table-cells"
+                className="h-3.5 w-3.5 flex-shrink-0 text-gray-400"
+              />
+              <span className="flex-1 truncate">{defaultViewLabel}</span>
+              {isDefaultBaselineActive && (
+                <Check className="h-4 w-4 flex-shrink-0 text-blue-600" aria-hidden="true" />
+              )}
+            </button>
             {groupedViews.length === 0 ? (
               <div>
                 <div className="border-b border-gray-100 p-2">

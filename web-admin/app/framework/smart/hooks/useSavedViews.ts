@@ -56,6 +56,10 @@ export interface UseSavedViewsResult {
   error: Error | null;
   /** Select a view by PID */
   selectView: (pid: string) => void;
+  /** Select the implicit default baseline, or clear selection if it does not exist */
+  selectDefaultView: () => void;
+  /** Insert or replace a returned view object and select it */
+  upsertView: (view: SavedView) => void;
   /** Create a new view */
   createView: (request: SavedViewCreateRequest) => Promise<SavedView>;
   /** Update the current view */
@@ -162,6 +166,36 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
       }
     },
     [views],
+  );
+
+  const selectDefaultView = useCallback(() => {
+    const implicitDefaultView = views.find((view) => view.isImplicit === true) ?? null;
+    selectedViewPidRef.current = implicitDefaultView?.pid ?? null;
+    setCurrentView(implicitDefaultView);
+  }, [views]);
+
+  const upsertView = useCallback(
+    (view: SavedView) => {
+      if (!mountedRef.current) {
+        return;
+      }
+      if (scopeFilter !== 'all' && view.scope !== scopeFilter) {
+        return;
+      }
+
+      setViews((prev) => {
+        const existingIndex = prev.findIndex((item) => item.pid === view.pid);
+        if (existingIndex < 0) {
+          return [...prev, view];
+        }
+        const next = [...prev];
+        next[existingIndex] = view;
+        return next;
+      });
+      selectedViewPidRef.current = view.pid;
+      setCurrentView(view);
+    },
+    [scopeFilter],
   );
 
   /**
@@ -354,6 +388,8 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
     loading,
     error,
     selectView,
+    selectDefaultView,
+    upsertView,
     createView,
     updateView,
     updateViewConfig,

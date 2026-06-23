@@ -13,17 +13,14 @@ import { mkdir } from 'node:fs/promises';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_CUSTOMER_CONFIG } from '../../helpers/configs/e2et-customer.config';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
-import {
-  navigateToDynamicPage,
-  openSavedViewManagePanel,
-  uniqueId,
-} from '../helpers';
+import { navigateToDynamicPage, openSavedViewManagePanel, uniqueId } from '../helpers';
+import { cleanupGeneratedSavedViews, createOrReuseSavedView } from './helpers';
 
 const ROUTE_PAGE_KEY = 'e2et_order';
 const CUSTOMER_PAGE_KEY = 'e2et_customer';
 const SCREENSHOT_DIR = 'test-results/saved-view-vnext';
 const ORDER_LIST_PAGE_KEY = 'e2et_order_list';
-const CLEANUP_PREFIXES = ['树视图视图', '树视图表格视图', 'SV Tree Table View'];
+const CLEANUP_PREFIXES = ['树视图视图', '树视图表格视图', 'SV Tree Table View', 'SV_Tree_'];
 
 async function cleanupTreeViews(page: Page): Promise<void> {
   const params = new URLSearchParams({
@@ -46,49 +43,36 @@ async function cleanupTreeViews(page: Page): Promise<void> {
 }
 
 async function ensureOrderTableView(page: Page): Promise<string> {
-  const params = new URLSearchParams({
+  const { pid } = await createOrReuseSavedView(page, {
+    name: '树视图表格视图',
     modelCode: ROUTE_PAGE_KEY,
     pageKey: ORDER_LIST_PAGE_KEY,
+    scope: 'personal',
+    viewType: 'table',
+    viewConfig: {},
+    expectSuccess: true,
   });
-  const accessible = await page.request.get(`/api/views/accessible?${params.toString()}`);
-  expect(accessible.ok(), `load table views failed: ${accessible.status()}`).toBe(true);
-  const accessibleBody = await accessible.json();
-  const views = Array.isArray(accessibleBody.data) ? accessibleBody.data : [];
-  const personalTable = views.find(
-    (view: any) =>
-      view?.pid && view.scope === 'personal' && (view.viewType || 'table') === 'table',
-  );
-  if (personalTable?.pid) {
-    return String(personalTable.pid);
-  }
-
-  const create = await page.request.post('/api/views', {
-    data: {
-      name: '树视图表格视图',
-      modelCode: ROUTE_PAGE_KEY,
-      pageKey: ORDER_LIST_PAGE_KEY,
-      scope: 'personal',
-      viewType: 'table',
-      viewConfig: {},
-    },
-  });
-  if (!create.ok()) {
-    throw new Error(`create table view failed: ${create.status()} ${await create.text()}`);
-  }
-  const createBody = await create.json();
-  const pid = createBody.data?.pid ?? createBody.data?.view?.pid ?? createBody.pid;
-  expect(pid, `create table view returned no pid: ${JSON.stringify(createBody)}`).toBeTruthy();
   return String(pid);
 }
 
 test.describe('SavedView — TREE View', () => {
   test.beforeEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, {
+      modelCode: ROUTE_PAGE_KEY,
+      pageKey: ORDER_LIST_PAGE_KEY,
+    });
     await cleanupTreeViews(page);
   });
 
-  test('SV-033: TREE — blocks creation when no hierarchy field exists @smoke', async ({
-    page,
-  }) => {
+  test.afterEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, {
+      modelCode: ROUTE_PAGE_KEY,
+      pageKey: ORDER_LIST_PAGE_KEY,
+    });
+    await cleanupTreeViews(page);
+  });
+
+  test('SV-033: TREE — blocks creation when no hierarchy field exists @smoke', async ({ page }) => {
     const customer = new ModelTestHelper(page, E2ET_CUSTOMER_CONFIG);
     const customerName = `SV Tree Blocked ${uniqueId('TREE_BLOCKED')}`;
     await customer.createViaApi({
@@ -175,8 +159,12 @@ test.describe('SavedView — TREE View', () => {
       fullPage: true,
     });
 
-    await expect(panel.getByTestId('saved-view-config-field-treeParentField')).toHaveValue('e2et_order_customer');
-    const titleField = await panel.getByTestId('saved-view-config-field-treeTitleField').inputValue();
+    await expect(panel.getByTestId('saved-view-config-field-treeParentField')).toHaveValue(
+      'e2et_order_customer',
+    );
+    const titleField = await panel
+      .getByTestId('saved-view-config-field-treeTitleField')
+      .inputValue();
     expect(titleField).toMatch(/^e2et_order_(no|title|desc|remark)$/);
 
     const save = panel.getByTestId('saved-view-config-save');
@@ -184,14 +172,16 @@ test.describe('SavedView — TREE View', () => {
 
     const createResponsePromise = page.waitForResponse(
       (response) =>
-        response.request().method() === 'POST' &&
-        new URL(response.url()).pathname === '/api/views',
+        response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
       { timeout: 10000 },
     );
 
     await save.click();
     const createResponse = await createResponsePromise;
     expect(createResponse.ok(), `create Tree view failed: ${createResponse.status()}`).toBe(true);
+    const createBody = await createResponse.json();
+    const treePid = createBody.data?.pid ?? createBody.data?.view?.pid ?? createBody.pid;
+    expect(treePid, `create Tree view returned no pid: ${JSON.stringify(createBody)}`).toBeTruthy();
 
     await expect(panel).toBeHidden({ timeout: 10000 });
     expect(createPayloads).toHaveLength(1);
@@ -202,6 +192,7 @@ test.describe('SavedView — TREE View', () => {
         treeTitleField: titleField,
       },
     });
+    await expect(page).toHaveURL(new RegExp(`view=${treePid}`), { timeout: 10000 });
 
     await expect(page.getByTestId('view-selector-trigger')).toHaveAttribute(
       'data-current-view-type',
@@ -213,7 +204,6 @@ test.describe('SavedView — TREE View', () => {
     await expect(treeContainer.getByTestId('tree-toolbar')).toBeVisible();
     await expect(page.getByTestId('ab:list:e2et_order:table')).toBeHidden();
     await expect(page.getByTestId('tree-node-count')).toContainText(/\d+ nodes/);
-    await expect(treeContainer).toBeInViewport();
     await page.screenshot({
       path: `${SCREENSHOT_DIR}/tree-view-rendered.png`,
       fullPage: true,

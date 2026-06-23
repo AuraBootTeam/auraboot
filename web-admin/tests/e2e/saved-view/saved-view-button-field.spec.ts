@@ -6,7 +6,11 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { uniqueId } from '../helpers';
+import { navigateToDynamicPage, uniqueId } from '../helpers';
+import { cleanupGeneratedSavedViews } from './helpers';
+
+const MODEL_CODE = 'e2et_order';
+const PAGE_KEY = 'e2et_order_list';
 
 async function createViewViaApi(
   page: Page,
@@ -15,14 +19,41 @@ async function createViewViaApi(
   viewConfig: any,
 ): Promise<string> {
   const resp = await page.request.post('/api/views', {
-    data: { name, modelCode, viewType: 'table', scope: 'personal', viewConfig },
+    data: { name, modelCode, pageKey: PAGE_KEY, viewType: 'table', scope: 'personal', viewConfig },
   });
+  if (!resp.ok() && resp.status() === 422) {
+    const body = await resp.text().catch(() => '');
+    if (body.includes('Saved view limit reached')) {
+      await cleanupGeneratedSavedViews(page, { modelCode, pageKey: PAGE_KEY });
+      const retry = await page.request.post('/api/views', {
+        data: {
+          name,
+          modelCode,
+          pageKey: PAGE_KEY,
+          viewType: 'table',
+          scope: 'personal',
+          viewConfig,
+        },
+      });
+      if (!retry.ok()) return '';
+      const retryBody = await retry.json();
+      return retryBody.data?.pid ?? retryBody.pid ?? '';
+    }
+  }
   if (!resp.ok()) return '';
   const body = await resp.json();
   return body.data?.pid ?? body.pid ?? '';
 }
 
 test.describe('Button Field (GAP-131)', () => {
+  test.beforeEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, { modelCode: MODEL_CODE, pageKey: PAGE_KEY });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, { modelCode: MODEL_CODE, pageKey: PAGE_KEY });
+  });
+
   test('BF-001: button valueType registered in renderer registry', async ({ page }) => {
     // Navigate to establish auth
     await page.goto('/');
@@ -31,7 +62,7 @@ test.describe('Button Field (GAP-131)', () => {
     // Verify the button renderer exists by checking it doesn't throw
     // We test this indirectly — create a view with button column config
     const viewName = `BF_Test_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName, {
+    const pid = await createViewViaApi(page, MODEL_CODE, viewName, {
       columns: [
         { fieldCode: 'e2et_order_title', visible: true, order: 0 },
         { fieldCode: 'e2et_order_status', visible: true, order: 1 },
@@ -47,7 +78,7 @@ test.describe('Button Field (GAP-131)', () => {
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
     const viewName = `BF_Type_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName, {
+    const pid = await createViewViaApi(page, MODEL_CODE, viewName, {
       columns: [{ fieldCode: 'e2et_order_no', visible: true, order: 0 }],
     });
     expect(pid).toBeTruthy();
@@ -55,7 +86,7 @@ test.describe('Button Field (GAP-131)', () => {
 
   test('BF-003: button renderer produces clickable element', async ({ page }) => {
     // Navigate to a list page to verify rendering works without errors
-    await page.goto('/p/e2et_order');
+    await navigateToDynamicPage(page, MODEL_CODE);
     const toolbar = page.getByTestId('row-height-btn');
     await expect(toolbar).toBeVisible({ timeout: 30000 });
 
@@ -68,7 +99,7 @@ test.describe('Button Field (GAP-131)', () => {
 
   test('BF-004: cell-button-click event dispatched on click', async ({ page }) => {
     // This test verifies the event dispatch mechanism
-    await page.goto('/p/e2et_order');
+    await navigateToDynamicPage(page, MODEL_CODE);
     await page.getByTestId('row-height-btn').waitFor({ state: 'visible', timeout: 30000 });
 
     // Register a listener for cell-button-click events
@@ -91,7 +122,7 @@ test.describe('Button Field (GAP-131)', () => {
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
     const viewName = `BF_Persist_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName, {
+    const pid = await createViewViaApi(page, MODEL_CODE, viewName, {
       columns: [
         { fieldCode: 'action_button', visible: true, order: 0, valueType: 'button' },
         { fieldCode: 'e2et_order_title', visible: true, order: 1 },
@@ -110,7 +141,7 @@ test.describe('Button Field (GAP-131)', () => {
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
     const viewName = `BF_Multi_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName, {
+    const pid = await createViewViaApi(page, MODEL_CODE, viewName, {
       columns: [
         { fieldCode: 'approve_btn', visible: true, order: 0, valueType: 'button' },
         { fieldCode: 'reject_btn', visible: true, order: 1, valueType: 'button' },

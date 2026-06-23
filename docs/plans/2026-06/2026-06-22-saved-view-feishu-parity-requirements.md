@@ -110,20 +110,29 @@ Mockup 覆盖:
 - 右侧 quick filter chips 保留为日常筛选,不放进 SavedView 管理 panel。
 - 管理 panel 展示 scope、team selector、能力 blocked/degraded、复制到个人、审计。
 
-## 验收矩阵
+## 历史验收矩阵
 
-| Priority | 验收项 | 证据 |
-| --- | --- | --- |
-| P0 | SavedView API 不返回 internal id | `SavedViewDTOTest`; live `/api/views/accessible` 34 条 key audit 无 `id/tenantId/entityId` |
-| P0 | SavedView audit API 不返回 internal audit id | `SavedViewControllerTest.auditEvents_returnsPidOnlyPublicContract`; live audit endpoint 当前 0 rows 但无内部 key 暴露 |
-| P0 | Role/Member/UserRole 响应不返回 internal id | `RoleControllerTest`, `MemberResponseTest`, `UserRoleControllerTest`; live `/api/roles/all` 8 条、`/api/user-roles` 5 条 key audit 通过 |
-| P0 | 共享视图普通成员只产生本地 draft,可复制个人视图 | `saved-view-shared-draft-actions.spec.ts` 2 passed |
-| P0 | 管理员共享保存必须确认后写回 | `saved-view-shared-draft-actions.spec.ts` 2 passed |
-| P1 | 团队共享依赖 `ab_team/ab_team_member` 且校验成员关系 | `SavedViewServiceImplTest.create_team_validatesMembership` |
-| P1 | 高级视图能力不足时 blocked,不落半成品 SavedView | `savedViewCapability.test.ts`, gallery/tree E2E; `VES-001` 验证缺 calendar date mapping 时 create API 422 |
-| P1 | View selector 对齐飞书 dropdown 入口 | `ViewSelector.test.tsx`; SavedView scoped E2E 114 passed / 5 skipped / 0 failed |
-| P1 | 管理 panel 支持新建、scope/team、copy、audit、locked preset | `ViewManagePanel.test.tsx`, `savedViewService.test.ts` |
-| P1 | SavedView E2E 矩阵 smoke-first 后 scoped 回归 | `@smoke` 14 passed; `tests/e2e/saved-view` scoped full 114 passed / 5 skipped / 0 failed |
+> 本节是 2026-06-22 原始需求的历史矩阵。2026-06-23 之后不能再用它直接声明
+> 当前 release 完成度；当前 Personal-only release 证据以
+> `docs/plans/2026-06/2026-06-23-saved-view-endgame-baseline.md` 和
+> `web-admin/tests/e2e/saved-view/FEATURE_MATRIX.md` 为准。
+>
+> shared/team/global、协作者、共享保存 diff、team/global quota、platform-wide
+> dynamic record pid-only migration 均为后续路线或外部任务，不阻塞当前
+> Personal-only release。
+
+| Priority | 验收项 | 历史证据 | 当前解释 |
+| --- | --- | --- | --- |
+| P0 | SavedView API 不返回 internal id | `SavedViewDTOTest`; live `/api/views/accessible` 34 条 key audit 无 `id/tenantId/entityId` | SavedView 内部 public DTO 仍有效；platform-wide pid-only migration 外置 |
+| P0 | SavedView audit API 不返回 internal audit id | `SavedViewControllerTest.auditEvents_returnsPidOnlyPublicContract`; live audit endpoint 当前 0 rows 但无内部 key 暴露 | SavedView 内部 public DTO 仍有效；platform-wide pid-only migration 外置 |
+| P0 | Role/Member/UserRole 响应不返回 internal id | `RoleControllerTest`, `MemberResponseTest`, `UserRoleControllerTest`; live `/api/roles/all` 8 条、`/api/user-roles` 5 条 key audit 通过 | RBAC public-contract 历史证据，不扩大当前 SavedView 分支 |
+| P0 | 共享视图普通成员只产生本地 draft,可复制个人视图 | `saved-view-shared-draft-actions.spec.ts` 2 passed | Roadmap-only；当前 UI 不验收 shared draft |
+| P0 | 管理员共享保存必须确认后写回 | `saved-view-shared-draft-actions.spec.ts` 2 passed | Roadmap-only；重新打开 shared scope 时补 diff mockup/E2E |
+| P1 | 团队共享依赖 `ab_team/ab_team_member` 且校验成员关系 | `SavedViewServiceImplTest.create_team_validatesMembership` | Roadmap-only；当前不接 `ab_team` UI |
+| P1 | 高级视图能力不足时 blocked,不落半成品 SavedView | `savedViewCapability.test.ts`, gallery/tree E2E; `VES-001` 验证缺 calendar date mapping 时 create API 422 | 当前 Personal-only release 保留为必需能力 |
+| P1 | View selector 对齐飞书 dropdown 入口 | `ViewSelector.test.tsx`; 历史 SavedView scoped E2E | 当前证据更新为 2026-06-23 `101 passed / 4 skipped` scoped run |
+| P1 | 管理 panel 支持新建、scope/team、copy、audit、locked preset | `ViewManagePanel.test.tsx`, `savedViewService.test.ts` | 当前只验收个人管理；scope/team/audit 属 roadmap |
+| P1 | SavedView E2E 矩阵 smoke-first 后 scoped 回归 | 历史 `@smoke` 和旧 scoped run | 当前以 `FEATURE_MATRIX.md` 的 Personal-only snapshot 为准 |
 
 ## E2E 覆盖说明
 

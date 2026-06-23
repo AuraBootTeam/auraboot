@@ -38,6 +38,16 @@ Related PR: `https://github.com/AuraBootTeam/auraboot/pull/1028`
 
 Dynamic business record pid-only migration has been removed from this SavedView tracker because it is owned by another workspace and is not a blocker for the SavedView feature completion decision.
 
+## 2026-06-23 Closeout Decision
+
+当前 backlog 不再作为本轮 SavedView Personal-only release 的阻塞清单。本轮最终收口结论：
+
+- `shared/team/global`、协作者、共享保存 diff、共享 audit、team/global quota 20：后续路线，当前不做。
+- `platform-wide dynamic record pid-only migration`：已移出 SavedView tracker，由其他会话处理，当前不做。
+- 当前分支只对 Personal-only 做 release-candidate 判断。
+- 最新 scoped 回归证据：SavedView E2E `101 passed / 4 skipped`，frontend focused Vitest `83 passed`，`git diff --check` PASS。
+- 后续若重新打开 shared/team/global，必须新开 scope 文档、mockup 和 E2E matrix，不能复用本 backlog 的历史 DONE 行。
+
 ## 2026-06-23 Personal-only Release Convergence
 
 本轮在 `codex/saved-view-endgame-baseline` 上重新收口后，当前 SavedView 发布判断改为 Personal-only：
@@ -80,20 +90,21 @@ Dynamic business record pid-only migration has been removed from this SavedView 
 
 | Lane | Included | Excluded |
 | --- | --- | --- |
-| Current SavedView follow-up | WP1-WP5:高级视图语义校验、E2E 矩阵治理、协作者产品化、配额 UX/fixture、quick preset 生命周期 | UserRole legacy endpoint removal、OpenAPI pid 清理 |
+| Historical SavedView follow-up record | WP1-WP5:高级视图语义校验、E2E 矩阵治理、协作者产品化、配额 UX/fixture、quick preset 生命周期 | 不能作为当前 Personal-only release 阻塞项 |
 | Non-blocking platform/public-contract notes | RBAC endpoint deprecation、docs/OpenAPI cleanup; audit actorPid query closed by dedicated audit branch | 不在当前 SavedView 分支里顺手改全仓文档命名或删除兼容端点 |
 
-当前文档状态是 `active backlog`:WP1-WP5 已在 `codex/saved-view-p2-remaining` 完成实现和目标验证;dynamic record pid-only migration 不再纳入本文档 backlog。
+当前文档状态是历史 gap 总账。WP1-WP5 的 DONE/证据行只保留为此前 `codex/saved-view-p2-remaining` 的能力记录；当前 release-candidate 以 Personal-only baseline 和 `FEATURE_MATRIX.md` 为准。dynamic record pid-only migration 不再纳入本文档 backlog。
 
 ## Follow-up Task Reading Guide
 
-本文档是 SavedView 飞书体验对齐后的后续任务总账。后续窗口先读本节,再进入具体 gap:
+本文档是 SavedView 飞书体验对齐后的历史后续任务总账。后续窗口先读本节,再判断是否真的要重开长期 shared/team/global scope:
 
-- 当前分支只处理 5 个 SavedView 内聚工作包:高级视图语义校验、E2E 覆盖矩阵、协作者产品化、配额 UX/测试夹具、quick filter preset 生命周期。
+- 当前 Personal-only 分支不处理 shared/team/global、协作者、共享 audit 或 pid-only migration。
+- 下方 5 个 SavedView 内聚工作包是历史 P2 路线记录:高级视图语义校验、E2E 覆盖矩阵、协作者产品化、配额 UX/测试夹具、quick filter preset 生命周期。
 - 任何 work package 不能只因为代码存在就标记完成;必须同时具备后端/前端单测、浏览器路径、golden 或截图证据、`e2e-truth` 真实性说明。
-- 后续开发完成某个 gap 时,需要同步更新三处:对应 `GAP-SV-FU-*` 详情、`Delivery Matrix`、`Verification Matrix`。
+- 后续如果重新打开 shared/team/global,必须先新开 scope 文档、mockup 和 E2E matrix,不能复用本表作为当前发布完成口径。
 
-本轮当前 worktree 已完成的 5 个包:
+历史 P2 worktree 曾完成的 5 个包:
 
 | Package | Gap | 已补齐什么 | 完成证据 |
 | --- | --- | --- | --- |
@@ -103,14 +114,14 @@ Dynamic business record pid-only migration has been removed from this SavedView 
 | WP4 | GAP-SV-FU-007 | personal 10、team/global 20 配额 UX、fixture create/reuse 策略 | Backend quota tests、quota browser path、golden screenshot `03` |
 | WP5 | GAP-SV-FU-008 | quick preset provider、saved/edited/reset 生命周期、个人副本复用 | Unit/component tests、target E2E、golden screenshots `04/05` |
 
-后续任务优先级的当前状态:
+历史后续任务优先级状态:
 
 | Order | Work package | Why now | Stop condition |
 | --- | --- | --- | --- |
 | 1 | WP2 E2E matrix/truth | 先把证据口径固定,避免后续用 pass count 冒充完成 | done: `FEATURE_MATRIX.md` 已区分 UI path、API setup、contract-only、deferred |
 | 2 | WP1 Advanced semantic validation | 阻断 API 创建无法渲染的半成品高级视图 | done: create/update/capability 和目标 E2E/contract 负例已有证据 |
-| 3 | WP3 Collaborator productization | 共享视图是飞书对齐的高级能力,必须有权限、审计和管理入口 | done: owner share/audit browser path + backend ACL denial path 已覆盖 |
-| 4 | WP4 Quota UX/fixtures | personal 10、team/global 20 是产品规则,不是只在 API 报错时才知道 | done: 用户创建前可见上限,测试 helper 记录 create/reuse |
+| 3 | WP3 Collaborator productization | 共享视图是飞书对齐的高级能力,必须有权限、审计和管理入口 | historical done: 当前 Personal-only release 不展示 / 不验收 |
+| 4 | WP4 Quota UX/fixtures | personal 10、team/global 20 是产品规则,不是只在 API 报错时才知道 | historical done: 当前只验收 personal 10; team/global 20 是后续路线 |
 | 5 | WP5 Quick preset lifecycle | 右侧 quick filters 要保持轻量,保存后的 personal copy 要像成熟 SavedView | done: saved/edited/reset 状态和个人副本复用已闭环 |
 
 非阻塞平台治理项:
@@ -750,9 +761,9 @@ Acceptance criteria:
 - OpenAPI deprecation annotations align with runtime behavior.
 - DSL examples use `recordPid`/`targetRecordPid` when the platform migration is ready.
 
-## Delivery Matrix
+## Historical Delivery Matrix
 
-This matrix is the closing checklist for the 5 current-window work packages. It records the evidence that allows WP1-WP5 to be treated as done for this SavedView branch.
+This matrix is a historical closing checklist for the earlier 5 work packages. It must not be used as the current Personal-only release checklist; use `web-admin/tests/e2e/saved-view/FEATURE_MATRIX.md` and `docs/plans/2026-06/2026-06-23-saved-view-endgame-baseline.md` for the active scope.
 
 | Work package | User path | Backend/integration evidence | Frontend/unit evidence | Web E2E evidence | Golden/truth evidence | Completion status |
 | --- | --- | --- | --- | --- | --- | --- |
