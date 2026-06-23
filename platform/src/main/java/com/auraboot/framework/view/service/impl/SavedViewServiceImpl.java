@@ -20,11 +20,15 @@ import com.auraboot.framework.view.dto.SavedViewDTO;
 import com.auraboot.framework.view.dto.SavedViewUpdateRequest;
 import com.auraboot.framework.view.entity.SavedView;
 import com.auraboot.framework.view.entity.ViewConfig;
+import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.entity.AuditTrail;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.AuditTrailService;
+import com.auraboot.framework.user.dto.UserSearchDTO;
+import com.auraboot.framework.user.service.UserService;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
 import com.auraboot.framework.view.service.SavedViewService;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -42,9 +46,12 @@ import org.springframework.util.StringUtils;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -64,16 +71,34 @@ public class SavedViewServiceImpl implements SavedViewService {
     private static final String CAPABILITY_AVAILABLE = "available";
     private static final String CAPABILITY_BLOCKED = "blocked";
     private static final String REASON_MISSING_REQUIRED_FIELD = "MISSING_REQUIRED_FIELD";
+    private static final String REASON_UNKNOWN_FIELD = "UNKNOWN_FIELD";
+    private static final String REASON_INCOMPATIBLE_FIELD_TYPE = "INCOMPATIBLE_FIELD_TYPE";
+    private static final Set<String> GROUPABLE_FIELD_TYPES = Set.of(
+            "boolean", "bool", "dict", "enum", "reference", "status", "string", "text", "user");
+    private static final Set<String> TEXT_FIELD_TYPES = Set.of(
+            "string", "text", "textarea", "richtext", "varchar");
+    private static final Set<String> DATE_FIELD_TYPES = Set.of(
+            "date", "datetime", "timestamp");
+    private static final Set<String> IMAGE_FIELD_TYPES = Set.of(
+            "image", "file", "attachment", "avatar", "media");
+    private static final Set<String> TREE_PARENT_FIELD_TYPES = Set.of(
+            "reference", "relation", "lookup");
+    private static final Set<String> TREE_PARENT_CODE_FALLBACK_TYPES = Set.of(
+            "string", "text", "integer", "int", "long", "bigint");
+    private static final Set<String> COLLABORATOR_PRINCIPAL_TYPES = Set.of("user");
+    private static final Set<String> COLLABORATOR_PERMISSIONS = Set.of("view", "save", "manage");
     private static final int PERSONAL_VIEW_LIMIT = 10;
     private static final int TEAM_VIEW_LIMIT = 20;
     private static final int GLOBAL_VIEW_LIMIT = 20;
 
     private final SavedViewMapper savedViewMapper;
     private final PageSchemaMapper pageSchemaMapper;
+    private final MetaModelService metaModelService;
     private final UserPermissionService userPermissionService;
     private final CurrentUserTeamResolver currentUserTeamResolver;
     private final TeamMapper teamMapper;
     private final AuditTrailService auditTrailService;
+    private final UserService userService;
 
     @Override
     public SavedViewDTO create(SavedViewCreateRequest request) {
@@ -88,7 +113,7 @@ public class SavedViewServiceImpl implements SavedViewService {
         }
         String viewType = StringUtils.hasText(request.getViewType()) ? request.getViewType() : "table";
         ViewConfig viewConfig = request.getViewConfig() != null ? request.getViewConfig() : new ViewConfig();
-        validateViewTypeConfig(viewType, viewConfig);
+        validateViewTypeConfig(request.getModelCode(), viewType, viewConfig);
 
         String currentUserPid = MetaContext.getCurrentUserPid();
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -101,6 +126,7 @@ public class SavedViewServiceImpl implements SavedViewService {
         }
 
         String scope = StringUtils.hasText(request.getScope()) ? request.getScope() : "personal";
+        validateCollaboratorAcl(scope, viewConfig);
         validateViewCountLimit(request, scope, currentUserPid);
 
         SavedView savedView = new SavedView();
@@ -199,6 +225,10 @@ public class SavedViewServiceImpl implements SavedViewService {
             ViewConfig nextConfig = hasManageAccess
                     ? request.getViewConfig()
                     : preserveManagedMetaForSaveAccess(savedView.getViewConfig(), request.getViewConfig());
+            if (hasManageAccess && hasCollaboratorAclPayload(request.getViewConfig())) {
+                validateCollaboratorAcl(savedView.getScope(), nextConfig);
+                changedFields.add("collaborators");
+            }
             savedView.setViewConfig(nextConfig);
             changedFields.add("viewConfig");
         }
@@ -228,7 +258,7 @@ public class SavedViewServiceImpl implements SavedViewService {
             validateCurrentUserInTeam(savedView.getTeamId());
         }
         if (request.getViewConfig() != null) {
-            validateViewTypeConfig(savedView.getViewType(), savedView.getViewConfig());
+            validateViewTypeConfig(savedView.getModelCode(), savedView.getViewType(), savedView.getViewConfig());
         }
 
         savedView.setUpdatedAt(Instant.now());
@@ -436,23 +466,29 @@ public class SavedViewServiceImpl implements SavedViewService {
                 ? request.getViewConfig()
                 : new ViewConfig();
         List<String> missingFields = missingRequiredConfigFields(viewType, config);
+        List<SavedViewCapabilityCheckResponse.Reason> reasons = new ArrayList<>();
 
         SavedViewCapabilityCheckResponse response = new SavedViewCapabilityCheckResponse();
         response.setViewType(viewType);
         response.setMissingFields(missingFields);
-        if (missingFields.isEmpty()) {
+        reasons.addAll(missingFields.stream()
+                .map(field -> new SavedViewCapabilityCheckResponse.Reason(
+                        REASON_MISSING_REQUIRED_FIELD,
+                        field,
+                        "Missing required " + viewType + " viewConfig field: " + field))
+                .toList());
+        if (missingFields.isEmpty() && request != null && StringUtils.hasText(request.getModelCode())) {
+            reasons.addAll(semanticValidationReasons(request.getModelCode(), viewType, config));
+        }
+
+        if (reasons.isEmpty()) {
             response.setStatus(CAPABILITY_AVAILABLE);
             response.setReasons(List.of());
             return response;
         }
 
         response.setStatus(CAPABILITY_BLOCKED);
-        response.setReasons(missingFields.stream()
-                .map(field -> new SavedViewCapabilityCheckResponse.Reason(
-                        REASON_MISSING_REQUIRED_FIELD,
-                        field,
-                        "Missing required " + viewType + " viewConfig field: " + field))
-                .toList());
+        response.setReasons(reasons);
         return response;
     }
 
@@ -589,7 +625,7 @@ public class SavedViewServiceImpl implements SavedViewService {
         };
     }
 
-    private void validateViewTypeConfig(String viewType, ViewConfig config) {
+    private void validateViewTypeConfig(String modelCode, String viewType, ViewConfig config) {
         String normalizedType = StringUtils.hasText(viewType) ? viewType.toLowerCase() : "table";
         ViewConfig cfg = config != null ? config : new ViewConfig();
         List<String> missingFields = missingRequiredConfigFields(normalizedType, cfg);
@@ -598,6 +634,82 @@ public class SavedViewServiceImpl implements SavedViewService {
                     "Missing required " + normalizedType + " viewConfig fields: "
                             + String.join(", ", missingFields));
         }
+
+        List<SavedViewCapabilityCheckResponse.Reason> semanticReasons =
+                semanticValidationReasons(modelCode, normalizedType, cfg);
+        if (!semanticReasons.isEmpty()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Invalid " + normalizedType + " viewConfig fields: " + formatReasons(semanticReasons));
+        }
+    }
+
+    private boolean hasCollaboratorAclPayload(ViewConfig config) {
+        return config != null
+                && config.getMeta() != null
+                && config.getMeta().getCollaborators() != null;
+    }
+
+    private void validateCollaboratorAcl(String scope, ViewConfig config) {
+        if (!hasCollaboratorAclPayload(config)) {
+            return;
+        }
+
+        List<ViewConfig.CollaboratorAcl> collaborators = config.getMeta().getCollaborators();
+        if (collaborators == null || collaborators.isEmpty()) {
+            return;
+        }
+
+        String normalizedScope = StringUtils.hasText(scope) ? scope.toLowerCase(Locale.ROOT) : "personal";
+        if (!Set.of("team", "global").contains(normalizedScope)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Collaborators are supported only for shared views");
+        }
+
+        for (int i = 0; i < collaborators.size(); i++) {
+            validateCollaboratorAclEntry(collaborators.get(i), i);
+        }
+    }
+
+    private void validateCollaboratorAclEntry(ViewConfig.CollaboratorAcl collaborator, int index) {
+        if (collaborator == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Collaborator entry is required at index " + index);
+        }
+
+        String principalType = normalizeCollaboratorValue(collaborator.getPrincipalType());
+        if (!StringUtils.hasText(principalType)) {
+            principalType = "user";
+        }
+        if (!COLLABORATOR_PRINCIPAL_TYPES.contains(principalType)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Unsupported collaborator principalType: " + collaborator.getPrincipalType());
+        }
+
+        String principalPid = collaborator.getPrincipalPid() != null ? collaborator.getPrincipalPid().trim() : "";
+        if (!StringUtils.hasText(principalPid)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Collaborator principalPid is required");
+        }
+
+        String permission = normalizeCollaboratorValue(collaborator.getPermission());
+        if (!COLLABORATOR_PERMISSIONS.contains(permission)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Invalid collaborator permission: " + collaborator.getPermission());
+        }
+
+        UserSearchDTO user = userService.findInTenantByPid(MetaContext.getCurrentTenantId(), principalPid);
+        if (user == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Collaborator user not found in current tenant: " + principalPid);
+        }
+
+        collaborator.setPrincipalType(principalType);
+        collaborator.setPrincipalPid(principalPid);
+        collaborator.setPermission(permission);
+    }
+
+    private String normalizeCollaboratorValue(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
     private List<String> missingRequiredConfigFields(String viewType, ViewConfig config) {
@@ -631,6 +743,153 @@ public class SavedViewServiceImpl implements SavedViewService {
     }
 
     private record RequiredConfigField(String name, String value) {
+    }
+
+    private List<SavedViewCapabilityCheckResponse.Reason> semanticValidationReasons(
+            String modelCode,
+            String viewType,
+            ViewConfig config) {
+        if (!StringUtils.hasText(modelCode)) {
+            return List.of();
+        }
+
+        String normalizedType = StringUtils.hasText(viewType) ? viewType.toLowerCase() : "table";
+        ViewConfig cfg = config != null ? config : new ViewConfig();
+        Map<String, FieldDefinition> fieldsByCode = modelFieldsByCode(modelCode);
+        List<SavedViewCapabilityCheckResponse.Reason> reasons = new ArrayList<>();
+
+        switch (normalizedType) {
+            case "kanban" -> {
+                validateMappedField(reasons, fieldsByCode, "groupByField", cfg.getGroupByField(),
+                        field -> hasType(field, GROUPABLE_FIELD_TYPES),
+                        "groupable boolean/dict/enum/reference/status/string/text/user");
+                validateMappedField(reasons, fieldsByCode, "titleField", cfg.getTitleField(),
+                        field -> hasType(field, TEXT_FIELD_TYPES),
+                        "text string/text/textarea/richtext/varchar");
+            }
+            case "calendar" -> {
+                validateMappedField(reasons, fieldsByCode, "calendarDateField", cfg.getCalendarDateField(),
+                        field -> hasType(field, DATE_FIELD_TYPES),
+                        "date/datetime/timestamp");
+                validateMappedField(reasons, fieldsByCode, "calendarTitleField", cfg.getCalendarTitleField(),
+                        field -> hasType(field, TEXT_FIELD_TYPES),
+                        "text string/text/textarea/richtext/varchar");
+            }
+            case "gantt" -> {
+                validateMappedField(reasons, fieldsByCode, "ganttStartDateField", cfg.getGanttStartDateField(),
+                        field -> hasType(field, DATE_FIELD_TYPES),
+                        "date/datetime/timestamp");
+                validateMappedField(reasons, fieldsByCode, "ganttEndDateField", cfg.getGanttEndDateField(),
+                        field -> hasType(field, DATE_FIELD_TYPES),
+                        "date/datetime/timestamp");
+                validateMappedField(reasons, fieldsByCode, "ganttTitleField", cfg.getGanttTitleField(),
+                        field -> hasType(field, TEXT_FIELD_TYPES),
+                        "text string/text/textarea/richtext/varchar");
+            }
+            case "gallery" -> {
+                validateMappedField(reasons, fieldsByCode, "galleryImageField", cfg.getGalleryImageField(),
+                        field -> hasType(field, IMAGE_FIELD_TYPES),
+                        "image/file/attachment/avatar/media");
+                validateMappedField(reasons, fieldsByCode, "galleryTitleField", cfg.getGalleryTitleField(),
+                        field -> hasType(field, TEXT_FIELD_TYPES),
+                        "text string/text/textarea/richtext/varchar");
+            }
+            case "tree" -> {
+                validateMappedField(reasons, fieldsByCode, "treeParentField", cfg.getTreeParentField(),
+                        this::isTreeParentField,
+                        "reference/relation/lookup or parent/path/level string/integer field");
+                validateMappedField(reasons, fieldsByCode, "treeTitleField", cfg.getTreeTitleField(),
+                        field -> hasType(field, TEXT_FIELD_TYPES),
+                        "text string/text/textarea/richtext/varchar");
+            }
+            case "timeline" -> {
+                validateMappedField(reasons, fieldsByCode, "timelineStartField", cfg.getTimelineStartField(),
+                        field -> hasType(field, DATE_FIELD_TYPES),
+                        "date/datetime/timestamp");
+                validateMappedField(reasons, fieldsByCode, "timelineEndField", cfg.getTimelineEndField(),
+                        field -> hasType(field, DATE_FIELD_TYPES),
+                        "date/datetime/timestamp");
+                validateMappedField(reasons, fieldsByCode, "timelineResourceField", cfg.getTimelineResourceField(),
+                        field -> hasType(field, GROUPABLE_FIELD_TYPES),
+                        "groupable boolean/dict/enum/reference/status/string/text/user");
+                validateMappedField(reasons, fieldsByCode, "timelineTitleField", cfg.getTimelineTitleField(),
+                        field -> hasType(field, TEXT_FIELD_TYPES),
+                        "text string/text/textarea/richtext/varchar");
+            }
+            default -> {
+                return List.of();
+            }
+        }
+        return reasons;
+    }
+
+    private Map<String, FieldDefinition> modelFieldsByCode(String modelCode) {
+        List<FieldDefinition> fields = metaModelService.getModelFields(modelCode);
+        if (fields == null || fields.isEmpty()) {
+            return Map.of();
+        }
+        return fields.stream()
+                .filter(field -> field != null && StringUtils.hasText(field.getCode()))
+                .collect(Collectors.toMap(FieldDefinition::getCode, field -> field, (left, right) -> left));
+    }
+
+    private void validateMappedField(
+            List<SavedViewCapabilityCheckResponse.Reason> reasons,
+            Map<String, FieldDefinition> fieldsByCode,
+            String configField,
+            String fieldCode,
+            Predicate<FieldDefinition> compatibility,
+            String expectedDescription) {
+        if (!StringUtils.hasText(fieldCode)) {
+            return;
+        }
+        FieldDefinition field = fieldsByCode.get(fieldCode);
+        if (field == null) {
+            reasons.add(new SavedViewCapabilityCheckResponse.Reason(
+                    REASON_UNKNOWN_FIELD,
+                    configField,
+                    "Configured field '" + fieldCode + "' does not exist on the target model"));
+            return;
+        }
+        if (!compatibility.test(field)) {
+            reasons.add(new SavedViewCapabilityCheckResponse.Reason(
+                    REASON_INCOMPATIBLE_FIELD_TYPE,
+                    configField,
+                    "Configured field '" + fieldCode + "' has dataType '" + normalizeDataType(field)
+                            + "' but expected " + expectedDescription));
+        }
+    }
+
+    private boolean hasType(FieldDefinition field, Set<String> acceptedTypes) {
+        return acceptedTypes.contains(normalizeDataType(field));
+    }
+
+    private boolean isTreeParentField(FieldDefinition field) {
+        String dataType = normalizeDataType(field);
+        if (TREE_PARENT_FIELD_TYPES.contains(dataType)) {
+            return true;
+        }
+        if (!TREE_PARENT_CODE_FALLBACK_TYPES.contains(dataType)) {
+            return false;
+        }
+        String searchText = ((field.getCode() != null ? field.getCode() : "")
+                + " " + (field.getName() != null ? field.getName() : "")
+                + " " + (field.getDisplayName() != null ? field.getDisplayName() : ""))
+                .toLowerCase(Locale.ROOT);
+        return searchText.contains("parent") || searchText.contains("path") || searchText.contains("level");
+    }
+
+    private String normalizeDataType(FieldDefinition field) {
+        if (field == null || field.getDataType() == null) {
+            return "";
+        }
+        return field.getDataType().trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String formatReasons(List<SavedViewCapabilityCheckResponse.Reason> reasons) {
+        return reasons.stream()
+                .map(reason -> reason.getCode() + " " + reason.getField() + " - " + reason.getMessage())
+                .collect(Collectors.joining("; "));
     }
 
     private ViewConfig mergeViewConfig(ViewConfig base, ViewConfig patch) {
@@ -863,6 +1122,9 @@ public class SavedViewServiceImpl implements SavedViewService {
         }
         if ("SET_DEFAULT".equals(operationType)) {
             return "Changed shared default view";
+        }
+        if (changedFields.contains("collaborators")) {
+            return "Updated saved view collaborators";
         }
         if (changedFields.contains("viewConfig")) {
             return "Saved shared view configuration";

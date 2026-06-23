@@ -4,7 +4,10 @@ import {
   buildListReferenceDisplayCacheKey,
   buildViewManageFieldOptions,
   collectListReferenceDisplayConfigs,
+  getActiveSavedQuickFilterPresetKey,
+  getSavedQuickFilterPresetKeys,
   findPersonalPresetSavedView,
+  isPersonalPresetSavedViewEdited,
   resolveColumnCapabilityDataType,
   resolveFieldMetaDataType,
   resolveFieldMetaDisplayName,
@@ -112,6 +115,81 @@ describe('findPersonalPresetSavedView', () => {
     );
 
     expect(match).toBeUndefined();
+  });
+});
+
+describe('quick filter preset saved-view lifecycle helpers', () => {
+  const now = new Date(2026, 5, 17, 14, 32, 10);
+
+  it('lists personal preset copies without including team views', () => {
+    expect(
+      getSavedQuickFilterPresetKeys([
+        {
+          scope: 'personal',
+          viewConfig: { meta: { originPresetKey: 'created_today' } },
+        },
+        {
+          scope: 'team',
+          viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+        },
+        {
+          scope: 'personal',
+          viewConfig: { meta: { originPresetKey: 'created_today' } },
+        },
+      ]),
+    ).toEqual(['created_today']);
+  });
+
+  it('resolves the active personal preset copy only for supported preset keys', () => {
+    expect(
+      getActiveSavedQuickFilterPresetKey({
+        scope: 'personal',
+        viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+      }),
+    ).toBe('modified_this_week');
+    expect(
+      getActiveSavedQuickFilterPresetKey({
+        scope: 'personal',
+        viewConfig: { meta: { originPresetKey: 'unknown_plugin_key' } },
+      }),
+    ).toBeNull();
+    expect(
+      getActiveSavedQuickFilterPresetKey({
+        scope: 'team',
+        viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+      }),
+    ).toBeNull();
+  });
+
+  it('detects whether a personal preset copy differs from the current system preset', () => {
+    const baseView = {
+      scope: 'personal' as const,
+      viewConfig: {
+        meta: { originPresetKey: 'created_today' },
+        filters: [
+          {
+            fieldCode: 'created_at',
+            operator: 'between' as const,
+            value: { start: '2026-06-17', end: '2026-06-17T23:59:59' },
+          },
+        ],
+      },
+    };
+
+    expect(isPersonalPresetSavedViewEdited(baseView, 'created_today', { now })).toBe(false);
+    expect(
+      isPersonalPresetSavedViewEdited(
+        {
+          ...baseView,
+          viewConfig: {
+            ...baseView.viewConfig,
+            filters: [{ fieldCode: 'status', operator: 'eq' as const, value: 'open' }],
+          },
+        },
+        'created_today',
+        { now },
+      ),
+    ).toBe(true);
   });
 });
 

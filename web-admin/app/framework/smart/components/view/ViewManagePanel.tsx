@@ -11,7 +11,9 @@ import {
   type SavedViewAuditEvent,
   type SavedViewCreateRequest,
   type SavedViewTeamOption,
+  type SavedViewUserOption,
   type ViewConfig,
+  type ViewCollaboratorAcl,
   type ViewScope,
   type ViewType,
 } from '~/framework/smart/types/savedView';
@@ -133,6 +135,28 @@ const SCOPE_CONFIGS: ScopeConfig[] = [
   { scope: 'personal', label: 'Personal Views', icon: '👤' },
 ];
 
+const MANUAL_VIEW_LIMITS: Record<ViewScope, number> = {
+  personal: 10,
+  team: 20,
+  global: 20,
+};
+
+function countManualViewsForScope(
+  views: SavedView[],
+  scope: ViewScope,
+  teamId?: string,
+): number {
+  return views.filter((view) => {
+    if (view.isImplicit || view.scope !== scope) {
+      return false;
+    }
+    if (scope === 'team' && teamId) {
+      return view.teamId === teamId;
+    }
+    return true;
+  }).length;
+}
+
 function formatAuditTimestamp(timestamp?: string): string {
   if (!timestamp) {
     return '';
@@ -224,6 +248,15 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   const [auditEvents, setAuditEvents] = useState<SavedViewAuditEvent[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [shareView, setShareView] = useState<SavedView | null>(null);
+  const [collaboratorSearch, setCollaboratorSearch] = useState('');
+  const [collaboratorResults, setCollaboratorResults] = useState<SavedViewUserOption[]>([]);
+  const [collaboratorPid, setCollaboratorPid] = useState('');
+  const [collaboratorPermission, setCollaboratorPermission] =
+    useState<ViewCollaboratorAcl['permission']>('save');
+  const [collaboratorLoading, setCollaboratorLoading] = useState(false);
+  const [collaboratorSaving, setCollaboratorSaving] = useState(false);
+  const [collaboratorError, setCollaboratorError] = useState<string | null>(null);
 
   /**
    * Reset state when panel closes
@@ -238,6 +271,12 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
       setAuditView(null);
       setAuditEvents([]);
       setAuditError(null);
+      setShareView(null);
+      setCollaboratorSearch('');
+      setCollaboratorResults([]);
+      setCollaboratorPid('');
+      setCollaboratorPermission('save');
+      setCollaboratorError(null);
     }
   }, [open]);
 
@@ -344,7 +383,11 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
     }
   }, [configStep, fields, modelPid]);
 
-  const createTargetDisabled = createScope === 'team' && !createTeamId;
+  const createViewLimit = MANUAL_VIEW_LIMITS[createScope] ?? MANUAL_VIEW_LIMITS.personal;
+  const createViewCount = countManualViewsForScope(views, createScope, createTeamId);
+  const createViewLimitReached = createViewCount >= createViewLimit;
+  const createTargetDisabled =
+    (createScope === 'team' && !createTeamId) || createViewLimitReached;
 
   const getCreateTargetPayload = useCallback((): Pick<SavedViewCreateRequest, 'scope' | 'teamId'> => {
     if (createScope === 'team') {
@@ -597,6 +640,91 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
     }
   }, []);
 
+  const handleOpenCollaborators = useCallback((view: SavedView) => {
+    if (!canShareSavedView(view)) return;
+    setShareView(view);
+    setCollaboratorSearch('');
+    setCollaboratorResults([]);
+    setCollaboratorPid('');
+    setCollaboratorPermission('save');
+    setCollaboratorError(null);
+  }, []);
+
+  const handleSearchCollaborators = useCallback(async () => {
+    const keyword = collaboratorSearch.trim();
+    setCollaboratorLoading(true);
+    setCollaboratorError(null);
+    try {
+      const users = await savedViewService.searchUsers(keyword, 10);
+      setCollaboratorResults(users);
+    } catch (err) {
+      setCollaboratorResults([]);
+      setCollaboratorError(err instanceof Error ? err.message : 'Failed to search users');
+    } finally {
+      setCollaboratorLoading(false);
+    }
+  }, [collaboratorSearch]);
+
+  const updateCollaborators = useCallback(
+    async (view: SavedView, collaborators: ViewCollaboratorAcl[]) => {
+      const nextConfig: ViewConfig = {
+        ...(view.viewConfig ?? {}),
+        meta: {
+          ...(view.viewConfig?.meta ?? {}),
+          collaborators,
+        },
+      };
+      setCollaboratorSaving(true);
+      setCollaboratorError(null);
+      try {
+        const updated = await savedViewService.updateView(view.pid, { viewConfig: nextConfig });
+        setShareView(updated);
+        onViewConfigSaved?.();
+      } catch (err) {
+        setCollaboratorError(
+          err instanceof Error ? err.message : 'Failed to update collaborators',
+        );
+      } finally {
+        setCollaboratorSaving(false);
+      }
+    },
+    [onViewConfigSaved],
+  );
+
+  const handleAddCollaborator = useCallback(async () => {
+    if (!shareView) return;
+    const principalPid = collaboratorPid.trim();
+    if (!principalPid) {
+      setCollaboratorError('User PID is required');
+      return;
+    }
+    const current = shareView.viewConfig?.meta?.collaborators ?? [];
+    const next = [
+      ...current.filter((item) => item.principalPid !== principalPid),
+      {
+        principalType: 'user',
+        principalPid,
+        permission: collaboratorPermission,
+      },
+    ];
+    await updateCollaborators(shareView, next);
+    setCollaboratorPid('');
+    setCollaboratorSearch('');
+    setCollaboratorResults([]);
+  }, [collaboratorPermission, collaboratorPid, shareView, updateCollaborators]);
+
+  const handleRemoveCollaborator = useCallback(
+    async (principalPid: string) => {
+      if (!shareView) return;
+      const current = shareView.viewConfig?.meta?.collaborators ?? [];
+      await updateCollaborators(
+        shareView,
+        current.filter((item) => item.principalPid !== principalPid),
+      );
+    },
+    [shareView, updateCollaborators],
+  );
+
   /**
    * Handle view selection
    */
@@ -818,9 +946,29 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                         </select>
                       </label>
                     </div>
+                    <div
+                      className={cn(
+                        'mb-3 rounded-md border px-3 py-2 text-xs',
+                        createViewLimitReached
+                          ? 'border-red-200 bg-red-50 text-red-700'
+                          : 'border-gray-200 bg-gray-50 text-gray-600',
+                      )}
+                      data-testid="saved-view-quota-status"
+                    >
+                      {createScope === 'team' ? 'Team' : createScope === 'global' ? 'Global' : 'Personal'} views:{' '}
+                      {createViewCount}/{createViewLimit}
+                      {createViewLimitReached && (
+                        <span data-testid="saved-view-quota-limit-reached">
+                          {' '}
+                          Limit reached. Delete or reuse an existing view before creating another one.
+                        </span>
+                      )}
+                    </div>
                     {createScope === 'team' && createTargetDisabled && (
                       <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                        Select a team before creating a shared view.
+                        {createViewLimitReached
+                          ? 'Team view limit reached for this page.'
+                          : 'Select a team before creating a shared view.'}
                       </div>
                     )}
                     {blockedCapability && (
@@ -1176,45 +1324,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                           {/* Share Button */}
                           <button
                             type="button"
-                            onClick={async () => {
-                              if (!canShareSavedView(view)) return;
-                              try {
-                                const resp = await fetch(`/api/views/${view.pid}/share/status`);
-                                const data = await resp.json();
-                                const isShared = data?.data?.shared;
-                                if (isShared) {
-                                  const shareUrl = data?.data?.shareUrl || '';
-                                  const action = window.confirm(
-                                    `This view is shared.\n\nURL: ${shareUrl}\n\nClick OK to copy link, Cancel to revoke sharing.`,
-                                  );
-                                  if (action) {
-                                    navigator.clipboard.writeText(shareUrl);
-                                  } else {
-                                    await fetch(`/api/views/${view.pid}/share`, {
-                                      method: 'delete',
-                                    });
-                                  }
-                                } else {
-                                  const password = window.prompt(
-                                    'Set a password (leave empty for no password):',
-                                  );
-                                  const body: any = {};
-                                  if (password) body.password = password;
-                                  const resp2 = await fetch(`/api/views/${view.pid}/share`, {
-                                    method: 'post',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(body),
-                                  });
-                                  const result = await resp2.json();
-                                  if (result?.data?.shareUrl) {
-                                    navigator.clipboard.writeText(result.data.shareUrl);
-                                    window.alert(`Share link copied!\n\n${result.data.shareUrl}`);
-                                  }
-                                }
-                              } catch (e) {
-                                console.error('Share error:', e);
-                              }
-                            }}
+                            onClick={() => handleOpenCollaborators(view)}
                             disabled={!canShareSavedView(view)}
                             className={cn(
                               'rounded-md p-1.5 text-gray-400',
@@ -1224,6 +1334,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                               'transition-colors duration-150',
                             )}
                             title="Share view"
+                            data-testid={`view-share-${view.pid}`}
                           >
                             <svg
                               className="h-4 w-4"
@@ -1363,6 +1474,165 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!configStep && shareView && (
+            <div
+              className="m-4 rounded-lg border border-blue-200 bg-blue-50 p-4"
+              data-testid="saved-view-collaborator-panel"
+            >
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Share: {shareView.name}
+                  </h3>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {shareView.effectivePermission
+                      ? `Your permission: ${shareView.effectivePermission}`
+                      : 'Manage collaborators for this shared view.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShareView(null);
+                    setCollaboratorError(null);
+                  }}
+                  className="rounded-md p-1 text-gray-400 hover:bg-white hover:text-gray-600"
+                  aria-label="Close collaborator panel"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mb-3 space-y-2">
+                {(shareView.viewConfig?.meta?.collaborators ?? []).length === 0 ? (
+                  <div className="rounded-md border border-blue-100 bg-white px-3 py-2 text-xs text-gray-500">
+                    No collaborators yet.
+                  </div>
+                ) : (
+                  (shareView.viewConfig?.meta?.collaborators ?? []).map((collaborator) => (
+                    <div
+                      key={`${collaborator.principalType ?? 'user'}:${collaborator.principalPid}`}
+                      className="flex items-center justify-between gap-3 rounded-md border border-blue-100 bg-white px-3 py-2"
+                      data-testid="saved-view-collaborator-row"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-medium text-gray-900">
+                          {collaborator.principalPid}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {collaborator.principalType || 'user'} · {collaborator.permission}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCollaborator(collaborator.principalPid)}
+                        disabled={collaboratorSaving}
+                        className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-gray-600">User</span>
+                  <input
+                    type="text"
+                    value={collaboratorSearch}
+                    onChange={(event) => {
+                      setCollaboratorSearch(event.target.value);
+                      setCollaboratorPid(event.target.value);
+                    }}
+                    placeholder="Search name, email, or paste user pid"
+                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  />
+                </label>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleSearchCollaborators}
+                    disabled={collaboratorLoading}
+                    className="h-8 rounded-md border border-blue-200 bg-white px-3 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                  >
+                    {collaboratorLoading ? 'Searching...' : 'Search'}
+                  </button>
+                </div>
+              </div>
+
+              {collaboratorResults.length > 0 && (
+                <div className="mt-2 max-h-32 overflow-auto rounded-md border border-blue-100 bg-white">
+                  {collaboratorResults.map((user) => (
+                    <button
+                      key={user.pid}
+                      type="button"
+                      onClick={() => {
+                        setCollaboratorPid(user.pid);
+                        setCollaboratorSearch(user.displayName || user.email || user.pid);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs hover:bg-blue-50"
+                      data-testid="saved-view-collaborator-user-option"
+                    >
+                      <span className="font-medium text-gray-900">
+                        {user.displayName || user.email || user.pid}
+                      </span>
+                      <span className="ml-2 text-gray-400">{user.pid}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-gray-600">Permission</span>
+                  <select
+                    aria-label="Collaborator permission"
+                    value={collaboratorPermission}
+                    onChange={(event) =>
+                      setCollaboratorPermission(event.target.value as ViewCollaboratorAcl['permission'])
+                    }
+                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="view">View</option>
+                    <option value="save">Save</option>
+                    <option value="manage">Manage</option>
+                  </select>
+                </label>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleAddCollaborator}
+                    disabled={collaboratorSaving || !collaboratorPid.trim()}
+                    className="h-8 rounded-md bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {collaboratorSaving ? 'Saving...' : 'Add collaborator'}
+                  </button>
+                </div>
+              </div>
+
+              {collaboratorError && (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {collaboratorError}
                 </div>
               )}
             </div>

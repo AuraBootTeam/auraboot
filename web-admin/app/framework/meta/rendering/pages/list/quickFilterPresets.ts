@@ -15,23 +15,36 @@ import type {
 } from '~/framework/smart/types/savedView';
 
 /** Keys of the built-in preset views, in display order. */
-export const QUICK_FILTER_PRESET_KEYS = [
+export const BUILT_IN_QUICK_FILTER_PRESET_KEYS = [
   'my_records',
   'created_today',
   'modified_this_week',
 ] as const;
 
-export type QuickFilterPresetKey = (typeof QUICK_FILTER_PRESET_KEYS)[number];
+export type BuiltInQuickFilterPresetKey = (typeof BUILT_IN_QUICK_FILTER_PRESET_KEYS)[number];
+export type QuickFilterPresetKey = string;
+
+export interface QuickFilterPresetDefinition {
+  key: QuickFilterPresetKey;
+  i18nKey: string;
+  fallbackLabel: string;
+  buildFilters: (ctx: BuildQuickFilterPresetContext) => Record<string, unknown> | null;
+}
+
+export interface QuickFilterPresetProvider {
+  id: string;
+  getPresets: () => QuickFilterPresetDefinition[];
+}
 
 /** The i18n key (under `common.`) that labels each preset. */
-export const QUICK_FILTER_PRESET_I18N_KEY: Record<QuickFilterPresetKey, string> = {
+export const QUICK_FILTER_PRESET_I18N_KEY: Record<BuiltInQuickFilterPresetKey, string> = {
   my_records: 'common.my_records',
   created_today: 'common.created_today',
   modified_this_week: 'common.modified_this_week',
 };
 
 /** English fallback label per preset (used when no translation is loaded). */
-export const QUICK_FILTER_PRESET_FALLBACK: Record<QuickFilterPresetKey, string> = {
+export const QUICK_FILTER_PRESET_FALLBACK: Record<BuiltInQuickFilterPresetKey, string> = {
   my_records: 'My Records',
   created_today: 'Created Today',
   modified_this_week: 'Modified This Week',
@@ -50,9 +63,92 @@ export interface BuildQuickFilterPresetViewRequestOptions {
   name?: string;
 }
 
+function buildBuiltInQuickFilterPreset(
+  key: BuiltInQuickFilterPresetKey,
+  ctx: BuildQuickFilterPresetContext,
+): Record<string, unknown> | null {
+  const today = toLocalDateString(ctx.now);
+
+  switch (key) {
+    case 'my_records': {
+      if (ctx.userId == null) return {};
+      // Keep the full-precision string id — user ids are snowflakes (>2^53), so
+      // Number()/parseInt would silently corrupt them (AGENTS.md snowflake red line).
+      const userId = String(ctx.userId).trim();
+      return userId ? { created_by: userId } : {};
+    }
+    case 'created_today':
+      return { created_at: { start: today, end: `${today}T23:59:59` } };
+    case 'modified_this_week': {
+      const weekAgo = toLocalDateString(new Date(ctx.now.getTime() - 7 * 86400000));
+      return { updated_at: { start: weekAgo, end: `${today}T23:59:59` } };
+    }
+    default:
+      return null;
+  }
+}
+
+const builtInQuickFilterPresetProvider: QuickFilterPresetProvider = {
+  id: 'built-in',
+  getPresets: () =>
+    BUILT_IN_QUICK_FILTER_PRESET_KEYS.map((key) => ({
+      key,
+      i18nKey: QUICK_FILTER_PRESET_I18N_KEY[key],
+      fallbackLabel: QUICK_FILTER_PRESET_FALLBACK[key],
+      buildFilters: (ctx) => buildBuiltInQuickFilterPreset(key, ctx),
+    })),
+};
+
+const quickFilterPresetProviders: QuickFilterPresetProvider[] = [builtInQuickFilterPresetProvider];
+
+export function registerQuickFilterPresetProvider(provider: QuickFilterPresetProvider): () => void {
+  if (!provider?.id) {
+    throw new Error('Quick filter preset provider id is required');
+  }
+  if (quickFilterPresetProviders.some((existing) => existing.id === provider.id)) {
+    throw new Error(`Quick filter preset provider already registered: ${provider.id}`);
+  }
+  quickFilterPresetProviders.push(provider);
+  return () => {
+    const index = quickFilterPresetProviders.findIndex((existing) => existing.id === provider.id);
+    if (index >= 0) {
+      quickFilterPresetProviders.splice(index, 1);
+    }
+  };
+}
+
+export function getQuickFilterPresetDefinitions(): QuickFilterPresetDefinition[] {
+  const definitions: QuickFilterPresetDefinition[] = [];
+  const seenKeys = new Set<string>();
+  for (const provider of quickFilterPresetProviders) {
+    for (const definition of provider.getPresets()) {
+      if (!definition?.key) continue;
+      if (seenKeys.has(definition.key)) {
+        console.warn(
+          `[quickFilterPresets] duplicate preset key "${definition.key}" from provider "${provider.id}" ignored`,
+        );
+        continue;
+      }
+      seenKeys.add(definition.key);
+      definitions.push(definition);
+    }
+  }
+  return definitions;
+}
+
+export function getQuickFilterPresetDefinition(
+  key: unknown,
+): QuickFilterPresetDefinition | undefined {
+  if (typeof key !== 'string') return undefined;
+  return getQuickFilterPresetDefinitions().find((definition) => definition.key === key);
+}
+
+/** Keys of all currently registered preset views, in display order. */
+export const QUICK_FILTER_PRESET_KEYS = BUILT_IN_QUICK_FILTER_PRESET_KEYS;
+
 /** Type guard: is `key` one of the known preset keys? */
 export function isQuickFilterPresetKey(key: unknown): key is QuickFilterPresetKey {
-  return typeof key === 'string' && (QUICK_FILTER_PRESET_KEYS as readonly string[]).includes(key);
+  return getQuickFilterPresetDefinition(key) != null;
 }
 
 /** Local `YYYY-MM-DD` for a Date (not UTC — matches the user's wall clock). */
@@ -74,27 +170,7 @@ export function buildQuickFilterPreset(
   key: QuickFilterPresetKey,
   ctx: BuildQuickFilterPresetContext,
 ): Record<string, unknown> | null {
-  if (!isQuickFilterPresetKey(key)) return null;
-
-  const today = toLocalDateString(ctx.now);
-
-  switch (key) {
-    case 'my_records': {
-      if (ctx.userId == null) return {};
-      // Keep the full-precision string id — user ids are snowflakes (>2^53), so
-      // Number()/parseInt would silently corrupt them (AGENTS.md snowflake red line).
-      const userId = String(ctx.userId).trim();
-      return userId ? { created_by: userId } : {};
-    }
-    case 'created_today':
-      return { created_at: { start: today, end: `${today}T23:59:59` } };
-    case 'modified_this_week': {
-      const weekAgo = toLocalDateString(new Date(ctx.now.getTime() - 7 * 86400000));
-      return { updated_at: { start: weekAgo, end: `${today}T23:59:59` } };
-    }
-    default:
-      return null;
-  }
+  return getQuickFilterPresetDefinition(key)?.buildFilters(ctx) ?? null;
 }
 
 function isRangeFilterValue(value: unknown): value is { start?: unknown; end?: unknown } {
@@ -140,12 +216,13 @@ export function buildQuickFilterPresetViewRequest(
   ctx: BuildQuickFilterPresetContext,
   options: BuildQuickFilterPresetViewRequestOptions,
 ): SavedViewCreateRequest | null {
-  if (!isQuickFilterPresetKey(key)) return null;
+  const definition = getQuickFilterPresetDefinition(key);
+  if (!definition) return null;
   const presetFilters = buildQuickFilterPreset(key, ctx);
   if (!presetFilters) return null;
 
   return {
-    name: options.name || QUICK_FILTER_PRESET_FALLBACK[key],
+    name: options.name || definition.fallbackLabel,
     modelCode: options.modelCode,
     pageKey: options.pageKey,
     scope: 'personal',

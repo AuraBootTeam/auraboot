@@ -5,6 +5,8 @@ import lombok.Data;
 
 @Data
 public class SavedViewCapabilityCheckRequest {
+    private String modelCode;
+    private String pageKey;
     private String viewType;
     private ViewConfig viewConfig;
 }

@@ -16,6 +16,9 @@ const ZH = {
     modified_this_week: '本周修改',
     preset_views: '预设视图',
     saved_view_save_preset_to_personal: '保存为我的视图',
+    saved_view_preset_saved_badge: '已保存',
+    saved_view_preset_edited_badge: '已编辑',
+    saved_view_preset_reset: '重置预设视图',
   },
 };
 
@@ -91,5 +94,38 @@ describe('PresetViewBar', () => {
     expect(saveButton.getAttribute('aria-label')).toBe('保存为我的视图');
     fireEvent.click(saveButton);
     expect(onSaveActivePreset).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks system presets that already have personal saved copies', () => {
+    renderBar({ savedPresetKeys: ['created_today'] });
+
+    const createdToday = screen.getByTestId('preset-view-created_today');
+    expect(createdToday.getAttribute('data-preset-saved')).toBe('true');
+    expect(screen.getByTestId('preset-view-created_today-saved').textContent).toContain('已保存');
+    expect(screen.getByTestId('preset-view-my_records').getAttribute('data-preset-saved')).toBe(
+      'false',
+    );
+  });
+
+  it('marks the active personal preset copy and exposes reset when edited', () => {
+    const onResetActiveSavedPreset = vi.fn();
+    renderBar({
+      savedPresetKeys: ['modified_this_week'],
+      activeSavedPresetKey: 'modified_this_week',
+      activeSavedPresetEdited: true,
+      onResetActiveSavedPreset,
+    });
+
+    const modified = screen.getByTestId('preset-view-modified_this_week');
+    expect(modified.getAttribute('data-preset-active')).toBe('true');
+    expect(modified.getAttribute('data-preset-edited')).toBe('true');
+    expect(screen.getByTestId('preset-view-modified_this_week-saved').textContent).toContain(
+      '已编辑',
+    );
+
+    const reset = screen.getByTestId('preset-view-reset-saved');
+    expect(reset.getAttribute('aria-label')).toBe('重置预设视图');
+    fireEvent.click(reset);
+    expect(onResetActiveSavedPreset).toHaveBeenCalledTimes(1);
   });
 });

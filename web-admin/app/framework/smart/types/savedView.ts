@@ -40,15 +40,28 @@ export interface SavedViewAuditEvent {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Tenant-scoped user option used by SavedView collaborator picker.
+ */
+export interface SavedViewUserOption {
+  pid: string;
+  displayName?: string;
+  email?: string;
+  avatarUrl?: string;
+  departmentName?: string;
+}
+
 export type SavedViewCapabilityStatus = 'available' | 'degraded' | 'blocked';
 
 export interface SavedViewCapabilityCheckRequest {
+  modelCode?: string;
+  pageKey?: string;
   viewType: ViewType;
   viewConfig?: Partial<ViewConfig>;
 }
 
 export interface SavedViewCapabilityReason {
-  code: 'MISSING_REQUIRED_FIELD' | string;
+  code: 'MISSING_REQUIRED_FIELD' | 'UNKNOWN_FIELD' | 'INCOMPATIBLE_FIELD_TYPE' | string;
   field?: string;
   message: string;
 }
