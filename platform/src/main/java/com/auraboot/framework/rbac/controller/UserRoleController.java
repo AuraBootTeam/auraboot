@@ -12,9 +12,13 @@ import com.auraboot.framework.rbac.dto.UserRoleResponse;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.Map;
@@ -31,6 +35,11 @@ import static com.auraboot.framework.common.constant.ResponseCode.*;
 @RestController
 @RequestMapping("/api/user-roles")
 public class UserRoleController {
+
+    private static final String DEPRECATION_HEADER = "Deprecation";
+    private static final String DEPRECATED_ENDPOINT_HEADER = "X-Aura-Deprecated-Endpoint";
+    private static final String REPLACEMENT_ENDPOINT_HEADER = "X-Aura-Replacement-Endpoint";
+    private static final String WARNING_HEADER = "Warning";
 
     @Autowired
     private UserRoleService userRoleService;
@@ -71,11 +80,13 @@ public class UserRoleController {
     @PostMapping("/assign")
     @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
     @Deprecated
+    @Operation(summary = "Assign roles by internal IDs (deprecated)", deprecated = true)
     public ApiResponse<Boolean> assignRolesToMember(
             @RequestParam Long memberId,
             @RequestBody List<Long> roleIds,
             @CurrentUserId Long operatorId) {
 
+        markLegacyEndpoint("/api/user-roles/assign", "/api/user-roles/assign-by-pid");
         Long tenantId = MetaContext.getCurrentTenantId();
         boolean result = userRoleService.assignRolesToMember(memberId, roleIds, tenantId, operatorId);
         return ApiResponse.success(result);
@@ -108,10 +119,12 @@ public class UserRoleController {
     @DeleteMapping("/remove")
     @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
     @Deprecated
+    @Operation(summary = "Remove roles by internal IDs (deprecated)", deprecated = true)
     public ApiResponse<Boolean> removeRolesFromMember(
             @RequestParam Long memberId,
             @RequestBody List<Long> roleIds) {
 
+        markLegacyEndpoint("/api/user-roles/remove", "/api/user-roles/remove-by-pid");
         Long tenantId = MetaContext.getCurrentTenantId();
         boolean result = userRoleService.removeRolesFromMember(memberId, roleIds, tenantId);
         return ApiResponse.success(result);
@@ -131,11 +144,13 @@ public class UserRoleController {
     @PutMapping("/sync")
     @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
     @Deprecated
+    @Operation(summary = "Sync member roles by internal IDs (deprecated)", deprecated = true)
     public ApiResponse<Boolean> syncMemberRoles(
             @RequestParam Long memberId,
             @RequestBody List<Long> roleIds,
             @CurrentUserId Long operatorId) {
 
+        markLegacyEndpoint("/api/user-roles/sync", "/api/user-roles/sync-by-pid");
         Long tenantId = MetaContext.getCurrentTenantId();
         boolean result = userRoleService.syncMemberRoles(memberId, roleIds, tenantId, operatorId);
         return ApiResponse.success(result);
@@ -193,10 +208,12 @@ public class UserRoleController {
     @PostMapping("/batch-assign")
     @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
     @Deprecated
+    @Operation(summary = "Batch assign roles by internal IDs (deprecated)", deprecated = true)
     public ApiResponse<Boolean> batchAssignRoles(
             @RequestBody List<UserRole> userRoles,
             @CurrentUserId Long operatorId) {
 
+        markLegacyEndpoint("/api/user-roles/batch-assign", "/api/user-roles/batch-assign-by-pid");
         Long tenantId = MetaContext.getCurrentTenantId();
         userRoles.forEach(userRole -> {
             userRole.setTenantId(tenantId);
@@ -224,7 +241,9 @@ public class UserRoleController {
     @DeleteMapping("/batch-remove")
     @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
     @Deprecated
+    @Operation(summary = "Batch remove user-role assignments by internal IDs (deprecated)", deprecated = true)
     public ApiResponse<Boolean> batchRemoveUserRoles(@RequestBody List<Long> userRoleIds) {
+        markLegacyEndpoint("/api/user-roles/batch-remove", "/api/user-roles/batch-remove-by-pid");
         int result = userRoleService.batchRemoveRoles(userRoleIds);
         return ApiResponse.success(result > 0);
     }
@@ -235,5 +254,22 @@ public class UserRoleController {
         Long tenantId = MetaContext.getCurrentTenantId();
         int result = userRoleService.batchRemoveRolesByPids(userRolePids, tenantId);
         return ApiResponse.success(result > 0);
+    }
+
+    private void markLegacyEndpoint(String legacyPath, String replacementPath) {
+        ServletRequestAttributes attributes =
+                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        HttpServletResponse response = attributes == null ? null : attributes.getResponse();
+        if (response != null) {
+            response.setHeader(DEPRECATION_HEADER, "true");
+            response.setHeader(DEPRECATED_ENDPOINT_HEADER, legacyPath);
+            response.setHeader(REPLACEMENT_ENDPOINT_HEADER, replacementPath);
+            response.setHeader(WARNING_HEADER,
+                    "299 AuraBoot \"Deprecated endpoint; use " + replacementPath + "\"");
+        }
+        Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        Long userId = MetaContext.exists() ? MetaContext.getCurrentUserId() : null;
+        log.warn("Deprecated UserRole endpoint used: legacyPath={}, replacementPath={}, tenantId={}, userId={}",
+                legacyPath, replacementPath, tenantId, userId);
     }
 }
