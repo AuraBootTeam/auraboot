@@ -77,6 +77,75 @@ class UserRoleControllerTest {
     }
 
     @Test
+    void removeByPid_acceptsMemberPidAndRolePids() {
+        AssignRolesByPidRequest request = new AssignRolesByPidRequest();
+        request.setMemberPid("member_e2e_operator");
+        request.setRolePids(List.of("role_e2et_operator"));
+        when(userRoleService.removeRolesFromMemberByRolePids("member_e2e_operator", List.of("role_e2et_operator"), 100L))
+                .thenReturn(true);
+
+        ApiResponse<Boolean> response = controller.removeRolesFromMemberByPid(request);
+
+        assertTrue(response.isSuccess());
+        assertTrue(response.getData());
+        verify(userRoleService).removeRolesFromMemberByRolePids("member_e2e_operator", List.of("role_e2et_operator"), 100L);
+    }
+
+    @Test
+    void syncByPid_acceptsMemberPidAndRolePids() {
+        AssignRolesByPidRequest request = new AssignRolesByPidRequest();
+        request.setMemberPid("member_e2e_operator");
+        request.setRolePids(List.of("role_e2et_operator", "role_e2et_viewer"));
+        when(userRoleService.syncMemberRolesByRolePids(
+                "member_e2e_operator", List.of("role_e2et_operator", "role_e2et_viewer"), 100L, 700L))
+                .thenReturn(true);
+
+        ApiResponse<Boolean> response = controller.syncMemberRolesByPid(request, 700L);
+
+        assertTrue(response.isSuccess());
+        assertTrue(response.getData());
+        verify(userRoleService).syncMemberRolesByRolePids(
+                "member_e2e_operator", List.of("role_e2et_operator", "role_e2et_viewer"), 100L, 700L);
+    }
+
+    @Test
+    void batchRemoveByPid_acceptsUserRolePids() {
+        when(userRoleService.batchRemoveRolesByPids(List.of("ur_pid_1", "ur_pid_2"), 100L))
+                .thenReturn(2);
+
+        ApiResponse<Boolean> response = controller.batchRemoveUserRolesByPid(List.of("ur_pid_1", "ur_pid_2"));
+
+        assertTrue(response.isSuccess());
+        assertTrue(response.getData());
+        verify(userRoleService).batchRemoveRolesByPids(List.of("ur_pid_1", "ur_pid_2"), 100L);
+    }
+
+    @Test
+    void batchAssignByPid_acceptsMemberPidAndRolePids() {
+        AssignRolesByPidRequest first = new AssignRolesByPidRequest();
+        first.setMemberPid("member_e2e_operator");
+        first.setRolePids(List.of("role_e2et_operator"));
+        AssignRolesByPidRequest second = new AssignRolesByPidRequest();
+        second.setMemberPid("member_e2e_viewer");
+        second.setRolePids(List.of("role_e2et_viewer"));
+        when(userRoleService.assignRolesToMemberByRolePids(
+                "member_e2e_operator", List.of("role_e2et_operator"), 100L, 700L))
+                .thenReturn(true);
+        when(userRoleService.assignRolesToMemberByRolePids(
+                "member_e2e_viewer", List.of("role_e2et_viewer"), 100L, 700L))
+                .thenReturn(true);
+
+        ApiResponse<Boolean> response = controller.batchAssignRolesByPid(List.of(first, second), 700L);
+
+        assertTrue(response.isSuccess());
+        assertTrue(response.getData());
+        verify(userRoleService).assignRolesToMemberByRolePids(
+                "member_e2e_operator", List.of("role_e2et_operator"), 100L, 700L);
+        verify(userRoleService).assignRolesToMemberByRolePids(
+                "member_e2e_viewer", List.of("role_e2et_viewer"), 100L, 700L);
+    }
+
+    @Test
     void getUserRoles_returnsPidOnlyPublicContract() throws Exception {
         UserRoleResponse assignment = new UserRoleResponse();
         assignment.setPid("ur_e2e_1");

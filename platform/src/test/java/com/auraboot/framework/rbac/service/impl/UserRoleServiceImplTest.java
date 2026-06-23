@@ -193,6 +193,20 @@ class UserRoleServiceImplTest {
     }
 
     @Test
+    @DisplayName("removeRolesFromMemberByRolePids resolves public ids within tenant")
+    void removeByRolePidsResolvesPublicIds() {
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "member-pid"))
+                .thenReturn(member(1L, "member-pid", 10L));
+        when(roleMapper.findByTenantIdAndPid(10L, "role-pid"))
+                .thenReturn(role(100L, "role-pid", "e2et_viewer", 10L));
+        doReturn(true).when(spyService).removeRolesFromMember(1L, List.of(100L), 10L);
+
+        assertTrue(spyService.removeRolesFromMemberByRolePids("member-pid", List.of("role-pid"), 10L));
+
+        verify(spyService).removeRolesFromMember(1L, List.of(100L), 10L);
+    }
+
+    @Test
     @DisplayName("removeAllRolesFromMemberInTenant uses mapper soft-delete")
     void removeAllInTenant() {
         when(userRoleMapper.deleteByMemberIdAndTenantId(1L, 10L)).thenReturn(2);
@@ -315,6 +329,18 @@ class UserRoleServiceImplTest {
     }
 
     @Test
+    @DisplayName("batchRemoveRolesByPids removes same-tenant public assignment pids")
+    void batchRemoveByPids() {
+        UserRole r = ur(1L, 1L, 100L, 10L);
+        doReturn(List.of(r)).when(spyService).list(any(QueryWrapper.class));
+        doReturn(true).when(spyService).removeByIds(List.of(1L));
+
+        assertEquals(1, spyService.batchRemoveRolesByPids(List.of("ur-pid-1"), 10L));
+
+        verify(spyService).removeByIds(List.of(1L));
+    }
+
+    @Test
     @DisplayName("copyMemberRoles returns true when source has no roles")
     void copyMemberRolesEmpty() {
         when(userRoleMapper.findByMemberIdAndTenantId(1L, 10L)).thenReturn(List.of());
@@ -339,6 +365,20 @@ class UserRoleServiceImplTest {
         doReturn(true).when(spyService).remove(any(QueryWrapper.class));
 
         assertTrue(spyService.syncMemberRoles(1L, List.of(200L), 10L, 99L));
+    }
+
+    @Test
+    @DisplayName("syncMemberRolesByRolePids resolves public ids within tenant")
+    void syncByRolePidsResolvesPublicIds() {
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "member-pid"))
+                .thenReturn(member(1L, "member-pid", 10L));
+        when(roleMapper.findByTenantIdAndPid(10L, "role-pid"))
+                .thenReturn(role(100L, "role-pid", "e2et_viewer", 10L));
+        doReturn(true).when(spyService).syncMemberRoles(1L, List.of(100L), 10L, 99L);
+
+        assertTrue(spyService.syncMemberRolesByRolePids("member-pid", List.of("role-pid"), 10L, 99L));
+
+        verify(spyService).syncMemberRoles(1L, List.of(100L), 10L, 99L);
     }
 
     @Test

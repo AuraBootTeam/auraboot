@@ -99,27 +99,27 @@ test.describe('Quick Filters (GAP-130)', () => {
     await expect(page.getByTestId('column-settings-btn')).toBeVisible();
   });
 
-  test('QF-007: quick filter does not create or update a SavedView', async ({ page }) => {
+  test('QF-007: active quick-filter preset can be saved as a personal SavedView', async ({ page }) => {
     await navigateToDynamicPage(page, 'e2et_order');
-    await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
-
-    const savedViewWrites: string[] = [];
-    page.on('request', (request) => {
-      const method = request.method();
-      if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return;
-      const pathname = new URL(request.url()).pathname;
-      if (pathname === '/api/views' || pathname.startsWith('/api/views/')) {
-        savedViewWrites.push(`${method} ${pathname}`);
-      }
-    });
+    await expect(page.getByTestId('preset-view-bar')).toBeVisible({ timeout: 30000 });
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/api/dynamic/e2et_order') && resp.url().includes('list'),
       { timeout: 10000 },
     );
-    await quickFilter(page, 'modified_this_week').click();
+    await page.getByTestId('preset-view-modified_this_week').click();
     await responsePromise;
 
-    expect(savedViewWrites).toEqual([]);
+    const createViewPromise = page.waitForResponse(
+      (resp) => resp.request().method() === 'POST' && new URL(resp.url()).pathname === '/api/views',
+      { timeout: 5000 },
+    ).catch(() => null);
+    await page.getByTestId('preset-view-save-as-personal').click();
+    const createViewResponse = await createViewPromise;
+    if (createViewResponse) {
+      expect(createViewResponse.ok()).toBeTruthy();
+    }
+    await expect(page).toHaveURL(/view=[^&]+/, { timeout: 10000 });
+    expect(new URL(page.url()).searchParams.get('preset')).toBeNull();
   });
 });

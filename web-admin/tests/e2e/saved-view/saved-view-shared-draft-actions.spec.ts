@@ -9,7 +9,7 @@
  *   dashboards menu → e2et_order list → View Selector → Column Settings.
  */
 
-import { expect, test, type APIResponse, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 import { mkdir, readFile } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { acceptConfirmDialog, uniqueId } from '../helpers';
@@ -21,7 +21,14 @@ const VIEWER_STORAGE_STATE = process.env.PW_VIEWER_STORAGE_STATE || 'tests/stora
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const SCREENSHOT_DIR = 'test-results/saved-view-vnext';
 
-async function expectApiJson(response: APIResponse, label: string) {
+interface JsonResponseLike {
+  text(): Promise<string>;
+  ok(): boolean;
+  status(): number;
+  statusText(): string;
+}
+
+async function expectApiJson(response: JsonResponseLike, label: string) {
   const bodyText = await response.text();
   expect(
     response.ok(),

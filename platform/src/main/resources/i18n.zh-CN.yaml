@@ -72,6 +72,14 @@ common:
   saved_view_copied_to_personal: 已复制为个人视图
   saved_view_copy_failed: 复制视图失败
   saved_view_copy_disabled_reason: 此视图不允许复制
+  saved_view_save_preset_to_personal: 保存为我的视图
+  saved_view_preset_saved_to_personal: 已保存为个人视图
+  saved_view_preset_save_failed: 保存预设视图失败
+  saved_view_preset_saved_badge: 已保存
+  saved_view_preset_edited_badge: 已编辑
+  saved_view_preset_reset: 重置预设视图
+  saved_view_preset_reset_done: 预设视图已重置
+  saved_view_preset_reset_failed: 重置预设视图失败
   options_load_failed: 选项加载失败
   retry: 重试
 

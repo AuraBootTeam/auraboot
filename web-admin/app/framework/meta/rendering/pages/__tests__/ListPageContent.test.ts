@@ -4,6 +4,10 @@ import {
   buildListReferenceDisplayCacheKey,
   buildViewManageFieldOptions,
   collectListReferenceDisplayConfigs,
+  getActiveSavedQuickFilterPresetKey,
+  getSavedQuickFilterPresetKeys,
+  findPersonalPresetSavedView,
+  isPersonalPresetSavedViewEdited,
   resolveColumnCapabilityDataType,
   resolveFieldMetaDataType,
   resolveFieldMetaDisplayName,
@@ -68,8 +72,133 @@ describe('resolveListSavedViewPageKey', () => {
   });
 });
 
+describe('findPersonalPresetSavedView', () => {
+  it('finds an existing personal SavedView created from a system preset', () => {
+    const match = findPersonalPresetSavedView(
+      [
+        {
+          pid: 'team-preset',
+          scope: 'team',
+          viewType: 'table',
+          viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+        },
+        {
+          pid: 'personal-preset',
+          scope: 'personal',
+          viewType: 'table',
+          viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+        },
+      ],
+      'modified_this_week',
+    );
+
+    expect(match?.pid).toBe('personal-preset');
+  });
+
+  it('ignores non-matching or non-personal preset views', () => {
+    const match = findPersonalPresetSavedView(
+      [
+        {
+          pid: 'created-today',
+          scope: 'personal',
+          viewType: 'table',
+          viewConfig: { meta: { originPresetKey: 'created_today' } },
+        },
+        {
+          pid: 'team-modified',
+          scope: 'team',
+          viewType: 'table',
+          viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+        },
+      ],
+      'modified_this_week',
+    );
+
+    expect(match).toBeUndefined();
+  });
+});
+
+describe('quick filter preset saved-view lifecycle helpers', () => {
+  const now = new Date(2026, 5, 17, 14, 32, 10);
+
+  it('lists personal preset copies without including team views', () => {
+    expect(
+      getSavedQuickFilterPresetKeys([
+        {
+          scope: 'personal',
+          viewConfig: { meta: { originPresetKey: 'created_today' } },
+        },
+        {
+          scope: 'team',
+          viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+        },
+        {
+          scope: 'personal',
+          viewConfig: { meta: { originPresetKey: 'created_today' } },
+        },
+      ]),
+    ).toEqual(['created_today']);
+  });
+
+  it('resolves the active personal preset copy only for supported preset keys', () => {
+    expect(
+      getActiveSavedQuickFilterPresetKey({
+        scope: 'personal',
+        viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+      }),
+    ).toBe('modified_this_week');
+    expect(
+      getActiveSavedQuickFilterPresetKey({
+        scope: 'personal',
+        viewConfig: { meta: { originPresetKey: 'unknown_plugin_key' } },
+      }),
+    ).toBeNull();
+    expect(
+      getActiveSavedQuickFilterPresetKey({
+        scope: 'team',
+        viewConfig: { meta: { originPresetKey: 'modified_this_week' } },
+      }),
+    ).toBeNull();
+  });
+
+  it('detects whether a personal preset copy differs from the current system preset', () => {
+    const baseView = {
+      scope: 'personal' as const,
+      viewConfig: {
+        meta: { originPresetKey: 'created_today' },
+        filters: [
+          {
+            fieldCode: 'created_at',
+            operator: 'between' as const,
+            value: { start: '2026-06-17', end: '2026-06-17T23:59:59' },
+          },
+        ],
+      },
+    };
+
+    expect(isPersonalPresetSavedViewEdited(baseView, 'created_today', { now })).toBe(false);
+    expect(
+      isPersonalPresetSavedViewEdited(
+        {
+          ...baseView,
+          viewConfig: {
+            ...baseView.viewConfig,
+            filters: [{ fieldCode: 'status', operator: 'eq' as const, value: 'open' }],
+          },
+        },
+        'created_today',
+        { now },
+      ),
+    ).toBe(true);
+  });
+});
+
 describe('useRestoreSavedViewFromUrl', () => {
   it('restores selection again when URL view pid changes after views are loaded', () => {
+    type RestoreHookProps = {
+      urlViewPid: string | null;
+      savedViews: Array<{ pid: string; viewType?: 'table' | null }>;
+    };
     const sourceView = {
       pid: 'source-view',
       name: 'Global View',
@@ -86,7 +215,7 @@ describe('useRestoreSavedViewFromUrl', () => {
     const setActiveViewType = vi.fn();
 
     const { rerender } = renderHook(
-      ({ urlViewPid, savedViews }) =>
+      ({ urlViewPid, savedViews }: RestoreHookProps) =>
         useRestoreSavedViewFromUrl({
           urlViewPid,
           savedViews,

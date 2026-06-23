@@ -48,6 +48,7 @@ import {
   DEFAULT_ROW_HEIGHT,
   type ViewFilterConfig,
   type RowHeight,
+  type SavedView,
   type SavedViewCreateRequest,
   type ColumnConfig as ViewColumnConfig,
   type ViewType,
@@ -73,6 +74,9 @@ import { areSortsEqual, encodeSorts, decodeSorts } from './list/useListUrlState'
 import {
   type QuickFilterPresetKey,
   buildQuickFilterPreset,
+  buildQuickFilterPresetViewRequest,
+  buildQuickFilterPresetViewFilters,
+  getQuickFilterPresetDefinition,
   isQuickFilterPresetKey,
 } from './list/quickFilterPresets';
 import { resolveListRowClickMode } from './list/rowClickNavigation';
@@ -126,6 +130,74 @@ export interface ListReferenceDisplayConfig {
 
 export function buildListReferenceDisplayCacheKey(config: ListReferenceDisplayConfig): string {
   return `${config.field}|${config.modelCode}|${config.valueField}|${config.displayField}`;
+}
+
+export function findPersonalPresetSavedView(
+  savedViews: Array<Pick<SavedView, 'pid' | 'scope' | 'viewConfig' | 'viewType'>>,
+  presetKey: QuickFilterPresetKey,
+): Pick<SavedView, 'pid' | 'scope' | 'viewConfig' | 'viewType'> | undefined {
+  return savedViews.find(
+    (view) =>
+      String(view.scope).toLowerCase() === 'personal' &&
+      view.viewConfig?.meta?.originPresetKey === presetKey,
+  );
+}
+
+export function getSavedQuickFilterPresetKeys(
+  savedViews: Array<Pick<SavedView, 'scope' | 'viewConfig'>>,
+): QuickFilterPresetKey[] {
+  const keys = new Set<QuickFilterPresetKey>();
+  for (const view of savedViews) {
+    const key = view.viewConfig?.meta?.originPresetKey;
+    if (String(view.scope).toLowerCase() === 'personal' && isQuickFilterPresetKey(key)) {
+      keys.add(key);
+    }
+  }
+  return Array.from(keys);
+}
+
+export function getActiveSavedQuickFilterPresetKey(
+  view: Pick<SavedView, 'scope' | 'viewConfig'> | null | undefined,
+): QuickFilterPresetKey | null {
+  const key = view?.viewConfig?.meta?.originPresetKey;
+  if (String(view?.scope || '').toLowerCase() !== 'personal') return null;
+  return isQuickFilterPresetKey(key) ? key : null;
+}
+
+function stableStringify(value: unknown): string {
+  if (value == null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`).join(',')}}`;
+}
+
+function normalizePresetFilters(filters: ViewFilterConfig[] | undefined): string[] {
+  return (filters ?? [])
+    .map((filter) =>
+      stableStringify({
+        fieldCode: filter.fieldCode,
+        operator: filter.operator,
+        value: filter.value,
+      }),
+    )
+    .sort();
+}
+
+export function isPersonalPresetSavedViewEdited(
+  view: Pick<SavedView, 'scope' | 'viewConfig'> | null | undefined,
+  presetKey: QuickFilterPresetKey,
+  ctx: { userId?: string | number; now: Date },
+): boolean {
+  if (getActiveSavedQuickFilterPresetKey(view) !== presetKey) return false;
+  const presetFilters = buildQuickFilterPresetViewFilters(buildQuickFilterPreset(presetKey, ctx));
+  return stableStringify(normalizePresetFilters(view?.viewConfig?.filters)) !==
+    stableStringify(normalizePresetFilters(presetFilters));
 }
 
 export function resolveListSavedViewPageKey(
@@ -878,6 +950,24 @@ function ListPageContentInner(props: PageContentProps) {
       return value && value !== key ? value : fallback;
     },
     [t],
+  );
+  const savedQuickFilterPresetKeys = useMemo(
+    () => getSavedQuickFilterPresetKeys(savedViews),
+    [savedViews],
+  );
+  const activeSavedQuickFilterPresetKey = useMemo(
+    () => getActiveSavedQuickFilterPresetKey(currentView),
+    [currentView],
+  );
+  const activeSavedQuickFilterPresetEdited = useMemo(
+    () =>
+      activeSavedQuickFilterPresetKey
+        ? isPersonalPresetSavedViewEdited(currentView, activeSavedQuickFilterPresetKey, {
+            userId: user?.id,
+            now: new Date(),
+          })
+        : false,
+    [activeSavedQuickFilterPresetKey, currentView, user?.id],
   );
 
   useEffect(() => {
@@ -3088,6 +3178,136 @@ function ListPageContentInner(props: PageContentProps) {
     [activeQuickFilter, user, setFilters, syncPresetToUrl, loadData, pagination.pageSize],
   );
 
+  const handleSaveActivePreset = useCallback(async () => {
+    if (!activeQuickFilter) return;
+
+    const existingPresetView = findPersonalPresetSavedView(savedViews, activeQuickFilter);
+    if (existingPresetView) {
+      selectView(existingPresetView.pid);
+      setActiveViewType((existingPresetView.viewType as ViewType) || 'table');
+      setActiveQuickFilter(null);
+      syncPresetToUrl(null);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set('view', existingPresetView.pid);
+          p.delete('preset');
+          p.delete('sort');
+          p.delete('keyword');
+          p.delete('filters');
+          return p;
+        },
+        { replace: true },
+      );
+      showSuccessToast(
+        translateCommon('common.saved_view_preset_saved_to_personal', 'Saved as personal view'),
+      );
+      return;
+    }
+
+    const presetDefinition = getQuickFilterPresetDefinition(activeQuickFilter);
+    if (!presetDefinition) return;
+    const presetName = translateCommon(
+      presetDefinition.i18nKey,
+      presetDefinition.fallbackLabel,
+    );
+    const request = buildQuickFilterPresetViewRequest(
+      activeQuickFilter,
+      { userId: user?.id, now: new Date() },
+      { modelCode, pageKey, name: presetName },
+    );
+    if (!request) return;
+
+    try {
+      const view = await createView(request);
+      setActiveQuickFilter(null);
+      syncPresetToUrl(null);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set('view', view.pid);
+          p.delete('preset');
+          p.delete('sort');
+          p.delete('keyword');
+          p.delete('filters');
+          return p;
+        },
+        { replace: true },
+      );
+      showSuccessToast(
+        translateCommon('common.saved_view_preset_saved_to_personal', 'Saved as personal view'),
+      );
+    } catch (err) {
+      showErrorToast(
+        err instanceof Error
+          ? err.message
+          : translateCommon('common.saved_view_preset_save_failed', 'Failed to save preset'),
+      );
+    }
+  }, [
+    activeQuickFilter,
+    createView,
+    modelCode,
+    pageKey,
+    savedViews,
+    selectView,
+    setSearchParams,
+    showErrorToast,
+    showSuccessToast,
+    syncPresetToUrl,
+    translateCommon,
+    user?.id,
+  ]);
+
+  const handleResetActiveSavedPreset = useCallback(async () => {
+    if (!currentView || !activeSavedQuickFilterPresetKey) return;
+
+    const presetFilters = buildQuickFilterPreset(activeSavedQuickFilterPresetKey, {
+      userId: user?.id,
+      now: new Date(),
+    });
+    if (!presetFilters) return;
+
+    const viewFilters = buildQuickFilterPresetViewFilters(presetFilters);
+    const nextConfig: ViewConfig = {
+      ...(currentView.viewConfig ?? {}),
+      filters: viewFilters,
+      meta: {
+        ...(currentView.viewConfig?.meta ?? {}),
+        managedBy: currentView.viewConfig?.meta?.managedBy ?? 'user',
+        originPresetKey: activeSavedQuickFilterPresetKey,
+      },
+    };
+
+    try {
+      await updateView({ viewConfig: nextConfig });
+      setFilters(presetFilters);
+      loadData({ page: 0, size: pagination.pageSize, filters: presetFilters });
+      flashViewSavedHint();
+      showSuccessToast(
+        translateCommon('common.saved_view_preset_reset_done', 'Preset view reset'),
+      );
+    } catch (err) {
+      showErrorToast(
+        err instanceof Error
+          ? err.message
+          : translateCommon('common.saved_view_preset_reset_failed', 'Failed to reset preset view'),
+      );
+    }
+  }, [
+    activeSavedQuickFilterPresetKey,
+    currentView,
+    flashViewSavedHint,
+    loadData,
+    pagination.pageSize,
+    setFilters,
+    showErrorToast,
+    showSuccessToast,
+    translateCommon,
+    updateView,
+    user?.id,
+  ]);
+
   // Save current filters to SavedView
   const handleSaveFilters = useCallback(async () => {
     const viewFilters = Object.entries(filters)
@@ -3435,6 +3655,11 @@ function ListPageContentInner(props: PageContentProps) {
             onExport={handleExport}
             activePreset={activeQuickFilter}
             onSelectPreset={handleQuickFilter}
+            onSaveActivePreset={handleSaveActivePreset}
+            savedPresetKeys={savedQuickFilterPresetKeys}
+            activeSavedPresetKey={activeSavedQuickFilterPresetKey}
+            activeSavedPresetEdited={activeSavedQuickFilterPresetEdited}
+            onResetActiveSavedPreset={handleResetActiveSavedPreset}
             hidePresetViews={hideQuickFilters}
             exportFilters={exportFilterConditions}
             isTenantMemberPage={isTenantMemberPage}

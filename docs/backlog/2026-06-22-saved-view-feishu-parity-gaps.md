@@ -43,17 +43,17 @@ relates_to:
 | Gap | 状态 | 当前处理 |
 | --- | --- | --- |
 | View 数量上限 | DONE in `codex/saved-view-count-limit` | 后端 `create` 路径限制手动视图数量:personal 每用户/模型/页面 10 个,team/global 每 scope/模型/页面 20 个;`duplicate`/`copyToPersonal` 继承限制,implicit autosave 不计入 |
+| 旧 ID-based UserRole mutation endpoints 仍保留 | DONE in `codex/saved-view-p2-remaining` | 新增 `/remove-by-pid`、`/sync-by-pid`、`/batch-assign-by-pid`、`/batch-remove-by-pid`;旧 ID mutation endpoint 标 `@Deprecated`;E2E setup 改用 `memberPid + rolePids` |
+| 其他 audit/governance endpoints 可能暴露 `AuditTrail.id` | DONE in `codex/saved-view-p2-remaining` | `/api/audit/trail`、`/by-actor`、`/by-command` 返回 `AuditTrailPublicDTO`,不暴露 `id/tenantId/entityId/actorId/actorIp/snapshot/hash`;SavedView audit DTO 增加 `sequenceNo` 作为 public key |
+| Team view 更细粒度 ACL | DONE in `codex/saved-view-p2-remaining` | `viewConfig.meta.collaborators` 支持 per-view user ACL;`save` 可保存配置/设默认但不能 manage/delete/share;`manage` 才有完整管理动作 |
+| Timeline capability gate 仍宽松 | DONE in `codex/saved-view-p2-remaining` | 后端 create/update/capability-check 要求 `timelineStartField + timelineResourceField`;前端 capability/ViewManagePanel/TimelineView 同步为 start/resource 必填,end 可选 |
+| Quick filter preset 化 | DONE in `codex/saved-view-p2-remaining` | quick filter 统一为 preset provider;active preset 可显式保存为 personal SavedView,保存 `originPresetKey` 并切到新个人视图 |
 
 ## P2 / Deferred
 
 | Gap | 为什么不是本轮 P0/P1 | 建议 |
 | --- | --- | --- |
-| Dynamic business record API 仍可能返回 `id` | 动态数据表历史契约广,列表/详情/子表/评论均可能依赖 `id` fallback;强行隐藏会破坏通用 renderer | 单独做 platform-wide public-id migration,先 inventory 再迁移 |
-| 旧 ID-based UserRole mutation endpoints 仍保留 | 兼容已有脚本和后台调用;本轮重点是 public response 和新增 pid/code mutation path | 新 UI 禁用旧接口;发布后一个周期标 deprecated,再移除 |
-| 其他 audit/governance endpoints 可能暴露 `AuditTrail.id` | 非 SavedView surface;不同页面可能需要审计链细节 | 建统一 `AuditTrailPublicDTO` 和 admin-only full DTO |
-| Team view 更细粒度 ACL | 当前 team scope = team 成员可见,manage 受全局权限/owner/action 控制;没有每个 view 的协作者 ACL | 增加 view collaborators 或 team role policy |
-| Timeline capability gate 仍宽松 | 当前允许创建后在视图内显示 setup/empty state | 对 timeline 增加 date/resource 字段 required mapping |
-| Quick filter preset 化 | 当前 chips 是轻量 daily filters,未沉到 SavedView preset region | 长期统一为 preset filter provider,并允许保存为个人视图 |
+| Dynamic business record API 仍可能返回 `id` | 动态数据表历史契约广,列表/详情/子表/评论均可能依赖 `id` fallback;强行隐藏会破坏通用 renderer;已交由其他窗口处理 | 见 `/Users/ghj/work/auraboot/.worktrees/oss-saved-view-feishu-p1/docs/backlog/2026-06-22-platform-public-record-pid-only-migration.md`,单独做 platform-wide public-id migration,先 inventory 再迁移 |
 
 ## E2E Truth Notes
 
@@ -69,3 +69,18 @@ relates_to:
 | E2E truth audit | `tests/e2e/saved-view` grep matrix | pass count 不等于 100% UI coverage | 目录内仍有历史 GAP specs 偏 API 驱动;本轮 P0/P1 UI 主链路已用浏览器路径验证 |
 
 报告时禁止只写 pass count;要说明哪些是 UI 路径、哪些是 API/setup、哪些属于 P2 deferred。当前可声明 P0/P1 scoped delivery 通过,不能声明 SavedView 全历史 GAP 100% UI 覆盖。
+
+2026-06-22 P2 remaining 收口验证:
+
+| 维度 | 命令/范围 | 结果 | 说明 |
+| --- | --- | --- | --- |
+| Backend focused contract | `./gradlew :test --tests com.auraboot.framework.view.service.impl.SavedViewServiceImplTest --tests com.auraboot.framework.rbac.controller.UserRoleControllerTest --tests com.auraboot.framework.rbac.service.impl.UserRoleServiceImplTest --tests com.auraboot.framework.meta.controller.config.AuditTrailControllerTest --tests com.auraboot.framework.meta.service.impl.AuditTrailEventListenerTest` | BUILD SUCCESSFUL | 覆盖 UserRole PID mutation、AuditTrail public DTO、SavedView team collaborator ACL、timeline 后端 gate |
+| Frontend typecheck | `pnpm typecheck` | PASS | React Router typegen + `tsc` 通过 |
+| Frontend unit/component | `pnpm test:unit:run app/framework/meta/rendering/pages/__tests__/ListPageContent.test.ts app/framework/meta/rendering/pages/list/__tests__/quickFilterPresets.test.ts app/framework/meta/rendering/pages/list/__tests__/PresetViewBar.test.tsx app/framework/meta/rendering/pages/list/__tests__/dsl-list-i18n-resources.test.ts app/framework/smart/utils/__tests__/savedViewCapability.test.ts` | 5 files / 110 tests passed | 覆盖 quick preset request、save-as-personal 按钮、已有 preset personal view 幂等匹配、i18n、timeline capability、URL view restore |
+| SavedView scoped E2E | `IMPORT_TEST_FIXTURES=true PW_PROFILE=oss PW_WORKERS=1 pnpm playwright test -c playwright.noweb.config.ts tests/api/setup/03-import-test-fixtures.spec.ts tests/api/setup/04-import-oss-plugins.spec.ts --project=setup --no-deps --reporter=line` + `PW_PROFILE=fast PW_WORKERS=1 pnpm playwright test -c playwright.noweb.config.ts tests/e2e/saved-view/saved-view-quick-filters.spec.ts tests/e2e/saved-view/saved-view-timeline.spec.ts --project=chromium --no-deps --reporter=line` | setup import 2/2 passed; target 13/13 passed | 隔离 runtime `saved-view-p2-e2e-79` 上验证。首轮 target 暴露 `e2et_order_list` 未导入导致页面不存在;显式导入 `test-fixtures` 后通过。后续复跑暴露 quick preset 重复保存同名失败、timeline 测试视图触达 personal 10 个上限;已改为 quick preset 已存在则切换个人视图、timeline 达上限时复用同配置历史视图,最终 13/13 passed |
+
+## Follow-up Backlog
+
+P0/P1/P2 收口后的后续成熟化 gap 统一迁入:
+
+`docs/backlog/2026-06-23-saved-view-post-pr-follow-up-gaps.md`

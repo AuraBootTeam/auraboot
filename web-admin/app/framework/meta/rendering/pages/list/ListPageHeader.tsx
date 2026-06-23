@@ -43,6 +43,16 @@ export interface ListPageHeaderProps {
   activePreset?: QuickFilterPresetKey | null;
   /** Toggle a preset view on/off */
   onSelectPreset?: (key: QuickFilterPresetKey) => void;
+  /** Save the active preset view as a personal SavedView */
+  onSaveActivePreset?: () => void;
+  /** Presets that already have a personal SavedView copy */
+  savedPresetKeys?: QuickFilterPresetKey[];
+  /** Origin preset key of the active personal SavedView copy */
+  activeSavedPresetKey?: QuickFilterPresetKey | null;
+  /** Whether the active personal copy differs from the current preset definition */
+  activeSavedPresetEdited?: boolean;
+  /** Reset the active personal copy to the current preset definition */
+  onResetActiveSavedPreset?: () => void;
   /** Hide the preset-view bar (e.g. config-only pages) */
   hidePresetViews?: boolean;
   /** Current filter conditions for export */
@@ -78,6 +88,11 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   onExport,
   activePreset,
   onSelectPreset,
+  onSaveActivePreset,
+  savedPresetKeys,
+  activeSavedPresetKey,
+  activeSavedPresetEdited,
+  onResetActiveSavedPreset,
   hidePresetViews,
   exportFilters,
   isTenantMemberPage,
@@ -110,7 +125,15 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
           {!hidePresetViews && onSelectPreset && (
             <>
               <div className="bg-border hidden h-5 w-px sm:block" aria-hidden />
-              <PresetViewBar activePreset={activePreset ?? null} onSelectPreset={onSelectPreset} />
+              <PresetViewBar
+                activePreset={activePreset ?? null}
+                onSelectPreset={onSelectPreset}
+                onSaveActivePreset={onSaveActivePreset}
+                savedPresetKeys={savedPresetKeys}
+                activeSavedPresetKey={activeSavedPresetKey}
+                activeSavedPresetEdited={activeSavedPresetEdited}
+                onResetActiveSavedPreset={onResetActiveSavedPreset}
+              />
             </>
           )}
         </div>

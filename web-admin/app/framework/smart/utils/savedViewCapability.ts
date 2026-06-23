@@ -224,5 +224,38 @@ export function checkSavedViewCapability(
     );
   }
 
+  if (viewType === 'timeline') {
+    const dateFields = fields.filter((field) => matchesType(field, DATE_TYPES));
+    const resourceFields = fields.filter((field) => matchesType(field, GROUPABLE_TYPES));
+    const titleFields = fields.filter((field) => matchesType(field, TEXT_TYPES));
+    const fieldOptions = {
+      timelineStartField: dateFields,
+      timelineEndField: dateFields,
+      timelineResourceField: resourceFields,
+      timelineTitleField: titleFields,
+    };
+
+    if (dateFields.length === 0 || resourceFields.length === 0) {
+      return result(
+        viewType,
+        'blocked',
+        [
+          dateFields.length === 0
+            ? 'Timeline requires at least one date or datetime start field.'
+            : 'Timeline requires a resource field for swim lanes.',
+        ],
+        fieldOptions,
+      );
+    }
+
+    const [startField, endField] = dateFields;
+    return result(viewType, 'available', [], fieldOptions, {
+      timelineStartField: startField.code,
+      timelineEndField: endField?.code,
+      timelineResourceField: firstCode(resourceFields),
+      timelineTitleField: firstCode(titleFields),
+    });
+  }
+
   return result(viewType, 'available', []);
 }

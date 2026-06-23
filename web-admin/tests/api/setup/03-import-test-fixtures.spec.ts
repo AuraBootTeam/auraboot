@@ -167,7 +167,7 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
   });
   expect(loginRes.ok(), `login failed: ${loginRes.status()}`).toBe(true);
   const loginBody = (await loginRes.json()) as { data?: { jwt?: string } };
-  const token = loginBody?.data?.jwt;
+  const token = loginBody?.data?.jwt ?? '';
   expect(token, 'login response missing jwt').toBeTruthy();
 
   const existingCommandsRes = await request.get(
