@@ -168,6 +168,51 @@ describe('useSavedViews', () => {
     expect(result.current.currentView?.pid).toBe('v1');
   });
 
+  it('upsertView inserts and selects a returned implicit view', () => {
+    const { result } = renderHook(() =>
+      useSavedViews({ modelCode: 'order', scopeFilter: 'personal', autoLoad: false }),
+    );
+    const implicitView = makeView({
+      pid: 'implicit_default',
+      name: 'Default View',
+      isImplicit: true,
+      viewConfig: { columns: [{ fieldCode: 'title', visible: false }] } as any,
+    });
+
+    act(() => result.current.upsertView(implicitView));
+
+    expect(result.current.views).toEqual([implicitView]);
+    expect(result.current.currentView).toBe(implicitView);
+  });
+
+  it('upsertView replaces an existing selected view with the returned config', async () => {
+    const implicitView = makeView({
+      pid: 'implicit_default',
+      name: 'Default View',
+      isImplicit: true,
+      viewConfig: { columns: [{ fieldCode: 'title', visible: true }] } as any,
+    });
+    mockService.getAccessibleViews.mockResolvedValue([implicitView]);
+    mockService.getDefaultView.mockResolvedValue(implicitView);
+
+    const { result } = renderHook(() =>
+      useSavedViews({ modelCode: 'order', scopeFilter: 'personal' }),
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const updatedImplicitView = makeView({
+      ...implicitView,
+      viewConfig: { columns: [{ fieldCode: 'title', visible: false }] } as any,
+    });
+    act(() => result.current.upsertView(updatedImplicitView));
+
+    expect(result.current.views).toEqual([updatedImplicitView]);
+    expect(result.current.currentView?.viewConfig.columns?.[0]).toEqual({
+      fieldCode: 'title',
+      visible: false,
+    });
+  });
+
   it('createView adds new view and selects it', async () => {
     mockService.getAccessibleViews.mockResolvedValue([]);
     mockService.getDefaultView.mockResolvedValue(null);

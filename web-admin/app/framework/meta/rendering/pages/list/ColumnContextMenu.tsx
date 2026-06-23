@@ -80,6 +80,7 @@ export function ColumnContextMenu({
     <div
       ref={menuRef}
       className="rounded-card border-border bg-panel fixed z-[1000] min-w-[180px] border py-1 shadow-lg"
+      data-testid="column-context-menu"
       style={{
         left: Math.min(x, window.innerWidth - 200),
         top: Math.min(y, window.innerHeight - 300),
@@ -93,6 +94,7 @@ export function ColumnContextMenu({
             key={idx}
             type="button"
             className={`hover:bg-hover flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${item.active ? 'text-accent font-medium' : 'text-text-2'}`}
+            data-testid={`column-context-menu-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
             onClick={() => {
               item.onClick();
               onClose();
