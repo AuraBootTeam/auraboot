@@ -7,6 +7,7 @@ import com.auraboot.framework.behavior.entity.BehaviorQuarantine;
 import com.auraboot.framework.behavior.service.BehaviorQuarantineService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.dto.PageResult;
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,7 +34,7 @@ public class BehaviorQuarantineController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Integer pageNum,
             @RequestParam(required = false) Integer pageSize) {
-        int apiPage = pageNum != null ? Math.max(pageNum - 1, 0) : page;
+        int apiPage = pageNum != null ? PaginationSafetyUtils.pageNumber(pageNum) - 1 : page;
         int apiSize = pageSize != null ? pageSize : size;
         return ApiResponse.success(service.list(MetaContext.getCurrentTenantId(), reason, replayStatus, apiPage, apiSize));
     }

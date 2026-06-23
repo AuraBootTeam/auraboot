@@ -64,6 +64,18 @@ class BehaviorQuarantineControllerTest {
     }
 
     @Test
+    void list_clampsOneBasedPageNumBeforeZeroBasedConversion() {
+        PageResult<BehaviorQuarantine> page = new PageResult<>(List.of(), 0L, 20L, 1L);
+        when(service.list(TENANT, null, null, 0, 20)).thenReturn(page);
+
+        ApiResponse<PageResult<BehaviorQuarantine>> response =
+                controller.list(null, null, 0, 20, Integer.MIN_VALUE, null);
+
+        assertThat(response.getCode()).isEqualTo("0");
+        verify(service).list(TENANT, null, null, 0, 20);
+    }
+
+    @Test
     void replayOne_usesCurrentTenantAndReturnsReplayResult() {
         BehaviorQuarantineReplayResult result =
                 new BehaviorQuarantineReplayResult(100L, "replayed", "evt-1", 901L, null);
