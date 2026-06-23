@@ -1,19 +1,5 @@
 [
   {
-    "_note": "ACP Menu Deprecation Status (as of 2026-03-24 AI Center migration)",
-    "_migration_summary": [
-      "All ACP sidebar menus are hidden (visible: false) after the AI Center UI redesign.",
-      "DSL pages (/p/...) remain fully functional and accessible via direct URL.",
-      "Each entry below documents where the feature is now accessed.",
-      "",
-      "Categories:",
-      "  MOVED_TO_AI_CENTER  - Embedded in the new AI Center tsx pages (AgentDetailPage, RunLogsPage, etc.)",
-      "  MOVED_TO_AI_SETTINGS - Accessible via AI Settings modal / governance config",
-      "  DEPRECATED          - Functionality merged into another surface; standalone page no longer needed",
-      "  PROMOTED            - Elevated to AI Center top-level nav (visible via AI Center, not sidebar)"
-    ]
-  },
-  {
     "code": "agent_control_plane",
     "parentCode": "ai_center",
     "name:zh-CN": "Agent",

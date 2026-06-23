@@ -28,9 +28,9 @@
     "namespace": {
       "type": "string",
       "description": "Resource isolation namespace, unique within tenant",
-      "pattern": "^[a-z][a-z0-9_]*$",
+      "pattern": "^[a-z][a-z0-9_-]*$",
       "maxLength": 64,
-      "examples": ["asset", "workflow"]
+      "examples": ["asset", "workflow", "core-bpm"]
     },
     "version": {
       "type": "string",
@@ -475,6 +475,10 @@
           "type": "string",
           "description": "Dictionary code (unique within tenant)"
         },
+        "name": {
+          "type": "string",
+          "description": "Default dictionary name"
+        },
         "name:zh-CN": {
           "type": "string",
           "description": "Chinese dictionary name"
@@ -513,6 +517,10 @@
         "value": {
           "type": "string",
           "description": "Item value (unique within dictionary)"
+        },
+        "label": {
+          "type": "string",
+          "description": "Default item label"
         },
         "label:zh-CN": {
           "type": "string",
@@ -578,12 +586,70 @@
           "enum": [
             "string", "text", "integer", "decimal", "boolean",
             "date", "datetime", "json", "reference", "enum",
-            "dict", "relation", "computed"
+            "dict", "relation", "computed", "file", "jsonb", "long", "money"
+          ]
+        },
+        "fieldType": {
+          "type": "string",
+          "description": "Canonical or imported field type alias",
+          "enum": [
+            "string", "text", "integer", "decimal", "boolean",
+            "date", "datetime", "json", "reference", "enum",
+            "dict", "relation", "computed", "file", "jsonb", "long", "money",
+            "input", "select", "textarea"
           ]
         },
         "dictCode": {
           "type": "string",
           "description": "Dictionary code for DICT/ENUM type fields"
+        },
+        "enumValues": {
+          "type": "array",
+          "description": "Inline enum values for simple field scaffolds",
+          "items": {
+            "anyOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "required": ["code"],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "Enum option code"
+                  },
+                  "displayName:zh-CN": {
+                    "type": "string",
+                    "description": "Chinese enum option label"
+                  },
+                  "displayName:en": {
+                    "type": "string",
+                    "description": "English enum option label"
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Default enum option label"
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "referenceModelCode": {
+          "type": "string",
+          "description": "Referenced model code for reference fields"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the field is required by default"
+        },
+        "precision": {
+          "type": "integer",
+          "description": "Decimal precision"
+        },
+        "scale": {
+          "type": "integer",
+          "description": "Decimal scale"
         },
         "constraints": {
           "type": "object",
@@ -624,6 +690,9 @@
             "unique": {
               "type": "boolean",
               "description": "Whether the field value must be unique"
+            },
+            "defaultValue": {
+              "description": "Default value for the field"
             }
           },
           "additionalProperties": false
@@ -649,8 +718,7 @@
           "description": "Reference target configuration (for REFERENCE type: targetModel, targetField, relationship, etc.)"
         },
         "defaultValue": {
-          "type": "string",
-          "description": "Default value expression"
+          "description": "Default value expression or JSON scalar"
         },
         "extension": {
           "type": "object",
@@ -687,8 +755,28 @@
         },
         "modelCategory": {
           "type": "string",
-          "enum": ["document", "master", "transaction", "activity", "reference", "entity"],
+          "enum": ["document", "master", "transaction", "activity", "reference", "entity", "basic", "business"],
           "description": "Business object classification"
+        },
+        "semantic_description": {
+          "type": "string",
+          "description": "Semantic description for AI and documentation"
+        },
+        "domain_category": {
+          "type": "string",
+          "description": "Business domain category"
+        },
+        "data_sensitivity": {
+          "type": "string",
+          "description": "Data sensitivity classification"
+        },
+        "lifecycle_description": {
+          "type": "string",
+          "description": "Lifecycle description"
+        },
+        "features": {
+          "type": "object",
+          "description": "Model feature flags"
         },
         "tableName": {
           "type": "string",
@@ -750,6 +838,14 @@
           "type": "integer",
           "description": "Display sequence/order",
           "default": 0
+        },
+        "sortOrder": {
+          "type": "integer",
+          "description": "Display sort order alias"
+        },
+        "columnName": {
+          "type": "string",
+          "description": "Physical column name override"
         },
         "required": {
           "type": "boolean",
@@ -837,8 +933,40 @@
           "enum": [
             "create", "update", "delete", "state_transition",
             "query", "action", "batch_create", "batch_update",
-            "batch_delete", "import"
+            "batch_delete", "import", "custom"
           ]
+        },
+        "agent_hint": {
+          "type": "string",
+          "description": "Agent-facing hint for when and how to use the command"
+        },
+        "cmd_risk_level": {
+          "type": "string",
+          "description": "Command risk level for agent governance"
+        },
+        "idempotent": {
+          "type": "boolean",
+          "description": "Whether repeated execution is safe"
+        },
+        "reversible": {
+          "type": "boolean",
+          "description": "Whether command effects can be reversed"
+        },
+        "example_input": {
+          "type": "object",
+          "description": "Example command input"
+        },
+        "precondition_description": {
+          "type": "string",
+          "description": "Human-readable precondition summary"
+        },
+        "side_effect_description": {
+          "type": ["string", "null"],
+          "description": "Human-readable side effect summary"
+        },
+        "output_description": {
+          "type": "string",
+          "description": "Human-readable output summary"
         },
         "inputFields": {
           "type": "array",
@@ -908,7 +1036,11 @@
               "strategy": {
                 "type": "string",
                 "description": "Strategy for auto-setting field value",
-                "enum": ["auto_generate", "current_user", "current_user_pid", "current_datetime", "fixed_value", "current_username", "copy_field"]
+                "enum": [
+                  "auto_generate", "current_user", "current_user_pid",
+                  "current_datetime", "current_date", "fixed_value",
+                  "default_value", "current_username", "copy_field"
+                ]
               },
               "value": {
                 "description": "Fixed value when strategy is FIXED_VALUE"
@@ -916,6 +1048,77 @@
               "sourceField": {
                 "type": "string",
                 "description": "Source field when strategy is COPY_FIELD"
+              },
+              "field": {
+                "type": "string",
+                "description": "Source field for generated values"
+              },
+              "pattern": {
+                "type": "string",
+                "description": "Generation pattern"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "preActions": {
+          "type": "array",
+          "description": "Pre-actions executed before main operation",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Pre-action type identifier"
+              },
+              "ruleCode": {
+                "type": "string",
+                "description": "Rule code to execute"
+              },
+              "facts": {
+                "type": "object",
+                "description": "Facts passed to the rule engine"
+              },
+              "contextLookup": {
+                "type": "array",
+                "description": "Context lookup configuration",
+                "items": {
+                  "type": "object",
+                  "required": ["modelCode", "exposeAs"],
+                  "properties": {
+                    "modelCode": {
+                      "type": "string",
+                      "description": "Model code to query before rule execution"
+                    },
+                    "filters": {
+                      "type": "array",
+                      "description": "Lookup filters",
+                      "items": {
+                        "type": "object",
+                        "required": ["field", "op", "value"],
+                        "properties": {
+                          "field": {
+                            "type": "string",
+                            "description": "Lookup field"
+                          },
+                          "op": {
+                            "type": "string",
+                            "description": "Lookup operator"
+                          },
+                          "value": {
+                            "description": "Lookup value or expression"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "exposeAs": {
+                      "type": "string",
+                      "description": "Name exposed to subsequent rule facts"
+                    }
+                  },
+                  "additionalProperties": false
+                }
               }
             },
             "additionalProperties": false
@@ -935,6 +1138,10 @@
                 "type": "string",
                 "description": "Action type (e.g., CREATE_RECORD, UPDATE_RECORD)"
               },
+              "type": {
+                "type": "string",
+                "description": "Side effect type identifier"
+              },
               "targetModel": {
                 "type": "string",
                 "description": "Target model code for the side effect"
@@ -946,6 +1153,10 @@
               "fieldMapping": {
                 "type": "object",
                 "description": "Field mappings for the side effect operation"
+              },
+              "fieldMap": {
+                "type": "object",
+                "description": "Field map for the side effect operation"
               },
               "actions": {
                 "type": "array",
@@ -1062,6 +1273,34 @@
               "condition": {
                 "type": "string",
                 "description": "SpEL condition for conditional execution"
+              },
+              "processKey": {
+                "type": "string",
+                "description": "BPM process key to start or operate on"
+              },
+              "businessKey": {
+                "type": "string",
+                "description": "Business key expression"
+              },
+              "title": {
+                "type": "string",
+                "description": "Title expression for workflow/task actions"
+              },
+              "variables": {
+                "type": "object",
+                "description": "Variables passed to workflow actions"
+              },
+              "storeInstanceIdIn": {
+                "type": "string",
+                "description": "Field used to store created process instance id"
+              },
+              "instanceIdField": {
+                "type": "string",
+                "description": "Field containing process instance id"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Reason expression for workflow actions"
               }
             },
             "additionalProperties": false
@@ -1105,7 +1344,17 @@
         "preconditions": {
           "type": "array",
           "description": "Preconditions that must be satisfied before execution",
-          "items": { "type": "object" }
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": { "type": "string" },
+              "operator": { "type": "string" },
+              "value": {},
+              "message:zh-CN": { "type": "string" },
+              "message:en": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false
@@ -1188,6 +1437,10 @@
           "type": "string",
           "description": "Permission code (unique within tenant)"
         },
+        "name": {
+          "type": "string",
+          "description": "Default permission name"
+        },
         "name:zh-CN": {
           "type": "string",
           "description": "Chinese permission name"
@@ -1199,6 +1452,22 @@
         "description": {
           "type": "string",
           "description": "Permission description"
+        },
+        "description:zh-CN": {
+          "type": "string",
+          "description": "Chinese permission description"
+        },
+        "description:en": {
+          "type": "string",
+          "description": "English permission description"
+        },
+        "type": {
+          "type": "string",
+          "description": "Permission type"
+        },
+        "resource": {
+          "type": "string",
+          "description": "Resource code or path"
         },
         "category": {
           "type": "string",
@@ -1314,6 +1583,10 @@
           "type": "string",
           "description": "Menu code (unique within tenant)"
         },
+        "name": {
+          "type": "string",
+          "description": "Default menu name"
+        },
         "name:zh-CN": {
           "type": "string",
           "description": "Chinese menu name"
@@ -1323,7 +1596,7 @@
           "description": "English menu name"
         },
         "path": {
-          "type": "string",
+          "type": ["string", "null"],
           "description": "Route path"
         },
         "component": {
@@ -1331,7 +1604,7 @@
           "description": "Component path for frontend routing"
         },
         "icon": {
-          "type": "string",
+          "type": ["string", "null"],
           "description": "Menu icon name"
         },
         "type": {
@@ -1344,7 +1617,7 @@
           "description": "Parent menu code (null for top-level menus)"
         },
         "permissionCode": {
-          "type": "string",
+          "type": ["string", "null"],
           "description": "Permission code required to see this menu"
         },
         "visible": {
@@ -1392,16 +1665,23 @@
           "description": "Extension properties"
         }
       },
+      "patternProperties": {
+        "^_": {}
+      },
       "additionalProperties": false
     },
     "pageDefinition": {
       "type": "object",
       "description": "Page schema definition for DSL-driven UI",
-      "required": ["pageKey", "pageType"],
+      "required": ["pageKey"],
       "properties": {
         "pageKey": {
           "type": "string",
           "description": "Page key (unique identifier)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Default page name"
         },
         "name:zh-CN": {
           "type": "string",
@@ -1412,7 +1692,7 @@
           "description": "English page name"
         },
         "title": {
-          "type": "string",
+          "type": ["string", "object"],
           "description": "Page title"
         },
         "description": {
@@ -1422,7 +1702,12 @@
         "pageType": {
           "type": "string",
           "description": "Page type",
-          "enum": ["list", "form", "detail", "dashboard", "custom"]
+          "enum": ["list", "form", "detail", "dashboard", "custom", "composite"]
+        },
+        "kind": {
+          "type": "string",
+          "description": "V2 page kind",
+          "enum": ["list", "form", "detail", "dashboard", "custom", "composite"]
         },
         "pageCategory": {
           "type": "string",
@@ -1444,6 +1729,28 @@
         "dslSchema": {
           "description": "DSL schema defining page structure",
           "$ref": "dsl-schema.generated.json#/definitions/DslSchema"
+        },
+        "layout": {
+          "type": "object",
+          "description": "V2 page layout"
+        },
+        "blocks": {
+          "type": "array",
+          "description": "V2 page blocks",
+          "items": { "type": "object" }
+        },
+        "dataSources": {
+          "type": "object",
+          "description": "Page data sources",
+          "additionalProperties": { "type": "object" }
+        },
+        "profile": {
+          "type": "string",
+          "description": "Rendering profile"
+        },
+        "mobileUx": {
+          "type": "object",
+          "description": "Mobile UX hints"
         },
         "schemaVersion": {
           "type": "integer",
