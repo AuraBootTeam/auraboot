@@ -1,5 +1,6 @@
 package com.auraboot.framework.integration.view;
 
+import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.view.dto.SavedViewCreateRequest;
 import com.auraboot.framework.view.dto.SavedViewDTO;
@@ -8,6 +9,7 @@ import com.auraboot.framework.view.service.SavedViewService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
@@ -25,7 +27,77 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private SavedViewService savedViewService;
 
-    private static final String TEST_MODEL_CODE = "device";
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private static final String TEST_MODEL_CODE = "saved_view_enhanced_test";
+    private static final String TEST_TABLE_NAME = "mt_saved_view_enhanced_test";
+    private static final String FIXTURE_REF = "SavedViewEnhancedIntegrationTest";
+
+    @BeforeEach
+    void ensureSavedViewFixture() {
+        Long tenantId = getTestTenant().getId();
+        jdbcTemplate.update("""
+                DELETE FROM ab_meta_model_field_binding
+                WHERE model_id IN (
+                    SELECT id FROM ab_meta_model WHERE tenant_id = ? AND code = ?
+                )
+                """, tenantId, TEST_MODEL_CODE);
+        jdbcTemplate.update("""
+                DELETE FROM ab_meta_field
+                WHERE tenant_id = ?
+                  AND code IN (
+                      'sc_name', 'sc_description', 'sc_start_date', 'sc_end_date',
+                      'sc_created_at', 'sc_status', 'sc_progress', 'sc_owner_user',
+                      'sc_attachment_file'
+                  )
+                """, tenantId);
+        jdbcTemplate.update("""
+                DELETE FROM ab_meta_model
+                WHERE tenant_id = ? AND code = ?
+                """, tenantId, TEST_MODEL_CODE);
+
+        Long modelId = jdbcTemplate.queryForObject("""
+                INSERT INTO ab_meta_model (
+                    pid, tenant_id, code, table_name, extension, capabilities,
+                    version, is_current, status, deleted_flag
+                )
+                VALUES (?, ?, ?, ?, ?::jsonb, '{}'::jsonb, 1, TRUE, 'published', FALSE)
+                RETURNING id
+                """, Long.class, UlidGenerator.generate(), tenantId, TEST_MODEL_CODE, TEST_TABLE_NAME,
+                "{\"displayName\":\"Saved View Enhanced Test\",\"testFixture\":\"" + FIXTURE_REF + "\"}");
+
+        bindFixtureField(tenantId, modelId, "sc_name", "string", 0);
+        bindFixtureField(tenantId, modelId, "sc_description", "text", 1);
+        bindFixtureField(tenantId, modelId, "sc_start_date", "date", 2);
+        bindFixtureField(tenantId, modelId, "sc_end_date", "date", 3);
+        bindFixtureField(tenantId, modelId, "sc_created_at", "datetime", 4);
+        bindFixtureField(tenantId, modelId, "sc_status", "enum", 5);
+        bindFixtureField(tenantId, modelId, "sc_progress", "integer", 6);
+        bindFixtureField(tenantId, modelId, "sc_owner_user", "reference", 7);
+        bindFixtureField(tenantId, modelId, "sc_attachment_file", "file", 8);
+    }
+
+    private void bindFixtureField(Long tenantId, Long modelId, String code, String dataType, int order) {
+        Long fieldId = jdbcTemplate.queryForObject("""
+                INSERT INTO ab_meta_field (
+                    pid, tenant_id, version, is_current, status, deleted_flag,
+                    code, data_type, extension, index_hint, ui_schema, query_schema
+                )
+                VALUES (?, ?, 1, TRUE, 'published', FALSE,
+                        ?, ?, ?::jsonb, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb)
+                RETURNING id
+                """, Long.class, UlidGenerator.generate(), tenantId, code, dataType,
+                "{\"testFixture\":\"" + FIXTURE_REF + "\"}");
+
+        jdbcTemplate.update("""
+                INSERT INTO ab_meta_model_field_binding (
+                    pid, tenant_id, model_id, field_id, field_order,
+                    required, visible, editable, searchable, deleted_flag, remarks
+                )
+                VALUES (?, ?, ?, ?, ?, FALSE, TRUE, TRUE, FALSE, FALSE, ?)
+                """, UlidGenerator.generate(), tenantId, modelId, fieldId, order, FIXTURE_REF);
+    }
 
     // ==================== Calendar View ====================
 
@@ -34,10 +106,10 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Create CALENDAR view with full config")
     void test01_createCalendarView() {
         ViewConfig config = new ViewConfig();
-        config.setCalendarDateField("created_at");
-        config.setCalendarTitleField("name");
-        config.setCalendarEndDateField("updated_at");
-        config.setCalendarColorField("status");
+        config.setCalendarDateField("sc_start_date");
+        config.setCalendarTitleField("sc_name");
+        config.setCalendarEndDateField("sc_end_date");
+        config.setCalendarColorField("sc_status");
         config.setCalendarDefaultView("dayGridMonth");
 
         SavedViewCreateRequest request = new SavedViewCreateRequest();
@@ -57,10 +129,10 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
         // Verify config persisted
         ViewConfig savedConfig = result.getViewConfig();
         assertNotNull(savedConfig);
-        assertEquals("created_at", savedConfig.getCalendarDateField());
-        assertEquals("name", savedConfig.getCalendarTitleField());
-        assertEquals("updated_at", savedConfig.getCalendarEndDateField());
-        assertEquals("status", savedConfig.getCalendarColorField());
+        assertEquals("sc_start_date", savedConfig.getCalendarDateField());
+        assertEquals("sc_name", savedConfig.getCalendarTitleField());
+        assertEquals("sc_end_date", savedConfig.getCalendarEndDateField());
+        assertEquals("sc_status", savedConfig.getCalendarColorField());
         assertEquals("dayGridMonth", savedConfig.getCalendarDefaultView());
 
         log.info("Created CALENDAR view with pid={}", result.getPid());
@@ -71,7 +143,7 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Create CALENDAR view with minimal config")
     void test02_createCalendarViewMinimal() {
         ViewConfig config = new ViewConfig();
-        config.setCalendarDateField("created_at");
+        config.setCalendarDateField("sc_start_date");
 
         SavedViewCreateRequest request = new SavedViewCreateRequest();
         request.setName("Calendar Minimal");
@@ -87,7 +159,7 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
 
         ViewConfig savedConfig = result.getViewConfig();
         assertNotNull(savedConfig);
-        assertEquals("created_at", savedConfig.getCalendarDateField());
+        assertEquals("sc_start_date", savedConfig.getCalendarDateField());
         assertNull(savedConfig.getCalendarEndDateField());
         assertNull(savedConfig.getCalendarColorField());
     }
@@ -99,14 +171,14 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Create GALLERY view with full config")
     void test03_createGalleryView() {
         ViewConfig config = new ViewConfig();
-        config.setGalleryImageField("image_url");
-        config.setGalleryTitleField("name");
-        config.setGalleryDescriptionField("description");
+        config.setGalleryImageField("sc_attachment_file");
+        config.setGalleryTitleField("sc_name");
+        config.setGalleryDescriptionField("sc_description");
         config.setGalleryColumns(4);
         config.setGalleryAspectRatio("16:9");
         config.setGalleryShowTitle(true);
         config.setGalleryShowDescription(true);
-        config.setGalleryDisplayFields(List.of("status", "created_at"));
+        config.setGalleryDisplayFields(List.of("sc_status", "sc_created_at"));
 
         SavedViewCreateRequest request = new SavedViewCreateRequest();
         request.setName("Gallery Test View");
@@ -122,15 +194,15 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
 
         ViewConfig savedConfig = result.getViewConfig();
         assertNotNull(savedConfig);
-        assertEquals("image_url", savedConfig.getGalleryImageField());
-        assertEquals("name", savedConfig.getGalleryTitleField());
-        assertEquals("description", savedConfig.getGalleryDescriptionField());
+        assertEquals("sc_attachment_file", savedConfig.getGalleryImageField());
+        assertEquals("sc_name", savedConfig.getGalleryTitleField());
+        assertEquals("sc_description", savedConfig.getGalleryDescriptionField());
         assertEquals(4, savedConfig.getGalleryColumns());
         assertEquals("16:9", savedConfig.getGalleryAspectRatio());
         assertTrue(savedConfig.getGalleryShowTitle());
         assertTrue(savedConfig.getGalleryShowDescription());
         assertEquals(2, savedConfig.getGalleryDisplayFields().size());
-        assertTrue(savedConfig.getGalleryDisplayFields().contains("status"));
+        assertTrue(savedConfig.getGalleryDisplayFields().contains("sc_status"));
 
         log.info("Created GALLERY view with pid={}", result.getPid());
     }
@@ -140,7 +212,8 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Create GALLERY view with default columns")
     void test04_createGalleryViewDefaults() {
         ViewConfig config = new ViewConfig();
-        config.setGalleryTitleField("name");
+        config.setGalleryImageField("sc_attachment_file");
+        config.setGalleryTitleField("sc_name");
 
         SavedViewCreateRequest request = new SavedViewCreateRequest();
         request.setName("Gallery Defaults");
@@ -156,7 +229,8 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
 
         ViewConfig savedConfig = result.getViewConfig();
         assertNotNull(savedConfig);
-        assertEquals("name", savedConfig.getGalleryTitleField());
+        assertEquals("sc_attachment_file", savedConfig.getGalleryImageField());
+        assertEquals("sc_name", savedConfig.getGalleryTitleField());
         // Columns should be null (frontend defaults to 3)
         assertNull(savedConfig.getGalleryColumns());
     }
@@ -168,11 +242,11 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Create GANTT view with full config")
     void test05_createGanttView() {
         ViewConfig config = new ViewConfig();
-        config.setGanttStartDateField("start_date");
-        config.setGanttEndDateField("end_date");
-        config.setGanttTitleField("task_name");
-        config.setGanttProgressField("progress");
-        config.setGanttDependencyField("depends_on");
+        config.setGanttStartDateField("sc_start_date");
+        config.setGanttEndDateField("sc_end_date");
+        config.setGanttTitleField("sc_name");
+        config.setGanttProgressField("sc_progress");
+        config.setGanttDependencyField("sc_owner_user");
         config.setGanttDefaultView("Week");
 
         SavedViewCreateRequest request = new SavedViewCreateRequest();
@@ -189,11 +263,11 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
 
         ViewConfig savedConfig = result.getViewConfig();
         assertNotNull(savedConfig);
-        assertEquals("start_date", savedConfig.getGanttStartDateField());
-        assertEquals("end_date", savedConfig.getGanttEndDateField());
-        assertEquals("task_name", savedConfig.getGanttTitleField());
-        assertEquals("progress", savedConfig.getGanttProgressField());
-        assertEquals("depends_on", savedConfig.getGanttDependencyField());
+        assertEquals("sc_start_date", savedConfig.getGanttStartDateField());
+        assertEquals("sc_end_date", savedConfig.getGanttEndDateField());
+        assertEquals("sc_name", savedConfig.getGanttTitleField());
+        assertEquals("sc_progress", savedConfig.getGanttProgressField());
+        assertEquals("sc_owner_user", savedConfig.getGanttDependencyField());
         assertEquals("Week", savedConfig.getGanttDefaultView());
 
         log.info("Created GANTT view with pid={}", result.getPid());
@@ -207,8 +281,8 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
     void test06_readBackViewConfig() {
         // Create a CALENDAR view
         ViewConfig config = new ViewConfig();
-        config.setCalendarDateField("event_date");
-        config.setCalendarTitleField("event_name");
+        config.setCalendarDateField("sc_created_at");
+        config.setCalendarTitleField("sc_name");
         config.setCalendarDefaultView("timeGridWeek");
 
         SavedViewCreateRequest request = new SavedViewCreateRequest();
@@ -230,8 +304,8 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
 
         ViewConfig readConfig = readBack.getViewConfig();
         assertNotNull(readConfig);
-        assertEquals("event_date", readConfig.getCalendarDateField());
-        assertEquals("event_name", readConfig.getCalendarTitleField());
+        assertEquals("sc_created_at", readConfig.getCalendarDateField());
+        assertEquals("sc_name", readConfig.getCalendarTitleField());
         assertEquals("timeGridWeek", readConfig.getCalendarDefaultView());
     }
 
@@ -261,7 +335,7 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
         // A ViewConfig can have fields from multiple view types
         // Only the fields relevant to the view type are used
         ViewConfig config = new ViewConfig();
-        config.setCalendarDateField("date_field");
+        config.setCalendarDateField("sc_start_date");
         config.setGanttStartDateField("start_field");
         config.setGalleryTitleField("title_field");
 
@@ -279,7 +353,7 @@ class SavedViewEnhancedIntegrationTest extends BaseIntegrationTest {
         // All fields should persist regardless of view type
         ViewConfig savedConfig = result.getViewConfig();
         assertNotNull(savedConfig);
-        assertEquals("date_field", savedConfig.getCalendarDateField());
+        assertEquals("sc_start_date", savedConfig.getCalendarDateField());
         assertEquals("start_field", savedConfig.getGanttStartDateField());
         assertEquals("title_field", savedConfig.getGalleryTitleField());
     }
