@@ -13,7 +13,6 @@ import ChartBarIcon from '@heroicons/react/24/outline/ChartBarIcon';
 import CurrencyDollarIcon from '@heroicons/react/24/outline/CurrencyDollarIcon';
 import InboxArrowDownIcon from '@heroicons/react/24/outline/InboxArrowDownIcon';
 import UsersIcon from '@heroicons/react/24/outline/UsersIcon';
-import KeyIcon from '@heroicons/react/24/outline/KeyIcon';
 import DocumentDuplicateIcon from '@heroicons/react/24/outline/DocumentDuplicateIcon';
 import ComputerDesktopIcon from '@heroicons/react/24/outline/ComputerDesktopIcon';
 import FilmIcon from '@heroicons/react/24/outline/FilmIcon';
@@ -134,11 +133,6 @@ const routes = [
         path: '/register', //url
         icon: <UserIcon className={submenuIconClasses} />, // icon component
         name: 'Register', // name that appear in Sidebar
-      },
-      {
-        path: '/forgot-password',
-        icon: <KeyIcon className={submenuIconClasses} />,
-        name: 'Forgot Password',
       },
     ],
   },

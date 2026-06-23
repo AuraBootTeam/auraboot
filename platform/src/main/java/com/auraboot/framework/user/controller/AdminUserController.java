@@ -9,10 +9,14 @@ import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.dto.EmployeeAccountProvisionRequest;
+import com.auraboot.framework.user.dto.EmployeeAccountProvisionResponse;
 import com.auraboot.framework.user.dto.UserProvisionRequest;
 import com.auraboot.framework.user.dto.UserProvisionResponse;
 import com.auraboot.framework.user.dto.UserSearchDTO;
 import com.auraboot.framework.user.mapper.UserMapper;
+import com.auraboot.framework.user.service.EmployeeAccountProvisioningService;
+import com.auraboot.framework.user.service.EmployeeAccountWorkbookParser;
 import com.auraboot.framework.user.service.UserProvisioningService;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -21,9 +25,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.List;
@@ -40,6 +47,8 @@ public class AdminUserController {
     private final PasswordEncoder passwordEncoder;
     private final PasswordManagementService passwordManagementService;
     private final UserProvisioningService userProvisioningService;
+    private final EmployeeAccountProvisioningService employeeAccountProvisioningService;
+    private final EmployeeAccountWorkbookParser employeeAccountWorkbookParser;
     private final UserService userService;
 
     private static final String CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
@@ -62,6 +71,62 @@ public class AdminUserController {
         }
         UserProvisionResponse response = userProvisioningService.provision(request, tenantId, currentUserId);
         return ApiResponse.success(response);
+    }
+
+    /**
+     * Customer employee account batch provisioning.
+     * Names are used as login names; passwords are generated as prefix + random digits.
+     */
+    @PostMapping("/employee-accounts")
+    @Operation(summary = "Provision customer employee accounts in the current tenant")
+    @RequirePermission(MetaPermission.ROLE_MANAGE)
+    public ApiResponse<EmployeeAccountProvisionResponse> provisionEmployeeAccounts(
+            @Valid @RequestBody EmployeeAccountProvisionRequest request,
+            @CurrentUserId Long currentUserId) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "No tenant context — admin must be in a tenant");
+        }
+        EmployeeAccountProvisionResponse response =
+                employeeAccountProvisioningService.provision(request, tenantId, currentUserId);
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * Customer employee account provisioning from Excel.
+     * Expected headers: 姓名, 类型, optional 手机/邮箱.
+     */
+    @PostMapping(value = "/employee-accounts/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Import customer employee accounts from Excel in the current tenant")
+    @RequirePermission(MetaPermission.ROLE_MANAGE)
+    public ApiResponse<EmployeeAccountProvisionResponse> importEmployeeAccounts(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) String passwordPrefix,
+            @RequestParam(required = false) Integer randomDigitCount,
+            @CurrentUserId Long currentUserId) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "No tenant context — admin must be in a tenant");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "Employee account import file is required");
+        }
+
+        try {
+            EmployeeAccountProvisionRequest request = new EmployeeAccountProvisionRequest();
+            request.setEmployees(employeeAccountWorkbookParser.parse(file.getInputStream()));
+            if (passwordPrefix != null && !passwordPrefix.isBlank()) {
+                request.setPasswordPrefix(passwordPrefix);
+            }
+            if (randomDigitCount != null) {
+                request.setRandomDigitCount(randomDigitCount);
+            }
+            EmployeeAccountProvisionResponse response =
+                    employeeAccountProvisioningService.provision(request, tenantId, currentUserId);
+            return ApiResponse.success(response);
+        } catch (IOException e) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "Failed to read employee account import file", e);
+        }
     }
 
     /**
@@ -124,12 +189,12 @@ public class AdminUserController {
         String tempPassword = generateRandomPassword(12);
 
         user.setPassword(passwordEncoder.encode(tempPassword));
-        user.setMustChangePassword(true);
+        user.setMustChangePassword(false);
         user.setSecurityVersion((user.getSecurityVersion() != null ? user.getSecurityVersion() : 0) + 1);
         user.setUpdatedAt(Instant.now());
         userMapper.updateById(user);
 
-        log.info("Admin reset password for user {}, mustChangePassword=true", userPid);
+        log.info("Admin reset password for user {}, mustChangePassword=false", userPid);
 
         return ApiResponse.success(Map.of("tempPassword", tempPassword));
     }

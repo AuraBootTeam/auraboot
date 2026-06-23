@@ -222,7 +222,7 @@ automation:
     validationMode.signature: 서명 검증
     validationMode.token: 토큰 검증
     recordId: 레코드 ID
-    recordId.desc: 표현식 참조 지원 (예: ${trigger.recordId})
+    recordId.desc: "표현식 참조 지원 (예: ${trigger.recordId})"
     updateFields: 수정 필드
     updateFields.desc: 수정할 필드와 값 (JSON 형식)
     createFields: 레코드 필드
@@ -258,7 +258,7 @@ automation:
     collection: 컬렉션
     collection.desc: 반복 처리할 배열 또는 리스트
     itemVariable: 요소 변수명
-    itemVariable.desc: 현재 요소의 변수명 (기본값: item)
+    itemVariable.desc: "현재 요소의 변수명 (기본값: item)"
     bpmProcess: BPM 프로세스
     eventTypes: 이벤트 유형
     eventTypes.desc: 비워두면 모든 이벤트 유형을 감시합니다
@@ -302,6 +302,8 @@ auth:
   tagline: 엔터프라이즈 로우코드 플랫폼
   email: 이메일
   emailPlaceholder: 이메일 주소를 입력하세요
+  identifier: 사용자 이름 또는 이메일
+  identifierPlaceholder: 사용자 이름 또는 이메일을 입력하세요
   password: 비밀번호
   passwordPlaceholder: 비밀번호를 입력하세요
   rememberMe: 로그인 상태 유지
@@ -321,14 +323,15 @@ auth:
     dataModel: 유연한 데이터 모델
     workflow: 자동화 워크플로우
   channel:
-    emailPassword: 이메일 & 비밀번호
+    emailPassword: 사용자 이름/이메일 & 비밀번호
     sms: SMS 로그인
     emailCode: 이메일 인증코드
   social:
     wechat: WeChat 로그인
     oidc: SSO 로그인
   error:
-    invalidCredentials: 이메일 또는 비밀번호가 올바르지 않습니다
+    invalidCredentials: 사용자 이름/이메일 또는 비밀번호가 올바르지 않습니다
+    identifierRequired: 사용자 이름 또는 이메일을 입력해 주세요
     invalidMobile: 유효한 휴대폰 번호를 입력해 주세요
     codeRequired: 인증 코드를 입력해 주세요
     codeInvalid: 인증 코드가 유효하지 않거나 만료되었습니다

@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { get, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToast } from '~/contexts/ToastContext';
-import PasswordChangeForm from '~/ui/security/PasswordChangeForm';
 
 interface SessionInfo {
   pid: string;
@@ -110,8 +109,6 @@ function ActiveSessions() {
 }
 
 export default function SecuritySettings() {
-  const [activeTab, setActiveTab] = useState<'password' | 'sessions'>('password');
-
   return (
     <div className="p-6">
       <div className="rounded-lg bg-white shadow-md">
@@ -119,34 +116,8 @@ export default function SecuritySettings() {
           <h1 className="text-2xl font-semibold text-gray-900">Security Settings</h1>
         </div>
 
-        {/* Tab navigation */}
-        <div className="border-b border-gray-200 px-6">
-          <nav className="flex space-x-8">
-            <button
-              onClick={() => setActiveTab('password')}
-              className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                activeTab === 'password'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Change Password
-            </button>
-            <button
-              onClick={() => setActiveTab('sessions')}
-              className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                activeTab === 'sessions'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Active Sessions
-            </button>
-          </nav>
-        </div>
-
         <div className="p-6">
-          {activeTab === 'password' ? <PasswordChangeForm /> : <ActiveSessions />}
+          <ActiveSessions />
         </div>
       </div>
     </div>

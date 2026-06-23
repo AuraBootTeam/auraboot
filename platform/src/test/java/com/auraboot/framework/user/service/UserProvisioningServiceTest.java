@@ -60,7 +60,8 @@ class UserProvisioningServiceTest {
     void provision_withInitialPasswordSkipsTempGeneration() throws Exception {
         UserProvisionRequest req = req();
         req.setInitialPassword("realpw");
-        when(userService.signUp("e@x.com", "realpw", "Display")).thenReturn(user(1L));
+        req.setUserName("吴书生");
+        when(userService.signUp("e@x.com", "realpw", "Display", "吴书生")).thenReturn(user(1L));
         when(tenantMemberService.findByTenantIdAndUserId(7L, 1L)).thenReturn(member(50L));
         when(roleService.findDefaultRole(7L)).thenReturn(role(99L, "default"));
 
@@ -73,33 +74,73 @@ class UserProvisioningServiceTest {
     }
 
     @Test
-    void provision_withoutPasswordGeneratesTemp() throws Exception {
+    void provision_userNameOnlySkipsEmailRequirement() throws Exception {
         UserProvisionRequest req = req();
-        when(userService.signUp(eq("e@x.com"), anyString(), eq("Display"))).thenReturn(user(1L));
+        req.setEmail(null);
+        req.setInitialPassword("realpw");
+        req.setUserName("吴书生");
+        User user = user(1L);
+        user.setEmail(null);
+        user.setUserName("吴书生");
+        when(userService.signUp(null, "realpw", "Display", "吴书生")).thenReturn(user);
+        when(tenantMemberService.findByTenantIdAndUserId(7L, 1L)).thenReturn(member(50L));
+        when(roleService.findDefaultRole(7L)).thenReturn(role(99L, "default"));
+
+        UserProvisionResponse resp = service.provision(req, 7L, 100L);
+
+        assertNull(resp.getEmail());
+        assertFalse(resp.isMustChangePassword());
+        assertEquals(List.of("default"), resp.getAssignedRoles());
+    }
+
+    @Test
+    void provision_missingEmailAndUserNameThrowsBusinessException() {
+        UserProvisionRequest req = req();
+        req.setEmail(" ");
+        req.setUserName(" ");
+
+        assertThrows(BusinessException.class, () -> service.provision(req, 7L, 100L));
+        verify(userService, never()).signUp(any(), any(), any(), any());
+    }
+
+    @Test
+    void provision_withoutPasswordGeneratesAdminManagedTempPassword() throws Exception {
+        UserProvisionRequest req = req();
+        when(userService.signUp(eq("e@x.com"), anyString(), eq("Display"), isNull())).thenReturn(user(1L));
         when(tenantMemberService.findByTenantIdAndUserId(7L, 1L)).thenReturn(member(50L));
         when(roleService.findDefaultRole(7L)).thenReturn(null);
 
         UserProvisionResponse resp = service.provision(req, 7L, 100L);
 
-        assertTrue(resp.isMustChangePassword());
+        assertFalse(resp.isMustChangePassword());
         assertNotNull(resp.getTemporaryPassword());
         assertEquals(12, resp.getTemporaryPassword().length());
         assertTrue(resp.getAssignedRoles().isEmpty());
-        verify(userService).update(argThat(u -> Boolean.TRUE.equals(u.getMustChangePassword())));
+        verify(userService, never()).update(any());
     }
 
     @Test
     void provision_existingUserThrowsBusinessException() throws Exception {
         UserProvisionRequest req = req();
-        when(userService.signUp(any(), any(), any())).thenThrow(new RuntimeException("dup"));
+        when(userService.signUp(any(), any(), any(), any())).thenThrow(new RuntimeException("dup"));
         when(userService.findByEmail("e@x.com")).thenReturn(user(99L));
+        assertThrows(BusinessException.class, () -> service.provision(req, 7L, 100L));
+    }
+
+    @Test
+    void provision_existingUserNameThrowsBusinessException() throws Exception {
+        UserProvisionRequest req = req();
+        req.setEmail(null);
+        req.setUserName("吴书生");
+        when(userService.signUp(any(), any(), any(), any())).thenThrow(new RuntimeException("dup"));
+        when(userService.findByUserName("吴书生")).thenReturn(user(99L));
         assertThrows(BusinessException.class, () -> service.provision(req, 7L, 100L));
     }
 
     @Test
     void provision_signUpFailureWithoutExistingPropagates() throws Exception {
         UserProvisionRequest req = req();
-        when(userService.signUp(any(), any(), any())).thenThrow(new RuntimeException("boom"));
+        when(userService.signUp(any(), any(), any(), any())).thenThrow(new RuntimeException("boom"));
         when(userService.findByEmail("e@x.com")).thenReturn(null);
         assertThrows(RuntimeException.class, () -> service.provision(req, 7L, 100L));
     }
@@ -108,7 +149,7 @@ class UserProvisioningServiceTest {
     void provision_addMemberAlreadyExistsContinues() throws Exception {
         UserProvisionRequest req = req();
         req.setInitialPassword("p");
-        when(userService.signUp(any(), any(), any())).thenReturn(user(1L));
+        when(userService.signUp(any(), any(), any(), any())).thenReturn(user(1L));
         when(tenantMemberService.addMember(1L, 7L, "active")).thenThrow(new BusinessException("already"));
         when(tenantMemberService.findByTenantIdAndUserId(7L, 1L)).thenReturn(member(50L));
         when(roleService.findDefaultRole(7L)).thenReturn(role(99L, "default"));
@@ -122,7 +163,7 @@ class UserProvisioningServiceTest {
         UserProvisionRequest req = req();
         req.setInitialPassword("p");
         req.setRoleCodes(List.of("admin", "ghost"));
-        when(userService.signUp(any(), any(), any())).thenReturn(user(1L));
+        when(userService.signUp(any(), any(), any(), any())).thenReturn(user(1L));
         when(tenantMemberService.findByTenantIdAndUserId(7L, 1L)).thenReturn(member(50L));
         when(roleService.findByTenantId(7L)).thenReturn(List.of(role(1L, "admin"), role(2L, "user")));
 
@@ -136,7 +177,7 @@ class UserProvisioningServiceTest {
     void provision_nullMemberIdSkipsRoleAssignment() throws Exception {
         UserProvisionRequest req = req();
         req.setInitialPassword("p");
-        when(userService.signUp(any(), any(), any())).thenReturn(user(1L));
+        when(userService.signUp(any(), any(), any(), any())).thenReturn(user(1L));
         when(tenantMemberService.findByTenantIdAndUserId(7L, 1L)).thenReturn(null);
 
         UserProvisionResponse resp = service.provision(req, 7L, 100L);
@@ -149,7 +190,7 @@ class UserProvisioningServiceTest {
         UserProvisionRequest req = req();
         req.setInitialPassword("p");
         req.setRoleCodes(List.of());
-        when(userService.signUp(any(), any(), any())).thenReturn(user(1L));
+        when(userService.signUp(any(), any(), any(), any())).thenReturn(user(1L));
         when(tenantMemberService.findByTenantIdAndUserId(7L, 1L)).thenReturn(member(50L));
         when(roleService.findDefaultRole(7L)).thenReturn(role(9L, "viewer"));
         UserProvisionResponse resp = service.provision(req, 7L, 100L);

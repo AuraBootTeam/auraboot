@@ -3,8 +3,7 @@
  *
  * Covers:
  * - Signup page rendering and validation
- * - Forgot password flow validation and success feedback
- * - Reset password error handling (missing token / weak password / mismatch)
+ * - Forgot/reset password routes show admin-managed password policy
  *
  * This suite runs in unauthenticated context and uses real UI interactions.
  */
@@ -13,7 +12,6 @@ import { test, expect } from '../../fixtures';
 
 async function waitForAuthHydration(page: import('@playwright/test').Page): Promise<void> {
   await page.waitForLoadState('networkidle');
-  await expect(page.locator('form').first()).toBeVisible();
 }
 
 test.describe('Auth Recovery & Signup Deep', () => {
@@ -46,72 +44,20 @@ test.describe('Auth Recovery & Signup Deep', () => {
     ).toBeVisible();
   });
 
-  test('ARS-003: forgot-password rejects malformed email', async ({ page }) => {
+  test('ARS-003: forgot-password shows admin-managed password policy', async ({ page }) => {
     await page.goto('/forgot-password', { waitUntil: 'domcontentloaded' });
     await waitForAuthHydration(page);
 
-    const emailInput = page.locator('input[type="email"]').first();
-    await expect(emailInput).toBeVisible();
-    await emailInput.fill('bad-email');
-    await page.getByRole('button', { name: /send reset link/i }).click();
-
-    // Browser-native email validation is used in this page.
-    const isValid = await emailInput.evaluate((el: HTMLInputElement) => el.checkValidity());
-    expect(isValid).toBe(false);
+    await expect(page.locator('[data-testid="forgot-password-disabled"]')).toBeVisible();
+    await expect(page.getByText(/tenant administrator/i)).toBeVisible();
     await expect(page).toHaveURL(/\/forgot-password/);
   });
 
-  test('ARS-004: forgot-password shows confirmation with valid email', async ({ page }) => {
-    await page.goto('/forgot-password', { waitUntil: 'domcontentloaded' });
-    await waitForAuthHydration(page);
-
-    const submitResp = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/auth/forgot-password') &&
-        r.request().method().toLowerCase() === 'post',
-      { timeout: 30000 },
-    );
-
-    await page.locator('input[type="email"]').first().fill('admin@auraboot.com');
-    await page.getByRole('button', { name: /send reset link/i }).click();
-    const resp = await submitResp;
-    expect(resp.ok()).toBe(true);
-
-    // App should render success confirmation page
-    await expect(page.getByText(/check your email/i)).toBeVisible();
-    await expect(page.getByText(/back to login/i)).toBeVisible();
-  });
-
-  test('ARS-005: reset-password without token shows invalid-link error', async ({ page }) => {
-    await page.goto('/reset-password', { waitUntil: 'domcontentloaded' });
-    await waitForAuthHydration(page);
-
-    const newPwd = page.locator('input[type="password"]').first();
-    const confirmPwd = page.locator('input[type="password"]').nth(1);
-    await newPwd.fill('Test2026x');
-    await confirmPwd.fill('Test2026x');
-    await page.getByRole('button', { name: /reset password/i }).click();
-
-    await expect(page.getByText(/invalid reset link/i)).toBeVisible();
-    await expect(page).toHaveURL(/\/reset-password/);
-  });
-
-  test('ARS-006: reset-password enforces strength and confirm match', async ({ page }) => {
+  test('ARS-004: reset-password shows admin-managed password policy', async ({ page }) => {
     await page.goto('/reset-password?token=e2e-dummy-token', { waitUntil: 'domcontentloaded' });
     await waitForAuthHydration(page);
-    const newPwd = page.locator('input[type="password"]').first();
-    const confirmPwd = page.locator('input[type="password"]').nth(1);
 
-    // Weak password branch
-    await newPwd.fill('123');
-    await confirmPwd.fill('123');
-    await page.getByRole('button', { name: /reset password/i }).click();
-    await expect(page.getByText(/at least 8 characters/i)).toBeVisible();
-
-    // Mismatch branch
-    await newPwd.fill('Test2026x');
-    await confirmPwd.fill('Test2026y');
-    await page.getByRole('button', { name: /reset password/i }).click();
-    await expect(page.getByText(/passwords do not match/i)).toBeVisible();
+    await expect(page.locator('[data-testid="reset-password-disabled"]')).toBeVisible();
+    await expect(page.getByText(/tenant administrator/i)).toBeVisible();
   });
 });

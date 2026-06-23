@@ -29,8 +29,8 @@ const LOGIN_URL = '/login';
 
 // Channel tab label mapping (must match CHANNEL_LABELS in Login.tsx)
 const TAB_LABELS: Record<string, string> = {
-  email_password: '邮箱密码',
-  EMAIL_PASSWORD: '邮箱密码',
+  email_password: '账号密码',
+  EMAIL_PASSWORD: '账号密码',
   sms: '短信登录',
   SMS: '短信登录',
   email_code: '邮箱验证码',
@@ -122,20 +122,27 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   // -----------------------------------------------------------------------
 
   function tabButton(page: import('@playwright/test').Page, channelCode: string) {
+    const testId = `login-tab-${channelCode.toLowerCase()}`;
     const label = TAB_LABELS[channelCode] || channelCode;
-    return page.getByRole('tab', { name: label, exact: true });
+    return page
+      .locator(`[data-testid="${testId}"], button[role="tab"]:has-text("${label}")`)
+      .first();
+  }
+
+  function accountInput(page: import('@playwright/test').Page) {
+    return page.locator('#identifier, #email').first();
   }
 
   // -----------------------------------------------------------------------
-  // LM-001: Default login page shows email/password form
+  // LM-001: Default login page shows account/password form
   // -----------------------------------------------------------------------
 
-  test('LM-001: default login page shows email/password form', async ({ page }) => {
+  test('LM-001: default login page shows account/password form', async ({ page }) => {
     await page.goto(LOGIN_URL);
     await page.waitForLoadState('domcontentloaded');
 
-    // Email and password inputs visible
-    await expect(page.locator('#email')).toBeVisible();
+    // Account identifier and password inputs visible
+    await expect(accountInput(page)).toBeVisible();
     await expect(page.locator('#password')).toBeVisible();
 
     // Submit button visible
@@ -162,13 +169,13 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
         timeout: 5000,
       });
 
-      // Wait for the email input to be ready
-      await page.locator('#email').waitFor({ state: 'visible', timeout: 5000 });
+      // Wait for the account input to be ready
+      await accountInput(page).waitFor({ state: 'visible', timeout: 5000 });
 
       // Fill credentials (click-before-fill to ensure React hydration)
-      await page.locator('#email').click();
-      await page.locator('#email').fill(TEST_CREDENTIALS.email);
-      await expect(page.locator('#email')).toHaveValue(TEST_CREDENTIALS.email, {
+      await accountInput(page).click();
+      await accountInput(page).fill(TEST_CREDENTIALS.email);
+      await expect(accountInput(page)).toHaveValue(TEST_CREDENTIALS.email, {
         timeout: 3000,
       });
 
@@ -204,7 +211,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
     // beforeAll enables EMAIL_PASSWORD + SMS + EMAIL_CODE — all 3 tabs should be visible
     await page.goto(LOGIN_URL);
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('#email').waitFor({ state: 'visible', timeout: 5000 });
+    await accountInput(page).waitFor({ state: 'visible', timeout: 5000 });
 
     // Switch to SMS tab
     await tabButton(page, 'sms').click();
@@ -219,7 +226,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
     // Switch back to EMAIL_PASSWORD
     await tabButton(page, 'email_password').click();
     await expect(tabButton(page, 'email_password')).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('#email')).toBeVisible();
+    await expect(accountInput(page)).toBeVisible();
     await expect(page.locator('#password')).toBeVisible();
   });
 
@@ -237,7 +244,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
     // beforeAll enables SMS channel — navigate and switch to SMS tab
     await page.goto(LOGIN_URL);
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('#email').waitFor({ state: 'visible', timeout: 5000 });
+    await accountInput(page).waitFor({ state: 'visible', timeout: 5000 });
 
     await tabButton(page, 'sms').click();
     await expect(tabButton(page, 'sms')).toHaveAttribute('aria-selected', 'true');
@@ -265,7 +272,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
     // beforeAll enables EMAIL_CODE channel — navigate and switch to EMAIL_CODE tab
     await page.goto(LOGIN_URL);
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('#email').waitFor({ state: 'visible', timeout: 5000 });
+    await accountInput(page).waitFor({ state: 'visible', timeout: 5000 });
 
     await tabButton(page, 'email_code').click();
     await expect(tabButton(page, 'email_code')).toHaveAttribute('aria-selected', 'true');
@@ -286,7 +293,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   test('LM-006: empty form submission shows validation', async ({ page }) => {
     await page.goto(LOGIN_URL);
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('#email').waitFor({ state: 'visible', timeout: 5000 });
+    await accountInput(page).waitFor({ state: 'visible', timeout: 5000 });
 
     // Submit without filling anything
     await page.locator('button:has-text("立即登录")').click();
@@ -300,8 +307,8 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
     // Verify we are still on the login page
     expect(page.url()).toContain('/login');
 
-    // The email input should still be visible (form was not submitted)
-    await expect(page.locator('#email')).toBeVisible();
+    // The account input should still be visible (form was not submitted)
+    await expect(accountInput(page)).toBeVisible();
   });
 
   // -----------------------------------------------------------------------
@@ -311,16 +318,16 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   test('LM-007: remember-me checkbox', async ({ page }) => {
     await page.goto(LOGIN_URL);
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('#email').waitFor({ state: 'visible', timeout: 5000 });
+    await accountInput(page).waitFor({ state: 'visible', timeout: 5000 });
 
     const rememberCheckbox = page.locator('#remember');
 
     // Initially unchecked (unless previously saved — fresh context has no localStorage)
     await expect(rememberCheckbox).not.toBeChecked();
 
-    // Fill email first
-    await page.locator('#email').click();
-    await page.locator('#email').fill(TEST_CREDENTIALS.email);
+    // Fill account identifier first
+    await accountInput(page).click();
+    await accountInput(page).fill(TEST_CREDENTIALS.email);
 
     // Check the remember-me box
     await rememberCheckbox.check();

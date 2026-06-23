@@ -16,7 +16,10 @@ import java.util.List;
 @Data
 public class UserProvisionRequest {
 
-    @NotBlank(message = "Email is required")
+    /**
+     * Optional when userName is provided. Email-based login, email-code login,
+     * and password reset still require a real email.
+     */
     @Email(message = "Invalid email format")
     private String email;
 
@@ -25,8 +28,14 @@ public class UserProvisionRequest {
     private String displayName;
 
     /**
-     * Initial password. If null, a temporary password is generated
-     * and mustChangePassword is set to true.
+     * Optional login name for private deployments. When set, users can sign in
+     * with either this value or their email address.
+     */
+    @Size(min = 1, max = 64)
+    private String userName;
+
+    /**
+     * Initial password. If null, an administrator-managed temporary password is generated.
      */
     @Size(min = 6, max = 128)
     private String initialPassword;

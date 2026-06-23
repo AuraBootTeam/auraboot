@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Form,
   useActionData,
   useNavigation,
   useLoaderData,
-  useSearchParams,
   Link,
   type LoaderFunctionArgs,
   type ActionFunctionArgs,
@@ -12,7 +11,6 @@ import {
 import { getUserProfile, updateUserProfile, uploadAvatar } from '~/shared/services/profile';
 import type { UserProfile, UpdateUserProfileRequest } from '~/types/profile';
 import { useToast } from '~/contexts/ToastContext';
-import PasswordChangeForm from '~/ui/security/PasswordChangeForm';
 
 // Loader函数 - 获取用户资料
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -296,9 +294,6 @@ export default function PersonalProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<UpdateUserProfileRequest>({});
   const [_retryCount, setRetryCount] = useState(0);
-  const [searchParams] = useSearchParams();
-  const forceChangePassword = searchParams.get('forceChangePassword') === 'true';
-  const securityRef = useRef<HTMLDivElement>(null);
 
   // 初始化表单数据
   useEffect(() => {
@@ -312,13 +307,6 @@ export default function PersonalProfile() {
       });
     }
   }, [profile]);
-
-  // Auto-scroll to security section if forceChangePassword
-  useEffect(() => {
-    if (forceChangePassword && securityRef.current) {
-      securityRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [forceChangePassword, profile]);
 
   // 处理loader数据更新
   useEffect(() => {
@@ -554,22 +542,6 @@ export default function PersonalProfile() {
           <p className="text-sm text-gray-500">
             Link your social accounts (WeChat, Google, Apple) for one-click login.
           </p>
-        </div>
-      </div>
-
-      {/* Security Settings Section */}
-      <div ref={securityRef} className="rounded-lg bg-white shadow-md">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-xl font-semibold text-gray-900">Security Settings</h2>
-          {forceChangePassword && (
-            <p className="mt-1 text-sm text-amber-600">
-              Your password must be changed before continuing.
-            </p>
-          )}
-        </div>
-        <div className="p-6">
-          <h3 className="mb-4 text-lg font-medium text-gray-800">Change Password</h3>
-          <PasswordChangeForm />
         </div>
       </div>
 

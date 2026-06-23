@@ -109,11 +109,39 @@ class EmailPasswordAuthStrategyTest {
     }
 
     @Test
+    void authenticate_userNameIdentifier_completesLoginWithIdentifierPrincipal() {
+        User user = buildUser("user@example.com", "吴书生");
+        when(userMapper.selectOne(any()))
+                .thenReturn(null)  // email lookup
+                .thenReturn(user); // user_name lookup
+        when(passwordManagementService.isAccountLocked(user)).thenReturn(false);
+
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        Authentication auth = mock(Authentication.class);
+        when(auth.getPrincipal()).thenReturn(userDetails);
+        when(authenticationManager.authenticate(any())).thenReturn(auth);
+
+        AuthenticationResponse response = mock(AuthenticationResponse.class);
+        when(loginCompletionHelper.completeLogin(any(), any(), any())).thenReturn(response);
+
+        AuthStrategyRequest request = buildIdentifierRequest("吴书生", "correct-pass");
+        AuthenticationResponse result = strategy.authenticate(request);
+
+        assertThat(result).isSameAs(response);
+        verify(passwordManagementService).resetLoginFailures(user);
+        verify(authenticationManager).authenticate(argThat(token ->
+                token instanceof UsernamePasswordAuthenticationToken &&
+                "吴书生".equals(token.getPrincipal()) &&
+                "correct-pass".equals(token.getCredentials())));
+    }
+
+    @Test
     void authenticate_userNotFoundInPreCheck_loadsAfterAuth() {
-        // First call to findUserByEmail returns null (not found in pre-check)
-        // Second call after auth returns the user
+        // First two calls are email and user_name pre-check lookups.
+        // Third call reloads the user after Spring Security authenticates.
         User user = buildUser("newlogin@example.com");
         when(userMapper.selectOne(any()))
+                .thenReturn(null)   // pre-check
                 .thenReturn(null)   // pre-check
                 .thenReturn(user);  // reload after auth
 
@@ -179,10 +207,24 @@ class EmailPasswordAuthStrategyTest {
         return r;
     }
 
+    private AuthStrategyRequest buildIdentifierRequest(String identifier, String password) {
+        AuthStrategyRequest r = new AuthStrategyRequest();
+        r.setIdentifier(identifier);
+        r.setPassword(password);
+        r.setChannelCode("email_password");
+        r.setIpAddress("127.0.0.1");
+        return r;
+    }
+
     private User buildUser(String email) {
+        return buildUser(email, null);
+    }
+
+    private User buildUser(String email, String userName) {
         User user = new User();
         user.setId(1L);
         user.setEmail(email);
+        user.setUserName(userName);
         user.setEnabled(true);
         return user;
     }

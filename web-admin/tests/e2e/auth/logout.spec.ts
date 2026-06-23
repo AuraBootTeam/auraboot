@@ -32,16 +32,11 @@ test.describe('Logout Functionality', () => {
     const isAuthenticated = await header.isAuthenticated();
     expect(isAuthenticated).toBe(true);
 
-    // Open user menu and navigate to the logout confirmation route.
-    await header.openUserMenu();
-    await expect(header.logoutLink).toHaveAttribute('href', '/logout');
-    await page.goto('/logout', { waitUntil: 'commit', timeout: 10000 });
-    await page.waitForLoadState('domcontentloaded');
+    await header.logout();
 
-    // Verify the menu action led to the dedicated logout confirmation screen.
-    await expect(
-      page.locator('button:has-text("确认退出"), button:has-text("Log Out")').first(),
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('input#identifier, input#email').first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   /**
@@ -59,15 +54,20 @@ test.describe('Logout Functionality', () => {
     const isAuthenticated = await header.userAvatar.isVisible({ timeout: 5000 }).catch(() => false);
     expect(isAuthenticated).toBe(true);
 
-    // Navigate to logout
-    await page.goto(`/logout`);
+    // Navigate to logout confirmation and submit it.
+    await page.goto(`/logout`, { waitUntil: 'commit', timeout: 10000 });
     await page.waitForLoadState('domcontentloaded');
+    await page.locator('button:has-text("确认退出"), button:has-text("Log Out")').first().click();
+    await page.waitForURL(/\/login/, { timeout: 10000 });
 
-    // Verify auth token is cleared from localStorage
+    // Verify client-side token state is cleared and protected pages no longer load authenticated UI.
     const authToken = await page.evaluate(() => localStorage.getItem('token'));
-
-    // Token should be null or empty after logout
     expect(authToken === null || authToken === '').toBe(true);
+
+    await page.goto(`/meta/models`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('input#identifier, input#email').first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   /**
@@ -86,7 +86,7 @@ test.describe('Logout Functionality', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Should see login form or be redirected
-    const loginForm = page.locator('input#email, input[type="email"]');
+    const loginForm = page.locator('input#identifier, input#email, input[type="email"]');
     const hasLoginForm = await loginForm.isVisible({ timeout: 5000 }).catch(() => false);
 
     // Either shows login form or redirected to login page

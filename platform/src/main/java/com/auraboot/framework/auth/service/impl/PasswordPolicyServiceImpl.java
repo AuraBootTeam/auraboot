@@ -17,7 +17,7 @@ public class PasswordPolicyServiceImpl implements PasswordPolicyService {
     @Value("${security.password.max-length:128}")
     private int maxLength;
 
-    @Value("${security.password.require-uppercase:true}")
+    @Value("${security.password.require-uppercase:false}")
     private boolean requireUppercase;
 
     @Value("${security.password.require-lowercase:true}")

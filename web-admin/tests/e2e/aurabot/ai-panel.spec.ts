@@ -23,7 +23,7 @@ import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 async function gotoAppAndWaitForHeader(page: Page) {
   await page.goto('/meta/models');
   if (page.url().includes('/login')) {
-    await page.locator('input#email').fill(DEFAULT_TEST_ACCOUNT.email);
+    await page.locator('input#identifier, input#email').fill(DEFAULT_TEST_ACCOUNT.email);
     await page.locator('input#password').fill(DEFAULT_TEST_ACCOUNT.password);
     await page.locator('button:has-text("立即登录")').click();
     await page.waitForURL((url) => !url.toString().includes('/login'), { timeout: 20000 });

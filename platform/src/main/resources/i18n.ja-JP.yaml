@@ -302,6 +302,8 @@ auth:
   tagline: エンタープライズローコードプラットフォーム
   email: メールアドレス
   emailPlaceholder: メールアドレスを入力
+  identifier: ユーザー名またはメールアドレス
+  identifierPlaceholder: ユーザー名またはメールアドレスを入力
   password: パスワード
   passwordPlaceholder: パスワードを入力
   rememberMe: ログイン状態を保持
@@ -321,14 +323,15 @@ auth:
     dataModel: 柔軟なデータモデル
     workflow: 自動化ワークフロー
   channel:
-    emailPassword: メール＆パスワード
+    emailPassword: ユーザー名/メール＆パスワード
     sms: SMS ログイン
     emailCode: メール認証コード
   social:
     wechat: WeChat ログイン
     oidc: SSO ログイン
   error:
-    invalidCredentials: メールアドレスまたはパスワードが正しくありません
+    invalidCredentials: ユーザー名/メールアドレスまたはパスワードが正しくありません
+    identifierRequired: ユーザー名またはメールアドレスを入力してください
     invalidMobile: 有効な電話番号を入力してください
     codeRequired: 認証コードを入力してください
     codeInvalid: 認証コードが無効または期限切れです

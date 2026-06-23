@@ -135,7 +135,7 @@ test.describe('Permission Depth — URL Direct Access', () => {
       await page.goto(`${BASE_URL}/meta/models`);
       await page.waitForLoadState('domcontentloaded');
 
-      const loginForm = page.locator('input#email, input[type="email"]');
+      const loginForm = page.locator('input#identifier, input#email, input[type="email"]');
       const hasLoginForm = await loginForm.isVisible({ timeout: 5000 }).catch(() => false);
 
       const url = page.url();
@@ -153,7 +153,7 @@ test.describe('Permission Depth — URL Direct Access', () => {
       await page.goto(`${BASE_URL}/p/e2et-order`);
       await page.waitForLoadState('domcontentloaded');
 
-      const loginForm = page.locator('input#email, input[type="email"]');
+      const loginForm = page.locator('input#identifier, input#email, input[type="email"]');
       const hasLoginForm = await loginForm.isVisible({ timeout: 5000 }).catch(() => false);
 
       const url = page.url();
