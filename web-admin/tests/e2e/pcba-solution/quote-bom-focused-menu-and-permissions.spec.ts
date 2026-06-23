@@ -19,6 +19,8 @@ const BOM_WORKBENCH_PATH = '/p/bom_conversion_task_pcba_workbench';
 const BOM_REVIEW_QUEUE_PATH = '/p/bom_review_queue';
 const BOM_MATERIAL_LIBRARY_PATH = '/p/bom_material_master';
 const BOM_FORMAT_PROFILE_PATH = '/p/bom_source_format_profile';
+const BOM_MATERIAL_SYNC_COMMAND = 'bom:sync_material_incremental_now';
+const BOM_MATERIAL_SYNC_DRY_RUN = { dryRun: true };
 
 const QUOTE_PERMISSIONS = [
   'qo.quote.read',
@@ -114,10 +116,10 @@ async function expectUnavailableByDirectUrl(page: Page, path: string): Promise<v
 
 function bomProjectPayload(seed: string): Record<string, unknown> {
   return {
-    bom_pcba_code: `PCBA-${seed}`,
     bom_project_name: `E2E BOM Project ${seed}`,
-    bom_product_name: `E2E Product ${seed}`,
-    bom_project_library_source: 'manual',
+    bom_project_customer_id: `ACC-${seed}`,
+    bom_project_quality_level: 'industrial',
+    bom_pcba_code: `PCBA-${seed}`,
     bom_project_remark: `Quote/BOM role permission probe ${seed}`,
   };
 }
@@ -214,10 +216,14 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       );
       expectIncludes(
         snapshot.menuPaths,
-        [BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH, BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH],
+        [BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH],
         'bom_operator menu paths',
       );
-      expectExcludes(snapshot.menuPaths, [BOM_MATERIAL_LIBRARY_PATH], 'bom_operator menu paths');
+      expectExcludes(
+        snapshot.menuPaths,
+        [BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH, BOM_MATERIAL_LIBRARY_PATH],
+        'bom_operator menu paths',
+      );
       expectNoQuoteMenus(snapshot, 'bom_operator');
     });
 
@@ -232,13 +238,12 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       expectExcludes(snapshot.permissionCodes, QUOTE_PERMISSIONS, 'bom_admin permissions');
       expectIncludes(
         snapshot.menuPaths,
-        [
-          BOM_PROJECTS_PATH,
-          BOM_WORKBENCH_PATH,
-          BOM_REVIEW_QUEUE_PATH,
-          BOM_FORMAT_PROFILE_PATH,
-          BOM_MATERIAL_LIBRARY_PATH,
-        ],
+        [BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH, BOM_MATERIAL_LIBRARY_PATH],
+        'bom_admin menu paths',
+      );
+      expectExcludes(
+        snapshot.menuPaths,
+        [BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH],
         'bom_admin menu paths',
       );
       expectNoQuoteMenus(snapshot, 'bom_admin');
@@ -279,8 +284,14 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     await withRolePage(browser, users.bomOperator, async (page) => {
       await assertSidebarLinks(
         page,
-        [BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH, BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH],
-        [QUOTE_MENU_PATH, PRICE_LIBRARY_MENU_PATH, BOM_MATERIAL_LIBRARY_PATH],
+        [BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH],
+        [
+          QUOTE_MENU_PATH,
+          PRICE_LIBRARY_MENU_PATH,
+          BOM_REVIEW_QUEUE_PATH,
+          BOM_FORMAT_PROFILE_PATH,
+          BOM_MATERIAL_LIBRARY_PATH,
+        ],
       );
       await expectUnavailableByDirectUrl(page, QUOTE_MENU_PATH);
     });
@@ -288,14 +299,8 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     await withRolePage(browser, users.bomAdmin, async (page) => {
       await assertSidebarLinks(
         page,
-        [
-          BOM_PROJECTS_PATH,
-          BOM_WORKBENCH_PATH,
-          BOM_REVIEW_QUEUE_PATH,
-          BOM_FORMAT_PROFILE_PATH,
-          BOM_MATERIAL_LIBRARY_PATH,
-        ],
-        [QUOTE_MENU_PATH, PRICE_LIBRARY_MENU_PATH],
+        [BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH, BOM_MATERIAL_LIBRARY_PATH],
+        [QUOTE_MENU_PATH, PRICE_LIBRARY_MENU_PATH, BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH],
       );
       await expectUnavailableByDirectUrl(page, QUOTE_MENU_PATH);
     });
@@ -328,18 +333,18 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       await expectCommandNotDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
       await expectCommandNotDenied(page, 'qo_offline_material_price_common:import_excel', {});
       await expectCommandDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-quoter`));
-      await expectCommandDenied(page, 'bom:import_material_library', {});
+      await expectCommandDenied(page, BOM_MATERIAL_SYNC_COMMAND, BOM_MATERIAL_SYNC_DRY_RUN);
     });
 
     await withRolePage(browser, users.bomOperator, async (page) => {
       await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-operator`));
-      await expectCommandDenied(page, 'bom:import_material_library', {});
+      await expectCommandDenied(page, BOM_MATERIAL_SYNC_COMMAND, BOM_MATERIAL_SYNC_DRY_RUN);
       await expectCommandDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
     });
 
     await withRolePage(browser, users.bomAdmin, async (page) => {
       await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-admin`));
-      await expectCommandNotDenied(page, 'bom:import_material_library', {});
+      await expectCommandNotDenied(page, BOM_MATERIAL_SYNC_COMMAND, BOM_MATERIAL_SYNC_DRY_RUN);
       await expectCommandDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
     });
 

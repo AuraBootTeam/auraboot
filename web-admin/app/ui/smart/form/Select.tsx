@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useCallback, useState } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
 import type { SelectProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
@@ -113,11 +113,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       options: rawOptions,
       loading,
       error: dataSourceError,
+      refetch,
     } = useFieldDataSource({
       staticOptions,
       dataSource: dataSource as any,
       context,
     });
+    const [radixOpen, setRadixOpen] = useState(false);
 
     // 批量翻译 options 的 label 字段
     const options = translateArray(rawOptions || [], ['label'], locale, t);
@@ -157,6 +159,16 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       field.setValue(newValue);
     };
 
+    const handleRadixOpenChange = useCallback(
+      (open: boolean) => {
+        setRadixOpen(open);
+        if (open && dataSource && !disabledValue) {
+          void refetch();
+        }
+      },
+      [dataSource, disabledValue, refetch],
+    );
+
     // 处理清除
     const handleClearClick = () => {
       const clearedValue = multiple ? [] : '';
@@ -188,7 +200,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           <BaseSelect
             value={currentValue}
             onValueChange={handleRadixValueChange}
-            disabled={disabledValue || loading}
+            open={radixOpen}
+            onOpenChange={handleRadixOpenChange}
+            disabled={disabledValue || (loading && !radixOpen)}
           >
             <SelectTrigger
               data-testid={`select-trigger-${name}`}
