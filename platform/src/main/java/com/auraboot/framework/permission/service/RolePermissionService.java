@@ -37,6 +37,18 @@ public interface RolePermissionService {
      * @return true if successful
      */
     boolean assignPermissionsToRole(Long roleId, List<Long> permissionIds);
+
+    /**
+     * Materialize the role's default data scope for already-bound permissions.
+     *
+     * <p>This does not create or update role-permission bindings; it only inserts
+     * missing role data-scope rows and preserves explicit overrides.
+     *
+     * @param roleId Role ID
+     * @param permissionIds Permission IDs whose resource/action scopes should inherit the role default
+     * @return true if successful
+     */
+    boolean inheritDefaultDataScope(Long roleId, List<Long> permissionIds);
     
     /**
      * Remove a permission from role

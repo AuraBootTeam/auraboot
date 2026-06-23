@@ -110,6 +110,24 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             throw BusinessException.i18nWrap(e, "permission.assign_failed");
         }
     }
+
+    @Override
+    @Transactional
+    public boolean inheritDefaultDataScope(Long roleId, List<Long> permissionIds) {
+        if (permissionIds == null || permissionIds.isEmpty()) {
+            return true;
+        }
+
+        try {
+            Long tenantId = MetaContext.getCurrentTenantId();
+            inheritDefaultDataScope(tenantId, roleId, permissionIds);
+            userPermissionService.evictRoleUsers(roleId);
+            return true;
+        } catch (Exception e) {
+            log.error("继承角色默认数据范围失败: roleId={}", roleId, e);
+            throw BusinessException.i18nWrap(e, "permission.assign_failed");
+        }
+    }
     
     /**
      * Materialize the role's default data-scope tier onto newly-granted permissions. For each granted
