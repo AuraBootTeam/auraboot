@@ -626,6 +626,8 @@ CREATE TABLE IF NOT EXISTS ab_named_query (
     code TEXT NOT NULL,
     title TEXT,
     description TEXT,
+    resource_code TEXT,
+    action_code TEXT,
     from_sql TEXT,                                   -- NULL when connector_pid is set
     base_where JSONB NOT NULL DEFAULT '[]'::jsonb,
     default_order JSONB,
@@ -1197,6 +1199,9 @@ CREATE INDEX IF NOT EXISTS ix_dict_item_value ON ab_dict_item(dict_id, value);
 
 -- Named Query Indexes
 CREATE INDEX IF NOT EXISTS ix_named_query_tenant_status ON ab_named_query(tenant_id,   status);
+CREATE INDEX IF NOT EXISTS ix_named_query_data_scope_declaration
+    ON ab_named_query(tenant_id, resource_code, action_code)
+    WHERE resource_code IS NOT NULL AND action_code IS NOT NULL;
 
 -- Named Query Field Indexes
 CREATE INDEX IF NOT EXISTS ix_named_query_field_query ON ab_named_query_field(tenant_id, query_code);
@@ -1392,6 +1397,8 @@ COMMENT ON TABLE ab_dict IS '字典主表';
 COMMENT ON TABLE ab_dict_item IS '字典项表（大字典/级联字典行存储）';
 
 COMMENT ON TABLE ab_named_query IS '命名查询表';
+COMMENT ON COLUMN ab_named_query.resource_code IS 'Protected business resource for DataScope evaluation';
+COMMENT ON COLUMN ab_named_query.action_code IS 'Protected action for DataScope evaluation';
 COMMENT ON TABLE ab_named_query_field IS '查询字段表';
 COMMENT ON TABLE ab_query_operator IS '查询操作符表';
 COMMENT ON TABLE ab_query_audit_log IS '查询审计日志表';

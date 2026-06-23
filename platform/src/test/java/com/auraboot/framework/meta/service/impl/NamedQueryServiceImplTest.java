@@ -11,13 +11,17 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryFieldMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryVersionMapper;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -32,6 +36,7 @@ class NamedQueryServiceImplTest {
     private final NamedQueryRateLimiter rateLimiter = mock(NamedQueryRateLimiter.class);
     private final ApiConnectorService apiConnectorService = mock(ApiConnectorService.class);
     private final DecisionUsageIndexService usageIndexService = mock(DecisionUsageIndexService.class);
+    private final DataPermissionEngine dataPermissionEngine = mock(DataPermissionEngine.class);
 
     private final NamedQueryServiceImpl service = new NamedQueryServiceImpl(
             namedQueryMapper,
@@ -40,7 +45,8 @@ class NamedQueryServiceImplTest {
             dynamicDataMapper,
             rateLimiter,
             apiConnectorService,
-            usageIndexService);
+            usageIndexService,
+            dataPermissionEngine);
 
     @AfterEach
     void clearContext() {
@@ -57,12 +63,16 @@ class NamedQueryServiceImplTest {
         request.setTitle("Customer Lookup");
         request.setConnectorPid("api-1");
         request.setConnectorEndpointCode("lookup");
+        request.setResourceCode("customer");
+        request.setActionCode("read");
 
         service.create(request);
 
         ArgumentCaptor<NamedQuery> captor = ArgumentCaptor.forClass(NamedQuery.class);
         verify(namedQueryMapper).insert(captor.capture());
         assertThat(captor.getValue().getPid()).isNotBlank();
+        assertThat(captor.getValue().getResourceCode()).isEqualTo("customer");
+        assertThat(captor.getValue().getActionCode()).isEqualTo("read");
         verify(usageIndexService).refreshSource("NAMED_QUERY", captor.getValue().getPid());
     }
 
@@ -73,12 +83,56 @@ class NamedQueryServiceImplTest {
 
         NamedQueryUpdateRequest request = new NamedQueryUpdateRequest();
         request.setDescription("Updated");
+        request.setResourceCode("customer");
+        request.setActionCode("read");
 
         service.update("nq-1", request);
 
         assertThat(query.getDescription()).isEqualTo("Updated");
+        assertThat(query.getResourceCode()).isEqualTo("customer");
+        assertThat(query.getActionCode()).isEqualTo("read");
         verify(namedQueryMapper).updateById(query);
         verify(usageIndexService).refreshSource("NAMED_QUERY", "nq-1");
+    }
+
+    @Test
+    void executeQueryAppliesDeclaredDataScopeRowFilter() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        NamedQuery query = sqlQuery();
+        query.setResourceCode("e2et_order");
+        query.setActionCode("read");
+        when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(namedQueryFieldMapper.findByQueryCode(10L, "order_summary")).thenReturn(List.of());
+        when(rateLimiter.tryAcquire(10L, "order_summary", 60)).thenReturn(true);
+        when(dataPermissionEngine.buildRowFilter(10L, "e2et_order", "read", 20L))
+                .thenReturn("AND created_by = 20");
+        when(dynamicDataMapper.countByQueryWithoutTenant(anyString(), anyMap())).thenReturn(1L);
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
+                .thenReturn(List.of(Map.of("pid", "order-1", "created_by", 20L)));
+
+        service.executeQuery("order_summary", new com.auraboot.framework.meta.dto.NamedQueryTestRequest());
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(dynamicDataMapper).selectByQueryWithoutTenant(sqlCaptor.capture(), anyMap());
+        assertThat(sqlCaptor.getValue()).contains("created_by = 20");
+        verify(dataPermissionEngine).buildRowFilter(10L, "e2et_order", "read", 20L);
+    }
+
+    @Test
+    void executeQueryDoesNotClaimDataScopeWhenDeclarationMissing() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        NamedQuery query = sqlQuery();
+        when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(namedQueryFieldMapper.findByQueryCode(10L, "order_summary")).thenReturn(List.of());
+        when(rateLimiter.tryAcquire(10L, "order_summary", 60)).thenReturn(true);
+        when(dynamicDataMapper.countByQueryWithoutTenant(anyString(), anyMap())).thenReturn(1L);
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
+                .thenReturn(List.of(Map.of("pid", "order-1")));
+
+        service.executeQuery("order_summary", new com.auraboot.framework.meta.dto.NamedQueryTestRequest());
+
+        verify(dataPermissionEngine, org.mockito.Mockito.never())
+                .buildRowFilter(any(), any(), any(), any());
     }
 
     @Test
@@ -154,6 +208,17 @@ class NamedQueryServiceImplTest {
         query.setTitle("Customer Lookup");
         query.setConnectorPid("api-1");
         query.setConnectorEndpointCode("lookup");
+        query.setStatus("draft");
+        return query;
+    }
+
+    private NamedQuery sqlQuery() {
+        NamedQuery query = new NamedQuery();
+        query.setPid("nq-1");
+        query.setTenantId(10L);
+        query.setCode("order_summary");
+        query.setTitle("Order Summary");
+        query.setFromSql("mt_e2et_order WHERE tenant_id = #{params.tenantId}");
         query.setStatus("draft");
         return query;
     }

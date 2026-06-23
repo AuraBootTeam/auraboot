@@ -51,6 +51,17 @@ public class NamedQueryDefinitionDTO {
     private String description;
 
     /**
+     * Protected business resource used for DataScope calculation.
+     * Optional; when absent, the named query is not marked as DataScope-protected.
+     */
+    private String resourceCode;
+
+    /**
+     * Protected action used with resourceCode, usually "read".
+     */
+    private String actionCode;
+
+    /**
      * FROM SQL clause.
      * Required.
      */

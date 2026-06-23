@@ -4,6 +4,8 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.AggregateQueryRequest;
 import com.auraboot.framework.meta.dto.AggregateQueryResponse;
 import com.auraboot.framework.meta.dto.MetricConfig;
+import com.auraboot.framework.meta.entity.NamedQuery;
+import com.auraboot.framework.meta.entity.NamedQueryField;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryFieldMapper;
@@ -28,8 +30,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class AggregateQueryServiceImplDataScopeTest {
@@ -91,6 +95,44 @@ class AggregateQueryServiceImplDataScopeTest {
                 .hasMessageContaining("Data permission evaluation failed");
     }
 
+    @Test
+    @DisplayName("all scope keeps dynamic aggregates tenant-aware instead of bypassing tenant isolation")
+    void dynamicAggregate_allScopeUsesTenantAwareMapper() {
+        when(metaModelService.getTableName(MODEL_CODE)).thenReturn("mt_phase_one_model");
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID)).thenReturn("");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("");
+        when(dynamicDataMapper.selectByQuery(anyString(), anyMap()))
+                .thenReturn(List.of(Map.of("total", 2L)));
+
+        AggregateQueryResponse response = service.execute(countRequest());
+
+        assertThat(response.getRows()).hasSize(1);
+        verify(dynamicDataMapper).selectByQuery(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+    }
+
+    @Test
+    @DisplayName("named query chart aggregate must include declared DataScope row filter")
+    void namedQueryAggregate_appliesDeclaredDataScopeRowFilter() {
+        NamedQuery query = namedQuery();
+        when(namedQueryMapper.findByCode("phase_one_summary")).thenReturn(query);
+        when(namedQueryFieldMapper.selectList(any())).thenReturn(List.of(
+                new NamedQueryField(TENANT_ID, "phase_one_summary", "id", "id", "integer")
+        ));
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "read", USER_ID))
+                .thenReturn("AND created_by = 20");
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
+                .thenReturn(List.of(Map.of("total", 1L)));
+
+        AggregateQueryResponse response = service.execute(namedQueryCountRequest());
+
+        assertThat(response.getRows()).hasSize(1);
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(dynamicDataMapper).selectByQueryWithoutTenant(sqlCaptor.capture(), anyMap());
+        assertThat(sqlCaptor.getValue()).contains("created_by = 20");
+        verify(dataPermissionEngine).buildRowFilter(TENANT_ID, MODEL_CODE, "read", USER_ID);
+    }
+
     private AggregateQueryRequest countRequest() {
         MetricConfig metric = new MetricConfig();
         metric.setField("id");
@@ -101,5 +143,25 @@ class AggregateQueryServiceImplDataScopeTest {
         request.setModelCode(MODEL_CODE);
         request.setMetrics(List.of(metric));
         return request;
+    }
+
+    private AggregateQueryRequest namedQueryCountRequest() {
+        AggregateQueryRequest request = countRequest();
+        request.setType("namedQuery");
+        request.setModelCode(null);
+        request.setQueryCode("phase_one_summary");
+        return request;
+    }
+
+    private NamedQuery namedQuery() {
+        NamedQuery query = new NamedQuery();
+        query.setTenantId(TENANT_ID);
+        query.setCode("phase_one_summary");
+        query.setTitle("Phase One Summary");
+        query.setFromSql("mt_phase_one_model WHERE tenant_id = #{params.tenantId}");
+        query.setStatus("draft");
+        query.setResourceCode(MODEL_CODE);
+        query.setActionCode("read");
+        return query;
     }
 }
