@@ -10,11 +10,13 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -59,7 +61,8 @@ class DeclaredAgentToolResolverTest {
                         "display_name", "Create Activity",
                         "agent_hint", "Create a CRM activity",
                         "model_code", "crm_activity_common",
-                        "input_schema", "{\"type\":\"object\",\"properties\":{\"crm_act_subject\":{\"type\":\"string\"}}}",
+                        "input_schema", "{\"type\":\"object\","
+                                + "\"properties\":{\"crm_act_subject\":{\"type\":\"string\"}}}",
                         "execution_config", "{}",
                         "cmd_risk_level", "L1"
                 )));
@@ -79,8 +82,14 @@ class DeclaredAgentToolResolverTest {
     void onlyReturnsDeclaredCodesNotEveryDiscoveredTool() {
         when(mapper.selectByQuery(anyString(), any()))
                 .thenReturn(List.of(Map.of("model_code", "crm_activity_common")));
-        ToolDefinition wanted = ToolDefinition.builder().toolCode("cmd:crm:create_activity").providerCode("dsl").build();
-        ToolDefinition other = ToolDefinition.builder().toolCode("cmd:crm:delete_activity").providerCode("dsl").build();
+        ToolDefinition wanted = ToolDefinition.builder()
+                .toolCode("cmd:crm:create_activity")
+                .providerCode("dsl")
+                .build();
+        ToolDefinition other = ToolDefinition.builder()
+                .toolCode("cmd:crm:delete_activity")
+                .providerCode("dsl")
+                .build();
         when(registry.discoverAll(any())).thenReturn(List.of(wanted, other));
 
         List<ToolDefinition> resolved = resolver.resolveDeclaredTools(
@@ -114,6 +123,59 @@ class DeclaredAgentToolResolverTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) tool.getParameterSchema().get("properties");
         assertThat(properties).containsKey("recordPid");
+    }
+
+    @Test
+    void resolvesDeclaredCustomToolDirectlyWhenAggregateDiscoveryMissesIt() {
+        List<ToolDefinition> cappedOut = IntStream.range(0, 100)
+                .mapToObj(i -> ToolDefinition.builder()
+                        .toolCode("custom:unrelated_" + i)
+                        .providerCode("custom")
+                        .build())
+                .toList();
+        when(registry.discoverAll(any())).thenReturn(cappedOut);
+        when(mapper.selectByQueryWithoutTenant(
+                argThat(sql -> sql != null && sql.contains("FROM ab_agent_tool")),
+                any()))
+                .thenReturn(List.of(Map.of(
+                        "tool_code", "send_customer_reply",
+                        "tool_name", "Send Customer Reply",
+                        "tool_description", "Send a professional customer email reply",
+                        "tool_type", "built_in",
+                        "input_schema", "{\"type\":\"object\","
+                                + "\"properties\":{\"recipient_email\":{\"type\":\"string\"}}}",
+                        "requires_approval", true,
+                        "risk_level", "L2"
+                )));
+
+        List<ToolDefinition> resolved = resolver.resolveDeclaredTools(
+                7L, 1L, "cs_agent", List.of("custom:send_customer_reply"));
+
+        assertThat(resolved).hasSize(1);
+        ToolDefinition tool = resolved.getFirst();
+        assertThat(tool.getToolCode()).isEqualTo("custom:send_customer_reply");
+        assertThat(tool.getProviderCode()).isEqualTo("custom");
+        assertThat(tool.getToolType()).isEqualTo("built_in");
+        assertThat(tool.isRequiresApproval()).isTrue();
+        assertThat(tool.getRiskLevel()).isEqualTo("L2");
+        assertThat(tool.getParameterSchema()).containsEntry("type", "object");
+    }
+
+    @Test
+    void resolvesDeclaredProviderToolByProviderDiscoveryWhenAggregateDiscoveryMissesIt() {
+        when(registry.discoverAll(any())).thenReturn(List.of());
+        ToolDefinition delegated = ToolDefinition.builder()
+                .toolCode("platform.delegate_task")
+                .providerCode("platform")
+                .toolType("platform")
+                .build();
+        when(registry.discoverByProvider(eq("platform"), any())).thenReturn(List.of(delegated));
+
+        List<ToolDefinition> resolved = resolver.resolveDeclaredTools(
+                7L, 1L, "planner", List.of("platform.delegate_task"));
+
+        assertThat(resolved).extracting(ToolDefinition::getToolCode)
+                .containsExactly("platform.delegate_task");
     }
 
     @Test
