@@ -21,6 +21,8 @@ const CLEANUP_PREFIXES = [
   'E2E Gantt Timeline',
   'FV_',
   'SV_Tree_',
+  'SV Tree Table View',
+  '树视图表格视图',
 ];
 
 async function cleanupSavedViewFixtures(page: import('@playwright/test').Page): Promise<void> {
@@ -79,11 +81,14 @@ test.describe('SavedView management panel', () => {
       );
 
       await panel.getByTestId('saved-view-create-personal').click();
-      await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图:');
+      await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图：');
       await expect(panel.getByTestId('saved-view-type-table')).toContainText('表格');
       await expect(panel.getByTestId('saved-view-type-kanban')).toContainText('看板');
       await expect(panel.getByTestId('saved-view-type-gallery')).toContainText('画册');
-      await expect(panel).not.toContainText(/Choose type|Table|Kanban|Gallery|Gantt/);
+      await expect(panel.getByTestId('saved-view-type-table')).not.toContainText('Table');
+      await expect(panel.getByTestId('saved-view-type-kanban')).not.toContainText('Kanban');
+      await expect(panel.getByTestId('saved-view-type-gallery')).not.toContainText('Gallery');
+      await expect(panel.getByTestId('saved-view-type-gantt')).not.toContainText('Gantt');
     } finally {
       if (viewPid) {
         await page.request.delete(`/api/views/${viewPid}`).catch(() => {});

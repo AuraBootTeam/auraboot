@@ -344,7 +344,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   }, [manageSearchTerm, personalViews]);
   const personalViewCount = countPersonalManualViews(views);
   const personalLimitReached = personalViewCount >= PERSONAL_VIEW_LIMIT;
-  const quotaText = tx('common.saved_view_personal_quota', '个人视图: {count}/{limit}', {
+  const quotaText = tx('common.saved_view_personal_quota', '个人视图：{count}/{limit}', {
     count: personalViewCount,
     limit: PERSONAL_VIEW_LIMIT,
   });
@@ -755,7 +755,8 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                               {' '}
                               {tx(
                                 'common.saved_view_personal_quota_reached',
-                                '已达到个人视图上限，请删除不需要的视图后再新建。',
+                                '已达到 {limit} 个个人视图上限，请删除或复用已有视图',
+                                { limit: PERSONAL_VIEW_LIMIT },
                               )}
                             </span>
                           )}
@@ -854,7 +855,8 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                           {' '}
                           {tx(
                             'common.saved_view_personal_quota_reached',
-                            '已达到个人视图上限，请删除不需要的视图后再新建。',
+                            '已达到 {limit} 个个人视图上限，请删除或复用已有视图',
+                            { limit: PERSONAL_VIEW_LIMIT },
                           )}
                         </span>
                       )}

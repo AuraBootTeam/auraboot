@@ -72,7 +72,7 @@ async function openTypePicker(page: Page) {
   const newViewBtn = page.getByTestId('saved-view-create-personal');
   await expect(newViewBtn).toBeVisible({ timeout: 5_000 });
   await newViewBtn.click();
-  await expect(page.getByTestId('saved-view-quota-status')).toContainText('个人视图:', {
+  await expect(page.getByTestId('saved-view-quota-status')).toContainText('个人视图：', {
     timeout: 5_000,
   });
 }

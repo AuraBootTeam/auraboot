@@ -114,9 +114,14 @@ export async function ensureSidebarExpanded(page: Page): Promise<void> {
  * @param page - Playwright page
  * @param pageKey - The dynamic page key (e.g. 'quarry_daily_report')
  */
-export async function navigateToDynamicPage(page: Page, pageKey: string): Promise<void> {
+export async function navigateToDynamicPage(
+  page: Page,
+  pageKey: string,
+  options: { viewPid?: string } = {},
+): Promise<void> {
   const normalizedPageKey = normalizeDynamicPageKey(pageKey);
-  const tableViewPid = await resolveTableSavedViewPid(page, normalizedPageKey, normalizedPageKey);
+  const tableViewPid =
+    options.viewPid ?? (await resolveTableSavedViewPid(page, normalizedPageKey, normalizedPageKey));
   const query = tableViewPid ? `?view=${encodeURIComponent(tableViewPid)}` : '';
   // Set up list API listener BEFORE navigation so we catch the response
   const listResponsePromise = page

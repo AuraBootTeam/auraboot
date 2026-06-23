@@ -172,7 +172,7 @@ async function createTableViewThroughUi(page: Page): Promise<string> {
     { timeout: 5000 },
   );
   await page.getByTestId('saved-view-create-personal').click();
-  await expect(page.getByTestId('saved-view-quota-status')).toContainText('个人视图:');
+  await expect(page.getByTestId('saved-view-quota-status')).toContainText('个人视图：');
   await page.getByTestId('saved-view-type-table').click();
   const response = await responsePromise;
   expect(response.ok()).toBeTruthy();
@@ -354,8 +354,10 @@ test.describe.serial('SavedView Personal-only management', () => {
     await navigateToOrderViaSidebar(page);
     await openManagePanel(page);
     await page.getByTestId('saved-view-create-personal').click();
-    await expect(page.getByTestId('saved-view-quota-status')).toContainText('个人视图: 10/10');
-    await expect(page.getByTestId('saved-view-quota-limit-reached')).toContainText('已达到个人视图上限');
+    await expect(page.getByTestId('saved-view-quota-status')).toContainText('个人视图：10/10');
+    await expect(page.getByTestId('saved-view-quota-limit-reached')).toContainText(
+      '已达到 10 个个人视图上限',
+    );
     await expect(page.getByTestId('saved-view-type-table')).toBeDisabled();
     await page.screenshot({ path: `${SHOTS}/07-personal-quota.png`, fullPage: true });
   });
