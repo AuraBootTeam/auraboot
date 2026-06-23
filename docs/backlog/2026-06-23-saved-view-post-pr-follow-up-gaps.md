@@ -78,7 +78,7 @@ Dynamic business record pid-only migration has been removed from this SavedView 
 
 | Gap | 外部原因 | 当前分支规则 |
 | --- | --- | --- |
-| GAP-SV-FU-004 | UserRole legacy ID endpoint 退役需要 telemetry、兼容窗口、OpenAPI 策略 | 当前分支不删除兼容端点 |
+| GAP-SV-FU-004 | UserRole legacy ID endpoint 退役需要 telemetry、兼容窗口、OpenAPI 策略 | in progress in `codex/user-role-pid-endpoint-deprecation`: runtime warning headers/logs added; hard removal still pending zero-usage window |
 | GAP-SV-FU-006 | audit actorPid 查询和 internal actor id 边界属于审计公共契约治理 | done in `codex/public-record-pid-latest-repair-v2`: public `actorPid` query added; legacy `actorId` remains compatibility-only |
 | GAP-SV-FU-010 | 文档/OpenAPI pid 清理依赖平台迁移命名决策 | 等 migration 决策落地后再统一清理 |
 
@@ -112,7 +112,7 @@ These follow-up gaps come from the Feishu parity analysis and the subsequent PR 
 
 | Gap | Reason for exclusion from current branch | Source of truth |
 | --- | --- | --- |
-| GAP-SV-FU-004 ID-based UserRole mutation endpoint retirement | pid/code 契约治理,需要兼容窗口、运行时 telemetry 和 OpenAPI deprecation 策略 | 本文档保留 backlog,开发单独分支 |
+| GAP-SV-FU-004 ID-based UserRole mutation endpoint retirement | pid/code 契约治理,需要兼容窗口、运行时 telemetry 和 OpenAPI deprecation 策略 | runtime deprecation signal branch in progress; hard removal remains separate |
 | GAP-SV-FU-006 Audit actor public query contract | `actorPid`/internal actor id 边界属于审计公共契约治理,应和 pid migration 统一口径 | done in separate audit/public-contract branch; keep `actorId` compatibility until deprecation policy removes it |
 | GAP-SV-FU-010 Documentation/OpenAPI pid cleanup | 依赖 pid migration 完成后的全局命名和 OpenAPI 决策 | 跟随 pid migration 后置收口 |
 
@@ -153,7 +153,7 @@ These follow-up gaps come from the Feishu parity analysis and the subsequent PR 
 | --- | --- | --- | --- | --- | --- | --- |
 | GAP-SV-FU-002 | P0 | WP1 | SavedView backend/frontend/E2E | done | model/page field metadata availability | Backend negative tests, frontend reason types, E2E invalid mapping evidence |
 | GAP-SV-FU-003 | P0 | WP2 | SavedView E2E governance | done | existing historical specs and fixture routes | `FEATURE_MATRIX.md`, direct-route audit, e2e-truth notes |
-| GAP-SV-FU-004 | External P1 | UserRole pid endpoint retirement | RBAC/API governance | blocked_external | legacy caller telemetry and compatibility window | Deprecation telemetry, docs, zero-usage evidence before removal |
+| GAP-SV-FU-004 | External P1 | UserRole pid endpoint retirement | RBAC/API governance | in_progress | legacy caller telemetry and compatibility window | Runtime deprecation headers/logs now covered by `UserRoleControllerTest`; removal still needs zero-usage evidence |
 | GAP-SV-FU-005 | P1 | WP3 | SavedView sharing UX/API | done | collaborator validator, audit event shape | Share panel E2E, backend ACL tests, audit row evidence |
 | GAP-SV-FU-006 | External P1 | Audit public actor query | Audit/API governance | done | actorPid query contract and admin/public split | `AuditTrailControllerTest`, `AuditTrailServiceTest`, OpenAPI parameter descriptions |
 | GAP-SV-FU-007 | P1 | WP4 | SavedView quota UX/tests | done | manual view limits from count-limit branch | Limit UI tests, quota-safe fixture helper, reuse evidence |
@@ -250,7 +250,7 @@ The table below is the actionable backlog. `Evidence owner` means where the clos
 | SV-WP5-A | GAP-SV-FU-008 | Keep quick preset provider registry and conflict/duplicate tests | unit tests | done |
 | SV-WP5-B | GAP-SV-FU-008 | Prove saved/edited/reset lifecycle from real list-page entry | follow-up golden E2E + screenshot | done |
 | SV-WP5-C | GAP-SV-FU-008 | Tie normal rename/delete management paths back to personal preset copy lifecycle in the matrix | feature matrix | done |
-| SV-EXT-B | GAP-SV-FU-004 | Add UserRole legacy endpoint telemetry/deprecation window before removal | separate RBAC/API branch | blocked_external |
+| SV-EXT-B | GAP-SV-FU-004 | Add UserRole legacy endpoint telemetry/deprecation window before removal | separate RBAC/API branch | runtime_signal_done; removal window pending |
 | SV-EXT-C | GAP-SV-FU-006 | Add public `actorPid` audit query and document internal/admin split | separate audit branch | done in `codex/public-record-pid-latest-repair-v2` |
 | SV-EXT-D | GAP-SV-FU-010 | Clean docs/OpenAPI pid language after migration naming settles | follow-up docs branch | blocked_external |
 
@@ -411,7 +411,7 @@ Current branch note: `FEATURE_MATRIX.md` and timeline direct-route cleanup are c
 
 | External gap | Required follow-up | Current branch rule |
 | --- | --- | --- |
-| GAP-SV-FU-004 UserRole legacy ID endpoint retirement | Add telemetry/warning headers/docs, prove zero first-party legacy callers, then remove or admin-gate deprecated endpoints | Do not remove compatibility endpoints in this branch |
+| GAP-SV-FU-004 UserRole legacy ID endpoint retirement | Add telemetry/warning headers/docs, prove zero first-party legacy callers, then remove or admin-gate deprecated endpoints | runtime warning headers/logs added in `codex/user-role-pid-endpoint-deprecation`; do not remove compatibility endpoints yet |
 | GAP-SV-FU-006 Audit actor public query | Add `actorPid` public query and document admin/internal actor-id boundary | done in `codex/public-record-pid-latest-repair-v2`; legacy `actorId` stays only as deprecated compatibility |
 | GAP-SV-FU-010 Docs/OpenAPI pid cleanup | Rewrite public examples after pid migration naming decisions settle | Do not mass-rename docs before platform migration contract is final |
 
@@ -484,7 +484,7 @@ Acceptance criteria:
 
 ### GAP-SV-FU-004: ID-Based UserRole Mutation Endpoint Retirement
 
-Status: blocked_external.
+Status: in_progress.
 
 Current state:
 
@@ -496,11 +496,19 @@ Current state:
   - existing `/assign-by-code` and `/assign-by-pid`
 - Old ID-based mutation endpoints remain and are marked `@Deprecated`.
 - E2E setup now uses `memberPid + rolePids` where touched.
+- Legacy ID mutation endpoints emit runtime deprecation headers:
+  - `Deprecation: true`
+  - `X-Aura-Deprecated-Endpoint`
+  - `X-Aura-Replacement-Endpoint`
+  - `Warning: 299 AuraBoot "..."`
+- Legacy ID mutation endpoints log tenant/user/path usage for compatibility-window telemetry.
+- OpenAPI marks the legacy mutation operations as deprecated.
 
 Gap:
 
-- Deprecation is currently source-level only.
-- There is no runtime telemetry, warning header, OpenAPI deprecation note, or removal date.
+- Hard removal/admin-gating is still not allowed until the compatibility window has zero-usage evidence.
+- There is no dashboard/query yet for aggregated legacy endpoint usage.
+- There is no removal date yet.
 - Internal scripts or older admin clients may still call numeric-id endpoints without visibility.
 
 Target behavior:
@@ -512,7 +520,8 @@ Target behavior:
 
 Acceptance criteria:
 
-- Dashboard/query can show legacy endpoint usage by tenant/caller.
+- Runtime deprecation signal is covered by `UserRoleControllerTest.legacyIdMutationEndpoints_emitDeprecationHeaders`.
+- Dashboard/query can show legacy endpoint usage by tenant/caller before removal.
 - CI or API docs gate prevents new first-party code from calling legacy ID endpoints.
 - Removal PR has usage evidence showing zero or accepted residual legacy callers.
 
