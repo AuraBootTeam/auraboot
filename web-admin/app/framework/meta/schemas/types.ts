@@ -665,6 +665,16 @@ export interface UnifiedSchema {
 
   // Page-level extension properties (e.g., showShare, showReport for detail pages)
   extension?: Record<string, any>;
+
+  /**
+   * Optional override for the edit-mode record-prefill fetch. When set, the form
+   * loads the existing record from this endpoint instead of the default
+   * `/api/dynamic/<modelCode>/<recordPid>`. Required for skipTableCreation models
+   * whose reads are served by a custom REST endpoint (e.g. `/api/qr/{recordPid}`).
+   * `{recordPid}` / `${recordPid}` / `{pid}` / `${pid}` in `endpoint` are
+   * interpolated with the URL record pid.
+   */
+  recordSource?: { endpoint: string; method?: string };
 }
 
 export interface ThemeConfig {
