@@ -1,136 +1,164 @@
 /**
- * E2E Test: SavedView GALLERY View
+ * E2E Test: SavedView GALLERY capability gate
  *
- * Tests Gallery card grid view features.
- *
- * Prerequisites: e2et-order page must exist (created by init setup).
- * Gallery view is selected via ViewSelector dropdown after creating a gallery saved view.
+ * e2et_order intentionally has no image/file/avatar field. The gallery view
+ * creation path must show a blocked diagnostic instead of creating a
+ * half-configured SavedView that cannot render.
  *
  * @since 7.0.0
  */
 
-import { test, expect } from '@playwright/test';
-import { navigateToDynamicPage, uniqueId } from '../helpers';
+import { test, expect, type APIRequestContext } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import {
+  navigateToDynamicPage,
+  openSavedViewManagePanel,
+  uniqueId,
+  viewSelectorTrigger,
+} from '../helpers';
 
-const VIEW_NAME = 'E2E Gallery View';
-const MODEL_CODE = 'e2et_order';
-const PAGE_KEY = 'e2et_order';
+const ROUTE_PAGE_KEY = 'e2et_order';
+const SHOWCASE_PAGE_KEY = 'showcase_all_fields';
+const GALLERY_IMAGE_FIELD = 'sc_attachment_file';
+const GALLERY_TITLE_FIELD = 'sc_name';
+const SCREENSHOT_DIR = 'test-results/saved-view-vnext';
+const GALLERY_IMAGE_DATA_URI =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'%3E%3Cpath fill='%232563eb' d='M0 0h2v2H0z'/%3E%3C/svg%3E";
 
-/** Navigate to e2et-order page and select the gallery view via ViewManagePanel */
-async function gotoAndSelectGalleryView(page: import('@playwright/test').Page) {
-  await navigateToDynamicPage(page, PAGE_KEY);
-  // Wait for the list page content to be visible (table renders by default)
-  await page.locator('table, [role="table"], [data-testid="dynamic-list"]').first().waitFor({ state: 'visible', timeout: 15000 });
+interface SeededShowcaseRecord {
+  pid: string;
+  scName: string;
+}
 
-  // Click ViewSelector button to open ViewManagePanel (slide-out dialog)
-  const viewSelector = page.locator('button[aria-haspopup="listbox"]');
-  await viewSelector.click();
-  const panel = page.locator('[role="dialog"]');
-  await panel.waitFor({ state: 'visible', timeout: 5000 });
-  // Find and click the gallery view by name in the panel
-  const viewOption = panel.getByText(VIEW_NAME, { exact: false }).first();
-  await viewOption.waitFor({ state: 'visible', timeout: 5000 });
-  await viewOption.click();
-  // Close the panel after selecting the view (panel does not auto-close)
-  const closeBtn = panel.locator('button[aria-label="Close panel"]');
-  if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await closeBtn.click();
-  }
-  await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+async function seedShowcaseGalleryRecord(
+  request: APIRequestContext,
+  label: string,
+): Promise<SeededShowcaseRecord> {
+  const scName = `SV Gallery ${label} ${uniqueId('GALLERY')}`;
+  const resp = await request.post('/api/meta/commands/execute/sc:create_showcase', {
+    data: {
+      operationType: 'create',
+      payload: {
+        sc_name: scName,
+        sc_description: 'SavedView Gallery positive fixture with a native file data URI',
+        sc_quantity: 7,
+        sc_price: 12.34,
+        sc_priority: 'medium',
+        sc_category: 'electronics',
+        [GALLERY_IMAGE_FIELD]: GALLERY_IMAGE_DATA_URI,
+      },
+    },
+  });
+  const body = await resp.json().catch(async () => resp.text().catch(() => null));
+  expect(resp.ok(), `Create showcase gallery seed failed: ${resp.status()} ${JSON.stringify(body)}`).toBe(true);
+  expect((body as { code?: string })?.code, `Create showcase seed non-zero: ${JSON.stringify(body)}`).toBe('0');
+  const pid = (body as { data?: { data?: { recordId?: string } } })?.data?.data?.recordId;
+  expect(pid, `Created showcase gallery seed missing recordId: ${JSON.stringify(body)}`).toBeTruthy();
+  return { pid: pid!, scName };
 }
 
 test.describe('SavedView — GALLERY View', () => {
-  let galleryViewPid = '';
+  test('SV-030: GALLERY — blocks creation when no image field exists @smoke', async ({
+    page,
+  }) => {
+    await navigateToDynamicPage(page, ROUTE_PAGE_KEY);
+    await expect(
+      page.locator('table, [role="table"], [data-testid="dynamic-list"]').first(),
+    ).toBeVisible({ timeout: 15000 });
 
-  test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({
-      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
-    });
-    const page = await context.newPage();
-
-    // Clean up leftover views from previous runs
-    const existing = await page.request.get(
-      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
-    );
-    if (existing.ok()) {
-      const body = await existing.json();
-      for (const v of (body.data ?? []).filter(
-        (v: any) => v.viewType === 'gallery' && v.name === VIEW_NAME,
-      )) {
-        await page.request.delete(`/api/views/${v.pid}`).catch(() => {});
+    const createRequests: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (request.method() === 'POST' && url.pathname === '/api/views') {
+        createRequests.push(request.postData() ?? '');
       }
-    }
+    });
 
-    // Create GALLERY SavedView via API
-    const viewResp = await page.request.post('/api/views', {
-      data: {
-        name: VIEW_NAME,
-        modelCode: MODEL_CODE,
-        pageKey: PAGE_KEY,
-        viewType: 'gallery',
-        scope: 'global',
-        viewConfig: {
-          galleryTitleField: 'e2et_order_title',
-        },
+    const panel = await openSavedViewManagePanel(page);
+    await panel.getByRole('button', { name: /New View/i }).click();
+    await expect(panel.getByText('Choose type')).toBeVisible();
+    await panel.locator('.grid button').filter({ hasText: 'Gallery' }).click();
+
+    const blocked = panel.getByTestId('view-capability-blocked-gallery');
+    await expect(blocked).toBeVisible({ timeout: 5000 });
+    await expect(blocked).toContainText(/image|file|attachment|avatar|cover/i);
+    await expect(panel.locator('[role="alert"]').first()).toContainText(/Gallery requires/i);
+    expect(createRequests).toHaveLength(0);
+
+    await mkdir(SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/gallery-capability-blocked.png`,
+      fullPage: true,
+    });
+  });
+
+  test('SV-032: GALLERY — creates and renders image cards when an image field exists @smoke', async ({
+    page,
+    request,
+  }) => {
+    const seed = await seedShowcaseGalleryRecord(request, 'Positive');
+
+    await navigateToDynamicPage(page, SHOWCASE_PAGE_KEY);
+    await expect(page.getByText(seed.scName)).toBeVisible({ timeout: 15000 });
+
+    const createPayloads: Array<Record<string, unknown>> = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (request.method() === 'POST' && url.pathname === '/api/views') {
+        const body = request.postData();
+        createPayloads.push(body ? JSON.parse(body) : {});
+      }
+    });
+
+    const panel = await openSavedViewManagePanel(page);
+    await panel.getByRole('button', { name: /New View/i }).click();
+    await expect(panel.getByText('Choose type')).toBeVisible();
+    await panel.locator('.grid button').filter({ hasText: 'Gallery' }).click();
+
+    await expect(panel.getByText(/Configure Gallery View/i)).toBeVisible({ timeout: 5000 });
+    const selects = panel.locator('select');
+    await selects.first().selectOption(GALLERY_IMAGE_FIELD);
+    await selects.nth(1).selectOption(GALLERY_TITLE_FIELD);
+
+    const done = panel.getByRole('button', { name: /^Done$/i });
+    await expect(done).toBeEnabled();
+
+    const createResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/views',
+      { timeout: 10000 },
+    );
+
+    await done.click();
+    const createResponse = await createResponsePromise;
+    expect(createResponse.ok(), `create Gallery view failed: ${createResponse.status()}`).toBe(true);
+
+    await expect(panel).toBeHidden({ timeout: 10000 });
+    expect(createPayloads).toHaveLength(1);
+    expect(createPayloads[0]).toMatchObject({
+      viewType: 'gallery',
+      viewConfig: {
+        galleryImageField: GALLERY_IMAGE_FIELD,
+        galleryTitleField: GALLERY_TITLE_FIELD,
       },
     });
-    if (viewResp.ok()) {
-      const body = await viewResp.json();
-      galleryViewPid = body.data?.pid ?? body.pid ?? '';
-    }
 
-    await context.close();
-  });
-
-  test.afterAll(async ({ browser }) => {
-    const context = await browser.newContext({
-      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    await expect(viewSelectorTrigger(page)).toHaveAttribute('data-current-view-type', 'gallery', {
+      timeout: 10000,
     });
-    const page = await context.newPage();
-    if (galleryViewPid) {
-      await page.request.delete(`/api/views/${galleryViewPid}`).catch(() => {});
-    }
-    const cleanup = await page.request.get(
-      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
-    );
-    if (cleanup.ok()) {
-      const body = await cleanup.json();
-      for (const v of (body.data ?? []).filter(
-        (v: any) => v.viewType === 'gallery' && v.name === VIEW_NAME,
-      )) {
-        await page.request.delete(`/api/views/${v.pid}`).catch(() => {});
-      }
-    }
-    await context.close();
-  });
+    const gallery = page.getByTestId('gallery-view');
+    await expect(gallery).toBeVisible({ timeout: 15000 });
+    await expect(gallery.getByText(seed.scName)).toBeVisible({ timeout: 15000 });
+    const image = gallery.getByRole('img', { name: seed.scName });
+    await expect(image).toBeVisible();
+    await expect(image).toHaveAttribute('src', /data:image\/svg\+xml/);
+    await expect(page.getByTestId('ab:list:showcase_all_fields:table')).toBeHidden();
 
-  test('SV-030: GALLERY — card grid renders @smoke', async ({ page }) => {
-    await gotoAndSelectGalleryView(page);
-
-    // Should show gallery grid or unconfigured message
-    const content = page
-      .locator('.grid, [data-testid="gallery-view"], [class*="gallery"]')
-      .or(page.getByText('Gallery not configured'))
-      .or(page.getByText('not configured'));
-    await expect(content.first()).toBeVisible({ timeout: 8000 });
-  });
-
-  test('SV-031: GALLERY — card field configuration', async ({ page }) => {
-    await gotoAndSelectGalleryView(page);
-
-    // Wait for gallery content or unconfigured message
-    const galleryContainer = page
-      .locator('[data-testid="gallery-view"], [class*="gallery"], .grid')
-      .first();
-    const hasGallery = await galleryContainer.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!hasGallery) {
-      test.skip(true, 'Gallery view not configured — no image field mapped for this model');
-      return;
-    }
-
-    // If gallery is configured, cards should show field values
-    const cards = page.locator('[class*="card"], [class*="gallery-item"]');
-    const count = await cards.count();
-    expect(count >= 0).toBe(true);
+    await mkdir(SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/gallery-view-rendered.png`,
+      fullPage: true,
+    });
   });
 });

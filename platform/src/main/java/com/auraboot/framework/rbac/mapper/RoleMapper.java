@@ -30,6 +30,45 @@ public interface RoleMapper extends BaseMapper<Role> {
     Role findByPid(@Param("pid") String pid);
 
     /**
+     * Find a role by PID within a tenant.
+     */
+    @Select("""
+        SELECT *
+        FROM ab_role
+        WHERE tenant_id = #{tenantId}
+          AND pid = #{pid}
+          AND (deleted_flag = false OR deleted_flag IS NULL)
+        LIMIT 1
+        """)
+    Role findByTenantIdAndPid(@Param("tenantId") Long tenantId, @Param("pid") String pid);
+
+    /**
+     * Find a role by internal ID within a tenant.
+     */
+    @Select("""
+        SELECT *
+        FROM ab_role
+        WHERE tenant_id = #{tenantId}
+          AND id = #{id}
+          AND (deleted_flag = false OR deleted_flag IS NULL)
+        LIMIT 1
+        """)
+    Role findByTenantIdAndId(@Param("tenantId") Long tenantId, @Param("id") Long id);
+
+    /**
+     * Find a role by code within a tenant.
+     */
+    @Select("""
+        SELECT *
+        FROM ab_role
+        WHERE tenant_id = #{tenantId}
+          AND code = #{code}
+          AND (deleted_flag = false OR deleted_flag IS NULL)
+        LIMIT 1
+        """)
+    Role findByTenantIdAndCode(@Param("tenantId") Long tenantId, @Param("code") String code);
+
+    /**
      * 根据租户ID查询角色列表
      */
     @Select("SELECT * FROM ab_role WHERE tenant_id = #{tenantId} AND deleted_flag = false ORDER BY priority ASC, created_at DESC")

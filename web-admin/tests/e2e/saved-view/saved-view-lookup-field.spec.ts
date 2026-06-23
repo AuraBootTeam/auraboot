@@ -8,6 +8,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
+const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
+
 async function fetchList(page: Page, modelCode: string): Promise<any> {
   const slug = modelCode;
   const resp = await page.request.get(`/api/dynamic/${slug}/list?pageNum=1&pageSize=5`);
@@ -22,7 +24,7 @@ test.describe('Lookup Field Type (GAP-124)', () => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
-    // Fetch e2et_order list — e2et_customer_id is a REFERENCE field
+    // Fetch e2et_order list — e2et_order_customer is a REFERENCE field
     const data = await fetchList(page, 'e2et_order');
     if (!data || !data.records || data.records.length === 0) {
       test.skip(true, 'No e2et_order records to test lookup');
@@ -31,16 +33,16 @@ test.describe('Lookup Field Type (GAP-124)', () => {
 
     // Check if any record has the _display suffix
     const firstRecord = data.records[0];
-    const hasCustomerRef = 'e2et_customer_id' in firstRecord;
+    const hasCustomerRef = 'e2et_order_customer' in firstRecord;
     if (!hasCustomerRef) {
-      test.skip(true, 'e2et_customer_id field not in response');
+      test.skip(true, 'e2et_order_customer field not in response');
       return;
     }
 
     // If the customer_id has a value, there should be a _display suffix
-    if (firstRecord.e2et_customer_id) {
-      expect(firstRecord).toHaveProperty('e2et_customer_id_display');
-      expect(firstRecord.e2et_customer_id_display).toBeTruthy();
+    if (firstRecord.e2et_order_customer) {
+      expect(firstRecord).toHaveProperty('e2et_order_customer_display');
+      expect(firstRecord.e2et_order_customer_display).toBeTruthy();
     }
   });
 
@@ -57,11 +59,12 @@ test.describe('Lookup Field Type (GAP-124)', () => {
       data: {
         name: `LF_Ref_${uniqueId()}`,
         modelCode: 'e2et_order',
+        pageKey: SAVED_VIEW_PAGE_KEY,
         viewType: 'table',
         scope: 'personal',
         viewConfig: {
           columns: [
-            { fieldCode: 'e2et_customer_id', visible: true, order: 0 },
+            { fieldCode: 'e2et_order_customer', visible: true, order: 0 },
             { fieldCode: 'e2et_order_title', visible: true, order: 1 },
           ],
         },
@@ -121,10 +124,10 @@ test.describe('Lookup Field Type (GAP-124)', () => {
     }
 
     // Find a record with null customer_id
-    const nullRefRecord = data.records.find((r: any) => !r.e2et_customer_id);
+    const nullRefRecord = data.records.find((r: any) => !r.e2et_order_customer);
     if (nullRefRecord) {
       // Null REFERENCE should NOT have _display
-      expect(nullRefRecord.e2et_customer_id_display).toBeUndefined();
+      expect(nullRefRecord.e2et_order_customer_display).toBeUndefined();
     }
     // Test passes regardless — we verified the data structure
     expect(data.records.length).toBeGreaterThan(0);
@@ -149,8 +152,8 @@ test.describe('Lookup Field Type (GAP-124)', () => {
     // Same record should have same display value
     const r1 = data1.records[0];
     const r2 = data2.records.find((r: any) => r.pid === r1.pid);
-    if (r2 && r1.e2et_customer_id_display) {
-      expect(r2.e2et_customer_id_display).toBe(r1.e2et_customer_id_display);
+    if (r2 && r1.e2et_order_customer_display) {
+      expect(r2.e2et_order_customer_display).toBe(r1.e2et_order_customer_display);
     }
   });
 });

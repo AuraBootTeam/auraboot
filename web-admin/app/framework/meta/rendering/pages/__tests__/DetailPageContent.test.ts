@@ -5,6 +5,7 @@ import {
   enrichDetailField,
   extractBlockDataRows,
   getByDataPath,
+  mergeDetailDisplayFields,
   resolveActiveDetailTab,
   resolveDetailFieldComponent,
   resolveDetailRecordEndpoint,
@@ -46,6 +47,31 @@ describe('buildDetailRecordEndpoint', () => {
   });
 });
 
+describe('mergeDetailDisplayFields', () => {
+  it('adds reference display fields returned by the list endpoint without overwriting raw values', () => {
+    expect(
+      mergeDetailDisplayFields(
+        {
+          pid: 'lead-1',
+          crm_lead_assigned_to: 'user-pid-1',
+          crm_lead_company: 'ACME',
+        },
+        {
+          pid: 'lead-1',
+          crm_lead_assigned_to: 'user-pid-1',
+          crm_lead_assigned_to_display: 'e2e-operator',
+          crm_lead_company: 'ACME from list',
+        },
+      ),
+    ).toEqual({
+      pid: 'lead-1',
+      crm_lead_assigned_to: 'user-pid-1',
+      crm_lead_assigned_to_display: 'e2e-operator',
+      crm_lead_company: 'ACME',
+    });
+  });
+});
+
 describe('shouldRenderDefaultDetailEditAction', () => {
   it('keeps the default edit action visible when the schema does not opt out', () => {
     expect(shouldRenderDefaultDetailEditAction({ extension: {} })).toBe(true);
@@ -59,17 +85,17 @@ describe('shouldRenderDefaultDetailEditAction', () => {
 
 describe('resolveHiddenSystemTabKeys', () => {
   it('normalizes hidden system tab keys from array and comma-separated config', () => {
-    expect(
-      [...resolveHiddenSystemTabKeys({
+    expect([
+      ...resolveHiddenSystemTabKeys({
         extension: { hiddenSystemTabs: ['__approval_comments__', ' __field_history__ '] },
-      })],
-    ).toEqual(['__approval_comments__', '__field_history__']);
+      }),
+    ]).toEqual(['__approval_comments__', '__field_history__']);
 
-    expect(
-      [...resolveHiddenSystemTabKeys({
+    expect([
+      ...resolveHiddenSystemTabKeys({
         extension: { hideSystemTabs: '__approval_comments__, __field_history__' },
-      })],
-    ).toEqual(['__approval_comments__', '__field_history__']);
+      }),
+    ]).toEqual(['__approval_comments__', '__field_history__']);
   });
 });
 
@@ -252,9 +278,9 @@ describe('resolveVisibleDetailTabs', () => {
   ] as any;
 
   it('hides all system tabs while creating a new record', () => {
-    expect(resolveVisibleDetailTabs(tabs, undefined, { extension: {} }).map((tab) => tab.key)).toEqual([
-      'overview',
-    ]);
+    expect(
+      resolveVisibleDetailTabs(tabs, undefined, { extension: {} }).map((tab) => tab.key),
+    ).toEqual(['overview']);
   });
 
   it('hides only configured system tabs for an existing record', () => {
@@ -288,14 +314,18 @@ describe('resolveDetailRecordEndpoint', () => {
     });
   });
   it('prefers schema.modelCode over tableName for the fallback endpoint', () => {
-    expect(
-      resolveDetailRecordEndpoint({ modelCode: 'crm_activity' }, 'crm-my-tasks', '5'),
-    ).toEqual({ endpoint: '/api/dynamic/crm_activity/5', method: 'get' });
+    expect(resolveDetailRecordEndpoint({ modelCode: 'crm_activity' }, 'crm-my-tasks', '5')).toEqual(
+      { endpoint: '/api/dynamic/crm_activity/5', method: 'get' },
+    );
   });
   it('uses a custom api dataSource endpoint, replacing the {id} placeholder', () => {
     expect(
       resolveDetailRecordEndpoint(
-        { extension: { dataSource: { type: 'api', method: 'get', endpoint: '/api/billing/plans/{id}' } } },
+        {
+          extension: {
+            dataSource: { type: 'api', method: 'get', endpoint: '/api/billing/plans/{id}' },
+          },
+        },
         'billing_plan_catalog_detail',
         '900202',
       ),
@@ -304,7 +334,11 @@ describe('resolveDetailRecordEndpoint', () => {
   it('appends /{recordId} when the api endpoint has no placeholder, and honors post', () => {
     expect(
       resolveDetailRecordEndpoint(
-        { extension: { dataSource: { type: 'api', method: 'POST', endpoint: '/api/billing/plans/' } } },
+        {
+          extension: {
+            dataSource: { type: 'api', method: 'POST', endpoint: '/api/billing/plans/' },
+          },
+        },
         't',
         '900202',
       ),
@@ -323,7 +357,9 @@ describe('resolveDetailRecordEndpoint', () => {
 
 describe('unwrapDetailRecord', () => {
   it('returns the recordPath-selected object as the master record', () => {
-    expect(unwrapDetailRecord({ version: { versionNo: 2 }, priceComponents: [] }, 'version')).toEqual({
+    expect(
+      unwrapDetailRecord({ version: { versionNo: 2 }, priceComponents: [] }, 'version'),
+    ).toEqual({
       versionNo: 2,
     });
   });

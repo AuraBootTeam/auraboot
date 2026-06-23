@@ -6,8 +6,21 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Globe,
+  Lock,
+  Plus,
+  Settings,
+  User,
+  Users,
+} from 'lucide-react';
 import { type SavedView, type ViewScope, type ViewType } from '~/framework/smart/types/savedView';
 import type { ViewRecommendation } from '~/framework/smart/hooks/useViewRecommendations';
+import { isSavedViewLockedPreset } from '~/framework/smart/utils/savedViewPersistence';
+import { useI18n } from '~/contexts/I18nContext';
 import { cn } from '~/utils/cn';
 
 /**
@@ -41,26 +54,54 @@ export interface ViewSelectorProps {
  */
 interface ScopeConfig {
   scope: ViewScope;
-  label: string;
-  icon: string;
+  labelKey: string;
+  fallback: string;
+  shortLabelKey: string;
+  shortFallback: string;
+  Icon: React.ComponentType<{ className?: string }>;
 }
 
 /**
  * Ordered scope configurations for grouping views
  */
 const SCOPE_CONFIGS: ScopeConfig[] = [
-  { scope: 'global', label: 'Global Views', icon: '🌐' },
-  { scope: 'team', label: 'Team Views', icon: '👥' },
-  { scope: 'personal', label: 'Personal Views', icon: '👤' },
+  {
+    scope: 'personal',
+    labelKey: 'common.saved_view_personal_group',
+    fallback: 'Personal Views',
+    shortLabelKey: 'common.saved_view_scope_personal',
+    shortFallback: 'Mine',
+    Icon: User,
+  },
+  {
+    scope: 'team',
+    labelKey: 'common.saved_view_team_group',
+    fallback: 'Team Shared',
+    shortLabelKey: 'common.saved_view_scope_team',
+    shortFallback: 'Team',
+    Icon: Users,
+  },
+  {
+    scope: 'global',
+    labelKey: 'common.saved_view_global_group',
+    fallback: 'All Views',
+    shortLabelKey: 'common.saved_view_scope_global',
+    shortFallback: 'All',
+    Icon: Globe,
+  },
 ];
 
 /**
- * Get scope icon by scope type
+ * Get scope configuration by scope type
  */
-const getScopeIcon = (scope: ViewScope): string => {
+const getScopeConfig = (scope: ViewScope): ScopeConfig => {
   const config = SCOPE_CONFIGS.find((c) => c.scope === scope);
-  return config?.icon ?? '📋';
+  return config ?? SCOPE_CONFIGS[0];
 };
+
+function isSavedViewCapabilityBlocked(view: SavedView | null | undefined): boolean {
+  return view?.viewConfig?.meta?.capabilityStatus?.toLowerCase() === 'blocked';
+}
 
 /**
  * SVG icons for view types
@@ -195,8 +236,29 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   loading = false,
   className,
 }) => {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const selectViewLabel = t('common.saved_view_select', undefined, 'Select View');
+  const defaultLabel = t('common.saved_view_default', undefined, 'Default');
+  const newViewLabel = t('common.saved_view_new', undefined, 'New View');
+  const manageLabel = t('common.saved_view_manage', undefined, 'Manage Views');
+  const emptyLabel = t('common.saved_view_empty', undefined, 'No saved views available');
+  const lockedPresetLabel = t('common.saved_view_locked_preset', undefined, 'Preset');
+  const capabilityBlockedLabel = t(
+    'common.saved_view_capability_blocked',
+    undefined,
+    'Needs setup',
+  );
+  const currentScopeConfig = getScopeConfig(currentView?.scope ?? 'personal');
+  const CurrentScopeIcon = currentScopeConfig.Icon;
+  const isCurrentViewLockedPreset = isSavedViewLockedPreset(currentView);
+  const isCurrentViewCapabilityBlocked = isSavedViewCapabilityBlocked(currentView);
+  const currentScopeLabel = t(
+    currentScopeConfig.shortLabelKey,
+    undefined,
+    currentScopeConfig.shortFallback,
+  );
 
   /**
    * Close dropdown when clicking outside
@@ -235,13 +297,13 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   }, [isOpen]);
 
   /**
-   * Click handler: directly open manage panel (no dropdown)
+   * Click handler: open the selector dropdown from the title area.
    */
   const handleClick = useCallback(() => {
-    if (!loading && onManageViews) {
-      onManageViews();
+    if (!loading) {
+      setIsOpen((prev) => !prev);
     }
-  }, [loading, onManageViews]);
+  }, [loading]);
 
   /**
    * Handle view selection
@@ -271,28 +333,13 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   }, [onManageViews]);
 
   /**
-   * Handle scope header click (PERSONAL opens management directly)
+   * Group views by scope. The selector must always list all saved views; the
+   * current active type only seeds the "New View" flow.
    */
-  const handleScopeHeaderClick = useCallback(
-    (scope: ViewScope) => {
-      if (scope === 'personal' && onManageViews) {
-        handleManageViews();
-      }
-    },
-    [handleManageViews, onManageViews],
-  );
-
-  /**
-   * Group views by scope
-   */
-  const filteredViews = useMemo(() => {
-    if (!activeViewType) return views;
-    return views.filter((v) => (v.viewType || 'table') === activeViewType);
-  }, [views, activeViewType]);
-
   const groupedViews = SCOPE_CONFIGS.map((config) => ({
     ...config,
-    views: filteredViews.filter((v) => v.scope === config.scope),
+    label: t(config.labelKey, undefined, config.fallback),
+    views: views.filter((v) => v.scope === config.scope),
   })).filter((group) => group.views.length > 0);
 
   const hasActions = onCreateView || onManageViews;
@@ -304,6 +351,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
         type="button"
         onClick={handleClick}
         disabled={loading}
+        aria-label={selectViewLabel}
         className={cn(
           'flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm',
           'hover:bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none',
@@ -323,55 +371,66 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
               className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500"
               aria-hidden="true"
             />
-            <span className="text-gray-400">Loading...</span>
+            <span className="text-gray-400">{t('common.loading', undefined, 'Loading...')}</span>
           </>
         ) : currentView ? (
           <>
-            <span className="flex-shrink-0" aria-hidden="true">
-              {getScopeIcon(currentView.scope)}
+            <CurrentScopeIcon className="h-4 w-4 flex-shrink-0 text-gray-500" aria-hidden="true" />
+            <span
+              className="flex-shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600"
+              data-testid="view-selector-scope-label"
+            >
+              {currentScopeLabel}
             </span>
             <span className="flex-1 truncate text-left text-gray-900">{currentView.name}</span>
             {currentView.isDefault && (
               <span
                 className="flex-shrink-0 text-xs font-medium text-blue-600"
-                title="Default view"
+                title={defaultLabel}
               >
                 *
               </span>
             )}
+            {isCurrentViewLockedPreset && (
+              <Lock
+                className="h-3.5 w-3.5 flex-shrink-0 text-amber-600"
+                aria-label={lockedPresetLabel}
+              />
+            )}
+            {isCurrentViewCapabilityBlocked && (
+              <AlertTriangle
+                className="h-3.5 w-3.5 flex-shrink-0 text-red-500"
+                aria-label={capabilityBlockedLabel}
+              />
+            )}
           </>
         ) : (
-          <span className="text-gray-400">Select view</span>
+          <span className="text-gray-400">{selectViewLabel}</span>
         )}
-        <svg
+        <ChevronDown
           className={cn(
             'h-4 w-4 flex-shrink-0 text-gray-400 transition-transform duration-200',
             isOpen && 'rotate-180',
           )}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
           aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        />
       </button>
 
       {/* Dropdown Menu */}
       {isOpen && (
         <div
           className={cn(
-            'absolute z-50 mt-1 w-64 rounded-md border border-gray-200 bg-white shadow-lg',
+            'absolute top-full left-0 z-50 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg',
             'animate-in fade-in-0 zoom-in-95 duration-100',
           )}
           role="listbox"
-          aria-label="Select view"
+          aria-label={selectViewLabel}
         >
           {/* View Groups */}
           <div className="max-h-64 overflow-y-auto py-1">
             {groupedViews.length === 0 ? (
               <div className="px-3 py-4 text-center text-sm text-gray-500">
-                No saved views available
+                {emptyLabel}
               </div>
             ) : (
               groupedViews.map((group, groupIndex) => (
@@ -379,26 +438,10 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                   {/* Group Separator */}
                   {groupIndex > 0 && <div className="mx-2 my-1 h-px bg-gray-200" />}
 
-                  {/* Group Header */}
-                  {group.scope === 'personal' && onManageViews ? (
-                    <button
-                      type="button"
-                      onClick={() => handleScopeHeaderClick(group.scope)}
-                      data-testid="view-group-personal-manage"
-                      className={cn(
-                        'w-full px-3 py-1.5 text-left text-xs font-medium tracking-wide uppercase',
-                        'text-blue-600 hover:bg-blue-50',
-                        'focus:ring-2 focus:ring-blue-500 focus:outline-none focus:ring-inset',
-                        'transition-colors duration-100',
-                      )}
-                    >
-                      {group.icon} {group.label}
-                    </button>
-                  ) : (
-                    <div className="px-3 py-1.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
-                      {group.icon} {group.label}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
+                    <group.Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                    {group.label}
+                  </div>
 
                   {/* Group Items */}
                   {group.views.map((view) => (
@@ -426,26 +469,31 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                       {view.isDefault && (
                         <span
                           className="flex-shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700"
-                          title="Default view"
+                          title={defaultLabel}
                         >
-                          Default
+                          {defaultLabel}
+                        </span>
+                      )}
+                      {isSavedViewLockedPreset(view) && (
+                        <span
+                          className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700"
+                          title={lockedPresetLabel}
+                        >
+                          <Lock className="h-3 w-3" aria-hidden="true" />
+                          {lockedPresetLabel}
+                        </span>
+                      )}
+                      {isSavedViewCapabilityBlocked(view) && (
+                        <span
+                          className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-700"
+                          title={capabilityBlockedLabel}
+                        >
+                          <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                          {capabilityBlockedLabel}
                         </span>
                       )}
                       {currentView?.pid === view.pid && (
-                        <svg
-                          className="h-4 w-4 flex-shrink-0 text-blue-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
+                        <Check className="h-4 w-4 flex-shrink-0 text-blue-600" aria-hidden="true" />
                       )}
                     </button>
                   ))}
@@ -463,6 +511,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                   <button
                     type="button"
                     onClick={handleCreateView}
+                    data-testid="view-selector-create"
                     className={cn(
                       'flex flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium',
                       'rounded-md text-blue-600 hover:bg-blue-50',
@@ -470,27 +519,15 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                       'transition-colors duration-100',
                     )}
                   >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    New View
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    {newViewLabel}
                   </button>
                 )}
                 {onManageViews && (
                   <button
                     type="button"
                     onClick={handleManageViews}
+                    data-testid="view-selector-manage"
                     className={cn(
                       'flex flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium',
                       'rounded-md text-gray-700 hover:bg-gray-100',
@@ -498,27 +535,8 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                       'transition-colors duration-100',
                     )}
                   >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
-                    Manage
+                    <Settings className="h-4 w-4" aria-hidden="true" />
+                    {manageLabel}
                   </button>
                 )}
               </div>

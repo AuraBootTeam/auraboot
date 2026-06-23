@@ -6,6 +6,7 @@
  */
 
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { openSavedViewManagePanel, viewSelectorTrigger } from '../helpers';
 
 const MODEL_CODE = 'showcase_all_fields';
 // Runtime ListPageContent scopes SavedViews by route tableName, not DSL pageKey.
@@ -64,13 +65,7 @@ async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
 }
 
 async function openViewManagePanel(page: Page) {
-  const viewBtn = page.locator('button[aria-haspopup="listbox"]').first();
-  await expect(viewBtn).toBeVisible({ timeout: 10_000 });
-  await viewBtn.click();
-
-  const panel = page.locator('[role="dialog"][aria-modal="true"]');
-  await expect(panel).toBeVisible({ timeout: 5_000 });
-  return panel;
+  return openSavedViewManagePanel(page);
 }
 
 async function openTypePicker(page: Page) {
@@ -98,21 +93,7 @@ async function createConfiguredView(
   });
   await expect(typeButton).toBeVisible({ timeout: 5_000 });
 
-  const createResponsePromise = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
-    { timeout: 15_000 },
-  );
   await typeButton.click();
-  const createResponse = await createResponsePromise;
-  const createBody = await createResponse
-    .json()
-    .catch(async () => createResponse.text().catch(() => null));
-  expect(
-    createResponse.ok(),
-    `Create view failed: ${createResponse.status()} ${JSON.stringify(createBody)}`,
-  ).toBe(true);
-  expect((createBody as { data?: { pid?: string } })?.data?.pid).toBeTruthy();
 
   await expect(
     panel.getByText(new RegExp(`Configure ${typeLabel[viewType]} View`, 'i')),
@@ -148,9 +129,22 @@ async function createConfiguredView(
   const doneBtn = panel.getByRole('button', { name: /^Done$/ });
   await expect(doneBtn).toBeEnabled();
 
+  const createResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
+    { timeout: 15_000 },
+  );
   const navigation = page.waitForURL(/(?:\?|&)view=/, { timeout: 10_000 });
   await doneBtn.click();
-  await navigation;
+  const [createResponse] = await Promise.all([createResponsePromise, navigation]);
+  const createBody = await createResponse
+    .json()
+    .catch(async () => createResponse.text().catch(() => null));
+  expect(
+    createResponse.ok(),
+    `Create view failed: ${createResponse.status()} ${JSON.stringify(createBody)}`,
+  ).toBe(true);
+  expect((createBody as { data?: { pid?: string } })?.data?.pid).toBeTruthy();
 
   const pid = new URL(page.url()).searchParams.get('view');
   expect(pid, 'created SavedView pid should be present in URL').toBeTruthy();
@@ -356,7 +350,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     const { pid, name } = await createDefaultTableView(request, 'Sort');
 
     await navigateToShowcaseListViaMenu(page);
-    await expect(page.locator('button[aria-haspopup="listbox"]').first()).toContainText(name, {
+    await expect(viewSelectorTrigger(page)).toContainText(name, {
       timeout: 10_000,
     });
 
@@ -389,7 +383,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await expect(page.locator('[data-testid="dynamic-list"] table tbody tr').first()).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.locator('button[aria-haspopup="listbox"]').first()).toContainText(name, {
+    await expect(viewSelectorTrigger(page)).toContainText(name, {
       timeout: 10_000,
     });
     await expect(
@@ -406,7 +400,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     const { pid, name } = await createDefaultTableView(request, 'Columns');
 
     await navigateToShowcaseListViaMenu(page);
-    await expect(page.locator('button[aria-haspopup="listbox"]').first()).toContainText(name, {
+    await expect(viewSelectorTrigger(page)).toContainText(name, {
       timeout: 10_000,
     });
     await expect(page.getByTestId('table-cell-0-sc_price')).toBeVisible({ timeout: 5_000 });
@@ -456,7 +450,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await expect(page.locator('[data-testid="dynamic-list"] table tbody tr').first()).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.locator('button[aria-haspopup="listbox"]').first()).toContainText(name, {
+    await expect(viewSelectorTrigger(page)).toContainText(name, {
       timeout: 10_000,
     });
     await expect(page.getByTestId('table-cell-0-sc_name')).toBeVisible({ timeout: 5_000 });
@@ -472,7 +466,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     const { pid, name } = await createDefaultTableView(request, 'Toolbar');
 
     await navigateToShowcaseListViaMenu(page);
-    await expect(page.locator('button[aria-haspopup="listbox"]').first()).toContainText(name, {
+    await expect(viewSelectorTrigger(page)).toContainText(name, {
       timeout: 10_000,
     });
     await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 5_000 });
@@ -545,7 +539,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await expect(page.locator('[data-testid="dynamic-list"] table tbody tr').first()).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.locator('button[aria-haspopup="listbox"]').first()).toContainText(name, {
+    await expect(viewSelectorTrigger(page)).toContainText(name, {
       timeout: 10_000,
     });
     await expect(page.getByTestId('toolbar-btn-create')).toHaveCount(0, { timeout: 5_000 });
@@ -564,7 +558,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     const seed = await seedShowcaseRecord(request, 'Filters');
 
     await navigateToShowcaseListViaMenu(page);
-    await expect(page.locator('button[aria-haspopup="listbox"]').first()).toContainText(name, {
+    await expect(viewSelectorTrigger(page)).toContainText(name, {
       timeout: 10_000,
     });
 
@@ -634,7 +628,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     );
     await page.reload({ waitUntil: 'load' });
     await restoredList;
-    await expect(page.locator('button[aria-haspopup="listbox"]').first()).toContainText(name, {
+    await expect(viewSelectorTrigger(page)).toContainText(name, {
       timeout: 10_000,
     });
     await expect(page.locator('[data-testid="dynamic-list"] table tbody tr').first()).toContainText(

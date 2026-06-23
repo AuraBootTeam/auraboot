@@ -404,6 +404,28 @@ class NlModelingManifestPostProcessingTest {
     }
 
     @Test
+    void conformPageTextToI18n_sanitizesRepeatedHyphenCodesWithoutRegexBacktracking() {
+        List<Map<String, Object>> blocks = List.of(mutable(
+                "code", "section-----客户-----summary",
+                "title", "客户概况"));
+        List<Map<String, Object>> pages = List.of(mutable(
+                "pageKey", "device_inspection_detail",
+                "modelCode", "device_inspection",
+                "title", "点检详情",
+                "blocks", blocks));
+        List<Map<String, Object>> i18n = new ArrayList<>();
+
+        NlModelingService.conformPageTextToI18n(pages, List.of(), i18n);
+
+        assertEquals("$i18n:page.device_inspection_detail.section-----_-----summary.title",
+                blocks.get(0).get("title"));
+        Set<String> i18nKeys = new HashSet<>();
+        i18n.forEach(entry -> i18nKeys.add((String) entry.get("key")));
+        assertTrue(i18nKeys.contains(
+                "page.device_inspection_detail.section-----_-----summary.title"));
+    }
+
+    @Test
     void humanize_splitsSnakeAndKebab() {
         assertEquals("Unit Price", NlModelingService.humanize("unit_price"));
         assertEquals("Order Line Item", NlModelingService.humanize("order-line-item"));

@@ -10,8 +10,12 @@ import { FilterChipBar } from '~/framework/smart/components/view/FilterChipBar';
 import type { SortConfig, ViewFilterConfig, RowHeight } from '~/framework/smart/types/savedView';
 import { SortPopover, type SortableColumn } from './SortPopover';
 import { useI18n } from '~/contexts/I18nContext';
+import {
+  type QuickFilterPresetKey,
+  getQuickFilterPresetDefinitions,
+} from './quickFilterPresets';
 
-type QuickFilterKey = 'my_records' | 'created_today' | 'modified_this_week';
+type QuickFilterKey = QuickFilterPresetKey;
 
 export interface ListToolbarProps {
   /** Current keyword search value */
@@ -98,23 +102,17 @@ export function ListToolbar({
     [onSearch],
   );
 
-  const quickFilters: Array<{ key: QuickFilterKey; label: string; icon: string }> = [
-    {
-      key: 'my_records',
-      label: t('common.my_records', undefined, 'My Records'),
-      icon: '\uD83D\uDC64',
-    },
-    {
-      key: 'created_today',
-      label: t('common.created_today', undefined, 'Created Today'),
-      icon: '\uD83D\uDCC5',
-    },
-    {
-      key: 'modified_this_week',
-      label: t('common.modified_this_week', undefined, 'Modified This Week'),
-      icon: '\uD83D\uDD50',
-    },
-  ];
+  const quickFilterIcons: Record<string, string> = {
+    my_records: '\uD83D\uDC64',
+    created_today: '\uD83D\uDCC5',
+    modified_this_week: '\uD83D\uDD50',
+  };
+  const quickFilters: Array<{ key: QuickFilterKey; label: string; icon: string }> =
+    getQuickFilterPresetDefinitions().map((definition) => ({
+      key: definition.key,
+      label: t(definition.i18nKey, undefined, definition.fallbackLabel),
+      icon: quickFilterIcons[definition.key] ?? '\u25CF',
+    }));
   const showInlineControls =
     !hideSort ||
     !hideColumnSettings ||

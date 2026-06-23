@@ -49,6 +49,32 @@ public interface TenantMemberMapper extends BaseMapper<TenantMember> {
             """)
     TenantMember findByTenantIdAndUserId(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
+    /**
+     * Find a tenant member by public PID within a tenant.
+     */
+    @Select("""
+            SELECT *
+            FROM ab_tenant_member
+            WHERE tenant_id = #{tenantId}
+              AND pid = #{pid}
+              AND deleted_flag = FALSE
+            LIMIT 1
+            """)
+    TenantMember findByTenantIdAndPid(@Param("tenantId") Long tenantId, @Param("pid") String pid);
+
+    /**
+     * Find a tenant member by internal ID within a tenant.
+     */
+    @Select("""
+            SELECT *
+            FROM ab_tenant_member
+            WHERE tenant_id = #{tenantId}
+              AND id = #{id}
+              AND deleted_flag = FALSE
+            LIMIT 1
+            """)
+    TenantMember findByTenantIdAndId(@Param("tenantId") Long tenantId, @Param("id") Long id);
+
 
 //    /**
 //     * 根据成员类型查询成员列表
