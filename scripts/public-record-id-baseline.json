@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-23T06:22:28.398Z",
+  "generatedAt": "2026-06-23T08:16:30.395Z",
   "accepted": [
     {
       "key": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK|platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java||dynamic-record-map|@Parameter(description = \"Cursor for keyset pagination. Pass the nextCursor value from the previous response to fetch the next page efficiently. When provided, pageNum is ignored a",
@@ -4296,60 +4296,6 @@
       "evidence": "List<DataChangeLog> history = changeLogService.getHistory(modelCode, recordId);"
     },
     {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java||recordId|@RequestParam Long recordId,",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java",
-      "line": 61,
-      "field": "recordId",
-      "evidence": "@RequestParam Long recordId,"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java||recordId|@RequestParam Long recordId) {",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java",
-      "line": 46,
-      "field": "recordId",
-      "evidence": "@RequestParam Long recordId) {"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java||recordId|* GET /api/audit/field-changes?modelCode=pe_sales_order&recordId=123",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java",
-      "line": 40,
-      "field": "recordId",
-      "evidence": "* GET /api/audit/field-changes?modelCode=pe_sales_order&recordId=123"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java||recordId|* GET /api/audit/field-changes/field?modelCode=pe_sales_order&recordId=123&fieldCode=pe_so_status",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java",
-      "line": 55,
-      "field": "recordId",
-      "evidence": "* GET /api/audit/field-changes/field?modelCode=pe_sales_order&recordId=123&fieldCode=pe_so_status"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java||recordId|tenantId, modelCode, recordId, fieldCode);",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java",
-      "line": 65,
-      "field": "recordId",
-      "evidence": "tenantId, modelCode, recordId, fieldCode);"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java||recordId|tenantId, modelCode, recordId);",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/config/FieldChangeAuditController.java",
-      "line": 49,
-      "field": "recordId",
-      "evidence": "tenantId, modelCode, recordId);"
-    },
-    {
       "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/config/SodController.java||recordId|entityPid = firstText(targetRecordId);",
       "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
       "category": "backend-public-api",
@@ -4645,114 +4591,6 @@
       "line": 81,
       "field": "recordId",
       "evidence": "modelCode, recordId, platform, context);"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java||recordId|@DeleteMapping(\"/{modelCode}/{recordPid}/comments/{commentId}\")",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java",
-      "line": 60,
-      "field": "recordId",
-      "evidence": "@DeleteMapping(\"/{modelCode}/{recordPid}/comments/{commentId}\")"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java||recordId|@PathVariable Long commentId,",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java",
-      "line": 54,
-      "field": "recordId",
-      "evidence": "@PathVariable Long commentId,"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java||recordId|@PathVariable Long commentId) {",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java",
-      "line": 65,
-      "field": "recordId",
-      "evidence": "@PathVariable Long commentId) {"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java||recordId|@PutMapping(\"/{modelCode}/{recordPid}/comments/{commentId}\")",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java",
-      "line": 49,
-      "field": "recordId",
-      "evidence": "@PutMapping(\"/{modelCode}/{recordPid}/comments/{commentId}\")"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java||recordId|commentService.deleteComment(commentId);",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java",
-      "line": 66,
-      "field": "recordId",
-      "evidence": "commentService.deleteComment(commentId);"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java||recordId|return ApiResponse.success(commentService.editComment(commentId, content));",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/RecordCommentController.java",
-      "line": 57,
-      "field": "recordId",
-      "evidence": "return ApiResponse.success(commentService.editComment(commentId, content));"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java||recordId|@GetMapping(\"/{pageKey}/{recordId}/watching\")",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java",
-      "line": 41,
-      "field": "recordId",
-      "evidence": "@GetMapping(\"/{pageKey}/{recordId}/watching\")"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java||recordId|@PathVariable Long recordId) {",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java",
-      "line": 35,
-      "field": "recordId",
-      "evidence": "@PathVariable Long recordId) {"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java||recordId|@PostMapping(\"/{pageKey}/{recordId}/watch\")",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java",
-      "line": 31,
-      "field": "recordId",
-      "evidence": "@PostMapping(\"/{pageKey}/{recordId}/watch\")"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java||recordId|* Mounted under /api/dynamic/{pageKey}/{recordId}/watch to align with",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java",
-      "line": 17,
-      "field": "recordId",
-      "evidence": "* Mounted under /api/dynamic/{pageKey}/{recordId}/watch to align with"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java||recordId|boolean isNowWatching = watchService.toggleWatch(modelCode, recordId);",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java",
-      "line": 37,
-      "field": "recordId",
-      "evidence": "boolean isNowWatching = watchService.toggleWatch(modelCode, recordId);"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java||recordId|boolean watching = watchService.isWatching(modelCode, recordId);",
-      "code": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY",
-      "category": "backend-public-api",
-      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/WatchController.java",
-      "line": 47,
-      "field": "recordId",
-      "evidence": "boolean watching = watchService.isWatching(modelCode, recordId);"
     },
     {
       "key": "S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY|platform/src/main/java/com/auraboot/framework/mobile/controller/MobileSearchController.java||recordId|.deepLink(recordId != null ? \"auraboot://object/\" + modelCode + \"/\" + recordId : null)",

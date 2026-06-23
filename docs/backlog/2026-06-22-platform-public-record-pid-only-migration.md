@@ -25,6 +25,8 @@ SavedView Feishu parity 已经补齐 SavedView、role、member、user-role 等�
 - OSS repair PRs already on `main`: #1035 SavedView semantic fixture, #1036 audit actor pid query, #1037 legacy user-role pid deprecation signal.
 - Enterprise validation branch `codex/public-record-dual-id-standard` adds the canonical dual-id agent rule and fixes the enterprise test-fixtures page golden drift that blocked latest-main full validation.
 - 当前 hardening slice 已把 DSL/config 旧占位与 NamedQuery/export SQL 泄漏从基线中清零，补齐评论/activity 的 pid-only 公共契约，补齐对应 runtime/集成测试，并把双 id 规范沉淀到 enterprise agent 文档。后续仍需继续收敛 backend public API、dynamic read boundary、frontend runtime 三类 accepted baseline。
+- 当前 stacked slice `codex/watch-field-history-pid` 已补齐 watch/follow 与 field history 的 `recordPid` 写入、查询、通知路由和 schema 迁移；公开边界不再新增 `recordId` alias，public-id gate baseline 从 541 收敛到 529。
+- Canonical agent rule 落点: enterprise `AGENTS.md` 高频红线表已指向 `docs/standards/core/data-and-api.md` §Public Record 双 id 规范和 `docs/agent-rules/public-record-dual-id-contract.md`。反复违背的根因不是策略不清,而是旧 `recordId` 命名惯性、`Map<String,Object>` 绕过 DTO 类型系统、DSL/SQL/NamedQuery 属于数据配置编译器看不到、前端局部 fallback 复制旧写法、以及测试/示例继续教旧契约；当前规则要求遇到这些关键词先跑 inventory gate 和 targeted pid-only 测试。
 
 ## Inventory Evidence
 
@@ -32,18 +34,18 @@ OSS public-record-id contract gate on current hardening branch:
 
 | Category | Count |
 | --- | ---: |
-| backend-public-api | 103 |
+| backend-public-api | 91 |
 | dsl-config | 0 |
 | dynamic-read-boundary | 79 |
 | frontend-runtime | 359 |
 | named-query-export | 0 |
-| **Total** | **541** |
+| **Total** | **529** |
 
 Gate result:
 
 ```text
 scripts/check-public-record-id-contracts.sh
-Summary: 541 finding(s), 541 accepted, 0 new.
+Summary: 529 finding(s), 529 accepted, 0 new.
 Node tests: 4/4 passing.
 ```
 
@@ -52,17 +54,17 @@ Combined OSS + enterprise canonical inventory was also run without a baseline:
 ```text
 node scripts/validate-public-record-id-contracts.mjs \
   --include-enterprise \
-  --enterprise=/Users/ghj/work/auraboot/auraboot-enterprise \
+  --enterprise=/Users/ghj/work/auraboot/.worktrees/enterprise-public-record-dual-id-standard \
   --no-baseline \
   --quiet
-Summary: 541 finding(s), 0 accepted, 541 new. Baseline: none FAILED.
+Summary: 529 finding(s), 0 accepted, 529 new. Baseline: none FAILED.
 ```
 
 The combined run is inventory-only by design. `--no-baseline` reports every finding as new, so it is not a passing gate and should not be used as a merge blocker by itself.
 
 ## Current PR Scope Implemented
 
-- Added a public-record contract inventory gate and CI workflow. Latest OSS baseline is 541 accepted findings and fails on newly introduced leaks.
+- Added a public-record contract inventory gate and CI workflow. Current OSS baseline is 529 accepted findings and fails on newly introduced leaks.
 - Added `PublicRecordSanitizer` and applied it to dynamic list, namedQuery list, detail, create, update, batch create/update, custom query and relation response boundaries.
 - Added `targetRecordPid` as the pid-first command request alias while keeping `targetRecordId` compatible during the migration window.
 - Added frontend `publicRecordId` helpers and adopted them in high-reuse dynamic runtime paths: list row selection/navigation/inline edit, list table row keys, tree row keys, form command submit, action handler, ActionRegistry, sub-table row actions/inline edit, smart calendar/gallery/timeline/gantt views and kanban persistence.
@@ -72,6 +74,7 @@ The combined run is inventory-only by design. `--no-baseline` reports every find
 - Tightened the inventory gate so SQL filters such as `WHERE tenant_id = ...` do not count unless internal fields are selected into public query output.
 - Added `commentPid` to record comments, changed comment edit/delete HTTP paths to pid-only, hid raw comment/actor ids from comment and activity responses, and added tenant-scoped activity lookup.
 - Added record-comment pid schema migration, schema.sql alignment, and generated OSS schema snapshot.
+- Added `ab_watch.record_pid` and `ab_field_change_log.record_pid` migrations, changed watch public controller methods to pid-only path variables, changed notification watcher resolution to `recordPid`, and mapped field-history public responses to DTOs that hide internal ids.
 - Repaired latest-main regressions discovered during full verification: SavedView semantic fixture drift, audit actor pid lookup, and legacy user-role endpoint deprecation behavior.
 - Enterprise branch `codex/public-record-dual-id-standard` adds the canonical dual-id agent rule and repairs `plugins/test-fixtures` page labels/required flags so latest-main enterprise full validation can pass under current page golden rules.
 
@@ -83,7 +86,10 @@ Passing checks on current OSS hardening branch:
 
 - OSS public-record-id contract gate:
   `scripts/check-public-record-id-contracts.sh`.
-  Current hardening result: 541 findings, 541 accepted, 0 new; Node test runner 4/4 passing.
+  Current stacked watch/field result: 529 findings, 529 accepted, 0 new; Node test runner 4/4 passing.
+- OSS watch/follow + field history targeted tests:
+  `./gradlew --no-daemon :test --tests 'com.auraboot.framework.integration.WatchServiceIntegrationTest' --tests 'com.auraboot.framework.notification.routing.DefaultRecipientResolverTest' --tests 'com.auraboot.framework.meta.service.impl.FieldChangeAuditServiceIntegrationTest' --console=plain`.
+  Result: 50/50 tests passed after applying the local test DB migration `platform/src/main/resources/db/migration/core/V20260622005000__watch_field_change_record_pid.sql`.
 - OSS frontend targeted unit tests:
   `pnpm --dir web-admin test:unit:run app/framework/meta/rendering/pages/__tests__/DetailPageContent.test.ts app/framework/meta/rendering/blocks/__tests__/SubTableViewer.test.tsx`.
   Result: 47/47 tests passed.
@@ -108,6 +114,12 @@ Passing checks on current OSS hardening branch:
 - OSS schema drift gate:
   `scripts/db/check-schema-drift.sh --edition oss`.
   Result: committed snapshot matches the Flyway result.
+- OSS backend full test for current stacked watch/field slice:
+  `AURA_ENV=test IMPORT_TEST_FIXTURES=true AURA_REGISTRY_ROOT_PLUGINS=/Users/ghj/work/auraboot/.worktrees/oss-watch-field-history-pid/plugins SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/aura_watch_field_history_pid_full_test?charSet=UTF8 ./gradlew --no-daemon cleanTest test --console=plain`.
+  Result: process exit 0. Log scan: 11954 `PASSED`, 46 `SKIPPED`, no failure pattern (`FAILED`, `BUILD FAILED`, `There were failing tests`, `Compilation failed`, `FAILURE:`). Log: `/tmp/auraboot-verify-logs/oss-watch-field-history-pid-full.log`.
+- OSS core publish for current enterprise validation:
+  `./gradlew --no-daemon publishToMavenLocal -Dmaven.repo.local=/tmp/auraboot-oss-watch-field-history-pid/platform/.m2/repository --console=plain` from `platform/`.
+  Result: `BUILD SUCCESSFUL`.
 - OSS backend full test:
   `AURA_ENV=test IMPORT_TEST_FIXTURES=true AURA_REGISTRY_ROOT_PLUGINS=/tmp/auraboot-oss-verify-v4/plugins SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/aura_public_record_pid_hardening_full_test?charSet=UTF8 ./gradlew --no-daemon cleanTest test --console=plain`.
   Result: `BUILD SUCCESSFUL` in 20m55s. XML summary: 1503 files / 11994 tests / 0 failures / 0 errors / 43 skipped. Log: `/tmp/auraboot-verify-logs/oss-backend-full-hardening-migrated.log`.
@@ -120,6 +132,12 @@ Passing checks on current OSS hardening branch:
 - Enterprise targeted i18n fixture verification:
   `AURA_ENV=test IMPORT_TEST_FIXTURES=true AURA_CORE_ROOT=/tmp/auraboot-oss-verify-v4 AURA_REGISTRY_ROOT_PLUGINS=/Users/ghj/work/auraboot/.worktrees/enterprise-public-record-dual-id-standard/plugins SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/aura_public_record_pid_ent_hardening_i18n_test?charSet=UTF8 ./gradlew --no-daemon cleanTest test -Dmaven.repo.local=/tmp/auraboot-oss-verify-v4/platform/.m2/repository --tests com.auraboot.framework.i18n.I18nPluginImportTest --console=plain`.
   Result: 3/3 tests passed. Log: `/tmp/auraboot-verify-logs/enterprise-i18n-after-fixture-fix.log`.
+- Enterprise targeted CRM overwrite verification for current stacked watch/field slice:
+  `AURA_ENV=test IMPORT_TEST_FIXTURES=true AURA_REGISTRY_ROOT_PLUGINS=/Users/ghj/work/auraboot/.worktrees/enterprise-public-record-dual-id-standard/plugins SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/aura_enterprise_watch_field_history_pid_full_test?charSet=UTF8 ./gradlew --no-daemon test -Dmaven.repo.local=/tmp/auraboot-oss-watch-field-history-pid/platform/.m2/repository --tests com.auraboot.framework.plugin.integration.PluginOverwriteUpgradeIntegrationTest --console=plain` from enterprise `platform/`.
+  Result: `BUILD SUCCESSFUL` in 59s. The preservation scenario passed; two precondition scenarios skipped by test design. Log: `/tmp/auraboot-verify-logs/enterprise-watch-field-history-pid-crm-overwrite.log`.
+- Enterprise backend full test for current stacked watch/field slice:
+  `AURA_ENV=test IMPORT_TEST_FIXTURES=true AURA_REGISTRY_ROOT_PLUGINS=/Users/ghj/work/auraboot/.worktrees/enterprise-public-record-dual-id-standard/plugins SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/aura_enterprise_watch_field_history_pid_full_test?charSet=UTF8 ./gradlew --no-daemon cleanTest test -Dmaven.repo.local=/tmp/auraboot-oss-watch-field-history-pid/platform/.m2/repository --console=plain` from enterprise `platform/`.
+  Result: `BUILD SUCCESSFUL` in 7m7s. Log scan: 938 `PASSED`, 58 `SKIPPED`, no failure pattern. Log: `/tmp/auraboot-verify-logs/enterprise-watch-field-history-pid-full-overlay.log`.
 - Enterprise backend full test:
   `AURA_ENV=test IMPORT_TEST_FIXTURES=true AURA_CORE_ROOT=/tmp/auraboot-oss-verify-v4 AURA_REGISTRY_ROOT_PLUGINS=/Users/ghj/work/auraboot/.worktrees/enterprise-public-record-dual-id-standard/plugins SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/aura_public_record_pid_ent_hardening_full_test?charSet=UTF8 ./gradlew --no-daemon cleanTest test -Dmaven.repo.local=/tmp/auraboot-oss-verify-v4/platform/.m2/repository --console=plain`.
   Result: `BUILD SUCCESSFUL` in 6m7s. XML summary: 166 files / 986 tests / 0 failures / 0 errors / 48 skipped. Log: `/tmp/auraboot-verify-logs/enterprise-backend-full-dual-id-standard-overlay-fixed.log`.
@@ -127,7 +145,8 @@ Passing checks on current OSS hardening branch:
 Current enterprise full validation still needs a temporary plugin materialization overlay because several tests resolve `projectRoot/plugins/<name>` directly:
 
 - `plugins/asset-management` and `plugins/project-management` came from `/Users/ghj/work/auraboot/plugins` to preserve enterprise plugin ids expected by historical integration tests.
-- `plugins/crm-quick-start`, `plugins/golden-path`, and `plugins/hr-essentials` came from OSS `/tmp/auraboot-oss-verify-v4/plugins` to provide the template catalog expected by template controller tests.
+- `plugins/crm-starter`, `plugins/templates/crm-quick-start`, `plugins/templates/golden-path`, and `plugins/templates/hr-essentials` came from the current OSS worktree plugins to provide CRM overwrite and template catalog fixtures.
+- `plugins/product-catalog` and `plugins/crm` came from `/Users/ghj/work/auraboot/plugins` to satisfy CRM overwrite dependencies.
 - The overlay symlinks were removed after verification and are not part of the branch diff.
 
 Historical full-stack checks from the prior merged OSS/enterprise validation round:
@@ -212,8 +231,8 @@ Status legend:
 | 16 | NamedQuery lacks public field allowlist metadata. The platform cannot distinguish public business ids from internal ids at query result boundary. | OPEN |
 | 17 | Showcase/workflow-demo contain explicit internal-id mappings. Examples include `SELECT id...` and `CAST(t.id AS VARCHAR) AS pid`. | DONE |
 | 18 | Comments only partially use public record identity. Record association uses `recordPid`, but comment edit/delete still needs `commentPid`, and response DTOs must hide internal comment and actor ids. | DONE |
-| 19 | Watch/follow still uses numeric storage. `WatchController` accepts `Long recordId`; `ab_watch` needs `record_pid` or a resolver/backfill layer. | OPEN |
-| 20 | Field history still uses numeric storage. `FieldChangeAuditController` accepts `Long recordId`; `ab_field_change_log` needs pid-facing lookup/backfill. | OPEN |
+| 19 | Watch/follow still uses numeric storage. `WatchController` accepted `Long recordId`; `ab_watch` needed `record_pid` or a resolver/backfill layer. | DONE |
+| 20 | Field history still uses numeric storage. `FieldChangeAuditController` accepted `Long recordId`; `ab_field_change_log` needed pid-facing lookup/backfill. | DONE |
 | 21 | Change log naming remains legacy. `ab_data_change_log.record_id` is string-like, but public DTO/API naming and actor id exposure still need cleanup. | PARTIAL |
 | 22 | Record share is mixed id/pid. It already has `record_id` and `record_pid`, but public controller paths still expose `recordId`. | OPEN |
 | 23 | Email, IM and inbox record links still use `recordId`. These record-adjacent surfaces must emit and accept pid-facing identifiers. | OPEN |
@@ -225,7 +244,7 @@ Status legend:
 | 29 | Tests and docs still teach `targetRecordId` and `recordId`. New DSL/plugin examples can continue creating legacy configs unless validators and docs are updated. | OPEN |
 | 30 | Governance gate does not yet cover OpenAPI/response schemas. Current inventory covers source/config patterns, not generated OpenAPI schemas or live API response fixtures. | OPEN |
 | 31 | Deprecation telemetry is missing. Legacy alias usage is not counted, logged, or exposed through metrics, so removal readiness cannot be measured. | OPEN |
-| 32 | Physical schema migrations are missing for record-adjacent tables. `commentPid` is implemented; `ab_watch.record_pid` and `ab_field_change_log.record_pid` remain. | PARTIAL |
+| 32 | Physical schema migrations are missing for record-adjacent tables. `commentPid`, `ab_watch.record_pid`, and `ab_field_change_log.record_pid` are implemented. | DONE |
 | 33 | SavedView enhanced IT fixture drift blocked latest-main verification. | DONE |
 | 34 | Audit actor lookup did not support actor pid query paths. | DONE |
 | 35 | Legacy user-role endpoints did not explicitly signal pid-only deprecation behavior. | DONE |

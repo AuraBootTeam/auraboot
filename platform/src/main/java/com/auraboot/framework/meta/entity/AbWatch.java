@@ -33,6 +33,9 @@ public class AbWatch {
     @TableField("record_id")
     private Long recordId;
 
+    @TableField("record_pid")
+    private String recordPid;
+
     @TableField("created_at")
     private Instant createdAt;
 }

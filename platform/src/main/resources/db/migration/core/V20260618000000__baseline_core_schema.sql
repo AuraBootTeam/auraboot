@@ -4199,7 +4199,8 @@ CREATE TABLE IF NOT EXISTS ab_field_change_log (
     tenant_id       BIGINT NOT NULL,
     audit_trail_id  BIGINT,
     model_code      VARCHAR(255) NOT NULL,
-    record_id       BIGINT NOT NULL,
+    record_id       BIGINT,
+    record_pid      VARCHAR(64),
     command_code    VARCHAR(255),
     field_code      VARCHAR(255) NOT NULL,
     field_label     VARCHAR(255),
@@ -4216,6 +4217,8 @@ CREATE TABLE IF NOT EXISTS ab_field_change_log (
 
 CREATE INDEX IF NOT EXISTS idx_field_change_model_record
     ON ab_field_change_log (tenant_id, model_code, record_id);
+CREATE INDEX IF NOT EXISTS idx_field_change_model_record_pid
+    ON ab_field_change_log (tenant_id, model_code, record_pid);
 CREATE INDEX IF NOT EXISTS idx_field_change_field
     ON ab_field_change_log (tenant_id, model_code, field_code);
 CREATE INDEX IF NOT EXISTS idx_field_change_actor
@@ -6835,12 +6838,19 @@ CREATE TABLE IF NOT EXISTS ab_watch (
     tenant_id   BIGINT        NOT NULL,
     user_id     BIGINT        NOT NULL,
     model_code  VARCHAR(100)  NOT NULL,
-    record_id   BIGINT        NOT NULL,
-    created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_watch UNIQUE (tenant_id, user_id, model_code, record_id)
+    record_id   BIGINT,
+    record_pid  VARCHAR(64),
+    created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_watch_record ON ab_watch (tenant_id, model_code, record_id);
+CREATE INDEX IF NOT EXISTS idx_watch_record_pid ON ab_watch (tenant_id, model_code, record_pid);
 CREATE INDEX IF NOT EXISTS idx_watch_user   ON ab_watch (tenant_id, user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_ab_watch_record_id
+    ON ab_watch (tenant_id, user_id, model_code, record_id)
+    WHERE record_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_ab_watch_record_pid
+    ON ab_watch (tenant_id, user_id, model_code, record_pid)
+    WHERE record_pid IS NOT NULL;
 COMMENT ON TABLE ab_watch IS 'Per-user record watch/follow subscriptions for notification routing (M-023)';
 
 -- ============================================================================

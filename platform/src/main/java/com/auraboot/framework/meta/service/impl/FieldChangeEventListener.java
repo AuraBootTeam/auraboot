@@ -48,13 +48,8 @@ public class FieldChangeEventListener {
                 return;
             }
 
-            String recordIdStr = event.getRecordId();
-            if (!StringUtils.hasText(recordIdStr)) {
-                return;
-            }
-
-            Long recordId = parseLong(recordIdStr);
-            if (recordId == null) {
+            String eventRecordId = event.getRecordId();
+            if (!StringUtils.hasText(eventRecordId)) {
                 return;
             }
 
@@ -74,12 +69,24 @@ public class FieldChangeEventListener {
             String operationType = event.getOperationType();
             Map<String, Object> afterData = null;
             if (!"delete".equalsIgnoreCase(operationType)) {
-                afterData = readRecordFromDb(tenantId, modelCode, recordId);
+                afterData = readRecordFromDbByPid(tenantId, modelCode, eventRecordId);
+                if (afterData == null) {
+                    Long legacyRecordId = parseLong(eventRecordId);
+                    if (legacyRecordId != null) {
+                        afterData = readRecordFromDbByLegacyId(tenantId, modelCode, legacyRecordId);
+                    }
+                }
             }
+
+            Long legacyRecordId = extractLong(afterData, "id");
+            if (legacyRecordId == null) {
+                legacyRecordId = extractLong(beforeData, "id");
+            }
+            String recordPid = resolveRecordPid(eventRecordId, beforeData, afterData);
 
             // Delegate to the audit service for diffing and recording
             fieldChangeAuditService.recordFieldChanges(
-                    tenantId, modelCode, recordId, event.getCommandCode(),
+                    tenantId, modelCode, legacyRecordId, recordPid, event.getCommandCode(),
                     beforeData, afterData, actorId != null ? actorId : 0L, actorName);
 
         } catch (Exception e) {
@@ -91,9 +98,33 @@ public class FieldChangeEventListener {
     }
 
     /**
-     * Read the current state of a record from its dynamic table.
+     * Read the current state of a record from its dynamic table by public PID.
      */
-    private Map<String, Object> readRecordFromDb(Long tenantId, String modelCode, Long recordId) {
+    private Map<String, Object> readRecordFromDbByPid(Long tenantId, String modelCode, String recordPid) {
+        try {
+            String tableName = metaModelService.getTableName(modelCode);
+            if (!StringUtils.hasText(tableName)) {
+                return null;
+            }
+            SqlSafetyUtils.validateIdentifier(tableName, "fieldChange tableName");
+            String sql = "SELECT * FROM " + tableName
+                    + " WHERE tenant_id = #{params.tenantId} AND pid = #{params.recordPid}";
+            Map<String, Object> params = Map.of("tenantId", tenantId, "recordPid", recordPid);
+            List<Map<String, Object>> result = dynamicDataMapper.selectByQuery(sql, params);
+            if (result != null && !result.isEmpty()) {
+                return result.get(0);
+            }
+        } catch (Exception e) {
+            log.debug("Failed to read record snapshot for field change audit: model={}, pid={}: {}",
+                    modelCode, recordPid, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Fallback reader for legacy events that still carry a numeric record id.
+     */
+    private Map<String, Object> readRecordFromDbByLegacyId(Long tenantId, String modelCode, Long recordId) {
         try {
             String tableName = metaModelService.getTableName(modelCode);
             if (!StringUtils.hasText(tableName)) {
@@ -108,10 +139,22 @@ public class FieldChangeEventListener {
                 return result.get(0);
             }
         } catch (Exception e) {
-            log.debug("Failed to read record snapshot for field change audit: model={}, id={}: {}",
+            log.debug("Failed to read legacy record snapshot for field change audit: model={}, id={}: {}",
                     modelCode, recordId, e.getMessage());
         }
         return null;
+    }
+
+    private String resolveRecordPid(String eventRecordId, Map<String, Object> beforeData, Map<String, Object> afterData) {
+        String afterPid = extractString(afterData, "pid");
+        if (StringUtils.hasText(afterPid)) {
+            return afterPid;
+        }
+        String beforePid = extractString(beforeData, "pid");
+        if (StringUtils.hasText(beforePid)) {
+            return beforePid;
+        }
+        return eventRecordId;
     }
 
     private Long extractLong(Map<String, Object> map, String key) {

@@ -1,5 +1,5 @@
 ---
-type: endgame-baseline
+type: plan-design
 status: active
 created: 2026-06-23
 owner_lane: saved-view
