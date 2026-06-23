@@ -55,34 +55,35 @@ public class UserProvisioningService {
     public UserProvisionResponse provision(UserProvisionRequest request, Long tenantId, Long creatorId) {
         // Quota enforcement is handled by QuotaEnforcementAspect (AOP) on addMember()
         // when auraboot.quota.enforcement.enabled=true
+        String email = normalizeBlankToNull(request.getEmail());
+        String userName = normalizeBlankToNull(request.getUserName());
+        if (email == null && userName == null) {
+            throw new BusinessException("Email or userName is required");
+        }
 
         // 1. Determine password
         String password = request.getInitialPassword();
         String temporaryPassword = null;
-        boolean mustChangePassword = false;
 
         if (password == null || password.isBlank()) {
             temporaryPassword = generateTemporaryPassword(12);
             password = temporaryPassword;
-            mustChangePassword = true;
         }
 
         // 2. Create user account
         User user;
         try {
-            user = userService.signUp(request.getEmail(), password, request.getDisplayName());
+            user = userService.signUp(email, password, request.getDisplayName(), userName);
         } catch (Exception e) {
             // Check if user already exists
-            User existing = userService.findByEmail(request.getEmail());
+            User existing = email != null ? userService.findByEmail(email) : null;
+            if (existing == null && userName != null) {
+                existing = userService.findByUserName(userName);
+            }
             if (existing != null) {
-                throw new BusinessException("User already exists: " + request.getEmail());
+                throw new BusinessException("User already exists: " + resolveIdentifier(email, userName));
             }
             throw e;
-        }
-
-        if (mustChangePassword) {
-            user.setMustChangePassword(true);
-            userService.update(user);
         }
 
         // 3. Add to tenant as active member
@@ -91,7 +92,7 @@ public class UserProvisioningService {
         } catch (BusinessException e) {
             // Already a member — acceptable for idempotent provisioning
             log.info("User {} already a member of tenant {}, continuing with role assignment",
-                    request.getEmail(), tenantId);
+                    resolveIdentifier(email, userName), tenantId);
         }
 
         // 4. Resolve member ID and assign roles
@@ -100,8 +101,8 @@ public class UserProvisioningService {
         Long memberId = tenantMember != null ? tenantMember.getId() : null;
         List<String> assignedRoles = assignRoles(request, memberId, tenantId);
 
-        log.info("User provisioned: email={}, userId={}, tenantId={}, roles={}",
-                request.getEmail(), user.getId(), tenantId, assignedRoles);
+        log.info("User provisioned: identifier={}, userId={}, tenantId={}, roles={}",
+                resolveIdentifier(email, userName), user.getId(), tenantId, assignedRoles);
 
         return UserProvisionResponse.builder()
                 .userId(user.getId())
@@ -110,7 +111,7 @@ public class UserProvisioningService {
                 .displayName(request.getDisplayName())
                 .tenantId(tenantId)
                 .assignedRoles(assignedRoles)
-                .mustChangePassword(mustChangePassword)
+                .mustChangePassword(false)
                 .temporaryPassword(temporaryPassword)
                 .build();
     }
@@ -147,6 +148,17 @@ public class UserProvisioningService {
         }
 
         return assigned;
+    }
+
+    private String normalizeBlankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private String resolveIdentifier(String email, String userName) {
+        return userName != null ? userName : email;
     }
 
     private String generateTemporaryPassword(int length) {
