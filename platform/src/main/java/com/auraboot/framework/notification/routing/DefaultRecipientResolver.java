@@ -100,16 +100,12 @@ public class DefaultRecipientResolver implements RecipientResolver {
             return List.of();
         }
         String modelCode = event.getModelCode();
-        String recordId = event.getRecordId();
-        if (modelCode == null || modelCode.isBlank() || recordId == null || recordId.isBlank()) {
+        String recordPid = event.getRecordId();
+        if (modelCode == null || modelCode.isBlank() || recordPid == null || recordPid.isBlank()) {
             return List.of();
         }
         try {
-            Long recordIdLong = Long.parseLong(recordId);
-            return watchService.getWatchers(modelCode, recordIdLong);
-        } catch (NumberFormatException e) {
-            log.debug("Cannot parse recordId as Long for watcher resolution: {}", recordId);
-            return List.of();
+            return watchService.getWatchersByRecordPid(modelCode, recordPid);
         } catch (Exception e) {
             log.warn("Failed to resolve WATCHERS recipients: {}", e.getMessage());
             return List.of();

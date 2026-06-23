@@ -30,6 +30,19 @@ public interface AbWatchMapper extends BaseMapper<AbWatch> {
                                   @Param("recordId") Long recordId);
 
     /**
+     * Get all watcher user IDs for a specific public record PID.
+     */
+    @Select("""
+        SELECT user_id FROM ab_watch
+        WHERE tenant_id = #{tenantId}
+          AND model_code = #{modelCode}
+          AND record_pid = #{recordPid}
+        """)
+    List<Long> findWatcherUserIdsByRecordPid(@Param("tenantId") Long tenantId,
+                                             @Param("modelCode") String modelCode,
+                                             @Param("recordPid") String recordPid);
+
+    /**
      * Get all watched record IDs for a user within a model.
      */
     @Select("""
@@ -41,4 +54,18 @@ public interface AbWatchMapper extends BaseMapper<AbWatch> {
     List<Long> findWatchedRecordIds(@Param("tenantId") Long tenantId,
                                     @Param("userId") Long userId,
                                     @Param("modelCode") String modelCode);
+
+    /**
+     * Get all watched public record PIDs for a user within a model.
+     */
+    @Select("""
+        SELECT COALESCE(record_pid, record_id::text) FROM ab_watch
+        WHERE tenant_id = #{tenantId}
+          AND user_id = #{userId}
+          AND model_code = #{modelCode}
+          AND COALESCE(record_pid, record_id::text) IS NOT NULL
+        """)
+    List<String> findWatchedRecordPids(@Param("tenantId") Long tenantId,
+                                       @Param("userId") Long userId,
+                                       @Param("modelCode") String modelCode);
 }

@@ -6926,7 +6926,8 @@ CREATE TABLE public.ab_field_change_log (
     tenant_id bigint NOT NULL,
     audit_trail_id bigint,
     model_code character varying(255) NOT NULL,
-    record_id bigint NOT NULL,
+    record_id bigint,
+    record_pid character varying(64),
     command_code character varying(255),
     field_code character varying(255) NOT NULL,
     field_label character varying(255),
@@ -13689,7 +13690,8 @@ CREATE TABLE public.ab_watch (
     tenant_id bigint NOT NULL,
     user_id bigint NOT NULL,
     model_code character varying(100) NOT NULL,
-    record_id bigint NOT NULL,
+    record_id bigint,
+    record_pid character varying(64),
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -19886,14 +19888,6 @@ ALTER TABLE ONLY public.ab_user_data_domain
 
 
 --
--- Name: ab_watch uq_watch; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.ab_watch
-    ADD CONSTRAINT uq_watch UNIQUE (tenant_id, user_id, model_code, record_id);
-
-
---
 -- Name: email_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -22715,6 +22709,13 @@ CREATE INDEX idx_field_change_model_record ON public.ab_field_change_log USING b
 
 
 --
+-- Name: idx_field_change_model_record_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_field_change_model_record_pid ON public.ab_field_change_log USING btree (tenant_id, model_code, record_pid);
+
+
+--
 -- Name: idx_field_change_time; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -24647,6 +24648,13 @@ CREATE INDEX idx_watch_record ON public.ab_watch USING btree (tenant_id, model_c
 
 
 --
+-- Name: idx_watch_record_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_watch_record_pid ON public.ab_watch USING btree (tenant_id, model_code, record_pid);
+
+
+--
 -- Name: idx_watch_user; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -25253,6 +25261,20 @@ CREATE UNIQUE INDEX user_name_idx ON public.ab_user USING btree (user_name) WHER
 --
 
 CREATE UNIQUE INDEX ux_ab_record_comment_pid ON public.ab_record_comment USING btree (pid);
+
+
+--
+-- Name: ux_ab_watch_record_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_ab_watch_record_id ON public.ab_watch USING btree (tenant_id, user_id, model_code, record_id) WHERE (record_id IS NOT NULL);
+
+
+--
+-- Name: ux_ab_watch_record_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_ab_watch_record_pid ON public.ab_watch USING btree (tenant_id, user_id, model_code, record_pid) WHERE (record_pid IS NOT NULL);
 
 
 --

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,33 +38,33 @@ public class FieldChangeAuditController {
 
     /**
      * Get all field changes for a specific record.
-     * GET /api/audit/field-changes?modelCode=pe_sales_order&recordId=123
+     * GET /api/audit/field-changes?modelCode=pe_sales_order&recordPid=01ABC...
      */
     @GetMapping("/field-changes")
     @RequirePermission(MetaPermission.META_FIELD_AUDIT_READ)
-    public ApiResponse<List<FieldChangeLog>> getRecordChanges(
+    public ApiResponse<List<FieldChangeLogResponse>> getRecordChanges(
             @RequestParam String modelCode,
-            @RequestParam Long recordId) {
+            @RequestParam String recordPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<FieldChangeLog> changes = fieldChangeAuditService.getRecordHistory(
-                tenantId, modelCode, recordId);
-        return ApiResponse.success(changes);
+        List<FieldChangeLog> changes = fieldChangeAuditService.getRecordHistoryByRecordPid(
+                tenantId, modelCode, recordPid);
+        return ApiResponse.success(toResponses(changes));
     }
 
     /**
      * Get change history for a specific field on a record.
-     * GET /api/audit/field-changes/field?modelCode=pe_sales_order&recordId=123&fieldCode=pe_so_status
+     * GET /api/audit/field-changes/field?modelCode=pe_sales_order&recordPid=01ABC...&fieldCode=pe_so_status
      */
     @GetMapping("/field-changes/field")
     @RequirePermission(MetaPermission.META_FIELD_AUDIT_READ)
-    public ApiResponse<List<FieldChangeLog>> getFieldHistory(
+    public ApiResponse<List<FieldChangeLogResponse>> getFieldHistory(
             @RequestParam String modelCode,
-            @RequestParam Long recordId,
+            @RequestParam String recordPid,
             @RequestParam String fieldCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<FieldChangeLog> changes = fieldChangeAuditService.getFieldHistory(
-                tenantId, modelCode, recordId, fieldCode);
-        return ApiResponse.success(changes);
+        List<FieldChangeLog> changes = fieldChangeAuditService.getFieldHistoryByRecordPid(
+                tenantId, modelCode, recordPid, fieldCode);
+        return ApiResponse.success(toResponses(changes));
     }
 
     /**
@@ -72,7 +73,7 @@ public class FieldChangeAuditController {
      */
     @GetMapping("/field-changes/actor")
     @RequirePermission(MetaPermission.META_FIELD_AUDIT_READ)
-    public ApiResponse<List<FieldChangeLog>> getChangesByActor(
+    public ApiResponse<List<FieldChangeLogResponse>> getChangesByActor(
             @RequestParam Long actorId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
@@ -81,7 +82,7 @@ public class FieldChangeAuditController {
         Instant endInstant = end.toInstant(ZoneOffset.UTC);
         List<FieldChangeLog> changes = fieldChangeAuditService.getChangesByActor(
                 tenantId, actorId, startInstant, endInstant);
-        return ApiResponse.success(changes);
+        return ApiResponse.success(toResponses(changes));
     }
 
     /**
@@ -99,7 +100,7 @@ public class FieldChangeAuditController {
         Instant endInstant = end.toInstant(ZoneOffset.UTC);
         Map<String, Object> report = fieldChangeAuditService.getChangeReport(
                 tenantId, modelCode, startInstant, endInstant);
-        return ApiResponse.success(report);
+        return ApiResponse.success(toResponseReport(report));
     }
 
     // =====================================================================
@@ -177,4 +178,53 @@ public class FieldChangeAuditController {
             boolean requireReason,
             boolean notifyOnChange
     ) {}
+
+    public record FieldChangeLogResponse(
+            String recordPid,
+            String modelCode,
+            String commandCode,
+            String fieldCode,
+            String fieldLabel,
+            String oldValue,
+            String newValue,
+            String valueType,
+            String changeType,
+            String actorName,
+            Instant changedAt,
+            String changeReason
+    ) {}
+
+    private List<FieldChangeLogResponse> toResponses(List<FieldChangeLog> changes) {
+        return changes.stream().map(this::toResponse).toList();
+    }
+
+    private FieldChangeLogResponse toResponse(FieldChangeLog change) {
+        return new FieldChangeLogResponse(
+                change.getRecordPid(),
+                change.getModelCode(),
+                change.getCommandCode(),
+                change.getFieldCode(),
+                change.getFieldLabel(),
+                change.getOldValue(),
+                change.getNewValue(),
+                change.getValueType(),
+                change.getChangeType(),
+                change.getActorName(),
+                change.getChangedAt(),
+                change.getChangeReason()
+        );
+    }
+
+    private Map<String, Object> toResponseReport(Map<String, Object> report) {
+        Map<String, Object> response = new LinkedHashMap<>(report);
+        Object recentChanges = response.get("recentChanges");
+        if (recentChanges instanceof List<?> changes) {
+            response.put("recentChanges", changes.stream()
+                    .filter(FieldChangeLog.class::isInstance)
+                    .map(FieldChangeLog.class::cast)
+                    .map(this::toResponse)
+                    .toList());
+        }
+        return response;
+    }
 }
