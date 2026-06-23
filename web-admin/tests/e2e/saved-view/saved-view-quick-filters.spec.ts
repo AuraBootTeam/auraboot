@@ -7,7 +7,11 @@
 
 import { test, expect } from '@playwright/test';
 import { openViewSelectorDropdown } from '../helpers';
-import { cleanupGeneratedSavedViews, navigateToOrderViaSidebar } from './helpers';
+import {
+  cleanupGeneratedSavedViews,
+  createOrReuseSavedView,
+  navigateToOrderViaSidebar,
+} from './helpers';
 
 const MODEL_CODE = 'e2et_order';
 const PAGE_KEY = 'e2et_order_list';
@@ -100,6 +104,45 @@ test.describe('Quick Filters (GAP-130)', () => {
       .toBe(initialClass);
   });
 
+  test('QF-003b: clicking a quick filter from a personal view returns to default preset mode', async ({
+    page,
+  }) => {
+    const viewName = `QF_个人视图_${Date.now()}`;
+    const { pid } = await createOrReuseSavedView(page, {
+      modelCode: MODEL_CODE,
+      pageKey: PAGE_KEY,
+      name: viewName,
+      viewType: 'table',
+      scope: 'personal',
+      viewConfig: { rowHeight: 'tall' },
+      expectSuccess: true,
+    });
+
+    await navigateToOrderViaSidebar(page);
+    const dropdown = await openViewSelectorDropdown(page);
+    await dropdown.getByTestId(`view-option-${pid}`).click();
+    await dropdown.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await expect(page).toHaveURL(new RegExp(`view=${pid}`), { timeout: 5000 });
+    await expect(page.getByTestId('view-selector-trigger')).toHaveAttribute(
+      'data-current-view-name',
+      viewName,
+    );
+
+    await clickStableTestId(page, 'quick-filter-my_records');
+
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('view'), { timeout: 5000 })
+      .toBeNull();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('preset'), { timeout: 5000 })
+      .toBe('my_records');
+    await expect(quickFilter(page, 'my_records')).toHaveAttribute('data-preset-active', 'true');
+    await expect(page.getByTestId('view-selector-trigger')).not.toHaveAttribute(
+      'data-current-view-name',
+      viewName,
+    );
+  });
+
   test('QF-004: only one quick filter active at a time', async ({ page }) => {
     await navigateToOrderTable(page);
     await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
@@ -172,5 +215,9 @@ test.describe('Quick Filters (GAP-130)', () => {
     await expect
       .poll(() => new URL(page.url()).searchParams.get('preset'), { timeout: 5000 })
       .toBeNull();
+    await expect(page.getByTestId('quick-filter-modified_this_week')).toHaveAttribute(
+      'data-preset-active',
+      'false',
+    );
   });
 });

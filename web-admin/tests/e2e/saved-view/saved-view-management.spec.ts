@@ -450,6 +450,11 @@ test.describe.serial('SavedView Personal-only management', () => {
     const savedPreset = await getView(page, pid);
     expect(savedPreset.scope).toBe('personal');
     expect(savedPreset.viewConfig?.meta).toMatchObject({ originPresetKey: 'my_records' });
+    await expect(page.getByTestId('quick-filter-my_records')).toHaveAttribute(
+      'data-preset-active',
+      'false',
+    );
+    await expect(page.getByTestId('preset-view-save-as-personal')).toHaveCount(0);
     await deleteView(page, pid);
   });
 

@@ -75,7 +75,6 @@ import {
   type QuickFilterPresetKey,
   buildQuickFilterPreset,
   buildQuickFilterPresetViewRequest,
-  buildQuickFilterPresetViewFilters,
   getQuickFilterPresetDefinition,
   isQuickFilterPresetKey,
 } from './list/quickFilterPresets';
@@ -156,52 +155,6 @@ export function findPersonalPresetSavedView(
   );
 }
 
-export function getSavedQuickFilterPresetKeys(
-  savedViews: Array<Pick<SavedView, 'scope' | 'viewConfig'>>,
-): QuickFilterPresetKey[] {
-  const keys = new Set<QuickFilterPresetKey>();
-  for (const view of savedViews) {
-    const key = view.viewConfig?.meta?.originPresetKey;
-    if (String(view.scope).toLowerCase() === 'personal' && isQuickFilterPresetKey(key)) {
-      keys.add(key);
-    }
-  }
-  return Array.from(keys);
-}
-
-export function getActiveSavedQuickFilterPresetKey(
-  view: Pick<SavedView, 'scope' | 'viewConfig'> | null | undefined,
-): QuickFilterPresetKey | null {
-  const key = view?.viewConfig?.meta?.originPresetKey;
-  if (String(view?.scope || '').toLowerCase() !== 'personal') return null;
-  return isQuickFilterPresetKey(key) ? key : null;
-}
-
-function stableStringify(value: unknown): string {
-  if (value == null || typeof value !== 'object') {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
-  }
-  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-    a.localeCompare(b),
-  );
-  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`).join(',')}}`;
-}
-
-function normalizePresetFilters(filters: ViewFilterConfig[] | undefined): string[] {
-  return (filters ?? [])
-    .map((filter) =>
-      stableStringify({
-        fieldCode: filter.fieldCode,
-        operator: filter.operator,
-        value: filter.value,
-      }),
-    )
-    .sort();
-}
-
 export function viewConfigFiltersToRuntimeFilters(
   filters: ViewFilterConfig[] | undefined,
 ): Record<string, any> {
@@ -268,19 +221,6 @@ export function pruneNoopViewConfigPatch(
   }
 
   return Object.keys(pruned).length > 0 ? (pruned as Partial<ViewConfig>) : null;
-}
-
-export function isPersonalPresetSavedViewEdited(
-  view: Pick<SavedView, 'scope' | 'viewConfig'> | null | undefined,
-  presetKey: QuickFilterPresetKey,
-  ctx: { userId?: string | number; now: Date },
-): boolean {
-  if (getActiveSavedQuickFilterPresetKey(view) !== presetKey) return false;
-  const presetFilters = buildQuickFilterPresetViewFilters(buildQuickFilterPreset(presetKey, ctx));
-  return (
-    stableStringify(normalizePresetFilters(view?.viewConfig?.filters)) !==
-    stableStringify(normalizePresetFilters(presetFilters))
-  );
 }
 
 export function resolveListSavedViewPageKey(
@@ -980,8 +920,8 @@ function ListPageContentInner(props: PageContentProps) {
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
   const hideSavedViews =
     listExtensions?.hideSavedViews ?? Boolean(schemaExtension.hideSavedViews || skipListData);
-  // Quick-filter / preset-view visibility (shared by the header preset bar and
-  // the toolbar quick filters so both stay in sync).
+  // Quick filters live only in the toolbar. They apply to default view mode and
+  // are not mirrored as saved-view selector entries.
   const hideQuickFilters =
     listExtensions?.hideQuickFilters ?? Boolean(schemaExtension.hideQuickFilters);
   const {
@@ -1058,25 +998,6 @@ function ListPageContentInner(props: PageContentProps) {
     },
     [t],
   );
-  const savedQuickFilterPresetKeys = useMemo(
-    () => getSavedQuickFilterPresetKeys(savedViews),
-    [savedViews],
-  );
-  const activeSavedQuickFilterPresetKey = useMemo(
-    () => getActiveSavedQuickFilterPresetKey(currentView),
-    [currentView],
-  );
-  const activeSavedQuickFilterPresetEdited = useMemo(
-    () =>
-      activeSavedQuickFilterPresetKey
-        ? isPersonalPresetSavedViewEdited(currentView, activeSavedQuickFilterPresetKey, {
-            userId: user?.id,
-            now: new Date(),
-          })
-        : false,
-    [activeSavedQuickFilterPresetKey, currentView, user?.id],
-  );
-
   useEffect(() => {
     setPendingViewConfig(null);
   }, [currentView?.pid]);
@@ -1186,6 +1107,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Apply SavedView viewConfig (pagination + filters + sorts) when view changes.
   // Empty config is meaningful: it restores the selected view back to a clean list state.
   useEffect(() => {
+    if (activeQuickFilterRef.current) return;
     if (!currentView) return;
     applyViewConfigToListState(currentView.viewConfig);
   }, [currentView?.pid, currentView?.viewConfig, applyViewConfigToListState]);
@@ -3364,13 +3286,17 @@ function ListPageContentInner(props: PageContentProps) {
   );
 
   // Sync the active preset view to the URL (?preset=created_today) so it
-  // survives reload; pass null to clear it.
+  // survives reload; pass null to clear it. A quick-filter preset belongs to
+  // the default list state, so selecting one clears any SavedView identity and
+  // transient URL state that came from a personal view.
   const syncPresetToUrl = useCallback(
     (key: QuickFilterKey | null) => {
       setSearchParams(
         (prev) => {
           const p = new URLSearchParams(prev);
           if (key) {
+            p.delete('view');
+            clearTransientViewSearchParams(p);
             p.set('preset', key);
           } else {
             p.delete('preset');
@@ -3395,6 +3321,12 @@ function ListPageContentInner(props: PageContentProps) {
         loadData({ page: 0, size: pagination.pageSize, filters: {} });
         return;
       }
+      if (currentView && !isImplicitSavedView(currentView)) {
+        selectDefaultView();
+        setPendingViewConfig(null);
+        setActiveViewType('table');
+        clearKeyword();
+      }
       const qf = buildQuickFilterPreset(key, { userId: user?.id, now: new Date() }) ?? {};
       activeQuickFilterRef.current = key;
       setActiveQuickFilter(key);
@@ -3402,7 +3334,16 @@ function ListPageContentInner(props: PageContentProps) {
       syncPresetToUrl(key);
       loadData({ page: 0, size: pagination.pageSize, filters: qf });
     },
-    [user, setFilters, syncPresetToUrl, loadData, pagination.pageSize],
+    [
+      clearKeyword,
+      currentView,
+      loadData,
+      pagination.pageSize,
+      selectDefaultView,
+      setFilters,
+      syncPresetToUrl,
+      user,
+    ],
   );
 
   const handleSaveActivePreset = useCallback(async () => {
@@ -3480,53 +3421,6 @@ function ListPageContentInner(props: PageContentProps) {
     showSuccessToast,
     syncPresetToUrl,
     translateCommon,
-    user?.id,
-  ]);
-
-  const handleResetActiveSavedPreset = useCallback(async () => {
-    if (!currentView || !activeSavedQuickFilterPresetKey) return;
-
-    const presetFilters = buildQuickFilterPreset(activeSavedQuickFilterPresetKey, {
-      userId: user?.id,
-      now: new Date(),
-    });
-    if (!presetFilters) return;
-
-    const viewFilters = buildQuickFilterPresetViewFilters(presetFilters);
-    const nextConfig: ViewConfig = {
-      ...(currentView.viewConfig ?? {}),
-      filters: viewFilters,
-      meta: {
-        ...(currentView.viewConfig?.meta ?? {}),
-        managedBy: currentView.viewConfig?.meta?.managedBy ?? 'user',
-        originPresetKey: activeSavedQuickFilterPresetKey,
-      },
-    };
-
-    try {
-      await updateView({ viewConfig: nextConfig });
-      setFilters(presetFilters);
-      loadData({ page: 0, size: pagination.pageSize, filters: presetFilters });
-      flashViewSavedHint();
-      showSuccessToast(translateCommon('common.saved_view_preset_reset_done', 'Preset view reset'));
-    } catch (err) {
-      showErrorToast(
-        err instanceof Error
-          ? err.message
-          : translateCommon('common.saved_view_preset_reset_failed', 'Failed to reset preset view'),
-      );
-    }
-  }, [
-    activeSavedQuickFilterPresetKey,
-    currentView,
-    flashViewSavedHint,
-    loadData,
-    pagination.pageSize,
-    setFilters,
-    showErrorToast,
-    showSuccessToast,
-    translateCommon,
-    updateView,
     user?.id,
   ]);
 
@@ -3843,6 +3737,8 @@ function ListPageContentInner(props: PageContentProps) {
             activeViewType={activeViewType}
             onSelectDefaultView={handleSelectDefaultView}
             onSelectView={(pid) => {
+              activeQuickFilterRef.current = null;
+              setActiveQuickFilter(null);
               selectView(pid);
               // Sync view selection to URL
               setSearchParams(
@@ -3850,9 +3746,7 @@ function ListPageContentInner(props: PageContentProps) {
                   const p = new URLSearchParams(prev);
                   p.set('view', pid);
                   // Clear temporary filter/sort params when switching views
-                  p.delete('sort');
-                  p.delete('keyword');
-                  p.delete('filters');
+                  clearTransientViewSearchParams(p);
                   return p;
                 },
                 { replace: true },
@@ -4435,10 +4329,6 @@ function ListPageContentInner(props: PageContentProps) {
                 activeQuickFilter={activeQuickFilter}
                 onQuickFilter={handleQuickFilter}
                 onSaveActivePreset={handleSaveActivePreset}
-                savedPresetKeys={savedQuickFilterPresetKeys}
-                activeSavedPresetKey={activeSavedQuickFilterPresetKey}
-                activeSavedPresetEdited={activeSavedQuickFilterPresetEdited}
-                onResetActiveSavedPreset={handleResetActiveSavedPreset}
                 activeSorts={activeSorts}
                 onSortsChange={setActiveSorts}
                 sortableColumns={tableColumns
@@ -4644,6 +4534,8 @@ function ListPageContentInner(props: PageContentProps) {
             onCreateView={async (req: SavedViewCreateRequest) => createView(req)}
             onCreateViewSuccess={(view) => {
               const newType = (view.viewType as ViewType) || 'table';
+              activeQuickFilterRef.current = null;
+              setActiveQuickFilter(null);
               setActiveViewType(newType);
               setStartCreateViewMode(false);
               if (view.pid) {
@@ -4651,6 +4543,7 @@ function ListPageContentInner(props: PageContentProps) {
                   (prev) => {
                     const p = new URLSearchParams(prev);
                     p.set('view', view.pid);
+                    clearTransientViewSearchParams(p);
                     return p;
                   },
                   { replace: true },
@@ -4668,14 +4561,14 @@ function ListPageContentInner(props: PageContentProps) {
               await setDefaultView(pid);
             }}
             onSelectView={(pid) => {
+              activeQuickFilterRef.current = null;
+              setActiveQuickFilter(null);
               selectView(pid);
               setSearchParams(
                 (prev) => {
                   const p = new URLSearchParams(prev);
                   p.set('view', pid);
-                  p.delete('sort');
-                  p.delete('keyword');
-                  p.delete('filters');
+                  clearTransientViewSearchParams(p);
                   return p;
                 },
                 { replace: true },
