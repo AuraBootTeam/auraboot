@@ -1,26 +1,24 @@
 /**
- * ViewManagePanel Component
+ * Personal SavedView management panel.
  *
- * A slide-out panel for managing saved views.
- * Allows users to create, delete, duplicate, and set default views.
+ * This release intentionally exposes only personal views. Team/global sharing,
+ * collaborators, and audit remain backend/roadmap capabilities outside the
+ * current user-visible management chain.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Copy, Pencil, Plus, Search, Star, Trash2, X } from 'lucide-react';
+import { useI18n } from '~/contexts/I18nContext';
 import {
   type SavedView,
-  type SavedViewAuditEvent,
   type SavedViewCreateRequest,
-  type SavedViewTeamOption,
-  type SavedViewUserOption,
   type ViewConfig,
-  type ViewCollaboratorAcl,
   type ViewScope,
   type ViewType,
 } from '~/framework/smart/types/savedView';
 import type { FieldOption } from './KanbanConfigPanel';
 import { cn } from '~/utils/cn';
 import { confirmDialog } from '~/utils/confirmDialog';
-import { modelService } from '~/shared/services/modelService';
 import {
   checkSavedViewCapability,
   type SavedViewCapabilityResult,
@@ -30,163 +28,218 @@ import {
   canDeleteSavedView,
   canManageSavedView,
   canSetDefaultSavedView,
-  canShareSavedView,
   isSavedViewLockedPreset,
 } from '~/framework/smart/utils/savedViewPersistence';
-import { savedViewService } from '~/shared/services/savedViewService';
 
-/**
- * View types that require field configuration after creation.
- * Table and Form views don't need configuration and close immediately.
- */
-const VIEW_TYPE_REQUIRED_FIELDS: Record<string, Array<{
-  key: string;
-  label: string;
+const PERSONAL_VIEW_LIMIT = 10;
+
+type ConfigFieldKey = keyof ViewConfig;
+
+function interpolateMessage(template: string, params?: Record<string, unknown>): string {
+  if (!params) return template;
+  return Object.entries(params).reduce(
+    (message, [key, value]) => message.replaceAll(`{${key}}`, String(value ?? '')),
+    template,
+  );
+}
+
+interface ViewTypeFieldRequirement {
+  key: ConfigFieldKey;
+  labelKey: string;
+  fallback: string;
   required: boolean;
-}>> = {
+}
+
+const VIEW_TYPE_REQUIRED_FIELDS: Partial<Record<ViewType, ViewTypeFieldRequirement[]>> = {
   kanban: [
-    { key: 'groupByField', label: 'Group By', required: true },
-    { key: 'titleField', label: 'Title Field', required: true },
+    {
+      key: 'groupByField',
+      labelKey: 'common.saved_view_field_groupByField',
+      fallback: '分组字段',
+      required: true,
+    },
+    {
+      key: 'titleField',
+      labelKey: 'common.saved_view_field_titleField',
+      fallback: '标题字段',
+      required: true,
+    },
   ],
   calendar: [
-    { key: 'calendarDateField', label: 'Date Field', required: true },
-    { key: 'calendarTitleField', label: 'Title Field', required: false },
+    {
+      key: 'calendarDateField',
+      labelKey: 'common.saved_view_field_calendarDateField',
+      fallback: '日期字段',
+      required: true,
+    },
+    {
+      key: 'calendarTitleField',
+      labelKey: 'common.saved_view_field_calendarTitleField',
+      fallback: '标题字段',
+      required: false,
+    },
   ],
   gantt: [
-    { key: 'ganttStartDateField', label: 'Start Date', required: true },
-    { key: 'ganttEndDateField', label: 'End Date', required: true },
-    { key: 'ganttTitleField', label: 'Title Field', required: false },
+    {
+      key: 'ganttStartDateField',
+      labelKey: 'common.saved_view_field_ganttStartDateField',
+      fallback: '开始日期字段',
+      required: true,
+    },
+    {
+      key: 'ganttEndDateField',
+      labelKey: 'common.saved_view_field_ganttEndDateField',
+      fallback: '结束日期字段',
+      required: true,
+    },
+    {
+      key: 'ganttTitleField',
+      labelKey: 'common.saved_view_field_ganttTitleField',
+      fallback: '标题字段',
+      required: false,
+    },
   ],
   gallery: [
-    { key: 'galleryImageField', label: 'Image Field', required: true },
-    { key: 'galleryTitleField', label: 'Title Field', required: false },
+    {
+      key: 'galleryImageField',
+      labelKey: 'common.saved_view_field_galleryImageField',
+      fallback: '图片字段',
+      required: true,
+    },
+    {
+      key: 'galleryTitleField',
+      labelKey: 'common.saved_view_field_galleryTitleField',
+      fallback: '标题字段',
+      required: false,
+    },
   ],
   tree: [
-    { key: 'treeParentField', label: 'Parent Field', required: true },
-    { key: 'treeTitleField', label: 'Title Field', required: false },
+    {
+      key: 'treeParentField',
+      labelKey: 'common.saved_view_field_treeParentField',
+      fallback: '父级字段',
+      required: true,
+    },
+    {
+      key: 'treeTitleField',
+      labelKey: 'common.saved_view_field_treeTitleField',
+      fallback: '标题字段',
+      required: false,
+    },
   ],
   timeline: [
-    { key: 'timelineStartField', label: 'Start Date', required: true },
-    { key: 'timelineResourceField', label: 'Resource Field', required: true },
-    { key: 'timelineEndField', label: 'End Date', required: false },
-    { key: 'timelineTitleField', label: 'Title Field', required: false },
+    {
+      key: 'timelineStartField',
+      labelKey: 'common.saved_view_field_timelineStartField',
+      fallback: '开始日期字段',
+      required: true,
+    },
+    {
+      key: 'timelineResourceField',
+      labelKey: 'common.saved_view_field_timelineResourceField',
+      fallback: '泳道字段',
+      required: true,
+    },
+    {
+      key: 'timelineEndField',
+      labelKey: 'common.saved_view_field_timelineEndField',
+      fallback: '结束日期字段',
+      required: false,
+    },
+    {
+      key: 'timelineTitleField',
+      labelKey: 'common.saved_view_field_timelineTitleField',
+      fallback: '标题字段',
+      required: false,
+    },
   ],
 };
 
-/**
- * Props for ViewManagePanel component
- */
+const VIEW_TYPE_OPTIONS: Array<{
+  type: ViewType;
+  labelKey: string;
+  fallback: string;
+}> = [
+  { type: 'table', labelKey: 'common.saved_view_type_table', fallback: '表格' },
+  { type: 'kanban', labelKey: 'common.saved_view_type_kanban', fallback: '看板' },
+  { type: 'calendar', labelKey: 'common.saved_view_type_calendar', fallback: '日历' },
+  { type: 'gallery', labelKey: 'common.saved_view_type_gallery', fallback: '画册' },
+  { type: 'gantt', labelKey: 'common.saved_view_type_gantt', fallback: '甘特图' },
+  { type: 'tree', labelKey: 'common.saved_view_type_tree', fallback: '树视图' },
+  { type: 'timeline', labelKey: 'common.saved_view_type_timeline', fallback: '时间线' },
+  { type: 'form', labelKey: 'common.saved_view_type_form', fallback: '表单' },
+];
+
+const CAPABILITY_REASON_I18N: Record<string, { key: string; fallback: string }> = {
+  missing_kanban_group_field: {
+    key: 'common.saved_view_reason_missing_kanban_group_field',
+    fallback: '缺少适合作为分组的字段，暂不能保存该视图。',
+  },
+  missing_title_field: {
+    key: 'common.saved_view_reason_missing_title_field',
+    fallback: '缺少适合作为标题的字段，暂不能保存该视图。',
+  },
+  missing_date_field: {
+    key: 'common.saved_view_reason_missing_date_field',
+    fallback: '缺少日期字段，暂不能保存该视图。',
+  },
+  missing_image_field: {
+    key: 'common.saved_view_reason_missing_image_field',
+    fallback: '缺少图片、附件、头像或封面字段，暂不能保存该视图。',
+  },
+  missing_tree_parent_field: {
+    key: 'common.saved_view_reason_missing_tree_parent_field',
+    fallback: '缺少父级、路径或层级字段，暂不能保存该视图。',
+  },
+  missing_timeline_resource_field: {
+    key: 'common.saved_view_reason_missing_timeline_resource_field',
+    fallback: '缺少适合作为泳道的资源字段，暂不能保存该视图。',
+  },
+  kanban_drag_command_missing: {
+    key: 'common.saved_view_reason_kanban_drag_command_missing',
+    fallback: '当前数据可生成看板，但未配置状态更新命令，拖拽将保持禁用。',
+  },
+  tree_reorder_command_missing: {
+    key: 'common.saved_view_reason_tree_reorder_command_missing',
+    fallback: '当前数据可生成树视图，但未配置更新命令，拖拽排序将保持禁用。',
+  },
+  single_date_field_reused: {
+    key: 'common.saved_view_reason_single_date_field_reused',
+    fallback: '当前只有一个日期字段，将同时作为开始和结束日期使用。',
+  },
+};
+
 export interface ViewManagePanelProps {
-  /** Whether the panel is open */
   open: boolean;
-  /** Callback to close the panel */
   onClose: () => void;
-  /** List of available views */
   views: SavedView[];
-  /** Currently selected view */
   currentView: SavedView | null;
-  /** Callback to create a new view */
   onCreateView: (request: SavedViewCreateRequest) => Promise<SavedView>;
-  /** Callback to delete a view */
   onDeleteView: (pid: string) => Promise<void>;
-  /** Callback to duplicate a view */
   onDuplicateView: (pid: string, newName: string) => Promise<void>;
-  /** Callback to edit a view (name, description, scope) */
   onEditView?: (pid: string, name: string, description: string, scope: ViewScope) => Promise<void>;
-  /** Callback to set a view as default */
   onSetDefaultView: (pid: string) => Promise<void>;
-  /** Callback when a view is selected */
   onSelectView: (pid: string) => void;
-  /** Associated model code */
   modelCode: string;
-  /** Associated page key (optional) */
   pageKey?: string;
-  /** Open panel directly in create mode */
   startInCreateMode?: boolean;
-  /** Current active view type for pre-selecting on create */
   activeViewType?: ViewType;
-  /** Callback after create success for parent sync (e.g. active view type) */
   onCreateViewSuccess?: (view: SavedView) => void;
-  /** Available model fields for kanban configuration */
   fields?: FieldOption[];
-  /** Model PID for creating fields */
   modelPid?: string;
-  /** Callback when fields are auto-created (to refresh parent) */
   onFieldsCreated?: () => void;
-  /** Callback after view config is saved (e.g. after config step for Kanban) to reload views */
   onViewConfigSaved?: () => void;
 }
 
-/**
- * Scope configuration for display
- */
-interface ScopeConfig {
-  scope: ViewScope;
-  label: string;
-  icon: string;
+function countPersonalManualViews(views: SavedView[]): number {
+  return views.filter((view) => view.scope === 'personal' && !view.isImplicit).length;
 }
 
-/**
- * Ordered scope configurations for grouping views
- */
-const SCOPE_CONFIGS: ScopeConfig[] = [
-  { scope: 'global', label: 'Global Views', icon: '🌐' },
-  { scope: 'team', label: 'Team Views', icon: '👥' },
-  { scope: 'personal', label: 'Personal Views', icon: '👤' },
-];
-
-const MANUAL_VIEW_LIMITS: Record<ViewScope, number> = {
-  personal: 10,
-  team: 20,
-  global: 20,
-};
-
-function countManualViewsForScope(
-  views: SavedView[],
-  scope: ViewScope,
-  teamId?: string,
-): number {
-  return views.filter((view) => {
-    if (view.isImplicit || view.scope !== scope) {
-      return false;
-    }
-    if (scope === 'team' && teamId) {
-      return view.teamId === teamId;
-    }
-    return true;
-  }).length;
-}
-
-function formatAuditTimestamp(timestamp?: string): string {
-  if (!timestamp) {
-    return '';
-  }
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return timestamp;
-  }
-  return date.toLocaleString();
-}
-
-function getAuditSummary(event: SavedViewAuditEvent): string {
-  const metadataSummary = event.metadata?.summary;
-  if (typeof metadataSummary === 'string' && metadataSummary.trim()) {
-    return metadataSummary;
-  }
-  if (event.changedFields && event.changedFields.length > 0) {
-    return `Changed ${event.changedFields.join(', ')}`;
-  }
-  return event.commandCode || event.eventType || 'Saved view changed';
-}
-
-function nextAutoViewName(label: string, views: SavedView[]): string {
-  const baseName = `${label} View`;
+function nextAutoViewName(baseName: string, views: SavedView[]): string {
   const usedNames = new Set(
     views.map((view) => String(view.name ?? '').trim().toLowerCase()).filter(Boolean),
   );
-  if (!usedNames.has(baseName.toLowerCase())) {
-    return baseName;
-  }
+  if (!usedNames.has(baseName.toLowerCase())) return baseName;
 
   let suffix = 2;
   while (usedNames.has(`${baseName} ${suffix}`.toLowerCase())) {
@@ -195,23 +248,6 @@ function nextAutoViewName(label: string, views: SavedView[]): string {
   return `${baseName} ${suffix}`;
 }
 
-/**
- * ViewManagePanel - A slide-out panel for managing saved views
- *
- * @example
- * <ViewManagePanel
- *   open={isPanelOpen}
- *   onClose={() => setIsPanelOpen(false)}
- *   views={savedViews}
- *   currentView={currentView}
- *   onCreateView={handleCreateView}
- *   onDeleteView={handleDeleteView}
- *   onDuplicateView={handleDuplicateView}
- *   onSetDefaultView={handleSetDefaultView}
- *   onSelectView={handleSelectView}
- *   modelCode="order"
- * />
- */
 export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   open,
   onClose,
@@ -227,56 +263,44 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   pageKey,
   onCreateViewSuccess,
   startInCreateMode,
-  modelPid,
-  fields,
+  fields = [],
   onViewConfigSaved,
 }) => {
-  // Editing state for inline edit form
+  const { t } = useI18n();
+  const tx = useCallback(
+    (key: string, fallback: string, params?: Record<string, unknown>) =>
+      interpolateMessage(t(key, params, fallback), params),
+    [t],
+  );
+  const [showTypePicker, setShowTypePicker] = useState(false);
+  const [configStep, setConfigStep] = useState<{
+    viewType: ViewType;
+    fields: Record<string, string>;
+    capability: SavedViewCapabilityResult;
+  } | null>(null);
+  const [blockedCapability, setBlockedCapability] = useState<SavedViewCapabilityResult | null>(
+    null,
+  );
   const [editingView, setEditingView] = useState<SavedView | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', description: '', scope: 'personal' as ViewScope });
-
-  // Loading states for operations
+  const [editForm, setEditForm] = useState({ name: '', description: '' });
+  const [duplicatingView, setDuplicatingView] = useState<SavedView | null>(null);
+  const [duplicateName, setDuplicateName] = useState('');
+  const [manageSearchTerm, setManageSearchTerm] = useState('');
   const [loadingState, setLoadingState] = useState<{
     type: 'create' | 'delete' | 'duplicate' | 'setDefault' | 'rename' | null;
     pid?: string;
   }>({ type: null });
-  const [teamOptions, setTeamOptions] = useState<SavedViewTeamOption[]>([]);
-  const [teamLoading, setTeamLoading] = useState(false);
-  const [createScope, setCreateScope] = useState<ViewScope>('personal');
-  const [createTeamId, setCreateTeamId] = useState('');
-  const [auditView, setAuditView] = useState<SavedView | null>(null);
-  const [auditEvents, setAuditEvents] = useState<SavedViewAuditEvent[]>([]);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [auditError, setAuditError] = useState<string | null>(null);
-  const [shareView, setShareView] = useState<SavedView | null>(null);
-  const [collaboratorSearch, setCollaboratorSearch] = useState('');
-  const [collaboratorResults, setCollaboratorResults] = useState<SavedViewUserOption[]>([]);
-  const [collaboratorPid, setCollaboratorPid] = useState('');
-  const [collaboratorPermission, setCollaboratorPermission] =
-    useState<ViewCollaboratorAcl['permission']>('save');
-  const [collaboratorLoading, setCollaboratorLoading] = useState(false);
-  const [collaboratorSaving, setCollaboratorSaving] = useState(false);
-  const [collaboratorError, setCollaboratorError] = useState<string | null>(null);
 
-  /**
-   * Reset state when panel closes
-   */
   useEffect(() => {
     if (!open) {
       setLoadingState({ type: null });
+      setShowTypePicker(false);
       setConfigStep(null);
       setBlockedCapability(null);
-      setCreateScope('personal');
-      setCreateTeamId('');
-      setAuditView(null);
-      setAuditEvents([]);
-      setAuditError(null);
-      setShareView(null);
-      setCollaboratorSearch('');
-      setCollaboratorResults([]);
-      setCollaboratorPid('');
-      setCollaboratorPermission('save');
-      setCollaboratorError(null);
+      setEditingView(null);
+      setDuplicatingView(null);
+      setDuplicateName('');
+      setManageSearchTerm('');
     }
   }, [open]);
 
@@ -288,138 +312,80 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   }, [open, startInCreateMode]);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    let cancelled = false;
-    setTeamLoading(true);
-    savedViewService
-      .getMyTeams()
-      .then((teams) => {
-        if (cancelled) {
-          return;
-        }
-        setTeamOptions(teams);
-        setCreateTeamId((current) => current || teams[0]?.pid || '');
-      })
-      .catch(() => {
-        if (cancelled) {
-          return;
-        }
-        setTeamOptions([]);
-        setCreateTeamId('');
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setTeamLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
-
-  /**
-   * Close panel on escape key
-   */
-  useEffect(() => {
+    if (!open) return;
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && open) {
-        onClose();
-      }
+      if (event.key === 'Escape') onClose();
     };
-
     document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-    };
+    return () => document.removeEventListener('keydown', handleEscape);
   }, [open, onClose]);
 
-  // Type picker expanded state
-  const [showTypePicker, setShowTypePicker] = useState(false);
+  const personalViews = useMemo(
+    () => views.filter((view) => view.scope === 'personal'),
+    [views],
+  );
+  const visiblePersonalViews = useMemo(() => {
+    const query = manageSearchTerm.trim().toLowerCase();
+    if (!query) return personalViews;
+    return personalViews.filter((view) => {
+      const viewTypeLabel =
+        view.viewType && VIEW_TYPE_OPTIONS.find((option) => option.type === view.viewType)?.fallback;
+      const haystack = [
+        view.name,
+        view.description,
+        view.viewType,
+        viewTypeLabel,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [manageSearchTerm, personalViews]);
+  const personalViewCount = countPersonalManualViews(views);
+  const personalLimitReached = personalViewCount >= PERSONAL_VIEW_LIMIT;
+  const quotaText = tx('common.saved_view_personal_quota', '个人视图: {count}/{limit}', {
+    count: personalViewCount,
+    limit: PERSONAL_VIEW_LIMIT,
+  });
 
-  // Config step state for view types that need field configuration
-  const [configStep, setConfigStep] = useState<{
-    viewType: ViewType;
-    fields: Record<string, string>;
-    capability: SavedViewCapabilityResult;
-  } | null>(null);
-  const [blockedCapability, setBlockedCapability] = useState<SavedViewCapabilityResult | null>(
-    null,
+  const viewTypeLabels = useMemo(() => {
+    return Object.fromEntries(
+      VIEW_TYPE_OPTIONS.map((option) => [option.type, tx(option.labelKey, option.fallback)]),
+    ) as Record<ViewType, string>;
+  }, [tx]);
+
+  const buildAutoViewName = useCallback(
+    (viewType: ViewType) => {
+      const typeLabel = viewTypeLabels[viewType] || viewType;
+      return nextAutoViewName(
+        tx('common.saved_view_auto_name', '{type}视图', { type: typeLabel }),
+        views,
+      );
+    },
+    [tx, viewTypeLabels, views],
   );
 
-  // Model fields for config step dropdowns
-  const [modelFields, setModelFields] = useState<FieldOption[]>([]);
-  const [configSaving, setConfigSaving] = useState(false);
-
-  // Use fields from props (already loaded by parent from DSL schema)
-  // Fallback to API if props.fields is empty
-  useEffect(() => {
-    if (!configStep) {
-      setModelFields([]);
-      return;
-    }
-    // Prefer fields from props (from tableColumns in ListPageContent)
-    if (fields && fields.length > 0) {
-      setModelFields(fields);
-      return;
-    }
-    // Fallback: fetch from API
-    if (modelPid) {
-      modelService
-        .getModelFields(modelPid)
-        .then((apiFields) => {
-          setModelFields(
-            apiFields.map((f) => ({
-              code: f.fieldCode,
-              name: f.displayName || f.fieldName || f.fieldCode,
-              dataType: f.dataType || 'text',
-            })),
-          );
-        })
-        .catch(() => setModelFields([]));
-    }
-  }, [configStep, fields, modelPid]);
-
-  const createViewLimit = MANUAL_VIEW_LIMITS[createScope] ?? MANUAL_VIEW_LIMITS.personal;
-  const createViewCount = countManualViewsForScope(views, createScope, createTeamId);
-  const createViewLimitReached = createViewCount >= createViewLimit;
-  const createTargetDisabled =
-    (createScope === 'team' && !createTeamId) || createViewLimitReached;
-
-  const getCreateTargetPayload = useCallback((): Pick<SavedViewCreateRequest, 'scope' | 'teamId'> => {
-    if (createScope === 'team') {
-      return { scope: 'team', teamId: createTeamId };
-    }
-    return { scope: createScope };
-  }, [createScope, createTeamId]);
-
-  /**
-   * One-click instant view creation (Feishu style).
-   * Click type → immediately create and switch.
-   */
-  const handleQuickCreate = useCallback(async (viewType: ViewType = 'table') => {
-    if (createTargetDisabled) return;
-
-    const typeLabels: Record<string, string> = {
-      table: 'Table', kanban: 'Kanban', calendar: 'Calendar', gallery: 'Gallery',
-      gantt: 'Gantt', tree: 'Tree', timeline: 'Timeline', form: 'Form',
-    };
-    const label = typeLabels[viewType] || 'Table';
-    const autoName = nextAutoViewName(label, views);
-    const requiredFields = VIEW_TYPE_REQUIRED_FIELDS[viewType];
-
-    setBlockedCapability(null);
-
-    if (requiredFields) {
-      const capability = checkSavedViewCapability(viewType, fields ?? []);
-      if (capability.status === 'blocked') {
-        setBlockedCapability(capability);
-        return;
+  const capabilityMessages = useCallback(
+    (capability: SavedViewCapabilityResult): string[] => {
+      if (capability.reasonCodes.length > 0) {
+        return capability.reasonCodes.map((code) => {
+          const item = CAPABILITY_REASON_I18N[code];
+          return item ? tx(item.key, item.fallback) : code;
+        });
       }
+      return capability.reasons;
+    },
+    [tx],
+  );
 
+  const capabilityForType = useCallback(
+    (viewType: ViewType) => checkSavedViewCapability(viewType, fields),
+    [fields],
+  );
+
+  const createConfiguredStep = useCallback(
+    (viewType: ViewType, capability: SavedViewCapabilityResult) => {
       setConfigStep({
         viewType,
         fields: Object.fromEntries(
@@ -429,58 +395,68 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
         ),
         capability,
       });
+      setBlockedCapability(null);
       setShowTypePicker(false);
-      return;
-    }
+    },
+    [],
+  );
 
-    setLoadingState({ type: 'create' });
-    try {
-      const createdView = await onCreateView({
-        name: autoName,
-        modelCode,
-        pageKey,
-        ...getCreateTargetPayload(),
-        viewType,
-        isDefault: false,
-      });
-      if (createdView?.pid) {
-        onSelectView(createdView.pid);
+  const handleQuickCreate = useCallback(
+    async (viewType: ViewType) => {
+      if (personalLimitReached) return;
+      setBlockedCapability(null);
+
+      const requiredFields = VIEW_TYPE_REQUIRED_FIELDS[viewType];
+      if (requiredFields) {
+        const capability = capabilityForType(viewType);
+        if (capability.status === 'blocked') {
+          setBlockedCapability(capability);
+          return;
+        }
+        createConfiguredStep(viewType, capability);
+        return;
       }
-      onCreateViewSuccess?.(createdView);
-      setShowTypePicker(false);
-      onClose();
-    } catch (err) {
-      console.error('Failed to create view:', err);
-    } finally {
-      setLoadingState({ type: null });
-    }
-  }, [
-    createTargetDisabled,
-    fields,
-    getCreateTargetPayload,
-    modelCode,
-    onClose,
-    onCreateView,
-    onCreateViewSuccess,
-    onSelectView,
-    pageKey,
-    views,
-  ]);
+
+      setLoadingState({ type: 'create' });
+      try {
+      const createdView = await onCreateView({
+          name: buildAutoViewName(viewType),
+          modelCode,
+          pageKey,
+          scope: 'personal',
+          viewType,
+          isDefault: false,
+        });
+        if (createdView?.pid) onSelectView(createdView.pid);
+        onCreateViewSuccess?.(createdView);
+        setShowTypePicker(false);
+        onClose();
+      } finally {
+        setLoadingState({ type: null });
+      }
+    },
+    [
+      capabilityForType,
+      createConfiguredStep,
+      modelCode,
+      onClose,
+      onCreateView,
+      onCreateViewSuccess,
+      onSelectView,
+      pageKey,
+      personalLimitReached,
+      buildAutoViewName,
+    ],
+  );
 
   const handleFinishConfigStep = useCallback(async () => {
-    if (!configStep || createTargetDisabled) return;
-    const requiredFields = VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] || [];
-    const missingRequired = requiredFields
+    if (!configStep || personalLimitReached) return;
+    const requirements = VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] ?? [];
+    const missingRequired = requirements
       .filter((field) => field.required)
       .some((field) => !configStep.fields[field.key]);
     if (missingRequired) return;
 
-    const typeLabels: Record<string, string> = {
-      table: 'Table', kanban: 'Kanban', calendar: 'Calendar', gallery: 'Gallery',
-      gantt: 'Gantt', tree: 'Tree', timeline: 'Timeline', form: 'Form',
-    };
-    const label = typeLabels[configStep.viewType] || 'Table';
-    const autoName = nextAutoViewName(label, views);
     const viewConfig = Object.entries(configStep.fields).reduce((acc, [key, value]) => {
       if (value) {
         (acc as Record<string, string>)[key] = value;
@@ -488,36 +464,34 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
       return acc;
     }, {} as Partial<ViewConfig>);
 
-    setConfigSaving(true);
     setLoadingState({ type: 'create' });
     try {
       const createdView = await onCreateView({
-        name: autoName,
+        name: buildAutoViewName(configStep.viewType),
         modelCode,
         pageKey,
-        ...getCreateTargetPayload(),
+        scope: 'personal',
         viewType: configStep.viewType,
-        viewConfig,
+        viewConfig: {
+          ...viewConfig,
+          meta: {
+            capabilityStatus: configStep.capability.status,
+            capabilityReasonCodes: configStep.capability.reasonCodes,
+          },
+        },
         isDefault: false,
       });
-      if (createdView?.pid) {
-        onSelectView(createdView.pid);
-      }
+      if (createdView?.pid) onSelectView(createdView.pid);
       onCreateViewSuccess?.(createdView);
       onViewConfigSaved?.();
       setConfigStep(null);
       setShowTypePicker(false);
       onClose();
-    } catch (err) {
-      console.error('Failed to create configured view:', err);
     } finally {
-      setConfigSaving(false);
       setLoadingState({ type: null });
     }
   }, [
     configStep,
-    createTargetDisabled,
-    getCreateTargetPayload,
     modelCode,
     onClose,
     onCreateView,
@@ -525,18 +499,78 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
     onSelectView,
     onViewConfigSaved,
     pageKey,
-    views,
+    personalLimitReached,
+    buildAutoViewName,
   ]);
 
-  /**
-   * Handle delete view
-   */
+  const handleEdit = useCallback((view: SavedView) => {
+    if (!canManageSavedView(view)) return;
+    setEditingView(view);
+    setEditForm({ name: view.name, description: view.description || '' });
+    setDuplicatingView(null);
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingView || !editForm.name.trim()) return;
+    setLoadingState({ type: 'rename', pid: editingView.pid });
+    try {
+      await onEditView?.(
+        editingView.pid,
+        editForm.name.trim(),
+        editForm.description.trim(),
+        'personal',
+      );
+      setEditingView(null);
+    } finally {
+      setLoadingState({ type: null });
+    }
+  }, [editForm.description, editForm.name, editingView, onEditView]);
+
+  const handleDuplicateStart = useCallback((view: SavedView) => {
+    if (!canCopySavedView(view)) return;
+    setDuplicatingView(view);
+    setDuplicateName(
+      tx('common.saved_view_copy_name', '{name} 副本', {
+        name: view.name.trim() || tx('common.saved_view_untitled', '未命名视图'),
+      }),
+    );
+    setEditingView(null);
+  }, [tx]);
+
+  const handleDuplicateSubmit = useCallback(async () => {
+    if (!duplicatingView || !duplicateName.trim()) return;
+    setLoadingState({ type: 'duplicate', pid: duplicatingView.pid });
+    try {
+      await onDuplicateView(duplicatingView.pid, duplicateName.trim());
+      setDuplicatingView(null);
+      setDuplicateName('');
+    } finally {
+      setLoadingState({ type: null });
+    }
+  }, [duplicateName, duplicatingView, onDuplicateView]);
+
+  const handleSetDefault = useCallback(
+    async (view: SavedView) => {
+      if (!canSetDefaultSavedView(view)) return;
+      setLoadingState({ type: 'setDefault', pid: view.pid });
+      try {
+        await onSetDefaultView(view.pid);
+      } finally {
+        setLoadingState({ type: null });
+      }
+    },
+    [onSetDefaultView],
+  );
+
   const handleDelete = useCallback(
     async (view: SavedView) => {
       if (!canDeleteSavedView(view)) return;
-
       const confirmed = await confirmDialog({
-        content: `Are you sure you want to delete the view "${view.name}"? This action cannot be undone.`,
+        content: tx(
+          'common.saved_view_delete_confirm',
+          '确定删除视图“{name}”？删除后无法恢复。',
+          { name: view.name },
+        ),
         variant: 'danger',
       });
       if (!confirmed) return;
@@ -548,310 +582,115 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
         setLoadingState({ type: null });
       }
     },
-    [onDeleteView],
+    [onDeleteView, tx],
   );
 
-  /**
-   * Handle edit view — open inline edit form
-   */
-  const handleEdit = useCallback((view: SavedView) => {
-    if (!canManageSavedView(view)) return;
-
-    setEditingView(view);
-    setEditForm({
-      name: view.name,
-      description: view.description || '',
-      scope: view.scope,
-    });
-  }, []);
-
-  /**
-   * Save edited view metadata
-   */
-  const handleSaveEdit = useCallback(async () => {
-    if (!editingView || !editForm.name.trim()) return;
-    setLoadingState({ type: 'rename', pid: editingView.pid });
-    try {
-      await onEditView?.(editingView.pid, editForm.name.trim(), editForm.description.trim(), editForm.scope);
-      setEditingView(null);
-    } finally {
-      setLoadingState({ type: null });
-    }
-  }, [editingView, editForm, onEditView]);
-
-  /**
-   * Cancel editing
-   */
-  const handleCancelEdit = useCallback(() => {
-    setEditingView(null);
-  }, []);
-
-  /**
-   * Handle duplicate view
-   */
-  const handleDuplicate = useCallback(
-    async (view: SavedView) => {
-      if (!canCopySavedView(view)) return;
-
-      const newName = window.prompt('Enter a name for the duplicated view:', `${view.name} (Copy)`);
-      if (!newName?.trim()) return;
-
-      setLoadingState({ type: 'duplicate', pid: view.pid });
-      try {
-        await onDuplicateView(view.pid, newName.trim());
-      } finally {
-        setLoadingState({ type: null });
-      }
-    },
-    [onDuplicateView],
-  );
-
-  /**
-   * Handle set default view
-   */
-  const handleSetDefault = useCallback(
-    async (view: SavedView) => {
-      if (!canSetDefaultSavedView(view)) return;
-
-      setLoadingState({ type: 'setDefault', pid: view.pid });
-      try {
-        await onSetDefaultView(view.pid);
-      } finally {
-        setLoadingState({ type: null });
-      }
-    },
-    [onSetDefaultView],
-  );
-
-  const handleOpenAudit = useCallback(async (view: SavedView) => {
-    setAuditView(view);
-    setAuditLoading(true);
-    setAuditError(null);
-    setAuditEvents([]);
-    try {
-      const events = await savedViewService.getAuditEvents(view.pid);
-      setAuditEvents(events);
-    } catch (err) {
-      setAuditError(
-        err instanceof Error ? err.message : 'Failed to fetch saved view audit events',
-      );
-    } finally {
-      setAuditLoading(false);
-    }
-  }, []);
-
-  const handleOpenCollaborators = useCallback((view: SavedView) => {
-    if (!canShareSavedView(view)) return;
-    setShareView(view);
-    setCollaboratorSearch('');
-    setCollaboratorResults([]);
-    setCollaboratorPid('');
-    setCollaboratorPermission('save');
-    setCollaboratorError(null);
-  }, []);
-
-  const handleSearchCollaborators = useCallback(async () => {
-    const keyword = collaboratorSearch.trim();
-    setCollaboratorLoading(true);
-    setCollaboratorError(null);
-    try {
-      const users = await savedViewService.searchUsers(keyword, 10);
-      setCollaboratorResults(users);
-    } catch (err) {
-      setCollaboratorResults([]);
-      setCollaboratorError(err instanceof Error ? err.message : 'Failed to search users');
-    } finally {
-      setCollaboratorLoading(false);
-    }
-  }, [collaboratorSearch]);
-
-  const updateCollaborators = useCallback(
-    async (view: SavedView, collaborators: ViewCollaboratorAcl[]) => {
-      const nextConfig: ViewConfig = {
-        ...(view.viewConfig ?? {}),
-        meta: {
-          ...(view.viewConfig?.meta ?? {}),
-          collaborators,
-        },
-      };
-      setCollaboratorSaving(true);
-      setCollaboratorError(null);
-      try {
-        const updated = await savedViewService.updateView(view.pid, { viewConfig: nextConfig });
-        setShareView(updated);
-        onViewConfigSaved?.();
-      } catch (err) {
-        setCollaboratorError(
-          err instanceof Error ? err.message : 'Failed to update collaborators',
-        );
-      } finally {
-        setCollaboratorSaving(false);
-      }
-    },
-    [onViewConfigSaved],
-  );
-
-  const handleAddCollaborator = useCallback(async () => {
-    if (!shareView) return;
-    const principalPid = collaboratorPid.trim();
-    if (!principalPid) {
-      setCollaboratorError('User PID is required');
-      return;
-    }
-    const current = shareView.viewConfig?.meta?.collaborators ?? [];
-    const next = [
-      ...current.filter((item) => item.principalPid !== principalPid),
-      {
-        principalType: 'user',
-        principalPid,
-        permission: collaboratorPermission,
-      },
-    ];
-    await updateCollaborators(shareView, next);
-    setCollaboratorPid('');
-    setCollaboratorSearch('');
-    setCollaboratorResults([]);
-  }, [collaboratorPermission, collaboratorPid, shareView, updateCollaborators]);
-
-  const handleRemoveCollaborator = useCallback(
-    async (principalPid: string) => {
-      if (!shareView) return;
-      const current = shareView.viewConfig?.meta?.collaborators ?? [];
-      await updateCollaborators(
-        shareView,
-        current.filter((item) => item.principalPid !== principalPid),
-      );
-    },
-    [shareView, updateCollaborators],
-  );
-
-  /**
-   * Handle view selection
-   */
-  const handleSelectView = useCallback(
-    (pid: string) => {
-      onSelectView(pid);
-    },
-    [onSelectView],
-  );
-
-  /**
-   * Group views by scope
-   */
-  const groupedViews = SCOPE_CONFIGS.map((config) => ({
-    ...config,
-    views: views.filter((v) => v.scope === config.scope),
-  })).filter((group) => group.views.length > 0);
-
-  /**
-   * Check if a view operation is loading
-   */
-  const isViewLoading = (pid: string) => {
-    return loadingState.pid === pid && loadingState.type !== null;
-  };
+  const isViewLoading = (pid: string) => loadingState.pid === pid && loadingState.type !== null;
 
   if (!open) return null;
 
   return (
     <>
-      {/* Backdrop overlay */}
       <div
         className="fixed inset-0 z-[1100] bg-black/50 transition-opacity duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Panel */}
       <div
         className={cn(
           'fixed top-0 right-0 z-[1110] h-full w-[min(95vw,52rem)] bg-white shadow-xl',
-          'flex flex-col',
-          'animate-in slide-in-from-right duration-200',
+          'flex flex-col animate-in slide-in-from-right duration-200',
         )}
         role="dialog"
         aria-modal="true"
         aria-labelledby="view-manage-panel-title"
+        data-testid="saved-view-manage-panel"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-          <h2 id="view-manage-panel-title" className="text-lg font-semibold text-gray-900">
-            View Management
-          </h2>
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+          <div>
+            <h2 id="view-manage-panel-title" className="text-lg font-semibold text-gray-900">
+              {tx('common.saved_view_manage', '管理视图')}
+            </h2>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {tx('common.saved_view_panel_subtitle', '管理当前列表的个人视图')}
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className={cn(
-              'rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500',
-              'focus:ring-2 focus:ring-blue-500 focus:outline-none',
-              'transition-colors duration-150',
-            )}
-            aria-label="Close panel"
+            className="rounded-md p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            aria-label={tx('common.close', 'Close')}
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {/* Config Step — shown after creating a view that needs field configuration */}
-          {configStep && (
-            <div className="p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-gray-900">
-                  Configure {configStep.viewType.charAt(0).toUpperCase() + configStep.viewType.slice(1)} View
-                </h4>
+          {configStep ? (
+            <div className="p-5">
+              <div className="mb-3">
+                <h3 className="text-base font-semibold text-gray-900">
+                  {tx('common.saved_view_config_title', '配置{type}视图', {
+                    type: viewTypeLabels[configStep.viewType] || configStep.viewType,
+                  })}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {tx(
+                    'common.saved_view_config_help',
+                    '选择这个视图需要使用的字段。必填字段完成后才能保存。',
+                  )}
+                </p>
               </div>
-              <p className="mb-4 text-xs text-gray-500">
-                Select the fields to use for this view. Required fields must be set before you can finish.
-              </p>
+
               {configStep.capability.status === 'degraded' && (
                 <div
-                  className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                  className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
                   role="status"
                   data-testid={`view-capability-degraded-${configStep.viewType}`}
                 >
-                  {configStep.capability.reasons.join(' ')}
+                  {capabilityMessages(configStep.capability).join(' ')}
                 </div>
               )}
-              <div className="space-y-3">
-                {(VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] || []).map((fieldDef) => {
-                  const options = configStep.capability.fieldOptions[fieldDef.key] ?? modelFields;
+
+              <div className="space-y-4">
+                {(VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] ?? []).map((fieldDef) => {
+                  const options = configStep.capability.fieldOptions[fieldDef.key] ?? fields;
+                  const fieldId = `saved-view-config-${fieldDef.key}`;
                   return (
                     <div key={fieldDef.key}>
-                      <label className="mb-1 block text-xs font-medium text-gray-600">
-                        {fieldDef.label} {fieldDef.required && <span className="text-red-500">*</span>}
+                      <label
+                        htmlFor={fieldId}
+                        className="mb-1 block text-sm font-medium text-gray-700"
+                      >
+                        {tx(fieldDef.labelKey, fieldDef.fallback)}
+                        {fieldDef.required && <span className="ml-1 text-red-500">*</span>}
                       </label>
                       <select
+                        id={fieldId}
+                        data-testid={`saved-view-config-field-${fieldDef.key}`}
                         value={configStep.fields[fieldDef.key] || ''}
-                        onChange={(e) =>
+                        onChange={(event) =>
                           setConfigStep((prev) =>
                             prev
                               ? {
                                   ...prev,
-                                  fields: { ...prev.fields, [fieldDef.key]: e.target.value },
+                                  fields: {
+                                    ...prev.fields,
+                                    [fieldDef.key]: event.target.value,
+                                  },
                                 }
                               : null,
                           )
                         }
-                        className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                       >
-                        <option value="">Select field...</option>
-                        {options.map((f) => (
-                          <option key={f.code} value={f.code}>
-                            {f.name} ({f.dataType})
+                        <option value="">
+                          {tx('common.saved_view_select_field', '选择字段')}
+                        </option>
+                        {options.map((field) => (
+                          <option key={field.code} value={field.code}>
+                            {field.name} ({field.dataType || 'string'})
                           </option>
                         ))}
                       </select>
@@ -859,783 +698,452 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                   );
                 })}
               </div>
-              <div className="mt-4 flex justify-end gap-2">
+
+              <div className="mt-6 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setConfigStep(null);
-                    onClose();
+                    setShowTypePicker(true);
                   }}
-                  className="rounded-md px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100"
+                  className="rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                  data-testid="saved-view-config-cancel"
                 >
-                  Skip
+                  {tx('common.saved_view_create_cancel', '取消')}
                 </button>
                 <button
                   type="button"
                   onClick={handleFinishConfigStep}
                   disabled={
-                    configSaving ||
-                    createTargetDisabled ||
-                    (VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] || [])
-                      .filter((f) => f.required)
-                      .some((f) => !configStep.fields[f.key])
+                    loadingState.type === 'create' ||
+                    personalLimitReached ||
+                    (VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] ?? [])
+                      .filter((field) => field.required)
+                      .some((field) => !configStep.fields[field.key])
                   }
-                  className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="saved-view-config-save"
                 >
-                  {configSaving ? 'Saving...' : 'Done'}
+                  {loadingState.type === 'create'
+                    ? tx('common.saved_view_create_saving', '保存中...')
+                    : tx('common.saved_view_create_save', '保存视图')}
                 </button>
               </div>
             </div>
-          )}
-
-          {/* New View Section — hidden when config step is active */}
-          {!configStep && <div className="border-b border-gray-200 p-4">
-            {showTypePicker ? (
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Choose type</span>
-                  <button type="button" onClick={() => setShowTypePicker(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
-                </div>
-                {loadingState.type === 'create' ? (
-                  <div className="flex items-center justify-center gap-2 py-4 text-sm text-blue-600">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-300 border-t-blue-600" />
-                    Creating...
-                  </div>
-                ) : (
-                  <>
-                    <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <label className="block">
-                        <span className="mb-1 block text-xs font-medium text-gray-600">Scope</span>
-                        <select
-                          aria-label="Scope"
-                          value={createScope}
-                          onChange={(e) => {
-                            const nextScope = e.target.value as ViewScope;
-                            setCreateScope(nextScope);
-                            if (nextScope === 'team' && !createTeamId) {
-                              setCreateTeamId(teamOptions[0]?.pid || '');
-                            }
-                          }}
-                          className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                        >
-                          <option value="personal">Personal</option>
-                          <option value="team" disabled={teamLoading || teamOptions.length === 0}>
-                            Team
-                          </option>
-                        </select>
-                      </label>
-                      <label className="block">
-                        <span className="mb-1 block text-xs font-medium text-gray-600">Team</span>
-                        <select
-                          aria-label="Team"
-                          value={createTeamId}
-                          onChange={(e) => setCreateTeamId(e.target.value)}
-                          disabled={createScope !== 'team' || teamLoading || teamOptions.length === 0}
-                          className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                        >
-                          {teamLoading && <option value="">Loading teams...</option>}
-                          {!teamLoading && teamOptions.length === 0 && (
-                            <option value="">No available teams</option>
+          ) : (
+            <>
+              <div className="border-b border-gray-200 p-5">
+                {showTypePicker ? (
+                  <div>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                          {tx('common.saved_view_choose_type', '选择视图类型')}
+                        </div>
+                        <div
+                          className={cn(
+                            'mt-2 rounded-md border px-3 py-2 text-xs',
+                            personalLimitReached
+                              ? 'border-red-200 bg-red-50 text-red-700'
+                              : 'border-gray-200 bg-gray-50 text-gray-600',
                           )}
-                          {!teamLoading &&
-                            teamOptions.map((team) => (
-                              <option key={team.pid} value={team.pid}>
-                                {team.name}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                    </div>
-                    <div
-                      className={cn(
-                        'mb-3 rounded-md border px-3 py-2 text-xs',
-                        createViewLimitReached
-                          ? 'border-red-200 bg-red-50 text-red-700'
-                          : 'border-gray-200 bg-gray-50 text-gray-600',
-                      )}
-                      data-testid="saved-view-quota-status"
-                    >
-                      {createScope === 'team' ? 'Team' : createScope === 'global' ? 'Global' : 'Personal'} views:{' '}
-                      {createViewCount}/{createViewLimit}
-                      {createViewLimitReached && (
-                        <span data-testid="saved-view-quota-limit-reached">
-                          {' '}
-                          Limit reached. Delete or reuse an existing view before creating another one.
-                        </span>
-                      )}
-                    </div>
-                    {createScope === 'team' && createTargetDisabled && (
-                      <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                        {createViewLimitReached
-                          ? 'Team view limit reached for this page.'
-                          : 'Select a team before creating a shared view.'}
+                          data-testid="saved-view-quota-status"
+                        >
+                          {quotaText}
+                          {personalLimitReached && (
+                            <span data-testid="saved-view-quota-limit-reached">
+                              {' '}
+                              {tx(
+                                'common.saved_view_personal_quota_reached',
+                                '已达到个人视图上限，请删除不需要的视图后再新建。',
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowTypePicker(false);
+                          setBlockedCapability(null);
+                        }}
+                        className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+                        data-testid="saved-view-type-picker-cancel"
+                      >
+                        {tx('common.saved_view_cancel', '取消')}
+                      </button>
+                    </div>
+
                     {blockedCapability && (
                       <div
-                        className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+                        className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
                         role="alert"
                         data-testid={`view-capability-blocked-${blockedCapability.viewType}`}
                       >
-                        {blockedCapability.reasons.join(' ')}
+                        {capabilityMessages(blockedCapability).join(' ')}
                       </div>
                     )}
-                    <div className="grid grid-cols-4 gap-2">
-                      {([
-                      { type: 'table' as ViewType, icon: '≡', label: 'Table' },
-                      { type: 'kanban' as ViewType, icon: '⊞', label: 'Kanban' },
-                      { type: 'calendar' as ViewType, icon: '📅', label: 'Calendar' },
-                      { type: 'gallery' as ViewType, icon: '▦', label: 'Gallery' },
-                      { type: 'gantt' as ViewType, icon: '━', label: 'Gantt' },
-                      { type: 'tree' as ViewType, icon: '⊟', label: 'Tree' },
-                      { type: 'timeline' as ViewType, icon: '⏤', label: 'Timeline' },
-                      { type: 'form' as ViewType, icon: '☐', label: 'Form' },
-                    ]).map((vt) => (
-                      <button
-                        key={vt.type}
-                        type="button"
-                        onClick={() => handleQuickCreate(vt.type)}
-                        disabled={createTargetDisabled}
-                        className={cn(
-                          'flex flex-col items-center gap-1 rounded-lg border border-gray-200 px-2 py-2.5 text-gray-600 transition-all',
-                          'hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600',
-                          'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-gray-200 disabled:hover:bg-white disabled:hover:text-gray-600',
-                        )}
-                      >
-                        <span className="text-lg">{vt.icon}</span>
-                        <span className="text-[10px] font-medium">{vt.label}</span>
-                      </button>
-                    ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowTypePicker(true)}
-                className={cn(
-                  'flex w-full items-center justify-center gap-2 rounded-lg',
-                  'border-2 border-dashed border-gray-300 py-2.5',
-                  'text-sm font-medium text-blue-600',
-                  'transition-all hover:border-blue-400 hover:bg-blue-50',
-                )}
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                New View
-              </button>
-            )}
-          </div>}
 
-          {/* View List — hidden when config step is active */}
-          {!configStep && <div className="py-2">
-            {groupedViews.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-500">
-                No saved views available. Create your first view above.
-              </div>
-            ) : (
-              groupedViews.map((group, groupIndex) => (
-                <div key={group.scope}>
-                  {/* Group Separator */}
-                  {groupIndex > 0 && <div className="mx-4 my-2 h-px bg-gray-200" />}
-
-                  {/* Group Header */}
-                  <div className="px-4 py-2 text-xs font-medium tracking-wide text-gray-500 uppercase">
-                    {group.icon} {group.label}
-                  </div>
-
-                  {/* Group Items */}
-                  {group.views.map((view) => (
-                    <div key={view.pid}>
-                    {editingView?.pid === view.pid ? (
-                      /* Inline edit form */
-                      <div className="mx-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
-                            <input
-                              type="text"
-                              value={editForm.name}
-                              onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                              autoFocus
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
-                            <input
-                              type="text"
-                              value={editForm.description}
-                              onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                              placeholder="Optional description"
-                              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Scope</label>
-                            <select
-                              value={editForm.scope}
-                              onChange={(e) => setEditForm(prev => ({ ...prev, scope: e.target.value as ViewScope }))}
-                              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                            >
-                              <option value="personal">Personal</option>
-                              <option value="team">Team</option>
-                              <option value="global">Global</option>
-                            </select>
-                          </div>
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={handleCancelEdit}
-                              className="rounded-md px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleSaveEdit}
-                              disabled={!editForm.name.trim() || loadingState.type === 'rename'}
-                              className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                            >
-                              {loadingState.type === 'rename' ? 'Saving...' : 'Save'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Normal view row */
-                    <div
-                      className={cn(
-                        'mx-2 rounded-md px-2 py-2',
-                        'hover:bg-gray-50',
-                        'transition-colors duration-100',
-                        currentView?.pid === view.pid && 'bg-blue-50',
-                      )}
-                    >
-                      <div className="flex items-start gap-2">
-                        {/* View Info */}
-                        <button
-                          type="button"
-                          onClick={() => handleSelectView(view.pid)}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {VIEW_TYPE_OPTIONS.map((option) => {
+                        const capability = VIEW_TYPE_REQUIRED_FIELDS[option.type]
+                          ? capabilityForType(option.type)
+                          : null;
+                        const status =
+                          capability?.status === 'blocked'
+                            ? tx('common.saved_view_type_status_blocked', '不适合')
+                            : capability?.status === 'degraded'
+                              ? tx('common.saved_view_type_status_degraded', '需注意')
+                              : tx('common.saved_view_type_status_available', '可创建');
+                        return (
+                          <button
+                            key={option.type}
+                            type="button"
+                            onClick={() => handleQuickCreate(option.type)}
+                            disabled={personalLimitReached}
+                            data-testid={`saved-view-type-${option.type}`}
+                            className={cn(
+                              'flex min-h-20 flex-col items-start justify-between rounded-md border border-gray-200 px-3 py-2 text-left transition-colors',
+                              'hover:border-blue-400 hover:bg-blue-50 focus:ring-2 focus:ring-blue-500 focus:outline-none',
+                              'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-gray-200 disabled:hover:bg-white',
+                            )}
+                          >
+                            <span className="text-sm font-medium text-gray-900">
+                              {tx(option.labelKey, option.fallback)}
+                            </span>
                             <span
                               className={cn(
-                                'truncate text-sm font-medium',
-                                currentView?.pid === view.pid ? 'text-blue-700' : 'text-gray-900',
+                                'mt-2 rounded px-1.5 py-0.5 text-[11px] font-medium',
+                                capability?.status === 'blocked'
+                                  ? 'bg-red-50 text-red-700'
+                                  : capability?.status === 'degraded'
+                                    ? 'bg-amber-50 text-amber-700'
+                                    : 'bg-green-50 text-green-700',
                               )}
                             >
-                              {view.name}
+                              {status}
                             </span>
-                            {view.viewType && view.viewType !== 'table' && (
-                              <span className="flex-shrink-0 rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700">
-                                {view.viewType}
-                              </span>
-                            )}
-                            {view.isDefault && (
-                              <span className="flex-shrink-0 rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
-                                Default
-                              </span>
-                            )}
-                            {isSavedViewLockedPreset(view) && (
-                              <span
-                                className="flex-shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600"
-                                data-testid={`view-locked-preset-${view.pid}`}
-                              >
-                                Preset
-                              </span>
-                            )}
-                          </div>
-                          {view.description && (
-                            <p className="mt-0.5 truncate text-xs text-gray-500">
-                              {view.description}
-                            </p>
-                          )}
-                          {view.teamName && view.scope === 'team' && (
-                            <p className="mt-0.5 text-xs text-gray-400">Team: {view.teamName}</p>
-                          )}
-                          {view.ownerName && (
-                            <p className="mt-0.5 text-xs text-gray-400">Owner: {view.ownerName}</p>
-                          )}
-                        </button>
-
-                        {/* Action Buttons */}
-                        <div className="flex flex-shrink-0 items-center gap-1">
-                          {/* Set Default Button */}
-                          <button
-                            type="button"
-                            onClick={() => handleSetDefault(view)}
-                            disabled={
-                              isViewLoading(view.pid) ||
-                              !canSetDefaultSavedView(view)
-                            }
-                            className={cn(
-                              'rounded-md p-1.5',
-                              'focus:ring-2 focus:ring-blue-500 focus:outline-none',
-                              'transition-colors duration-150',
-                              'disabled:cursor-not-allowed disabled:opacity-50',
-                              view.isDefault
-                                ? 'cursor-default text-yellow-500'
-                                : 'text-gray-400 hover:bg-gray-100 hover:text-yellow-500',
-                            )}
-                            title={
-                              isSavedViewLockedPreset(view)
-                                ? 'Plugin preset is locked'
-                                : view.isDefault
-                                  ? 'Default view'
-                                  : 'Set as default'
-                            }
-                          >
-                            {loadingState.type === 'setDefault' && loadingState.pid === view.pid ? (
-                              <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-yellow-500" />
-                            ) : (
-                              <svg
-                                className="h-4 w-4"
-                                fill={view.isDefault ? 'currentColor' : 'none'}
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-                                />
-                              </svg>
-                            )}
                           </button>
-
-                          {/* Edit Button */}
-                          {onEditView && (
-                            <button
-                              type="button"
-                              onClick={() => handleEdit(view)}
-                              disabled={isViewLoading(view.pid) || !canManageSavedView(view)}
-                              className={cn(
-                                'rounded-md p-1.5 text-gray-400',
-                                'hover:bg-gray-100 hover:text-green-500',
-                                'focus:ring-2 focus:ring-blue-500 focus:outline-none',
-                                'disabled:cursor-not-allowed disabled:opacity-50',
-                                'transition-colors duration-150',
-                              )}
-                              title={
-                                isSavedViewLockedPreset(view)
-                                  ? 'Plugin preset is locked'
-                                  : 'Edit view'
-                              }
-                            >
-                              {loadingState.type === 'rename' && loadingState.pid === view.pid ? (
-                                <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-green-500" />
-                              ) : (
-                                <svg
-                                  className="h-4 w-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                  aria-hidden="true"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                          )}
-
-                          {/* Duplicate Button */}
-                          <button
-                            type="button"
-                            onClick={() => handleDuplicate(view)}
-                            disabled={isViewLoading(view.pid) || !canCopySavedView(view)}
-                            className={cn(
-                              'rounded-md p-1.5 text-gray-400',
-                              'hover:bg-gray-100 hover:text-blue-500',
-                              'focus:ring-2 focus:ring-blue-500 focus:outline-none',
-                              'disabled:cursor-not-allowed disabled:opacity-50',
-                              'transition-colors duration-150',
-                            )}
-                            title={canCopySavedView(view) ? 'Duplicate view' : 'Copy is disabled'}
-                          >
-                            {loadingState.type === 'duplicate' && loadingState.pid === view.pid ? (
-                              <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
-                            ) : (
-                              <svg
-                                className="h-4 w-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                />
-                              </svg>
-                            )}
-                          </button>
-
-                          {(view.scope === 'team' ||
-                            view.scope === 'global' ||
-                            isSavedViewLockedPreset(view)) && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenAudit(view)}
-                              disabled={auditLoading && auditView?.pid === view.pid}
-                              className={cn(
-                                'rounded-md p-1.5 text-gray-400',
-                                'hover:bg-gray-100 hover:text-indigo-500',
-                                'focus:ring-2 focus:ring-indigo-500 focus:outline-none',
-                                'disabled:cursor-not-allowed disabled:opacity-50',
-                                'transition-colors duration-150',
-                              )}
-                              title="View audit"
-                              data-testid={`view-audit-${view.pid}`}
-                            >
-                              {auditLoading && auditView?.pid === view.pid ? (
-                                <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-500" />
-                              ) : (
-                                <svg
-                                  className="h-4 w-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                  aria-hidden="true"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                          )}
-
-                          {/* Share Button */}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenCollaborators(view)}
-                            disabled={!canShareSavedView(view)}
-                            className={cn(
-                              'rounded-md p-1.5 text-gray-400',
-                              'hover:bg-gray-100 hover:text-green-500',
-                              'focus:ring-2 focus:ring-green-500 focus:outline-none',
-                              'disabled:cursor-not-allowed disabled:opacity-50',
-                              'transition-colors duration-150',
-                            )}
-                            title="Share view"
-                            data-testid={`view-share-${view.pid}`}
-                          >
-                            <svg
-                              className="h-4 w-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                              />
-                            </svg>
-                          </button>
-
-                          {/* Delete Button (for PERSONAL and TEAM views the user owns) */}
-                          {(view.scope === 'personal' || view.scope === 'team') &&
-                            !isSavedViewLockedPreset(view) && (
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(view)}
-                              disabled={isViewLoading(view.pid) || !canDeleteSavedView(view)}
-                              className={cn(
-                                'rounded-md p-1.5 text-gray-400',
-                                'hover:bg-gray-100 hover:text-red-500',
-                                'focus:ring-2 focus:ring-red-500 focus:outline-none',
-                                'disabled:cursor-not-allowed disabled:opacity-50',
-                                'transition-colors duration-150',
-                              )}
-                              title="Delete view"
-                            >
-                              {loadingState.type === 'delete' && loadingState.pid === view.pid ? (
-                                <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-red-500" />
-                              ) : (
-                                <svg
-                                  className="h-4 w-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                  aria-hidden="true"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                        );
+                      })}
                     </div>
-                    )}
-                    </div>
-                  ))}
-                </div>
-              ))
-            )}
-          </div>}
-
-          {!configStep && auditView && (
-            <div
-              className="m-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
-              data-testid="saved-view-audit-panel"
-            >
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    Audit: {auditView.name}
-                  </h3>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    Recent changes for shared or managed views.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuditView(null);
-                    setAuditEvents([]);
-                    setAuditError(null);
-                  }}
-                  className="rounded-md p-1 text-gray-400 hover:bg-white hover:text-gray-600"
-                  aria-label="Close audit panel"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              {auditLoading ? (
-                <div className="flex items-center gap-2 text-xs text-indigo-600">
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
-                  Loading audit events...
-                </div>
-              ) : auditError ? (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                  {auditError}
-                </div>
-              ) : auditEvents.length === 0 ? (
-                <div className="text-xs text-gray-500">No audit events yet.</div>
-              ) : (
-                <div className="space-y-2">
-                  {auditEvents.map((event, index) => (
-                    <div
-                      key={`${event.sequenceNo ?? event.entityPid ?? event.timestamp ?? index}`}
-                      className="rounded-md border border-gray-200 bg-white px-3 py-2"
-                      data-testid="saved-view-audit-event"
-                    >
-                      <div className="flex items-center justify-between gap-3 text-xs">
-                        <span className="font-medium text-gray-900">
-                          {event.operationType || event.commandCode || 'UPDATE'}
-                        </span>
-                        {event.timestamp && (
-                          <span className="text-gray-400">
-                            {formatAuditTimestamp(event.timestamp)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 text-xs text-gray-600">{getAuditSummary(event)}</div>
-                      {event.actorName && (
-                        <div className="mt-1 text-xs text-gray-400">By {event.actorName}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {!configStep && shareView && (
-            <div
-              className="m-4 rounded-lg border border-blue-200 bg-blue-50 p-4"
-              data-testid="saved-view-collaborator-panel"
-            >
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    Share: {shareView.name}
-                  </h3>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    {shareView.effectivePermission
-                      ? `Your permission: ${shareView.effectivePermission}`
-                      : 'Manage collaborators for this shared view.'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShareView(null);
-                    setCollaboratorError(null);
-                  }}
-                  className="rounded-md p-1 text-gray-400 hover:bg-white hover:text-gray-600"
-                  aria-label="Close collaborator panel"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="mb-3 space-y-2">
-                {(shareView.viewConfig?.meta?.collaborators ?? []).length === 0 ? (
-                  <div className="rounded-md border border-blue-100 bg-white px-3 py-2 text-xs text-gray-500">
-                    No collaborators yet.
                   </div>
                 ) : (
-                  (shareView.viewConfig?.meta?.collaborators ?? []).map((collaborator) => (
-                    <div
-                      key={`${collaborator.principalType ?? 'user'}:${collaborator.principalPid}`}
-                      className="flex items-center justify-between gap-3 rounded-md border border-blue-100 bg-white px-3 py-2"
-                      data-testid="saved-view-collaborator-row"
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowTypePicker(true)}
+                      className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-blue-300 bg-blue-50 py-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      data-testid="saved-view-create-personal"
                     >
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-medium text-gray-900">
-                          {collaborator.principalPid}
+                      <Plus className="h-4 w-4" aria-hidden="true" />
+                      {tx('common.saved_view_new_personal', '新建个人视图')}
+                    </button>
+                    <div
+                      className={cn(
+                        'rounded-md border px-3 py-2 text-xs',
+                        personalLimitReached
+                          ? 'border-red-200 bg-red-50 text-red-700'
+                          : 'border-gray-200 bg-gray-50 text-gray-600',
+                      )}
+                      data-testid="saved-view-quota-summary"
+                    >
+                      {quotaText}
+                      {personalLimitReached && (
+                        <span>
+                          {' '}
+                          {tx(
+                            'common.saved_view_personal_quota_reached',
+                            '已达到个人视图上限，请删除不需要的视图后再新建。',
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="py-2">
+                <div className="border-b border-gray-100 px-5 py-3">
+                  <label className="relative block">
+                    <Search
+                      className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400"
+                      aria-hidden="true"
+                    />
+                    <input
+                      type="search"
+                      value={manageSearchTerm}
+                      onChange={(event) => setManageSearchTerm(event.currentTarget.value)}
+                      placeholder={tx(
+                        'common.saved_view_manage_search_placeholder',
+                        '搜索我的视图...',
+                      )}
+                      aria-label={tx(
+                        'common.saved_view_manage_search_placeholder',
+                        '搜索我的视图...',
+                      )}
+                      className="w-full rounded-md border border-gray-200 py-2 pr-3 pl-9 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      data-testid="saved-view-manage-search"
+                    />
+                  </label>
+                </div>
+                <div className="px-5 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                  {tx('common.saved_view_personal_group', '个人视图')}
+                </div>
+                {personalViews.length === 0 ? (
+                  <div className="px-5 py-8 text-center text-sm text-gray-500">
+                    <div>{tx('common.saved_view_empty', '暂无保存视图')}</div>
+                    <div className="mt-1 text-xs">
+                      {tx(
+                        'common.saved_view_empty_hint',
+                        '创建一个个人视图后，可保存当前筛选、字段和排序。',
+                      )}
+                    </div>
+                  </div>
+                ) : visiblePersonalViews.length === 0 ? (
+                  <div
+                    className="px-5 py-8 text-center text-sm text-gray-500"
+                    data-testid="saved-view-manage-no-results"
+                  >
+                    {tx('common.saved_view_manage_no_results', '没有匹配的个人视图')}
+                  </div>
+                ) : (
+                  visiblePersonalViews.map((view) => (
+                    <div
+                      key={view.pid}
+                      className="px-3 py-1"
+                      data-testid={`saved-view-row-${view.pid}`}
+                    >
+                      {editingView?.pid === view.pid ? (
+                        <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                          <div className="space-y-3">
+                            <label className="block">
+                              <span className="mb-1 block text-xs font-medium text-gray-600">
+                                {tx('common.saved_view_edit_name', '视图名称')}
+                              </span>
+                              <input
+                                type="text"
+                                data-testid={`saved-view-edit-name-${view.pid}`}
+                                value={editForm.name}
+                                onChange={(event) =>
+                                  setEditForm((prev) => ({
+                                    ...prev,
+                                    name: event.target.value,
+                                  }))
+                                }
+                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                autoFocus
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="mb-1 block text-xs font-medium text-gray-600">
+                                {tx('common.saved_view_edit_description', '说明')}
+                              </span>
+                              <input
+                                type="text"
+                                data-testid={`saved-view-edit-description-${view.pid}`}
+                                value={editForm.description}
+                                onChange={(event) =>
+                                  setEditForm((prev) => ({
+                                    ...prev,
+                                    description: event.target.value,
+                                  }))
+                                }
+                                placeholder={tx(
+                                  'common.saved_view_edit_description_placeholder',
+                                  '可选说明',
+                                )}
+                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                              />
+                            </label>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditingView(null)}
+                                className="rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                                data-testid={`saved-view-edit-cancel-${view.pid}`}
+                              >
+                                {tx('common.saved_view_cancel', '取消')}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleSaveEdit}
+                                disabled={!editForm.name.trim() || loadingState.type === 'rename'}
+                                className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                                data-testid={`saved-view-edit-save-${view.pid}`}
+                              >
+                                {tx('common.saved_view_edit_save', '保存')}
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {collaborator.principalType || 'user'} · {collaborator.permission}
+                      ) : duplicatingView?.pid === view.pid ? (
+                        <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                          <h3 className="mb-3 text-sm font-semibold text-gray-900">
+                            {tx('common.saved_view_duplicate_title', '复制个人视图')}
+                          </h3>
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-medium text-gray-600">
+                              {tx('common.saved_view_duplicate_name', '新视图名称')}
+                            </span>
+                            <input
+                              type="text"
+                              data-testid={`saved-view-duplicate-name-${view.pid}`}
+                              value={duplicateName}
+                              onChange={(event) => setDuplicateName(event.target.value)}
+                              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                              autoFocus
+                            />
+                          </label>
+                          <div className="mt-3 flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setDuplicatingView(null)}
+                              className="rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                              data-testid={`saved-view-duplicate-cancel-${view.pid}`}
+                            >
+                              {tx('common.saved_view_cancel', '取消')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleDuplicateSubmit}
+                              disabled={!duplicateName.trim() || loadingState.type === 'duplicate'}
+                              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                              data-testid={`saved-view-duplicate-submit-${view.pid}`}
+                            >
+                              {tx('common.saved_view_duplicate_submit', '创建副本')}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveCollaborator(collaborator.principalPid)}
-                        disabled={collaboratorSaving}
-                        className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
+                      ) : (
+                        <div
+                          className={cn(
+                            'rounded-md px-2 py-2 transition-colors hover:bg-gray-50',
+                            currentView?.pid === view.pid && 'bg-blue-50',
+                          )}
+                        >
+                          <div className="flex items-start gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onSelectView(view.pid)}
+                              className="min-w-0 flex-1 text-left"
+                              data-testid={`saved-view-select-${view.pid}`}
+                            >
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span
+                                  className={cn(
+                                    'truncate text-sm font-medium',
+                                    currentView?.pid === view.pid
+                                      ? 'text-blue-700'
+                                      : 'text-gray-900',
+                                  )}
+                                >
+                                  {view.name}
+                                </span>
+                                {view.viewType && view.viewType !== 'table' && (
+                                  <span className="flex-shrink-0 rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700">
+                                    {viewTypeLabels[view.viewType as ViewType] || view.viewType}
+                                  </span>
+                                )}
+                                {view.isDefault && (
+                                  <span className="flex-shrink-0 rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                                    {tx('common.saved_view_default', '默认')}
+                                  </span>
+                                )}
+                                {isSavedViewLockedPreset(view) && (
+                                  <span
+                                    className="flex-shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600"
+                                    data-testid={`view-locked-preset-${view.pid}`}
+                                  >
+                                    {tx('common.saved_view_locked_preset', '预置')}
+                                  </span>
+                                )}
+                              </div>
+                              {view.description && (
+                                <p className="mt-0.5 truncate text-xs text-gray-500">
+                                  {view.description}
+                                </p>
+                              )}
+                            </button>
+
+                            <div className="flex flex-shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSetDefault(view)}
+                                disabled={isViewLoading(view.pid) || !canSetDefaultSavedView(view)}
+                                className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                data-testid={`saved-view-action-set-default-${view.pid}`}
+                                aria-label={
+                                  view.isDefault
+                                    ? tx('common.saved_view_action_default', '默认视图')
+                                    : tx('common.saved_view_action_set_default', '设为默认')
+                                }
+                                title={
+                                  view.isDefault
+                                    ? tx('common.saved_view_action_default', '默认视图')
+                                    : tx('common.saved_view_action_set_default', '设为默认')
+                                }
+                              >
+                                {loadingState.type === 'setDefault' &&
+                                loadingState.pid === view.pid ? (
+                                  <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-yellow-500" />
+                                ) : view.isDefault ? (
+                                  <Star className="h-4 w-4 fill-current" aria-hidden="true" />
+                                ) : (
+                                  <Star className="h-4 w-4" aria-hidden="true" />
+                                )}
+                              </button>
+
+                              {onEditView && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleEdit(view)}
+                                  disabled={isViewLoading(view.pid) || !canManageSavedView(view)}
+                                  className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                  data-testid={`saved-view-action-edit-${view.pid}`}
+                                  aria-label={tx('common.saved_view_action_edit', '重命名视图')}
+                                  title={tx('common.saved_view_action_edit', '重命名视图')}
+                                >
+                                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleDuplicateStart(view)}
+                                disabled={isViewLoading(view.pid) || !canCopySavedView(view)}
+                                className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                data-testid={`saved-view-action-copy-${view.pid}`}
+                                aria-label={tx('common.saved_view_action_copy', '复制视图')}
+                                title={tx('common.saved_view_action_copy', '复制视图')}
+                              >
+                                <Copy className="h-4 w-4" aria-hidden="true" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(view)}
+                                disabled={isViewLoading(view.pid) || !canDeleteSavedView(view)}
+                                className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                data-testid={`saved-view-action-delete-${view.pid}`}
+                                aria-label={tx('common.saved_view_action_delete', '删除视图')}
+                                title={tx('common.saved_view_action_delete', '删除视图')}
+                              >
+                                {loadingState.type === 'delete' && loadingState.pid === view.pid ? (
+                                  <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-red-500" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
               </div>
-
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-gray-600">User</span>
-                  <input
-                    type="text"
-                    value={collaboratorSearch}
-                    onChange={(event) => {
-                      setCollaboratorSearch(event.target.value);
-                      setCollaboratorPid(event.target.value);
-                    }}
-                    placeholder="Search name, email, or paste user pid"
-                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                  />
-                </label>
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    onClick={handleSearchCollaborators}
-                    disabled={collaboratorLoading}
-                    className="h-8 rounded-md border border-blue-200 bg-white px-3 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                  >
-                    {collaboratorLoading ? 'Searching...' : 'Search'}
-                  </button>
-                </div>
-              </div>
-
-              {collaboratorResults.length > 0 && (
-                <div className="mt-2 max-h-32 overflow-auto rounded-md border border-blue-100 bg-white">
-                  {collaboratorResults.map((user) => (
-                    <button
-                      key={user.pid}
-                      type="button"
-                      onClick={() => {
-                        setCollaboratorPid(user.pid);
-                        setCollaboratorSearch(user.displayName || user.email || user.pid);
-                      }}
-                      className="block w-full px-3 py-2 text-left text-xs hover:bg-blue-50"
-                      data-testid="saved-view-collaborator-user-option"
-                    >
-                      <span className="font-medium text-gray-900">
-                        {user.displayName || user.email || user.pid}
-                      </span>
-                      <span className="ml-2 text-gray-400">{user.pid}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-gray-600">Permission</span>
-                  <select
-                    aria-label="Collaborator permission"
-                    value={collaboratorPermission}
-                    onChange={(event) =>
-                      setCollaboratorPermission(event.target.value as ViewCollaboratorAcl['permission'])
-                    }
-                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                  >
-                    <option value="view">View</option>
-                    <option value="save">Save</option>
-                    <option value="manage">Manage</option>
-                  </select>
-                </label>
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    onClick={handleAddCollaborator}
-                    disabled={collaboratorSaving || !collaboratorPid.trim()}
-                    className="h-8 rounded-md bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {collaboratorSaving ? 'Saving...' : 'Add collaborator'}
-                  </button>
-                </div>
-              </div>
-
-              {collaboratorError && (
-                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                  {collaboratorError}
-                </div>
-              )}
-            </div>
+            </>
           )}
         </div>
       </div>

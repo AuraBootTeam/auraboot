@@ -7,6 +7,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { cn } from '~/utils/cn';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface DiagnosticCategory {
   key: string;
@@ -48,6 +49,7 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
   onRefresh,
   className,
 }) => {
+  const { t } = useI18n();
   const [activeFilter, setActiveFilter] = useState<string>('all');
 
   const filteredIssues = useMemo(() => {
@@ -62,13 +64,17 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
     >
       {/* Summary header */}
       <div className="mb-2 font-medium text-gray-800 dark:text-gray-200">
-        View loaded, but some records cannot be rendered.
+        {t(
+          'common.saved_view_diagnostics_summary',
+          undefined,
+          '视图已加载，但部分记录暂时无法渲染。',
+        )}
       </div>
 
       {/* Field mapping */}
       {fieldMapping && Object.keys(fieldMapping).length > 0 && (
         <div className="mb-3 text-gray-500 dark:text-gray-400">
-          Current mapping:{' '}
+          {t('common.saved_view_current_mapping', undefined, '当前字段映射：')}{' '}
           {Object.entries(fieldMapping).map(([key, value], idx) => (
             <span key={key}>
               {idx > 0 && ', '}
@@ -80,8 +86,12 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
 
       {/* Summary grid */}
       <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-        <div>Total records: {totalRecords}</div>
-        <div>Valid records: {validRecords}</div>
+        <div>
+          {t('common.saved_view_total_records', undefined, '记录总数')}: {totalRecords}
+        </div>
+        <div>
+          {t('common.saved_view_valid_records', undefined, '可渲染记录')}: {validRecords}
+        </div>
         {categories.map((cat) => (
           <div key={cat.key}>
             {cat.label}: {cat.count}
@@ -97,7 +107,7 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
             onClick={onOpenViewConfig}
             className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
-            Configure
+            {t('common.saved_view_configure', undefined, '配置')}
           </button>
         )}
         {onSwitchToTableView && (
@@ -106,7 +116,7 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
             onClick={onSwitchToTableView}
             className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
-            Switch to Table
+            {t('common.saved_view_switch_to_table', undefined, '切换到表格')}
           </button>
         )}
         {onRefresh && (
@@ -115,7 +125,7 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
             onClick={onRefresh}
             className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
-            Refresh
+            {t('common.refresh', undefined, '刷新')}
           </button>
         )}
       </div>
@@ -124,7 +134,11 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
       {issues.length > 0 && (
         <div className="mt-5 rounded-md border border-gray-200 dark:border-gray-700">
           <div className="border-b border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">
-            Issue records (first {MAX_VISIBLE_ISSUES})
+            {t('common.saved_view_issue_records', undefined, '异常记录')} (
+            {t('common.saved_view_first_n', {
+              count: MAX_VISIBLE_ISSUES,
+            }, '前 {count} 条')}
+            )
           </div>
 
           {/* Filter buttons */}
@@ -139,7 +153,7 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600',
               )}
             >
-              All ({issues.length})
+              {t('common.all', undefined, '全部')} ({issues.length})
             </button>
             {categories
               .filter((cat) => cat.count > 0)

@@ -41,14 +41,13 @@ test.describe('SavedView — TREE View', () => {
     });
 
     const panel = await openSavedViewManagePanel(page);
-    await panel.getByRole('button', { name: /New View/i }).click();
-    await expect(panel.getByText('Choose type')).toBeVisible();
-    await panel.locator('.grid button').filter({ hasText: 'Tree' }).click();
+    await panel.getByTestId('saved-view-create-personal').click();
+    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图:');
+    await panel.getByTestId('saved-view-type-tree').click();
 
     const blocked = panel.getByTestId('view-capability-blocked-tree');
     await expect(blocked).toBeVisible({ timeout: 5000 });
-    await expect(blocked).toContainText(/parent|path|level/i);
-    await expect(panel.locator('[role="alert"]').first()).toContainText(/Tree requires/i);
+    await expect(blocked).toContainText(/缺少|父级|路径|层级/);
     expect(createRequests).toHaveLength(0);
 
     await mkdir(SCREENSHOT_DIR, { recursive: true });
@@ -81,14 +80,14 @@ test.describe('SavedView — TREE View', () => {
     });
 
     const panel = await openSavedViewManagePanel(page);
-    await panel.getByRole('button', { name: /New View/i }).click();
-    await expect(panel.getByText('Choose type')).toBeVisible();
-    await panel.locator('.grid button').filter({ hasText: 'Tree' }).click();
+    await panel.getByTestId('saved-view-create-personal').click();
+    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图:');
+    await panel.getByTestId('saved-view-type-tree').click();
 
     const degraded = panel.getByTestId('view-capability-degraded-tree');
     await expect(degraded).toBeVisible({ timeout: 5000 });
-    await expect(degraded).toContainText(/Reorder is disabled/i);
-    await expect(panel.getByText(/Configure Tree View/i)).toBeVisible();
+    await expect(degraded).toContainText(/拖拽排序|更新命令/);
+    await expect(panel.getByText(/配置树视图/)).toBeVisible();
     expect(createPayloads).toHaveLength(0);
 
     await mkdir(SCREENSHOT_DIR, { recursive: true });
@@ -97,13 +96,12 @@ test.describe('SavedView — TREE View', () => {
       fullPage: true,
     });
 
-    const selects = panel.locator('select');
-    await expect(selects.first()).toHaveValue('e2et_order_customer');
-    const titleField = await selects.nth(1).inputValue();
+    await expect(panel.getByTestId('saved-view-config-field-treeParentField')).toHaveValue('e2et_order_customer');
+    const titleField = await panel.getByTestId('saved-view-config-field-treeTitleField').inputValue();
     expect(titleField).toMatch(/^e2et_order_(no|title|desc|remark)$/);
 
-    const done = panel.getByRole('button', { name: /^Done$/i });
-    await expect(done).toBeEnabled();
+    const save = panel.getByTestId('saved-view-config-save');
+    await expect(save).toBeEnabled();
 
     const createResponsePromise = page.waitForResponse(
       (response) =>
@@ -112,7 +110,7 @@ test.describe('SavedView — TREE View', () => {
       { timeout: 10000 },
     );
 
-    await done.click();
+    await save.click();
     const createResponse = await createResponsePromise;
     expect(createResponse.ok(), `create Tree view failed: ${createResponse.status()}`).toBe(true);
 

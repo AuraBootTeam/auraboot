@@ -97,7 +97,7 @@ export function mergeViewConfigPatch(
 
 export function buildPersonalCopyName(name: string | null | undefined): string {
   const trimmed = name?.trim();
-  return `${trimmed || 'View'} - My Copy`;
+  return `${trimmed || '视图'} 副本`;
 }
 
 export function summarizeViewConfigPatch(patch: Partial<ViewConfig> | null | undefined): string[] {
@@ -107,28 +107,28 @@ export function summarizeViewConfigPatch(patch: Partial<ViewConfig> | null | und
 
   const summary: string[] = [];
   if (Array.isArray(patch.filters)) {
-    summary.push(`filters ${patch.filters.length}`);
+    summary.push(`筛选 ${patch.filters.length} 项`);
   }
   if (Array.isArray(patch.sorts)) {
-    summary.push(`sorts ${patch.sorts.length}`);
+    summary.push(`排序 ${patch.sorts.length} 项`);
   }
   if (Array.isArray(patch.columns)) {
-    summary.push(`columns ${patch.columns.length}`);
+    summary.push(`字段 ${patch.columns.length} 项`);
   }
   if (Array.isArray(patch.groupBy)) {
-    summary.push(`groups ${patch.groupBy.length}`);
+    summary.push(`分组 ${patch.groupBy.length} 项`);
   }
   if (patch.rowHeight) {
-    summary.push('row height');
+    summary.push('行高');
   }
   if (patch.density) {
-    summary.push('density');
+    summary.push('密度');
   }
   if (Array.isArray(patch.conditionalFormats)) {
-    summary.push(`conditional formats ${patch.conditionalFormats.length}`);
+    summary.push(`条件格式 ${patch.conditionalFormats.length} 项`);
   }
   if (Array.isArray(patch.toolbarActions)) {
-    summary.push(`toolbar actions ${patch.toolbarActions.length}`);
+    summary.push(`工具栏动作 ${patch.toolbarActions.length} 项`);
   }
   return summary;
 }

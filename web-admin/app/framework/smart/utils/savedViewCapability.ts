@@ -11,6 +11,7 @@ export interface SavedViewCapabilityField {
 export interface SavedViewCapabilityResult {
   viewType: ViewType;
   status: SavedViewCapabilityStatus;
+  reasonCodes: string[];
   reasons: string[];
   fieldOptions: Record<string, SavedViewCapabilityField[]>;
   suggestedConfig: Partial<ViewConfig>;
@@ -52,6 +53,88 @@ function fieldSearchText(field: SavedViewCapabilityField): string {
   return `${field.code} ${field.name}`.toLowerCase();
 }
 
+function hasSemanticToken(text: string, tokens: string[]): boolean {
+  return tokens.some((token) => {
+    if (/^[\u4e00-\u9fff]+$/.test(token)) {
+      return text.includes(token);
+    }
+    return new RegExp(`(^|[_\\s.-])${token}([_\\s.-]|$)`, 'i').test(text);
+  });
+}
+
+function rankTextFieldForTitle(field: SavedViewCapabilityField): number {
+  const text = fieldSearchText(field);
+  if (hasSemanticToken(text, ['title', 'subject', 'summary', '标题', '主题', '摘要'])) {
+    return 0;
+  }
+  if (hasSemanticToken(text, ['name', '名称'])) return 1;
+  if (hasSemanticToken(text, ['code', 'no', 'number', '编码', '编号', '单号'])) return 2;
+  if (hasSemanticToken(text, ['id', 'pid', 'uuid', 'internal', 'created', 'updated', 'timestamp'])) {
+    return 9;
+  }
+  return 5;
+}
+
+function rankKanbanGroupField(field: SavedViewCapabilityField): number {
+  const type = normalizedDataType(field);
+  const text = fieldSearchText(field);
+  if (['status', 'dict', 'enum', 'boolean', 'bool', 'reference', 'user'].includes(type)) {
+    return 0;
+  }
+  if (hasSemanticToken(text, [
+    'status',
+    'stage',
+    'state',
+    'type',
+    'category',
+    'priority',
+    'owner',
+    'assignee',
+    'customer',
+    'source',
+    'channel',
+    '状态',
+    '阶段',
+    '类型',
+    '分类',
+    '优先级',
+    '负责人',
+    '客户',
+    '来源',
+    '渠道',
+  ])) {
+    return 1;
+  }
+  if (hasSemanticToken(text, [
+    'id',
+    'pid',
+    'uuid',
+    'code',
+    'no',
+    'number',
+    'created',
+    'updated',
+    'timestamp',
+    '编码',
+    '编号',
+    '单号',
+  ])) {
+    return 8;
+  }
+  return 4;
+}
+
+function sortFieldsByRank(
+  fields: SavedViewCapabilityField[],
+  ranker: (field: SavedViewCapabilityField) => number,
+): SavedViewCapabilityField[] {
+  return [...fields].sort((left, right) => {
+    const rankDelta = ranker(left) - ranker(right);
+    if (rankDelta !== 0) return rankDelta;
+    return left.code.localeCompare(right.code);
+  });
+}
+
 function matchesImageField(field: SavedViewCapabilityField): boolean {
   if (matchesType(field, IMAGE_TYPES)) {
     return true;
@@ -69,11 +152,12 @@ function matchesTreeParentField(field: SavedViewCapabilityField): boolean {
 function result(
   viewType: ViewType,
   status: SavedViewCapabilityStatus,
+  reasonCodes: string[],
   reasons: string[],
   fieldOptions: Record<string, SavedViewCapabilityField[]> = {},
   suggestedConfig: Partial<ViewConfig> = {},
 ): SavedViewCapabilityResult {
-  return { viewType, status, reasons, fieldOptions, suggestedConfig };
+  return { viewType, status, reasonCodes, reasons, fieldOptions, suggestedConfig };
 }
 
 export function checkSavedViewCapability(
@@ -81,12 +165,18 @@ export function checkSavedViewCapability(
   fields: SavedViewCapabilityField[],
 ): SavedViewCapabilityResult {
   if (viewType === 'table' || viewType === 'form') {
-    return result(viewType, 'available', []);
+    return result(viewType, 'available', [], []);
   }
 
   if (viewType === 'kanban') {
-    const groupFields = fields.filter((field) => matchesType(field, GROUPABLE_TYPES));
-    const titleFields = fields.filter((field) => matchesType(field, TEXT_TYPES));
+    const groupFields = sortFieldsByRank(
+      fields.filter((field) => matchesType(field, GROUPABLE_TYPES)),
+      rankKanbanGroupField,
+    );
+    const titleFields = sortFieldsByRank(
+      fields.filter((field) => matchesType(field, TEXT_TYPES)),
+      rankTextFieldForTitle,
+    );
     const fieldOptions = {
       groupByField: groupFields,
       titleField: titleFields,
@@ -96,6 +186,7 @@ export function checkSavedViewCapability(
       return result(
         viewType,
         'blocked',
+        [groupFields.length === 0 ? 'missing_kanban_group_field' : 'missing_title_field'],
         [
           groupFields.length === 0
             ? 'Kanban requires a groupable status, enum, reference, user, boolean, or text field.'
@@ -108,6 +199,7 @@ export function checkSavedViewCapability(
     return result(
       viewType,
       'degraded',
+      ['kanban_drag_command_missing'],
       ['Drag is disabled until a status update command is configured.'],
       fieldOptions,
       {
@@ -119,7 +211,10 @@ export function checkSavedViewCapability(
 
   if (viewType === 'calendar') {
     const dateFields = fields.filter((field) => matchesType(field, DATE_TYPES));
-    const titleFields = fields.filter((field) => matchesType(field, TEXT_TYPES));
+    const titleFields = sortFieldsByRank(
+      fields.filter((field) => matchesType(field, TEXT_TYPES)),
+      rankTextFieldForTitle,
+    );
     const fieldOptions = {
       calendarDateField: dateFields,
       calendarTitleField: titleFields,
@@ -129,12 +224,13 @@ export function checkSavedViewCapability(
       return result(
         viewType,
         'blocked',
+        ['missing_date_field'],
         ['Calendar requires at least one date or datetime field.'],
         fieldOptions,
       );
     }
 
-    return result(viewType, 'available', [], fieldOptions, {
+    return result(viewType, 'available', [], [], fieldOptions, {
       calendarDateField: firstCode(dateFields),
       calendarTitleField: firstCode(titleFields),
     });
@@ -142,7 +238,10 @@ export function checkSavedViewCapability(
 
   if (viewType === 'gantt') {
     const dateFields = fields.filter((field) => matchesType(field, DATE_TYPES));
-    const titleFields = fields.filter((field) => matchesType(field, TEXT_TYPES));
+    const titleFields = sortFieldsByRank(
+      fields.filter((field) => matchesType(field, TEXT_TYPES)),
+      rankTextFieldForTitle,
+    );
     const fieldOptions = {
       ganttStartDateField: dateFields,
       ganttEndDateField: dateFields,
@@ -153,6 +252,7 @@ export function checkSavedViewCapability(
       return result(
         viewType,
         'blocked',
+        ['missing_date_field'],
         ['Gantt requires at least one date or datetime field for start and end dates.'],
         fieldOptions,
       );
@@ -164,8 +264,9 @@ export function checkSavedViewCapability(
       dateFields.length === 1
         ? ['Only one date field is available; it will be reused as both start and end date.']
         : [];
+    const reasonCodes = dateFields.length === 1 ? ['single_date_field_reused'] : [];
 
-    return result(viewType, status, reasons, fieldOptions, {
+    return result(viewType, status, reasonCodes, reasons, fieldOptions, {
       ganttStartDateField: startField.code,
       ganttEndDateField: endField.code,
       ganttTitleField: firstCode(titleFields),
@@ -174,7 +275,10 @@ export function checkSavedViewCapability(
 
   if (viewType === 'gallery') {
     const imageFields = fields.filter(matchesImageField);
-    const titleFields = fields.filter((field) => matchesType(field, TEXT_TYPES));
+    const titleFields = sortFieldsByRank(
+      fields.filter((field) => matchesType(field, TEXT_TYPES)),
+      rankTextFieldForTitle,
+    );
     const fieldOptions = {
       galleryImageField: imageFields,
       galleryTitleField: titleFields,
@@ -184,12 +288,13 @@ export function checkSavedViewCapability(
       return result(
         viewType,
         'blocked',
+        ['missing_image_field'],
         ['Gallery requires an image, file, attachment, avatar, or cover field.'],
         fieldOptions,
       );
     }
 
-    return result(viewType, 'available', [], fieldOptions, {
+    return result(viewType, 'available', [], [], fieldOptions, {
       galleryImageField: firstCode(imageFields),
       galleryTitleField: firstCode(titleFields),
     });
@@ -197,7 +302,10 @@ export function checkSavedViewCapability(
 
   if (viewType === 'tree') {
     const parentFields = fields.filter(matchesTreeParentField);
-    const titleFields = fields.filter((field) => matchesType(field, TEXT_TYPES));
+    const titleFields = sortFieldsByRank(
+      fields.filter((field) => matchesType(field, TEXT_TYPES)),
+      rankTextFieldForTitle,
+    );
     const fieldOptions = {
       treeParentField: parentFields,
       treeTitleField: titleFields,
@@ -207,6 +315,7 @@ export function checkSavedViewCapability(
       return result(
         viewType,
         'blocked',
+        ['missing_tree_parent_field'],
         ['Tree requires a parent, path, or level field to build the hierarchy.'],
         fieldOptions,
       );
@@ -215,6 +324,7 @@ export function checkSavedViewCapability(
     return result(
       viewType,
       'degraded',
+      ['tree_reorder_command_missing'],
       ['Reorder is disabled until a tree update command is configured.'],
       fieldOptions,
       {
@@ -226,8 +336,14 @@ export function checkSavedViewCapability(
 
   if (viewType === 'timeline') {
     const dateFields = fields.filter((field) => matchesType(field, DATE_TYPES));
-    const resourceFields = fields.filter((field) => matchesType(field, GROUPABLE_TYPES));
-    const titleFields = fields.filter((field) => matchesType(field, TEXT_TYPES));
+    const resourceFields = sortFieldsByRank(
+      fields.filter((field) => matchesType(field, GROUPABLE_TYPES)),
+      rankKanbanGroupField,
+    );
+    const titleFields = sortFieldsByRank(
+      fields.filter((field) => matchesType(field, TEXT_TYPES)),
+      rankTextFieldForTitle,
+    );
     const fieldOptions = {
       timelineStartField: dateFields,
       timelineEndField: dateFields,
@@ -239,6 +355,7 @@ export function checkSavedViewCapability(
       return result(
         viewType,
         'blocked',
+        [dateFields.length === 0 ? 'missing_date_field' : 'missing_timeline_resource_field'],
         [
           dateFields.length === 0
             ? 'Timeline requires at least one date or datetime start field.'
@@ -249,7 +366,7 @@ export function checkSavedViewCapability(
     }
 
     const [startField, endField] = dateFields;
-    return result(viewType, 'available', [], fieldOptions, {
+    return result(viewType, 'available', [], [], fieldOptions, {
       timelineStartField: startField.code,
       timelineEndField: endField?.code,
       timelineResourceField: firstCode(resourceFields),
@@ -257,5 +374,5 @@ export function checkSavedViewCapability(
     });
   }
 
-  return result(viewType, 'available', []);
+  return result(viewType, 'available', [], []);
 }

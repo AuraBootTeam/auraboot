@@ -54,10 +54,95 @@ common:
   saved_view_scope_global: 全员
   saved_view_default: 默认
   saved_view_new: 新建视图
+  saved_view_new_personal: 新建个人视图
   saved_view_manage: 管理视图
   saved_view_empty: 暂无保存视图
+  saved_view_empty_hint: 你可以先新建一个只影响自己的个人视图
+  saved_view_search_placeholder: 搜索我的视图...
+  saved_view_manage_search_placeholder: 搜索我的视图...
+  saved_view_manage_no_results: 没有匹配的个人视图
+  saved_view_auto_name: "{type}视图"
+  saved_view_copy_name: "{name} 副本"
+  saved_view_untitled: 未命名视图
   saved_view_locked_preset: 预置
   saved_view_capability_blocked: 需要配置
+  saved_view_panel_subtitle: 管理当前列表的个人视图
+  saved_view_personal_draft: 当前个人视图有本地变更
+  saved_view_save_current: 保存到当前视图
+  saved_view_save_as_personal: 另存为新视图
+  saved_view_current_saved: 当前视图已保存
+  saved_view_save_filters: 保存筛选到当前视图
+  saved_view_personal_quota: "个人视图：{count}/{limit}"
+  saved_view_personal_quota_reached: 已达到 10 个个人视图上限，请删除或复用已有视图
+  saved_view_choose_type: 选择视图类型
+  saved_view_cancel: 取消
+  saved_view_create_cancel: 取消
+  saved_view_create_saving: 保存中...
+  saved_view_create_save: 保存视图
+  saved_view_create_not_saveable: 当前类型不可保存
+  saved_view_config_title: "配置{type}视图"
+  saved_view_config_help: 选择字段映射后保存为个人视图，只影响你自己
+  saved_view_select_field: 选择字段
+  saved_view_type_table: 表格
+  saved_view_type_kanban: 看板
+  saved_view_type_calendar: 日历
+  saved_view_type_gallery: 画册
+  saved_view_type_gantt: 甘特图
+  saved_view_type_tree: 树视图
+  saved_view_type_timeline: 时间线
+  saved_view_type_form: 表单
+  saved_view_type_status_available: 可用
+  saved_view_type_status_degraded: 需注意
+  saved_view_type_status_blocked: 不适合
+  saved_view_field_groupByField: 分组字段
+  saved_view_field_titleField: 标题字段
+  saved_view_field_calendarDateField: 日期字段
+  saved_view_field_calendarTitleField: 标题字段
+  saved_view_field_ganttStartDateField: 开始日期
+  saved_view_field_ganttEndDateField: 结束日期
+  saved_view_field_ganttTitleField: 标题字段
+  saved_view_field_galleryImageField: 图片字段
+  saved_view_field_galleryTitleField: 标题字段
+  saved_view_field_treeParentField: 父级字段
+  saved_view_field_treeTitleField: 标题字段
+  saved_view_field_timelineStartField: 开始时间
+  saved_view_field_timelineEndField: 结束时间
+  saved_view_field_timelineResourceField: 资源字段
+  saved_view_field_timelineTitleField: 标题字段
+  saved_view_reason_missing_kanban_group_field: 缺少适合作为看板分组的状态、枚举或分类字段
+  saved_view_reason_missing_title_field: 缺少适合作为卡片标题的名称或标题字段
+  saved_view_reason_missing_date_field: 缺少日期字段，无法稳定渲染该视图
+  saved_view_reason_missing_image_field: 缺少图片、附件或头像字段，当前模型不适合画册视图
+  saved_view_reason_missing_tree_parent_field: 缺少父级、路径或层级字段，无法形成树结构
+  saved_view_reason_missing_timeline_resource_field: 缺少资源字段，无法按资源维度展示时间线
+  saved_view_reason_kanban_drag_command_missing: 未配置状态更新命令，看板拖拽将被禁用
+  saved_view_reason_tree_reorder_command_missing: 未配置树节点排序命令，树视图只能只读展示
+  saved_view_reason_single_date_field_reused: 当前只有一个日期字段，将同时作为开始和结束时间使用
+  saved_view_action_set_default: 设为默认
+  saved_view_action_default: 默认视图
+  saved_view_action_edit: 重命名视图
+  saved_view_action_copy: 复制视图
+  saved_view_action_delete: 删除视图
+  saved_view_edit_name: 视图名称
+  saved_view_edit_description: 说明
+  saved_view_edit_description_placeholder: 补充这个个人视图的使用场景
+  saved_view_edit_save: 保存
+  saved_view_duplicate_title: 复制为个人视图
+  saved_view_duplicate_name: 新视图名称
+  saved_view_duplicate_submit: 创建副本
+  saved_view_delete_confirm: "确定删除“{name}”吗？"
+  saved_view_not_configured: 视图未配置
+  saved_view_configure: 配置
+  saved_view_switch_to_table: 切换到表格
+  saved_view_switch_to_table_full: 切换到表格查看完整分页。
+  saved_view_error: 出现错误
+  saved_view_diagnostics_summary: 视图已加载，但部分记录暂时无法渲染。
+  saved_view_current_mapping: 当前字段映射：
+  saved_view_total_records: 记录总数
+  saved_view_valid_records: 可渲染记录
+  saved_view_issue_records: 异常记录
+  saved_view_first_n: "前 {count} 条"
+  saved_view_data_limit_summary: "当前显示 {fetchedCount}/{totalCount} 条记录。"
   saved_view_shared_draft: 共享视图已产生本地改动
   saved_view_save_shared: 保存到共享视图
   saved_view_save_shared_disabled_reason: 你可以调整当前视图，但暂不能保存给团队或全员

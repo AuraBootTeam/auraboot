@@ -66,7 +66,7 @@ test.describe('SavedView — CALENDAR View', () => {
         modelCode: MODEL_CODE,
         pageKey: SAVED_VIEW_PAGE_KEY,
         viewType: 'calendar',
-        scope: 'global',
+        scope: 'personal',
         viewConfig: {
           calendarDateField: 'e2et_order_date',
           calendarTitleField: 'e2et_order_title',
@@ -132,7 +132,7 @@ test.describe('SavedView — CALENDAR View', () => {
     // Wait for calendar content to render (FullCalendar or unconfigured/not-configured message)
     const calendarContent = page
       .locator('.fc, [data-testid="calendar-view"], [class*="calendar"]')
-      .or(page.getByText('Calendar not configured'))
+      .or(page.getByText('日历视图未配置'))
       .or(page.getByText('not configured'));
     await expect(calendarContent.first()).toBeVisible({ timeout: 8000 });
   });

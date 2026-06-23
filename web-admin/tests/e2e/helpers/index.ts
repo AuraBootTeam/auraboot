@@ -199,6 +199,7 @@ export function viewSelectorTrigger(page: Page): Locator {
 export async function openViewSelectorDropdown(page: Page): Promise<Locator> {
   const trigger = viewSelectorTrigger(page);
   await expect(trigger).toBeVisible({ timeout: 10_000 });
+  await expect(trigger).toBeEnabled({ timeout: 10_000 });
   await trigger.click();
 
   const dropdown = page.locator('[role="listbox"]').first();

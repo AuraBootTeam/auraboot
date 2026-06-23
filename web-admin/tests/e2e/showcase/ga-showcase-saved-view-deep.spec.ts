@@ -69,10 +69,12 @@ async function openViewManagePanel(page: Page) {
 }
 
 async function openTypePicker(page: Page) {
-  const newViewBtn = page.getByRole('button', { name: /New View/i });
+  const newViewBtn = page.getByTestId('saved-view-create-personal');
   await expect(newViewBtn).toBeVisible({ timeout: 5_000 });
   await newViewBtn.click();
-  await expect(page.getByText('Choose type')).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByTestId('saved-view-quota-status')).toContainText('个人视图:', {
+    timeout: 5_000,
+  });
 }
 
 async function createConfiguredView(
@@ -83,20 +85,18 @@ async function createConfiguredView(
   await openTypePicker(page);
 
   const typeLabel: Record<typeof viewType, string> = {
-    kanban: 'Kanban',
-    calendar: 'Calendar',
-    gallery: 'Gallery',
+    kanban: '看板',
+    calendar: '日历',
+    gallery: '画册',
   };
 
-  const typeButton = panel.locator('.grid.grid-cols-4 button').filter({
-    hasText: typeLabel[viewType],
-  });
+  const typeButton = panel.getByTestId(`saved-view-type-${viewType}`);
   await expect(typeButton).toBeVisible({ timeout: 5_000 });
 
   await typeButton.click();
 
   await expect(
-    panel.getByText(new RegExp(`Configure ${typeLabel[viewType]} View`, 'i')),
+    panel.getByText(new RegExp(`配置${typeLabel[viewType]}视图`)),
   ).toBeVisible({ timeout: 10_000 });
 
   const selects = panel.locator('select');
@@ -126,7 +126,7 @@ async function createConfiguredView(
     configValues.push(selected);
   }
 
-  const doneBtn = panel.getByRole('button', { name: /^Done$/ });
+  const doneBtn = panel.getByTestId('saved-view-config-save');
   await expect(doneBtn).toBeEnabled();
 
   const createResponsePromise = page.waitForResponse(
@@ -264,7 +264,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await page.reload({ waitUntil: 'load' });
     await expect(page).toHaveURL(new RegExp(`(?:\\?|&)view=${pid}(?:&|$)`), { timeout: 10_000 });
 
-    const notConfigured = page.getByText('Kanban not configured');
+    const notConfigured = page.getByText('看板视图未配置');
     const kanbanBoard = page.locator('.flex.gap-4.overflow-x-auto').first();
     await expect
       .poll(
@@ -295,7 +295,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await page.reload({ waitUntil: 'load' });
     await expect(page).toHaveURL(new RegExp(`(?:\\?|&)view=${pid}(?:&|$)`), { timeout: 10_000 });
 
-    const notConfigured = page.getByText('Calendar not configured');
+    const notConfigured = page.getByText('日历视图未配置');
     const calendar = page.locator('.fc').first();
     await expect
       .poll(
@@ -327,7 +327,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await page.reload({ waitUntil: 'load' });
     await expect(page).toHaveURL(new RegExp(`(?:\\?|&)view=${pid}(?:&|$)`), { timeout: 10_000 });
 
-    const notConfigured = page.getByText('Gallery not configured');
+    const notConfigured = page.getByText('画册视图未配置');
     const galleryView = page.getByTestId('gallery-view');
     await expect
       .poll(
