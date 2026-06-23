@@ -1,11 +1,16 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { validateStructural } from '../../src/validation/structural.js';
+import { loadPlugin } from '../../src/utils/plugin-loader.js';
 import type { PluginFiles } from '../../src/utils/plugin-loader.js';
 
 const tempDirs: string[] = [];
+const shippedPluginsDir = resolve(import.meta.dirname, '../../../../plugins');
+const shippedPluginNames = readdirSync(shippedPluginsDir)
+  .filter((name) => existsSync(join(shippedPluginsDir, name, 'plugin.json')))
+  .sort();
 
 function pluginWithManifest(manifest: Record<string, unknown>): PluginFiles {
   const dir = mkdtempSync(join(tmpdir(), 'aura-plugin-structural-'));
@@ -141,4 +146,17 @@ describe('validateStructural plugin manifest schema', () => {
     );
     expect(result.errorCount).toBeGreaterThan(0);
   });
+
+  it.each(shippedPluginNames)(
+    'validates shipped %s resource schemas without schema load warnings',
+    (pluginName) => {
+      const plugin = loadPlugin(join(shippedPluginsDir, pluginName));
+
+      const result = validateStructural(plugin);
+
+      expect(result.messages.filter((message) => message.code === 'L1-RESOURCE-SCHEMA')).toEqual([]);
+      expect(result.messages.filter((message) => message.code === 'L1-RESOURCE')).toEqual([]);
+      expect(result.errorCount).toBe(0);
+    },
+  );
 });

@@ -44,7 +44,8 @@ export function validateStructural(plugin: PluginFiles): ValidationResult {
   if (existsSync(manifestSchemaPath)) {
     try {
       const schema = JSON.parse(readFileSync(manifestSchemaPath, 'utf-8'));
-      const validate = ajv.compile(schema);
+      ajv.addSchema(schema, 'plugin-manifest.schema.json');
+      const validate = ajv.getSchema('plugin-manifest.schema.json') || ajv.compile(schema);
       const manifestRaw = JSON.parse(readFileSync(join(plugin.dir, 'plugin.json'), 'utf-8'));
       if (!validate(manifestRaw)) {
         for (const err of validate.errors || []) {
