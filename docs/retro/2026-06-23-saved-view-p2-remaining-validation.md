@@ -22,7 +22,6 @@ relates_to:
 
 不在本报告内完成的外部任务:
 
-- Dynamic record/list/detail/sub-table/comment/export 的 pid-only migration。
 - UserRole legacy id endpoint retirement。
 - Audit actorPid public query。
 - OpenAPI/docs pid naming cleanup。
@@ -129,7 +128,8 @@ Full historical directory classification:
 
 WP1-WP5 are closed for the current SavedView branch. The remaining active backlog is external platform/public-contract work:
 
-- Platform dynamic record pid-only migration.
 - UserRole legacy endpoint telemetry/deprecation/removal.
 - Audit `actorPid` public query.
 - Documentation/OpenAPI pid cleanup after migration naming settles.
+
+Platform dynamic record pid-only migration is intentionally removed from this SavedView tracker because it is owned by a separate workspace and is not a blocker for the SavedView feature completion decision.

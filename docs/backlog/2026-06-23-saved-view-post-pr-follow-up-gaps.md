@@ -22,39 +22,35 @@ SavedView Feishu parity has been split into a stacked delivery:
 
 This document tracks follow-up gaps that remain after PR `#1028`. It is intentionally not a reopen of the completed P0/P1/P2 work. It separates:
 
-- Platform migrations that must run as independent branches.
 - Product maturity work needed to reach long-term Feishu-level robustness.
 - E2E and governance debts found during `e2e-truth` review.
 
 Related PR: `https://github.com/AuraBootTeam/auraboot/pull/1028`
 
-Dynamic business record pid-only migration is already delegated to another workspace:
-
-`/Users/ghj/work/auraboot/.worktrees/oss-saved-view-feishu-p1/docs/backlog/2026-06-22-platform-public-record-pid-only-migration.md`
+Dynamic business record pid-only migration has been removed from this SavedView tracker because it is owned by another workspace and is not a blocker for the SavedView feature completion decision.
 
 ## Scope Boundary And Source Of Truth
 
 本文档现在是 SavedView 飞书体验对齐后的后续任务唯一 gap 总账。它回答三个问题:
 
 - 还有哪些工作是 SavedView 当前产品成熟度必须补齐的。
-- 哪些工作虽然来自同一轮 review,但已经超出 SavedView 分支边界,必须交给独立 platform/public-contract 分支。
+- 哪些非 SavedView 治理项虽然来自同一轮 review,但不能阻塞 SavedView 分支收口。
 - 每个 gap 需要哪些产品行为、代码层、浏览器路径、golden 截图和 `e2e-truth` 证据才能关闭。
 
 边界裁决:
 
 | Lane | Included | Excluded |
 | --- | --- | --- |
-| Current SavedView follow-up | WP1-WP5:高级视图语义校验、E2E 矩阵治理、协作者产品化、配额 UX/fixture、quick preset 生命周期 | dynamic record pid-only、UserRole legacy endpoint removal、audit actorPid public query、OpenAPI pid 清理 |
-| Delegated platform/public-contract | public record pid-only migration、RBAC endpoint deprecation、audit query public contract、docs/OpenAPI cleanup | 不在当前 SavedView 分支里顺手改通用 dynamic API、audit 公共契约或全仓文档命名 |
+| Current SavedView follow-up | WP1-WP5:高级视图语义校验、E2E 矩阵治理、协作者产品化、配额 UX/fixture、quick preset 生命周期 | UserRole legacy endpoint removal、audit actorPid public query、OpenAPI pid 清理 |
+| Non-blocking platform/public-contract notes | RBAC endpoint deprecation、audit query public contract、docs/OpenAPI cleanup | 不在当前 SavedView 分支里顺手改 audit 公共契约或全仓文档命名 |
 
-当前文档状态是 `active backlog`:WP1-WP5 已在 `codex/saved-view-p2-remaining` 完成实现和目标验证;平台 pid/public-contract lane 仍为 `blocked_external`,继续作为后续独立分支入口。
+当前文档状态是 `active backlog`:WP1-WP5 已在 `codex/saved-view-p2-remaining` 完成实现和目标验证;dynamic record pid-only migration 不再纳入本文档 backlog。
 
 ## Follow-up Task Reading Guide
 
 本文档是 SavedView 飞书体验对齐后的后续任务总账。后续窗口先读本节,再进入具体 gap:
 
 - 当前分支只处理 5 个 SavedView 内聚工作包:高级视图语义校验、E2E 覆盖矩阵、协作者产品化、配额 UX/测试夹具、quick filter preset 生命周期。
-- pid-only / public-id 迁移不在当前分支继续扩范围,只保留来源、影响面和依赖关系;具体开发以外部 backlog 为准。
 - 任何 work package 不能只因为代码存在就标记完成;必须同时具备后端/前端单测、浏览器路径、golden 或截图证据、`e2e-truth` 真实性说明。
 - 后续开发完成某个 gap 时,需要同步更新三处:对应 `GAP-SV-FU-*` 详情、`Delivery Matrix`、`Verification Matrix`。
 
@@ -78,11 +74,10 @@ Dynamic business record pid-only migration is already delegated to another works
 | 4 | WP4 Quota UX/fixtures | personal 10、team/global 20 是产品规则,不是只在 API 报错时才知道 | done: 用户创建前可见上限,测试 helper 记录 create/reuse |
 | 5 | WP5 Quick preset lifecycle | 右侧 quick filters 要保持轻量,保存后的 personal copy 要像成熟 SavedView | done: saved/edited/reset 状态和个人副本复用已闭环 |
 
-外部独立分支处理的 4 个包:
+非阻塞平台治理项:
 
 | Gap | 外部原因 | 当前分支规则 |
 | --- | --- | --- |
-| GAP-SV-FU-001 | dynamic record/list/detail/comment/export 影响面是平台级 public-id 迁移 | 只链接 delegated backlog,不要顺手改动态记录契约 |
 | GAP-SV-FU-004 | UserRole legacy ID endpoint 退役需要 telemetry、兼容窗口、OpenAPI 策略 | 当前分支不删除兼容端点 |
 | GAP-SV-FU-006 | audit actorPid 查询和 internal actor id 边界属于审计公共契约治理 | 不和 SavedView sharing UI 混在同一 PR |
 | GAP-SV-FU-010 | 文档/OpenAPI pid 清理依赖平台迁移命名决策 | 等 migration 决策落地后再统一清理 |
@@ -97,11 +92,11 @@ These follow-up gaps come from the Feishu parity analysis and the subsequent PR 
 - Team/shared views are an advanced capability backed by `ab_team` and `ab_team_member`; team/global ownership and collaborators must be permission-aware.
 - SavedView limits are intentionally small: personal 10, team/global 20. UX and tests should respect those limits instead of treating them as edge-only API failures.
 - Advanced view types can be offered only when the underlying DSL model/page has enough field semantics to render them. Missing or incompatible fields should block creation before persistence.
-- Public contract work must avoid exposing internal ids. Platform-wide pid-only migration is broader than SavedView and is tracked outside this branch.
+- Public contract work must avoid exposing internal ids, but platform-wide pid-only migration is no longer tracked in this SavedView backlog.
 
 ## 2026-06-23 Scope Decision
 
-本轮后续任务不再扩大当前 `codex/saved-view-p2-remaining` 分支范围。pid/public-id 迁移相关问题只在本文档保留来源、影响面和依赖关系,具体开发交给独立窗口/独立分支处理。
+本轮后续任务不再扩大当前 `codex/saved-view-p2-remaining` 分支范围。Dynamic record pid-only migration 已移出本文档,由独立窗口处理。
 
 当前窗口只承接 SavedView 产品成熟度和测试治理,按 5 个 work package 收口:
 
@@ -113,11 +108,10 @@ These follow-up gaps come from the Feishu parity analysis and the subsequent PR 
 | WP4 Quota UX and test fixtures | GAP-SV-FU-007 | SavedView quota UI + E2E helpers | 用户提前知道 personal 10/team-global 20 上限,测试不再污染长生命周期 runtime |
 | WP5 Quick preset lifecycle | GAP-SV-FU-008 | Quick filter preset UX/provider | 系统 preset、已保存个人副本、已编辑副本有明确生命周期 |
 
-外部窗口或后续独立分支承接:
+非阻塞平台治理项:
 
 | Gap | Reason for exclusion from current branch | Source of truth |
 | --- | --- | --- |
-| GAP-SV-FU-001 Platform dynamic record pid-only migration | 平台级 list/detail/sub-table/comment/export 契约迁移,影响面远超 SavedView | `2026-06-22-platform-public-record-pid-only-migration.md` |
 | GAP-SV-FU-004 ID-based UserRole mutation endpoint retirement | pid/code 契约治理,需要兼容窗口、运行时 telemetry 和 OpenAPI deprecation 策略 | 本文档保留 backlog,开发单独分支 |
 | GAP-SV-FU-006 Audit actor public query contract | `actorPid`/internal actor id 边界属于审计公共契约治理,应和 pid migration 统一口径 | 本文档保留 backlog,开发单独分支 |
 | GAP-SV-FU-010 Documentation/OpenAPI pid cleanup | 依赖 pid migration 完成后的全局命名和 OpenAPI 决策 | 跟随 pid migration 后置收口 |
@@ -127,7 +121,7 @@ These follow-up gaps come from the Feishu parity analysis and the subsequent PR 
 本文件是 SavedView 飞书体验对齐后的后续 gap 总账,不是单次 PR 的临时 handover。后续窗口如果继续开发,以本文档为范围边界:
 
 - `Current SavedView follow-up` 行可以在 SavedView 分支内继续实现和验证。
-- `External` 行只记录依赖和影响面,不要在当前 SavedView 分支里顺手处理。
+- Non-blocking platform notes 只记录依赖和影响面,不要在当前 SavedView 分支里顺手处理。
 - `Status: open` 表示尚未满足验收标准;如果存在半成品代码,也不能改成 DONE,必须等测试矩阵和 `e2e-truth` 证据齐全。
 - 完成一个 gap 后,在对应 gap、Delivery Matrix、Verification Matrix 三处同步更新状态和证据。
 
@@ -137,7 +131,7 @@ These follow-up gaps come from the Feishu parity analysis and the subsequent PR 
 | --- | --- |
 | `open` | 已确认存在产品/测试/契约缺口,尚未开工或没有可合并实现 |
 | `in_progress` | 当前分支有部分实现或测试,但验收矩阵尚未闭合 |
-| `blocked_external` | 本分支不做;依赖 pid/public-id、audit public contract 或 OpenAPI 迁移分支 |
+| `blocked_external` | 本分支不做;依赖 audit public contract 或 OpenAPI 迁移分支 |
 | `done` | 代码、文档、测试、E2E truth 证据均已落地 |
 
 ## Executive Summary
@@ -149,7 +143,6 @@ These follow-up gaps come from the Feishu parity analysis and the subsequent PR 
 | P1 | Team collaborator management UI/API + ACL validation | Current SavedView follow-up | Done in current branch; Share panel, ACL validator, audit evidence, and golden screenshots are present | Future expansion to team/role principals should be a separate contract change |
 | P1 | View quota UX and test isolation | Current SavedView follow-up | Done in current branch; count/limit UI, personal/team/global limits, and quota-safe helper evidence are present | Keep long-lived runtime tests on create-or-reuse policy |
 | P2 | Quick filter preset lifecycle | Current SavedView follow-up | Done in current branch; provider registry, saved/edited/reset UI, and browser evidence are present | Plugin-contributed preset examples remain optional future expansion |
-| External P0 | Platform dynamic record pid-only migration | Delegated window | Out of scope for `#1028`; separate backlog exists | Continue in delegated workspace; keep this branch free of platform-wide record contract changes |
 | External P1 | ID-based UserRole mutation endpoint retirement | Separate governance branch | PID endpoints exist; old ID endpoints are only `@Deprecated` | Add deprecation telemetry, docs, compatibility window, then remove/admin-gate legacy endpoints |
 | External P1 | Audit actor public query contract | Separate audit/public-contract branch | Audit responses are public DTOs; `/by-actor` still uses `actorId` query | Add `actorPid` query path/alias and restrict full internal audit DTOs to admin/verification endpoints |
 | External P2 | Documentation/OpenAPI pid cleanup | Follows pid migration | Code paths changed faster than public docs | Update API docs, examples, and generated schema language to pid-first contracts after migration decisions land |
@@ -158,7 +151,6 @@ These follow-up gaps come from the Feishu parity analysis and the subsequent PR 
 
 | Gap | Priority | Package | Owner lane | Status | Dependencies | Exit evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| GAP-SV-FU-001 | External P0 | Platform public record contract | Platform migration | blocked_external | dynamic record/list/detail/comment/export inventory | Dedicated pid-only migration backlog and PR |
 | GAP-SV-FU-002 | P0 | WP1 | SavedView backend/frontend/E2E | done | model/page field metadata availability | Backend negative tests, frontend reason types, E2E invalid mapping evidence |
 | GAP-SV-FU-003 | P0 | WP2 | SavedView E2E governance | done | existing historical specs and fixture routes | `FEATURE_MATRIX.md`, direct-route audit, e2e-truth notes |
 | GAP-SV-FU-004 | External P1 | UserRole pid endpoint retirement | RBAC/API governance | blocked_external | legacy caller telemetry and compatibility window | Deprecation telemetry, docs, zero-usage evidence before removal |
@@ -192,7 +184,7 @@ This section is the handoff-level summary after the current coding and verificat
 | WP3 Collaborator productization | Share panel exists in `ViewManagePanel`; tenant-member search service and component tests cover add/remove; backend validates user principal pid, permission, tenant membership, and audits collaborator changes | done for current user-principal collaborator contract; future team/role principals require a separate contract branch |
 | WP4 Quota UX and fixtures | Create/manage flow shows current count/limit and disables create when limit is reached; component test covers limit state; E2E helper can create or reuse matching SavedViews | done for personal 10 and team/global 20; long-lived runtime policy is create-or-reuse, not destructive cleanup |
 | WP5 Quick preset lifecycle | Preset definitions are provider-based; duplicate provider/key behavior has tests; system preset chip can show saved/edited state; reset-to-system handler and i18n keys are wired; unit/component tests cover state derivation | done for save/repeat/personal copy/edited/reset lifecycle; rename/delete are normal management-path behavior in the matrix |
-| External pid/public-id lane | Dynamic record pid migration, UserRole legacy endpoint retirement, audit actorPid query, and OpenAPI cleanup are documented here with owner boundaries | Keep out of this branch; link to delegated migration backlog and open separate branches for telemetry/docs cleanup |
+| Non-blocking platform governance notes | UserRole legacy endpoint retirement, audit actorPid query, and OpenAPI cleanup are documented here with owner boundaries | Keep out of this branch; open separate branches for telemetry/docs cleanup |
 
 ## Latest Verification Fallout And Follow-up Tasks
 
@@ -224,7 +216,7 @@ Immediate next action order after Checkpoint D:
 
 1. Do not reopen WP1-WP5 in this branch unless a regression appears; use the commands in the validation report as the repeatable gate.
 2. Keep historical `tests/e2e/saved-view` debt classified in `FEATURE_MATRIX.md`; convert old direct-route/API-heavy rows opportunistically when those feature areas are next touched.
-3. Move remaining active work to the external platform/public-contract lanes: dynamic record pid-only, UserRole legacy endpoint retirement, audit actorPid public query, and OpenAPI/docs cleanup.
+3. Do not reopen WP1-WP5 for non-blocking platform/public-contract notes such as UserRole legacy endpoint retirement, audit actorPid public query, and OpenAPI/docs cleanup.
 
 Current status after Checkpoint D:
 
@@ -258,7 +250,6 @@ The table below is the actionable backlog. `Evidence owner` means where the clos
 | SV-WP5-A | GAP-SV-FU-008 | Keep quick preset provider registry and conflict/duplicate tests | unit tests | done |
 | SV-WP5-B | GAP-SV-FU-008 | Prove saved/edited/reset lifecycle from real list-page entry | follow-up golden E2E + screenshot | done |
 | SV-WP5-C | GAP-SV-FU-008 | Tie normal rename/delete management paths back to personal preset copy lifecycle in the matrix | feature matrix | done |
-| SV-EXT-A | GAP-SV-FU-001 | Complete platform dynamic record pid-only inventory and migration | delegated backlog/PR | blocked_external |
 | SV-EXT-B | GAP-SV-FU-004 | Add UserRole legacy endpoint telemetry/deprecation window before removal | separate RBAC/API branch | blocked_external |
 | SV-EXT-C | GAP-SV-FU-006 | Add public `actorPid` audit query and document internal/admin split | separate audit branch | blocked_external |
 | SV-EXT-D | GAP-SV-FU-010 | Clean docs/OpenAPI pid language after migration naming settles | follow-up docs branch | blocked_external |
@@ -420,33 +411,11 @@ Current branch note: `FEATURE_MATRIX.md` and timeline direct-route cleanup are c
 
 | External gap | Required follow-up | Current branch rule |
 | --- | --- | --- |
-| GAP-SV-FU-001 Platform dynamic record pid-only migration | Inventory dynamic list/detail/sub-table/comment/history/export surfaces; define `pid` response sanitizer and legacy alias sunset | Do not edit in this SavedView branch; link to delegated backlog only |
 | GAP-SV-FU-004 UserRole legacy ID endpoint retirement | Add telemetry/warning headers/docs, prove zero first-party legacy callers, then remove or admin-gate deprecated endpoints | Do not remove compatibility endpoints in this branch |
 | GAP-SV-FU-006 Audit actor public query | Add `actorPid` public query and document admin/internal actor-id boundary | Do not mix with SavedView collaborator UI unless audit API branch lands first |
 | GAP-SV-FU-010 Docs/OpenAPI pid cleanup | Rewrite public examples after pid migration naming decisions settle | Do not mass-rename docs before platform migration contract is final |
 
 ## Gap Details
-
-### GAP-SV-FU-001: Platform Dynamic Record PID-Only Migration
-
-Status: blocked_external.
-
-Why it remains:
-
-- Dynamic list/detail/sub-table/comment/watch/history/export APIs can still expose or accept internal record ids through generic record maps or legacy naming.
-- This impacts renderer identity, command runtime, NamedQuery/DataSource, export, comments, watch/follow, field history, and public cursor design.
-- It is too broad for SavedView PR scope and already has a dedicated backlog.
-
-Required outcome:
-
-- Public dynamic record responses expose `pid`, not top-level internal `id`.
-- Public request bodies prefer `recordPid`, `recordPids`, `targetRecordPid`, `commentPid`.
-- Legacy `recordId/targetRecordId` is compatibility-only with telemetry and sunset plan.
-- NamedQuery/DataSource/export cannot bypass the public-record sanitizer.
-
-Source of truth:
-
-- External backlog: `2026-06-22-platform-public-record-pid-only-migration.md`.
 
 ### GAP-SV-FU-002: Advanced View Field Semantic Validation
 
@@ -765,7 +734,6 @@ This matrix is the closing checklist for the 5 current-window work packages. It 
 - Check branch and PR: `git status --short --branch`, `gh pr view 1028`.
 - Inspect unstaged changes before editing: `git diff -- docs/backlog/2026-06-23-saved-view-post-pr-follow-up-gaps.md platform/src/main/java/com/auraboot/framework/view/service/impl/SavedViewServiceImpl.java web-admin/tests/e2e/saved-view/saved-view-timeline.spec.ts`.
 - Treat WP1-WP5 as complete for current SavedView scope, but rerun the verification matrix before merge or PR update if code changes again.
-- Keep pid/public-id migration out of this branch even if grep finds adjacent `id` naming.
 
 ## Definition Of Done
 
@@ -776,13 +744,11 @@ For any current-window package:
 - UI shows explicit feedback for loading, empty, validation failure, permission denial, and destructive actions when the package touches those states.
 - Tests include focused backend/unit coverage and at least one browser path for every user-visible command.
 - Completion report includes command output summary, feature/action coverage matrix, and `e2e-truth` review notes.
-- If a package intentionally leaves an item for the pid/public-id migration, the report links to the external backlog instead of claiming it is complete.
 
 ## Remaining Execution Order
 
 | Order | Work package | Suggested branch | Reason |
 | --- | --- | --- | --- |
-| external-1 | Platform dynamic record pid-only migration | delegated branch/workspace | Large platform migration, must stay separate |
 | external-2 | UserRole legacy endpoint retirement telemetry | `codex/user-role-pid-endpoint-deprecation` | Governance work tied to pid/code contract migration |
 | external-3 | Audit actorPid public query | `codex/audit-public-actor-pid-query` | Audit public-contract cleanup should align with pid migration language |
 | external-4 | Documentation/OpenAPI pid cleanup | follows pid migration | Avoids rewriting docs before public-id naming decisions settle |
@@ -793,6 +759,5 @@ When reporting future progress from this backlog:
 
 - Do not say "SavedView 100% complete" unless feature/action coverage matrix and `e2e-truth` both pass with no product gaps.
 - Separate UI browser evidence from API/setup evidence.
-- Treat platform dynamic record pid-only work as an independent migration, not a SavedView-only cleanup.
 - If legacy ID paths remain for compatibility, report them as compatibility debt with telemetry/removal status.
 - If E2E uses direct `/p/` navigation or API-created records, state why and what user-path evidence pairs with it.
