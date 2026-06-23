@@ -1303,7 +1303,7 @@
           {
             "code": "deploy",
             "visibleWhen": "row.status === 'draft'",
-            "label": "部署",
+            "label": { "zh-CN": "部署", "en-US": "Deploy" },
             "action": {
               "type": "flow",
               "steps": [
@@ -1318,7 +1318,7 @@
           {
             "code": "suspend",
             "visibleWhen": "row.status === 'deployed'",
-            "label": "暂停",
+            "label": { "zh-CN": "暂停", "en-US": "Suspend" },
             "action": {
               "type": "flow",
               "steps": [
@@ -1333,7 +1333,7 @@
           {
             "code": "resume",
             "visibleWhen": "row.status === 'suspended'",
-            "label": "恢复",
+            "label": { "zh-CN": "恢复", "en-US": "Resume" },
             "action": {
               "type": "flow",
               "steps": [
@@ -1349,7 +1349,7 @@
             "code": "delete",
             "visibleWhen": "row.status === 'draft'",
             "danger": true,
-            "label": "删除",
+            "label": { "zh-CN": "删除", "en-US": "Delete" },
             "confirm": "confirm.delete",
             "action": {
               "type": "flow",
@@ -2290,6 +2290,79 @@
               "en-US": "Error Message"
             },
             "width": 250
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "template_center",
+    "name": "$i18n:template.gallery.title",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": { "type": "stack" },
+    "dataSources": {
+      "templates": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/templates",
+        "adaptor": "table"
+      }
+    },
+    "blocks": [
+      {
+        "id": "template_gallery_grid",
+        "blockType": "card-grid",
+        "dataSource": "templates",
+        "titleField": "name",
+        "descriptionField": "description",
+        "categoryField": "category",
+        "iconField": "icon",
+        "cardActions": [
+          {
+            "code": "install",
+            "label": "$i18n:template.gallery.install",
+            "variant": "primary",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "id": "preview",
+                  "action": "api.request",
+                  "method": "get",
+                  "endpoint": "/api/templates/{id}/preview",
+                  "target": "previewData"
+                },
+                {
+                  "id": "confirm",
+                  "action": "dialog.confirm",
+                  "args": {
+                    "message": { "zh-CN": "确认应用此模板？这将在当前租户创建模板包含的模型与页面。", "en-US": "Install this template? It will create the template's models and pages in your tenant." }
+                  }
+                },
+                {
+                  "id": "install",
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/templates/{id}/install",
+                  "target": "installResult"
+                },
+                {
+                  "id": "toast",
+                  "action": "toast.success",
+                  "args": {
+                    "message": { "zh-CN": "模板已应用", "en-US": "Template installed" }
+                  }
+                },
+                {
+                  "id": "reload",
+                  "action": "reloadDataSource",
+                  "args": {
+                    "dataSourceId": "templates"
+                  }
+                }
+              ]
+            }
           }
         ]
       }

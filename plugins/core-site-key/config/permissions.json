@@ -1,0 +1,23 @@
+[
+  {
+    "code": "behavior.site_key.read",
+    "name:zh-CN": "查看站点密钥",
+    "name:en": "View Site Keys",
+    "resourceType": "data",
+    "module": "behavior"
+  },
+  {
+    "code": "behavior.site_key.create",
+    "name:zh-CN": "创建站点密钥",
+    "name:en": "Create Site Keys",
+    "resourceType": "operation",
+    "module": "behavior"
+  },
+  {
+    "code": "behavior.site_key.manage",
+    "name:zh-CN": "管理站点密钥",
+    "name:en": "Manage Site Keys",
+    "resourceType": "operation",
+    "module": "behavior"
+  }
+]

@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { useReportStore } from '../store/useReportStore';
+import { useReportDocument } from '../state/ReportDocumentProvider';
 import type { BlockDefinition, ReportBand } from '../types';
 import { DesignerPalette } from '~/shared/designer';
 import type { PaletteItem } from '~/shared/designer';
@@ -199,7 +199,7 @@ const BlockIcon: React.FC<{ type: string; className?: string }> = ({
 // ==================== Component ====================
 
 export const BlockPalette: React.FC = () => {
-  const { addBlock, updateHeader, updateFooter, report } = useReportStore();
+  const { addBlock, updateHeader, updateFooter, report } = useReportDocument();
 
   const handleAddBlock = (def: BlockDefinition) => {
     if (def.type === 'table') {

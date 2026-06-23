@@ -399,15 +399,17 @@ function auditClosure(repoRoot, relPath, abs, data, axis, hasNoPrecip, grandfath
     }
     for (const target of distilled) {
       const resolved = resolveDocPath(repoRoot, abs, target);
-      if (!resolved) {
-        addGated(grandfathered, 'S-DOCS-DISTILL-UNRESOLVED', abs, `distilled_to target not found: ${target}`);
-      } else if (options.deep) {
-        // rule 6: target must be canonical-typed (only when --deep, reads target frontmatter)
-        const tf = parseFrontmatter(fs.readFileSync(resolved, 'utf8'));
-        if (tf.present && tf.data.type && !CANONICAL_TYPES.has(tf.data.type)) {
-          addGated(grandfathered, 'S-DOCS-DISTILL-TARGET-NONCANON', abs,
-            `distilled_to target ${target} is type "${tf.data.type}" (must be canonical).`);
+      if (resolved) {
+        if (options.deep) {
+          // rule 6: target must be canonical-typed (only when --deep, reads target frontmatter)
+          const tf = parseFrontmatter(fs.readFileSync(resolved, 'utf8'));
+          if (tf.present && tf.data.type && !CANONICAL_TYPES.has(tf.data.type)) {
+            addGated(grandfathered, 'S-DOCS-DISTILL-TARGET-NONCANON', abs,
+              `distilled_to target ${target} is type "${tf.data.type}" (must be canonical).`);
+          }
         }
+      } else if (!isAcceptedCrossRepoTarget(target)) {
+        addGated(grandfathered, 'S-DOCS-DISTILL-UNRESOLVED', abs, `distilled_to target not found: ${target}`);
       }
     }
   }
@@ -415,7 +417,7 @@ function auditClosure(repoRoot, relPath, abs, data, axis, hasNoPrecip, grandfath
   if (data.status === 'superseded') {
     if (!data.superseded_by) {
       addGated(grandfathered, 'S-DOCS-SUPERSEDE-NO-TARGET', abs, 'status:superseded requires superseded_by.');
-    } else if (!resolveDocPath(repoRoot, abs, data.superseded_by)) {
+    } else if (!resolveDocPath(repoRoot, abs, data.superseded_by) && !isAcceptedCrossRepoTarget(data.superseded_by)) {
       add('warning', 'S-DOCS-LINK-RELATES', abs, `superseded_by target not found: ${data.superseded_by}`);
     }
   }
@@ -425,7 +427,7 @@ function auditLinks(repoRoot, abs, data, options, add) {
   const severity = options.strict ? 'error' : 'warning';
   for (const key of ['relates_to', 'supersedes', 'superseded_by', 'distilled_to']) {
     for (const target of asArray(data[key])) {
-      if (!resolveDocPath(repoRoot, abs, target)) {
+      if (!resolveDocPath(repoRoot, abs, target) && !isAcceptedCrossRepoTarget(target)) {
         add(severity, 'S-DOCS-LINK-RELATES', abs, `${key} target not found: ${target}`);
       }
     }
@@ -452,6 +454,18 @@ function resolveDocPath(repoRoot, fromFile, target) {
     if (fs.existsSync(c)) return c;
   }
   return null;
+}
+
+// Sibling canonical repo(s) an OSS process doc may legitimately precipitate a lesson into
+// (OSS → auraboot-enterprise canonical). When this gate runs in CI with only this repo checked
+// out, such a target cannot be resolved (the sibling repo isn't present) — it is a recognized
+// cross-repo precipitation reference, not a dead link, so accept it. When the sibling IS checked
+// out side-by-side, resolveDocPath's `..` candidate validates the path normally.
+const CROSS_REPO_PREFIXES = ['auraboot-enterprise/'];
+function isAcceptedCrossRepoTarget(target) {
+  if (!target) return false;
+  const cleaned = String(target).split('#')[0].replace(/\s+\([^)]*\)\s*$/, '').trim();
+  return CROSS_REPO_PREFIXES.some((p) => cleaned.startsWith(p));
 }
 
 // ---------------------------------------------------------------------------

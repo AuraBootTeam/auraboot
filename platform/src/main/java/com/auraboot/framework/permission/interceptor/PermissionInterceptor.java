@@ -3,12 +3,15 @@ package com.auraboot.framework.permission.interceptor;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.menu.mapper.MenuMapper;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -16,6 +19,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Interceptor for permission-based access control
@@ -57,7 +63,29 @@ public class PermissionInterceptor implements HandlerInterceptor {
     
     private final UserPermissionService userPermissionService;
     private final MenuMapper menuMapper;
-    
+
+    /**
+     * Authorization behavior for handlers that have NEITHER {@link RequirePermission} NOR
+     * {@link AuthenticatedAccess} — the "un-annotated" surface. Staged default-deny migration:
+     * <ul>
+     *   <li>{@code allow}  — legacy fail-open: permit silently.</li>
+     *   <li>{@code shadow} — permit, but log each unique reached endpoint once (default). This
+     *       collects the real-traffic coverage needed to flip to {@code deny} safely.</li>
+     *   <li>{@code deny}   — fail-closed / default-deny: reject un-annotated handlers.</li>
+     * </ul>
+     * Configured via {@code aura.security.authz.unannotated-mode} (default {@code shadow}).
+     */
+    @Value("${aura.security.authz.unannotated-mode:shadow}")
+    private String unannotatedMode = "shadow";
+
+    /** Bounded dedup for shadow logging — log each (method+uri+userId) once to avoid log spam. */
+    private final Set<String> shadowSeen = ConcurrentHashMap.newKeySet();
+
+    /** Test seam for the un-annotated mode. */
+    void setUnannotatedMode(String mode) {
+        this.unannotatedMode = mode;
+    }
+
     /**
      * Pre-handle method to check permission before request processing
      * 
@@ -75,9 +103,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
         // 1. Extract @RequirePermission annotation
         RequirePermission annotation = extractAnnotation(handler);
         if (annotation == null) {
-            log.trace("No @RequirePermission annotation found, allowing access: {}",
-                request.getRequestURI());
-            return true; // No permission check required
+            return handleUnannotated(request, handler);
         }
 
         String permissionTemplate = annotation.value();
@@ -127,6 +153,10 @@ public class PermissionInterceptor implements HandlerInterceptor {
             }
         }
 
+        if (!hasPermission && isPublishedPageSchemaReadPermission(permissionCode, request)) {
+            hasPermission = hasRuntimePageSchemaReadPermission(userId, request);
+        }
+
         if (!hasPermission) {
             if (annotation.optional()) {
                 log.warn("Optional permission check failed (allowing access): userId={}, permission={}, endpoint={}",
@@ -144,6 +174,74 @@ public class PermissionInterceptor implements HandlerInterceptor {
         return true;
     }
     
+    /**
+     * Decide what to do with a handler that has no {@link RequirePermission}, per the configured
+     * un-annotated mode. {@link AuthenticatedAccess}-marked handlers are always allowed (and never
+     * shadow-logged) — they are an acknowledged authenticated-only surface.
+     */
+    private boolean handleUnannotated(HttpServletRequest request, Object handler) {
+        if (hasAuthenticatedAccess(handler)) {
+            return true;
+        }
+        String mode = unannotatedMode == null ? "shadow" : unannotatedMode;
+        switch (mode) {
+            case "deny":
+                log.warn("[authz-deny] denied un-annotated handler under default-deny: {} {}",
+                    request.getMethod(), request.getRequestURI());
+                throw new AccessDeniedException(
+                    "Access denied: endpoint declares no @RequirePermission/@AuthenticatedAccess "
+                    + "and the authorization policy is default-deny");
+            case "allow":
+                return true;
+            case "shadow":
+            default:
+                shadowLog(request, handler);
+                return true;
+        }
+    }
+
+    /**
+     * Log each unique un-annotated endpoint reached, once, so the real-traffic coverage needed to
+     * flip to default-deny can be built from logs (grep {@code [authz-shadow]}). Never affects the
+     * request outcome.
+     */
+    private void shadowLog(HttpServletRequest request, Object handler) {
+        try {
+            Long userId = null;
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof CustomUserDetails details) {
+                userId = details.getUserId();
+            }
+            String handlerSig = handler instanceof HandlerMethod hm
+                ? hm.getBeanType().getSimpleName() + "#" + hm.getMethod().getName()
+                : String.valueOf(handler);
+            String key = request.getMethod() + " " + request.getRequestURI() + " u=" + userId;
+            if (shadowSeen.size() < 20000 && shadowSeen.add(key)) {
+                log.info("[authz-shadow] un-annotated handler reached (would be DENIED under "
+                        + "default-deny): method={} uri={} handler={} userId={} tenantId={}",
+                    request.getMethod(), request.getRequestURI(), handlerSig,
+                    userId, MetaContext.getCurrentTenantId());
+            }
+        } catch (Exception e) {
+            // Shadow logging must never affect the request.
+            log.debug("authz-shadow logging failed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Whether the handler is marked {@link AuthenticatedAccess} (method-level takes precedence over
+     * class-level), i.e. an acknowledged authenticated-only endpoint.
+     */
+    private boolean hasAuthenticatedAccess(Object handler) {
+        if (!(handler instanceof HandlerMethod handlerMethod)) {
+            return false;
+        }
+        if (handlerMethod.getMethodAnnotation(AuthenticatedAccess.class) != null) {
+            return true;
+        }
+        return handlerMethod.getBeanType().getAnnotation(AuthenticatedAccess.class) != null;
+    }
+
     /**
      * Extract @RequirePermission annotation from handler
      * 
@@ -289,6 +387,47 @@ public class PermissionInterceptor implements HandlerInterceptor {
 
     private boolean isReadOnlyModelPagePermission(String permissionTemplate) {
         return "model.{pageKey}.read".equals(permissionTemplate);
+    }
+
+    private boolean isPublishedPageSchemaReadPermission(String permissionCode, HttpServletRequest request) {
+        return MetaPermission.PAGE_SCHEMA_READ.equals(permissionCode) && rawPageKey(request) != null;
+    }
+
+    private boolean hasRuntimePageSchemaReadPermission(Long userId, HttpServletRequest request) {
+        String menuPermissionCode = resolveMenuPermissionByPageKey(request);
+        if (menuPermissionCode != null
+                && !menuPermissionCode.isBlank()
+                && userPermissionService.hasPermission(userId, menuPermissionCode)) {
+            log.debug("Page schema read passed via menu permission fallback: userId={}, permission={}, endpoint={}",
+                    userId, menuPermissionCode, request.getRequestURI());
+            return true;
+        }
+
+        String pageKey = rawPageKey(request);
+        if (pageKey == null) {
+            return false;
+        }
+
+        String modelCode = com.auraboot.framework.meta.util.PageKeyConverter.toModelCode(pageKey);
+        if (modelCode != null && SAFE_IDENTIFIER.matcher(modelCode).matches()) {
+            String modelReadPermission = "model." + modelCode + ".read";
+            if (userPermissionService.hasPermission(userId, modelReadPermission)) {
+                log.debug("Page schema read passed via model permission fallback: userId={}, permission={}, endpoint={}",
+                        userId, modelReadPermission, request.getRequestURI());
+                return true;
+            }
+        }
+
+        if (!pageKey.equals(modelCode)) {
+            String rawModelReadPermission = "model." + pageKey + ".read";
+            if (userPermissionService.hasPermission(userId, rawModelReadPermission)) {
+                log.debug("Page schema read passed via raw pageKey model permission fallback: userId={}, permission={}, endpoint={}",
+                        userId, rawModelReadPermission, request.getRequestURI());
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private String resolveMenuPermissionByPageKey(HttpServletRequest request) {

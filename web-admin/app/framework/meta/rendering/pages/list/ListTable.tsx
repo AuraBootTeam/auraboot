@@ -33,6 +33,7 @@ import { SummaryRow, hasAnyAggregate } from './SummaryRow';
 import { buildRowTree, flattenVisible, collectAllNodeIds } from './rowTree';
 import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
+import { getPublicRecordKey } from '~/framework/meta/utils/publicRecordId';
 
 interface DictItem {
   value: string;
@@ -584,7 +585,7 @@ export const ListTable = React.memo(function ListTable({
               {treeMode && !loading && data.length > 0
                 ? visibleTreeRows.map((node, index) => {
                     const record = node.row;
-                    const rowId = record.pid || record.id || '';
+                    const rowId = getPublicRecordKey(record) || '';
                     const cfInline = getRowStyle?.(record);
                     const firstColumnField = orderedDataColumns[0]?.field;
                     return (
@@ -677,7 +678,7 @@ export const ListTable = React.memo(function ListTable({
                               maxWidth: `${actionColumnWidth}px`,
                             }}
                           >
-                            <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
+                            <div className="flex items-center">
                               <RowActionButtons
                                 buttons={actionColumn.buttons || []}
                                 record={record}
@@ -713,7 +714,7 @@ export const ListTable = React.memo(function ListTable({
                   {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const index = virtualRow.index;
                     const record = visibleData[index]!;
-                    const rowId = record.pid || record.id || '';
+                    const rowId = getPublicRecordKey(record) || '';
                     const cfInline = getRowStyle?.(record);
                     return (
                       <tr
@@ -792,7 +793,7 @@ export const ListTable = React.memo(function ListTable({
                               maxWidth: `${actionColumnWidth}px`,
                             }}
                           >
-                            <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
+                            <div className="flex items-center">
                               <RowActionButtons
                                 buttons={actionColumn.buttons || []}
                                 record={record}
@@ -827,7 +828,7 @@ export const ListTable = React.memo(function ListTable({
                 !loading &&
                 data.length > 0 &&
                 visibleData.map((record, index) => {
-                  const rowId = record.pid || record.id || '';
+                  const rowId = getPublicRecordKey(record) || '';
                   const cfInline = getRowStyle?.(record);
                   return (
                     <tr
@@ -909,7 +910,7 @@ export const ListTable = React.memo(function ListTable({
                             maxWidth: `${actionColumnWidth}px`,
                           }}
                         >
-                          <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
+                          <div className="flex items-center">
                             <RowActionButtons
                               buttons={actionColumn.buttons || []}
                               record={record}

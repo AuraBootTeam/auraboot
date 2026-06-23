@@ -17,6 +17,8 @@
  * is preserved within each sibling group.
  */
 
+import { getLegacyCompatibleRecordPid, toPublicRecordPid } from '~/framework/meta/utils/publicRecordId';
+
 export interface RowTreeOptions {
   /** Field holding the row's own id. Falls back to `id` when the configured
    *  field is absent on a given row (rows are keyed by `pid` or `id`). */
@@ -39,9 +41,7 @@ export interface FlattenedRow {
 }
 
 function readId(row: Record<string, any>, idField: string): string | null {
-  const raw = row[idField] ?? row.id ?? row.pid;
-  if (raw == null || raw === '') return null;
-  return String(raw);
+  return toPublicRecordPid(row[idField]) ?? getLegacyCompatibleRecordPid(row) ?? null;
 }
 
 function readParentId(row: Record<string, any>, parentField: string): string | null {

@@ -9,6 +9,7 @@ import com.auraboot.framework.exception.PermissionDeniedException;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.exception.TemporalParseException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +64,28 @@ class GlobalExceptionHandlerTest {
                 "no access");
 
         ResponseEntity<ApiResponse<Object>> resp = handler.handlePermissionDeniedException(ex);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(resp.getBody()).isNotNull();
+    }
+
+    @Test
+    void handleResponseStatusException_honorsStatus_429() {
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
+
+        ResponseEntity<ApiResponse<Object>> resp = handler.handleResponseStatusException(ex);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(resp.getBody()).isNotNull();
+    }
+
+    @Test
+    void handleResponseStatusException_honorsStatus_403() {
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "site_key_invalid");
+
+        ResponseEntity<ApiResponse<Object>> resp = handler.handleResponseStatusException(ex);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(resp.getBody()).isNotNull();
@@ -168,7 +191,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void handleBusinessException_returns422_withMessageInProd() {
         BusinessException ex = new BusinessException(ResponseCode.BUSINESS_ERROR, "biz fail");
-        ResponseEntity<ApiResponse<Object>> resp = handler.handleBusinessException(ex);
+        ResponseEntity<ApiResponse<Object>> resp = handler.handleBusinessException(ex, mock(HttpServletRequest.class));
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
@@ -176,7 +199,7 @@ class GlobalExceptionHandlerTest {
     void handleBusinessException_includesDevDetail_whenDevProfile() {
         asDev();
         BusinessException ex = new BusinessException(ResponseCode.BUSINESS_ERROR, "biz fail dev");
-        ResponseEntity<ApiResponse<Object>> resp = handler.handleBusinessException(ex);
+        ResponseEntity<ApiResponse<Object>> resp = handler.handleBusinessException(ex, mock(HttpServletRequest.class));
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         // dev detail map populated
         assertThat(resp.getBody().getContext()).isInstanceOf(Map.class);

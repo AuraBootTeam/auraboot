@@ -92,7 +92,7 @@ async function navigateToCrmLeadList(page: Page): Promise<void> {
 async function openCreateForm(page: Page): Promise<void> {
   const createBtn = page
     .locator(
-      '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+      '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
     )
     .first();
 
@@ -411,7 +411,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     // Open create form
     const createBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+        '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
       )
       .first();
     await createBtn.waitFor({ state: 'visible', timeout: 10_000 });

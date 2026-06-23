@@ -193,4 +193,70 @@ class OeeCalculationEngineTest {
         assertEquals(0, BigDecimal.ZERO.compareTo(l.getSetupHours()));
         assertEquals(0, new BigDecimal("20").compareTo(l.getProcessDefectUnits()));  // defect still flows through
     }
+
+    @Test
+    void telemetrySourcedAPQ_overrideDowntimeDerivation_butLossBreakdownStaysFromDowntimes() {
+        // Option A / GreptimeDB convergence (DDR-2026-06-21 D5): when telemetry-measured
+        // run-time / output / good are present, A/P/Q come from the real device signals;
+        // downtimes drive ONLY the six-big-losses reason breakdown.
+        // calendar 10h; planned 2h -> loading 8h. Telemetry operating = 6h (real run signal),
+        // INDEPENDENT of downtime subtraction (which would give loading 8 - breakdown 1 = 7h).
+        // availability must be 6/8 = 0.75 (telemetry), NOT the downtime-derived 7/8 = 0.875.
+        OeeInputs in = OeeInputs.builder()
+            .calendarHours(new BigDecimal("10"))
+            .downtimes(List.of(dt("planned", "2"), dt("breakdown", "1")))
+            // Postgres output/defect are intentionally wrong; telemetry must win:
+            .actualQty(new BigDecimal("999")).defectQty(new BigDecimal("999"))
+            .capacityPerHour(new BigDecimal("100"))
+            // telemetry-derived signals (the new optional block):
+            .telemetryOperatingHours(new BigDecimal("6"))
+            .telemetryOutputQty(new BigDecimal("540"))
+            .telemetryGoodQty(new BigDecimal("513"))
+            .build();
+        OeeResult r = engine.calculate(in);
+        // A/P/Q from telemetry:
+        assertEquals(0, new BigDecimal("0.7500").compareTo(r.getAvailability().setScale(4, RoundingMode.HALF_UP))); // 6/8, not 7/8
+        assertEquals(0, new BigDecimal("0.9000").compareTo(r.getPerformance().setScale(4, RoundingMode.HALF_UP)));  // 540/(6*100)
+        assertEquals(0, new BigDecimal("0.9500").compareTo(r.getQuality().setScale(4, RoundingMode.HALF_UP)));      // 513/540
+        assertEquals(0, new BigDecimal("0.6413").compareTo(r.getOee().setScale(4, RoundingMode.HALF_UP)));          // 0.75*0.90*0.95
+        // six-big-losses breakdown STILL from downtime records, unaffected by telemetry:
+        OeeResult.SixBigLosses l = r.getLosses();
+        assertEquals(0, new BigDecimal("1").compareTo(l.getBreakdownHours()));      // breakdown downtime
+        assertEquals(0, new BigDecimal("2").compareTo(l.getSetupHours()));          // planned downtime
+        assertEquals(0, new BigDecimal("60").compareTo(l.getSpeedLossUnits()));     // 600 - 540 (telemetry output)
+        assertEquals(0, new BigDecimal("27").compareTo(l.getProcessDefectUnits())); // 540 - 513 (telemetry-derived defect)
+    }
+
+    @Test
+    void telemetryOperatingHoursAboveLoading_capsAvailabilityAtOne() {
+        // Real run-time signals can be noisy at the window boundary; cap measured operating time at
+        // loading time so dashboard rates never exceed 100%.
+        OeeInputs in = OeeInputs.builder()
+            .calendarHours(new BigDecimal("8"))
+            .downtimes(List.of())
+            .actualQty(BigDecimal.ZERO).defectQty(BigDecimal.ZERO)
+            .capacityPerHour(new BigDecimal("100"))
+            .telemetryOperatingHours(new BigDecimal("10"))
+            .telemetryOutputQty(new BigDecimal("800"))
+            .telemetryGoodQty(new BigDecimal("760"))
+            .build();
+        OeeResult r = engine.calculate(in);
+        assertEquals(0, BigDecimal.ONE.compareTo(r.getAvailability()));
+        assertEquals(0, BigDecimal.ONE.compareTo(r.getPerformance()));
+        assertEquals(0, new BigDecimal("0.9500").compareTo(r.getQuality().setScale(4, RoundingMode.HALF_UP)));
+    }
+
+    @Test
+    void telemetryAbsent_fallsBackToDowntimeDerivation_backwardCompatible() {
+        // No telemetry block -> engine behaves exactly as before (downtime-derived A/P/Q).
+        // Same downtimes as above: loading 8, operating = 8 - breakdown 1 = 7, availability = 7/8 = 0.875.
+        OeeInputs in = OeeInputs.builder()
+            .calendarHours(new BigDecimal("10"))
+            .downtimes(List.of(dt("planned", "2"), dt("breakdown", "1")))
+            .actualQty(new BigDecimal("700")).defectQty(new BigDecimal("35"))
+            .capacityPerHour(new BigDecimal("100"))
+            .build();
+        OeeResult r = engine.calculate(in);
+        assertEquals(0, new BigDecimal("0.8750").compareTo(r.getAvailability().setScale(4, RoundingMode.HALF_UP))); // 7/8 downtime-derived
+    }
 }

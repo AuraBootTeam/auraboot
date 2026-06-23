@@ -10,6 +10,7 @@ import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.meta.service.RecordCapabilityService;
 import com.auraboot.framework.meta.util.PageKeyConverter;
+import com.auraboot.framework.meta.util.PublicRecordSanitizer;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -144,7 +145,7 @@ public class DynamicController {
         // If queryCode is provided, delegate to NamedQuery execution.
         if (queryCode != null && !queryCode.isBlank()) {
             PaginationResult<Map<String, Object>> result = dynamicDataService.listByQueryCode(queryCode, queryRequest);
-            return ApiResponse.success(result);
+            return ApiResponse.success(PublicRecordSanitizer.sanitizePage(result));
         }
 
         // For VIEW models (no physical table), fallback to same-code NamedQuery when available.
@@ -155,7 +156,7 @@ public class DynamicController {
                 NamedQueryDTO namedQuery = namedQueryService.findByCode(modelCode);
                 if (namedQuery != null && namedQuery.getCode() != null && !namedQuery.getCode().isBlank()) {
                     PaginationResult<Map<String, Object>> result = dynamicDataService.listByQueryCode(namedQuery.getCode(), queryRequest);
-                    return ApiResponse.success(result);
+                    return ApiResponse.success(PublicRecordSanitizer.sanitizePage(result));
                 }
             }
         } catch (Exception e) {
@@ -164,7 +165,7 @@ public class DynamicController {
         }
 
         PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, queryRequest);
-        return ApiResponse.success(result);
+        return ApiResponse.success(PublicRecordSanitizer.sanitizePage(result));
     }
 
     /**
@@ -335,7 +336,7 @@ public class DynamicController {
         log.info("获取单条数据: {} - {}", logSafe(pageKey), logSafe(recordId));
         String modelCode = resolveModelCode(pageKey);
         Map<String, Object> result = dynamicDataService.getById(modelCode, recordId);
-        return ApiResponse.success(result);
+        return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
     }
 
     /**
@@ -375,7 +376,7 @@ public class DynamicController {
         log.info("创建数据: {}", logSafe(pageKey));
         String modelCode = resolveModelCode(pageKey);
         Map<String, Object> result = dynamicDataService.create(modelCode, data);
-        return ApiResponse.success(result);
+        return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
     }
 
     /**
@@ -404,7 +405,7 @@ public class DynamicController {
         log.info("更新数据: {} - {}", logSafe(pageKey), logSafe(recordId));
         String modelCode = resolveModelCode(pageKey);
         Map<String, Object> result = dynamicDataService.update(modelCode, recordId, data);
-        return ApiResponse.success(result);
+        return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
     }
 
     /**
@@ -437,7 +438,7 @@ public class DynamicController {
         log.info("批量创建数据: {}, 数量: {}", logSafe(pageKey), dataList.size());
         String modelCode = resolveModelCode(pageKey);
         DynamicBatchResponse result = dynamicDataService.batchCreate(modelCode, dataList);
-        return ApiResponse.success(result);
+        return ApiResponse.success(PublicRecordSanitizer.sanitizeBatch(result));
     }
 
     /**
@@ -455,7 +456,7 @@ public class DynamicController {
         log.info("批量更新数据: {}, 数量: {}", logSafe(pageKey), dataList.size());
         String modelCode = resolveModelCode(pageKey);
         DynamicBatchResponse result = dynamicDataService.batchUpdate(modelCode, dataList);
-        return ApiResponse.success(result);
+        return ApiResponse.success(PublicRecordSanitizer.sanitizeBatch(result));
     }
 
     /**
@@ -548,7 +549,7 @@ public class DynamicController {
         log.info("执行自定义查询: {} - {}", logSafe(pageKey), logSafe(queryName));
         String modelCode = resolveModelCode(pageKey);
         List<Map<String, Object>> result = dynamicDataService.executeCustomQuery(modelCode, queryName, queryParams);
-        return ApiResponse.success(result);
+        return ApiResponse.success(PublicRecordSanitizer.sanitizeRecords(result));
     }
 
     /**
@@ -582,7 +583,13 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}/export")
     @Operation(summary = "导出数据", description = "根据页面定义导出数据")
-    @RequirePermission("model.{pageKey}.export")
+    // Export is gated by read: exporting is just packaging data the user can already
+    // read, and the page-permission metadata already advertises canExport = canRead ||
+    // canExport (see getPagePermissions). A separate model.<model>.export permission is
+    // not auto-created on model publish (only the E2E test seed makes it), so requiring
+    // it here 403s for every real model while the UI shows the export button — an
+    // endpoint-vs-metadata inconsistency. Align to read.
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<Map<String, Object>> exportData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> exportParams) {
@@ -670,7 +677,8 @@ public class DynamicController {
      */
     @GetMapping("/{pageKey}/download")
     @Operation(summary = "下载导出文件", description = "下载导出的CSV文件")
-    @RequirePermission("model.{pageKey}.export")
+    // Gated by read — see exportData above (export = packaging readable data).
+    @RequirePermission("model.{pageKey}.read")
     public void downloadExport(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "文件路径") @RequestParam String file,
@@ -800,7 +808,7 @@ public class DynamicController {
         // 转换为新的接口调用
         String modelCode = resolveModelCode(pageKey);
         List<Map<String, Object>> result = dynamicDataService.getRelationData(modelCode, recordId, relationName, Collections.emptyMap());
-        return ApiResponse.success(result);
+        return ApiResponse.success(PublicRecordSanitizer.sanitizeRecords(result));
     }
 
     /**

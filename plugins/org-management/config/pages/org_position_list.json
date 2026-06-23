@@ -71,8 +71,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "org_position_form",
-            "command": "org:create_position"
+            "to": "org_position_form"
           }
         }
       ]
@@ -132,8 +131,7 @@
               },
               "action": {
                 "type": "navigate",
-                "to": "org_position_form",
-                "command": "org:update_position"
+                "to": "org_position_form"
               }
             },
             {
@@ -146,8 +144,7 @@
               },
               "confirm": "delete.confirm",
               "action": {
-                "type": "command",
-                "command": "org:delete_position"
+                "type": "command"
               }
             }
           ],

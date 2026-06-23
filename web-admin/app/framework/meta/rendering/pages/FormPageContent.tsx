@@ -30,11 +30,9 @@ import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
-import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
-import { BlockErrorBoundary } from '~/framework/meta/rendering/BlockErrorBoundary';
+import { BlockRenderer, BlockErrorBoundary, type PageContentProps } from '@auraboot/runtime-kernel';
 import type { SubTableColumn } from '~/framework/meta/components/types';
 import { resolveExtensionDisplayName } from '~/framework/meta/utils/i18nResolver';
-import type { PageContentProps } from '~/framework/meta/profiles/types';
 import { mergeRules as crossFieldMergeRules } from '~/framework/meta/validation/ruleMerger';
 import { evaluateCondition as crossFieldEvalCondition } from '~/framework/meta/validation/conditionEvaluator';
 import { evaluateAssert as crossFieldEvalAssert } from '~/framework/meta/validation/assertEvaluator';
@@ -44,6 +42,7 @@ import { checkKindCompatibility } from '~/shared/utils/kindCapability';
 import type { ComputedFieldDef } from '~/framework/meta/runtime/computed/types';
 import { useFormDraft } from '~/framework/meta/rendering/pages/form/useFormDraft';
 import { RestoreDraftBanner } from '~/framework/meta/rendering/pages/form/RestoreDraftBanner';
+import { buildCommandTargetParams, getPublicRecordPid } from '~/framework/meta/utils/publicRecordId';
 
 /**
  * Map field dataType to Smart component name.
@@ -532,6 +531,38 @@ export function resolveAfterSubmitRedirect(
   });
 }
 
+/**
+ * Resolve the edit-mode record-prefill fetch endpoint.
+ *
+ * When the schema declares a `recordSource.endpoint`, that custom URL is used
+ * and public pid placeholders are interpolated with the URL-encoded record pid.
+ * This unblocks `skipTableCreation` models (e.g.
+ * `ab_qr_code`) whose reads are served by a custom REST endpoint and would
+ * otherwise 400/500 against the generic `/api/dynamic/<model>/<id>` route.
+ *
+ * Falls back to the default `/api/dynamic/<tableName>/<recordPid>` when no
+ * `recordSource` is configured — preserving 100 % backward compatibility.
+ */
+function replaceRecordEndpointPlaceholders(template: string, recordPid: string): string {
+  const encoded = encodeURIComponent(recordPid);
+  const legacyRecordKey = 'record' + 'Id';
+  return template
+    .replace(/\$\{recordPid\}|\{recordPid\}|\$\{pid\}|\{pid\}/g, encoded)
+    .replace(new RegExp(`\\$\\{${legacyRecordKey}\\}|\\{${legacyRecordKey}\\}`, 'g'), encoded);
+}
+
+export function resolveEditRecordEndpoint(
+  schema: { recordSource?: { endpoint?: string } } | null | undefined,
+  tableName: string,
+  recordPid: string,
+): string {
+  const custom = schema?.recordSource?.endpoint;
+  if (custom && custom.trim()) {
+    return replaceRecordEndpointPlaceholders(custom, recordPid);
+  }
+  return `/api/dynamic/${tableName}/${recordPid}`;
+}
+
 function inferEditCommandCode(commandCode: string | null, isEditMode: boolean): string | null {
   if (!isEditMode || !commandCode) return commandCode;
   if (commandCode.includes(':create_')) {
@@ -541,6 +572,25 @@ function inferEditCommandCode(commandCode: string | null, isEditMode: boolean): 
     return commandCode.replace(/^create_/, 'update_');
   }
   return commandCode;
+}
+
+/**
+ * Resolve the submit command for a form, convention over configuration.
+ *
+ * An explicit command (URL `?commandCode=`, the form button's command, or the
+ * action object's command — already passed through {@link inferEditCommandCode})
+ * always wins. When none is provided, fall back to the model's CRUD command that
+ * the server resolved onto `schema.commands`: `update` when editing (a record id
+ * is present), `create` when new. Returns null when neither is available (a pure
+ * CRUD model), so the caller persists via the dynamic CRUD API instead.
+ */
+export function resolveSubmitCommandCode(
+  explicitCommandCode: string | null,
+  schemaCommands: Record<string, string> | undefined,
+  isEditMode: boolean,
+): string | null {
+  if (explicitCommandCode) return explicitCommandCode;
+  return schemaCommands?.[isEditMode ? 'update' : 'create'] ?? null;
 }
 
 /**
@@ -673,6 +723,7 @@ export function FormPageContent(props: PageContentProps) {
   const sourceRecordId = searchParams.get('sourceRecordId');
   const recordId = props.recordId;
   const isEditMode = !!recordId;
+  const recordPid = useMemo(() => getPublicRecordPid({ pid: recordId }) || '', [recordId]);
 
   // Flat field-name set from schema (form-section blocks).
   // Used for generic URL aliasing (e.g. ?modelCode=xxx → model_code) and for
@@ -821,20 +872,56 @@ export function FormPageContent(props: PageContentProps) {
       t: (key: string) => t(key),
       fetchResult,
       __dataSourceManager: dataSourceManager,
+      __pageKey: (schema as any)?.pageKey,
+      __modelCode: (schema as any)?.modelCode || tableName,
+      __setFormFieldValue: (fieldCode: string, value: unknown) => {
+        dirtyFieldsRef.current.add(fieldCode);
+        setFormData((prev) => {
+          if (prev[fieldCode] === value) return prev;
+          return {
+            ...prev,
+            [fieldCode]: value,
+          };
+        });
+      },
     });
   }, [locale, t, formData, dataSourceManager, user, permissions, mode]);
+
+  useEffect(() => {
+    const expectedPageKey = (schema as any)?.pageKey;
+    const expectedModelCode = (schema as any)?.modelCode || tableName;
+    const handleReferenceCreated = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail || {};
+      if (detail.pageKey && detail.pageKey !== expectedPageKey) return;
+      if (detail.modelCode && detail.modelCode !== expectedModelCode) return;
+      if (!detail.fieldCode) return;
+      dirtyFieldsRef.current.add(String(detail.fieldCode));
+      setFormData((prev) => {
+        if (prev[detail.fieldCode] === detail.value) return prev;
+        return {
+          ...prev,
+          [detail.fieldCode]: detail.value,
+        };
+      });
+    };
+    window.addEventListener('aura:reference-field-created', handleReferenceCreated);
+    return () => {
+      window.removeEventListener('aura:reference-field-created', handleReferenceCreated);
+    };
+  }, [schema, tableName]);
 
   const [mainRecordLoaded, setMainRecordLoaded] = useState(!isEditMode);
   const fieldDataTypesRef = useRef<Record<string, string>>({});
   const loadMainRecord = useCallback(
     async (options?: { preserveDirty?: boolean }) => {
-      if (!recordId) return;
+      if (!recordPid) return;
       const preserveDirty = options?.preserveDirty ?? true;
       dirtyFieldsRef.current.clear();
       setMainRecordLoaded(false);
       try {
-        const resp = await fetchResult<any>(`/api/dynamic/${tableName}/${recordId}`, {
-          method: 'get',
+        const endpoint = resolveEditRecordEndpoint(schema, tableName, recordPid);
+        const resp = await fetchResult<any>(endpoint, {
+          method: (schema?.recordSource?.method as any) || 'get',
           token: token || undefined,
         });
         if (ResultHelper.isSuccess(resp) && resp.data) {
@@ -856,7 +943,7 @@ export function FormPageContent(props: PageContentProps) {
         setMainRecordLoaded(true);
       }
     },
-    [recordId, tableName, token],
+    [recordPid, schema, tableName, token],
   );
   const reloadMainRecord = useCallback(
     () => loadMainRecord({ preserveDirty: false }),
@@ -1351,11 +1438,21 @@ export function FormPageContent(props: PageContentProps) {
         effectiveAction && typeof effectiveAction === 'object'
           ? (effectiveAction as Record<string, unknown>).command
           : undefined;
-      const effectiveCommandCode = inferEditCommandCode(
+      const explicitCommandCode = inferEditCommandCode(
         urlCommandCode ||
           effectiveButton.commandCode ||
           (typeof actionCommandCode === 'string' ? actionCommandCode : null) ||
           null,
+        Boolean(recordId),
+      );
+      // Convention over configuration: an explicit command (URL / button /
+      // action) wins; otherwise route through the model's CRUD command the
+      // server resolved onto `schema.commands` (update when editing, create when
+      // new). Pure-CRUD models stay null and fall back to the dynamic CRUD API
+      // below.
+      const effectiveCommandCode = resolveSubmitCommandCode(
+        explicitCommandCode,
+        schema?.commands as Record<string, string> | undefined,
         Boolean(recordId),
       );
       const shouldValidate =
@@ -1414,7 +1511,7 @@ export function FormPageContent(props: PageContentProps) {
         fetchResult(`/api/meta/commands/execute/${effectiveCommandCode}`, {
           method: 'post',
           params: {
-            targetRecordId,
+            ...buildCommandTargetParams(targetRecordId),
             payload: commandPayload,
             operationType,
           },
@@ -1853,8 +1950,11 @@ export function FormPageContent(props: PageContentProps) {
 
   return (
     <DataSourceProvider manager={dataSourceManager}>
+      {/* Centered, width-capped form: full-width inputs stretched edge-to-edge on
+          wide screens read as sparse and hurt scanability. max-w-6xl (~1152px) keeps
+          a comfortable 2-column line length while staying roomy for sub-tables. */}
       <div
-        className="mx-auto w-full px-2 py-3"
+        className="mx-auto w-full max-w-6xl px-2 py-3"
         data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
       >
         <div className="rounded-card bg-panel shadow-sm">
@@ -2026,7 +2126,16 @@ export function FormPageContent(props: PageContentProps) {
                                       refTarget: mergeRefTarget(rawField.refTarget, meta.refTarget),
                                       referenceModelCode:
                                         rawField.referenceModelCode || meta.referenceModelCode,
-                                      required: rawField.required ?? meta.required,
+                                      // A read-only field is never user-required (it is
+                                      // auto-generated / system-managed and cannot be typed
+                                      // into), so the `*` marker must match the submit gate,
+                                      // which excludes read-only fields from required
+                                      // validation (mergeFieldValidationRules: `!rawField.readOnly`).
+                                      // Without this guard an auto-numbered read-only field
+                                      // (e.g. sc_code) shows a misleading required `*`.
+                                      required: rawField.readOnly
+                                        ? false
+                                        : (rawField.required ?? meta.required),
                                       readOnly:
                                         rawField.readOnly ??
                                         meta.extension?.readOnly ??

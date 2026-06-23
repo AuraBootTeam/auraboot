@@ -71,6 +71,8 @@ class RecordLevelSlaActivationIT extends BaseIntegrationTest {
     private final String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toLowerCase(Locale.ROOT);
     private final String complaintModel = "rsla_" + suffix;
     private final String complaintTable = "mt_" + complaintModel;
+    private final String subjectField = "c_subject_" + suffix;
+    private final String priorityField = "c_priority_" + suffix;
     private final long escalationRecipientId = 960000000L + Math.floorMod(System.nanoTime(), 1_000_000L);
 
     private String slaConfigPid;
@@ -83,7 +85,7 @@ class RecordLevelSlaActivationIT extends BaseIntegrationTest {
 
         dropIfExists(complaintTable);
         cleanMeta(complaintModel);
-        publishModel(complaintModel, "Record-SLA complaint", new String[]{"c_subject", "c_priority"});
+        publishModel(complaintModel, "Record-SLA complaint", new String[]{subjectField, priorityField});
 
         // RECORD-level SLA: respond within PT2H of creating any record of this model; escalate at 50%.
         var cfg = slaConfigService.create(new SlaConfigService.CreateSlaConfigRequest(
@@ -117,7 +119,7 @@ class RecordLevelSlaActivationIT extends BaseIntegrationTest {
     @DisplayName("creating a record of the SLA-bound model activates an ab_sla_record with deadline")
     void recordCreate_activatesRecordLevelSla() {
         Map<String, Object> rec = dynamicDataService.create(complaintModel, Map.of(
-                "c_subject", "device black screen", "c_priority", "high"));
+                subjectField, "device black screen", priorityField, "high"));
         String recordPid = String.valueOf(rec.get("pid"));
 
         List<Map<String, Object>> slaRows = jdbcTemplate.queryForList(
@@ -186,12 +188,15 @@ class RecordLevelSlaActivationIT extends BaseIntegrationTest {
 
     private void cleanMeta(String modelCode) {
         try {
+            Long tenantId = getTestTenant().getId();
             jdbcTemplate.update(
-                    "DELETE FROM ab_meta_field WHERE id IN (SELECT field_id FROM ab_meta_model_field_binding b "
-                            + "JOIN ab_meta_model m ON m.id = b.model_id WHERE m.code = ?)", modelCode);
-            jdbcTemplate.update("DELETE FROM ab_meta_model_field_binding WHERE model_id IN "
-                    + "(SELECT id FROM ab_meta_model WHERE code = ?)", modelCode);
-            jdbcTemplate.update("DELETE FROM ab_meta_model WHERE code = ?", modelCode);
+                    "DELETE FROM ab_meta_model_field_binding WHERE model_id IN "
+                            + "(SELECT id FROM ab_meta_model WHERE code = ? AND tenant_id = ?)",
+                    modelCode, tenantId);
+            jdbcTemplate.update(
+                    "DELETE FROM ab_meta_field WHERE tenant_id = ? AND code IN (?, ?)",
+                    tenantId, subjectField, priorityField);
+            jdbcTemplate.update("DELETE FROM ab_meta_model WHERE code = ? AND tenant_id = ?", modelCode, tenantId);
         } catch (Exception e) {
             log.warn("[cleanup] meta cleanup for {} failed: {}", modelCode, e.getMessage());
         }

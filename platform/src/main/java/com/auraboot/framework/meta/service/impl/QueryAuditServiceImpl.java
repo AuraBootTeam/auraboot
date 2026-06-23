@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -44,6 +45,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
 
     private final QueryAuditLogMapper queryAuditLogMapper;
     private final ObjectMapper objectMapper;
+    private final Tracer tracer;
 
     /**
      * In-memory audit config per tenant. In production, this could be
@@ -71,6 +73,10 @@ public class QueryAuditServiceImpl implements QueryAuditService {
                      logSafe(request.getModelCode()), request.getUserId(), executionTimeMs);
 
             QueryAuditLog auditLog = new QueryAuditLog();
+            if (tracer != null && tracer.currentSpan() != null) {
+                auditLog.setTraceId(tracer.currentSpan().context().traceId());
+                auditLog.setSpanId(tracer.currentSpan().context().spanId());
+            }
 
             // Basic info
             auditLog.setTenantId(request.getTenantId());
@@ -145,6 +151,10 @@ public class QueryAuditServiceImpl implements QueryAuditService {
                      logSafe(request.getModelCode()), request.getUserId(), logSafe(error.getMessage()));
 
             QueryAuditLog auditLog = new QueryAuditLog();
+            if (tracer != null && tracer.currentSpan() != null) {
+                auditLog.setTraceId(tracer.currentSpan().context().traceId());
+                auditLog.setSpanId(tracer.currentSpan().context().spanId());
+            }
 
             auditLog.setTenantId(request.getTenantId());
             auditLog.setUserId(request.getUserId());

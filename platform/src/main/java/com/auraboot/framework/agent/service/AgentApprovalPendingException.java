@@ -1,5 +1,7 @@
 package com.auraboot.framework.agent.service;
 
+import java.util.Map;
+
 /**
  * Thrown by {@code StepLoopService} when a plan step requires approval and the
  * approval gate has created a pending {@code ab_agent_approval} row. Carries
@@ -16,19 +18,36 @@ package com.auraboot.framework.agent.service;
 public class AgentApprovalPendingException extends RuntimeException {
 
     private final String approvalPid;
+    private final String toolName;
+    private final Map<String, Object> input;
 
     public AgentApprovalPendingException(String message) {
         this(null, message);
     }
 
     public AgentApprovalPendingException(String approvalPid, String message) {
+        this(approvalPid, message, null, null);
+    }
+
+    public AgentApprovalPendingException(String approvalPid, String message,
+                                         String toolName, Map<String, Object> input) {
         super(message);
         this.approvalPid = approvalPid;
+        this.toolName = toolName;
+        this.input = input;
     }
 
     /** {@code ab_agent_approval.pid} of the pending approval row, or null when
      *  the throw site does not yet know it (legacy callers). */
     public String getApprovalPid() {
         return approvalPid;
+    }
+
+    public String getToolName() {
+        return toolName;
+    }
+
+    public Map<String, Object> getInput() {
+        return input;
     }
 }

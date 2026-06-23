@@ -14,7 +14,8 @@
       "crm_lead_industry",
       "crm_lead_score",
       "crm_lead_campaign",
-      "crm_lead_assigned_to",
+      "owner_type",
+      "owner_id",
       "crm_lead_requirement"
     ],
     "autoSetFields": {
@@ -48,7 +49,8 @@
       "crm_lead_industry",
       "crm_lead_score",
       "crm_lead_campaign",
-      "crm_lead_assigned_to",
+      "owner_type",
+      "owner_id",
       "crm_lead_requirement"
     ],
     "permissions": [

@@ -36,10 +36,12 @@ const fakeProfile = {
   pageRenderers: new Map<string, React.ComponentType>([['form', FakeFormPage]]),
   skeletons: new Map(),
 };
-vi.mock('~/framework/meta/profiles/ProfileRegistry', () => ({
+// profileRegistry + ProfileProvider now live in @auraboot/runtime-kernel; mock
+// that module (preserving its other exports via importActual) so DslFormRenderer
+// resolves the fake admin profile + a passthrough ProfileProvider.
+vi.mock('@auraboot/runtime-kernel', async (importActual) => ({
+  ...(await importActual<typeof import('@auraboot/runtime-kernel')>()),
   profileRegistry: { resolve: () => fakeProfile, get: () => fakeProfile, register: () => {} },
-}));
-vi.mock('~/framework/meta/profiles/ProfileContext', () => ({
   ProfileProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 

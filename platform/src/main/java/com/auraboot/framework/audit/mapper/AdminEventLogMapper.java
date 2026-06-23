@@ -21,13 +21,14 @@ public interface AdminEventLogMapper extends BaseMapper<AdminEventLog> {
     @Insert("""
             INSERT INTO ab_admin_event_log
                 (pid, tenant_id, actor_user_id, actor_type, action_type,
-                 resource_type, resource_pid, success, reason, payload, created_at)
+                 resource_type, resource_pid, success, reason, payload, trace_id, span_id, created_at)
             VALUES
                 (#{entry.pid}, #{entry.tenantId}, #{entry.actorUserId},
                  #{entry.actorType}, #{entry.actionType},
                  #{entry.resourceType}, #{entry.resourcePid},
                  #{entry.success}, #{entry.reason},
                  #{entry.payload, typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}::jsonb,
+                 #{entry.traceId}, #{entry.spanId},
                  #{entry.createdAt})
             """)
     int insertEventLog(@Param("entry") AdminEventLog entry);

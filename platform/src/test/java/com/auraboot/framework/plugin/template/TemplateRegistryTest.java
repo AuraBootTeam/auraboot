@@ -111,6 +111,73 @@ class TemplateRegistryTest {
         assertThat(template.relativePath()).isEqualTo("plugins/project-management");
     }
 
+    // ---- A1: nullable description/category/icon ----
+
+    @Test
+    @DisplayName("readTemplate reads description/category/icon and falls back to null when absent")
+    void readTemplate_readsDescriptionCategoryIcon_andFallsBackToNull() throws IOException {
+        // Manifest WITH all three fields
+        createPlugin(
+                tempDir.resolve("plugins/rich-tpl"),
+                """
+                {
+                  "catalogType": "template",
+                  "displayName": "Rich Template",
+                  "namespace": "rtpl",
+                  "description": "A helpful template",
+                  "category": "CRM",
+                  "icon": "package"
+                }
+                """
+        );
+        // Manifest WITHOUT description/category/icon
+        createPlugin(
+                tempDir.resolve("plugins/bare-tpl"),
+                """
+                {
+                  "catalogType": "template",
+                  "displayName": "Bare Template",
+                  "namespace": "btpl"
+                }
+                """
+        );
+
+        TemplateRegistry registry = new TemplateRegistry(objectMapper, List.of(tempDir));
+
+        TemplateRegistry.TemplateDef rich = registry.getTemplate("rich-tpl");
+        assertThat(rich).isNotNull();
+        assertThat(rich.name()).isEqualTo("Rich Template");
+        assertThat(rich.description()).isEqualTo("A helpful template");
+        assertThat(rich.category()).isEqualTo("CRM");
+        assertThat(rich.icon()).isEqualTo("package");
+
+        TemplateRegistry.TemplateDef bare = registry.getTemplate("bare-tpl");
+        assertThat(bare).isNotNull();
+        assertThat(bare.description()).isNull();
+        assertThat(bare.category()).isNull();
+        assertThat(bare.icon()).isNull();
+    }
+
+    @Test
+    @DisplayName("legacyTemplatesDirStillDiscovered via plugins/templates subdir")
+    void legacyTemplatesDirStillDiscovered() throws IOException {
+        createPlugin(
+                tempDir.resolve("plugins/templates/legacy-x"),
+                """
+                {
+                  "displayName": "Legacy X",
+                  "namespace": "lx"
+                }
+                """
+        );
+
+        TemplateRegistry registry = new TemplateRegistry(objectMapper, List.of(tempDir));
+        assertThat(registry.listAll()).extracting(TemplateRegistry.TemplateDef::id)
+                .contains("legacy-x");
+    }
+
+    // ---- helpers ----
+
     private static void createPlugin(Path pluginDir, String pluginJson) throws IOException {
         Files.createDirectories(pluginDir);
         Files.writeString(pluginDir.resolve("plugin.json"), pluginJson);

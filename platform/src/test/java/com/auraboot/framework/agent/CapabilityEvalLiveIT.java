@@ -218,20 +218,29 @@ class CapabilityEvalLiveIT extends BaseIntegrationTest {
         assertNotNull(report, "eval report must not be null");
         assertEquals("llm", report.get("evalMode"),
                 "with a real provider configured the run must stay in llm mode, not degrade to keyword");
-        assertEquals(cases.size(), ((Number) report.get("totalCases")).intValue());
-        assertNotNull(report.get("weightedScore"), "report must carry a weighted score");
+        // D3a-aware: every case is either scored or marked unavailable (its tools absent from
+        // this environment's catalog). cmd_create_order/cmd_cancel_order are not registered in
+        // the bare IT tenant, so here all cases are unavailable → no scored run is persisted.
+        // The live LLM tool-selection itself is exercised by the "controlled catalog" test above.
+        int scored = ((Number) report.get("totalCases")).intValue();
+        int unavailable = ((Number) report.getOrDefault("unavailableCases", 0)).intValue();
+        assertEquals(cases.size(), scored + unavailable,
+                "every eval case must be either scored or marked unavailable");
 
-        long countAfter = evalRunMapper.selectCount(
-                new LambdaQueryWrapper<AbCapabilityEvalRun>().eq(AbCapabilityEvalRun::getTenantId, tenantId));
-        assertTrue(countAfter > countBefore, "a new eval run must be persisted");
+        if (scored > 0) {
+            assertNotNull(report.get("weightedScore"), "a scored report must carry a weighted score");
+            long countAfter = evalRunMapper.selectCount(
+                    new LambdaQueryWrapper<AbCapabilityEvalRun>().eq(AbCapabilityEvalRun::getTenantId, tenantId));
+            assertTrue(countAfter > countBefore, "a scored eval run must be persisted");
 
-        AbCapabilityEvalRun latest = evalRunMapper.selectList(
-                new LambdaQueryWrapper<AbCapabilityEvalRun>()
-                        .eq(AbCapabilityEvalRun::getTenantId, tenantId)
-                        .orderByDesc(AbCapabilityEvalRun::getRunAt)
-                        .last("LIMIT 1")).get(0);
-        assertEquals("llm", latest.getEvalMode(),
-                "the persisted run must record eval_mode=llm (honest mode label)");
+            AbCapabilityEvalRun latest = evalRunMapper.selectList(
+                    new LambdaQueryWrapper<AbCapabilityEvalRun>()
+                            .eq(AbCapabilityEvalRun::getTenantId, tenantId)
+                            .orderByDesc(AbCapabilityEvalRun::getRunAt)
+                            .last("LIMIT 1")).get(0);
+            assertEquals("llm", latest.getEvalMode(),
+                    "the persisted run must record eval_mode=llm (honest mode label)");
+        }
     }
 
     private static ToolDefinition tool(String code, String description, String risk) {

@@ -47,7 +47,7 @@ public class FieldEncryptionService {
     private SecretKeySpec secretKey;
 
     @PostConstruct
-    void init() {
+    public void init() {
         if (base64Key == null || base64Key.isBlank()) {
             log.warn("security.field-encryption.key is not configured — " +
                     "field encryption is DISABLED (passthrough mode). " +
@@ -202,6 +202,92 @@ public class FieldEncryptionService {
             return objectMapper.writeValueAsString(obj);
         } catch (Exception e) {
             log.warn("Failed to mask JSON fields: {}", e.getMessage());
+            return json;
+        }
+    }
+
+    /**
+     * Encrypt specified fields within a JSON string, keeping the blob valid JSON.
+     * <p>
+     * For example, given JSON {@code {"password":"secret","username":"alice"}}
+     * and fields {@code {"password"}}, returns
+     * {@code {"password":"ENC:...","username":"alice"}}.
+     * Non-existent fields and null values are left untouched.
+     * If no encryption key is configured, the JSON is returned unchanged.
+     *
+     * @param json   the JSON string to process; null/blank values pass through
+     * @param fields set of field names whose values should be encrypted
+     * @return JSON string with specified fields encrypted, or original if parsing fails
+     */
+    public String encryptJsonFields(String json, Set<String> fields) {
+        if (json == null || json.isBlank() || fields == null || fields.isEmpty()) {
+            return json;
+        }
+        if (secretKey == null) {
+            return json; // passthrough — encryption disabled
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            if (!root.isObject()) {
+                return json;
+            }
+
+            ObjectNode obj = (ObjectNode) root;
+            for (String field : fields) {
+                if (obj.has(field) && !obj.get(field).isNull()) {
+                    String plainValue = obj.get(field).asText();
+                    if (!isEncrypted(plainValue)) {
+                        obj.put(field, encrypt(plainValue));
+                    }
+                }
+            }
+
+            return objectMapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            log.warn("Failed to encrypt JSON fields: {}", e.getMessage());
+            return json;
+        }
+    }
+
+    /**
+     * Decrypt specified fields within a JSON string.
+     * <p>
+     * The inverse of {@link #encryptJsonFields}: for each named field whose
+     * value starts with {@code ENC:}, the value is decrypted in place.
+     * Fields without the prefix (plaintext or missing) are left untouched,
+     * enabling zero-downtime migration from unencrypted rows.
+     *
+     * @param json   the JSON string to process; null/blank values pass through
+     * @param fields set of field names whose values should be decrypted
+     * @return JSON string with specified fields decrypted, or original if parsing fails
+     */
+    public String decryptJsonFields(String json, Set<String> fields) {
+        if (json == null || json.isBlank() || fields == null || fields.isEmpty()) {
+            return json;
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            if (!root.isObject()) {
+                return json;
+            }
+
+            ObjectNode obj = (ObjectNode) root;
+            boolean changed = false;
+            for (String field : fields) {
+                if (obj.has(field) && !obj.get(field).isNull()) {
+                    String value = obj.get(field).asText();
+                    if (isEncrypted(value)) {
+                        obj.put(field, decrypt(value));
+                        changed = true;
+                    }
+                }
+            }
+
+            return changed ? objectMapper.writeValueAsString(obj) : json;
+        } catch (Exception e) {
+            log.warn("Failed to decrypt JSON fields: {}", e.getMessage());
             return json;
         }
     }

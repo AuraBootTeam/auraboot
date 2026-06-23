@@ -16,7 +16,11 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -48,6 +52,7 @@ public class ReconciliationService extends BaseMetaService {
     private final ReconciliationItemMapper itemMapper;
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
+    private final PlatformTransactionManager transactionManager;
 
     // ==================== Profile CRUD ====================
 
@@ -210,10 +215,57 @@ public class ReconciliationService extends BaseMetaService {
                     run.getUnmatchedBCount(), run.getDiscrepancyCount());
 
         } catch (Exception e) {
-            run.setStatus(ReconciliationRun.STATUS_FAILED);
-            run.setErrorMessage(e.getMessage());
-            run.setCompletedAt(Instant.now());
-            runMapper.updateById(run);
+            // The outer @Transactional will roll back on re-throw, which would swallow the FAILED
+            // audit row if we tried to persist it here inside the still-open transaction.
+            // Using REQUIRES_NEW inside the live transaction causes a deadlock (the new transaction
+            // waits for row-locks held by the outer one, which waits for the inner to finish).
+            // Solution: register a TransactionSynchronization whose afterCompletion fires AFTER
+            // the outer transaction has fully rolled back and released all its locks — then insert
+            // a fresh FAILED-run row in a brand-new independent transaction. No lock contention.
+            final String failedRunCode = run.getRunCode();
+            final Long failedProfileId = run.getProfileId();
+            final Long failedTenantId = run.getTenantId();
+            final Long failedCreatedBy = run.getCreatedBy();
+            final LocalDate failedPeriodStart = run.getPeriodStart();
+            final LocalDate failedPeriodEnd = run.getPeriodEnd();
+            final Instant failedStartedAt = run.getStartedAt();
+            final Instant failedCompletedAt = Instant.now();
+            final String failedErrorMessage = e.getMessage();
+
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status != TransactionSynchronization.STATUS_ROLLED_BACK) {
+                            // Only write the FAILED audit on rollback; if the outer tx somehow
+                            // committed (unexpected), don't double-write.
+                            return;
+                        }
+                        // Outer tx is fully done and its locks released — safe to open a new tx.
+                        TransactionTemplate tt = new TransactionTemplate(transactionManager);
+                        tt.execute(txStatus -> {
+                            ReconciliationRun failedRun = new ReconciliationRun();
+                            // id=null → AUTO increment assigns a fresh PK; avoids any PK conflict
+                            // with the rolled-back row that the DB never committed.
+                            failedRun.setTenantId(failedTenantId);
+                            failedRun.setRunCode(failedRunCode);
+                            failedRun.setProfileId(failedProfileId);
+                            failedRun.setStatus(ReconciliationRun.STATUS_FAILED);
+                            failedRun.setPeriodStart(failedPeriodStart);
+                            failedRun.setPeriodEnd(failedPeriodEnd);
+                            failedRun.setStartedAt(failedStartedAt);
+                            failedRun.setCompletedAt(failedCompletedAt);
+                            failedRun.setCreatedBy(failedCreatedBy);
+                            failedRun.setCreatedAt(Instant.now());
+                            failedRun.setErrorMessage(failedErrorMessage);
+                            runMapper.insert(failedRun);
+                            log.info("Persisted FAILED-run audit after rollback: {}", failedRunCode);
+                            return null;
+                        });
+                    }
+                });
+            }
+
             log.error("Reconciliation run failed: {}", run.getRunCode(), e);
             throw new MetaServiceException("Reconciliation failed: " + e.getMessage());
         }
@@ -239,10 +291,15 @@ public class ReconciliationService extends BaseMetaService {
         pageSize = PaginationSafetyUtils.pageSize(pageSize, 200);
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, 200);
 
+        // Bug fix: selectCount(qw) must use a wrapper WITHOUT orderBy — PostgreSQL rejects
+        // "SELECT COUNT(*) ... ORDER BY ..." as invalid SQL. Use a separate count-only wrapper.
+        QueryWrapper<ReconciliationRun> countQw = new QueryWrapper<>();
+        countQw.eq("tenant_id", tenantId);
+        long total = runMapper.selectCount(countQw);
+
         QueryWrapper<ReconciliationRun> qw = new QueryWrapper<>();
         qw.eq("tenant_id", tenantId);
         qw.orderByDesc("created_at");
-        long total = runMapper.selectCount(qw);
 
         qw.last("LIMIT " + pageSize + " OFFSET " + offset);
         List<ReconciliationRun> runs = runMapper.selectList(qw);
@@ -279,10 +336,15 @@ public class ReconciliationService extends BaseMetaService {
             items = itemMapper.findByRunIdAndStatus(run.getId(), matchStatus, pageSize, offset);
             total = itemMapper.countByRunIdAndStatus(run.getId(), matchStatus);
         } else {
+            // Bug fix: selectCount(qw) must use a wrapper WITHOUT orderBy — PostgreSQL rejects
+            // "SELECT COUNT(*) ... ORDER BY ..." as invalid SQL. Use a separate count-only wrapper.
+            QueryWrapper<ReconciliationItem> countQw = new QueryWrapper<>();
+            countQw.eq("run_id", run.getId());
+            total = itemMapper.selectCount(countQw);
+
             QueryWrapper<ReconciliationItem> qw = new QueryWrapper<>();
             qw.eq("run_id", run.getId());
             qw.orderByAsc("match_status", "id");
-            total = itemMapper.selectCount(qw);
             qw.last("LIMIT " + pageSize + " OFFSET " + offset);
             items = itemMapper.selectList(qw);
         }
@@ -802,10 +864,17 @@ public class ReconciliationService extends BaseMetaService {
     }
 
     private void validateProfileType(String type) {
-        if (type == null) return;
-        Set<String> valid = Set.of("supplier", "bank", "intercompany");
+        // Bug fix: profile_type is NOT NULL in DB — reject null explicitly instead of silent pass-through.
+        if (type == null) {
+            throw new MetaServiceException("Profile type must not be null. Must be one of: SUPPLIER, BANK, INTERCOMPANY");
+        }
+        // Bug fix: valid set was lowercase but comparison used type.toUpperCase(), so every valid
+        // lowercase input ("supplier", "bank", "intercompany") was always rejected. Fix: compare
+        // case-insensitively by upper-casing both sides, consistent with mapRequestToProfile which
+        // stores profileType.toUpperCase().
+        Set<String> valid = Set.of("SUPPLIER", "BANK", "INTERCOMPANY");
         if (!valid.contains(type.toUpperCase())) {
-            throw new MetaServiceException("Invalid profile type: " + type + ". Must be one of: " + valid);
+            throw new MetaServiceException("Invalid profile type: " + type + ". Must be one of: SUPPLIER, BANK, INTERCOMPANY");
         }
     }
 

@@ -75,8 +75,7 @@
                 "en-US": "Edit"
               },
               "action": {
-                "type": "command",
-                "command": "wd:update_leave_balance"
+                "type": "command"
               }
             }
           ],

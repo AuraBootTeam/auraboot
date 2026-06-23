@@ -1,0 +1,30 @@
+{
+  "pluginId": "com.auraboot.core-ownership",
+  "namespace": "ownership",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Record Ownership",
+  "displayName:zh-CN": "记录归属",
+  "displayName:en": "Record Ownership",
+  "description": "Platform-generic record ownership capability: a reusable owner_type/owner_id field pair (assign a record to a user or a team) plus the owner_type dictionary. Any model can bind these fields; rendered via the OwnerSelect component and the owner cell renderer.",
+  "author": "AuraBoot Team",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "provides": [
+    {"type": "dict", "code": "owner_type"},
+    {"type": "field", "code": "owner_type"},
+    {"type": "field", "code": "owner_id"}
+  ],
+  "requires": [],
+  "resourceDirs": {
+    "dicts": "config/dicts.json",
+    "fields": "config/fields.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishFields": true,
+    "createResourcePermissions": false
+  }
+}

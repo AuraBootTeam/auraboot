@@ -1,12 +1,14 @@
 package com.auraboot.framework.view.dto;
 
 import com.auraboot.framework.view.entity.ViewConfig;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * SavedView Data Transfer Object
@@ -20,8 +22,10 @@ import java.time.Instant;
 @AllArgsConstructor
 public class SavedViewDTO {
 
+    @JsonIgnore
     private Long id;
     private String pid;
+    @JsonIgnore
     private Long tenantId;
 
     private String name;
@@ -39,7 +43,24 @@ public class SavedViewDTO {
 
     private Boolean allowFullModel;
     private Boolean isDefault;
+    private Boolean isImplicit;
     private Integer sortOrder;
+
+    /**
+     * Effective permission for the current user on this view: view, save, or manage.
+     */
+    private String effectivePermission;
+
+    /**
+     * Server-authoritative actions the frontend may render for the current user.
+     */
+    private List<String> actions;
+
+    /**
+     * Whether this DTO already includes persisted local override changes.
+     * Currently false until the local override table is introduced.
+     */
+    private Boolean dirty;
 
     private Instant createdAt;
     private Instant updatedAt;

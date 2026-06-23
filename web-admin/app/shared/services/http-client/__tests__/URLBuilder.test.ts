@@ -271,6 +271,24 @@ describe('buildRequest', () => {
   });
 });
 
+describe('keepalive passthrough', () => {
+  const serverContext: RequestContext = { isServer: true };
+
+  it('threads keepalive into RequestInit while preserving Authorization and credentials', () => {
+    const options: FetchOptions = { method: 'post', keepalive: true };
+    const { init } = buildRequest('/api/collect', options, serverContext, 'my-token');
+    expect(init.keepalive).toBe(true);
+    expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer my-token');
+    expect(init.credentials).toBe('include');
+  });
+
+  it('does not set keepalive when option is absent', () => {
+    const options: FetchOptions = { method: 'post' };
+    const { init } = buildRequest('/api/collect', options, serverContext, 'my-token');
+    expect(init.keepalive).toBeUndefined();
+  });
+});
+
 describe('X-Timezone header injection', () => {
   it('should add X-Timezone header when context has timezone', () => {
     const context: RequestContext = {

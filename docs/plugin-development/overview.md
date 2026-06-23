@@ -288,3 +288,4 @@ Do you need custom Java logic (external APIs, complex calculations)?
 | [Frontend Plugin Guide](./frontend-plugin.md) | Custom React components via Module Federation |
 | [Full-Stack Plugin Guide](./full-stack-plugin.md) | Combining config + backend + frontend |
 | [Plugin Manifest Reference](./plugin-manifest-reference.md) | Complete plugin.json field reference |
+| [AI Capabilities in Plugins](./agent-capabilities-in-plugins.md) | Add an agent + eval cases + tools/knowledge to a plugin (per-business AI, injected on demand); boundary gates + test requirements |

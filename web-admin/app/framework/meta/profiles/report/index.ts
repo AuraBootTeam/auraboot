@@ -6,8 +6,7 @@
  */
 
 import React from 'react';
-import type { RenderProfile } from '../types';
-import { profileRegistry } from '../ProfileRegistry';
+import { profileRegistry, type RenderProfile } from '@auraboot/runtime-kernel';
 
 // Lazy-loaded renderers
 const ReportPageContent = React.lazy(() =>

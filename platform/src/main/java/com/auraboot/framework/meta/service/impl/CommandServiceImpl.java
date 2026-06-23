@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -159,6 +160,34 @@ public class CommandServiceImpl implements CommandService {
         // tenant_id is automatically added by TenantLineInnerInterceptor
         List<CommandDefinition> entities = commandDefinitionMapper.findAllCurrent();
         return entities.stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
+    @Override
+    public Map<String, String> resolveCrudCommands(String modelCode) {
+        Map<String, String> crud = new LinkedHashMap<>();
+        if (modelCode == null || modelCode.isBlank()) {
+            return crud;
+        }
+        // First command matching each CRUD operation type wins. A model with no
+        // command of a given type simply omits that key, so the runtime falls
+        // back to the dynamic CRUD API. Non-CRUD types (query / state_transition)
+        // are intentionally ignored — they are not the standard form submit path.
+        for (CommandDefinitionDTO cmd : listByModelCode(modelCode)) {
+            String type = cmd.getType();
+            if (type == null) {
+                continue;
+            }
+            switch (type) {
+                case "create":
+                case "update":
+                case "delete":
+                    crud.putIfAbsent(type, cmd.getCode());
+                    break;
+                default:
+                    break;
+            }
+        }
+        return crud;
     }
 
     @Override

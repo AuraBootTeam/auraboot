@@ -132,6 +132,39 @@ public class DynamicSqlProvider {
         return sql.toString();
     }
 
+    /**
+     * Build an atomic counter UPDATE … RETURNING. Identifiers (table, counter,
+     * cap, primary-key columns) MUST be pre-validated meta-model identifiers;
+     * they are re-validated here as defence-in-depth. {@code softDeleteClause}
+     * is a trusted platform constant (from DynamicDataServiceImpl#buildSoftDeleteClause)
+     * appended verbatim. Values (delta, recordId, tenantId, currentUserId) are
+     * bound as #{} parameters. Cap predicate omitted when capCol is null (uncapped).
+     */
+    public static String atomicIncrementReturning(Map<String, Object> params) {
+        String tableName  = requireName((String) params.get("tableName"), "table name");
+        String counterCol = requireName((String) params.get("counterCol"), "counter column");
+        String pkColumn   = requireName((String) params.get("pkColumn"), "primary key column");
+        Object capColObj  = params.get("capCol");
+        String softDelete = (String) params.getOrDefault("softDeleteClause", "");
+
+        StringBuilder sql = new StringBuilder();
+        sql.append("UPDATE ").append(tableName).append(" SET ")
+           .append(counterCol).append(" = COALESCE(").append(counterCol).append(", 0) + #{delta}")
+           .append(", updated_at = now()")
+           .append(", updated_by = #{currentUserId}")
+           .append(" WHERE ").append(pkColumn).append(" = #{recordId}")
+           .append(" AND tenant_id = #{tenantId}");
+        if (capColObj != null) {
+            String capCol = requireName((String) capColObj, "cap column");
+            sql.append(" AND COALESCE(").append(counterCol).append(", 0) + #{delta} <= ").append(capCol);
+        }
+        if (softDelete != null && !softDelete.isBlank()) {
+            sql.append(softDelete);
+        }
+        sql.append(" RETURNING ").append(counterCol).append(" AS new_value");
+        return sql.toString();
+    }
+
     public static String delete(Map<String, Object> params) {
         String tableName = requireName((String) params.get("tableName"), "table name");
         @SuppressWarnings("unchecked")

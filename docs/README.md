@@ -70,6 +70,7 @@ If you are new to AuraBoot, follow this path:
 | [Docker](deployment/docker.md) | Docker Compose production setup |
 | [Kubernetes](deployment/kubernetes.md) | K8s Helm chart deployment |
 | [Configuration](deployment/configuration.md) | Environment variables and application.yml |
+| [Reverse Proxy & Branded Subdomain](deployment/reverse-proxy.md) | Hosting under a branded domain (e.g. `ai.example.com`) |
 | [Upgrading](deployment/upgrading.md) | Version upgrade guide |
 | **Architecture** | |
 | [Overview](architecture/overview.md) | System architecture and request flow |

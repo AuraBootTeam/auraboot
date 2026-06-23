@@ -1,0 +1,111 @@
+{
+  "pageKey": "behavior_site_key_list",
+  "modelCode": "behavior_site_key",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "behavior_site_key_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "behavior.site_key.create",
+          "label": {
+            "zh-CN": "新建",
+            "en-US": "Create"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "behavior_site_key_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "behavior_site_key_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": { "en": "All", "zh-CN": "全部" },
+          "filter": null
+        },
+        {
+          "key": "active",
+          "label": { "en": "Active", "zh-CN": "启用" },
+          "filter": { "field": "status", "value": "active", "operator": "EQ" }
+        },
+        {
+          "key": "disabled",
+          "label": { "en": "Disabled", "zh-CN": "已禁用" },
+          "filter": { "field": "status", "value": "disabled", "operator": "EQ" }
+        }
+      ]
+    },
+    {
+      "id": "behavior_site_key_table",
+      "blockType": "table",
+      "onRowClick": "navigate",
+      "columns": [
+        {
+          "field": "name",
+          "width": 200,
+          "sortable": true
+        },
+        {
+          "field": "site_key",
+          "width": 360,
+          "sortable": true
+        },
+        {
+          "field": "status",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "behavior_site_key_status"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": {
+            "zh-CN": "操作",
+            "en-US": "Actions"
+          },
+          "buttons": [
+            {
+              "code": "view",
+              "label": { "zh-CN": "详情", "en-US": "Detail" },
+              "action": { "type": "navigate", "to": "behavior_site_key_detail" }
+            },
+            {
+              "code": "disable",
+              "danger": true,
+              "permissionCode": "behavior.site_key.manage",
+              "label": { "zh-CN": "禁用", "en-US": "Disable" },
+              "confirm": "behavior_site_key.disable.confirm",
+              "action": { "type": "command", "command": "behavior_site_key:disable" }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "name",
+        "site_key"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      }
+    }
+  ],
+  "name:zh-CN": "站点密钥列表",
+  "name:en": "Site Keys",
+  "title": {
+    "zh-CN": "站点密钥列表",
+    "en": "Site Keys"
+  }
+}

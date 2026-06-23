@@ -3,6 +3,7 @@ package com.auraboot.framework.engagement.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.engagement.dto.UserEngagementDTO;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.engagement.service.UserEngagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,6 +16,7 @@ import java.util.List;
 @RequestMapping("/api/user-engagement")
 @RequiredArgsConstructor
 @Tag(name = "User Engagement", description = "Favorites, recent views, bookmarks")
+@AuthenticatedAccess("operates only on the caller's own favorites/pins (MetaContext userId)")
 public class UserEngagementController {
 
     private final UserEngagementService engagementService;

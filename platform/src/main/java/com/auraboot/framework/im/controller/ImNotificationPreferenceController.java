@@ -3,6 +3,7 @@ package com.auraboot.framework.im.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.im.model.ImNotificationPreference;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.im.service.ImNotificationPreferenceService;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,6 +12,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/im/notification-preferences")
+@AuthenticatedAccess("operates only on the caller's own IM notification preferences (MetaContext userId)")
 public class ImNotificationPreferenceController {
 
     private final ImNotificationPreferenceService preferenceService;

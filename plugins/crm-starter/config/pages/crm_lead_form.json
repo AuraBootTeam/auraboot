@@ -8,54 +8,122 @@
   },
   "blocks": [
     {
-      "id": "basic",
+      "id": "customer",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "线索信息",
-        "en-US": "Lead Information"
+        "zh-CN": "客户信息",
+        "en-US": "Customer"
       },
       "fields": [
         {
           "field": "crm_lead_company",
           "colSpan": 6,
-          "required": true
+          "required": true,
+          "props": {
+            "placeholder": "请输入公司全称"
+          }
         },
         {
           "field": "crm_lead_contact_name",
           "colSpan": 6,
-          "required": true
+          "required": true,
+          "props": {
+            "placeholder": "主要联系人姓名"
+          }
         },
         {
           "field": "crm_lead_contact_phone",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": "11 位手机号码",
+            "helpText": "保存后在列表 / 详情中自动脱敏显示"
+          }
         },
         {
           "field": "crm_lead_contact_email",
-          "colSpan": 6
-        },
+          "colSpan": 6,
+          "props": {
+            "placeholder": "name@company.com"
+          }
+        }
+      ]
+    },
+    {
+      "id": "detail",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "线索详情",
+        "en-US": "Lead Details"
+      },
+      "fields": [
         {
           "field": "crm_lead_source",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": "请选择来源渠道"
+          }
         },
         {
           "field": "crm_lead_industry",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": "如:制造业 / 互联网 / 医疗"
+          }
         },
         {
           "field": "crm_lead_score",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": "0–100",
+            "min": 0,
+            "max": 100,
+            "helpText": "线索质量评分,越高越优质"
+          }
         },
         {
           "field": "crm_lead_campaign",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": "来源的市场活动(可选)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "assignment",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "分配与需求",
+        "en-US": "Assignment & Notes"
+      },
+      "fields": [
+        {
+          "field": "owner_type",
+          "colSpan": 6,
+          "label": { "zh-CN": "分配类型", "en-US": "Assign To" },
+          "props": {
+            "placeholder": "选择 用户 或 团队"
+          }
         },
         {
-          "field": "crm_lead_assigned_to",
-          "colSpan": 6
+          "field": "owner_id",
+          "colSpan": 6,
+          "component": "ownerselect",
+          "label": { "zh-CN": "分配给", "en-US": "Assignee" },
+          "props": {
+            "placeholder": "先选分配类型,再选具体对象"
+          }
         },
         {
           "field": "crm_lead_requirement",
-          "colSpan": 12
+          "colSpan": 12,
+          "props": {
+            "placeholder": "客户的核心需求、预算、采购时间线等",
+            "autoSize": {
+              "minRows": 3,
+              "maxRows": 6
+            }
+          }
         }
       ]
     },
@@ -66,13 +134,13 @@
         {
           "code": "submit",
           "primary": true,
+          "icon": "Check",
           "label": {
             "zh-CN": "保存",
             "en-US": "Save"
           },
           "action": {
-            "type": "command",
-            "command": "crm:update_lead"
+            "type": "command"
           }
         },
         {

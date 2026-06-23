@@ -12,12 +12,15 @@
  * ```
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { FieldConfig, DataSourceConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
+import { usePermission } from '~/contexts/AuthContext';
+import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import { ReferenceCreateDialog } from '~/framework/meta/runtime/reference-create/ReferenceCreateDialog';
 
 export interface RuntimeFieldRendererProps {
   field: FieldConfig;
@@ -96,6 +99,81 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
     runtime?.triggerFieldLinkage(field.field, 'focus');
   };
 
+  // --- Reference inline-create wiring (hooks called unconditionally) ---
+  const fieldKind = String((field as any).dataType || field.type || '').toLowerCase();
+  const isReferenceField = fieldKind === 'reference' && !field.dataSource;
+  const refTargetCfg = {
+    ...(((field as any).props?.refTarget || {}) as Record<string, any>),
+    ...(((field as any).refTarget || {}) as Record<string, any>),
+  };
+  const refTargetModel: string =
+    refTargetCfg?.targetModel || refTargetCfg?.modelCode || refTargetCfg?.targetEntity || '';
+  const refDisplayField: string | undefined =
+    refTargetCfg?.displayField || refTargetCfg?.labelField || refTargetCfg?.targetField;
+  const createCommandCode =
+    field.createCommand || (refTargetModel ? `${refTargetModel}:create` : '');
+  const createPermissionCode = field.createPermission || createCommandCode;
+  // usePermission('') returns false — harmless when no target model.
+  const hasCreatePerm = usePermission(createPermissionCode);
+  const allowCreate =
+    Boolean(field.allowCreate) && isReferenceField && !!refTargetModel && hasCreatePerm;
+  const [createOpen, setCreateOpen] = useState(false);
+  const { executeCommand } = useActionHandler({
+    runtime,
+    navigate: (() => undefined) as any,
+    tableName: refTargetModel || field.field,
+    locale,
+    t,
+    token: (context as any).token,
+  });
+
+  const handleCreated = (selected: { value: string; label: string }) => {
+    // Pin before selecting so controlled selects never see a value without a matching option.
+    const dataSourceManager = runtime?.getDataSourceManager?.() as any;
+    const ids =
+      refTargetModel && typeof dataSourceManager?.getDataSourceIdsByModel === 'function'
+        ? dataSourceManager.getDataSourceIdsByModel(refTargetModel)
+        : [];
+    const pinCreatedOption = () => {
+      if (
+        typeof dataSourceManager?.getState !== 'function' ||
+        typeof dataSourceManager?.setData !== 'function'
+      ) {
+        return;
+      }
+      const createdOption = { value: selected.value, label: selected.label };
+      ids.forEach((dsId: string) => {
+        const currentData = dataSourceManager.getState(dsId)?.data;
+        const options = Array.isArray(currentData) ? currentData : [];
+        const exists = options.some(
+          (option: any) => String(option?.value) === String(selected.value),
+        );
+        if (!exists) {
+          dataSourceManager.setData(dsId, [createdOption, ...options]);
+        }
+      });
+    };
+    if (ids.length > 0) {
+      pinCreatedOption();
+    }
+
+    const cur = stateManager.getFieldValue(scopeId, field.field);
+    if (Array.isArray(cur)) {
+      const nextValue = cur.some((item) => String(item) === String(selected.value))
+        ? cur
+        : [...cur, selected.value];
+      handleChange(nextValue);
+    } else {
+      handleChange(selected.value);
+    }
+
+    // Reload target-model option data sources so the new record is present on next open.
+    if (ids.length > 0 && typeof dataSourceManager?.reload === 'function') {
+      void Promise.resolve(dataSourceManager.reload(ids)).then(pinCreatedOption);
+    }
+    setCreateOpen(false);
+  };
+
   // Disabled: fieldMeta.disabled takes priority over disableWhen
   const disableExpr = field.disableWhen || (field as any).disabledWhen;
   const enableExpr = field.enableWhen;
@@ -118,9 +196,16 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   const isReadOnly =
     isReadOnlyStatic || (readOnlyExpr ? evaluateCondition(readOnlyExpr, context) : false);
 
-  // Required: fieldMeta.required takes priority over validation rules
-  const isRequired =
-    fieldMeta?.required !== undefined
+  // Required: fieldMeta.required takes priority over validation rules.
+  // A read-only field is never user-required — it is system-managed / auto-generated
+  // (e.g. an auto-numbered code) and the user cannot type into it. Suppressing the
+  // required marker keeps the display consistent with the submit gate, which already
+  // excludes read-only fields from required validation (FormPageContent:
+  // `!rawField.readOnly && (rawField.required ?? meta.required)`). Without this guard
+  // an auto-generated read-only field shows a misleading `*` / "此字段为必填项".
+  const isRequired = isReadOnly
+    ? false
+    : fieldMeta?.required !== undefined
       ? fieldMeta.required
       : Boolean((field as any).required) ||
         field.validation?.some((rule) => rule.type === 'required');
@@ -211,10 +296,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
       autoFetch: true,
     };
     componentProps.dataSource = dictDataSource;
-  } else if (
-    String((field as any).dataType || '').toLowerCase() === 'reference' &&
-    !field.dataSource
-  ) {
+  } else if (fieldKind === 'reference' && !field.dataSource) {
     const refTarget = {
       ...(((field as any).props?.refTarget || {}) as Record<string, any>),
       ...(((field as any).refTarget || {}) as Record<string, any>),
@@ -233,6 +315,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
       if (systemModel) {
         componentProps.dataSource = {
           type: 'api',
+          modelCode: targetModelCode,
           endpoint: systemModel.endpoint,
           method: 'get',
           params: { size: 200 },
@@ -254,6 +337,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
         }
         const referenceDataSource: DataSourceConfig = {
           type: 'api',
+          modelCode: targetModelCode,
           endpoint: `/api/dynamic/${targetModelCode}/list`,
           method: 'get',
           params,
@@ -284,6 +368,12 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
     componentProps.validationRules = field.validation;
   }
 
+  // Reference inline-create: set canCreateNew on the selector when permission is held.
+  if (allowCreate) {
+    componentProps.canCreateNew = true;
+    componentProps.onCreateNew = () => setCreateOpen(true);
+  }
+
   // 处理布局
   const colSpan = field.layout?.colSpan || 6;
   const colSpanClass =
@@ -300,9 +390,26 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
               : '';
 
   return (
-    <div className={`runtime-field-renderer ${colSpanClass}`} data-testid={`field-${field.field}`}>
-      <ComponentLoader componentName={componentName} props={componentProps} />
-    </div>
+    <>
+      <div
+        className={`runtime-field-renderer ${colSpanClass}`}
+        data-testid={`field-${field.field}`}
+      >
+        <ComponentLoader componentName={componentName} props={componentProps} />
+      </div>
+      {allowCreate && (
+        <ReferenceCreateDialog
+          open={createOpen}
+          targetModel={refTargetModel}
+          createPageKey={field.createPageKey}
+          createCommand={createCommandCode}
+          displayField={refDisplayField}
+          executeCommand={executeCommand}
+          onCreated={handleCreated}
+          onClose={() => setCreateOpen(false)}
+        />
+      )}
+    </>
   );
 };
 

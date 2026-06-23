@@ -19,6 +19,13 @@ public class ChatRequest {
     private String sessionId;
 
     /**
+     * OTel W3C traceId, snapshotted by the controller on the request thread (before
+     * the async hop) so the self-built AI trace bridges to the distributed trace
+     * (A-G1, P1). Server-set only; not part of the client request contract.
+     */
+    private String otelTraceId;
+
+    /**
      * User message content.
      */
     private String message;

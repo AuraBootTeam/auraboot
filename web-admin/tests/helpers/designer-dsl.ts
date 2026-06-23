@@ -82,7 +82,7 @@ async function navigateToProcessDefinitionList(page: Page): Promise<void> {
   // Wait for the list page toolbar or table to appear
   await page
     .locator(
-      'main table, main [data-testid="dynamic-list"], main [data-testid="toolbar-btn-create"], main button:has-text("创建"), main button:has-text("新建"), main button:has-text("Create")',
+      'main table, main [data-testid="dynamic-list"], main [data-testid="toolbar-btn-create"], main button:has-text("创建"), main button:has-text("新建"):not(:has-text("今日")), main button:has-text("Create")',
     )
     .first()
     .waitFor({ state: 'visible', timeout: 15_000 });
@@ -124,7 +124,7 @@ export async function openDesigner(
 
   // Click the "Create" button in the toolbar — navigates to /bpmn-designer
   const createBtn = page.locator(
-    '[data-testid="toolbar-btn-create"], button:has-text("创建"), button:has-text("新建"), button:has-text("Create")',
+    '[data-testid="toolbar-btn-create"], button:has-text("创建"), button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
   ).first();
   await createBtn.waitFor({ state: 'visible', timeout: 10_000 });
   await createBtn.click();

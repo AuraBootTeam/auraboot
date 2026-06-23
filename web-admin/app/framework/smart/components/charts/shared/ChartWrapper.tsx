@@ -11,6 +11,7 @@
 import React from 'react';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
 import type { ChartDataSource, FilterConfig, AggregateQueryResponse } from '~/framework/smart/types/chart';
+import { useSmartText } from '~/utils/i18n';
 
 interface ChartWrapperProps {
   /** Chart title shown in the not-configured placeholder */
@@ -65,6 +66,7 @@ export function ChartWrapper({
   style,
   children,
 }: ChartWrapperProps) {
+  const st = useSmartText();
   const configured = isDataSourceConfigured(dataSource);
 
   const { data, loading, error } = useChartData({
@@ -83,7 +85,7 @@ export function ChartWrapper({
       >
         <div className="mb-2 text-4xl text-gray-400">{icon || '📊'}</div>
         <div className="text-sm font-medium text-gray-500">{title}</div>
-        <div className="mt-1 text-xs text-gray-400">请在右侧配置数据源</div>
+        <div className="mt-1 text-xs text-gray-400">{st('$i18n:chart.configure_datasource', 'Configure a data source')}</div>
       </div>
     );
   }
@@ -108,7 +110,7 @@ export function ChartWrapper({
         style={style}
       >
         <div className="mb-2 text-2xl text-red-400">&#9888;</div>
-        <div className="text-sm text-red-500">数据加载失败</div>
+        <div className="text-sm text-red-500">{st('$i18n:chart.load_failed', 'Failed to load data')}</div>
         <div className="mt-1 text-xs text-red-400">{error.message}</div>
       </div>
     );
@@ -122,7 +124,7 @@ export function ChartWrapper({
         style={style}
       >
         <div className="mb-2 text-2xl text-gray-400">📭</div>
-        <div className="text-sm text-gray-500">暂无数据</div>
+        <div className="text-sm text-gray-500">{st('$i18n:chart.no_data', 'No data')}</div>
       </div>
     );
   }

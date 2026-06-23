@@ -132,8 +132,7 @@
               },
               "confirm": "delete.confirm",
               "action": {
-                "type": "command",
-                "command": "wd:delete_leave_request"
+                "type": "command"
               }
             }
           ],

@@ -146,6 +146,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for FileAccessor in the settings map. */
     String FILE_ACCESSOR_KEY = FileAccessor.SETTINGS_KEY;
 
+    /** Well-known key for AsyncTaskAccessor in the settings map. */
+    String ASYNC_TASK_ACCESSOR_KEY = AsyncTaskAccessor.SETTINGS_KEY;
+
     /**
      * Command execution context.
      */
@@ -194,6 +197,16 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public FileAccessor fileAccessor() {
             Object accessor = settings != null ? settings.get(FILE_ACCESSOR_KEY) : null;
             return accessor instanceof FileAccessor ? (FileAccessor) accessor : null;
+        }
+
+        /**
+         * Get the host async-task submission bridge from the settings map.
+         * Returns null if the host application has no async-task bridge, in which
+         * case handlers should fall back to running the follow-up work inline.
+         */
+        public AsyncTaskAccessor asyncTaskAccessor() {
+            Object accessor = settings != null ? settings.get(ASYNC_TASK_ACCESSOR_KEY) : null;
+            return accessor instanceof AsyncTaskAccessor ? (AsyncTaskAccessor) accessor : null;
         }
 
         public static Builder builder() {

@@ -41,4 +41,40 @@ describe('useFieldDataSource', () => {
       expect(manager.register).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('registers inline dataSource configs with modelCode for model-scoped reloads', async () => {
+    const manager = {
+      register: vi.fn(),
+      registerWithModel: vi.fn(),
+      subscribe: vi.fn(() => vi.fn()),
+      getState: vi.fn(() => ({ data: [], loading: false, error: null })),
+      unregister: vi.fn(),
+    };
+
+    function Harness() {
+      useFieldDataSource({
+        managerInstance: manager as any,
+        dataSource: {
+          type: 'api',
+          endpoint: '/api/dynamic/customer/list',
+          method: 'get',
+          params: { pageNum: 1, pageSize: 200 },
+          adaptor: 'optionList',
+          valueField: 'pid',
+          labelField: 'name',
+          autoFetch: true,
+          modelCode: 'customer',
+        } as any,
+      });
+      return <div />;
+    }
+
+    render(<Harness />);
+
+    await waitFor(() => {
+      expect(manager.registerWithModel).toHaveBeenCalledTimes(1);
+    });
+    expect(manager.registerWithModel.mock.calls[0][2]).toBe('customer');
+    expect(manager.register).not.toHaveBeenCalled();
+  });
 });

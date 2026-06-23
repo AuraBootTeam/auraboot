@@ -6,6 +6,7 @@ import com.auraboot.framework.audit.mapper.AdminEventLogMapper;
 import com.auraboot.framework.audit.service.AdminEventLogService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import io.micrometer.tracing.Tracer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,9 @@ public class AdminEventLogServiceImpl implements AdminEventLogService {
 
     @Autowired
     private AdminEventLogMapper adminEventLogMapper;
+
+    @Autowired(required = false)
+    private Tracer tracer;
 
     @Override
     public void record(AdminEventLog logEntry) {
@@ -62,6 +66,12 @@ public class AdminEventLogServiceImpl implements AdminEventLogService {
                 // Cannot persist a multi-tenant audit row without tenant context.
                 log.warn("AdminEventLog.record called with no tenantId in MetaContext — dropping entry actionType={}", logEntry.getActionType());
                 return;
+            }
+            // Anchor the audit row to the request's OTel trace (A-G2, P1). Admin ops
+            // run on the request thread -> span active. Null for system-context events.
+            if (tracer != null && tracer.currentSpan() != null) {
+                logEntry.setTraceId(tracer.currentSpan().context().traceId());
+                logEntry.setSpanId(tracer.currentSpan().context().spanId());
             }
 
             adminEventLogMapper.insertEventLog(logEntry);

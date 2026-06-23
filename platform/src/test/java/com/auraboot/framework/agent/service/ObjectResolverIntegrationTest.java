@@ -1,9 +1,11 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -27,6 +29,9 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
     @Autowired
     DynamicDataMapper dynamicDataMapper;
 
+    @Autowired
+    JdbcTemplate jdbcTemplate;
+
     // Tenant that owns published commands (may differ from test tenant)
     private Long commandTenantId;
     private String sampleDisplayName;
@@ -34,6 +39,7 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void ensureIndexBuilt() {
+        seedResolverFixture();
         // Force rebuild to ensure test starts with a clean, populated index
         objectResolver.rebuildIndex();
 
@@ -276,5 +282,61 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
         // Should still work (fresh load)
         ObjectResolver.ObjectResult result = objectResolver.resolve(tenantId, "客户");
         assertThat(result.getModelCode()).isEqualTo("crm_account");
+    }
+
+    private void seedResolverFixture() {
+        Long tenantId = getTestTenant().getId();
+        jdbcTemplate.update("""
+                INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, acp_priority, deleted_flag)
+                VALUES (?, -1, 'crm_account', '客户', 'zh-CN', 1000, FALSE)
+                ON CONFLICT (tenant_id, alias, language)
+                DO UPDATE SET model_code = EXCLUDED.model_code,
+                              acp_priority = EXCLUDED.acp_priority,
+                              deleted_flag = FALSE,
+                              updated_at = CURRENT_TIMESTAMP
+                """, UniqueIdGenerator.generate());
+        jdbcTemplate.update("""
+                INSERT INTO ab_meta_model (
+                    pid, tenant_id, code, table_name, extension, capabilities,
+                    version, is_current, status, deleted_flag
+                )
+                SELECT ?, ?, 'crm_account', 'mt_crm_account',
+                       '{"displayName":"客户"}'::jsonb, '{}'::jsonb,
+                       1, TRUE, 'published', FALSE
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM ab_meta_model
+                    WHERE tenant_id = ? AND code = 'crm_account' AND deleted_flag = FALSE
+                )
+                """, UniqueIdGenerator.generate(), tenantId, tenantId);
+        seedCommand(tenantId, "crm:create_account", "create");
+        seedCommand(tenantId, "crm:update_account", "update");
+        seedCommand(tenantId, "crm:delete_account", "delete");
+        seedCommand(tenantId, "crm:list_account", "query");
+    }
+
+    private void seedCommand(Long tenantId, String code, String type) {
+        jdbcTemplate.update("""
+                INSERT INTO ab_command_definition (
+                    pid, tenant_id, code, display_name, model_code,
+                    input_schema, target_models, execution_config, extension,
+                    version, is_current, status, deleted_flag
+                )
+                VALUES (?, ?, ?, ?, 'crm_account',
+                        '{}'::jsonb, '[]'::jsonb, ?::jsonb, '{}'::jsonb,
+                        1, TRUE, 'published', FALSE)
+                ON CONFLICT (tenant_id, code, version)
+                DO UPDATE SET display_name = EXCLUDED.display_name,
+                              model_code = EXCLUDED.model_code,
+                              execution_config = EXCLUDED.execution_config,
+                              is_current = TRUE,
+                              status = 'published',
+                              deleted_flag = FALSE,
+                              updated_at = CURRENT_TIMESTAMP
+                """,
+                UniqueIdGenerator.generate(),
+                tenantId,
+                code,
+                code,
+                "{\"type\":\"" + type + "\"}");
     }
 }

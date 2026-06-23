@@ -1,0 +1,268 @@
+[
+  {
+    "pageKey": "behavior_analytics",
+    "name:zh-CN": "行为分析",
+    "name:en": "Behavior Analytics",
+    "description": "UV/PV telemetry dashboard — KPI cards for page views, unique visitors, sessions, and total events; plus a top-events table. Backed by /api/analytics/behavior/* endpoints.",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "grid"
+    },
+    "extension": {
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showEdit": false
+    },
+    "dataSources": {
+      "ds_behavior_overview": {
+        "type": "api",
+        "endpoint": "/api/analytics/behavior/overview",
+        "url": "/api/analytics/behavior/overview",
+        "method": "get",
+        "autoFetch": true
+      },
+      "ds_top_events": {
+        "type": "api",
+        "endpoint": "/api/analytics/behavior/top-events",
+        "url": "/api/analytics/behavior/top-events",
+        "method": "get",
+        "autoFetch": true
+      }
+    },
+    "blocks": [
+      {
+        "id": "kpi_pv",
+        "blockType": "chart",
+        "chartType": "number-card",
+        "dataSource": "ds_behavior_overview",
+        "title": {
+          "zh-CN": "页面浏览量 (PV)",
+          "en": "Page Views (PV)"
+        },
+        "chartConfig": {
+          "metricField": "pageViews"
+        }
+      },
+      {
+        "id": "kpi_uv",
+        "blockType": "chart",
+        "chartType": "number-card",
+        "dataSource": "ds_behavior_overview",
+        "title": {
+          "zh-CN": "独立访客 (UV)",
+          "en": "Unique Visitors (UV)"
+        },
+        "chartConfig": {
+          "metricField": "uniqueVisitors"
+        }
+      },
+      {
+        "id": "kpi_sessions",
+        "blockType": "chart",
+        "chartType": "number-card",
+        "dataSource": "ds_behavior_overview",
+        "title": {
+          "zh-CN": "会话数",
+          "en": "Sessions"
+        },
+        "chartConfig": {
+          "metricField": "sessions"
+        }
+      },
+      {
+        "id": "kpi_total",
+        "blockType": "chart",
+        "chartType": "number-card",
+        "dataSource": "ds_behavior_overview",
+        "title": {
+          "zh-CN": "事件总数",
+          "en": "Total Events"
+        },
+        "chartConfig": {
+          "metricField": "totalEvents"
+        }
+      },
+      {
+        "id": "tbl_top_events",
+        "blockType": "chart",
+        "chartType": "table",
+        "dataSource": "ds_top_events",
+        "title": {
+          "zh-CN": "热门事件",
+          "en": "Top Events"
+        }
+      }
+    ],
+    "title": {
+      "zh-CN": "行为分析",
+      "en": "Behavior Analytics"
+    }
+  },
+  {
+    "pageKey": "behavior_quarantine_list",
+    "name:zh-CN": "行为隔离队列",
+    "name:en": "Behavior Quarantine",
+    "modelCode": "behavior_quarantine",
+    "kind": "list",
+    "profile": "admin",
+    "schemaVersion": 4,
+    "title": {
+      "zh-CN": "行为隔离队列",
+      "en-US": "Behavior Quarantine"
+    },
+    "layout": {
+      "type": "stack",
+      "gap": 12
+    },
+    "extension": {
+      "dataSource": {
+        "type": "api",
+        "endpoint": "/api/analytics/behavior/quarantine",
+        "method": "get",
+        "pagination": true
+      },
+      "skipFieldMeta": true,
+      "hideSavedViews": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true
+    },
+    "blocks": [
+      {
+        "id": "behavior_quarantine_filters",
+        "blockType": "filters",
+        "fields": [
+          {
+            "field": "reason",
+            "label": {
+              "zh-CN": "隔离原因",
+              "en-US": "Reason"
+            },
+            "layout": { "colSpan": 4 }
+          },
+          {
+            "field": "replayStatus",
+            "label": {
+              "zh-CN": "回放状态",
+              "en-US": "Replay Status"
+            },
+            "layout": { "colSpan": 4 }
+          }
+        ]
+      },
+      {
+        "id": "behavior_quarantine_table",
+        "blockType": "table",
+        "table": {
+          "columns": [
+            {
+              "field": "id",
+              "label": {
+                "zh-CN": "ID",
+                "en-US": "ID"
+              },
+              "width": 90
+            },
+            {
+              "field": "reason",
+              "label": {
+                "zh-CN": "隔离原因",
+                "en-US": "Reason"
+              },
+              "width": 220
+            },
+            {
+              "field": "replayStatus",
+              "label": {
+                "zh-CN": "回放状态",
+                "en-US": "Replay Status"
+              },
+              "width": 130
+            },
+            {
+              "field": "eventId",
+              "label": {
+                "zh-CN": "事件 ID",
+                "en-US": "Event ID"
+              },
+              "width": 220
+            },
+            {
+              "field": "eventName",
+              "label": {
+                "zh-CN": "事件名",
+                "en-US": "Event Name"
+              },
+              "width": 180
+            },
+            {
+              "field": "detail",
+              "label": {
+                "zh-CN": "错误详情",
+                "en-US": "Detail"
+              },
+              "width": 320
+            },
+            {
+              "field": "rawEvent",
+              "label": {
+                "zh-CN": "原始事件",
+                "en-US": "Raw Event"
+              },
+              "width": 420
+            },
+            {
+              "field": "quarantinedAt",
+              "label": {
+                "zh-CN": "隔离时间",
+                "en-US": "Quarantined At"
+              },
+              "width": 190,
+              "format": "YYYY-MM-DD HH:mm"
+            }
+          ],
+          "rowActions": [
+            {
+              "code": "replay",
+              "label": {
+                "zh-CN": "回放",
+                "en-US": "Replay"
+              },
+              "visibleWhen": "record.replayStatus == 'pending'",
+              "action": {
+                "type": "flow",
+                "steps": [
+                  {
+                    "action": "api.request",
+                    "endpoint": "/api/analytics/behavior/quarantine/{id}/replay",
+                    "method": "post"
+                  },
+                  {
+                    "action": "toast.show",
+                    "args": {
+                      "message": {
+                        "zh-CN": "隔离事件已回放",
+                        "en-US": "Quarantined event replayed"
+                      },
+                      "level": "success"
+                    }
+                  },
+                  {
+                    "action": "dataSource.reload",
+                    "args": { "target": "list" }
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultSort": {
+            "field": "quarantinedAt",
+            "order": "desc"
+          }
+        }
+      }
+    ]
+  }
+]

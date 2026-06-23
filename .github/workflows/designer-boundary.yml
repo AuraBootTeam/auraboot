@@ -1,0 +1,61 @@
+name: Designer Boundary Gate
+
+# B3a manifest-only designer boundary gate (DDR-2026-06-18-designer-kernel-boundary).
+# Every designer SURFACE must declare its layout family via designer.family.json
+# so no one can grow a new wild canvas/store/palette kernel unnoticed. This is the
+# early defense line that ships BEFORE the report-designer refactor (B1).
+# Vendored, self-contained checker — see scripts/check-designer-boundary.mjs and
+# the enterprise canonical docs/standards/decisions/DDR-2026-06-18-designer-kernel-boundary.md.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web-admin/app/plugins/core-designer/**'
+      - 'web-admin/app/plugins/core-dashboard/**'
+      - 'web-admin/app/plugins/core-automation/**'
+      - '**/designer.family.json'
+      - '.designer-boundary.json'
+      - 'scripts/designer-family-registry.json'
+      - 'scripts/check-designer-boundary.mjs'
+      - 'scripts/check-designer-boundary.test.mjs'
+      - '.github/workflows/designer-boundary.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'web-admin/app/plugins/core-designer/**'
+      - 'web-admin/app/plugins/core-dashboard/**'
+      - 'web-admin/app/plugins/core-automation/**'
+      - '**/designer.family.json'
+      - '.designer-boundary.json'
+      - 'scripts/designer-family-registry.json'
+      - 'scripts/check-designer-boundary.mjs'
+      - 'scripts/check-designer-boundary.test.mjs'
+      - '.github/workflows/designer-boundary.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: designer-boundary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  designer-boundary:
+    name: Designer Boundary Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Designer boundary (manifest-only; strict)
+        run: node scripts/check-designer-boundary.mjs --strict
+
+      - name: Designer boundary checker unit tests
+        run: node --test scripts/check-designer-boundary.test.mjs

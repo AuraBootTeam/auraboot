@@ -13,6 +13,7 @@ import com.auraboot.framework.plugin.exception.PluginLifecycleException;
 import com.auraboot.framework.plugin.exception.PluginNotFoundException;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
+import com.auraboot.framework.plugin.pf4j.BackgroundComponentRegistry;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +50,7 @@ class PluginManagerServiceImplTest {
     @Mock private PluginRecordMapper pluginRecordMapper;
     @Mock private AuraPluginManager auraPluginManager;
     @Mock private ExtensionRegistry extensionRegistry;
+    @Mock private BackgroundComponentRegistry backgroundComponentRegistry;
     @Mock private AdminEventLogService adminEventLogService;
 
     @InjectMocks private PluginManagerServiceImpl service;

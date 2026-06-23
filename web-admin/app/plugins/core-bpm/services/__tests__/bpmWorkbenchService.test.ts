@@ -7,16 +7,23 @@ vi.mock('~/shared/services/http-client', () => {
   return { get, post, ErrorCodes };
 });
 
-import { get } from '~/shared/services/http-client';
+import { get, post } from '~/shared/services/http-client';
 import {
+  claimTask,
+  completeTask,
+  delegateTask,
   getCompletedTasks,
   getInstanceForRecord,
   getStartedProcesses,
+  getTaskDetail,
   getTodoTasks,
   getWorkbench,
+  startProcess,
+  transferTask,
 } from '~/plugins/core-bpm/services/bpmWorkbenchService';
 
 const mockedGet = vi.mocked(get);
+const mockedPost = vi.mocked(post);
 
 describe('bpmWorkbenchService query param wiring', () => {
   beforeEach(() => {
@@ -100,5 +107,68 @@ describe('bpmWorkbenchService query param wiring', () => {
     } as any);
 
     await expect(getInstanceForRecord('BIZ-2')).resolves.toBeNull();
+  });
+});
+
+describe('bpmWorkbenchService task detail + mutations', () => {
+  beforeEach(() => {
+    mockedGet.mockReset();
+    mockedPost.mockReset();
+  });
+
+  it('getTaskDetail GETs the task by id', async () => {
+    mockedGet.mockResolvedValue({ code: '0', data: { taskId: 't-1', taskName: 'Approve' } } as any);
+    await expect(getTaskDetail('t-1')).resolves.toBeDefined();
+    expect(mockedGet).toHaveBeenCalledWith('/api/bpm/tasks/t-1');
+  });
+
+  it('getTaskDetail throws the backend desc on failure', async () => {
+    mockedGet.mockResolvedValue({ code: '50000', desc: 'boom', data: null } as any);
+    await expect(getTaskDetail('t-x')).rejects.toThrow('boom');
+  });
+
+  it('completeTask POSTs variables + comment to the complete endpoint', async () => {
+    mockedPost.mockResolvedValue({ code: '0' } as any);
+    await completeTask({ taskId: 't-2', variables: { approved: true }, comment: 'ok' });
+    expect(mockedPost).toHaveBeenCalledWith('/api/bpm/tasks/t-2/complete', {
+      variables: { approved: true },
+      comment: 'ok',
+    });
+  });
+
+  it('claimTask POSTs to the claim endpoint', async () => {
+    mockedPost.mockResolvedValue({ code: '0' } as any);
+    await claimTask('t-3');
+    expect(mockedPost).toHaveBeenCalledWith('/api/bpm/tasks/t-3/claim');
+  });
+
+  it('delegateTask POSTs userId + comment to the delegate endpoint', async () => {
+    mockedPost.mockResolvedValue({ code: '0' } as any);
+    await delegateTask('t-4', 'u-9', 'please handle');
+    expect(mockedPost).toHaveBeenCalledWith('/api/bpm/tasks/t-4/delegate', {
+      userId: 'u-9',
+      comment: 'please handle',
+    });
+  });
+
+  it('transferTask POSTs userId + comment to the transfer endpoint', async () => {
+    mockedPost.mockResolvedValue({ code: '0' } as any);
+    await transferTask('t-5', 'u-10', 'reassign');
+    expect(mockedPost).toHaveBeenCalledWith('/api/bpm/tasks/t-5/transfer', {
+      userId: 'u-10',
+      comment: 'reassign',
+    });
+  });
+
+  it('startProcess POSTs the request and returns the instance id', async () => {
+    mockedPost.mockResolvedValue({ code: '0', data: 'pi-new-1' } as any);
+    const request = { processKey: 'wd_leave', businessKey: 'BIZ-9', variables: {} } as any;
+    await expect(startProcess(request)).resolves.toBe('pi-new-1');
+    expect(mockedPost).toHaveBeenCalledWith('/api/bpm/workbench/start-process', request);
+  });
+
+  it('a failed mutation throws the backend desc', async () => {
+    mockedPost.mockResolvedValue({ code: '40000', desc: 'denied' } as any);
+    await expect(claimTask('t-6')).rejects.toThrow('denied');
   });
 });

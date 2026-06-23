@@ -7,8 +7,8 @@
  * saw "Sort / Fields / My Records / Created Today" on `/p/scheduled_task`.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
 import { ListToolbar } from '../ListToolbar';
 
@@ -22,6 +22,10 @@ const ZH_TRANSLATIONS = {
     my_records: '我的记录',
     created_today: '今日新建',
     modified_this_week: '本周修改',
+    saved_view_save_preset_to_personal: '保存为我的视图',
+    saved_view_preset_saved_badge: '已保存',
+    saved_view_preset_edited_badge: '已编辑',
+    saved_view_preset_reset: '重置预设视图',
   },
 };
 
@@ -81,6 +85,47 @@ describe('ListToolbar i18n', () => {
     expect(screen.queryByText('My Records')).toBeNull();
     expect(screen.queryByText('Created Today')).toBeNull();
     expect(screen.queryByText('Modified This Week')).toBeNull();
+  });
+
+  it('uses the toolbar quick filter group as the only preset interaction surface', () => {
+    const onSaveActivePreset = vi.fn();
+    renderToolbar({
+      activeQuickFilter: 'my_records',
+      onSaveActivePreset,
+    });
+
+    const myRecords = screen.getByTestId('quick-filter-my_records');
+    expect(screen.queryByTestId('preset-view-bar')).toBeNull();
+    expect(myRecords).toHaveAttribute('data-preset-active', 'true');
+    expect(myRecords).toHaveAttribute('aria-pressed', 'true');
+
+    const saveButton = screen.getByTestId('preset-view-save-as-personal');
+    expect(saveButton).toHaveAttribute('aria-label', '保存为我的视图');
+    fireEvent.click(saveButton);
+    expect(onSaveActivePreset).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows saved preset lifecycle state on the toolbar quick filter chip', () => {
+    const onResetActiveSavedPreset = vi.fn();
+    renderToolbar({
+      savedPresetKeys: ['modified_this_week'],
+      activeSavedPresetKey: 'modified_this_week',
+      activeSavedPresetEdited: true,
+      onResetActiveSavedPreset,
+    });
+
+    const modifiedThisWeek = screen.getByTestId('quick-filter-modified_this_week');
+    expect(modifiedThisWeek).toHaveAttribute('data-preset-active', 'true');
+    expect(modifiedThisWeek).toHaveAttribute('data-preset-saved', 'true');
+    expect(modifiedThisWeek).toHaveAttribute('data-preset-edited', 'true');
+    expect(screen.getByTestId('quick-filter-modified_this_week-saved')).toHaveTextContent(
+      '已编辑',
+    );
+
+    const resetButton = screen.getByTestId('preset-view-reset-saved');
+    expect(resetButton).toHaveAttribute('aria-label', '重置预设视图');
+    fireEvent.click(resetButton);
+    expect(onResetActiveSavedPreset).toHaveBeenCalledTimes(1);
   });
 
   it('renders search placeholder from common.search', () => {

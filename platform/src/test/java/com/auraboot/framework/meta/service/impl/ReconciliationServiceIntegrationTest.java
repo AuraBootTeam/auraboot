@@ -52,10 +52,14 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>Uses {@code integration-test} profile (shared Postgres :5432). All data is created
  * under a dedicated tenant with {@code recon}-prefixed codes and hard-deleted in tearDown.
  *
- * <p>NOTE: A real product bug is documented in {@code testCreateProfile_validationType_bug}:
- * {@code validateProfileType} always rejects valid lowercase types because it checks
- * {@code type.toUpperCase()} against a lowercase Set — so every profile creation with
- * valid type throws MetaServiceException.
+ * <p>4 product bugs fixed (see individual test methods for details):
+ * 1. validateProfileType: lowercase Set vs toUpperCase comparison (all valid types rejected).
+ * 2. validateProfileType: null type silently passed, causing raw DB DataIntegrityViolationException.
+ * 3. listRuns / getRunItems unfiltered: selectCount(qw) with ORDER BY → invalid PostgreSQL SQL.
+ * 4. startReconciliation: @Transactional rollback swallowed the FAILED-run audit record.
+ *    Fixed via TransactionSynchronization.afterCompletion(STATUS_ROLLED_BACK) hook: the audit
+ *    row is inserted in a fresh independent transaction after the outer tx releases all locks,
+ *    avoiding the REQUIRES_NEW deadlock documented in backend-spring-db.md §deadlock.
  */
 @Slf4j
 @SpringBootTest(classes = TestApplication.class)
@@ -164,7 +168,7 @@ class ReconciliationServiceIntegrationTest {
 
     /**
      * Build a minimal valid ReconciliationProfileRequest.
-     * Note: profileType is intentionally passed lowercase to document the validateProfileType bug.
+     * Accepts any profileType string; the service validates it case-insensitively.
      */
     private ReconciliationProfileRequest profileRequest(String code, String profileType) {
         ReconciliationProfileRequest req = new ReconciliationProfileRequest();
@@ -184,8 +188,8 @@ class ReconciliationServiceIntegrationTest {
     }
 
     /**
-     * Insert a ReconciliationProfile directly via mapper (bypassing validateProfileType service bug)
-     * to enable testing of downstream service methods (update, delete, get, list, startReconciliation).
+     * Insert a ReconciliationProfile directly via mapper to enable testing of downstream service
+     * methods (update, delete, get, list, startReconciliation) with pre-existing data.
      */
     private ReconciliationProfile insertProfileDirectly(String code, String profileType) {
         ReconciliationProfile profile = new ReconciliationProfile();
@@ -271,27 +275,27 @@ class ReconciliationServiceIntegrationTest {
     // ==================== Profile CRUD Tests ====================
 
     @Test
-    @DisplayName("createProfile: validateProfileType bug — lowercase type is always rejected (PRODUCT BUG)")
-    void testCreateProfile_validationBug_lowercaseTypeAlwaysRejected() {
-        // BUG: validateProfileType checks type.toUpperCase() against Set.of("supplier","bank","intercompany")
-        // (all lowercase). "supplier".toUpperCase() = "SUPPLIER" which is NOT in the set, so it ALWAYS throws.
-        // All three ostensibly valid types fail:
+    @DisplayName("createProfile: all valid profile types (lowercase and uppercase) are accepted after fix")
+    void testCreateProfile_validType_accepted() {
+        // Fix verified: validateProfileType now compares type.toUpperCase() against uppercase Set,
+        // so lowercase inputs ("supplier", "bank", "intercompany") are correctly accepted.
+        // The stored value is always UPPER (mapRequestToProfile calls toUpperCase()).
         String code1 = CODE_PREFIX + RUN + "_supplier";
-        MetaServiceException ex1 = assertThrows(MetaServiceException.class,
-                () -> reconciliationService.createProfile(profileRequest(code1, "supplier")));
-        assertTrue(ex1.getMessage().contains("Invalid profile type"));
+        ReconciliationProfileDTO dto1 = reconciliationService.createProfile(profileRequest(code1, "supplier"));
+        assertNotNull(dto1.getId());
+        assertEquals("SUPPLIER", dto1.getProfileType()); // stored as UPPER
 
         String code2 = CODE_PREFIX + RUN + "_bank";
-        MetaServiceException ex2 = assertThrows(MetaServiceException.class,
-                () -> reconciliationService.createProfile(profileRequest(code2, "bank")));
-        assertTrue(ex2.getMessage().contains("Invalid profile type"));
+        ReconciliationProfileDTO dto2 = reconciliationService.createProfile(profileRequest(code2, "BANK"));
+        assertNotNull(dto2.getId());
+        assertEquals("BANK", dto2.getProfileType());
 
         String code3 = CODE_PREFIX + RUN + "_intercompany";
-        MetaServiceException ex3 = assertThrows(MetaServiceException.class,
-                () -> reconciliationService.createProfile(profileRequest(code3, "intercompany")));
-        assertTrue(ex3.getMessage().contains("Invalid profile type"));
+        ReconciliationProfileDTO dto3 = reconciliationService.createProfile(profileRequest(code3, "Intercompany"));
+        assertNotNull(dto3.getId());
+        assertEquals("INTERCOMPANY", dto3.getProfileType());
 
-        // Truly invalid type also rejected (but for the same broken reason)
+        // Truly invalid type is still rejected
         String code4 = CODE_PREFIX + RUN + "_bad";
         MetaServiceException ex4 = assertThrows(MetaServiceException.class,
                 () -> reconciliationService.createProfile(profileRequest(code4, "bogus")));
@@ -299,29 +303,30 @@ class ReconciliationServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("createProfile: null profileType passes validateProfileType (null short-circuit) but DB rejects it (NOT NULL constraint)")
-    void testCreateProfile_nullType_dbConstraintRejects() {
-        // validateProfileType returns immediately on null — passes Java validation.
-        // However, profile_type column has NOT NULL constraint in DB, so insert throws.
-        // This is a secondary bug: the service doesn't validate that profile_type is non-null
-        // when bypassing validateProfileType (type==null), but the DB enforces the constraint.
+    @DisplayName("createProfile: null profileType now throws clean ValidationException (not a raw DB constraint error)")
+    void testCreateProfile_nullType_throwsValidationException() {
+        // Fix verified: validateProfileType now explicitly rejects null with a MetaServiceException
+        // instead of silently passing through (which previously caused a raw DataIntegrityViolationException
+        // from the DB NOT NULL constraint — an unhelpful error for callers).
         String code = CODE_PREFIX + RUN + "_nulltype";
         ReconciliationProfileRequest req = profileRequest(code, "supplier");
         req.setProfileType(null);
 
-        // The DB NOT NULL constraint causes a DataIntegrityViolationException at insert
-        assertThrows(Exception.class, () -> reconciliationService.createProfile(req));
+        MetaServiceException ex = assertThrows(MetaServiceException.class,
+                () -> reconciliationService.createProfile(req));
+        assertTrue(ex.getMessage().contains("must not be null"),
+                "Expected clean null-type message but got: " + ex.getMessage());
     }
 
     @Test
     @DisplayName("createProfile: duplicate profileCode for same tenant is rejected")
     void testCreateProfile_duplicateCode_rejected() {
         String code = CODE_PREFIX + RUN + "_dup";
-        // First insert via mapper (bypass validation bug)
+        // First insert via mapper
         insertProfileDirectly(code, "SUPPLIER");
 
-        // Now try to create via service with same code
-        ReconciliationProfileRequest req = profileRequest(code, null);
+        // Now try to create via service with same code (use valid type so we reach the dup-check)
+        ReconciliationProfileRequest req = profileRequest(code, "supplier");
         MetaServiceException ex = assertThrows(MetaServiceException.class,
                 () -> reconciliationService.createProfile(req));
         assertTrue(ex.getMessage().contains("Profile code already exists"));
@@ -421,16 +426,22 @@ class ReconciliationServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("updateProfile: validates profileType when provided (same bug applies)")
+    @DisplayName("updateProfile: lowercase valid profileType is accepted after fix; invalid type still rejected")
     void testUpdateProfile_validatesType() {
         String code = CODE_PREFIX + RUN + "_updtype";
         ReconciliationProfile profile = insertProfileDirectly(code, "SUPPLIER");
 
+        // Fix verified: lowercase "bank" is now accepted and stored as "BANK"
         ReconciliationProfileRequest req = new ReconciliationProfileRequest();
-        req.setProfileType("bank"); // lowercase will be rejected by same bug
+        req.setProfileType("bank");
+        ReconciliationProfileDTO updated = reconciliationService.updateProfile(profile.getId(), req);
+        assertEquals("BANK", updated.getProfileType());
 
+        // Invalid type is still rejected
+        ReconciliationProfileRequest badReq = new ReconciliationProfileRequest();
+        badReq.setProfileType("invalid_type");
         MetaServiceException ex = assertThrows(MetaServiceException.class,
-                () -> reconciliationService.updateProfile(profile.getId(), req));
+                () -> reconciliationService.updateProfile(profile.getId(), badReq));
         assertTrue(ex.getMessage().contains("Invalid profile type"));
     }
 
@@ -502,24 +513,20 @@ class ReconciliationServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("startReconciliation: PRODUCT BUG — @Transactional rolls back FAILED run on exception (run not persisted)")
-    void testStartReconciliation_modelNotFound_transactionRollback() {
-        // startReconciliation is @Transactional. When loadRecords fails (model not found),
-        // the catch block sets status=FAILED and calls runMapper.updateById(run), then re-throws
-        // MetaServiceException. Because MetaServiceException is a RuntimeException, Spring's
-        // @Transactional rolls back the ENTIRE transaction — including the initial runMapper.insert(run).
-        // Result: the run record is NOT persisted in the DB, even though the code explicitly
-        // tries to save it with FAILED status.
-        //
-        // This is a real design bug: the intent is clearly to persist the failed run for
-        // auditability, but the single @Transactional method means the recovery write is
-        // always rolled back. The fix would require either:
-        //   (a) saving the initial run in a separate REQUIRES_NEW transaction before the main work, or
-        //   (b) committing the run creation separately then catching the exception in a non-transactional wrapper.
+    @DisplayName("startReconciliation: saves FAILED-run audit even when outer transaction rolls back")
+    void testStartReconciliation_modelNotFound_failedRunAuditPersisted() throws InterruptedException {
+        // Bug-4 fix: startReconciliation is @Transactional. When loadRecords fails (model not
+        // found), the outer transaction rolls back — so any persistence attempted inside the
+        // still-open transaction would also be rolled back. The fix registers a
+        // TransactionSynchronization whose afterCompletion(STATUS_ROLLED_BACK) fires AFTER the
+        // outer transaction has fully completed and released all locks, then inserts a fresh
+        // FAILED-run row in a new independent transaction. This avoids the REQUIRES_NEW deadlock
+        // (where a new tx would have waited for row-locks held by the not-yet-rolled-back outer
+        // tx), and ensures the audit record survives rollback.
 
         String code = CODE_PREFIX + RUN + "_nomodel";
         ReconciliationProfile profile = insertProfileDirectly(code, "SUPPLIER");
-        // Profile points to "ap_invoice" model which does not exist in integration test DB
+        // Profile references "ap_invoice" model which does not exist in the integration test DB
 
         ReconciliationRunRequest req = new ReconciliationRunRequest();
         req.setProfileId(profile.getId());
@@ -532,13 +539,32 @@ class ReconciliationServiceIntegrationTest {
         assertTrue(ex.getMessage().startsWith("Reconciliation failed:"),
                 "Expected 'Reconciliation failed:' but got: " + ex.getMessage());
 
-        // The run record is NOT persisted because @Transactional rolled back on exception
+        // afterCompletion fires synchronously within the same thread's transaction completion,
+        // but give the synchronization a brief moment to complete the insert in case of any
+        // scheduling delay in test environment.
+        Thread.sleep(200);
+
+        // The FAILED-run audit row MUST be persisted via the afterCompletion hook
         QueryWrapper<ReconciliationRun> qw = new QueryWrapper<>();
         qw.eq("tenant_id", testTenant.getId());
         qw.eq("profile_id", profile.getId());
         List<ReconciliationRun> runs = runMapper.selectList(qw);
-        assertTrue(runs.isEmpty(),
-                "Run should NOT be persisted — @Transactional rolled back on RuntimeException");
+        assertFalse(runs.isEmpty(),
+                "A FAILED-run audit row must be persisted by afterCompletion(STATUS_ROLLED_BACK)");
+        assertEquals(1, runs.size(),
+                "Expected exactly one FAILED-run audit row, got: " + runs.size());
+
+        ReconciliationRun failedRun = runs.get(0);
+        assertEquals(ReconciliationRun.STATUS_FAILED, failedRun.getStatus(),
+                "Run status must be FAILED");
+        assertEquals(profile.getId(), failedRun.getProfileId(),
+                "Run must reference the correct profile");
+        assertNotNull(failedRun.getErrorMessage(),
+                "Error message must be captured in the audit row");
+        assertTrue(failedRun.getErrorMessage().contains("ap_invoice") || failedRun.getErrorMessage().length() > 0,
+                "Error message should describe the failure cause");
+        assertNotNull(failedRun.getStartedAt(), "startedAt must be set");
+        assertNotNull(failedRun.getCompletedAt(), "completedAt must be set");
     }
 
     // ==================== Run Query Tests ====================
@@ -573,37 +599,37 @@ class ReconciliationServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("listRuns: PRODUCT BUG — selectCount(qw) with orderByDesc generates invalid SQL (ORDER BY in COUNT aggregate)")
-    void testListRuns_productBug_countWithOrderBy() {
-        // BUG in ReconciliationService.listRuns(): the QueryWrapper has orderByDesc("created_at")
-        // set before calling selectCount(qw). MyBatis-Plus includes the ORDER BY in the COUNT(*)
-        // subquery, which PostgreSQL rejects:
-        //   SELECT COUNT(*) AS total FROM ab_reconciliation_run WHERE ... ORDER BY created_at DESC
-        // This is invalid SQL — ORDER BY cannot appear in an aggregate query.
-        // Both valid page parameters and boundary parameters (0,0) hit the same bug.
+    @DisplayName("listRuns: returns paginated results without SQL error after count/orderBy fix")
+    void testListRuns_returnsPaginatedResults() {
+        // Fix verified: listRuns now builds a separate count QueryWrapper without orderByDesc,
+        // so PostgreSQL no longer rejects "SELECT COUNT(*) ... ORDER BY ...".
         String code = CODE_PREFIX + RUN + "_listruns";
         ReconciliationProfile profile = insertProfileDirectly(code, "BANK");
         String rc1 = "RUN-" + code.toUpperCase() + "-A-" + System.currentTimeMillis();
+        String rc2 = "RUN-" + code.toUpperCase() + "-B-" + (System.currentTimeMillis() + 1);
         insertRunDirectly(profile.getId(), rc1, ReconciliationRun.STATUS_COMPLETED);
+        insertRunDirectly(profile.getId(), rc2, ReconciliationRun.STATUS_COMPLETED);
 
-        // Documenting the real product behavior — listRuns throws due to invalid SQL
-        assertThrows(Exception.class, () -> reconciliationService.listRuns(1, 10));
-        assertThrows(Exception.class, () -> reconciliationService.listRuns(0, 0));
+        // No exception — both count and paged query now work
+        PaginationResult<ReconciliationRunDTO> page1 = reconciliationService.listRuns(1, 10);
+        assertNotNull(page1);
+        assertTrue(page1.getTotal() >= 2, "Expected at least 2 runs, got " + page1.getTotal());
+        assertFalse(page1.getRecords().isEmpty());
+
+        // Boundary parameters also work
+        PaginationResult<ReconciliationRunDTO> page2 = reconciliationService.listRuns(1, 1);
+        assertNotNull(page2);
+        assertEquals(1, page2.getRecords().size());
+        assertTrue(page2.getTotal() >= 2);
     }
 
     // ==================== getRunItems Tests ====================
 
     @Test
-    @DisplayName("getRunItems: PRODUCT BUG — unfiltered path generates invalid SQL (ORDER BY in COUNT aggregate)")
-    void testGetRunItems_unfiltered_productBug_countWithOrderBy() {
-        // BUG in ReconciliationService.getRunItems() when matchStatus is null:
-        // The QueryWrapper has orderByAsc("match_status", "id") set before selectCount(qw),
-        // which generates:
-        //   SELECT COUNT(*) FROM ab_reconciliation_item WHERE (run_id = ?) ORDER BY match_status ASC, id ASC
-        // PostgreSQL rejects this — ORDER BY cannot appear in a COUNT aggregate query.
-        // This is the same pattern as the listRuns bug above.
-        // The filtered path (matchStatus != null) uses itemMapper.findByRunIdAndStatus (custom @Select)
-        // which does NOT call selectCount(qw), so it works correctly.
+    @DisplayName("getRunItems: unfiltered path returns results without SQL error after count/orderBy fix")
+    void testGetRunItems_unfiltered_returnsResults() {
+        // Fix verified: getRunItems unfiltered path now builds a separate count QueryWrapper without
+        // orderByAsc, so PostgreSQL no longer rejects "SELECT COUNT(*) ... ORDER BY ...".
         String code = CODE_PREFIX + RUN + "_items";
         ReconciliationProfile profile = insertProfileDirectly(code, "SUPPLIER");
         String runCode = "RUN-" + code.toUpperCase() + "-" + System.currentTimeMillis();
@@ -611,8 +637,11 @@ class ReconciliationServiceIntegrationTest {
         insertItemDirectly(run.getId(), ReconciliationItem.MATCH_MATCHED, new BigDecimal("1000.00"), new BigDecimal("1000.00"), "REF-001");
         insertItemDirectly(run.getId(), ReconciliationItem.MATCH_UNMATCHED_A, new BigDecimal("500.00"), null, null);
 
-        // Documenting the real product behavior — unfiltered getRunItems throws
-        assertThrows(Exception.class, () -> reconciliationService.getRunItems(runCode, null, 1, 10));
+        // No exception — unfiltered count and paged query now both work
+        PaginationResult<ReconciliationItemDTO> result = reconciliationService.getRunItems(runCode, null, 1, 10);
+        assertNotNull(result);
+        assertEquals(2L, result.getTotal());
+        assertEquals(2, result.getRecords().size());
     }
 
     @Test

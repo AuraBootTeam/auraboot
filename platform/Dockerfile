@@ -25,6 +25,7 @@ RUN chmod +x gradlew
 # Download dependencies (cached unless build files change)
 RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
+    --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
     ./gradlew dependencies --no-daemon || true
 
 # Copy source code
@@ -37,6 +38,7 @@ COPY vendor* ./vendor/
 # Build the application (skip tests for faster builds)
 RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
+    --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
     ./gradlew bootJar --no-daemon -x test
 
 # ── Stage 2: Runtime ────────────────────────────────────────

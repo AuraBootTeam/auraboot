@@ -285,5 +285,24 @@
         "web"
       ]
     }
+  },
+  {
+    "code": "template_center",
+    "parentCode": "system_management",
+    "name:zh-CN": "应用模板市场",
+    "name:en": "Template Marketplace",
+    "path": "/p/c/template_center",
+    "pageKey": "template_center",
+    "component": null,
+    "icon": "layout-grid",
+    "type": 1,
+    "permissionCode": "plugin.plugin.manage",
+    "orderNo": 55,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
   }
 ]

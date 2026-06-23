@@ -17,7 +17,7 @@
 //   MD020 no missing space inside hashes on closed atx
 //   MD022 headings surrounded by blank lines
 //   MD023 headings start at line beginning
-//   MD025 single h1 in doc
+//   MD025 single h1 in doc (frontmatter title ignored)
 //   MD027 no multiple spaces after blockquote
 //   MD028 blank line in blockquote
 //   MD029 ordered list item prefix
@@ -32,6 +32,9 @@
 
 {
   "config": {
+    // Keep MD025 active, but do not count frontmatter title as an H1.
+    "MD025": { "front_matter_title": "" },
+
     // Disabled — noise rules that don't reflect AuraBoot doc culture
     "MD012": false,  // multiple blank lines
     "MD013": false,  // line length

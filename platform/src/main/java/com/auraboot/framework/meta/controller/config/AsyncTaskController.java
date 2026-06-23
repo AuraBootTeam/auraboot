@@ -54,7 +54,8 @@ public class AsyncTaskController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        IPage<AsyncTaskDTO> result = asyncTaskService.listTasks(tenantId, status, taskType, page, size);
+        Long userId = MetaContext.getCurrentUserId();
+        IPage<AsyncTaskDTO> result = asyncTaskService.listTasks(tenantId, userId, status, taskType, page, size);
         return ApiResponse.success(result);
     }
 

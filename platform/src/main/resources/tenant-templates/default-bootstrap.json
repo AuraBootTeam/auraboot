@@ -1265,6 +1265,46 @@
       "resourceType": "function"
     },
     {
+      "code": "report.definition.view",
+      "name": "Report definition view",
+      "description": "Report definition — view (load / get / list)",
+      "type": "function",
+      "module": "report",
+      "resource": "report:definition",
+      "action": "view",
+      "resourceType": "function"
+    },
+    {
+      "code": "report.definition.manage",
+      "name": "Report definition manage",
+      "description": "Report definition — manage (create / update / delete)",
+      "type": "function",
+      "module": "report",
+      "resource": "report:definition",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "report.export.execute",
+      "name": "Report export execute",
+      "description": "Report export — execute (Excel / PDF / JSON)",
+      "type": "function",
+      "module": "report",
+      "resource": "report:export",
+      "action": "execute",
+      "resourceType": "function"
+    },
+    {
+      "code": "report.schedule.manage",
+      "name": "Report schedule manage",
+      "description": "Report schedule — manage (schedule CRUD + test-send)",
+      "type": "function",
+      "module": "report",
+      "resource": "report:schedule",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
       "code": "meta.state_graph.read",
       "name": "Meta state_graph read",
       "description": "Meta state_graph — read",
@@ -1312,6 +1352,46 @@
       "module": "meta",
       "resource": "meta:manufacturing-oee",
       "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.manufacturing.aps",
+      "name": "Manage APS scheduling",
+      "description": "Manufacturing APS — run / clear advanced planning & scheduling",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:manufacturing-aps",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "ai.scoring.run",
+      "name": "Run AI record scoring",
+      "description": "Platform AI — run LLM record scoring and write scores onto model records",
+      "type": "function",
+      "module": "ai",
+      "resource": "ai:scoring",
+      "action": "run",
+      "resourceType": "function"
+    },
+    {
+      "code": "org.tenant.invite.manage",
+      "name": "Manage tenant invite codes",
+      "description": "Tenant membership — generate / revoke invite codes",
+      "type": "function",
+      "module": "org",
+      "resource": "org:tenant-invite",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "notification.template.manage",
+      "name": "Manage notification templates",
+      "description": "Notification — create / update / delete tenant notification templates",
+      "type": "function",
+      "module": "notification",
+      "resource": "notification:template",
+      "action": "manage",
       "resourceType": "function"
     },
     {
@@ -1649,7 +1729,10 @@
       "roleCode": "operator",
       "permissionCodes": [
         "dashboards",
+        "dashboard.read",
         "dashboard.manage",
+        "dashboard.saved_view.read",
+        "dashboard.saved_view.update",
         "dashboard_mgmt",
         "query_builder",
         "bpm_management",
@@ -1661,6 +1744,8 @@
         "bpm.form.manage",
         "org_management",
         "member_management",
+        "org.tenant.invite.manage",
+        "notification.template.manage",
         "org_teams",
         "org.team.read",
         "org.team.manage",
@@ -1676,6 +1761,8 @@
       "roleCode": "viewer",
       "permissionCodes": [
         "dashboards",
+        "dashboard.read",
+        "dashboard.saved_view.read",
         "bpm_management",
         "bpm_task_center",
         "bpm.task.read",

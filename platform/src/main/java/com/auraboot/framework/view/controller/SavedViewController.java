@@ -4,6 +4,10 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.view.dto.AutoSaveViewRequest;
+import com.auraboot.framework.view.dto.CopySavedViewToPersonalRequest;
+import com.auraboot.framework.view.dto.SavedViewAuditEventDTO;
+import com.auraboot.framework.view.dto.SavedViewCapabilityCheckRequest;
+import com.auraboot.framework.view.dto.SavedViewCapabilityCheckResponse;
 import com.auraboot.framework.view.dto.SavedViewCreateRequest;
 import com.auraboot.framework.view.dto.SavedViewDTO;
 import com.auraboot.framework.view.dto.SavedViewUpdateRequest;
@@ -64,6 +68,15 @@ public class SavedViewController {
             @Valid @RequestBody AutoSaveViewRequest request) {
         SavedViewDTO result = savedViewService.autoSave(request);
         return ApiResponse.success(result);
+    }
+
+    @PostMapping("/capability-check")
+    @Operation(summary = "Check saved view capability",
+            description = "Check whether a view type has the required field mapping before saving")
+    @RequirePermission(MetaPermission.VIEW_READ)
+    public ApiResponse<SavedViewCapabilityCheckResponse> checkCapability(
+            @Valid @RequestBody SavedViewCapabilityCheckRequest request) {
+        return ApiResponse.success(savedViewService.checkCapability(request));
     }
 
     @GetMapping("/{pid}")
@@ -223,6 +236,30 @@ public class SavedViewController {
 
         log.info("View duplicated: sourcePid={}, newPid={}", pid, result.getPid());
         return ApiResponse.success("View duplicated successfully", result);
+    }
+
+    @PostMapping("/{pid}/copy-to-personal")
+    @Operation(summary = "Copy view to personal scope",
+            description = "Create a personal copy of any accessible view, optionally with local config changes applied")
+    @RequirePermission(MetaPermission.VIEW_READ)
+    public ApiResponse<SavedViewDTO> copyToPersonal(
+            @Parameter(description = "Source view PID") @PathVariable @NotBlank String pid,
+            @Valid @RequestBody(required = false) CopySavedViewToPersonalRequest request) {
+        String newName = request != null ? request.getName() : null;
+        SavedViewDTO result = savedViewService.copyToPersonal(
+                pid,
+                newName,
+                request != null ? request.getViewConfig() : null);
+        return ApiResponse.success("View copied to personal scope successfully", result);
+    }
+
+    @GetMapping("/{pid}/audit-events")
+    @Operation(summary = "Get saved view audit events",
+            description = "Get shared/global SavedView audit events after checking the current user's view access")
+    @RequirePermission(MetaPermission.VIEW_READ)
+    public ApiResponse<List<SavedViewAuditEventDTO>> getAuditEvents(
+            @Parameter(description = "View PID") @PathVariable @NotBlank String pid) {
+        return ApiResponse.success(savedViewService.getAuditEvents(pid));
     }
 
     @GetMapping("/my-teams")

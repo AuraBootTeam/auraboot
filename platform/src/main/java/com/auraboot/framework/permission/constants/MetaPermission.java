@@ -350,6 +350,39 @@ public final class MetaPermission {
      */
     public static final String REPORT_GENERATE = "meta.report.generate";
 
+    // ==================== Clean REPORT family (B6) ====================
+    // First-class report.* permission family (B1 discovery Q11). These are the clean replacements
+    // for the template/report-aliased STOPGAP codes above (REPORT_READ=meta.template.read,
+    // REPORT_MANAGE=meta.template.update, REPORT_GENERATE=meta.report.generate). They are introduced
+    // and granted to every tenant FIRST (B6-1: this slice — additive, zero enforcement change); the
+    // report controllers switch their @RequirePermission to these codes in a LATER slice (B6-2), by
+    // which point every tenant already holds them so the flip cannot 403 anyone.
+    // NO report.*.publish code is defined: the report controllers expose no publish action.
+
+    /**
+     * Report definition view permission (load / get / get-by-code / list a report definition).
+     * Clean replacement for the stopgap {@link #REPORT_READ} on {@code ReportDefinitionController}.
+     */
+    public static final String REPORT_DEFINITION_VIEW = "report.definition.view";
+
+    /**
+     * Report definition manage permission (create / upsert / delete a report definition).
+     * Clean replacement for the stopgap {@link #REPORT_MANAGE} on {@code ReportDefinitionController}.
+     */
+    public static final String REPORT_DEFINITION_MANAGE = "report.definition.manage";
+
+    /**
+     * Report export execute permission (export a report as Excel / PDF / JSON).
+     * Clean replacement for the stopgap {@link #REPORT_GENERATE} on {@code ReportExportController}.
+     */
+    public static final String REPORT_EXPORT_EXECUTE = "report.export.execute";
+
+    /**
+     * Report schedule manage permission (schedule CRUD + test-send).
+     * Clean replacement for the stopgap {@link #REPORT_GENERATE} on {@code ReportScheduleController}.
+     */
+    public static final String REPORT_SCHEDULE_MANAGE = "report.schedule.manage";
+
     // ==================== PRINT permissions ====================
 
     /**
@@ -710,6 +743,14 @@ public final class MetaPermission {
      */
     public static final String MANUFACTURING_OEE = "meta.manufacturing.oee";
 
+    /**
+     * APS (Advanced Planning &amp; Scheduling) management permission for the platform-side
+     * {@code ApsSchedulingController}. run / clear schedule are compute-heavy write operations,
+     * so they are gated by a minimal manufacturing capability in the OSS default bootstrap
+     * (module {@code meta}) rather than left open via the PermissionInterceptor fail-open default.
+     */
+    public static final String MANUFACTURING_APS = "meta.manufacturing.aps";
+
     // ==================== DECISION RUNTIME permissions ====================
     // NOTE: These are for the Decision Runtime module (ab_drt_* tables, /api/decision).
     // They are DISTINCT from the meta.decision.* permissions above which belong to the
@@ -842,6 +883,13 @@ public final class MetaPermission {
      * Knowledge retrieval permission (run retrieval queries / playground).
      */
     public static final String AI_KNOWLEDGE_RETRIEVE = "ai.knowledge.retrieve";
+
+    /**
+     * Platform AI record-scoring permission for {@code PlatformAiController#scoreRecords}.
+     * Scoring triggers LLM calls (cost) and writes scores onto arbitrary model records, so it is
+     * gated rather than left open via the PermissionInterceptor fail-open default.
+     */
+    public static final String AI_SCORING_RUN = "ai.scoring.run";
 
     // ==================== Private Constructor ====================
 

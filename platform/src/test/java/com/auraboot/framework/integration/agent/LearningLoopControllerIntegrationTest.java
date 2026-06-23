@@ -1,6 +1,7 @@
 package com.auraboot.framework.integration.agent;
 
 import com.auraboot.framework.agent.controller.LearningLoopController;
+import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.service.PatternExtractor;
 import com.auraboot.framework.agent.service.SkillDraftGenerator;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
@@ -21,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 
 /**
  * PR-26: REST API for the Mission Control HITL workflow.
@@ -37,6 +42,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private PatternExtractor extractor;
     @Autowired private SkillDraftGenerator generator;
     @Autowired private JdbcTemplate jdbc;
+    @SpyBean  private LlmProviderFactory providerFactory;
 
     private Long tenantId;
 
@@ -226,6 +232,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("auto-rename returns renamed=false gracefully when no LLM configured")
     void auto_rename_no_llm_graceful() {
         String draftPid = seedDraft("sig_ren_" + tenantId, "crm_lead", "update");
+        doReturn(null).when(providerFactory).resolveConfig(eq(tenantId), any());
         ApiResponse<Map<String, Object>> r = controller.autoRename(draftPid);
         assertThat(r.getCode()).isEqualTo("0");
         assertThat(r.getData().get("pid")).isEqualTo(draftPid);

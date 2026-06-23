@@ -113,6 +113,32 @@ class ToolLoopServiceSafetyTest {
         verifyNoInteractions(toolProviderRegistry, commandExecutor, namedQueryService);
     }
 
+    @Test
+    @DisplayName("generic get/list DSL query tools execute through provider registry")
+    void genericModelReadToolExecutesThroughProviderRegistry() {
+        Map<String, Object> input = Map.of("recordPid", "ct_001");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("get:crm_contact")
+                .description("Get CRM contact by pid")
+                .toolType("dsl_query")
+                .sourceCode("crm_contact")
+                .riskLevel("L0")
+                .build();
+        when(toolProviderRegistry.execute(eq(1L), eq("get:crm_contact"), eq(input)))
+                .thenReturn(ProviderExecutionResult.builder()
+                        .success(true)
+                        .data(Map.of("record", Map.of("pid", "ct_001")))
+                        .durationMs(5)
+                        .build());
+
+        String result = service.executeToolCall(1L, "run-get", "task-get", "agent",
+                tool.getName(), input, List.of(tool), null);
+
+        assertThat(result).contains("\"success\":true").contains("\"pid\":\"ct_001\"");
+        verify(toolProviderRegistry).execute(1L, "get:crm_contact", input);
+        verifyNoInteractions(namedQueryService, commandExecutor);
+    }
+
     @AfterEach
     void cleanup() {
         BifContext.clear();

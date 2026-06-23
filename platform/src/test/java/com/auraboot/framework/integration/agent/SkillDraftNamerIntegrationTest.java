@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -153,6 +155,7 @@ class SkillDraftNamerIntegrationTest extends BaseIntegrationTest {
         assertThat(codeBefore).startsWith("auto.");
 
         // Integration test env has no LLM provider configured for this tenant.
+        doReturn(null).when(providerFactory).resolveConfig(eq(tenantId), any());
         boolean renamed = namer.renameDraft(tenantId, draftPid);
         assertThat(renamed).isFalse();
 
@@ -166,6 +169,7 @@ class SkillDraftNamerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("renameAllAutoDrafts returns 0 when no drafts / no LLM configured")
     void batch_rename_returns_zero_without_llm() {
         seedDraftWithAutoName();
+        doReturn(null).when(providerFactory).resolveConfig(eq(tenantId), any());
         int renamed = namer.renameAllAutoDrafts(tenantId);
         assertThat(renamed).isZero();
     }

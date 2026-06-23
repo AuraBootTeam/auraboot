@@ -198,6 +198,14 @@ public class ChatBiSkill implements AuraBotSkill {
         payload.set("columns", columns);
         payload.set("records", objectMapper.valueToTree(rows));
         payload.put("rowCount", rows.size());
+        // Carry the aggregate spec so the chat card can persist this ad-hoc chart as a
+        // dashboard widget ("save as dashboard" bridge) without re-deriving it.
+        ArrayNode dimensionsNode = objectMapper.createArrayNode();
+        if (request.getDimensions() != null) {
+            request.getDimensions().forEach(dimensionsNode::add);
+        }
+        payload.set("dimensions", dimensionsNode);
+        payload.set("metrics", objectMapper.valueToTree(metrics));
         String interpretation = text(params, "interpretation");
         if (interpretation != null && !interpretation.isBlank()) {
             payload.put("interpretation", interpretation);

@@ -108,7 +108,7 @@ test.describe('DP Inspection Task — Direct CRUD (create/update/delete)', () =>
     // Click the toolbar "新建" button (added in this upgrade).
     const addBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+        '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
       )
       .first();
     await expect(addBtn).toBeVisible({ timeout: 10000 });

@@ -9,6 +9,7 @@ import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.rbac.dto.CopyPermissionsRequest;
+import com.auraboot.framework.rbac.dto.RoleResponse;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.permission.service.RolePermissionService;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
@@ -47,7 +48,7 @@ public class RoleController {
      */
     @GetMapping
     @RequirePermission(MetaPermission.ROLE_READ)
-    public ApiResponse<Page<Role>> getRoles(
+    public ApiResponse<Page<RoleResponse>> getRoles(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize,
             @RequestParam(required = false) String keyword,
@@ -57,7 +58,7 @@ public class RoleController {
         Long tenantId = MetaContext.getCurrentTenantId();
         Page<Role> roles = roleService.findRoles(
             pageNum, pageSize, tenantId, keyword, type, status);
-        return ApiResponse.success(roles);
+        return ApiResponse.success(toResponsePage(roles));
     }
 
     /**
@@ -65,10 +66,10 @@ public class RoleController {
      */
     @GetMapping("/all")
     @RequirePermission(MetaPermission.ROLE_READ)
-    public ApiResponse<List<Role>> getAllRoles() {
+    public ApiResponse<List<RoleResponse>> getAllRoles() {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Role> roles = roleService.findByTenantId(tenantId);
-        return ApiResponse.success(roles);
+        return ApiResponse.success(roles.stream().map(RoleResponse::from).toList());
     }
 
     /**
@@ -76,12 +77,12 @@ public class RoleController {
      */
     @GetMapping("/{pid}")
     @RequirePermission(MetaPermission.ROLE_READ)
-    public ApiResponse<Role> getRole(@PathVariable String pid) {
+    public ApiResponse<RoleResponse> getRole(@PathVariable String pid) {
         Role role = roleService.findByPid(pid);
         if (role == null) {
             throw new RootUnCheckedException(BadParam,"Not found by the param :"+pid);
         }
-        return ApiResponse.success(role);
+        return ApiResponse.success(RoleResponse.from(role));
     }
 
     /**
@@ -89,7 +90,7 @@ public class RoleController {
      */
     @PostMapping
     @RequirePermission(MetaPermission.ROLE_MANAGE)
-    public ApiResponse<Role> createRole(
+    public ApiResponse<RoleResponse> createRole(
             @RequestBody Role role,
             @CurrentUserId Long userId) {
         
@@ -98,7 +99,7 @@ public class RoleController {
         role.setCreatedBy(userId);
         role.setUpdatedBy(userId);
         Role created = roleService.createRole(role);
-        return ApiResponse.success(created);
+        return ApiResponse.success(RoleResponse.from(created));
     }
 
     /**
@@ -106,7 +107,7 @@ public class RoleController {
      */
     @PutMapping("/{pid}")
     @RequirePermission(MetaPermission.ROLE_MANAGE)
-    public ApiResponse<Role> updateRole(
+    public ApiResponse<RoleResponse> updateRole(
             @PathVariable String pid,
             @RequestBody Role role,
             @CurrentUserId Long userId) {
@@ -119,7 +120,7 @@ public class RoleController {
         role.setUpdatedBy(userId);
         Role updated = roleService.updateRole(role);
         pluginResourceTracker.markAsUserModified(ResourceType.ROLE, existingRole.getCode());
-        return ApiResponse.success(updated);
+        return ApiResponse.success(RoleResponse.from(updated));
     }
 
     /**
@@ -242,5 +243,12 @@ public class RoleController {
         }
         boolean result = rolePermissionService.copyRolePermissions(role.getId(), request.targetRoleId());
         return ApiResponse.success(result);
+    }
+
+    private Page<RoleResponse> toResponsePage(Page<Role> roles) {
+        Page<RoleResponse> response = new Page<>(roles.getCurrent(), roles.getSize(), roles.getTotal());
+        response.setPages(roles.getPages());
+        response.setRecords(roles.getRecords().stream().map(RoleResponse::from).toList());
+        return response;
     }
 }

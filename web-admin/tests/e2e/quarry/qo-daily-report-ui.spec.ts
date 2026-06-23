@@ -125,7 +125,7 @@ test.describe('QO Daily Report — UI Tests', () => {
 
     // Click "新建" toolbar button
     const addBtn = page
-      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建")')
+      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日"))')
       .first();
     await addBtn.click();
 

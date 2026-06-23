@@ -36,13 +36,13 @@ async function openPalette(page: Page) {
     await page.waitForLoadState('networkidle').catch(() => {});
   }
 
-  const trigger = page.locator('[data-testid="cmd-k-trigger"]');
+  const trigger = page.locator('[data-testid="header-search-trigger"]');
   await expect(trigger).toBeVisible({ timeout: 15000 });
 
   // Ensure React hydration is complete before clicking
   // Wait for any interactive element that indicates the app is hydrated
   await page.waitForFunction(() => {
-    const btn = document.querySelector('[data-testid="cmd-k-trigger"]');
+    const btn = document.querySelector('[data-testid="header-search-trigger"]');
     // Check if React has attached event handlers (hydrated) by verifying __reactFiber exists
     return btn && Object.keys(btn).some(k => k.startsWith('__reactFiber') || k.startsWith('__reactProps'));
   }, { timeout: 10000 });

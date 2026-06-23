@@ -45,7 +45,7 @@
       "cardFields": [
         { "field": "crm_lead_contact_name", "label": "Contact", "type": "text" },
         { "field": "crm_lead_source", "label": "Source", "type": "tag" },
-        { "field": "crm_lead_assigned_to", "label": "Owner", "type": "avatar" }
+        { "field": "owner_id", "label": "Owner", "type": "avatar" }
       ],
       "kanbanAggregations": [{ "field": null, "function": "count", "label": "Count" }],
       "draggable": true,

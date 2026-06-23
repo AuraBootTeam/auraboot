@@ -4,6 +4,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.notification.dto.NotificationTemplateCreateRequest;
 import com.auraboot.framework.notification.entity.NotificationTemplate;
 import com.auraboot.framework.notification.service.NotificationTemplateService;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,7 @@ public class NotificationTemplateController {
      * POST /api/notification-templates
      */
     @PostMapping
+    @RequirePermission("notification.template.manage")
     public ApiResponse<NotificationTemplate> create(
             @Valid @RequestBody NotificationTemplateCreateRequest request) {
         return ApiResponse.success(templateService.create(request));
@@ -51,6 +53,7 @@ public class NotificationTemplateController {
      * PUT /api/notification-templates/{pid}
      */
     @PutMapping("/{pid}")
+    @RequirePermission("notification.template.manage")
     public ApiResponse<NotificationTemplate> update(
             @PathVariable String pid,
             @Valid @RequestBody NotificationTemplateCreateRequest request) {
@@ -62,6 +65,7 @@ public class NotificationTemplateController {
      * DELETE /api/notification-templates/{pid}
      */
     @DeleteMapping("/{pid}")
+    @RequirePermission("notification.template.manage")
     public ApiResponse<Void> delete(@PathVariable String pid) {
         templateService.delete(pid);
         return ApiResponse.success();

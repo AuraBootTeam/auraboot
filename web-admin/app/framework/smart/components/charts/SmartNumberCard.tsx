@@ -5,7 +5,7 @@
  * Supports number/currency/percent formatting with loading and error states.
  */
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
 import type {
   ChartDataSource,
@@ -13,8 +13,6 @@ import type {
   FilterConfig,
   DrillDownConfig,
 } from '~/framework/smart/types/chart';
-import { fetchResult } from '~/shared/services/http-client';
-import { ResultHelper } from '~/utils/type';
 import { cn } from '~/utils/cn';
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -174,58 +172,15 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   onDrillDown,
 }) => {
   const isConfigured = isDataSourceConfigured(dataSource);
-  const useApiBranch = dataSource?.type === 'api' && !!dataSource.url;
-  const [apiRows, setApiRows] = useState<Record<string, unknown>[]>([]);
-  const [apiLoading, setApiLoading] = useState(false);
-  const [apiError, setApiError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    if (!useApiBranch || !dataSource?.url) return;
-    let cancelled = false;
-    setApiLoading(true);
-    setApiError(null);
-    const params = Object.fromEntries(
-      Object.entries(dataSource.params ?? {}).map(([key, value]) => [key, String(value)]),
-    );
-    fetchResult<{ records?: Record<string, unknown>[]; rows?: Record<string, unknown>[] }>(
-      dataSource.url,
-      { method: 'get', params },
-    )
-      .then((result) => {
-        if (cancelled) return;
-        if (ResultHelper.isSuccess(result)) {
-          setApiRows(result.data?.records ?? result.data?.rows ?? []);
-        } else {
-          setApiRows([]);
-        }
-        setApiLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setApiError(err instanceof Error ? err : new Error(String(err)));
-        setApiRows([]);
-        setApiLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [useApiBranch, dataSource?.url, dataSource?.params]);
-
   const chartState = useChartData({
     dataSource,
     linkageFilters: linkage?.receiveFilter ? linkageFilters : undefined,
     refreshInterval,
-    enabled: isConfigured && !useApiBranch,
+    enabled: isConfigured,
   });
-  const data = useApiBranch
-    ? {
-        rows: apiRows,
-        summary: {},
-        meta: { dimensions: [] as string[], metrics: cards?.map((card) => card.field) ?? [] },
-      }
-    : chartState.data;
-  const loading = useApiBranch ? apiLoading : chartState.loading;
-  const error = useApiBranch ? apiError : chartState.error;
+  const data = chartState.data;
+  const loading = chartState.loading;
+  const error = chartState.error;
   const accentLine = hexToRgba(color, 0.22);
   const cardLabel = label || title;
   const isEmpty = !loading && !error && !data?.rows?.length;
@@ -265,10 +220,13 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
 
   const formattedValue = `${prefix || ''}${formatValue(getValue())}${suffix || ''}`;
   const firstRow = data?.rows?.[0] ?? {};
+  // When `metricField` is set the caller targets a single column from a multi-field
+  // response (e.g. four KPI cards each reading one field of the same overview query).
+  // In that case we must NOT auto-expand to a multi-card grid — stay in single-value mode.
   const effectiveCards: NumberCardItem[] | undefined =
     cards?.length
       ? cards
-      : useApiBranch && Object.keys(firstRow).length > 1
+      : dataSource?.type === 'api' && !metricField && Object.keys(firstRow).length > 1
         ? Object.keys(firstRow).slice(0, 6).map((field) => ({ field, label: field }))
         : undefined;
 
@@ -351,13 +309,22 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   }
 
   if (effectiveCards?.length) {
+    const cardGridClass =
+      effectiveCards.length === 1
+        ? 'grid-cols-1'
+        : effectiveCards.length === 2
+          ? 'grid-cols-2'
+          : effectiveCards.length === 3
+            ? 'grid-cols-2 md:grid-cols-3'
+            : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-6';
+
     return (
       <div
-        className={cn('grid h-full grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6', className)}
+        className={cn('grid h-full gap-3', cardGridClass, className)}
         style={style}
       >
         {effectiveCards.map((card) => (
-          <div key={card.field} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div key={card.field} className="h-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-medium text-slate-500">{resolveCardLabel(card)}</div>
             <div className="mt-3 text-2xl font-semibold text-slate-950 tabular-nums">
               {loading

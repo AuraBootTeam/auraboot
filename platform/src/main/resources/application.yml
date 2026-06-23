@@ -27,8 +27,10 @@ logging:
   pattern:
     # Central log-injection guard: normalize CR/LF/TAB in formatted log messages
     # at the Logback layout layer so business code does not need per-call sanitizers.
-    console: '%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}){} %clr(${PID:-}){magenta} %clr(--- [%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
-    file: '%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}} ${LOG_LEVEL_PATTERN:-%5p} ${PID:-} --- [%t] %-40.40logger{39} : %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
+    # [traceId,spanId] are injected by micrometer-tracing into MDC; surfacing them
+    # here correlates each log line with the OTel trace (P1, A-G3). Empty when no span.
+    console: '%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}){} %clr(${PID:-}){magenta} %clr(--- [%15.15t]){faint} %clr([%X{traceId:-},%X{spanId:-}]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
+    file: '%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}} ${LOG_LEVEL_PATTERN:-%5p} ${PID:-} --- [%t] [%X{traceId:-},%X{spanId:-}] %-40.40logger{39} : %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
   level:
     org.apache.tomcat.util.net.jsse.JSSESupport: INFO
     org.apache.coyote: INFO
@@ -336,6 +338,14 @@ aura:
   security:
     cross-tenant:
       enabled: ${AURA_CROSS_TENANT_ENABLED:true}
+    authz:
+      # Behavior for /api/** handlers that declare neither @RequirePermission nor
+      # @AuthenticatedAccess (the "un-annotated" surface). Staged default-deny migration:
+      #   allow  - legacy fail-open: permit silently
+      #   shadow - permit, but log each reached endpoint once ([authz-shadow]) to collect the
+      #            real-traffic coverage needed before enforcing (default)
+      #   deny   - fail-closed / default-deny: reject un-annotated handlers
+      unannotated-mode: ${AURA_AUTHZ_UNANNOTATED_MODE:shadow}
   git:
     repos-base-path: ${AURA_GIT_REPOS_PATH:./data/git-repos}
     default-repo-id: 1           # 默认仓库ID

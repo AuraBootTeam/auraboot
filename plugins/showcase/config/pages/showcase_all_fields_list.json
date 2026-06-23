@@ -213,8 +213,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "showcase_all_fields_form",
-            "command": "sc:create_showcase"
+            "to": "showcase_all_fields_form"
           }
         }
       ]
@@ -348,8 +347,7 @@
               },
               "confirm": "delete.confirm",
               "action": {
-                "type": "command",
-                "command": "sc:delete_showcase"
+                "type": "command"
               }
             }
           ],

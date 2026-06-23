@@ -4,16 +4,9 @@ import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import {
   DndContext,
   DragOverlay,
-  KeyboardSensor,
-  PointerSensor,
   closestCenter,
   pointerWithin,
-  useSensor,
-  useSensors,
   type CollisionDetection,
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
 } from '@dnd-kit/core';
 import type {
   DslBlockV3,
@@ -31,6 +24,9 @@ import {
 } from '../utils/recursiveBlockWalker';
 import { setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
+import { useDesignerDocument, serializeDocument } from '../document/useDesignerDocument';
+import { useDesignerSelection } from '../selection/useDesignerSelection';
+import { useDesignerDnd } from '../dnd/useDesignerDnd';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
 import {
   DEVICE_PREVIEW_PRESETS,
@@ -50,15 +46,7 @@ import {
   type ModelFieldTargetBlockType,
 } from '../registry/createBlockTemplate';
 import { collectBlockIds } from '../utils/blockIds';
-import {
-  buildDesignerCollisionCandidates,
-  readDragData,
-  readDropData,
-  resolveBlockDropIntent,
-  resolveCanvasBlockAncestorDropAction,
-  resolveDragEndAction,
-  type DragData,
-} from '../dnd/dndShared';
+import { buildDesignerCollisionCandidates, type DragData } from '../dnd/dndShared';
 import {
   canMoveExistingBlockBeforeTarget,
   canMoveExistingBlockToParent,
@@ -70,7 +58,7 @@ import {
 } from './WorkbenchToolbar';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
 import { ResourcePanel } from './ResourcePanel';
-import { CanvasHost, type ActiveDropIntent } from '../canvas/CanvasHost';
+import { CanvasHost } from '../canvas/CanvasHost';
 import { InspectorHost } from './InspectorHost';
 import { RecursiveBlockRenderer } from '../runtime/RecursiveBlockRenderer';
 import { defaultRuntimeExecutionServices } from '../runtime/runtimeExecution';
@@ -122,8 +110,6 @@ export interface UnifiedDesignerWorkbenchProps {
   aiCopilot?: boolean | { domainGuidance?: string };
 }
 
-const MAX_DOCUMENT_HISTORY = 50;
-
 export function UnifiedDesignerWorkbench({
   initialDocument,
   modelFieldsByModel = {},
@@ -138,12 +124,7 @@ export function UnifiedDesignerWorkbench({
 }: UnifiedDesignerWorkbenchProps) {
   const { locale } = useI18n();
   const initialSnapshot = serializeDocument(initialDocument);
-  const [documentHistory, setDocumentHistory] = useState(() => ({
-    document: initialDocument,
-    history: [initialSnapshot],
-    historyIndex: 0,
-  }));
-  const [savedSnapshot, setSavedSnapshot] = useState(() => serializeDocument(initialDocument));
+  const [savedSnapshot, setSavedSnapshot] = useState(initialSnapshot);
   const savedSnapshotRef = useRef(initialSnapshot);
   const [saveStatus, setSaveStatus] = useState<DesignerSaveStatus>('saved');
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -154,22 +135,41 @@ export function UnifiedDesignerWorkbench({
   const [publishError, setPublishError] = useState<string | null>(null);
   const [mode, setMode] = useState<WorkbenchMode>('edit');
   const [previewDeviceId, setPreviewDeviceId] = useState<string>(DEFAULT_DEVICE_PREVIEW_ID);
-  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  // Multi-selection is intentionally a separate set from `selectedBlockId`.
-  // `selectedBlockId` is dual-purpose: it is both the inspector target AND the
-  // drop-placement context (palette drops land inside / before it). Multi-select
-  // must not perturb that context, so it tracks its own ids and leaves the
-  // primary selection (and therefore the drop context) intact.
-  const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(() => new Set());
+  // Primary + additive multi-selection model, extracted to a shared kernel so
+  // the report designer (block-tree family) reuses the same modifier-click /
+  // marquee rules. `selectedBlockId` is dual-purpose: the inspector target AND
+  // the drop-placement context (palette drops land inside / before it);
+  // multi-selection tracks its own ids without perturbing it.
+  const {
+    selectedBlockId,
+    multiSelectedIds,
+    setSelectedBlockId,
+    setMultiSelectedIds,
+    selectFromCanvas: handleCanvasSelect,
+    selectFromMarquee: handleMarqueeSelect,
+    clearMultiSelection,
+  } = useDesignerSelection();
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
-  const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
-  const [activeDropIntent, setActiveDropIntent] = useState<ActiveDropIntent>(null);
-  const document = documentHistory.document;
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor),
-  );
+
+  // Toolbar save indicator follows the live document snapshot; wired into the
+  // document kernel's onChange so every edit / undo / redo refreshes it.
+  const syncSaveStateForSnapshot = (snapshot: string) => {
+    setSaveStatus(snapshot === savedSnapshotRef.current ? 'saved' : 'dirty');
+    setSaveError(null);
+    setValidationErrorCount(0);
+  };
+
+  // Shared block-tree document + history kernel. Selection, drag-and-drop, the
+  // block registry, and save/publish state are layered on top by this workbench.
+  const documentKernel = useDesignerDocument({
+    initialDocument,
+    onChange: syncSaveStateForSnapshot,
+  });
+  const document = documentKernel.document;
+  const updateDocument = documentKernel.update;
+  const handleUndo = documentKernel.undo;
+  const handleRedo = documentKernel.redo;
   const blockRegistry = useMemo(() => createDefaultBlockRegistryV3(), []);
   const blockDefinitions = useMemo(
     () =>
@@ -179,10 +179,10 @@ export function UnifiedDesignerWorkbench({
     [blockRegistry, document.kind],
   );
 
-  const currentSnapshot = serializeDocument(document);
+  const currentSnapshot = documentKernel.currentSnapshot;
   const isDirty = currentSnapshot !== savedSnapshot;
-  const canUndo = documentHistory.historyIndex > 0;
-  const canRedo = documentHistory.historyIndex < documentHistory.history.length - 1;
+  const canUndo = documentKernel.canUndo;
+  const canRedo = documentKernel.canRedo;
 
   const selectedBlockResult = useMemo(
     () => (selectedBlockId ? findBlockById(document.blocks, selectedBlockId) : null),
@@ -194,62 +194,6 @@ export function UnifiedDesignerWorkbench({
     document.modelCode ??
     null;
   const selectedModelFields = selectedModelCode ? (modelFieldsByModel[selectedModelCode] ?? []) : [];
-
-  const updateDocument = (updater: (current: PageSchemaV3) => PageSchemaV3) => {
-    setDocumentHistory((state) => {
-      const snapshot = serializeDocument(state.document);
-      const nextDocument = updater(state.document);
-      const serializedNext = serializeDocument(nextDocument);
-      if (serializedNext === snapshot) return state;
-
-      const nextHistory = [
-        ...state.history.slice(0, state.historyIndex + 1),
-        serializedNext,
-      ];
-      const trimmedHistory = nextHistory.slice(-MAX_DOCUMENT_HISTORY);
-      syncSaveStateForSnapshot(serializedNext);
-
-      return {
-        document: nextDocument,
-        history: trimmedHistory,
-        historyIndex: trimmedHistory.length - 1,
-      };
-    });
-  };
-
-  const syncSaveStateForSnapshot = (snapshot: string) => {
-    setSaveStatus(snapshot === savedSnapshotRef.current ? 'saved' : 'dirty');
-    setSaveError(null);
-    setValidationErrorCount(0);
-  };
-
-  const handleUndo = () => {
-    setDocumentHistory((state) => {
-      if (state.historyIndex <= 0) return state;
-      const nextIndex = state.historyIndex - 1;
-      const snapshot = state.history[nextIndex];
-      syncSaveStateForSnapshot(snapshot);
-      return {
-        ...state,
-        document: parseDocumentSnapshot(snapshot),
-        historyIndex: nextIndex,
-      };
-    });
-  };
-
-  const handleRedo = () => {
-    setDocumentHistory((state) => {
-      if (state.historyIndex >= state.history.length - 1) return state;
-      const nextIndex = state.historyIndex + 1;
-      const snapshot = state.history[nextIndex];
-      syncSaveStateForSnapshot(snapshot);
-      return {
-        ...state,
-        document: parseDocumentSnapshot(snapshot),
-        historyIndex: nextIndex,
-      };
-    });
-  };
 
   // C4 — switch the page kind. Per the owner design decision (2026-06-18), the
   // switch is BLOCKED whenever a descendant block is incompatible with the target
@@ -340,61 +284,6 @@ export function UnifiedDesignerWorkbench({
     });
   };
 
-  // Canvas selection with modifier support. A plain click is single-select
-  // (clears multi-selection, current behaviour); a shift / cmd / ctrl click
-  // toggles the block in/out of the multi-selection AND makes it the primary
-  // selection (so the inspector + drop context still point at it).
-  //
-  // When the first additive click happens while only a single block is selected
-  // (multi-set empty), the existing primary block is folded into the set first
-  // so that "click A, shift+click B" yields the intuitive {A, B} selection.
-  const handleCanvasSelect = (blockId: string, modifiers?: { additive?: boolean }) => {
-    if (!modifiers?.additive) {
-      setMultiSelectedIds((current) => (current.size === 0 ? current : new Set()));
-      setSelectedBlockId(blockId);
-      return;
-    }
-    const primaryId = selectedBlockId;
-    setMultiSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.size === 0 && primaryId && primaryId !== blockId) {
-        next.add(primaryId);
-      }
-      if (next.has(blockId)) {
-        next.delete(blockId);
-      } else {
-        next.add(blockId);
-      }
-      return next;
-    });
-    setSelectedBlockId(blockId);
-  };
-
-  const clearMultiSelection = () => {
-    setMultiSelectedIds((current) => (current.size === 0 ? current : new Set()));
-  };
-
-  // Box-select (geometric marquee) result: the canvas reports the ids of every
-  // block its selection rectangle covered. We replace the multi-selection with
-  // those ids (a fresh marquee is a fresh selection, not additive) and make the
-  // last one the primary selection so the inspector + drop context stay live.
-  // An empty marquee (covered nothing) clears the multi-selection. The primary
-  // single-selection is left untouched on an empty marquee so an accidental
-  // empty drag does not blow away the current inspector target.
-  const handleMarqueeSelect = (blockIds: string[]) => {
-    if (blockIds.length === 0) {
-      clearMultiSelection();
-      return;
-    }
-    if (blockIds.length === 1) {
-      // A marquee that grabbed exactly one block behaves like a single select.
-      setMultiSelectedIds((current) => (current.size === 0 ? current : new Set()));
-      setSelectedBlockId(blockIds[0]);
-      return;
-    }
-    setMultiSelectedIds(new Set(blockIds));
-    setSelectedBlockId(blockIds[blockIds.length - 1]);
-  };
 
   // Batch-delete every deletable block in the multi-selection in a single
   // history step (one updateDocument → one undo). Undeletable blocks (the root
@@ -737,77 +626,51 @@ export function UnifiedDesignerWorkbench({
     canMoveBlockBeforeTarget,
     canMoveBlockToParent,
   };
-  const rootAccepts = activeDrag?.kind === 'palette-block' && canAddBlockToRoot(activeDrag.blockType);
-
-  const handleDragStart = (event: DragStartEvent) => {
-    const drag = readDragData(event.active.data.current);
-    setActiveDrag(drag);
-    setActiveDropIntent(null);
-    if (drag?.kind === 'canvas-block') setSelectedBlockId(drag.blockId);
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const drag = readDragData(event.active.data.current);
-    const drop = readDropData(event.over?.data.current);
-    if (!drag || !drop || drop.kind !== 'block') {
-      setActiveDropIntent(null);
-      return;
-    }
-    const intent = resolveBlockDropIntent(drag, drop.blockId, dropCapabilities);
-    setActiveDropIntent(intent ? { blockId: drop.blockId, intent } : null);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const drag = readDragData(event.active.data.current);
-    const drop = readDropData(event.over?.data.current);
-    setActiveDrag(null);
-    setActiveDropIntent(null);
-
-    let action: ReturnType<typeof resolveDragEndAction> = null;
-    if (drag?.kind === 'canvas-block' && drop?.kind === 'block') {
-      const dropPath = findBlockById(document.blocks, drop.blockId)?.path.map((item) => item.id) ?? [];
-      action = resolveCanvasBlockAncestorDropAction(
-        drag.blockId,
-        dropPath,
-        {
-          ...dropCapabilities,
-          canAddBlockToRoot,
-        },
-        {
-          getBlockType: (blockId) => findBlockById(document.blocks, blockId)?.block.blockType,
-        },
-      );
-    }
-    action ??= resolveDragEndAction(drag, drop, {
-      ...dropCapabilities,
-      canAddBlockToRoot,
-    });
-    if (!action) return;
-
-    switch (action.type) {
-      case 'add-block-root':
-        handleAddBlockToRoot(action.blockType);
-        break;
-      case 'add-block-before':
-        handleAddBlockBeforeTarget(action.targetBlockId, action.blockType);
-        break;
-      case 'add-block-inside':
-        handleAddBlockToParent(action.parentBlockId, action.blockType);
-        break;
-      case 'add-field-before':
-        handleAddModelFieldBeforeTarget(action.targetBlockId, action.field);
-        break;
-      case 'add-field-inside':
-        handleAddModelFieldToParent(action.parentBlockId, action.field);
-        break;
-      case 'move-before':
-        handleMoveBefore(action.movingBlockId, action.targetBlockId);
-        break;
-      case 'move-inside':
-        handleMoveToParent(action.movingBlockId, action.parentBlockId);
-        break;
-    }
-  };
+  // Block-tree drag-and-drop kernel: owns the active-drag / drop-intent state
+  // and the @dnd-kit start/over/end glue, dispatching the resolved drop action
+  // back here so this workbench keeps its own add/move executors.
+  const {
+    activeDrag,
+    activeDropIntent,
+    rootAccepts,
+    sensors,
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+    clearActiveDrag,
+  } = useDesignerDnd({
+    dropCapabilities,
+    canAddBlockToRoot,
+    getBlockPath: (blockId) =>
+      findBlockById(document.blocks, blockId)?.path.map((item) => item.id) ?? [],
+    getBlockType: (blockId) => findBlockById(document.blocks, blockId)?.block.blockType,
+    onSelectCanvasBlock: setSelectedBlockId,
+    onDropAction: (action) => {
+      switch (action.type) {
+        case 'add-block-root':
+          handleAddBlockToRoot(action.blockType);
+          break;
+        case 'add-block-before':
+          handleAddBlockBeforeTarget(action.targetBlockId, action.blockType);
+          break;
+        case 'add-block-inside':
+          handleAddBlockToParent(action.parentBlockId, action.blockType);
+          break;
+        case 'add-field-before':
+          handleAddModelFieldBeforeTarget(action.targetBlockId, action.field);
+          break;
+        case 'add-field-inside':
+          handleAddModelFieldToParent(action.parentBlockId, action.field);
+          break;
+        case 'move-before':
+          handleMoveBefore(action.movingBlockId, action.targetBlockId);
+          break;
+        case 'move-inside':
+          handleMoveToParent(action.movingBlockId, action.parentBlockId);
+          break;
+      }
+    },
+  });
 
   const handleSave = async () => {
     const validation = validatePageSchemaV3(document);
@@ -867,11 +730,7 @@ export function UnifiedDesignerWorkbench({
   // it clean/saved (it now matches the backend exactly).
   const resetToDocument = (nextDocument: PageSchemaV3) => {
     const snapshot = serializeDocument(nextDocument);
-    setDocumentHistory({
-      document: nextDocument,
-      history: [snapshot],
-      historyIndex: 0,
-    });
+    documentKernel.reset(nextDocument);
     savedSnapshotRef.current = snapshot;
     setSavedSnapshot(snapshot);
     setSaveStatus('saved');
@@ -1070,10 +929,7 @@ export function UnifiedDesignerWorkbench({
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => {
-            setActiveDrag(null);
-            setActiveDropIntent(null);
-          }}
+          onDragCancel={clearActiveDrag}
         >
           {getPageTemplates().length > 0 ? (
             <div
@@ -1194,14 +1050,6 @@ function DragGhost({ drag }: { drag: DragData }) {
 function localizedLabel(value: ModelFieldDefinition['label']): string {
   if (typeof value === 'string') return value;
   return value['zh-CN'] || value['en-US'] || Object.values(value)[0] || '';
-}
-
-function serializeDocument(document: PageSchemaV3): string {
-  return JSON.stringify(document);
-}
-
-function parseDocumentSnapshot(snapshot: string): PageSchemaV3 {
-  return JSON.parse(snapshot) as PageSchemaV3;
 }
 
 function formatValidationSaveError(errorCount: number): string {

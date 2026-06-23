@@ -1,0 +1,6 @@
+[
+  { "modelCode": "behavior_site_key", "fieldCode": "site_key", "sequence": 1, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "behavior_site_key", "fieldCode": "name", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "behavior_site_key", "fieldCode": "status", "sequence": 3, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "behavior_site_key", "fieldCode": "origin_allowlist", "sequence": 4, "required": false, "visible": false, "editable": true }
+]

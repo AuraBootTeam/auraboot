@@ -11,6 +11,70 @@
 export type ViewScope = 'personal' | 'team' | 'global';
 
 /**
+ * Team option available to the current user for SavedView sharing.
+ */
+export interface SavedViewTeamOption {
+  /** Team PID used as SavedView.teamId */
+  pid: string;
+  /** Team display name */
+  name: string;
+  /** Optional role of the current user in the team */
+  role?: string;
+  /** Optional member count for richer selectors */
+  memberCount?: number;
+}
+
+/**
+ * Audit trail entry for shared/global SavedView changes.
+ */
+export interface SavedViewAuditEvent {
+  id?: string;
+  sequenceNo?: number;
+  eventType?: string;
+  entityType?: string;
+  entityPid?: string;
+  commandCode?: string;
+  operationType?: string;
+  actorName?: string;
+  timestamp?: string;
+  changedFields?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Tenant-scoped user option used by SavedView collaborator picker.
+ */
+export interface SavedViewUserOption {
+  pid: string;
+  displayName?: string;
+  email?: string;
+  avatarUrl?: string;
+  departmentName?: string;
+}
+
+export type SavedViewCapabilityStatus = 'available' | 'degraded' | 'blocked';
+
+export interface SavedViewCapabilityCheckRequest {
+  modelCode?: string;
+  pageKey?: string;
+  viewType: ViewType;
+  viewConfig?: Partial<ViewConfig>;
+}
+
+export interface SavedViewCapabilityReason {
+  code: 'MISSING_REQUIRED_FIELD' | 'UNKNOWN_FIELD' | 'INCOMPATIBLE_FIELD_TYPE' | string;
+  field?: string;
+  message: string;
+}
+
+export interface SavedViewCapabilityCheckResponse {
+  viewType: ViewType;
+  status: SavedViewCapabilityStatus;
+  missingFields: string[];
+  reasons: SavedViewCapabilityReason[];
+}
+
+/**
  * View type determines the rendering mode
  */
 export type ViewType =
@@ -139,6 +203,39 @@ export interface ToolbarActionConfig {
 }
 
 /**
+ * SavedView lifecycle metadata stored inside viewConfig.meta.
+ */
+export interface ViewConfigMeta {
+  /** Stable plugin-owned key for upgrade-safe preset matching */
+  viewKey?: string;
+  /** Owner of this view definition, e.g. user/admin/plugin/system */
+  managedBy?: 'user' | 'admin' | 'plugin' | 'system' | string;
+  /** Whether direct runtime edits are blocked */
+  locked?: boolean;
+  /** Whether users may copy this view into their personal scope */
+  allowUserCopy?: boolean;
+  /** Whether tenant users may directly override this view */
+  allowUserOverride?: boolean;
+  /** Source view pid when copied from a shared/plugin preset */
+  originViewPid?: string;
+  /** Built-in quick-filter preset key when a preset is saved as a personal view */
+  originPresetKey?: string;
+  /** Optional capability state captured at import/build time */
+  capabilityStatus?: string;
+  /** Per-view collaborator ACL for shared team views */
+  collaborators?: ViewCollaboratorAcl[];
+}
+
+export interface ViewCollaboratorAcl {
+  /** Principal kind; currently user is supported */
+  principalType?: 'user' | string;
+  /** Public principal PID */
+  principalPid: string;
+  /** Permission granted on the view */
+  permission: 'view' | 'save' | 'manage' | string;
+}
+
+/**
  * Aggregation function for group summaries
  */
 export type AggregationFunction = 'count' | 'sum' | 'avg' | 'min' | 'max';
@@ -264,6 +361,8 @@ export interface ViewConfig {
   conditionalFormats?: ConditionalFormatRule[];
   /** Toolbar action button configuration (visibility, pinning, order) */
   toolbarActions?: ToolbarActionConfig[];
+  /** Lifecycle and ownership metadata */
+  meta?: ViewConfigMeta;
 
   // ==================== Kanban Fields ====================
 
@@ -459,11 +558,11 @@ export const VIEW_TYPE_FIELD_REQUIREMENTS: Record<string, ViewFieldRequirement[]
       autoCreateConfig: { code: 'start_date', dataType: 'date' },
     },
     {
-      key: 'timelineEndField',
-      label: 'End Date',
-      acceptedTypes: ['date', 'datetime'],
+      key: 'timelineResourceField',
+      label: 'Resource Field',
+      acceptedTypes: ['text', 'dict', 'enum', 'reference', 'status', 'user'],
       required: true,
-      autoCreateConfig: { code: 'end_date', dataType: 'date' },
+      autoCreateConfig: { code: 'resource', dataType: 'text' },
     },
   ],
 };
@@ -496,8 +595,16 @@ export interface SavedView {
   allowFullModel?: boolean;
   /** Whether this is the default view */
   isDefault?: boolean;
+  /** Whether this is an implicit system-created personal view */
+  isImplicit?: boolean;
   /** Sort order for view list display */
   sortOrder?: number;
+  /** Effective permission for current user on this view */
+  effectivePermission?: 'view' | 'save' | 'manage' | string;
+  /** Server-authoritative actions available to current user */
+  actions?: Array<'view' | 'copy' | 'save' | 'manage' | 'delete' | 'setDefault' | 'share' | string>;
+  /** Whether persisted local override changes are present */
+  dirty?: boolean;
   /** Creation timestamp */
   createdAt?: string;
   /** Last update timestamp */
@@ -561,6 +668,18 @@ export interface SavedViewUpdateRequest {
   isDefault?: boolean;
   /** Sort order for display */
   sortOrder?: number;
+}
+
+/**
+ * Request payload for copying any accessible SavedView into the current user's
+ * personal scope. Used when a user customizes a team/global view but should not
+ * mutate the shared source view.
+ */
+export interface SavedViewCopyToPersonalRequest {
+  /** Optional new personal view name */
+  name?: string;
+  /** Optional config override with the user's local pending changes applied */
+  viewConfig?: ViewConfig;
 }
 
 /**

@@ -42,6 +42,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for FileAccessor in the settings map. */
     String FILE_ACCESSOR_KEY = FileAccessor.SETTINGS_KEY;
 
+    /** Well-known key for AsyncTaskAccessor in the settings map. */
+    String ASYNC_TASK_ACCESSOR_KEY = AsyncTaskAccessor.SETTINGS_KEY;
+
     /**
      * Get the command type this handler processes.
      * Format: "namespace:command-name" (e.g., "billing:generate-invoice")
@@ -163,6 +166,19 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         if (execConfig == null || execConfig.isEmpty()) {
             return false;
         }
+        // An explicit `handlerParams.dslPersistence` flag wins: a command whose
+        // handler owns its persistence (and accepts non-model command inputs) can
+        // set it false to opt out of the generic field-map + field-edit permission
+        // path while still being declared type=create (so its CRUD create resolves
+        // into schema.commands and forms can submit it without an explicit
+        // ?commandCode). handlerParams is the import-preserved config slot.
+        Object handlerParams = execConfig.get("handlerParams");
+        if (handlerParams instanceof Map<?, ?> hp) {
+            Object explicit = hp.get("dslPersistence");
+            if (explicit instanceof Boolean dslPersist) {
+                return dslPersist;
+            }
+        }
         String operationType = request != null ? request.getOperationType() : null;
         if ("delete".equalsIgnoreCase(operationType) || "state_transition".equalsIgnoreCase(operationType)) {
             return true;
@@ -225,6 +241,16 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public FileAccessor fileAccessor() {
             Object accessor = settings != null ? settings.get(FILE_ACCESSOR_KEY) : null;
             return accessor instanceof FileAccessor ? (FileAccessor) accessor : null;
+        }
+
+        /**
+         * Get the host async-task submission bridge from the settings map.
+         * Returns null if the host application has no async-task bridge, in which
+         * case handlers should fall back to running the follow-up work inline.
+         */
+        public AsyncTaskAccessor asyncTaskAccessor() {
+            Object accessor = settings != null ? settings.get(ASYNC_TASK_ACCESSOR_KEY) : null;
+            return accessor instanceof AsyncTaskAccessor ? (AsyncTaskAccessor) accessor : null;
         }
 
         public static Builder builder() {

@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import type { BlockConfig, DetailTabConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
+import { BlockRenderer } from '@auraboot/runtime-kernel';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 
 export interface TabsBlockRendererProps {

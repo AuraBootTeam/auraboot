@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.rag.service.EmbeddingService;
@@ -114,5 +115,50 @@ class RecordCommentServiceIntegrationTest extends BaseIntegrationTest {
         List<Map<String, Object>> activities = commentService.listActivity(MODEL_CODE, RECORD_PID);
         // May or may not have activities depending on whether commands were run
         assertThat(activities).isNotNull();
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("CMT-07: a different user cannot edit my comment (IDOR guard)")
+    void editCommentForeignUserDenied() {
+        commentService.addComment(MODEL_CODE, RECORD_PID, "Owner-only content", null);
+        Number commentId = (Number) commentService.listComments(MODEL_CODE, RECORD_PID).get(0).get("id");
+
+        // Simulate a second authenticated user in the same tenant (not the author).
+        Long foreignUserId = testUser.getId() + 999_999L;
+        MetaContext.setContext(testTenant.getId(), foreignUserId, testUser.getPid(), "foreign-user");
+        try {
+            assertThatThrownBy(() -> commentService.editComment(commentId.longValue(), "hijacked"))
+                    .isInstanceOf(RuntimeException.class);
+        } finally {
+            applyTestMetaContext();
+        }
+
+        // Content must be unchanged for the real owner.
+        Map<String, Object> after = commentService.listComments(MODEL_CODE, RECORD_PID).stream()
+                .filter(c -> commentId.equals(c.get("id"))).findFirst().orElseThrow();
+        assertThat(after.get("content")).isEqualTo("Owner-only content");
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("CMT-08: a different user cannot delete my comment (IDOR guard)")
+    void deleteCommentForeignUserDenied() {
+        commentService.addComment(MODEL_CODE, RECORD_PID, "Keep me", null);
+        Number commentId = (Number) commentService.listComments(MODEL_CODE, RECORD_PID).get(0).get("id");
+
+        Long foreignUserId = testUser.getId() + 888_888L;
+        MetaContext.setContext(testTenant.getId(), foreignUserId, testUser.getPid(), "foreign-user");
+        try {
+            assertThatThrownBy(() -> commentService.deleteComment(commentId.longValue()))
+                    .isInstanceOf(RuntimeException.class);
+        } finally {
+            applyTestMetaContext();
+        }
+
+        // Comment must still be visible to the owner (not soft-deleted by the foreign user).
+        boolean stillPresent = commentService.listComments(MODEL_CODE, RECORD_PID).stream()
+                .anyMatch(c -> commentId.equals(c.get("id")));
+        assertThat(stillPresent).isTrue();
     }
 }

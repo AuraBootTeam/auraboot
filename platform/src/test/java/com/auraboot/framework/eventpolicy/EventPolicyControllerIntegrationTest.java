@@ -353,20 +353,21 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     void httpLifecycle_create_draftVersion_validate_publish_run_allThreeRulesMatch() throws Exception {
         String code = "ep_http_" + System.nanoTime();
+        String targetKey = code + "_form";
 
-        // 1. create definition (eventType=FORM_SUBMITTED, targetType=FORM, targetKey=complaint)
+        // 1. create definition (eventType=FORM_SUBMITTED, targetType=FORM, unique targetKey)
         mockMvc.perform(post("/api/event-policy/definitions").contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "policyCode", code,
                                 "policyName", "HTTP IT Policy",
                                 "eventType", "FORM_SUBMITTED",
                                 "targetType", "FORM",
-                                "targetKey", "complaint"))))
+                                "targetKey", targetKey))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.policyCode").value(code))
                 .andExpect(jsonPath("$.data.eventType").value("FORM_SUBMITTED"))
                 .andExpect(jsonPath("$.data.targetType").value("FORM"))
-                .andExpect(jsonPath("$.data.targetKey").value("complaint"));
+                .andExpect(jsonPath("$.data.targetKey").value(targetKey));
 
         // 2. GET definition by code
         mockMvc.perform(get("/api/event-policy/definitions/" + code))
@@ -415,9 +416,9 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
                         .content(json.writeValueAsString(Map.of(
                                 "eventType", "FORM_SUBMITTED",
                                 "targetType", "FORM",
-                                "targetKey", "complaint",
+                                "targetKey", targetKey,
                                 "context", Map.of("record", Map.of(
-                                        "entityCode", "complaint",
+                                        "entityCode", targetKey,
                                         "recordId", "CMP-1",
                                         "data", Map.of(
                                                 "priority", "HIGH",
@@ -433,12 +434,13 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     void httpRun_notMatchedCase_smallAmountNormalPriorityNonVip() throws Exception {
         String code = "ep_http_nm_" + System.nanoTime();
+        String targetKey = code + "_form";
 
         // Setup: create + publish a policy
         mockMvc.perform(post("/api/event-policy/definitions").contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "policyCode", code, "policyName", "NM Test Policy",
-                                "eventType", "FORM_SUBMITTED", "targetType", "FORM", "targetKey", "complaint"))))
+                                "eventType", "FORM_SUBMITTED", "targetType", "FORM", "targetKey", targetKey))))
                 .andExpect(status().isOk());
 
         String draftBody = mockMvc.perform(
@@ -462,7 +464,7 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
                         .content(json.writeValueAsString(Map.of(
                                 "eventType", "FORM_SUBMITTED",
                                 "targetType", "FORM",
-                                "targetKey", "complaint",
+                                "targetKey", targetKey,
                                 "context", Map.of("record", Map.of(
                                         "data", Map.of(
                                                 "priority", "LOW",

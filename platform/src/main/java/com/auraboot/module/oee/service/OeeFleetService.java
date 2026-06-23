@@ -70,11 +70,12 @@ public class OeeFleetService {
         List<Computed> out = new ArrayList<>();
         for (OeeEquipmentRef ref : port.listEquipment(tenantId)) {
             OeeRequest req = OeeRequest.builder()
-                .tenantId(tenantId)
-                .equipmentId(ref.getEquipmentId())
-                .windowStart(start)
-                .windowEnd(end)
-                .build();
+                    .tenantId(tenantId)
+                    .equipmentId(ref.getEquipmentId())
+                    .equipmentCode(ref.getCode())
+                    .windowStart(start)
+                    .windowEnd(end)
+                    .build();
             OeeInputs inputs = port.fetch(req);
             OeeResult r = engine.calculate(inputs);
             boolean hasData = inputs.getCalendarHours() != null && inputs.getCalendarHours().signum() > 0;
@@ -120,8 +121,8 @@ public class OeeFleetService {
             return BigDecimal.ZERO.setScale(PCT_SCALE, RoundingMode.HALF_UP);
         }
         BigDecimal total = rows.stream()
-            .map(c -> nz(field.apply(c.row())))
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .map(c -> nz(field.apply(c.row())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         return total.divide(BigDecimal.valueOf(rows.size()), PCT_SCALE, RoundingMode.HALF_UP);
     }
 

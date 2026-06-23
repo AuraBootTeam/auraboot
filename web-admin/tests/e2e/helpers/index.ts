@@ -137,7 +137,6 @@ async function resolveTableSavedViewPid(
   modelCode: string,
   pageKey: string,
 ): Promise<string | null> {
-  const params = `modelCode=${encodeURIComponent(modelCode)}&pageKey=${encodeURIComponent(pageKey)}`;
   const readData = async (respPromise: Promise<import('@playwright/test').APIResponse>) => {
     const resp = await respPromise.catch(() => null);
     if (!resp?.ok()) return null;
@@ -145,15 +144,28 @@ async function resolveTableSavedViewPid(
     return body?.data ?? null;
   };
 
-  const defaultView = await readData(page.request.get(`/api/views/default?${params}`));
-  if (defaultView?.pid && (defaultView.viewType || 'table') === 'table') {
-    return String(defaultView.pid);
+  const candidatePageKeys = [
+    pageKey,
+    pageKey.endsWith('_list') ? pageKey : `${pageKey}_list`,
+  ].filter((candidate, index, values) => candidate && values.indexOf(candidate) === index);
+
+  for (const candidatePageKey of candidatePageKeys) {
+    const params = `modelCode=${encodeURIComponent(modelCode)}&pageKey=${encodeURIComponent(candidatePageKey)}`;
+
+    const defaultView = await readData(page.request.get(`/api/views/default?${params}`));
+    if (defaultView?.pid && (defaultView.viewType || 'table') === 'table') {
+      return String(defaultView.pid);
+    }
+
+    const accessible = await readData(page.request.get(`/api/views/accessible?${params}`));
+    const views = Array.isArray(accessible) ? accessible : (accessible?.records ?? []);
+    const tableView = views.find((view: any) => view?.pid && (view.viewType || 'table') === 'table');
+    if (tableView?.pid) {
+      return String(tableView.pid);
+    }
   }
 
-  const accessible = await readData(page.request.get(`/api/views/accessible?${params}`));
-  const views = Array.isArray(accessible) ? accessible : (accessible?.records ?? []);
-  const tableView = views.find((view: any) => view?.pid && (view.viewType || 'table') === 'table');
-  return tableView?.pid ? String(tableView.pid) : null;
+  return null;
 }
 
 export async function forceDefaultTableView(
@@ -176,6 +188,68 @@ export async function forceDefaultTableView(
     waitUntil: 'domcontentloaded',
   });
   await waitForDynamicPageLoad(page);
+}
+
+export function viewSelectorTrigger(page: Page): Locator {
+  return page
+    .locator('[data-testid="view-selector-trigger"], button[aria-haspopup="listbox"]')
+    .first();
+}
+
+export async function openViewSelectorDropdown(page: Page): Promise<Locator> {
+  const trigger = viewSelectorTrigger(page);
+  await expect(trigger).toBeVisible({ timeout: 10_000 });
+  await trigger.click();
+
+  const dropdown = page.locator('[role="listbox"]').first();
+  await expect(dropdown).toBeVisible({ timeout: 5_000 });
+  return dropdown;
+}
+
+export async function openSavedViewManagePanel(page: Page): Promise<Locator> {
+  await openViewSelectorDropdown(page);
+  const manageButton = page.getByTestId('view-selector-manage');
+  await expect(manageButton).toBeVisible({ timeout: 5_000 });
+  await manageButton.click();
+
+  const panel = page.locator('[role="dialog"][aria-modal="true"], [role="dialog"]').first();
+  await expect(panel).toBeVisible({ timeout: 5_000 });
+  return panel;
+}
+
+export async function selectSavedViewByName(
+  page: Page,
+  viewName: string | RegExp,
+): Promise<boolean> {
+  const dropdown = await openViewSelectorDropdown(page);
+  const option = dropdown.getByRole('option').filter({ hasText: viewName }).first();
+
+  if (!(await option.isVisible({ timeout: 5_000 }).catch(() => false))) {
+    await page.keyboard.press('Escape').catch(() => {});
+    await dropdown.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => {});
+    return false;
+  }
+
+  await option.click();
+  await dropdown.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+  return true;
+}
+
+export async function selectSavedViewByType(page: Page, viewType: string): Promise<boolean> {
+  if (viewType === 'table') return true;
+
+  const dropdown = await openViewSelectorDropdown(page);
+  const option = dropdown.locator(`[role="option"][data-view-type="${viewType}"]`).first();
+
+  if (!(await option.isVisible({ timeout: 5_000 }).catch(() => false))) {
+    await page.keyboard.press('Escape').catch(() => {});
+    await dropdown.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => {});
+    return false;
+  }
+
+  await option.click();
+  await dropdown.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+  return true;
 }
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,9 @@ package com.auraboot.framework.event;
 import com.auraboot.framework.infrastructure.mq.MqProvider;
 import com.auraboot.framework.infrastructure.mq.memory.InMemoryMqProvider;
 import com.auraboot.framework.meta.context.SandboxContext;
+import com.auraboot.framework.observability.W3cTraceparent;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Tracer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,6 +42,9 @@ public class AuraEventBus {
 
     @Autowired(required = false)
     private ObjectMapper objectMapper;
+
+    @Autowired(required = false)
+    private Tracer tracer;
 
     /** Enable MQ forwarding. Off by default — set aura.event.mq-bridge=true to enable. */
     @Value("${aura.event.mq-bridge:false}")
@@ -145,6 +150,17 @@ public class AuraEventBus {
             }
             if (event.getModelCode() != null) {
                 headers.put("modelCode", event.getModelCode());
+            }
+            // Inject W3C traceparent so the cross-process trace continues downstream
+            // (A-G4, P1). Captured here on the publishing thread where the span is active;
+            // the dumb transport (KafkaMqProvider) just forwards the header.
+            if (tracer != null && tracer.currentSpan() != null) {
+                var ctx = tracer.currentSpan().context();
+                String traceparent = W3cTraceparent.format(ctx.traceId(), ctx.spanId(),
+                        Boolean.TRUE.equals(ctx.sampled()));
+                if (traceparent != null) {
+                    headers.put(W3cTraceparent.HEADER, traceparent);
+                }
             }
 
             String body;

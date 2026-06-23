@@ -1,0 +1,300 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`reportDslToBlockTree > snapshot goldens (old DSL -> normalized block-tree schema) > chart 1`] = `
+{
+  "charts": {
+    "c1": {
+      "dataSource": {
+        "modelCode": "sl_order",
+        "type": "aggregate",
+      },
+      "dimensions": [
+        {
+          "field": "category",
+          "role": "category",
+        },
+      ],
+      "interaction": {
+        "tooltip": true,
+      },
+      "measures": [
+        {
+          "aggregation": "sum",
+          "field": "amount",
+        },
+      ],
+      "title": "By Category",
+      "type": "bar",
+      "visual": {
+        "orientation": "horizontal",
+      },
+    },
+  },
+  "layoutProfile": {
+    "page": {
+      "margin": {
+        "bottom": 20,
+        "left": 15,
+        "right": 15,
+        "top": 20,
+      },
+      "orientation": "portrait",
+      "size": "A4",
+    },
+  },
+  "page": {
+    "blocks": [
+      {
+        "blockType": "report-chart",
+        "dataSource": {
+          "ref": "sales",
+        },
+        "id": "c1",
+        "props": {
+          "chartSpec": {
+            "dataSource": {
+              "modelCode": "sl_order",
+              "type": "aggregate",
+            },
+            "dimensions": [
+              {
+                "field": "category",
+                "role": "category",
+              },
+            ],
+            "interaction": {
+              "tooltip": true,
+            },
+            "measures": [
+              {
+                "aggregation": "sum",
+                "field": "amount",
+              },
+            ],
+            "title": "By Category",
+            "type": "bar",
+            "visual": {
+              "orientation": "horizontal",
+            },
+          },
+        },
+        "title": "By Category",
+      },
+    ],
+    "extension": {
+      "reportDataSources": {
+        "sales": {
+          "modelCode": "sl_order",
+          "type": "model",
+        },
+      },
+      "reportLayoutProfile": {
+        "page": {
+          "margin": {
+            "bottom": 20,
+            "left": 15,
+            "right": 15,
+            "top": 20,
+          },
+          "orientation": "portrait",
+          "size": "A4",
+        },
+      },
+      "surface": "report",
+    },
+    "id": "fixed",
+    "kind": "composite",
+    "schemaVersion": 3,
+    "title": "Chart Report",
+  },
+  "warnings": [],
+}
+`;
+
+exports[`reportDslToBlockTree > snapshot goldens (old DSL -> normalized block-tree schema) > header/footer + paged band 1`] = `
+{
+  "charts": {},
+  "layoutProfile": {
+    "footer": {
+      "elements": [
+        {
+          "align": "right",
+          "type": "page-number",
+        },
+      ],
+      "height": 20,
+    },
+    "header": {
+      "elements": [
+        {
+          "align": "center",
+          "content": "Monthly",
+          "type": "text",
+        },
+      ],
+      "height": 30,
+    },
+    "page": {
+      "margin": {
+        "bottom": 20,
+        "left": 15,
+        "right": 15,
+        "top": 20,
+      },
+      "orientation": "portrait",
+      "size": "A4",
+    },
+    "parameters": [
+      {
+        "label": "Month",
+        "name": "month",
+        "type": "date",
+      },
+    ],
+  },
+  "page": {
+    "blocks": [
+      {
+        "blockType": "report-table",
+        "dataSource": {
+          "ref": "orders",
+        },
+        "id": "t1",
+        "props": {
+          "columns": [
+            {
+              "field": "id",
+            },
+          ],
+        },
+      },
+    ],
+    "extension": {
+      "reportDataSources": {
+        "orders": {
+          "data": [],
+          "type": "static",
+        },
+      },
+      "reportLayoutProfile": {
+        "footer": {
+          "elements": [
+            {
+              "align": "right",
+              "type": "page-number",
+            },
+          ],
+          "height": 20,
+        },
+        "header": {
+          "elements": [
+            {
+              "align": "center",
+              "content": "Monthly",
+              "type": "text",
+            },
+          ],
+          "height": 30,
+        },
+        "page": {
+          "margin": {
+            "bottom": 20,
+            "left": 15,
+            "right": 15,
+            "top": 20,
+          },
+          "orientation": "portrait",
+          "size": "A4",
+        },
+        "parameters": [
+          {
+            "label": "Month",
+            "name": "month",
+            "type": "date",
+          },
+        ],
+      },
+      "surface": "report",
+    },
+    "id": "fixed",
+    "kind": "composite",
+    "schemaVersion": 3,
+    "title": "Banded Report",
+  },
+  "warnings": [],
+}
+`;
+
+exports[`reportDslToBlockTree > snapshot goldens (old DSL -> normalized block-tree schema) > table-only 1`] = `
+{
+  "charts": {},
+  "layoutProfile": {
+    "page": {
+      "margin": {
+        "bottom": 20,
+        "left": 15,
+        "right": 15,
+        "top": 20,
+      },
+      "orientation": "portrait",
+      "size": "A4",
+    },
+  },
+  "page": {
+    "blocks": [
+      {
+        "blockType": "report-table",
+        "dataSource": {
+          "ref": "orders",
+        },
+        "id": "t1",
+        "props": {
+          "columns": [
+            {
+              "field": "id",
+              "label": "ID",
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+            },
+          ],
+          "showHeader": true,
+        },
+        "title": "Orders",
+      },
+    ],
+    "extension": {
+      "reportDataSources": {
+        "orders": {
+          "data": [
+            {
+              "amount": 10,
+              "id": 1,
+            },
+          ],
+          "type": "static",
+        },
+      },
+      "reportLayoutProfile": {
+        "page": {
+          "margin": {
+            "bottom": 20,
+            "left": 15,
+            "right": 15,
+            "top": 20,
+          },
+          "orientation": "portrait",
+          "size": "A4",
+        },
+      },
+      "surface": "report",
+    },
+    "id": "fixed",
+    "kind": "composite",
+    "schemaVersion": 3,
+    "title": "Sales Report",
+  },
+  "warnings": [],
+}
+`;
