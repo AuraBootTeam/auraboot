@@ -213,7 +213,7 @@ ext {
     sentryVersion = '6.28.0'
     jwtVersion = '0.13.0'
     mybatisPlusVersion = '3.5.16'
-    lombokVersion = '1.18.40'
+    lombokVersion = '1.18.46'
     aspectjVersion = '1.9.25.1'
     reflectasmVersion = '1.11.3'
     validationApiVersion = '2.0.1.Final'

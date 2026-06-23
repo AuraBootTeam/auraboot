@@ -27,8 +27,8 @@ dependencies {
     api 'org.slf4j:slf4j-api:2.0.18'
 
     // Lombok for reducing boilerplate
-    compileOnly 'org.projectlombok:lombok:1.18.32'
-    annotationProcessor 'org.projectlombok:lombok:1.18.32'
+    compileOnly 'org.projectlombok:lombok:1.18.46'
+    annotationProcessor 'org.projectlombok:lombok:1.18.46'
 
     // Unit-test deps for SPI contract tests (no Spring on the test classpath
     // — these are pure interface-shape and in-memory-fake assertions).
