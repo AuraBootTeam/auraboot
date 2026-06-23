@@ -87,6 +87,11 @@ public class RoleDefinitionDTO {
     private Map<String, Object> scopeContent;
 
     /**
+     * Default data scope inherited by newly-granted permissions.
+     */
+    private String defaultDataScopeType;
+
+    /**
      * Captures all "name:*" localized name entries from JSON beyond the hardcoded nameZhCN/nameEn.
      */
     @JsonIgnore

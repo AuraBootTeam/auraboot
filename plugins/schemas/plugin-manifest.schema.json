@@ -1570,6 +1570,11 @@
         "scopeContent": {
           "type": "object",
           "description": "Scope content configuration"
+        },
+        "defaultDataScopeType": {
+          "type": "string",
+          "description": "Default data scope inherited by newly granted permissions",
+          "enum": ["none", "self", "dept", "dept_and_sub", "all"]
         }
       },
       "additionalProperties": false

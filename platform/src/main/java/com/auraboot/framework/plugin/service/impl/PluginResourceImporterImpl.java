@@ -43,6 +43,7 @@ import com.auraboot.framework.permission.dto.PermissionCreateRequest;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.PermissionService;
+import com.auraboot.framework.permission.service.RolePermissionService;
 import com.auraboot.framework.dashboard.dto.DashboardCreateRequest;
 import com.auraboot.framework.dashboard.dto.DashboardDTO;
 import com.auraboot.framework.dashboard.dto.DashboardUpdateRequest;
@@ -118,6 +119,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final DictService dictService;
     private final CommandService commandService;
     private final PermissionService permissionService;
+    private final RolePermissionService rolePermissionService;
     private final RoleService roleService;
     private final MenuService menuService;
     private final PageSchemaService pageSchemaService;
@@ -1147,9 +1149,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             roleMapper.updateForPluginImport(
                     dto.getEffectiveName(), dto.getDescription(), dto.getType(),
                     dto.getPriority(), dto.getIsDefault(), dto.getIsSystem(),
-                    dto.getScopeType(), scopeContentJson, pluginPid, tenantId, dto.getCode());
+                    dto.getScopeType(), scopeContentJson, dto.getDefaultDataScopeType(),
+                    pluginPid, tenantId, dto.getCode());
 
-            // Update role-permission bindings using Mapper
+            // Reconcile role-permission bindings and data-scope defaults.
             Long roleId = roleMapper.findIdByCode(tenantId, dto.getCode());
             updateRolePermissions(roleId, dto.getPermissions(), tenantId, pluginPid);
 
@@ -1171,6 +1174,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             role.setIsDefault(dto.getIsDefault() != null ? dto.getIsDefault() : false);
             role.setIsSystem(dto.getIsSystem() != null ? dto.getIsSystem() : false);
             role.setScopeType(dto.getScopeType() != null ? dto.getScopeType() : "tenant");
+            role.setDefaultDataScopeType(dto.getDefaultDataScopeType());
             role.setStatus(StatusConstants.ACTIVE);
             role.setDeletedFlag(false);
             role.setCreatedAt(Instant.now());
@@ -1207,8 +1211,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 int count = rolePermissionMapper.countByRoleAndPermission(roleId, perm.getId(), tenantId);
 
                 if (count == 0) {
-                    // Use service to bind
-                    permissionService.bindToRole(roleId, perm.getId());
+                    // Use role-permission service so role default data scope is inherited.
+                    rolePermissionService.assignPermissionsToRole(roleId, List.of(perm.getId()));
+                } else {
+                    rolePermissionService.inheritDefaultDataScope(roleId, List.of(perm.getId()));
                 }
             } catch (Exception e) {
                 // Bind loop is per-permission best-effort: a single failed binding

@@ -183,6 +183,7 @@ public interface RoleMapper extends BaseMapper<Role> {
             name = #{name}, description = #{description}, type = #{type},
             priority = #{priority}, is_default = #{isDefault}, is_system = #{isSystem},
             scope_type = #{scopeType}, scope_content = #{scopeContent}::jsonb,
+            default_data_scope_type = COALESCE(#{defaultDataScopeType}, default_data_scope_type),
             plugin_pid = #{pluginPid}, updated_at = NOW()
         WHERE tenant_id = #{tenantId} AND code = #{code} AND deleted_flag = FALSE
         """)
@@ -194,6 +195,7 @@ public interface RoleMapper extends BaseMapper<Role> {
                               @Param("isSystem") Boolean isSystem,
                               @Param("scopeType") String scopeType,
                               @Param("scopeContent") String scopeContent,
+                              @Param("defaultDataScopeType") String defaultDataScopeType,
                               @Param("pluginPid") String pluginPid,
                               @Param("tenantId") Long tenantId,
                               @Param("code") String code);

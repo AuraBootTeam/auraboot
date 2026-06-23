@@ -15,6 +15,8 @@ import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
+import com.auraboot.framework.permission.engine.model.EvaluationStep;
+import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -185,22 +187,21 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
                 .filter(p -> "row".equals(p.getPolicyType()))
                 .collect(Collectors.toList());
 
-        // No row policies = allow all
-        if (rowPolicies.isEmpty()) {
-            return records;
-        }
+        List<Map<String, Object>> policyFiltered = records;
 
         // ANY policy with ALL scope = allow all
         boolean hasAllAccess = rowPolicies.stream()
                 .anyMatch(p -> "all".equals(p.getScopeType()));
-        if (hasAllAccess) {
-            return records;
+        if (!rowPolicies.isEmpty() && !hasAllAccess) {
+            // Filter each record: a record passes if ANY policy allows it (OR logic)
+            policyFiltered = records.stream()
+                    .filter(record -> rowPolicies.stream()
+                            .anyMatch(policy -> recordMatchesPolicy(policy, userId, record)))
+                    .collect(Collectors.toList());
         }
 
-        // Filter each record: a record passes if ANY policy allows it (OR logic)
-        return records.stream()
-                .filter(record -> rowPolicies.stream()
-                        .anyMatch(policy -> recordMatchesPolicy(policy, userId, record)))
+        return policyFiltered.stream()
+                .filter(record -> dataScopeAllows(memberId, modelCode, record))
                 .collect(Collectors.toList());
     }
 
@@ -220,21 +221,18 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
                 .filter(p -> "row".equals(p.getPolicyType()))
                 .collect(Collectors.toList());
 
-        // No policies = allow all
-        if (rowPolicies.isEmpty()) {
-            return true;
-        }
-
         // ANY policy with ALL scope = allow all
         boolean hasAllAccess = rowPolicies.stream()
                 .anyMatch(p -> "all".equals(p.getScopeType()));
-        if (hasAllAccess) {
-            return true;
+        if (!rowPolicies.isEmpty() && !hasAllAccess) {
+            boolean policyAllows = rowPolicies.stream()
+                    .anyMatch(policy -> recordMatchesPolicy(policy, userId, record));
+            if (!policyAllows) {
+                return false;
+            }
         }
 
-        // Record passes if ANY policy allows it (OR logic)
-        return rowPolicies.stream()
-                .anyMatch(policy -> recordMatchesPolicy(policy, userId, record));
+        return dataScopeAllows(memberId, modelCode, record);
     }
 
     // ==================== Column-Level Masking ====================
@@ -329,6 +327,14 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             return "AND " + sql;
         }
         return "";
+    }
+
+    /**
+     * Apply the role data-scope guard to in-memory record checks.
+     */
+    private boolean dataScopeAllows(Long memberId, String modelCode, Map<String, Object> record) {
+        EvaluationStep step = dataScopeEvaluator.evaluate(memberId, modelCode, "read", record);
+        return step == null || step.verdict() != EvaluationVerdict.DENY;
     }
 
     /**

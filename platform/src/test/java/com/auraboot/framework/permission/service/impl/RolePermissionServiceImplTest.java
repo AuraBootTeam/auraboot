@@ -136,6 +136,24 @@ class RolePermissionServiceImplTest {
         verify(dataScopeService).setScope(100L, 7L, "crm.lead", "manage", "dept", "MAX");
     }
 
+    @Test
+    void inheritDefaultDataScopeMaterializesWithoutUpsertingBinding() {
+        Role role = new Role();
+        role.setId(7L);
+        role.setDefaultDataScopeType("self");
+        when(roleMapper.selectById(7L)).thenReturn(role);
+        when(dataScopeService.getScopesByRole(100L, 7L)).thenReturn(List.of());
+        when(permissionMapper.findByIds(anyList())).thenReturn(List.of(
+                perm(50L, "crm.account", "read")));
+
+        boolean ok = service.inheritDefaultDataScope(7L, List.of(50L));
+
+        assertThat(ok).isTrue();
+        verify(dataScopeService).setScope(100L, 7L, "crm.account", "read", "self", "MAX");
+        verify(rolePermissionMapper, never()).batchInsert(anyList());
+        verify(userPermissionService).evictRoleUsers(7L);
+    }
+
     private Permission perm(Long id, String resourceCode, String action) {
         Permission p = new Permission();
         p.setId(id);

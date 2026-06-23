@@ -30,6 +30,7 @@ import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.dto.PermissionCreateRequest;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.PermissionService;
+import com.auraboot.framework.permission.service.RolePermissionService;
 import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
 import com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
@@ -91,6 +92,7 @@ class PluginResourceImporterImplApplyTest {
     @Mock private DictService dictService;
     @Mock private CommandService commandService;
     @Mock private PermissionService permissionService;
+    @Mock private RolePermissionService rolePermissionService;
     @Mock private RoleService roleService;
     @Mock private MenuService menuService;
     @Mock private PageSchemaService pageSchemaService;
@@ -233,6 +235,29 @@ class PluginResourceImporterImplApplyTest {
     }
 
     @Test
+    @DisplayName("importRole CREATE carries default data scope to created role")
+    void importRole_create_setsDefaultDataScopeType() {
+        when(roleMapper.existsByCode(1L, "member")).thenReturn(false);
+        Role created = new Role();
+        created.setPid("member-role-pid");
+        created.setId(101L);
+        when(roleService.createRole(any(Role.class))).thenReturn(created);
+
+        RoleDefinitionDTO dto = RoleDefinitionDTO.builder()
+                .code("member")
+                .name("Member")
+                .defaultDataScopeType("self")
+                .build();
+
+        importer.importRole(dto, "plugin-r", "imp-r", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        ArgumentCaptor<Role> roleCaptor = ArgumentCaptor.forClass(Role.class);
+        verify(roleService).createRole(roleCaptor.capture());
+        assertThat(roleCaptor.getValue().getDefaultDataScopeType()).isEqualTo("self");
+    }
+
+    @Test
     @DisplayName("importRole UPDATE branch: existing role + OVERWRITE -> roleMapper.updateForPluginImport")
     void importRole_update_happyPath() {
         when(roleMapper.existsByCode(1L, "tester")).thenReturn(true);
@@ -253,9 +278,31 @@ class PluginResourceImporterImplApplyTest {
         assertThat(result.getResourceId()).isEqualTo(55L);
         verify(roleMapper).updateForPluginImport(
                 eq("Tester Updated"), eq("desc"), any(),
-                any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(),
                 eq("plugin-r"), eq(1L), eq("tester"));
         verify(roleService, never()).createRole(any());
+    }
+
+    @Test
+    @DisplayName("importRole UPDATE passes default data scope to role mapper")
+    void importRole_update_passesDefaultDataScopeType() {
+        when(roleMapper.existsByCode(1L, "tester")).thenReturn(true);
+        when(roleMapper.findIdByCode(1L, "tester")).thenReturn(55L);
+        when(roleMapper.findPidByCode(1L, "tester")).thenReturn("role-pid-exist");
+
+        RoleDefinitionDTO dto = RoleDefinitionDTO.builder()
+                .code("tester")
+                .name("Tester Updated")
+                .defaultDataScopeType("all")
+                .build();
+
+        importer.importRole(dto, "plugin-r", "imp-r", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        verify(roleMapper).updateForPluginImport(
+                eq("Tester Updated"), any(), any(),
+                any(), any(), any(), any(), any(), eq("all"),
+                eq("plugin-r"), eq(1L), eq("tester"));
     }
 
     @Test
@@ -283,7 +330,7 @@ class PluginResourceImporterImplApplyTest {
                 ImportRequest.ConflictStrategy.OVERWRITE);
 
         assertThat(result.getAction()).isEqualTo(ResourceAction.CREATE.code());
-        verify(permissionService).bindToRole(200L, 1001L);
+        verify(rolePermissionService).assignPermissionsToRole(200L, List.of(1001L));
     }
 
     @Test
@@ -303,7 +350,35 @@ class PluginResourceImporterImplApplyTest {
         PluginResource result = importer.importRole(dto, "plg", "imp", 1L,
                 ImportRequest.ConflictStrategy.OVERWRITE);
         assertThat(result.getAction()).isEqualTo(ResourceAction.UPDATE.code());
-        verify(permissionService, never()).bindToRole(anyLong(), anyLong());
+        verify(rolePermissionService, never()).assignPermissionsToRole(anyLong(), any());
+        verify(rolePermissionService, never()).inheritDefaultDataScope(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("importRole UPDATE existing permission binding inherits default data scope")
+    void importRole_update_existingPermissionBindingInheritsDefaultDataScope() {
+        when(roleMapper.existsByCode(1L, "rwp")).thenReturn(true);
+        when(roleMapper.findIdByCode(1L, "rwp")).thenReturn(77L);
+        when(roleMapper.findPidByCode(1L, "rwp")).thenReturn("rp");
+
+        PermissionDTO permission = new PermissionDTO();
+        permission.setId(1001L);
+        when(permissionService.findByCode("p.read")).thenReturn(permission);
+        when(rolePermissionMapper.countByRoleAndPermission(77L, 1001L, 1L)).thenReturn(1);
+
+        RoleDefinitionDTO dto = RoleDefinitionDTO.builder()
+                .code("rwp")
+                .name("RoleWithExistingPerm")
+                .defaultDataScopeType("self")
+                .permissions(List.of("p.read"))
+                .build();
+
+        PluginResource result = importer.importRole(dto, "plg", "imp", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        assertThat(result.getAction()).isEqualTo(ResourceAction.UPDATE.code());
+        verify(rolePermissionService).inheritDefaultDataScope(77L, List.of(1001L));
+        verify(rolePermissionService, never()).assignPermissionsToRole(77L, List.of(1001L));
     }
 
     // ==================== importBindingRule CREATE / UPDATE ====================
