@@ -90,9 +90,11 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
 }) => {
   return (
     <div className="border-border border-b px-6 py-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-text text-lg font-semibold">{title}</h2>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <h2 className="text-text flex-shrink-0 whitespace-nowrap text-lg font-semibold">
+            {title}
+          </h2>
           {!hideSavedViews && (
             <ViewSelector
               views={savedViews}
@@ -113,7 +115,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
           )}
         </div>
         <div
-          className="print-hide flex items-center gap-2"
+          className="print-hide flex flex-wrap items-center gap-2 lg:justify-end"
           data-print="hide"
           data-testid={deriveTestId('list', modelCode, 'toolbar')}
         >

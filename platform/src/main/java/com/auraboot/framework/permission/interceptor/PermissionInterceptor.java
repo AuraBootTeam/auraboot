@@ -5,6 +5,7 @@ import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -150,6 +151,10 @@ public class PermissionInterceptor implements HandlerInterceptor {
                         userId, menuPermissionCode, request.getRequestURI());
                 }
             }
+        }
+
+        if (!hasPermission && isPublishedPageSchemaReadPermission(permissionCode, request)) {
+            hasPermission = hasRuntimePageSchemaReadPermission(userId, request);
         }
 
         if (!hasPermission) {
@@ -382,6 +387,47 @@ public class PermissionInterceptor implements HandlerInterceptor {
 
     private boolean isReadOnlyModelPagePermission(String permissionTemplate) {
         return "model.{pageKey}.read".equals(permissionTemplate);
+    }
+
+    private boolean isPublishedPageSchemaReadPermission(String permissionCode, HttpServletRequest request) {
+        return MetaPermission.PAGE_SCHEMA_READ.equals(permissionCode) && rawPageKey(request) != null;
+    }
+
+    private boolean hasRuntimePageSchemaReadPermission(Long userId, HttpServletRequest request) {
+        String menuPermissionCode = resolveMenuPermissionByPageKey(request);
+        if (menuPermissionCode != null
+                && !menuPermissionCode.isBlank()
+                && userPermissionService.hasPermission(userId, menuPermissionCode)) {
+            log.debug("Page schema read passed via menu permission fallback: userId={}, permission={}, endpoint={}",
+                    userId, menuPermissionCode, request.getRequestURI());
+            return true;
+        }
+
+        String pageKey = rawPageKey(request);
+        if (pageKey == null) {
+            return false;
+        }
+
+        String modelCode = com.auraboot.framework.meta.util.PageKeyConverter.toModelCode(pageKey);
+        if (modelCode != null && SAFE_IDENTIFIER.matcher(modelCode).matches()) {
+            String modelReadPermission = "model." + modelCode + ".read";
+            if (userPermissionService.hasPermission(userId, modelReadPermission)) {
+                log.debug("Page schema read passed via model permission fallback: userId={}, permission={}, endpoint={}",
+                        userId, modelReadPermission, request.getRequestURI());
+                return true;
+            }
+        }
+
+        if (!pageKey.equals(modelCode)) {
+            String rawModelReadPermission = "model." + pageKey + ".read";
+            if (userPermissionService.hasPermission(userId, rawModelReadPermission)) {
+                log.debug("Page schema read passed via raw pageKey model permission fallback: userId={}, permission={}, endpoint={}",
+                        userId, rawModelReadPermission, request.getRequestURI());
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private String resolveMenuPermissionByPageKey(HttpServletRequest request) {

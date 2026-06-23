@@ -6,6 +6,9 @@ import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.rbac.dto.AssignRolesByCodeRequest;
+import com.auraboot.framework.rbac.dto.AssignRolesByPidRequest;
+import com.auraboot.framework.rbac.dto.UserRoleResponse;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -20,7 +23,7 @@ import static com.auraboot.framework.common.constant.ResponseCode.*;
 
 /**
  * User-role management controller.
- * Phase 2: all subject references use memberId (tenant_member.id).
+ * Public read contracts return PIDs only; legacy ID-based mutation paths are kept for compatibility.
  */
 @Slf4j
 @RestController
@@ -32,31 +35,34 @@ public class UserRoleController {
 
     @GetMapping
     @RequirePermission(MetaPermission.USER_ROLE_READ)
-    public ApiResponse<Page<UserRole>> getUserRoles(
+    public ApiResponse<Page<UserRoleResponse>> getUserRoles(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) String memberPid,
+            @RequestParam(required = false) String rolePid,
             @RequestParam(required = false) Long memberId,
             @RequestParam(required = false) Long roleId,
             @RequestParam(required = false) String status) {
 
         Long tenantId = MetaContext.getCurrentTenantId();
-        Page<UserRole> userRoles = userRoleService.findUserRoles(
-            pageNum, pageSize, memberId, roleId, tenantId, null);
+        Page<UserRoleResponse> userRoles = userRoleService.findUserRoleResponses(
+            pageNum, pageSize, memberPid, rolePid, memberId, roleId, tenantId, null);
         return ApiResponse.success(userRoles);
     }
 
-    @GetMapping("/member/{memberId}")
+    @GetMapping("/member/{memberPid}")
     @RequirePermission(MetaPermission.USER_ROLE_READ)
-    public ApiResponse<List<Long>> getMemberRoleIds(@PathVariable Long memberId) {
+    public ApiResponse<List<String>> getMemberRolePids(@PathVariable String memberPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
-        return ApiResponse.success(roleIds);
+        List<String> rolePids = userRoleService.getRolePidsByMemberPidAndTenantId(memberPid, tenantId);
+        return ApiResponse.success(rolePids);
     }
 
-    @GetMapping("/role/{roleId}")
+    @GetMapping("/role/{rolePid}")
     @RequirePermission(MetaPermission.ROLE_READ)
-    public ApiResponse<List<UserRole>> getRoleMembers(@PathVariable Long roleId) {
-        List<UserRole> userRoles = userRoleService.findByRoleIds(List.of(roleId));
+    public ApiResponse<List<UserRoleResponse>> getRoleMembers(@PathVariable String rolePid) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        List<UserRoleResponse> userRoles = userRoleService.findRoleMemberResponsesByRolePid(rolePid, tenantId);
         return ApiResponse.success(userRoles);
     }
 
@@ -69,6 +75,30 @@ public class UserRoleController {
 
         Long tenantId = MetaContext.getCurrentTenantId();
         boolean result = userRoleService.assignRolesToMember(memberId, roleIds, tenantId, operatorId);
+        return ApiResponse.success(result);
+    }
+
+    @PostMapping("/assign-by-code")
+    @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    public ApiResponse<Boolean> assignRolesToMemberByCode(
+            @RequestBody AssignRolesByCodeRequest request,
+            @CurrentUserId Long operatorId) {
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        boolean result = userRoleService.assignRolesToMemberByRoleCodes(
+                request.getMemberPid(), request.getRoleCodes(), tenantId, operatorId);
+        return ApiResponse.success(result);
+    }
+
+    @PostMapping("/assign-by-pid")
+    @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    public ApiResponse<Boolean> assignRolesToMemberByPid(
+            @RequestBody AssignRolesByPidRequest request,
+            @CurrentUserId Long operatorId) {
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        boolean result = userRoleService.assignRolesToMemberByRolePids(
+                request.getMemberPid(), request.getRolePids(), tenantId, operatorId);
         return ApiResponse.success(result);
     }
 
@@ -120,11 +150,15 @@ public class UserRoleController {
     @GetMapping("/statistics")
     @RequirePermission(MetaPermission.USER_ROLE_READ)
     public ApiResponse<Map<String, Object>> getMemberRoleStatistics(
+            @RequestParam(required = false) String memberPid,
+            @RequestParam(required = false) String rolePid,
             @RequestParam(required = false) Long memberId,
             @RequestParam(required = false) Long roleId) {
 
         Long tenantId = MetaContext.getCurrentTenantId();
-        Map<String, Object> statistics = userRoleService.validateMemberRoles(memberId, tenantId);
+        Map<String, Object> statistics = memberPid != null
+                ? userRoleService.validateMemberRolesByPid(memberPid, tenantId)
+                : userRoleService.validateMemberRoles(memberId, tenantId);
         return ApiResponse.success(statistics);
     }
 

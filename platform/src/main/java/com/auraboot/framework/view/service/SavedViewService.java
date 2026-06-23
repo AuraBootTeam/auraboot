@@ -1,9 +1,13 @@
 package com.auraboot.framework.view.service;
 
 import com.auraboot.framework.view.dto.AutoSaveViewRequest;
+import com.auraboot.framework.view.dto.SavedViewAuditEventDTO;
+import com.auraboot.framework.view.dto.SavedViewCapabilityCheckRequest;
+import com.auraboot.framework.view.dto.SavedViewCapabilityCheckResponse;
 import com.auraboot.framework.view.dto.SavedViewCreateRequest;
 import com.auraboot.framework.view.dto.SavedViewDTO;
 import com.auraboot.framework.view.dto.SavedViewUpdateRequest;
+import com.auraboot.framework.view.entity.ViewConfig;
 
 import java.util.List;
 
@@ -100,6 +104,32 @@ public interface SavedViewService {
      * @return duplicated view DTO
      */
     SavedViewDTO duplicate(String pid, String newName);
+
+    /**
+     * Copy an accessible view into the current user's personal scope.
+     *
+     * @param pid source view PID
+     * @param newName optional new personal view name
+     * @param viewConfigOverride optional view config override
+     * @return created personal view DTO
+     */
+    SavedViewDTO copyToPersonal(String pid, String newName, ViewConfig viewConfigOverride);
+
+    /**
+     * Get audit events for a visible SavedView.
+     *
+     * @param pid view PID
+     * @return public audit event records for the SavedView
+     */
+    List<SavedViewAuditEventDTO> getAuditEvents(String pid);
+
+    /**
+     * Check whether a SavedView type has the required configuration.
+     *
+     * @param request capability check request
+     * @return capability status and structured reasons
+     */
+    SavedViewCapabilityCheckResponse checkCapability(SavedViewCapabilityCheckRequest request);
 
     /**
      * Auto-save view configuration with atomic upsert.

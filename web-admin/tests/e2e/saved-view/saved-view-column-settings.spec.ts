@@ -15,11 +15,20 @@
  * Uses e2et_order model.
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import {
+  test,
+  expect,
+  type APIResponse,
+  type Browser,
+  type Page,
+  type Response as PlaywrightResponse,
+} from '@playwright/test';
 import { uniqueId } from '../helpers';
 
 const MODEL_CODE = 'e2et_order';
-const PAGE_KEY = 'e2et_order';
+const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
+const ADMIN_STORAGE_STATE = process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 
 // ---------------------------------------------------------------------------
 // Navigation helper — sidebar menu, NOT page.goto for the list page  [D1]
@@ -56,18 +65,52 @@ async function navigateToOrderList(page: Page): Promise<void> {
   });
 }
 
-/** Delete all SavedViews for e2et_order */
-async function deleteAllSavedViews(page: Page) {
-  const resp = await page.request.get(
-    `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
-  );
-  if (resp.ok()) {
-    const body = await resp.json();
-    const views = body.data ?? [];
-    for (const v of views) {
-      await page.request.delete(`/api/views/${v.pid}`).catch(() => {});
-    }
+async function expectApiJson(response: APIResponse | PlaywrightResponse, label: string) {
+  const bodyText = await response.text();
+  expect(
+    response.ok(),
+    `${label} failed: ${response.status()} ${response.statusText()} ${bodyText}`,
+  ).toBe(true);
+  return bodyText ? JSON.parse(bodyText) : {};
+}
+
+async function withAdminPage<T>(browser: Browser, action: (page: Page) => Promise<T>): Promise<T> {
+  const context = await browser.newContext({
+    baseURL: BASE_URL,
+    storageState: ADMIN_STORAGE_STATE,
+  });
+  const page = await context.newPage();
+  try {
+    return await action(page);
+  } finally {
+    await context.close();
   }
+}
+
+async function listSavedViews(page: Page) {
+  const resp = await page.request.get(
+    `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${SAVED_VIEW_PAGE_KEY}`,
+  );
+  const body = await expectApiJson(resp, 'list saved views');
+  return Array.isArray(body.data) ? body.data : [];
+}
+
+/** Delete all SavedViews for e2et_order. */
+async function deleteAllSavedViews(page: Page) {
+  const views = await listSavedViews(page);
+  for (const v of views) {
+    await page.request.delete(`/api/views/${v.pid}`).catch(() => {});
+  }
+}
+
+async function expectNoSavedViews(page: Page) {
+  const views = await listSavedViews(page);
+  expect(
+    views,
+    `SavedView cleanup left ${views.length} accessible view(s): ${views
+      .map((v: any) => `${v.scope}:${v.name}`)
+      .join(', ')}`,
+  ).toHaveLength(0);
 }
 
 /** Open column settings panel and return the panel locator */
@@ -80,24 +123,95 @@ async function openColumnSettingsPanel(page: Page) {
   return panel;
 }
 
-async function getSavedViewBySaveResponse(page: Page, resp: Awaited<ReturnType<Page['waitForResponse']>>) {
-  const body = await resp.json().catch(() => null);
+async function getSavedViewBySaveResponse(
+  page: Page,
+  resp: Awaited<ReturnType<Page['waitForResponse']>>,
+) {
+  const body = await expectApiJson(resp, 'save saved view');
   const saved = body?.data ?? body;
   const pid = saved?.pid;
   if (pid) {
     const detailResp = await page.request.get(`/api/views/${pid}`);
-    if (detailResp.ok()) {
-      const detailBody = await detailResp.json();
-      return detailBody.data ?? detailBody;
+    const detailBody = await expectApiJson(detailResp, 'get saved view detail');
+    return detailBody.data ?? detailBody;
+  }
+
+  const views = await listSavedViews(page);
+  return views.find((v: any) => Array.isArray(v.viewConfig?.columns));
+}
+
+async function findImplicitPersonalColumnView(page: Page) {
+  const views = await listSavedViews(page);
+  return views.find(
+    (v: any) =>
+      v.scope === 'personal' &&
+      v.name === 'Default View' &&
+      v.modelCode === MODEL_CODE &&
+      v.pageKey === SAVED_VIEW_PAGE_KEY &&
+      Array.isArray(v.viewConfig?.columns),
+  );
+}
+
+function compactText(text: string) {
+  return text.replace(/\s+/g, '').trim();
+}
+
+function headersContainLabel(headers: string[], label: string) {
+  const needle = compactText(label);
+  return Boolean(needle) && headers.some((header) => compactText(header).includes(needle));
+}
+
+async function hideFirstVisibleColumnAndSave(page: Page) {
+  await deleteAllSavedViews(page);
+  await expectNoSavedViews(page);
+
+  await navigateToOrderList(page);
+
+  const headersBefore = await page.locator('thead th').allTextContents();
+  const panel = await openColumnSettingsPanel(page);
+
+  const columnItems = panel.locator('div[draggable="true"]');
+  const itemCount = await columnItems.count();
+  expect(itemCount).toBeGreaterThan(2);
+
+  let targetIdx = -1;
+  let targetLabel = '';
+  for (let i = 0; i < itemCount; i++) {
+    const item = columnItems.nth(i);
+    const checkbox = item.locator('input[type="checkbox"]');
+    const label = (await item.locator('span.truncate').textContent())?.trim() ?? '';
+    if ((await checkbox.isChecked()) && headersContainLabel(headersBefore, label)) {
+      targetIdx = i;
+      targetLabel = label;
+      break;
     }
   }
 
-  const listResp = await page.request.get(
-    `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
+  expect(
+    targetIdx,
+    `No visible configurable column found in headers: ${headersBefore.join(' | ')}`,
+  ).toBeGreaterThanOrEqual(0);
+
+  const targetItem = columnItems.nth(targetIdx);
+  const rowTestId = await targetItem.getAttribute('data-testid');
+  const targetFieldCode = rowTestId?.replace('column-settings-row-', '') ?? '';
+  const checkbox = targetItem.locator('input[type="checkbox"]');
+  expect(await checkbox.isChecked()).toBe(true);
+
+  await checkbox.uncheck();
+  await expect(checkbox).not.toBeChecked();
+
+  const saveResponse = page.waitForResponse(
+    (r) => r.url().includes('/api/views/auto-save') && r.request().method() === 'POST',
+    { timeout: 8000 },
   );
-  const listBody = await listResp.json();
-  const views = Array.isArray(listBody.data) ? listBody.data : [];
-  return views.find((v: any) => Array.isArray(v.viewConfig?.columns));
+  await getSaveBtn(panel).click();
+  const resp = await saveResponse;
+  const savedView = await getSavedViewBySaveResponse(page, resp);
+
+  await expect(panel).not.toBeVisible({ timeout: 5000 });
+
+  return { headersBefore, targetFieldCode, targetLabel, savedView };
 }
 
 /** Get Save button (handles i18n: "Save" or "保存") */
@@ -116,26 +230,30 @@ function getCancelBtn(panel: ReturnType<Page['getByTestId']>) {
     .last();
 }
 
+function getPanelButton(panel: ReturnType<Page['getByTestId']>, name: string) {
+  return panel.getByRole('button', { name, exact: true });
+}
+
 test.describe('Column Settings — SavedView integration', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeAll(async ({ browser }) => {
-    const page = await browser.newPage();
     // Clean up any existing saved views for a fresh test
-    await deleteAllSavedViews(page);
-    // Ensure at least 1 test record exists
-    const title = `ColSet_${uniqueId()}`;
-    await page.request.post(`/api/dynamic/${PAGE_KEY}/execute`, {
-      data: {
-        commandCode: 'create_order',
+    await withAdminPage(browser, async (page) => {
+      await deleteAllSavedViews(page);
+      // Ensure at least 1 test record exists
+      const title = `ColSet_${uniqueId()}`;
+      const createResp = await page.request.post(`/api/dynamic/${MODEL_CODE}/create`, {
         data: {
           e2et_order_title: title,
           e2et_order_type: 'normal',
+          e2et_order_status: 'draft',
           e2et_order_urgent: false,
         },
-      },
+      });
+      const createBody = await expectApiJson(createResp, 'create column settings test record');
+      expect(createBody.code).toBe('0');
     });
-    await page.close();
   });
 
   test('CS-001: Column settings panel opens from toolbar button @smoke', async ({ page }) => {
@@ -152,8 +270,8 @@ test.describe('Column Settings — SavedView integration', () => {
     await expect(panel.getByText('Column Settings')).toBeVisible();
 
     // Should have batch action buttons
-    await expect(panel.getByText('Select All', { exact: true })).toBeVisible();
-    await expect(panel.getByText('Deselect All')).toBeVisible();
+    await expect(getPanelButton(panel, 'Select All')).toBeVisible();
+    await expect(getPanelButton(panel, 'Deselect All')).toBeVisible();
 
     // Should have draggable column items
     const draggableItems = panel.locator('div[draggable="true"]');
@@ -168,48 +286,20 @@ test.describe('Column Settings — SavedView integration', () => {
     await expect(getCancelBtn(panel)).toBeVisible();
   });
 
-  test.fixme('CS-002: Hide column → auto-creates SavedView → column removed from table @critical', async ({
+  test('CS-002: Hide column → auto-creates SavedView → column removed from table @critical', async ({
     page,
   }) => {
-    // Ensure clean state — no SavedView exists
-    await deleteAllSavedViews(page);
-
-    await navigateToOrderList(page);
-
-    // Record initial column headers
-    const headersBefore = await page.locator('thead th').allTextContents();
-
-    const panel = await openColumnSettingsPanel(page);
-
-    // Find business columns (non-system)
-    const columnItems = panel.locator('div[draggable="true"]');
-    const itemCount = await columnItems.count();
-    expect(itemCount).toBeGreaterThan(2);
-
-    // Pick the 3rd business column to hide
-    const targetIdx = Math.min(2, itemCount - 1);
-    const targetItem = columnItems.nth(targetIdx);
-    const targetLabel = (await targetItem.locator('span.truncate').textContent())?.trim() ?? '';
-    const checkbox = targetItem.locator('input[type="checkbox"]');
-    expect(await checkbox.isChecked()).toBe(true);
-
-    // Uncheck to hide
-    await checkbox.uncheck();
-    expect(await checkbox.isChecked()).toBe(false);
-
-    // Save — should auto-create SavedView via POST or auto-save
-    const viewResponse = page.waitForResponse(
-      (r) => r.url().includes('/api/views') && ['POST', 'PUT'].includes(r.request().method()),
-      { timeout: 8000 },
+    const { headersBefore, targetFieldCode, targetLabel, savedView } =
+      await hideFirstVisibleColumnAndSave(page);
+    expect(savedView?.scope).toBe('personal');
+    expect(savedView?.name).toBe('Default View');
+    expect(savedView?.modelCode).toBe(MODEL_CODE);
+    expect(savedView?.pageKey).toBe(SAVED_VIEW_PAGE_KEY);
+    expect(headersContainLabel(headersBefore, targetLabel)).toBe(true);
+    const savedTargetColumn = savedView?.viewConfig?.columns?.find(
+      (c: any) => c.fieldCode === targetFieldCode,
     );
-    await getSaveBtn(panel).click();
-    const resp = await viewResponse.catch(() => null);
-    if (resp) {
-      expect(resp.ok()).toBe(true);
-    }
-
-    // Panel should close
-    await expect(panel).not.toBeVisible({ timeout: 5000 });
+    expect(savedTargetColumn?.visible).toBe(false);
 
     // Wait for table re-render with new column config — reload to ensure fresh state
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -218,31 +308,22 @@ test.describe('Column Settings — SavedView integration', () => {
     // Verify column is hidden — check headers no longer contain the label
     const headersAfter = await page.locator('thead th').allTextContents();
     if (targetLabel) {
-      const wasInHeaders = headersBefore.some((h) => h.includes(targetLabel));
-      const isInHeaders = headersAfter.some((h) => h.includes(targetLabel));
-      // If the label was originally visible, it should now be hidden
-      if (wasInHeaders) {
-        // Column config may take effect after reload; if not, the feature may have a bug
-        expect(isInHeaders, `Column "${targetLabel}" should be hidden after unchecking and saving`).toBe(false);
-      }
+      const isInHeaders = headersContainLabel(headersAfter, targetLabel);
+      expect(isInHeaders, `Column "${targetLabel}" should be hidden after unchecking and saving`).toBe(
+        false,
+      );
     }
   });
 
   test('CS-003: Auto-created SavedView has correct structure in backend', async ({ page }) => {
-    test.fixme(true, 'SavedView auto-creation depends on CS-002 UI state — unreliable in batch runs');
-    // After CS-002, verify the auto-created view in the API
-    const resp = await page.request.get(
-      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
-    );
-    expect(resp.ok()).toBe(true);
-    const body = await resp.json();
-    const views = body.data ?? [];
-    expect(views.length).toBeGreaterThanOrEqual(1);
-
-    const myView = views.find((v: any) => v.name === 'My View');
+    const myView =
+      (await findImplicitPersonalColumnView(page)) ??
+      (await hideFirstVisibleColumnAndSave(page)).savedView;
     expect(myView).toBeTruthy();
+    expect(myView.name).toBe('Default View');
     expect(myView.scope).toBe('personal');
     expect(myView.modelCode).toBe(MODEL_CODE);
+    expect(myView.pageKey).toBe(SAVED_VIEW_PAGE_KEY);
     expect(myView.viewConfig).toBeTruthy();
     expect(myView.viewConfig.columns).toBeDefined();
     expect(myView.viewConfig.columns.length).toBeGreaterThan(0);
@@ -283,7 +364,7 @@ test.describe('Column Settings — SavedView integration', () => {
     const panel = await openColumnSettingsPanel(page);
 
     // Click "Select All"
-    await panel.getByText('Select All', { exact: true }).click();
+    await getPanelButton(panel, 'Select All').click();
 
     // All checkboxes should now be checked
     const checkboxes = panel.locator('input[type="checkbox"]');
@@ -312,7 +393,7 @@ test.describe('Column Settings — SavedView integration', () => {
     const panel = await openColumnSettingsPanel(page);
 
     // Click "Deselect All"
-    await panel.getByText('Deselect All').click();
+    await getPanelButton(panel, 'Deselect All').click();
 
     // All checkboxes should be unchecked
     const checkboxes = panel.locator('input[type="checkbox"]');
@@ -322,7 +403,7 @@ test.describe('Column Settings — SavedView integration', () => {
     }
 
     // Restore via "Select All" before saving (don't want 0 columns)
-    await panel.getByText('Select All', { exact: true }).click();
+    await getPanelButton(panel, 'Select All').click();
     for (let i = 0; i < total; i++) {
       await expect(checkboxes.nth(i)).toBeChecked();
     }
@@ -417,7 +498,7 @@ test.describe('Column Settings — SavedView integration', () => {
     const panel = await openColumnSettingsPanel(page);
 
     // Make a change — deselect all
-    await panel.getByText('Deselect All').click();
+    await getPanelButton(panel, 'Deselect All').click();
 
     // Cancel — should NOT trigger any API call
     await getCancelBtn(panel).click();

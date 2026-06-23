@@ -1,12 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildListReferenceDisplayCacheKey,
+  buildViewManageFieldOptions,
   collectListReferenceDisplayConfigs,
+  resolveColumnCapabilityDataType,
+  resolveFieldMetaDataType,
   resolveFieldMetaDisplayName,
+  resolveListSavedViewPageKey,
   resolveListMiscBlocksPosition,
   resolveTableBlockRowActions,
   shouldSkipListData,
   shouldSkipModelFieldMeta,
+  useRestoreSavedViewFromUrl,
 } from '../ListPageContent';
 
 describe('collectListReferenceDisplayConfigs', () => {
@@ -47,6 +53,65 @@ describe('collectListReferenceDisplayConfigs', () => {
     expect(buildListReferenceDisplayCacheKey(configs[0])).toBe(
       'bom_task_project_id|req_requirement_set_pcba_bom|pid|bom_project_name',
     );
+  });
+});
+
+describe('resolveListSavedViewPageKey', () => {
+  it('uses the loaded schema pageKey instead of the route model segment', () => {
+    expect(resolveListSavedViewPageKey({ pageKey: 'e2et_order_list' }, 'e2et_order')).toBe(
+      'e2et_order_list',
+    );
+  });
+
+  it('falls back to the route table name when schema pageKey is absent', () => {
+    expect(resolveListSavedViewPageKey({}, 'legacy_order')).toBe('legacy_order');
+  });
+});
+
+describe('useRestoreSavedViewFromUrl', () => {
+  it('restores selection again when URL view pid changes after views are loaded', () => {
+    const sourceView = {
+      pid: 'source-view',
+      name: 'Global View',
+      scope: 'global',
+      viewType: 'table',
+    } as const;
+    const copiedView = {
+      pid: 'personal-copy',
+      name: 'Global View - My Copy',
+      scope: 'personal',
+      viewType: 'table',
+    } as const;
+    const selectView = vi.fn();
+    const setActiveViewType = vi.fn();
+
+    const { rerender } = renderHook(
+      ({ urlViewPid, savedViews }) =>
+        useRestoreSavedViewFromUrl({
+          urlViewPid,
+          savedViews,
+          viewsLoading: false,
+          selectView,
+          setActiveViewType,
+        }),
+      {
+        initialProps: {
+          urlViewPid: sourceView.pid,
+          savedViews: [sourceView, copiedView],
+        },
+      },
+    );
+
+    expect(selectView).toHaveBeenLastCalledWith(sourceView.pid);
+
+    selectView.mockClear();
+    rerender({
+      urlViewPid: copiedView.pid,
+      savedViews: [sourceView, copiedView],
+    });
+
+    expect(selectView).toHaveBeenCalledTimes(1);
+    expect(selectView).toHaveBeenCalledWith(copiedView.pid);
   });
 });
 
@@ -214,5 +279,112 @@ describe('resolveFieldMetaDisplayName', () => {
     expect(resolveFieldMetaDisplayName('crm_crq_blank', map)).toBeUndefined();
     expect(resolveFieldMetaDisplayName('unknown_field', map)).toBeUndefined();
     expect(resolveFieldMetaDisplayName('crm_crq_code', undefined)).toBeUndefined();
+  });
+});
+
+describe('resolveFieldMetaDataType', () => {
+  const map = new Map<string, any>([
+    ['e2et_order_customer', { code: 'e2et_order_customer', dataType: 'reference' }],
+    ['cover', { code: 'cover', extension: { dataType: 'image' } }],
+    ['blank', { code: 'blank', dataType: '   ' }],
+  ]);
+
+  it('resolves the field dataType from field-meta', () => {
+    expect(resolveFieldMetaDataType('e2et_order_customer', map)).toBe('reference');
+    expect(resolveFieldMetaDataType('cover', map)).toBe('image');
+  });
+
+  it('returns undefined when field metadata has no usable dataType', () => {
+    expect(resolveFieldMetaDataType('blank', map)).toBeUndefined();
+    expect(resolveFieldMetaDataType('unknown', map)).toBeUndefined();
+    expect(resolveFieldMetaDataType('cover', undefined)).toBeUndefined();
+  });
+});
+
+describe('resolveColumnCapabilityDataType', () => {
+  it('prefers model field metadata over table column fallbacks for capability gates', () => {
+    const map = new Map<string, any>([
+      ['e2et_order_customer', { code: 'e2et_order_customer', dataType: 'reference' }],
+    ]);
+
+    expect(
+      resolveColumnCapabilityDataType(
+        {
+          field: 'e2et_order_customer',
+          valueType: 'text',
+          sorter: true,
+        },
+        map,
+      ),
+    ).toBe('reference');
+  });
+
+  it('falls back to explicit column metadata and ignores non-string sorter values', () => {
+    expect(
+      resolveColumnCapabilityDataType(
+        {
+          field: 'status',
+          valueType: 'enum',
+          sorter: true,
+        },
+        new Map(),
+      ),
+    ).toBe('enum');
+    expect(resolveColumnCapabilityDataType({ field: 'name', sorter: true }, new Map())).toBe(
+      'text',
+    );
+  });
+});
+
+describe('buildViewManageFieldOptions', () => {
+  it('includes model fields that are not visible table columns for advanced view capability gates', () => {
+    const fields = buildViewManageFieldOptions(
+      [
+        {
+          field: 'sc_name',
+          label: 'Name',
+          valueType: 'text',
+        },
+      ],
+      new Map([
+        ['sc_name', { code: 'sc_name', displayName: '名称', dataType: 'string' }],
+        [
+          'sc_attachment_file',
+          { code: 'sc_attachment_file', displayName: '附件文件', dataType: 'file' },
+        ],
+      ]),
+    );
+
+    expect(fields).toContainEqual({
+      code: 'sc_attachment_file',
+      name: '附件文件',
+      dataType: 'file',
+    });
+    expect(fields).toContainEqual({
+      code: 'sc_name',
+      name: 'Name',
+      dataType: 'string',
+    });
+  });
+
+  it('falls back to visible table columns when model field metadata is unavailable', () => {
+    expect(
+      buildViewManageFieldOptions(
+        [
+          {
+            field: 'e2et_order_customer',
+            label: 'Customer',
+            valueType: 'text',
+          },
+        ],
+        undefined,
+      ),
+    ).toEqual([
+      {
+        code: 'e2et_order_customer',
+        name: 'Customer',
+        dataType: 'text',
+      },
+    ]);
   });
 });

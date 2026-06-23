@@ -52,6 +52,7 @@ import {
   type ColumnConfig as ViewColumnConfig,
   type ViewType,
   type ViewScope,
+  type ViewConfig,
   type SortConfig,
 } from '~/framework/smart/types/savedView';
 import {
@@ -93,6 +94,14 @@ import {
 import { savedViewService } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
+import {
+  buildPersonalCopyName,
+  canCopySavedView,
+  getSavedViewPersistenceMode,
+  isSavedViewLockedPreset,
+  mergeViewConfigPatch,
+  summarizeViewConfigPatch,
+} from '~/framework/smart/utils/savedViewPersistence';
 
 // Dict data item type
 interface DictItem {
@@ -117,6 +126,43 @@ export interface ListReferenceDisplayConfig {
 
 export function buildListReferenceDisplayCacheKey(config: ListReferenceDisplayConfig): string {
   return `${config.field}|${config.modelCode}|${config.valueField}|${config.displayField}`;
+}
+
+export function resolveListSavedViewPageKey(
+  schema: { pageKey?: string | null } | null | undefined,
+  routeTableName: string,
+): string {
+  return schema?.pageKey || routeTableName;
+}
+
+export function useRestoreSavedViewFromUrl({
+  urlViewPid,
+  savedViews,
+  viewsLoading,
+  selectView,
+  setActiveViewType,
+}: {
+  urlViewPid: string | null;
+  savedViews: Array<{ pid: string; viewType?: string | null }>;
+  viewsLoading: boolean;
+  selectView: (pid: string) => void;
+  setActiveViewType: (viewType: ViewType) => void;
+}): void {
+  useEffect(() => {
+    if (!urlViewPid || savedViews.length === 0 || viewsLoading) {
+      return;
+    }
+
+    const match = savedViews.find((v) => v.pid === urlViewPid);
+    if (!match) {
+      return;
+    }
+
+    selectView(urlViewPid);
+    if (match.viewType && match.viewType !== 'table') {
+      setActiveViewType(match.viewType as ViewType);
+    }
+  }, [urlViewPid, savedViews, viewsLoading, selectView, setActiveViewType]);
 }
 
 export function resolveTableBlockRowActions(tableBlock: any): ButtonConfig[] {
@@ -164,6 +210,77 @@ export function resolveFieldMetaDisplayName(
   if (typeof candidate !== 'string') return undefined;
   const trimmed = candidate.trim();
   return trimmed && trimmed !== fieldCode ? trimmed : undefined;
+}
+
+function normalizeFieldDataType(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.toLowerCase() : undefined;
+}
+
+export function resolveFieldMetaDataType(
+  fieldCode: string,
+  modelFieldMap: Map<string, any> | undefined,
+): string | undefined {
+  if (!fieldCode || !modelFieldMap) return undefined;
+  const meta = modelFieldMap.get(fieldCode);
+  if (!meta) return undefined;
+  return (
+    normalizeFieldDataType(meta.dataType) ??
+    normalizeFieldDataType(meta.fieldType) ??
+    normalizeFieldDataType(meta.extension?.dataType) ??
+    normalizeFieldDataType(meta.extension?.fieldType)
+  );
+}
+
+export function resolveColumnCapabilityDataType(
+  column: { field?: string; dataType?: unknown; valueType?: unknown; sorter?: unknown },
+  modelFieldMap: Map<string, any> | undefined,
+): string {
+  return (
+    resolveFieldMetaDataType(column.field ?? '', modelFieldMap) ??
+    normalizeFieldDataType(column.dataType) ??
+    normalizeFieldDataType(column.valueType) ??
+    normalizeFieldDataType(column.sorter) ??
+    'text'
+  );
+}
+
+export interface ViewManageFieldOption {
+  code: string;
+  name: string;
+  dataType: string;
+}
+
+export function buildViewManageFieldOptions(
+  tableColumns: ColumnConfig[],
+  modelFieldMap: Map<string, any> | undefined,
+): ViewManageFieldOption[] {
+  const byCode = new Map<string, ViewManageFieldOption>();
+
+  for (const [fieldCode] of modelFieldMap?.entries() ?? []) {
+    if (!fieldCode) continue;
+    byCode.set(fieldCode, {
+      code: fieldCode,
+      name: resolveFieldMetaDisplayName(fieldCode, modelFieldMap) ?? fieldCode,
+      dataType: resolveFieldMetaDataType(fieldCode, modelFieldMap) ?? 'string',
+    });
+  }
+
+  for (const column of tableColumns) {
+    if (!column.field || column.isActionColumn) continue;
+    const fallbackName =
+      typeof column.label === 'string'
+        ? column.label
+        : byCode.get(column.field)?.name ?? column.field;
+    byCode.set(column.field, {
+      code: column.field,
+      name: fallbackName,
+      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
+    });
+  }
+
+  return Array.from(byCode.values());
 }
 
 export function collectListReferenceDisplayConfigs(
@@ -688,7 +805,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   // SavedView integration
   const modelCode = schema?.modelCode || tableName;
-  const pageKey = tableName;
+  const pageKey = resolveListSavedViewPageKey(schema, tableName);
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
   const hideSavedViews =
     listExtensions?.hideSavedViews ?? Boolean(schemaExtension.hideSavedViews || skipListData);
@@ -701,13 +818,71 @@ function ListPageContentInner(props: PageContentProps) {
     currentView,
     selectView,
     createView,
+    updateView,
     updateViewConfig,
     deleteView: deleteSavedView,
     setDefaultView,
     duplicateView,
+    copyToPersonal,
     reload: reloadViews,
     loading: viewsLoading,
   } = useSavedViews({ modelCode, pageKey, autoLoad: !!schema && !hideSavedViews && !skipListData });
+  const [pendingSharedViewConfig, setPendingSharedViewConfig] =
+    useState<Partial<ViewConfig> | null>(null);
+  const [savingSharedViewDraft, setSavingSharedViewDraft] = useState(false);
+  const [copyingSharedViewDraft, setCopyingSharedViewDraft] = useState(false);
+  const savedViewPersistenceMode = getSavedViewPersistenceMode(currentView);
+  const isCurrentViewLockedPreset = isSavedViewLockedPreset(currentView);
+  const canCopyCurrentView = canCopySavedView(currentView);
+  const canSaveSharedView = useMemo(() => {
+    if (!currentView || savedViewPersistenceMode !== 'shared-draft') {
+      return false;
+    }
+    if (isCurrentViewLockedPreset) {
+      return false;
+    }
+    if (Array.isArray(currentView.actions)) {
+      return currentView.actions.includes('save');
+    }
+    if (currentView.createdBy && user?.pid && currentView.createdBy === user.pid) {
+      return true;
+    }
+    if (currentView.scope === 'team') {
+      return (
+        hasPermission('dashboard.saved_view.team.update') ||
+        hasPermission('dashboard.saved_view.update')
+      );
+    }
+    if (currentView.scope === 'global') {
+      return hasPermission('dashboard.saved_view.update');
+    }
+    return false;
+  }, [currentView, hasPermission, isCurrentViewLockedPreset, savedViewPersistenceMode, user?.pid]);
+  const hasPendingSharedViewConfig =
+    savedViewPersistenceMode === 'shared-draft' &&
+    Object.keys(pendingSharedViewConfig ?? {}).length > 0;
+  const effectiveViewConfig = useMemo(
+    () =>
+      currentView
+        ? mergeViewConfigPatch(currentView.viewConfig, pendingSharedViewConfig ?? {})
+        : undefined,
+    [currentView, pendingSharedViewConfig],
+  );
+  const pendingSharedViewSummary = useMemo(
+    () => summarizeViewConfigPatch(pendingSharedViewConfig),
+    [pendingSharedViewConfig],
+  );
+  const translateCommon = useCallback(
+    (key: string, fallback: string) => {
+      const value = t(key);
+      return value && value !== key ? value : fallback;
+    },
+    [t],
+  );
+
+  useEffect(() => {
+    setPendingSharedViewConfig(null);
+  }, [currentView?.pid]);
 
   // Resolve modelPid from modelCode for ViewManagePanel field operations
   const [modelPid, setModelPid] = useState<string | undefined>();
@@ -774,19 +949,14 @@ function ListPageContentInner(props: PageContentProps) {
     [reloadViews],
   );
 
-  // Restore view from URL ?view= parameter (highest priority)
-  useEffect(() => {
-    if (urlViewPid && savedViews.length > 0 && !viewsLoading) {
-      const match = savedViews.find((v) => v.pid === urlViewPid);
-      if (match) {
-        selectView(urlViewPid);
-        if (match.viewType && match.viewType !== 'table') {
-          setActiveViewType(match.viewType as ViewType);
-        }
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedViews, viewsLoading]); // Run when views finish loading
+  // Restore view from URL ?view= parameter (highest priority).
+  useRestoreSavedViewFromUrl({
+    urlViewPid,
+    savedViews,
+    viewsLoading,
+    selectView,
+    setActiveViewType,
+  });
 
   useEffect(() => {
     if (!currentView) return;
@@ -1624,8 +1794,8 @@ function ListPageContentInner(props: PageContentProps) {
     }
     if (viewsLoading) return;
     if (
-      currentView?.viewConfig?.sorts &&
-      areSortsEqual(currentView.viewConfig.sorts, activeSorts)
+      effectiveViewConfig?.sorts &&
+      areSortsEqual(effectiveViewConfig.sorts, activeSorts)
     ) {
       return;
     }
@@ -1637,7 +1807,7 @@ function ListPageContentInner(props: PageContentProps) {
     activeSorts,
     schema,
     viewsLoading,
-    currentView?.viewConfig?.sorts,
+    effectiveViewConfig?.sorts,
     searchParams,
     setSearchParams,
     skipListData,
@@ -2188,7 +2358,7 @@ function ListPageContentInner(props: PageContentProps) {
     }
 
     // Apply SavedView column config (visibility + order + width)
-    const viewColumns = currentView?.viewConfig?.columns;
+    const viewColumns = effectiveViewConfig?.columns;
     if (!viewColumns || viewColumns.length === 0) return baseCols;
 
     const viewColMap = new Map(viewColumns.map((vc) => [vc.fieldCode, vc]));
@@ -2223,7 +2393,7 @@ function ListPageContentInner(props: PageContentProps) {
     }
 
     return visibleCols;
-  }, [tableBlock, currentView]);
+  }, [tableBlock, effectiveViewConfig]);
 
   const referenceDisplayConfigs = useMemo(
     () => collectListReferenceDisplayConfigs(tableColumns, modelFieldMap),
@@ -2317,7 +2487,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Initialize column order from SavedView or table columns
   useEffect(() => {
-    const viewColumns = currentView?.viewConfig?.columns;
+    const viewColumns = effectiveViewConfig?.columns;
     if (viewColumns && viewColumns.length > 0) {
       const hasOrder = viewColumns.some((vc) => vc.order !== undefined && vc.order !== null);
       if (hasOrder) {
@@ -2331,7 +2501,7 @@ function ListPageContentInner(props: PageContentProps) {
     }
     // Default: use tableColumns order
     setColumnOrder(tableColumns.filter((c) => !c.isActionColumn).map((c) => c.field));
-  }, [currentView, tableColumns]);
+  }, [effectiveViewConfig?.columns, tableColumns]);
 
   // Resolve column label via i18n
   const resolveColumnLabel = useCallback(
@@ -2377,25 +2547,25 @@ function ListPageContentInner(props: PageContentProps) {
   // Column widths map from SavedView
   const columnWidths = useMemo(() => {
     const widths: Record<string, number> = {};
-    const viewColumns = currentView?.viewConfig?.columns;
+    const viewColumns = effectiveViewConfig?.columns;
     if (viewColumns) {
       for (const vc of viewColumns) {
         if (vc.width) widths[vc.fieldCode] = vc.width;
       }
     }
     return widths;
-  }, [currentView]);
+  }, [effectiveViewConfig?.columns]);
 
   // Row style from conditional formats
   const getRowStyle = useCallback(
     (record: Record<string, any>): React.CSSProperties | undefined => {
       const cfStyle = evaluateConditionalFormats(
-        currentView?.viewConfig?.conditionalFormats,
+        effectiveViewConfig?.conditionalFormats,
         record,
       );
       return buildConditionalStyle(cfStyle);
     },
-    [currentView],
+    [effectiveViewConfig?.conditionalFormats],
   );
 
   // Row click → navigate to detail page or open preview drawer
@@ -2488,6 +2658,26 @@ function ListPageContentInner(props: PageContentProps) {
     return [...dslCols, ...sysDefs];
   }, [tableBlock, locale, t, tableName, schema?.modelCode]);
 
+  const viewManageFields = useMemo(() => {
+    const fieldMap = new Map(
+      buildViewManageFieldOptions(tableColumns, modelFieldMap).map((field) => [
+        field.code,
+        field,
+      ]),
+    );
+
+    for (const column of tableColumns) {
+      if (!column.field || column.isActionColumn) continue;
+      fieldMap.set(column.field, {
+        code: column.field,
+        name: resolveColumnLabel(column),
+        dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
+      });
+    }
+
+    return Array.from(fieldMap.values());
+  }, [tableColumns, modelFieldMap, resolveColumnLabel]);
+
   // Auto-save view config — delegates upsert logic to backend
   // §3: after sort/filter/column/row-height changes auto-save to the current
   // view, surface a quiet "已保存到当前视图" hint so the persistence is visible.
@@ -2499,8 +2689,11 @@ function ListPageContentInner(props: PageContentProps) {
       options?: { isStale?: () => boolean; rethrow?: boolean },
     ) => {
       try {
-        if (currentView) {
+        const persistenceMode = getSavedViewPersistenceMode(currentView);
+        if (persistenceMode === 'personal-persist') {
           await updateViewConfig(config);
+        } else if (persistenceMode === 'shared-draft') {
+          setPendingSharedViewConfig((prev) => mergeViewConfigPatch(prev, config));
         } else {
           // No explicit view — use backend auto-save (atomic upsert of implicit view)
           const view = await savedViewService.autoSave({
@@ -2513,7 +2706,7 @@ function ListPageContentInner(props: PageContentProps) {
             selectView(view.pid);
           }
         }
-        if (!options?.isStale?.()) {
+        if (!options?.isStale?.() && persistenceMode !== 'shared-draft') {
           flashViewSavedHint();
         }
       } catch (err) {
@@ -2528,6 +2721,110 @@ function ListPageContentInner(props: PageContentProps) {
     },
     [currentView, updateViewConfig, modelCode, pageKey, selectView, flashViewSavedHint],
   );
+
+  const handleCopySharedDraftToPersonal = useCallback(async () => {
+    if (!currentView) return;
+    if (!canCopyCurrentView) {
+      showErrorToast(
+        translateCommon('common.saved_view_copy_disabled_reason', 'This view cannot be copied'),
+      );
+      return;
+    }
+    setCopyingSharedViewDraft(true);
+    try {
+      const copiedView = await copyToPersonal(currentView.pid, {
+        name: buildPersonalCopyName(currentView.name),
+        viewConfig: mergeViewConfigPatch(currentView.viewConfig, pendingSharedViewConfig ?? {}),
+      });
+      setPendingSharedViewConfig(null);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set('view', copiedView.pid);
+          p.delete('sort');
+          p.delete('keyword');
+          p.delete('filters');
+          return p;
+        },
+        { replace: true },
+      );
+      showSuccessToast(
+        translateCommon('common.saved_view_copied_to_personal', 'Copied as personal view'),
+      );
+    } catch (err) {
+      showErrorToast(
+        err instanceof Error
+          ? err.message
+          : translateCommon('common.saved_view_copy_failed', 'Failed to copy view'),
+      );
+    } finally {
+      setCopyingSharedViewDraft(false);
+    }
+  }, [
+    canCopyCurrentView,
+    copyToPersonal,
+    currentView,
+    pendingSharedViewConfig,
+    setSearchParams,
+    showErrorToast,
+    showSuccessToast,
+    translateCommon,
+  ]);
+
+  const handleSaveSharedDraft = useCallback(async () => {
+    if (!currentView || !hasPendingSharedViewConfig || !pendingSharedViewConfig) return;
+
+    const targetName =
+      currentView.scope === 'team'
+        ? currentView.teamName || translateCommon('common.saved_view_scope_team', 'Team')
+        : translateCommon('common.saved_view_scope_global', 'Global');
+    const summaryText =
+      pendingSharedViewSummary.length > 0
+        ? pendingSharedViewSummary.join(', ')
+        : translateCommon('common.saved_view_shared_changes', 'view configuration');
+    const confirmed = await confirmDialog({
+      title: translateCommon('common.saved_view_save_shared_confirm_title', 'Save shared view?'),
+      content: translateCommon(
+        'common.saved_view_save_shared_confirm_content',
+        `This will update the shared view for ${targetName}. Changes: ${summaryText}.`,
+      )
+        .replace('{target}', targetName)
+        .replace('{changes}', summaryText),
+      confirmText: translateCommon('common.saved_view_save_shared', 'Save Shared View'),
+      cancelText: translateCommon('common.cancel', 'Cancel'),
+    });
+    if (!confirmed) return;
+
+    setSavingSharedViewDraft(true);
+    try {
+      await updateView({
+        viewConfig: mergeViewConfigPatch(currentView.viewConfig, pendingSharedViewConfig),
+      });
+      setPendingSharedViewConfig(null);
+      flashViewSavedHint();
+      showSuccessToast(
+        translateCommon('common.saved_view_shared_saved', 'Shared view updated'),
+      );
+    } catch (err) {
+      showErrorToast(
+        err instanceof Error
+          ? err.message
+          : translateCommon('common.saved_view_shared_save_failed', 'Failed to save shared view'),
+      );
+    } finally {
+      setSavingSharedViewDraft(false);
+    }
+  }, [
+    currentView,
+    flashViewSavedHint,
+    hasPendingSharedViewConfig,
+    pendingSharedViewConfig,
+    pendingSharedViewSummary,
+    showErrorToast,
+    showSuccessToast,
+    translateCommon,
+    updateView,
+  ]);
 
   const autoSaveMountedRef = useRef(true);
   useEffect(() => {
@@ -2554,19 +2851,19 @@ function ListPageContentInner(props: PageContentProps) {
       setColumnOrder(newOrder);
       // Persist to SavedView
       const cols = newOrder.map((fieldCode, idx) => {
-        const existing = currentView?.viewConfig?.columns?.find((c) => c.fieldCode === fieldCode);
+        const existing = effectiveViewConfig?.columns?.find((c) => c.fieldCode === fieldCode);
         return { ...(existing || { fieldCode }), fieldCode, order: idx };
       });
       autoSave({ columns: cols });
     },
-    [currentView, autoSave],
+    [effectiveViewConfig, autoSave],
   );
 
   // Handle column resize
   const handleColumnResize = useCallback(
     (field: string, width: number) => {
       if (!currentView) return;
-      const cols = [...(currentView.viewConfig?.columns || [])];
+      const cols = [...(effectiveViewConfig?.columns || [])];
       const idx = cols.findIndex((c) => c.fieldCode === field);
       if (idx >= 0) {
         cols[idx] = { ...cols[idx], width };
@@ -2575,7 +2872,7 @@ function ListPageContentInner(props: PageContentProps) {
       }
       autoSave({ columns: cols });
     },
-    [currentView, autoSave],
+    [currentView, effectiveViewConfig, autoSave],
   );
 
   // Handle column settings save -> update SavedView
@@ -2741,7 +3038,7 @@ function ListPageContentInner(props: PageContentProps) {
   );
 
   // Row height from current view config (with fallback)
-  const effectiveRowHeight: RowHeight = currentView?.viewConfig?.rowHeight || DEFAULT_ROW_HEIGHT;
+  const effectiveRowHeight: RowHeight = effectiveViewConfig?.rowHeight || DEFAULT_ROW_HEIGHT;
 
   // Handle row height change -> update SavedView
   const handleRowHeightChange = useCallback(
@@ -2990,6 +3287,92 @@ function ListPageContentInner(props: PageContentProps) {
               )}
             </div>
           )}
+          {hasPendingSharedViewConfig && currentView && (
+            <div
+              className="absolute top-2 right-3 z-10 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 shadow-sm"
+              role="status"
+              data-testid="shared-view-draft-banner"
+            >
+              <span>
+                {translateCommon(
+                  'common.saved_view_shared_draft',
+                  'Shared view has local changes',
+                )}
+                {pendingSharedViewSummary.length > 0 && (
+                  <span className="ml-1 text-amber-700">
+                    {pendingSharedViewSummary.join(', ')}
+                  </span>
+                )}
+              </span>
+              <button
+                type="button"
+                className="rounded px-2 py-1 font-medium text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleSaveSharedDraft}
+                disabled={!canSaveSharedView || savingSharedViewDraft}
+                title={
+                  canSaveSharedView
+                    ? translateCommon(
+                        'common.saved_view_save_shared_confirm_title',
+                        'Save shared view?',
+                      )
+                    : translateCommon(
+                        isCurrentViewLockedPreset
+                          ? 'common.saved_view_locked_preset_reason'
+                          : 'common.saved_view_save_shared_disabled_reason',
+                        isCurrentViewLockedPreset
+                          ? 'Plugin preset views cannot be saved directly. Copy it to My Views first.'
+                          : 'You do not have permission to save this shared view yet.',
+                      )
+                }
+                data-testid={
+                  canSaveSharedView ? 'shared-view-save' : 'shared-view-save-disabled'
+                }
+              >
+                {savingSharedViewDraft
+                  ? translateCommon('common.saving', 'Saving...')
+                  : translateCommon('common.saved_view_save_shared', 'Save Shared View')}
+              </button>
+              {!canSaveSharedView && (
+                <span className="text-amber-700">
+                  {translateCommon(
+                    isCurrentViewLockedPreset
+                      ? 'common.saved_view_locked_preset_reason'
+                      : 'common.saved_view_save_shared_disabled_reason',
+                    isCurrentViewLockedPreset
+                      ? 'Plugin preset views cannot be saved directly. Copy it to My Views first.'
+                      : 'You do not have permission to save this shared view yet.',
+                  )}
+                </span>
+              )}
+              <button
+                type="button"
+                className="rounded px-2 py-1 font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                onClick={handleCopySharedDraftToPersonal}
+                disabled={copyingSharedViewDraft || !canCopyCurrentView}
+                title={
+                  canCopyCurrentView
+                    ? translateCommon('common.saved_view_copy_to_personal', 'Copy to My View')
+                    : translateCommon(
+                        'common.saved_view_copy_disabled_reason',
+                        'This view cannot be copied',
+                      )
+                }
+                data-testid="shared-view-copy-to-personal"
+              >
+                {copyingSharedViewDraft
+                  ? translateCommon('common.saving', 'Saving...')
+                  : translateCommon('common.saved_view_copy_to_personal', 'Copy to My View')}
+              </button>
+              <button
+                type="button"
+                className="rounded px-2 py-1 text-amber-800 hover:bg-amber-100"
+                onClick={() => setPendingSharedViewConfig(null)}
+                data-testid="shared-view-dismiss-draft"
+              >
+                {translateCommon('common.saved_view_dismiss_draft', 'Discard')}
+              </button>
+            </div>
+          )}
           {/* Page title, view selector, and action buttons */}
           <ListPageHeader
             title={
@@ -3043,7 +3426,7 @@ function ListPageContentInner(props: PageContentProps) {
               }
             }}
             buttons={actionBlock?.buttons || []}
-            toolbarActions={currentView?.viewConfig?.toolbarActions}
+            toolbarActions={effectiveViewConfig?.toolbarActions}
             onAction={handleAction}
             onToolbarConfigChange={handleToolbarConfigChange}
             resolveLabel={resolveButtonLabel}
@@ -3605,7 +3988,7 @@ function ListPageContentInner(props: PageContentProps) {
                     label: resolveColumnLabel(c),
                     valueType: c.valueType || c.sorter,
                   }))}
-                rowHeight={currentView?.viewConfig?.rowHeight}
+                rowHeight={effectiveViewConfig?.rowHeight}
                 onRowHeightChange={handleRowHeightChange}
                 onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
                 chipFilters={chipFilters}
@@ -3756,7 +4139,7 @@ function ListPageContentInner(props: PageContentProps) {
                   ...(currentView || {}),
                   modelCode,
                   viewType: activeViewType,
-                  viewConfig: currentView?.viewConfig || {},
+                  viewConfig: effectiveViewConfig || {},
                 } as any
               }
               onGanttTaskClick={navigateToRecordView}
@@ -3803,6 +4186,16 @@ function ListPageContentInner(props: PageContentProps) {
               const newType = (view.viewType as ViewType) || 'table';
               setActiveViewType(newType);
               setStartCreateViewMode(false);
+              if (view.pid) {
+                setSearchParams(
+                  (prev) => {
+                    const p = new URLSearchParams(prev);
+                    p.set('view', view.pid);
+                    return p;
+                  },
+                  { replace: true },
+                );
+              }
             }}
             onDeleteView={async (pid: string) => {
               await deleteSavedView(pid);
@@ -3827,22 +4220,12 @@ function ListPageContentInner(props: PageContentProps) {
               loadData({ page: 0, size: pagination.pageSize, filters });
             }}
             onViewConfigSaved={reloadViews}
-            viewManageFields={tableColumns
-              .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
-              .map((c: ColumnConfig) => ({
-                code: c.field,
-                name: c.label
-                  ? typeof c.label === 'string'
-                    ? c.label
-                    : (c.label as any)?.['zh-CN'] || c.field
-                  : c.field,
-                dataType: c.valueType || c.sorter || 'text',
-              }))}
+            viewManageFields={viewManageFields}
             // ColumnSettingsPanel
             columnSettingsOpen={columnSettingsOpen}
             onColumnSettingsClose={() => setColumnSettingsOpen(false)}
             allColumnDefs={allColumnDefs}
-            viewColumns={currentView?.viewConfig?.columns}
+            viewColumns={effectiveViewConfig?.columns}
             onColumnSettingsSave={handleColumnSettingsSave}
             t={t}
             // FilterFieldPicker
@@ -3914,14 +4297,14 @@ function ListPageContentInner(props: PageContentProps) {
             }}
             onHide={() => {
               if (!currentView || !contextMenu) return;
-              const cols = (currentView.viewConfig?.columns || []).map((c) =>
+              const cols = (effectiveViewConfig?.columns || []).map((c) =>
                 c.fieldCode === contextMenu.column.field ? { ...c, visible: false } : c,
               );
               // If column not in saved config yet, add it as hidden
               if (!cols.find((c) => c.fieldCode === contextMenu.column.field)) {
                 cols.push({ fieldCode: contextMenu.column.field, visible: false });
               }
-              updateViewConfig({ columns: cols });
+              void ensureViewAndUpdateConfig({ columns: cols });
             }}
             onFilterByColumn={() => {
               // Placeholder — will be connected to FilterChipBar in integration step

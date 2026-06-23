@@ -8,6 +8,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
+const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
+
 async function fetchList(page: Page, modelCode: string): Promise<any> {
   const slug = modelCode;
   const resp = await page.request.get(`/api/dynamic/${slug}/list?pageNum=1&pageSize=5`);
@@ -57,6 +59,7 @@ test.describe('Lookup Field Type (GAP-124)', () => {
       data: {
         name: `LF_Ref_${uniqueId()}`,
         modelCode: 'e2et_order',
+        pageKey: SAVED_VIEW_PAGE_KEY,
         viewType: 'table',
         scope: 'personal',
         viewConfig: {
