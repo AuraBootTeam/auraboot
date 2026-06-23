@@ -298,8 +298,8 @@ export const TreeView: React.FC<TreeViewProps> = ({
     return (
       <ViewEmptyState
         variant="not-configured"
-        title="Tree view not configured"
-        description="Please configure the Parent ID Field to display the tree view."
+        title="树视图未配置"
+        description="请配置父级字段后再显示树视图。"
         className={className}
       />
     );

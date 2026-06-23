@@ -80,7 +80,7 @@ test.describe('Timeline View (GAP-128)', () => {
       await timelineBtn.click();
       // Should show timeline or "not configured" message
       const timelineView = page.getByTestId('timeline-view');
-      const notConfigured = page.locator('text=Timeline view not configured');
+      const notConfigured = page.locator('text=时间线视图未配置');
       const visible = await Promise.race([
         timelineView.waitFor({ timeout: 5000 }).then(() => 'timeline'),
         notConfigured.waitFor({ timeout: 5000 }).then(() => 'not-configured'),

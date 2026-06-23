@@ -19,9 +19,36 @@ describe('savedViewCapability', () => {
     ]);
 
     expect(result.status).toBe('degraded');
+    expect(result.reasonCodes).toEqual(['kanban_drag_command_missing']);
     expect(result.fieldOptions.groupByField).toHaveLength(2);
     expect(result.fieldOptions.titleField).toHaveLength(1);
     expect(result.reasons.join(' ')).toContain('Drag');
+  });
+
+  it('prioritizes semantic status fields over generic string fields for kanban grouping', () => {
+    const result = checkSavedViewCapability('kanban', [
+      { code: 'order_no', name: '订单编号', dataType: 'string' },
+      { code: 'order_status', name: '订单状态', dataType: 'dict' },
+      { code: 'customer_name', name: '客户名称', dataType: 'string' },
+      { code: 'order_title', name: '订单标题', dataType: 'text' },
+    ]);
+
+    expect(result.status).toBe('degraded');
+    expect(result.fieldOptions.groupByField.map((field) => field.code).slice(0, 2)).toEqual([
+      'order_status',
+      'customer_name',
+    ]);
+    expect(result.suggestedConfig.groupByField).toBe('order_status');
+    expect(result.suggestedConfig.titleField).toBe('order_title');
+  });
+
+  it('exposes stable reason codes for localized blocked messages', () => {
+    const result = checkSavedViewCapability('calendar', [
+      { code: 'name', name: 'Name', dataType: 'text' },
+    ]);
+
+    expect(result.status).toBe('blocked');
+    expect(result.reasonCodes).toEqual(['missing_date_field']);
   });
 
   it('marks gantt as degraded with a single date field but still provides mappings', () => {

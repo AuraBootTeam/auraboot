@@ -58,7 +58,7 @@ test.describe('SavedView — KANBAN View', () => {
         modelCode: MODEL_CODE,
         pageKey: SAVED_VIEW_PAGE_KEY,
         viewType: 'kanban',
-        scope: 'global',
+        scope: 'personal',
         viewConfig: {
           groupByField: 'e2et_order_status',
           titleField: 'e2et_order_title',
@@ -131,7 +131,7 @@ test.describe('SavedView — KANBAN View', () => {
     // Check for kanban board (SmartKanban wraps columns in a flex container)
     // or unconfigured message from KanbanView
     const kanbanBoard = page.locator('.flex.gap-4.overflow-x-auto');
-    const unconfiguredMsg = page.getByText('Kanban not configured');
+    const unconfiguredMsg = page.getByText('看板视图未配置');
     await expect(kanbanBoard.or(unconfiguredMsg).first()).toBeVisible({ timeout: 8000 });
   });
 
@@ -141,7 +141,7 @@ test.describe('SavedView — KANBAN View', () => {
 
     // Wait for kanban content
     const kanbanBoard = page.locator('.flex.gap-4.overflow-x-auto');
-    const unconfiguredMsg = page.getByText('Kanban not configured');
+    const unconfiguredMsg = page.getByText('看板视图未配置');
     await expect(kanbanBoard.or(unconfiguredMsg).first()).toBeVisible({ timeout: 8000 });
     // Look for draggable cards (KanbanCardItem uses role="button" with cursor-grab class)
     const cards = page.locator('[role="button"].cursor-grab, [draggable="true"]');
@@ -156,7 +156,7 @@ test.describe('SavedView — KANBAN View', () => {
 
     // Wait for kanban content
     const kanbanBoard = page.locator('.flex.gap-4.overflow-x-auto');
-    const unconfiguredMsg = page.getByText('Kanban not configured');
+    const unconfiguredMsg = page.getByText('看板视图未配置');
     await expect(kanbanBoard.or(unconfiguredMsg).first()).toBeVisible({ timeout: 8000 });
     // If cards exist, clicking one should open detail/modal (KanbanCardItem has role="button")
     const firstCard = page.locator('[role="button"].cursor-grab').first();
@@ -178,7 +178,7 @@ test.describe('SavedView — KANBAN View', () => {
 
     // Wait for kanban content
     const kanbanBoard = page.locator('.flex.gap-4.overflow-x-auto');
-    const unconfiguredMsg = page.getByText('Kanban not configured');
+    const unconfiguredMsg = page.getByText('看板视图未配置');
     await expect(kanbanBoard.or(unconfiguredMsg).first()).toBeVisible({ timeout: 8000 });
     // Check for column structure (SmartKanban columns use bg-gray-100 rounded-lg)
     const columns = page.locator('.bg-gray-100.rounded-lg');

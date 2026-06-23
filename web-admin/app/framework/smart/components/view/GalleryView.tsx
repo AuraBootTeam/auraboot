@@ -176,8 +176,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     return (
       <ViewEmptyState
         variant="not-configured"
-        title="Gallery not configured"
-        description="Please configure the Image Field to display the gallery view."
+        title="画册视图未配置"
+        description="请配置图片字段后再显示画册视图。"
         onConfigure={onOpenViewConfig}
         onSwitchToTableView={onSwitchToTableView}
         className={className}

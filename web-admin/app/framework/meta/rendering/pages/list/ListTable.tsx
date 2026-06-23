@@ -48,6 +48,9 @@ const ACTION_COLUMN_WIDTH = 112;
 // TreeView indent feel; the chevron sits within this space.
 const TREE_INDENT_PX = 20;
 
+const normalizeRowHeight = (value: unknown): RowHeight =>
+  typeof value === 'string' && value in ROW_HEIGHT_CONFIG ? (value as RowHeight) : DEFAULT_ROW_HEIGHT;
+
 function isAutoFillColumn(column: ColumnConfig): boolean {
   if (column.isActionColumn) return false;
   const renderHint = String((column as any).renderType ?? column.valueType ?? '').toLowerCase();
@@ -145,7 +148,7 @@ export const ListTable = React.memo(function ListTable({
   locale = 'en',
   treeConfig,
 }: ListTableProps) {
-  const effectiveRowHeight = rowHeight || DEFAULT_ROW_HEIGHT;
+  const effectiveRowHeight = normalizeRowHeight(rowHeight);
   const rowHeightCfg = ROW_HEIGHT_CONFIG[effectiveRowHeight];
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);

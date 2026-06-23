@@ -2,7 +2,7 @@
  * ViewSelector Component
  *
  * A dropdown component for selecting saved views.
- * Displays views grouped by scope (GLOBAL, TEAM, PERSONAL) with management options.
+ * This release exposes personal saved views only; team/global scopes remain roadmap.
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -10,12 +10,10 @@ import {
   AlertTriangle,
   Check,
   ChevronDown,
-  Globe,
   Lock,
   Plus,
   Settings,
   User,
-  Users,
 } from 'lucide-react';
 import { type SavedView, type ViewScope, type ViewType } from '~/framework/smart/types/savedView';
 import type { ViewRecommendation } from '~/framework/smart/hooks/useViewRecommendations';
@@ -62,32 +60,18 @@ interface ScopeConfig {
 }
 
 /**
- * Ordered scope configurations for grouping views
+ * Ordered scope configurations for grouping views.
+ *
+ * Personal-only release rule: do not render team/global groups from this selector.
  */
 const SCOPE_CONFIGS: ScopeConfig[] = [
   {
     scope: 'personal',
     labelKey: 'common.saved_view_personal_group',
-    fallback: 'Personal Views',
+    fallback: '个人视图',
     shortLabelKey: 'common.saved_view_scope_personal',
-    shortFallback: 'Mine',
+    shortFallback: '我的',
     Icon: User,
-  },
-  {
-    scope: 'team',
-    labelKey: 'common.saved_view_team_group',
-    fallback: 'Team Shared',
-    shortLabelKey: 'common.saved_view_scope_team',
-    shortFallback: 'Team',
-    Icon: Users,
-  },
-  {
-    scope: 'global',
-    labelKey: 'common.saved_view_global_group',
-    fallback: 'All Views',
-    shortLabelKey: 'common.saved_view_scope_global',
-    shortFallback: 'All',
-    Icon: Globe,
   },
 ];
 
@@ -238,22 +222,29 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
 }) => {
   const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
-  const selectViewLabel = t('common.saved_view_select', undefined, 'Select View');
-  const defaultLabel = t('common.saved_view_default', undefined, 'Default');
-  const newViewLabel = t('common.saved_view_new', undefined, 'New View');
-  const manageLabel = t('common.saved_view_manage', undefined, 'Manage Views');
-  const emptyLabel = t('common.saved_view_empty', undefined, 'No saved views available');
-  const lockedPresetLabel = t('common.saved_view_locked_preset', undefined, 'Preset');
+  const selectViewLabel = t('common.saved_view_select', undefined, '选择视图');
+  const defaultLabel = t('common.saved_view_default', undefined, '默认');
+  const newViewLabel = t('common.saved_view_new_personal', undefined, '新建个人视图');
+  const manageLabel = t('common.saved_view_manage', undefined, '管理视图');
+  const emptyLabel = t('common.saved_view_empty', undefined, '暂无保存视图');
+  const searchPlaceholder = t(
+    'common.saved_view_search_placeholder',
+    undefined,
+    '搜索我的视图...',
+  );
+  const lockedPresetLabel = t('common.saved_view_locked_preset', undefined, '预置');
   const capabilityBlockedLabel = t(
     'common.saved_view_capability_blocked',
     undefined,
-    'Needs setup',
+    '需配置',
   );
-  const currentScopeConfig = getScopeConfig(currentView?.scope ?? 'personal');
+  const displayCurrentView = currentView?.scope === 'personal' ? currentView : null;
+  const currentScopeConfig = getScopeConfig(displayCurrentView?.scope ?? 'personal');
   const CurrentScopeIcon = currentScopeConfig.Icon;
-  const isCurrentViewLockedPreset = isSavedViewLockedPreset(currentView);
-  const isCurrentViewCapabilityBlocked = isSavedViewCapabilityBlocked(currentView);
+  const isCurrentViewLockedPreset = isSavedViewLockedPreset(displayCurrentView);
+  const isCurrentViewCapabilityBlocked = isSavedViewCapabilityBlocked(displayCurrentView);
   const currentScopeLabel = t(
     currentScopeConfig.shortLabelKey,
     undefined,
@@ -333,14 +324,23 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   }, [onManageViews]);
 
   /**
-   * Group views by scope. The selector must always list all saved views; the
-   * current active type only seeds the "New View" flow.
+   * Group personal views only. Team/global views may exist in API responses for
+   * historical data, but they are not part of the current user-facing release.
    */
-  const groupedViews = SCOPE_CONFIGS.map((config) => ({
-    ...config,
-    label: t(config.labelKey, undefined, config.fallback),
-    views: views.filter((v) => v.scope === config.scope),
-  })).filter((group) => group.views.length > 0);
+  const groupedViews = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    return SCOPE_CONFIGS.map((config) => ({
+      ...config,
+      label: t(config.labelKey, undefined, config.fallback),
+      views: views
+        .filter((v) => v.scope === 'personal')
+        .filter((v) => {
+          if (!normalizedSearch) return true;
+          const haystack = `${v.name} ${v.description ?? ''} ${v.viewType ?? ''}`.toLowerCase();
+          return haystack.includes(normalizedSearch);
+        }),
+    })).filter((group) => group.views.length > 0);
+  }, [searchTerm, t, views]);
 
   const hasActions = onCreateView || onManageViews;
 
@@ -362,8 +362,8 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         data-testid="view-selector-trigger"
-        data-current-view-name={currentView?.name || ''}
-        data-current-view-type={currentView?.viewType || ''}
+        data-current-view-name={displayCurrentView?.name || ''}
+        data-current-view-type={displayCurrentView?.viewType || ''}
       >
         {loading ? (
           <>
@@ -373,7 +373,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
             />
             <span className="text-gray-400">{t('common.loading', undefined, 'Loading...')}</span>
           </>
-        ) : currentView ? (
+        ) : displayCurrentView ? (
           <>
             <CurrentScopeIcon className="h-4 w-4 flex-shrink-0 text-gray-500" aria-hidden="true" />
             <span
@@ -382,8 +382,8 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
             >
               {currentScopeLabel}
             </span>
-            <span className="flex-1 truncate text-left text-gray-900">{currentView.name}</span>
-            {currentView.isDefault && (
+            <span className="flex-1 truncate text-left text-gray-900">{displayCurrentView.name}</span>
+            {displayCurrentView.isDefault && (
               <span
                 className="flex-shrink-0 text-xs font-medium text-blue-600"
                 title={defaultLabel}
@@ -429,76 +429,102 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
           {/* View Groups */}
           <div className="max-h-64 overflow-y-auto py-1">
             {groupedViews.length === 0 ? (
-              <div className="px-3 py-4 text-center text-sm text-gray-500">
-                {emptyLabel}
+              <div>
+                <div className="border-b border-gray-100 p-2">
+                  <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.currentTarget.value)}
+                    placeholder={searchPlaceholder}
+                    aria-label={searchPlaceholder}
+                    className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    data-testid="view-selector-search"
+                  />
+                </div>
+                <div className="px-3 py-4 text-center text-sm text-gray-500">
+                  {emptyLabel}
+                </div>
               </div>
             ) : (
-              groupedViews.map((group, groupIndex) => (
-                <div key={group.scope}>
-                  {/* Group Separator */}
-                  {groupIndex > 0 && <div className="mx-2 my-1 h-px bg-gray-200" />}
-
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
-                    <group.Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                    {group.label}
-                  </div>
-
-                  {/* Group Items */}
-                  {group.views.map((view) => (
-                    <button
-                      key={view.pid}
-                      type="button"
-                      onClick={() => handleSelectView(view.pid)}
-                      data-testid={`view-option-${view.pid}`}
-                      data-view-name={view.name}
-                      data-view-type={view.viewType}
-                      className={cn(
-                        'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
-                        'hover:bg-gray-100 focus:bg-gray-100 focus:outline-none',
-                        'transition-colors duration-100',
-                        currentView?.pid === view.pid && 'bg-blue-50 text-blue-700',
-                      )}
-                      role="option"
-                      aria-selected={currentView?.pid === view.pid}
-                    >
-                      <ViewTypeIcon
-                        type={getViewTypeIcon(view.viewType)}
-                        className="h-3.5 w-3.5 flex-shrink-0 text-gray-400"
-                      />
-                      <span className="flex-1 truncate">{view.name}</span>
-                      {view.isDefault && (
-                        <span
-                          className="flex-shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700"
-                          title={defaultLabel}
-                        >
-                          {defaultLabel}
-                        </span>
-                      )}
-                      {isSavedViewLockedPreset(view) && (
-                        <span
-                          className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700"
-                          title={lockedPresetLabel}
-                        >
-                          <Lock className="h-3 w-3" aria-hidden="true" />
-                          {lockedPresetLabel}
-                        </span>
-                      )}
-                      {isSavedViewCapabilityBlocked(view) && (
-                        <span
-                          className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-700"
-                          title={capabilityBlockedLabel}
-                        >
-                          <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-                          {capabilityBlockedLabel}
-                        </span>
-                      )}
-                      {currentView?.pid === view.pid && (
-                        <Check className="h-4 w-4 flex-shrink-0 text-blue-600" aria-hidden="true" />
-                      )}
-                    </button>
-                  ))}
+              <>
+                <div className="border-b border-gray-100 p-2">
+                  <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.currentTarget.value)}
+                    placeholder={searchPlaceholder}
+                    aria-label={searchPlaceholder}
+                    className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    data-testid="view-selector-search"
+                  />
                 </div>
-              ))
+                {groupedViews.map((group, groupIndex) => (
+                  <div key={group.scope}>
+                    {/* Group Separator */}
+                    {groupIndex > 0 && <div className="mx-2 my-1 h-px bg-gray-200" />}
+
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
+                      <group.Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                      {group.label}
+                    </div>
+
+                    {/* Group Items */}
+                    {group.views.map((view) => (
+                      <button
+                        key={view.pid}
+                        type="button"
+                        onClick={() => handleSelectView(view.pid)}
+                        data-testid={`view-option-${view.pid}`}
+                        data-view-name={view.name}
+                        data-view-type={view.viewType}
+                        className={cn(
+                          'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
+                          'hover:bg-gray-100 focus:bg-gray-100 focus:outline-none',
+                          'transition-colors duration-100',
+                          displayCurrentView?.pid === view.pid && 'bg-blue-50 text-blue-700',
+                        )}
+                        role="option"
+                        aria-selected={displayCurrentView?.pid === view.pid}
+                      >
+                        <ViewTypeIcon
+                          type={getViewTypeIcon(view.viewType)}
+                          className="h-3.5 w-3.5 flex-shrink-0 text-gray-400"
+                        />
+                        <span className="flex-1 truncate">{view.name}</span>
+                        {view.isDefault && (
+                          <span
+                            className="flex-shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700"
+                            title={defaultLabel}
+                          >
+                            {defaultLabel}
+                          </span>
+                        )}
+                        {isSavedViewLockedPreset(view) && (
+                          <span
+                            className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700"
+                            title={lockedPresetLabel}
+                          >
+                            <Lock className="h-3 w-3" aria-hidden="true" />
+                            {lockedPresetLabel}
+                          </span>
+                        )}
+                        {isSavedViewCapabilityBlocked(view) && (
+                          <span
+                            className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-700"
+                            title={capabilityBlockedLabel}
+                          >
+                            <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                            {capabilityBlockedLabel}
+                          </span>
+                        )}
+                        {displayCurrentView?.pid === view.pid && (
+                          <Check className="h-4 w-4 flex-shrink-0 text-blue-600" aria-hidden="true" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </>
             )}
           </div>
 

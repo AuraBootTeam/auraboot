@@ -896,18 +896,21 @@ function ListPageContentInner(props: PageContentProps) {
     selectView,
     createView,
     updateView,
-    updateViewConfig,
     deleteView: deleteSavedView,
     setDefaultView,
     duplicateView,
     copyToPersonal,
     reload: reloadViews,
     loading: viewsLoading,
-  } = useSavedViews({ modelCode, pageKey, autoLoad: !!schema && !hideSavedViews && !skipListData });
-  const [pendingSharedViewConfig, setPendingSharedViewConfig] =
-    useState<Partial<ViewConfig> | null>(null);
-  const [savingSharedViewDraft, setSavingSharedViewDraft] = useState(false);
-  const [copyingSharedViewDraft, setCopyingSharedViewDraft] = useState(false);
+  } = useSavedViews({
+    modelCode,
+    pageKey,
+    scopeFilter: 'personal',
+    autoLoad: !!schema && !hideSavedViews && !skipListData,
+  });
+  const [pendingViewConfig, setPendingViewConfig] = useState<Partial<ViewConfig> | null>(null);
+  const [savingViewDraft, setSavingViewDraft] = useState(false);
+  const [copyingViewDraft, setCopyingViewDraft] = useState(false);
   const savedViewPersistenceMode = getSavedViewPersistenceMode(currentView);
   const isCurrentViewLockedPreset = isSavedViewLockedPreset(currentView);
   const canCopyCurrentView = canCopySavedView(currentView);
@@ -937,17 +940,21 @@ function ListPageContentInner(props: PageContentProps) {
   }, [currentView, hasPermission, isCurrentViewLockedPreset, savedViewPersistenceMode, user?.pid]);
   const hasPendingSharedViewConfig =
     savedViewPersistenceMode === 'shared-draft' &&
-    Object.keys(pendingSharedViewConfig ?? {}).length > 0;
+    Object.keys(pendingViewConfig ?? {}).length > 0;
+  const hasPendingPersonalViewConfig =
+    savedViewPersistenceMode === 'personal-persist' &&
+    Object.keys(pendingViewConfig ?? {}).length > 0;
+  const hasPendingViewConfig = hasPendingPersonalViewConfig || hasPendingSharedViewConfig;
   const effectiveViewConfig = useMemo(
     () =>
       currentView
-        ? mergeViewConfigPatch(currentView.viewConfig, pendingSharedViewConfig ?? {})
+        ? mergeViewConfigPatch(currentView.viewConfig, pendingViewConfig ?? {})
         : undefined,
-    [currentView, pendingSharedViewConfig],
+    [currentView, pendingViewConfig],
   );
-  const pendingSharedViewSummary = useMemo(
-    () => summarizeViewConfigPatch(pendingSharedViewConfig),
-    [pendingSharedViewConfig],
+  const pendingViewSummary = useMemo(
+    () => summarizeViewConfigPatch(pendingViewConfig),
+    [pendingViewConfig],
   );
   const translateCommon = useCallback(
     (key: string, fallback: string) => {
@@ -976,7 +983,7 @@ function ListPageContentInner(props: PageContentProps) {
   );
 
   useEffect(() => {
-    setPendingSharedViewConfig(null);
+    setPendingViewConfig(null);
   }, [currentView?.pid]);
 
   // Resolve modelPid from modelCode for ViewManagePanel field operations
@@ -2773,9 +2780,8 @@ function ListPageContentInner(props: PageContentProps) {
     return Array.from(fieldMap.values());
   }, [tableColumns, modelFieldMap, resolveColumnLabel]);
 
-  // Auto-save view config — delegates upsert logic to backend
-  // §3: after sort/filter/column/row-height changes auto-save to the current
-  // view, surface a quiet "已保存到当前视图" hint so the persistence is visible.
+  // Personal-only baseline: changes to an explicit personal view are staged as
+  // a visible local draft. The user chooses save-current, save-as-new, or discard.
   const [viewSavedHintOn, flashViewSavedHint] = useTransientFlag(2200);
 
   const ensureViewAndUpdateConfig = useCallback(
@@ -2785,10 +2791,8 @@ function ListPageContentInner(props: PageContentProps) {
     ) => {
       try {
         const persistenceMode = getSavedViewPersistenceMode(currentView);
-        if (persistenceMode === 'personal-persist') {
-          await updateViewConfig(config);
-        } else if (persistenceMode === 'shared-draft') {
-          setPendingSharedViewConfig((prev) => mergeViewConfigPatch(prev, config));
+        if (persistenceMode === 'personal-persist' || persistenceMode === 'shared-draft') {
+          setPendingViewConfig((prev) => mergeViewConfigPatch(prev, config));
         } else {
           // No explicit view — use backend auto-save (atomic upsert of implicit view)
           const view = await savedViewService.autoSave({
@@ -2801,7 +2805,7 @@ function ListPageContentInner(props: PageContentProps) {
             selectView(view.pid);
           }
         }
-        if (!options?.isStale?.() && persistenceMode !== 'shared-draft') {
+        if (!options?.isStale?.() && persistenceMode === 'implicit-autosave') {
           flashViewSavedHint();
         }
       } catch (err) {
@@ -2814,24 +2818,68 @@ function ListPageContentInner(props: PageContentProps) {
         }
       }
     },
-    [currentView, updateViewConfig, modelCode, pageKey, selectView, flashViewSavedHint],
+    [currentView, modelCode, pageKey, selectView, flashViewSavedHint],
   );
 
-  const handleCopySharedDraftToPersonal = useCallback(async () => {
-    if (!currentView) return;
+  const handleSaveCurrentViewDraft = useCallback(async () => {
+    if (!currentView || !hasPendingViewConfig || !pendingViewConfig) return;
+
+    setSavingViewDraft(true);
+    try {
+      await updateView({
+        viewConfig: mergeViewConfigPatch(currentView.viewConfig, pendingViewConfig),
+      });
+      setPendingViewConfig(null);
+      flashViewSavedHint();
+      showSuccessToast(
+        translateCommon('common.saved_view_current_saved', 'Current view saved'),
+      );
+    } catch (err) {
+      showErrorToast(
+        err instanceof Error
+          ? err.message
+          : translateCommon('common.saved_view_shared_save_failed', 'Failed to save view'),
+      );
+    } finally {
+      setSavingViewDraft(false);
+    }
+  }, [
+    currentView,
+    flashViewSavedHint,
+    hasPendingViewConfig,
+    pendingViewConfig,
+    showErrorToast,
+    showSuccessToast,
+    translateCommon,
+    updateView,
+  ]);
+
+  const handleSaveDraftAsPersonalView = useCallback(async () => {
+    if (!currentView || !hasPendingViewConfig || !pendingViewConfig) return;
     if (!canCopyCurrentView) {
       showErrorToast(
-        translateCommon('common.saved_view_copy_disabled_reason', 'This view cannot be copied'),
+        translateCommon('common.saved_view_copy_disabled_reason', '当前视图不能复制'),
       );
       return;
     }
-    setCopyingSharedViewDraft(true);
+    setCopyingViewDraft(true);
     try {
-      const copiedView = await copyToPersonal(currentView.pid, {
-        name: buildPersonalCopyName(currentView.name),
-        viewConfig: mergeViewConfigPatch(currentView.viewConfig, pendingSharedViewConfig ?? {}),
-      });
-      setPendingSharedViewConfig(null);
+      const mergedConfig = mergeViewConfigPatch(currentView.viewConfig, pendingViewConfig);
+      const copiedView =
+        currentView.scope === 'personal'
+          ? await createView({
+              name: buildPersonalCopyName(currentView.name),
+              modelCode,
+              pageKey,
+              scope: 'personal',
+              viewType: currentView.viewType ?? activeViewType ?? 'table',
+              viewConfig: mergedConfig,
+            })
+          : await copyToPersonal(currentView.pid, {
+              name: buildPersonalCopyName(currentView.name),
+              viewConfig: mergedConfig,
+            });
+      setPendingViewConfig(null);
       setSearchParams(
         (prev) => {
           const p = new URLSearchParams(prev);
@@ -2844,22 +2892,27 @@ function ListPageContentInner(props: PageContentProps) {
         { replace: true },
       );
       showSuccessToast(
-        translateCommon('common.saved_view_copied_to_personal', 'Copied as personal view'),
+        translateCommon('common.saved_view_copied_to_personal', '已另存为个人视图'),
       );
     } catch (err) {
       showErrorToast(
         err instanceof Error
           ? err.message
-          : translateCommon('common.saved_view_copy_failed', 'Failed to copy view'),
+          : translateCommon('common.saved_view_copy_failed', '复制视图失败'),
       );
     } finally {
-      setCopyingSharedViewDraft(false);
+      setCopyingViewDraft(false);
     }
   }, [
+    activeViewType,
     canCopyCurrentView,
     copyToPersonal,
+    createView,
     currentView,
-    pendingSharedViewConfig,
+    hasPendingViewConfig,
+    modelCode,
+    pageKey,
+    pendingViewConfig,
     setSearchParams,
     showErrorToast,
     showSuccessToast,
@@ -2867,18 +2920,18 @@ function ListPageContentInner(props: PageContentProps) {
   ]);
 
   const handleSaveSharedDraft = useCallback(async () => {
-    if (!currentView || !hasPendingSharedViewConfig || !pendingSharedViewConfig) return;
+    if (!currentView || !hasPendingSharedViewConfig || !pendingViewConfig) return;
 
     const targetName =
       currentView.scope === 'team'
         ? currentView.teamName || translateCommon('common.saved_view_scope_team', 'Team')
         : translateCommon('common.saved_view_scope_global', 'Global');
     const summaryText =
-      pendingSharedViewSummary.length > 0
-        ? pendingSharedViewSummary.join(', ')
+      pendingViewSummary.length > 0
+        ? pendingViewSummary.join(', ')
         : translateCommon('common.saved_view_shared_changes', 'view configuration');
     const confirmed = await confirmDialog({
-      title: translateCommon('common.saved_view_save_shared_confirm_title', 'Save shared view?'),
+      title: translateCommon('common.saved_view_save_shared_confirm_title', '保存到共享视图？'),
       content: translateCommon(
         'common.saved_view_save_shared_confirm_content',
         `This will update the shared view for ${targetName}. Changes: ${summaryText}.`,
@@ -2886,16 +2939,16 @@ function ListPageContentInner(props: PageContentProps) {
         .replace('{target}', targetName)
         .replace('{changes}', summaryText),
       confirmText: translateCommon('common.saved_view_save_shared', 'Save Shared View'),
-      cancelText: translateCommon('common.cancel', 'Cancel'),
+      cancelText: translateCommon('common.cancel', '取消'),
     });
     if (!confirmed) return;
 
-    setSavingSharedViewDraft(true);
+    setSavingViewDraft(true);
     try {
       await updateView({
-        viewConfig: mergeViewConfigPatch(currentView.viewConfig, pendingSharedViewConfig),
+        viewConfig: mergeViewConfigPatch(currentView.viewConfig, pendingViewConfig),
       });
-      setPendingSharedViewConfig(null);
+      setPendingViewConfig(null);
       flashViewSavedHint();
       showSuccessToast(
         translateCommon('common.saved_view_shared_saved', 'Shared view updated'),
@@ -2907,14 +2960,14 @@ function ListPageContentInner(props: PageContentProps) {
           : translateCommon('common.saved_view_shared_save_failed', 'Failed to save shared view'),
       );
     } finally {
-      setSavingSharedViewDraft(false);
+      setSavingViewDraft(false);
     }
   }, [
     currentView,
     flashViewSavedHint,
     hasPendingSharedViewConfig,
-    pendingSharedViewConfig,
-    pendingSharedViewSummary,
+    pendingViewConfig,
+    pendingViewSummary,
     showErrorToast,
     showSuccessToast,
     translateCommon,
@@ -3507,94 +3560,117 @@ function ListPageContentInner(props: PageContentProps) {
               <span className="bg-status-green rounded-pill h-1.5 w-1.5" aria-hidden="true" />
               {/* usePageRuntime's t() returns the key itself when missing, so a
                   plain `|| fallback` never fires — guard against the raw key leaking. */}
-              {((s) => (s && s !== 'common.view_saved' ? s : 'Saved to current view'))(
+              {((s) => (s && s !== 'common.view_saved' ? s : '已保存到当前视图'))(
                 t('common.view_saved'),
               )}
             </div>
           )}
-          {hasPendingSharedViewConfig && currentView && (
+          {hasPendingViewConfig && currentView && (
             <div
               className="absolute top-2 right-3 z-10 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 shadow-sm"
               role="status"
-              data-testid="shared-view-draft-banner"
+              data-testid={
+                hasPendingPersonalViewConfig
+                  ? 'personal-view-draft-banner'
+                  : 'shared-view-draft-banner'
+              }
             >
               <span>
-                {translateCommon(
-                  'common.saved_view_shared_draft',
-                  'Shared view has local changes',
-                )}
-                {pendingSharedViewSummary.length > 0 && (
+                {hasPendingPersonalViewConfig
+                  ? translateCommon(
+                      'common.saved_view_personal_draft',
+                      '当前个人视图有本地变更',
+                    )
+                  : translateCommon(
+                      'common.saved_view_shared_draft',
+                      '共享视图有本地变更',
+                    )}
+                {pendingViewSummary.length > 0 && (
                   <span className="ml-1 text-amber-700">
-                    {pendingSharedViewSummary.join(', ')}
+                    {pendingViewSummary.join(', ')}
                   </span>
                 )}
               </span>
               <button
                 type="button"
                 className="rounded px-2 py-1 font-medium text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={handleSaveSharedDraft}
-                disabled={!canSaveSharedView || savingSharedViewDraft}
+                onClick={hasPendingPersonalViewConfig ? handleSaveCurrentViewDraft : handleSaveSharedDraft}
+                disabled={
+                  (hasPendingSharedViewConfig && !canSaveSharedView) || savingViewDraft
+                }
                 title={
-                  canSaveSharedView
+                  hasPendingPersonalViewConfig
+                    ? translateCommon('common.saved_view_save_current', '保存当前视图')
+                    : canSaveSharedView
                     ? translateCommon(
                         'common.saved_view_save_shared_confirm_title',
-                        'Save shared view?',
+                        '保存到共享视图？',
                       )
                     : translateCommon(
                         isCurrentViewLockedPreset
                           ? 'common.saved_view_locked_preset_reason'
                           : 'common.saved_view_save_shared_disabled_reason',
                         isCurrentViewLockedPreset
-                          ? 'Plugin preset views cannot be saved directly. Copy it to My Views first.'
-                          : 'You do not have permission to save this shared view yet.',
+                          ? '插件预置视图不能直接保存，请先复制为个人视图。'
+                          : '你可以调整当前视图，但暂不能保存给团队或全员。',
                       )
                 }
                 data-testid={
-                  canSaveSharedView ? 'shared-view-save' : 'shared-view-save-disabled'
+                  hasPendingPersonalViewConfig
+                    ? 'personal-view-save-current'
+                    : canSaveSharedView
+                      ? 'shared-view-save'
+                      : 'shared-view-save-disabled'
                 }
               >
-                {savingSharedViewDraft
-                  ? translateCommon('common.saving', 'Saving...')
-                  : translateCommon('common.saved_view_save_shared', 'Save Shared View')}
+                {savingViewDraft
+                  ? translateCommon('common.saving', '保存中...')
+                  : hasPendingPersonalViewConfig
+                    ? translateCommon('common.saved_view_save_current', '保存当前视图')
+                    : translateCommon('common.saved_view_save_shared', '保存到共享视图')}
               </button>
-              {!canSaveSharedView && (
+              {hasPendingSharedViewConfig && !canSaveSharedView && (
                 <span className="text-amber-700">
                   {translateCommon(
                     isCurrentViewLockedPreset
                       ? 'common.saved_view_locked_preset_reason'
                       : 'common.saved_view_save_shared_disabled_reason',
                     isCurrentViewLockedPreset
-                      ? 'Plugin preset views cannot be saved directly. Copy it to My Views first.'
-                      : 'You do not have permission to save this shared view yet.',
+                      ? '插件预置视图不能直接保存，请先复制为个人视图。'
+                      : '你可以调整当前视图，但暂不能保存给团队或全员。',
                   )}
                 </span>
               )}
               <button
                 type="button"
                 className="rounded px-2 py-1 font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60"
-                onClick={handleCopySharedDraftToPersonal}
-                disabled={copyingSharedViewDraft || !canCopyCurrentView}
+                onClick={handleSaveDraftAsPersonalView}
+                disabled={copyingViewDraft || !canCopyCurrentView}
                 title={
                   canCopyCurrentView
-                    ? translateCommon('common.saved_view_copy_to_personal', 'Copy to My View')
+                    ? translateCommon('common.saved_view_save_as_personal', '另存为新视图')
                     : translateCommon(
                         'common.saved_view_copy_disabled_reason',
-                        'This view cannot be copied',
+                        '当前视图不能复制',
                       )
                 }
-                data-testid="shared-view-copy-to-personal"
+                data-testid="personal-view-save-as-new"
               >
-                {copyingSharedViewDraft
-                  ? translateCommon('common.saving', 'Saving...')
-                  : translateCommon('common.saved_view_copy_to_personal', 'Copy to My View')}
+                {copyingViewDraft
+                  ? translateCommon('common.saving', '保存中...')
+                  : translateCommon('common.saved_view_save_as_personal', '另存为新视图')}
               </button>
               <button
                 type="button"
                 className="rounded px-2 py-1 text-amber-800 hover:bg-amber-100"
-                onClick={() => setPendingSharedViewConfig(null)}
-                data-testid="shared-view-dismiss-draft"
+                onClick={() => setPendingViewConfig(null)}
+                data-testid={
+                  hasPendingPersonalViewConfig
+                    ? 'personal-view-discard-draft'
+                    : 'shared-view-dismiss-draft'
+                }
               >
-                {translateCommon('common.saved_view_dismiss_draft', 'Discard')}
+                {translateCommon('common.saved_view_dismiss_draft', '放弃')}
               </button>
             </div>
           )}
@@ -4094,7 +4170,10 @@ function ListPageContentInner(props: PageContentProps) {
                         data-testid="filter-save"
                         onClick={handleSaveFilters}
                         className="rounded-control text-text-2 hover:bg-hover hover:text-text-2 px-3 py-2 text-sm transition-colors"
-                        title="Save filters to current view"
+                        title={translateCommon(
+                          'common.saved_view_save_filters',
+                          '保存筛选到当前视图',
+                        )}
                       >
                         <svg
                           className="mr-1 inline h-4 w-4"
@@ -4436,6 +4515,17 @@ function ListPageContentInner(props: PageContentProps) {
             }}
             onSelectView={(pid) => {
               selectView(pid);
+              setSearchParams(
+                (prev) => {
+                  const p = new URLSearchParams(prev);
+                  p.set('view', pid);
+                  p.delete('sort');
+                  p.delete('keyword');
+                  p.delete('filters');
+                  return p;
+                },
+                { replace: true },
+              );
               const view = savedViews.find((v) => v.pid === pid);
               setActiveViewType((view?.viewType as ViewType) || 'table');
             }}

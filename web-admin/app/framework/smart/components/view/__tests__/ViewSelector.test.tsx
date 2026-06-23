@@ -17,6 +17,7 @@ const ZH = {
     saved_view_scope_global: '全员',
     saved_view_default: '默认',
     saved_view_new: '新建视图',
+    saved_view_new_personal: '新建个人视图',
     saved_view_manage: '管理视图',
     saved_view_empty: '暂无保存视图',
     saved_view_locked_preset: '预置',
@@ -61,7 +62,7 @@ function renderSelector(
 }
 
 describe('ViewSelector', () => {
-  it('opens a Feishu-style grouped dropdown from the title trigger without entering management', () => {
+  it('opens a personal-only dropdown from the title trigger without entering management', () => {
     const onManageViews = vi.fn();
     renderSelector({ onManageViews });
 
@@ -70,11 +71,11 @@ describe('ViewSelector', () => {
     expect(onManageViews).not.toHaveBeenCalled();
     const listbox = screen.getByRole('listbox', { name: '选择视图' });
     expect(listbox).toHaveTextContent('个人视图');
-    expect(listbox).toHaveTextContent('团队共享');
-    expect(listbox).toHaveTextContent('全员视图');
     expect(listbox).toHaveTextContent('我的表格');
-    expect(listbox).toHaveTextContent('研发团队看板');
-    expect(listbox).toHaveTextContent('全员默认');
+    expect(listbox).not.toHaveTextContent('团队共享');
+    expect(listbox).not.toHaveTextContent('全员视图');
+    expect(listbox).not.toHaveTextContent('研发团队看板');
+    expect(listbox).not.toHaveTextContent('全员默认');
   });
 
   it('selects a view from the dropdown and closes it', () => {
@@ -82,31 +83,25 @@ describe('ViewSelector', () => {
     renderSelector({ onSelectView });
 
     fireEvent.click(screen.getByTestId('view-selector-trigger'));
-    fireEvent.click(screen.getByTestId('view-option-view-team'));
+    fireEvent.click(screen.getByTestId('view-option-view-personal'));
 
-    expect(onSelectView).toHaveBeenCalledWith('view-team');
+    expect(onSelectView).toHaveBeenCalledWith('view-personal');
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
-  it('shows current scope in the collapsed trigger', () => {
-    const currentView = makeView({
-      pid: 'view-team',
-      name: '研发团队看板',
-      scope: 'team',
-      teamName: '研发团队',
-    });
-    renderSelector({ currentView });
+  it('shows personal scope in the collapsed trigger', () => {
+    renderSelector();
 
     const trigger = screen.getByTestId('view-selector-trigger');
-    expect(screen.getByTestId('view-selector-scope-label')).toHaveTextContent('团队');
-    expect(trigger).toHaveTextContent('研发团队看板');
+    expect(screen.getByTestId('view-selector-scope-label')).toHaveTextContent('我的');
+    expect(trigger).toHaveTextContent('我的表格');
   });
 
   it('marks locked plugin presets in the trigger and dropdown', () => {
     const pluginView = makeView({
       pid: 'plugin-view',
       name: '插件预置表格',
-      scope: 'global',
+      scope: 'personal',
       viewConfig: { meta: { managedBy: 'plugin', locked: true, allowUserCopy: true } },
     });
     renderSelector({ views: [pluginView], currentView: pluginView });
@@ -120,7 +115,7 @@ describe('ViewSelector', () => {
     const blockedView = makeView({
       pid: 'blocked-gantt',
       name: '甘特预置',
-      scope: 'global',
+      scope: 'personal',
       viewType: 'gantt',
       viewConfig: { meta: { capabilityStatus: 'blocked' } },
     });
@@ -139,6 +134,7 @@ describe('ViewSelector', () => {
     fireEvent.click(screen.getByTestId('view-selector-trigger'));
     fireEvent.click(screen.getByTestId('view-selector-create'));
     expect(onCreateView).toHaveBeenCalledWith('gantt');
+    expect(screen.queryByText('新建视图')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('view-selector-trigger'));
     fireEvent.click(screen.getByTestId('view-selector-manage'));
