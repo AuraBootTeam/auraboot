@@ -33,6 +33,11 @@ async function getViewViaApi(page: Page, pid: string): Promise<any> {
   return body.data ?? body;
 }
 
+async function deleteViewViaApi(page: Page, pid: string): Promise<void> {
+  if (!pid) return;
+  await page.request.delete(`/api/views/${pid}`).catch(() => {});
+}
+
 test.describe('Timeline View (GAP-128)', () => {
   test('TL-001: TIMELINE viewType accepted by API', async ({ page }) => {
     await page.goto('/');
@@ -45,11 +50,15 @@ test.describe('Timeline View (GAP-128)', () => {
       timelineResourceField: 'e2et_order_customer',
       timelineTitleField: 'e2et_order_title',
     });
-    expect(pid).toBeTruthy();
+    try {
+      expect(pid).toBeTruthy();
 
-    const view = await getViewViaApi(page, pid);
-    expect(view.viewType).toBe('timeline');
-    expect(view.viewConfig?.timelineStartField).toBe('e2et_order_date');
+      const view = await getViewViaApi(page, pid);
+      expect(view.viewType).toBe('timeline');
+      expect(view.viewConfig?.timelineStartField).toBe('e2et_order_date');
+    } finally {
+      await deleteViewViaApi(page, pid);
+    }
   });
 
   test('TL-002: timeline with resource grouping field', async ({ page }) => {
@@ -63,10 +72,14 @@ test.describe('Timeline View (GAP-128)', () => {
       timelineResourceField: 'e2et_order_customer',
       timelineTitleField: 'e2et_order_title',
     });
-    expect(pid).toBeTruthy();
+    try {
+      expect(pid).toBeTruthy();
 
-    const view = await getViewViaApi(page, pid);
-    expect(view.viewConfig?.timelineResourceField).toBe('e2et_order_customer');
+      const view = await getViewViaApi(page, pid);
+      expect(view.viewConfig?.timelineResourceField).toBe('e2et_order_customer');
+    } finally {
+      await deleteViewViaApi(page, pid);
+    }
   });
 
   test('TL-003: timeline view renders without errors', async ({ page }) => {
@@ -100,14 +113,18 @@ test.describe('Timeline View (GAP-128)', () => {
       timelineResourceField: 'e2et_order_customer',
       timelineTitleField: 'e2et_order_title',
     });
-    expect(pid).toBeTruthy();
+    try {
+      expect(pid).toBeTruthy();
 
-    // Re-fetch
-    const view = await getViewViaApi(page, pid);
-    expect(view.viewConfig?.timelineStartField).toBe('e2et_order_date');
-    expect(view.viewConfig?.timelineEndField).toBe('e2et_order_date');
-    expect(view.viewConfig?.timelineResourceField).toBe('e2et_order_customer');
-    expect(view.viewConfig?.timelineTitleField).toBe('e2et_order_title');
+      // Re-fetch
+      const view = await getViewViaApi(page, pid);
+      expect(view.viewConfig?.timelineStartField).toBe('e2et_order_date');
+      expect(view.viewConfig?.timelineEndField).toBe('e2et_order_date');
+      expect(view.viewConfig?.timelineResourceField).toBe('e2et_order_customer');
+      expect(view.viewConfig?.timelineTitleField).toBe('e2et_order_title');
+    } finally {
+      await deleteViewViaApi(page, pid);
+    }
   });
 
   test('TL-005: TIMELINE in VIEW_TYPE_CONFIGS', async ({ page }) => {
@@ -132,7 +149,9 @@ test.describe('Timeline View (GAP-128)', () => {
     expect(pid).toBe('');
   });
 
-  test('TL-007: incompatible timeline field mapping is rejected by backend semantics', async ({ page }) => {
+  test('TL-007: incompatible timeline field mapping is rejected by backend semantics', async ({
+    page,
+  }) => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 

@@ -45,6 +45,7 @@ const REQUIRED_COMMON_KEYS = [
   'saved_view_scope_team',
   'saved_view_scope_global',
   'saved_view_default',
+  'saved_view_default_view',
   'saved_view_new',
   'saved_view_new_personal',
   'saved_view_manage',

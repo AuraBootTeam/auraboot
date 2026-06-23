@@ -7,7 +7,7 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
-import { createOrReuseSavedView } from './helpers';
+import { cleanupGeneratedSavedViews, createOrReuseSavedView } from './helpers';
 
 async function createKanbanViewViaApi(
   page: Page,
@@ -34,6 +34,14 @@ async function getViewViaApi(page: Page, pid: string): Promise<any> {
 }
 
 test.describe('Kanban Enhanced Grouping (GAP-129)', () => {
+  test.beforeEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, { modelCode: 'e2et_order', pageKey: 'e2et_order_list' });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, { modelCode: 'e2et_order', pageKey: 'e2et_order_list' });
+  });
+
   test('KG-001: BOOLEAN field accepted as groupByField', async ({ page }) => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });

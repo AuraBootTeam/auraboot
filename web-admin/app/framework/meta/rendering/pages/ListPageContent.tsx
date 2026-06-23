@@ -107,6 +107,7 @@ import {
   buildPersonalCopyName,
   canCopySavedView,
   getSavedViewPersistenceMode,
+  isImplicitSavedView,
   isSavedViewLockedPreset,
   mergeViewConfigPatch,
   summarizeViewConfigPatch,
@@ -123,6 +124,13 @@ interface DynamicEntity {
   [key: string]: any;
   id?: string;
   pid?: string;
+}
+
+interface ListLoadDataParams {
+  page?: number;
+  size?: number;
+  filters?: Record<string, any>;
+  sorts?: SortConfig[];
 }
 
 export interface ListReferenceDisplayConfig {
@@ -194,6 +202,74 @@ function normalizePresetFilters(filters: ViewFilterConfig[] | undefined): string
     .sort();
 }
 
+export function viewConfigFiltersToRuntimeFilters(
+  filters: ViewFilterConfig[] | undefined,
+): Record<string, any> {
+  const restoredFilters: Record<string, any> = {};
+  for (const filter of filters ?? []) {
+    restoredFilters[filter.fieldCode] = filter.value;
+  }
+  return restoredFilters;
+}
+
+function clearTransientViewSearchParams(params: URLSearchParams): void {
+  for (const key of Array.from(params.keys())) {
+    if (
+      key === 'sort' ||
+      key === 'keyword' ||
+      key === 'filters' ||
+      key === 'preset' ||
+      key === 'pageNum' ||
+      key.startsWith('filter_')
+    ) {
+      params.delete(key);
+    }
+  }
+}
+
+function stableConfigString(value: unknown): string {
+  return JSON.stringify(value ?? null);
+}
+
+function isNoopViewConfigPatchEntry(
+  key: keyof ViewConfig,
+  value: unknown,
+  baseValue: unknown,
+): boolean {
+  if (value === undefined) {
+    return true;
+  }
+  if (key === 'sorts') {
+    return areSortsEqual(
+      Array.isArray(baseValue) ? (baseValue as SortConfig[]) : [],
+      Array.isArray(value) ? (value as SortConfig[]) : [],
+    );
+  }
+  if (Array.isArray(value)) {
+    const normalizedBase = Array.isArray(baseValue) ? baseValue : [];
+    return stableConfigString(value) === stableConfigString(normalizedBase);
+  }
+  return stableConfigString(value) === stableConfigString(baseValue);
+}
+
+export function pruneNoopViewConfigPatch(
+  base: ViewConfig | Partial<ViewConfig> | null | undefined,
+  patch: Partial<ViewConfig> | null | undefined,
+): Partial<ViewConfig> | null {
+  if (!patch) {
+    return null;
+  }
+
+  const pruned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch) as Array<[keyof ViewConfig, unknown]>) {
+    if (!isNoopViewConfigPatchEntry(key, value, base?.[key])) {
+      pruned[key] = value;
+    }
+  }
+
+  return Object.keys(pruned).length > 0 ? (pruned as Partial<ViewConfig>) : null;
+}
+
 export function isPersonalPresetSavedViewEdited(
   view: Pick<SavedView, 'scope' | 'viewConfig'> | null | undefined,
   presetKey: QuickFilterPresetKey,
@@ -201,8 +277,10 @@ export function isPersonalPresetSavedViewEdited(
 ): boolean {
   if (getActiveSavedQuickFilterPresetKey(view) !== presetKey) return false;
   const presetFilters = buildQuickFilterPresetViewFilters(buildQuickFilterPreset(presetKey, ctx));
-  return stableStringify(normalizePresetFilters(view?.viewConfig?.filters)) !==
-    stableStringify(normalizePresetFilters(presetFilters));
+  return (
+    stableStringify(normalizePresetFilters(view?.viewConfig?.filters)) !==
+    stableStringify(normalizePresetFilters(presetFilters))
+  );
 }
 
 export function resolveListSavedViewPageKey(
@@ -349,7 +427,7 @@ export function buildViewManageFieldOptions(
     const fallbackName =
       typeof column.label === 'string'
         ? column.label
-        : byCode.get(column.field)?.name ?? column.field;
+        : (byCode.get(column.field)?.name ?? column.field);
     byCode.set(column.field, {
       code: column.field,
       name: fallbackName,
@@ -853,6 +931,25 @@ function ListPageContentInner(props: PageContentProps) {
     column: ColumnConfig;
   } | null>(null);
   const [activeQuickFilter, setActiveQuickFilter] = useState<QuickFilterKey | null>(null);
+  const activeQuickFilterRef = useRef<QuickFilterKey | null>(null);
+
+  useEffect(() => {
+    activeQuickFilterRef.current = activeQuickFilter;
+  }, [activeQuickFilter]);
+
+  useEffect(() => {
+    if (!urlViewPid || !searchParams.has('preset')) return;
+    setActiveQuickFilter(null);
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('preset');
+        return p;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams, urlViewPid]);
+
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [filterFormVisible, setFilterFormVisible] = useState(false);
   const [activeViewType, setActiveViewType] = useState<ViewType>('table');
@@ -872,10 +969,7 @@ function ListPageContentInner(props: PageContentProps) {
   // When restoring a preset view from ?preset= on mount, skip the first run of
   // the debounced sort/filter effect so it doesn't re-fetch with empty filters.
   const skipFirstSortFilterEffectRef = useRef(false);
-  const loadDataRef = useRef<
-    | ((params?: { page?: number; size?: number; filters?: Record<string, any> }) => Promise<void>)
-    | null
-  >(null);
+  const loadDataRef = useRef<((params?: ListLoadDataParams) => Promise<void>) | null>(null);
 
   // Record preview drawer state
   const [previewRecordId, setPreviewRecordId] = useState<string | null>(null);
@@ -894,6 +988,8 @@ function ListPageContentInner(props: PageContentProps) {
     views: savedViews,
     currentView,
     selectView,
+    selectDefaultView,
+    upsertView,
     createView,
     updateView,
     deleteView: deleteSavedView,
@@ -939,8 +1035,7 @@ function ListPageContentInner(props: PageContentProps) {
     return false;
   }, [currentView, hasPermission, isCurrentViewLockedPreset, savedViewPersistenceMode, user?.pid]);
   const hasPendingSharedViewConfig =
-    savedViewPersistenceMode === 'shared-draft' &&
-    Object.keys(pendingViewConfig ?? {}).length > 0;
+    savedViewPersistenceMode === 'shared-draft' && Object.keys(pendingViewConfig ?? {}).length > 0;
   const hasPendingPersonalViewConfig =
     savedViewPersistenceMode === 'personal-persist' &&
     Object.keys(pendingViewConfig ?? {}).length > 0;
@@ -1065,30 +1160,40 @@ function ListPageContentInner(props: PageContentProps) {
     setActiveViewType((currentView.viewType as ViewType) || 'table');
   }, [currentView?.pid, currentView?.viewType]);
 
-  // Apply SavedView viewConfig (pagination + filters) when view changes
-  useEffect(() => {
-    if (!currentView?.viewConfig) return;
-    const vc = currentView.viewConfig;
-    if (vc.pagination?.pageSize && vc.pagination.pageSize > 0) {
-      setPagination((prev: typeof pagination) => ({
-        ...prev,
-        pageSize: vc.pagination!.pageSize!,
-      }));
-    }
-    // Apply saved filters
-    if (vc.filters && vc.filters.length > 0) {
-      const restoredFilters: Record<string, any> = {};
-      vc.filters.forEach((f) => {
-        restoredFilters[f.fieldCode] = f.value;
-      });
+  const applyViewConfigToListState = useCallback(
+    (viewConfig: ViewConfig | undefined): Record<string, any> => {
+      const vc = viewConfig ?? {};
+      const restoredFilters = viewConfigFiltersToRuntimeFilters(vc.filters);
+
       pendingSavedViewFiltersRef.current = restoredFilters;
       setFilters(restoredFilters);
-    }
-    // Apply saved sorts
-    if (vc.sorts && vc.sorts.length > 0) {
-      setActiveSorts((prev) => (areSortsEqual(prev, vc.sorts) ? prev : vc.sorts!));
-    }
-  }, [currentView, setPagination, setFilters]);
+
+      const restoredSorts = vc.sorts ?? [];
+      setActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
+
+      if (vc.pagination?.pageSize && vc.pagination.pageSize > 0) {
+        setPagination((prev: typeof pagination) => ({
+          ...prev,
+          pageSize: vc.pagination!.pageSize!,
+        }));
+      }
+
+      return restoredFilters;
+    },
+    [setFilters, setPagination],
+  );
+
+  // Apply SavedView viewConfig (pagination + filters + sorts) when view changes.
+  // Empty config is meaningful: it restores the selected view back to a clean list state.
+  useEffect(() => {
+    if (!currentView) return;
+    applyViewConfigToListState(currentView.viewConfig);
+  }, [currentView?.pid, currentView?.viewConfig, applyViewConfigToListState]);
+
+  const clearKeyword = useCallback(() => {
+    keywordRef.current = '';
+    _setKeyword('');
+  }, []);
 
   // Dict data cache
   const dictDataCache = useRef<Map<string, DictItem[]>>(new Map());
@@ -1292,7 +1397,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Load data from API - P2-1 fix: use destructured pagination
   const loadData = useCallback(
-    async (params?: { page?: number; size?: number; filters?: Record<string, any> }) => {
+    async (params?: ListLoadDataParams) => {
       if (!schema || skipListData) {
         setData([]);
         setError(null);
@@ -1328,6 +1433,7 @@ function ListPageContentInner(props: PageContentProps) {
         const requestedPageNum = (params?.page ?? pagination.current - 1) + 1;
         const requestedPageSize = params?.size ?? pagination.pageSize;
         const requestedPageZeroBased = Math.max(requestedPageNum - 1, 0);
+        const requestedSorts = params?.sorts ?? activeSorts;
         const queryParams: Record<string, any> = {};
 
         if (isApiDatasource) {
@@ -1352,9 +1458,9 @@ function ListPageContentInner(props: PageContentProps) {
               }
             }
           }
-          if (activeSorts.length === 1) {
-            queryParams.sortField = activeSorts[0].fieldCode;
-            queryParams.sortOrder = activeSorts[0].direction;
+          if (requestedSorts.length === 1) {
+            queryParams.sortField = requestedSorts[0].fieldCode;
+            queryParams.sortOrder = requestedSorts[0].direction;
           } else if (tableBlock?.defaultSort?.field) {
             queryParams.sortField = tableBlock.defaultSort.field;
             queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
@@ -1368,13 +1474,13 @@ function ListPageContentInner(props: PageContentProps) {
           }
           // Use active sorts (user-driven) > SavedView sorts > DSL defaultSort
           // Multi-field sort: use sortFields param (field:direction pairs) when >1 sort
-          if (activeSorts.length > 1) {
-            queryParams.sortFields = activeSorts
+          if (requestedSorts.length > 1) {
+            queryParams.sortFields = requestedSorts
               .map((s) => `${s.fieldCode}:${s.direction}`)
               .join(',');
-          } else if (activeSorts.length === 1) {
-            queryParams.sortField = activeSorts[0].fieldCode;
-            queryParams.sortOrder = activeSorts[0].direction;
+          } else if (requestedSorts.length === 1) {
+            queryParams.sortField = requestedSorts[0].fieldCode;
+            queryParams.sortOrder = requestedSorts[0].direction;
           } else if (tableBlock?.defaultSort?.field) {
             queryParams.sortField = tableBlock.defaultSort.field;
             queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
@@ -1461,12 +1567,53 @@ function ListPageContentInner(props: PageContentProps) {
     loadDataRef.current = loadData;
   }, [loadData]);
 
+  const handleSelectDefaultView = useCallback(() => {
+    const implicitDefaultView =
+      savedViews.find((view) => view.scope === 'personal' && isImplicitSavedView(view)) ?? null;
+    const implicitViewConfig = implicitDefaultView?.viewConfig;
+    const restoredFilters = applyViewConfigToListState(implicitViewConfig);
+    const restoredSorts = implicitViewConfig?.sorts ?? [];
+    setPendingViewConfig(null);
+    selectDefaultView();
+    setActiveQuickFilter(null);
+    clearKeyword();
+    setActiveViewType((implicitDefaultView?.viewType as ViewType) || 'table');
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('view');
+        clearTransientViewSearchParams(p);
+        return p;
+      },
+      { replace: true },
+    );
+    loadData({
+      page: 0,
+      size: pagination.pageSize,
+      filters: restoredFilters,
+      sorts: restoredSorts,
+    });
+  }, [
+    applyViewConfigToListState,
+    clearKeyword,
+    loadData,
+    pagination.pageSize,
+    savedViews,
+    selectDefaultView,
+    setSearchParams,
+  ]);
+
   useEffect(() => {
     const restoredFilters = pendingSavedViewFiltersRef.current;
     if (!restoredFilters) return;
     pendingSavedViewFiltersRef.current = null;
-    loadData({ page: 0, size: pagination.pageSize, filters: restoredFilters });
-  }, [currentView?.pid, loadData, pagination.pageSize]);
+    loadData({
+      page: 0,
+      size: pagination.pageSize,
+      filters: restoredFilters,
+      sorts: currentView?.viewConfig?.sorts ?? [],
+    });
+  }, [currentView?.pid, currentView?.viewConfig?.sorts, loadData, pagination.pageSize]);
 
   // Use unified action handler hook
   // IMPORTANT: Must be declared before any useEffect that references handleAction
@@ -1895,10 +2042,7 @@ function ListPageContentInner(props: PageContentProps) {
       );
     }
     if (viewsLoading) return;
-    if (
-      effectiveViewConfig?.sorts &&
-      areSortsEqual(effectiveViewConfig.sorts, activeSorts)
-    ) {
+    if (areSortsEqual(effectiveViewConfig?.sorts ?? [], activeSorts)) {
       return;
     }
     autoSave({ sorts: activeSorts });
@@ -2661,10 +2805,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Row style from conditional formats
   const getRowStyle = useCallback(
     (record: Record<string, any>): React.CSSProperties | undefined => {
-      const cfStyle = evaluateConditionalFormats(
-        effectiveViewConfig?.conditionalFormats,
-        record,
-      );
+      const cfStyle = evaluateConditionalFormats(effectiveViewConfig?.conditionalFormats, record);
       return buildConditionalStyle(cfStyle);
     },
     [effectiveViewConfig?.conditionalFormats],
@@ -2762,10 +2903,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   const viewManageFields = useMemo(() => {
     const fieldMap = new Map(
-      buildViewManageFieldOptions(tableColumns, modelFieldMap).map((field) => [
-        field.code,
-        field,
-      ]),
+      buildViewManageFieldOptions(tableColumns, modelFieldMap).map((field) => [field.code, field]),
     );
 
     for (const column of tableColumns) {
@@ -2792,7 +2930,9 @@ function ListPageContentInner(props: PageContentProps) {
       try {
         const persistenceMode = getSavedViewPersistenceMode(currentView);
         if (persistenceMode === 'personal-persist' || persistenceMode === 'shared-draft') {
-          setPendingViewConfig((prev) => mergeViewConfigPatch(prev, config));
+          setPendingViewConfig((prev) =>
+            pruneNoopViewConfigPatch(currentView?.viewConfig, mergeViewConfigPatch(prev, config)),
+          );
         } else {
           // No explicit view — use backend auto-save (atomic upsert of implicit view)
           const view = await savedViewService.autoSave({
@@ -2800,9 +2940,9 @@ function ListPageContentInner(props: PageContentProps) {
             pageKey,
             viewConfig: config,
           });
-          // Select the newly created implicit view so subsequent saves go through updateViewConfig
+          // Apply the returned implicit view immediately; reloading should not be required.
           if (view) {
-            selectView(view.pid);
+            upsertView(view);
           }
         }
         if (!options?.isStale?.() && persistenceMode === 'implicit-autosave') {
@@ -2818,7 +2958,7 @@ function ListPageContentInner(props: PageContentProps) {
         }
       }
     },
-    [currentView, modelCode, pageKey, selectView, flashViewSavedHint],
+    [currentView, modelCode, pageKey, upsertView, flashViewSavedHint],
   );
 
   const handleSaveCurrentViewDraft = useCallback(async () => {
@@ -2831,9 +2971,7 @@ function ListPageContentInner(props: PageContentProps) {
       });
       setPendingViewConfig(null);
       flashViewSavedHint();
-      showSuccessToast(
-        translateCommon('common.saved_view_current_saved', 'Current view saved'),
-      );
+      showSuccessToast(translateCommon('common.saved_view_current_saved', 'Current view saved'));
     } catch (err) {
       showErrorToast(
         err instanceof Error
@@ -2854,12 +2992,45 @@ function ListPageContentInner(props: PageContentProps) {
     updateView,
   ]);
 
+  const handleDiscardViewDraft = useCallback(() => {
+    if (!currentView) {
+      setPendingViewConfig(null);
+      return;
+    }
+
+    const restoredFilters = applyViewConfigToListState(currentView.viewConfig);
+    const restoredSorts = currentView.viewConfig?.sorts ?? [];
+    setPendingViewConfig(null);
+    setActiveQuickFilter(null);
+    clearKeyword();
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.set('view', currentView.pid);
+        clearTransientViewSearchParams(p);
+        return p;
+      },
+      { replace: true },
+    );
+    loadData({
+      page: 0,
+      size: currentView.viewConfig?.pagination?.pageSize ?? pagination.pageSize,
+      filters: restoredFilters,
+      sorts: restoredSorts,
+    });
+  }, [
+    applyViewConfigToListState,
+    clearKeyword,
+    currentView,
+    loadData,
+    pagination.pageSize,
+    setSearchParams,
+  ]);
+
   const handleSaveDraftAsPersonalView = useCallback(async () => {
     if (!currentView || !hasPendingViewConfig || !pendingViewConfig) return;
     if (!canCopyCurrentView) {
-      showErrorToast(
-        translateCommon('common.saved_view_copy_disabled_reason', '当前视图不能复制'),
-      );
+      showErrorToast(translateCommon('common.saved_view_copy_disabled_reason', '当前视图不能复制'));
       return;
     }
     setCopyingViewDraft(true);
@@ -2891,9 +3062,7 @@ function ListPageContentInner(props: PageContentProps) {
         },
         { replace: true },
       );
-      showSuccessToast(
-        translateCommon('common.saved_view_copied_to_personal', '已另存为个人视图'),
-      );
+      showSuccessToast(translateCommon('common.saved_view_copied_to_personal', '已另存为个人视图'));
     } catch (err) {
       showErrorToast(
         err instanceof Error
@@ -2950,9 +3119,7 @@ function ListPageContentInner(props: PageContentProps) {
       });
       setPendingViewConfig(null);
       flashViewSavedHint();
-      showSuccessToast(
-        translateCommon('common.saved_view_shared_saved', 'Shared view updated'),
-      );
+      showSuccessToast(translateCommon('common.saved_view_shared_saved', 'Shared view updated'));
     } catch (err) {
       showErrorToast(
         err instanceof Error
@@ -3219,8 +3386,9 @@ function ListPageContentInner(props: PageContentProps) {
   // Quick filter handler — toggle a preset view on/off, apply its filter, reload.
   const handleQuickFilter = useCallback(
     (key: QuickFilterKey) => {
-      if (activeQuickFilter === key) {
+      if (activeQuickFilterRef.current === key) {
         // Toggle off — clear preset filter and reload
+        activeQuickFilterRef.current = null;
         setActiveQuickFilter(null);
         setFilters({});
         syncPresetToUrl(null);
@@ -3228,12 +3396,13 @@ function ListPageContentInner(props: PageContentProps) {
         return;
       }
       const qf = buildQuickFilterPreset(key, { userId: user?.id, now: new Date() }) ?? {};
+      activeQuickFilterRef.current = key;
       setActiveQuickFilter(key);
       setFilters(qf);
       syncPresetToUrl(key);
       loadData({ page: 0, size: pagination.pageSize, filters: qf });
     },
-    [activeQuickFilter, user, setFilters, syncPresetToUrl, loadData, pagination.pageSize],
+    [user, setFilters, syncPresetToUrl, loadData, pagination.pageSize],
   );
 
   const handleSaveActivePreset = useCallback(async () => {
@@ -3265,10 +3434,7 @@ function ListPageContentInner(props: PageContentProps) {
 
     const presetDefinition = getQuickFilterPresetDefinition(activeQuickFilter);
     if (!presetDefinition) return;
-    const presetName = translateCommon(
-      presetDefinition.i18nKey,
-      presetDefinition.fallbackLabel,
-    );
+    const presetName = translateCommon(presetDefinition.i18nKey, presetDefinition.fallbackLabel);
     const request = buildQuickFilterPresetViewRequest(
       activeQuickFilter,
       { userId: user?.id, now: new Date() },
@@ -3342,9 +3508,7 @@ function ListPageContentInner(props: PageContentProps) {
       setFilters(presetFilters);
       loadData({ page: 0, size: pagination.pageSize, filters: presetFilters });
       flashViewSavedHint();
-      showSuccessToast(
-        translateCommon('common.saved_view_preset_reset_done', 'Preset view reset'),
-      );
+      showSuccessToast(translateCommon('common.saved_view_preset_reset_done', 'Preset view reset'));
     } catch (err) {
       showErrorToast(
         err instanceof Error
@@ -3577,43 +3741,35 @@ function ListPageContentInner(props: PageContentProps) {
             >
               <span>
                 {hasPendingPersonalViewConfig
-                  ? translateCommon(
-                      'common.saved_view_personal_draft',
-                      '当前个人视图有本地变更',
-                    )
-                  : translateCommon(
-                      'common.saved_view_shared_draft',
-                      '共享视图有本地变更',
-                    )}
+                  ? translateCommon('common.saved_view_personal_draft', '当前个人视图有本地变更')
+                  : translateCommon('common.saved_view_shared_draft', '共享视图有本地变更')}
                 {pendingViewSummary.length > 0 && (
-                  <span className="ml-1 text-amber-700">
-                    {pendingViewSummary.join(', ')}
-                  </span>
+                  <span className="ml-1 text-amber-700">{pendingViewSummary.join(', ')}</span>
                 )}
               </span>
               <button
                 type="button"
                 className="rounded px-2 py-1 font-medium text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={hasPendingPersonalViewConfig ? handleSaveCurrentViewDraft : handleSaveSharedDraft}
-                disabled={
-                  (hasPendingSharedViewConfig && !canSaveSharedView) || savingViewDraft
+                onClick={
+                  hasPendingPersonalViewConfig ? handleSaveCurrentViewDraft : handleSaveSharedDraft
                 }
+                disabled={(hasPendingSharedViewConfig && !canSaveSharedView) || savingViewDraft}
                 title={
                   hasPendingPersonalViewConfig
                     ? translateCommon('common.saved_view_save_current', '保存当前视图')
                     : canSaveSharedView
-                    ? translateCommon(
-                        'common.saved_view_save_shared_confirm_title',
-                        '保存到共享视图？',
-                      )
-                    : translateCommon(
-                        isCurrentViewLockedPreset
-                          ? 'common.saved_view_locked_preset_reason'
-                          : 'common.saved_view_save_shared_disabled_reason',
-                        isCurrentViewLockedPreset
-                          ? '插件预置视图不能直接保存，请先复制为个人视图。'
-                          : '你可以调整当前视图，但暂不能保存给团队或全员。',
-                      )
+                      ? translateCommon(
+                          'common.saved_view_save_shared_confirm_title',
+                          '保存到共享视图？',
+                        )
+                      : translateCommon(
+                          isCurrentViewLockedPreset
+                            ? 'common.saved_view_locked_preset_reason'
+                            : 'common.saved_view_save_shared_disabled_reason',
+                          isCurrentViewLockedPreset
+                            ? '插件预置视图不能直接保存，请先复制为个人视图。'
+                            : '你可以调整当前视图，但暂不能保存给团队或全员。',
+                        )
                 }
                 data-testid={
                   hasPendingPersonalViewConfig
@@ -3649,10 +3805,7 @@ function ListPageContentInner(props: PageContentProps) {
                 title={
                   canCopyCurrentView
                     ? translateCommon('common.saved_view_save_as_personal', '另存为新视图')
-                    : translateCommon(
-                        'common.saved_view_copy_disabled_reason',
-                        '当前视图不能复制',
-                      )
+                    : translateCommon('common.saved_view_copy_disabled_reason', '当前视图不能复制')
                 }
                 data-testid="personal-view-save-as-new"
               >
@@ -3663,7 +3816,7 @@ function ListPageContentInner(props: PageContentProps) {
               <button
                 type="button"
                 className="rounded px-2 py-1 text-amber-800 hover:bg-amber-100"
-                onClick={() => setPendingViewConfig(null)}
+                onClick={handleDiscardViewDraft}
                 data-testid={
                   hasPendingPersonalViewConfig
                     ? 'personal-view-discard-draft'
@@ -3688,6 +3841,7 @@ function ListPageContentInner(props: PageContentProps) {
             currentView={currentView}
             viewsLoading={viewsLoading}
             activeViewType={activeViewType}
+            onSelectDefaultView={handleSelectDefaultView}
             onSelectView={(pid) => {
               selectView(pid);
               // Sync view selection to URL
@@ -4613,7 +4767,7 @@ function ListPageContentInner(props: PageContentProps) {
               // This would require extending ViewColumnConfig with frozen support
             }}
             onHide={() => {
-              if (!currentView || !contextMenu) return;
+              if (!contextMenu) return;
               const cols = (effectiveViewConfig?.columns || []).map((c) =>
                 c.fieldCode === contextMenu.column.field ? { ...c, visible: false } : c,
               );

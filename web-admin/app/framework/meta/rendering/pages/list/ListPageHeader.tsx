@@ -23,6 +23,7 @@ export interface ListPageHeaderProps {
   viewsLoading: boolean;
   activeViewType: ViewType;
   onSelectView: (pid: string) => void;
+  onSelectDefaultView: () => void;
   onCreateView: (viewType?: ViewType) => void;
   onManageViews: () => void;
   onViewTypeChange: (vt: ViewType) => void;
@@ -57,6 +58,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   viewsLoading,
   activeViewType,
   onSelectView,
+  onSelectDefaultView,
   onCreateView,
   onManageViews,
   onViewTypeChange,
@@ -89,6 +91,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               views={savedViews}
               currentView={currentView}
               onSelectView={onSelectView}
+              onSelectDefaultView={onSelectDefaultView}
               onCreateView={onCreateView}
               onManageViews={onManageViews}
               loading={viewsLoading}
