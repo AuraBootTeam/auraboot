@@ -1470,28 +1470,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         logOperation("batchDelete", modelCode, recordIds.size());
         
-        ModelDefinition model = getModelDefinition(modelCode);
-        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-        
-        // 构建批量删除条件
-        List<QueryCondition> conditions = List.of(
-                QueryCondition.builder()
-                        .fieldName(primaryKey.getCode())
-                        .operator(QueryCondition.Operator.IN)
-                        .value(recordIds)
-                        .build()
-        );
-        
-        QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(model, conditions);
-        queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), getCurrentTenantId());
-        
-        // 使用SecureSqlRewriter替代正则表达式重写SQL
-        String sql = secureSqlRewriter.rewriteForDelete(queryBuilder.getSql(), model.getTableName());
-        Map<String, Object> paramMap = queryBuilder.getParameterMap();
-        
-        int result = dynamicDataMapper.deleteByQuery(sql, paramMap);
-        
-        log.info("Batch deleted {} records from model: {}", result, logSafe(modelCode));
+        for (String recordId : recordIds) {
+            delete(modelCode, recordId);
+        }
+
+        log.info("Batch deleted {} records from model: {}", recordIds.size(), logSafe(modelCode));
     }
 
     // ==================== Custom Query ====================
@@ -1654,6 +1637,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         RelationDefinition relation = findRelation(model, relationName);
 
         Long tenantId = getCurrentTenantId();
+
+        // Source record visibility gates relation traversal. Target rows are
+        // filtered below; the source must also pass the same single-record scope.
+        getById(modelCode, recordId);
 
         // Security: validate all relation SQL identifiers to prevent injection
         java.util.regex.Pattern NAME_PATTERN = java.util.regex.Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
@@ -2270,20 +2257,38 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
             switch (actionName) {
                 case "count": {
-                    String sql = "SELECT COUNT(*) as cnt FROM " + model.getTableName()
-                            + " WHERE tenant_id = #{params.tenantId}";
-                    Map<String, Object> params = Map.of("tenantId", getCurrentTenantId());
-                    List<Map<String, Object>> results = dynamicDataMapper.selectByQuery(sql, params);
+                    Long tenantId = getCurrentTenantId();
+                    Long userId = getCurrentUserId();
+                    StringBuilder sql = new StringBuilder("SELECT COUNT(*) as cnt FROM ")
+                            .append(model.getTableName())
+                            .append(" WHERE tenant_id = #{params.tenantId}");
+                    Map<String, Object> params = new HashMap<>();
+                    params.put("tenantId", tenantId);
+
+                    if (!MetaContext.isDataPermissionBypassed()) {
+                        String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
+                        if (rowFilter != null && !rowFilter.isBlank()) {
+                            sql.append(" ").append(rowFilter);
+                        }
+                        String domainFilter = dataDomainService.buildDomainFilter(modelCode, userId);
+                        if (domainFilter != null && !domainFilter.isBlank()) {
+                            sql.append(" ").append(domainFilter);
+                        }
+                    }
+
+                    List<Map<String, Object>> results = dynamicDataMapper.selectByQuery(sql.toString(), params);
                     long count = results.isEmpty() ? 0 : ((Number) results.get(0).get("cnt")).longValue();
                     resultData.put("count", count);
                     break;
                 }
                 case "truncate": {
-                    Map<String, Object> conditions = new HashMap<>();
-                    conditions.put("tenant_id", getCurrentTenantId());
-                    int deleted = dynamicDataMapper.delete(model.getTableName(), conditions);
-                    resultData.put("deletedCount", deleted);
-                    break;
+                    return ActionExecutionResult.builder()
+                            .success(false)
+                            .actionName(actionName)
+                            .errorMessage("Unsupported action: " + actionName)
+                            .executionTime(startTime)
+                            .duration(java.time.Duration.between(startTime, Instant.now()).toMillis())
+                            .build();
                 }
                 default:
                     return ActionExecutionResult.builder()

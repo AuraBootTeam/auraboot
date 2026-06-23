@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.AggregateQueryRequest;
 import com.auraboot.framework.meta.dto.AggregateQueryResponse;
 import com.auraboot.framework.meta.dto.MetricConfig;
@@ -10,6 +11,8 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryFieldMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.meta.service.AggregateQueryService;
+import com.auraboot.framework.meta.service.DataDomainService;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +44,8 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     private final NamedQueryMapper namedQueryMapper;
     private final NamedQueryFieldMapper namedQueryFieldMapper;
     private final com.auraboot.framework.meta.service.MetaModelService metaModelService;
+    private final DataPermissionEngine dataPermissionEngine;
+    private final DataDomainService dataDomainService;
 
     /**
      * Optional — when present and the request carries a {@code semanticModelCode},
@@ -102,7 +107,8 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
      */
     private AggregateQueryResponse executeAggregateQuery(AggregateQueryRequest request) {
         String tableName = resolveTableName(request.getModelCode());
-        String sql = buildAggregateSql(request, tableName);
+        List<String> accessClauses = buildDataAccessClauses(request.getModelCode());
+        String sql = buildAggregateSql(request, tableName, accessClauses);
         Map<String, Object> params = buildParams(request);
 
         log.debug("Executing aggregate query: SQL={}, params={}", sql, params);
@@ -501,10 +507,51 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         throw new MetaServiceException("Model not found or not published for aggregate query: " + modelCode);
     }
 
+    private List<String> buildDataAccessClauses(String modelCode) {
+        if (MetaContext.isDataPermissionBypassed()) {
+            return Collections.emptyList();
+        }
+
+        Long tenantId = getCurrentTenantId();
+        Long userId = getCurrentUserId();
+        List<String> clauses = new ArrayList<>();
+
+        try {
+            appendAccessClause(clauses, dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+        } catch (Exception e) {
+            log.error("Failed to evaluate row-level access for aggregate model {} — failing closed",
+                    modelCode, e);
+            throw new MetaServiceException("Data permission evaluation failed for aggregate: " + modelCode, e);
+        }
+
+        try {
+            appendAccessClause(clauses, dataDomainService.buildDomainFilter(modelCode, userId));
+        } catch (Exception e) {
+            log.error("Failed to evaluate data domain access for aggregate model {} — failing closed",
+                    modelCode, e);
+            throw new MetaServiceException("Data domain evaluation failed for aggregate: " + modelCode, e);
+        }
+
+        return clauses;
+    }
+
+    private void appendAccessClause(List<String> clauses, String fragment) {
+        if (fragment == null || fragment.isBlank()) {
+            return;
+        }
+        String clause = fragment.trim()
+                .replaceFirst("(?i)^AND\\s+", "")
+                .replaceFirst("(?i)^WHERE\\s+", "")
+                .trim();
+        if (!clause.isBlank()) {
+            clauses.add("(" + clause + ")");
+        }
+    }
+
     /**
      * Build the aggregate SQL query.
      */
-    private String buildAggregateSql(AggregateQueryRequest request, String tableName) {
+    private String buildAggregateSql(AggregateQueryRequest request, String tableName, List<String> accessClauses) {
         StringBuilder sql = new StringBuilder("SELECT ");
 
         List<String> selectClauses = new ArrayList<>();
@@ -551,6 +598,10 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
                     whereClauses.add(whereClause);
                 }
             }
+        }
+
+        if (accessClauses != null && !accessClauses.isEmpty()) {
+            whereClauses.addAll(accessClauses);
         }
 
         if (!whereClauses.isEmpty()) {
