@@ -80,7 +80,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     @Transactional(readOnly = true)
     @Cacheable(
             value = "aggregateQuery",
-            key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #request.hashCode()",
+            key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getDataAccessContextSuffix() + ':' + #request.hashCode()",
             unless = "#result == null || #result.getRows() == null || #result.getRows().isEmpty()"
     )
     public AggregateQueryResponse execute(AggregateQueryRequest request) {
@@ -179,8 +179,6 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         validateNamedQueryFilters(request.getFilters(), fieldMap);
         validateNamedQueryFilters(request.getDrillFilters(), fieldMap);
 
-        // 6. Build SQL
-        String sql = buildNamedQuerySql(request, query, fieldMap, tenantId);
         Map<String, Object> params = buildNamedQueryParams(request, fieldMap);
         // Inject tenantId for fromSql that uses #{params.tenantId} for tenant isolation
         params.put("tenantId", tenantId);
@@ -191,6 +189,10 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         // NamedQueryServiceImpl (the datasource/list executor).
         Long currentUserId = getCurrentUserId();
         params.put("currentUserId", currentUserId != null ? currentUserId.toString() : null);
+        List<String> accessClauses = buildNamedQueryDataAccessClauses(query, tenantId, currentUserId);
+
+        // 6. Build SQL
+        String sql = buildNamedQuerySql(request, query, fieldMap, tenantId, accessClauses);
 
         log.debug("Executing named query aggregate: code={}, SQL={}, params={}", queryCode, sql, params);
 
@@ -235,7 +237,8 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
      * Uses the Named Query's fromSql as a subquery, with aggregation on top.
      */
     private String buildNamedQuerySql(AggregateQueryRequest request, NamedQuery query,
-                                      Map<String, NamedQueryField> fieldMap, Long tenantId) {
+                                      Map<String, NamedQueryField> fieldMap, Long tenantId,
+                                      List<String> accessClauses) {
         StringBuilder sql = new StringBuilder("SELECT ");
 
         List<String> selectClauses = new ArrayList<>();
@@ -319,6 +322,10 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
                     whereClauses.add(whereClause);
                 }
             }
+        }
+
+        if (accessClauses != null && !accessClauses.isEmpty()) {
+            whereClauses.addAll(accessClauses);
         }
 
         if (!whereClauses.isEmpty()) {
@@ -535,6 +542,29 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         return clauses;
     }
 
+    private List<String> buildNamedQueryDataAccessClauses(NamedQuery query, Long tenantId, Long userId) {
+        if (MetaContext.isDataPermissionBypassed()) {
+            return Collections.emptyList();
+        }
+
+        String resourceCode = trimToNull(query.getResourceCode());
+        String actionCode = trimToNull(query.getActionCode());
+        if (resourceCode == null || actionCode == null) {
+            return Collections.emptyList();
+        }
+
+        List<String> clauses = new ArrayList<>();
+        try {
+            appendAccessClause(clauses, dataPermissionEngine.buildRowFilter(tenantId, resourceCode, actionCode, userId));
+        } catch (Exception e) {
+            log.error("Failed to evaluate row-level access for named query aggregate {} — failing closed",
+                    query.getCode(), e);
+            throw new MetaServiceException("Data permission evaluation failed for named query aggregate: "
+                    + query.getCode(), e);
+        }
+        return clauses;
+    }
+
     private void appendAccessClause(List<String> clauses, String fragment) {
         if (fragment == null || fragment.isBlank()) {
             return;
@@ -546,6 +576,14 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         if (!clause.isBlank()) {
             clauses.add("(" + clause + ")");
         }
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /**

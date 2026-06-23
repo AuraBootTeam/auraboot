@@ -64,6 +64,19 @@ public class NamedQuery {
     private String description;
 
     /**
+     * Protected business resource used for DataScope calculation.
+     * When null, NamedQuery execution is not treated as DataScope-protected.
+     */
+    @TableField("resource_code")
+    private String resourceCode;
+
+    /**
+     * Protected action used with {@link #resourceCode}; usually "read".
+     */
+    @TableField("action_code")
+    private String actionCode;
+
+    /**
      * FROM子句SQL
      * 定义查询的数据源 — NULL when using external connector (connector_pid is set)
      */

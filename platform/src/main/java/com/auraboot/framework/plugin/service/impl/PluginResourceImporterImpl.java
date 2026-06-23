@@ -1934,6 +1934,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             NamedQueryUpdateRequest updateRequest = new NamedQueryUpdateRequest();
             updateRequest.setTitle(dto.getEffectiveTitle());
             updateRequest.setDescription(dto.getDescription());
+            updateRequest.setResourceCode(dto.getResourceCode());
+            updateRequest.setActionCode(dto.getActionCode());
             updateRequest.setFromSql(dto.getFromSql());
             updateRequest.setBaseWhere(dto.getBaseWhere());
             updateRequest.setDefaultOrder(dto.getDefaultOrder());
@@ -1967,6 +1969,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         createRequest.setCode(dto.getCode());
         createRequest.setTitle(dto.getEffectiveTitle());
         createRequest.setDescription(dto.getDescription());
+        createRequest.setResourceCode(dto.getResourceCode());
+        createRequest.setActionCode(dto.getActionCode());
         createRequest.setFromSql(dto.getFromSql());
         createRequest.setBaseWhere(dto.getBaseWhere());
         createRequest.setDefaultOrder(dto.getDefaultOrder());
@@ -1991,6 +1995,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         state.put("code", dto.getCode());
         state.put("title", dto.getEffectiveTitle());
         state.put("description", dto.getDescription());
+        state.put("resourceCode", dto.getResourceCode());
+        state.put("actionCode", dto.getActionCode());
         state.put("fromSql", dto.getFromSql());
         state.put("status", normalizeNamedQueryStatus(dto.getStatus()));
         if (dto.getBaseWhere() != null) {

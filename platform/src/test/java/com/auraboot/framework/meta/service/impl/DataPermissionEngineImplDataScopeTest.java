@@ -65,6 +65,19 @@ class DataPermissionEngineImplDataScopeTest {
     }
 
     @Test
+    @DisplayName("canAccessRecord uses explicit action for role data scope")
+    void canAccessRecord_usesExplicitAction() {
+        Map<String, Object> record = Map.of("pid", "rec-1", "created_by", USER_ID);
+        when(policyMapper.findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID)).thenReturn(List.of());
+        when(dataScopeEvaluator.evaluate(MEMBER_ID, MODEL_CODE, "delete", record))
+                .thenReturn(new EvaluationStep("DataScope", EvaluationVerdict.ALLOW, "delete owner"));
+
+        boolean allowed = engine.canAccessRecord(TENANT_ID, MODEL_CODE, "delete", USER_ID, record);
+
+        assertThat(allowed).isTrue();
+    }
+
+    @Test
     @DisplayName("filterRecords applies role data scope as a post-query guard")
     void filterRecords_appliesDataScopeGuard() {
         Map<String, Object> own = Map.of("pid", "own", "created_by", USER_ID);
