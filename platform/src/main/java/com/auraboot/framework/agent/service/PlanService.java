@@ -16,7 +16,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -37,17 +41,23 @@ public class PlanService {
         if (config != null && StubLlmProvider.PROVIDER_CODE.equals(config.getProviderCode())) {
             return List.of(new AgentPlanStep(0, "Execute task directly"));
         }
-        String toolNames = tools.stream().map(AgentToolDefinition::getName).collect(Collectors.joining(", "));
+        String toolCatalog = buildToolCatalog(tools);
         String planningPrompt = systemPrompt + "\n\n## Planning Phase\n"
                 + "You are in PLANNING mode. Analyze the task and create a step-by-step execution plan.\n"
                 + "Respond with a JSON array of steps. Each step has:\n"
                 + "- \"description\": what this step does (concise)\n"
                 + "- \"toolCode\": which tool to use (from available tools), or null for reasoning-only steps\n"
                 + "- \"requiresApproval\": true only for reasoning-only checkpoints that need human sign-off;\n"
-                + "  tool-specific approval is enforced separately at execution time, so ordinary tool steps should use false\n\n"
-                + "Available tools: " + toolNames + "\n\n"
+                + "  tool-specific approval is enforced separately at execution time, "
+                + "so ordinary tool steps should use false\n\n"
+                + "Tool selection rules:\n"
+                + "- Use toolCode values exactly as listed. Never invent, translate, or rewrite tool codes.\n"
+                + "- Prefer purpose-built DSL/query/custom tools when one matches the task.\n"
+                + "- Use platform.execute_sql only when no listed DSL/query/custom tool can satisfy the task.\n\n"
+                + "Tool catalog:\n" + toolCatalog + "\n"
                 + "Respond ONLY with the JSON array. Example:\n"
-                + "[{\"description\":\"Search for data\",\"toolCode\":\"nq_active_projects\",\"requiresApproval\":false}]\n"
+                + "[{\"description\":\"Search for data\","
+                + "\"toolCode\":\"nq_active_projects\",\"requiresApproval\":false}]\n"
                 + "If the task is simple enough for one step, return a single-element array.";
 
         LlmChatRequest planReq = LlmChatRequest.builder()
@@ -77,12 +87,64 @@ public class PlanService {
                     step.setRequiresApproval(Boolean.TRUE.equals(raw.get("requiresApproval")));
                     steps.add(step);
                 }
-                if (!steps.isEmpty()) return steps;
+                if (!steps.isEmpty()) {
+                    return steps;
+                }
             }
         } catch (Exception e) {
             throw new IllegalStateException("Plan generation failed: " + e.getMessage(), e);
         }
         throw new IllegalStateException("Plan generation failed: provider did not return a valid JSON plan");
+    }
+
+    private String buildToolCatalog(List<AgentToolDefinition> tools) {
+        if (tools == null || tools.isEmpty()) {
+            return "- (none)\n";
+        }
+        StringBuilder sb = new StringBuilder(tools.size() * 128);
+        for (AgentToolDefinition tool : tools) {
+            appendToolCatalogEntry(sb, tool);
+        }
+        return sb.toString();
+    }
+
+    private void appendToolCatalogEntry(StringBuilder sb, AgentToolDefinition tool) {
+        if (tool == null || tool.getName() == null || tool.getName().isBlank()) {
+            return;
+        }
+        sb.append("- ").append(tool.getName());
+        List<String> metadata = toolMetadata(tool);
+        if (!metadata.isEmpty()) {
+            sb.append(" (").append(String.join(", ", metadata)).append(')');
+        }
+        String description = oneLine(tool.getDescription());
+        if (description != null) {
+            sb.append("\n  description: ").append(description);
+        }
+        sb.append('\n');
+    }
+
+    private List<String> toolMetadata(AgentToolDefinition tool) {
+        List<String> metadata = new ArrayList<>();
+        if (tool.getToolType() != null && !tool.getToolType().isBlank()) {
+            metadata.add("type: " + tool.getToolType());
+        }
+        if (tool.getRiskLevel() != null && !tool.getRiskLevel().isBlank()) {
+            metadata.add("risk: " + tool.getRiskLevel());
+        }
+        if (tool.isRequiresApproval()) {
+            metadata.add("approval: required");
+        } else if (tool.isRequiresConfirmation()) {
+            metadata.add("confirmation: required");
+        }
+        return metadata;
+    }
+
+    private String oneLine(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.replaceAll("\\s+", " ").trim();
     }
 
     /**
@@ -103,7 +165,8 @@ public class PlanService {
             String toolCode = step.getToolCode();
             boolean requestedPlanApproval = step.isRequiresApproval();
             if (toolCode != null && !toolCode.isBlank() && !validToolCodes.contains(toolCode)) {
-                log.warn("Plan validation: step {} references non-existent tool '{}', clearing", step.getStepIndex(), toolCode);
+                log.warn("Plan validation: step {} references non-existent tool '{}', clearing",
+                        step.getStepIndex(), toolCode);
                 step.setToolCode(null); // Clear hallucinated tool code
                 invalidCount++;
                 toolCode = null;
@@ -118,7 +181,8 @@ public class PlanService {
                     log.info("Plan step {} requested approval for tool '{}'; deferring to tool-level approval",
                             step.getStepIndex(), toolCode);
                 } else {
-                    log.info("Plan step {} requested plan-level approval without a tool; ignoring to keep runtime deterministic",
+                    log.info("Plan step {} requested plan-level approval without a tool; "
+                                    + "ignoring to keep runtime deterministic",
                             step.getStepIndex());
                 }
             }
@@ -130,7 +194,8 @@ public class PlanService {
                         .findFirst()
                         .ifPresent(t -> {
                             if ("high".equals(t.getRiskLevel())) {
-                                log.info("Plan step {} uses high-risk tool '{}'; approval will be enforced at tool execution time",
+                                log.info("Plan step {} uses high-risk tool '{}'; "
+                                                + "approval will be enforced at tool execution time",
                                         step.getStepIndex(), validatedToolCode);
                             }
                         });
@@ -224,7 +289,9 @@ public class PlanService {
      */
     int findFirstPendingStep(List<AgentPlanStep> plan) {
         for (int i = 0; i < plan.size(); i++) {
-            if (!plan.get(i).isTerminal()) return i;
+            if (!plan.get(i).isTerminal()) {
+                return i;
+            }
         }
         return plan.size();
     }
@@ -233,16 +300,22 @@ public class PlanService {
      * Parse JSON array from LLM output (handles markdown code blocks).
      */
     String extractJsonArray(String text) {
-        if (text == null) return null;
+        if (text == null) {
+            return null;
+        }
         int codeStart = text.indexOf("```json");
         if (codeStart >= 0) {
             int jsonStart = text.indexOf('[', codeStart);
             int jsonEnd = text.lastIndexOf(']');
-            if (jsonStart >= 0 && jsonEnd > jsonStart) return text.substring(jsonStart, jsonEnd + 1);
+            if (jsonStart >= 0 && jsonEnd > jsonStart) {
+                return text.substring(jsonStart, jsonEnd + 1);
+            }
         }
         int start = text.indexOf('[');
         int end = text.lastIndexOf(']');
-        if (start >= 0 && end > start) return text.substring(start, end + 1);
+        if (start >= 0 && end > start) {
+            return text.substring(start, end + 1);
+        }
         return null;
     }
 
@@ -251,7 +324,9 @@ public class PlanService {
      */
     @SuppressWarnings("unchecked")
     Map<String, Object> parseJsonSafe(String json) {
-        if (json == null || json.isBlank()) return null;
+        if (json == null || json.isBlank()) {
+            return null;
+        }
         try {
             return objectMapper.readValue(json, Map.class);
         } catch (Exception e) {

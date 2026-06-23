@@ -1,0 +1,46 @@
+[
+  {
+    "code": "analytics_root",
+    "parentCode": null,
+    "name:zh-CN": "数据分析",
+    "name:en": "Analytics",
+    "path": "/analytics",
+    "component": null,
+    "icon": "IconChartLine",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 900,
+    "visible": true,
+    "extension": { "platforms": ["web"] }
+  },
+  {
+    "code": "behavior_analytics",
+    "parentCode": "analytics_root",
+    "name:zh-CN": "行为分析",
+    "name:en": "Behavior Analytics",
+    "path": "/p/c/behavior_analytics",
+    "pageKey": "behavior_analytics",
+    "component": null,
+    "icon": "IconChartLine",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 10,
+    "visible": true,
+    "extension": { "platforms": ["web"] }
+  },
+  {
+    "code": "behavior_quarantine",
+    "parentCode": "analytics_root",
+    "name:zh-CN": "行为隔离队列",
+    "name:en": "Behavior Quarantine",
+    "path": "/p/c/behavior_quarantine_list",
+    "pageKey": "behavior_quarantine_list",
+    "component": null,
+    "icon": "IconAlertTriangle",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 20,
+    "visible": true,
+    "extension": { "platforms": ["web"] }
+  }
+]

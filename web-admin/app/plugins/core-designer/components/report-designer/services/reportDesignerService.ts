@@ -6,6 +6,7 @@
 import type { ReportDsl } from '../types';
 
 const PAGES_API = '/api/pages';
+const REPORT_DEFINITIONS_API = '/api/report-definitions';
 
 interface ApiResponse<T> {
   code: number | string;
@@ -26,6 +27,20 @@ interface PageSchemaRecord {
   };
   title?: string | Record<string, unknown>;
   status?: string;
+}
+
+/**
+ * Shape of `GET /api/report-definitions/{pid}` and `.../by-code/{code}` (Phase 4 slice 2b-2 read
+ * path). `dsl` is returned as a JSON OBJECT (the whole ReportDsl), not an escaped string.
+ */
+interface ReportDefinitionRecord {
+  pid: string;
+  code?: string;
+  title?: string;
+  profile?: string;
+  status?: string;
+  version?: number;
+  dsl?: ReportDsl;
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -59,23 +74,83 @@ function parseReportDsl(record: PageSchemaRecord): ReportDsl {
   return typeof stored === 'string' ? (JSON.parse(stored) as ReportDsl) : stored;
 }
 
+/**
+ * Normalize a `ReportDefinitionRecord` (the ab_report read path) into the existing `{dsl, pid}`
+ * return shape. The report-definitions GET returns `dsl` as a JSON object that is the SAME ReportDsl
+ * the page-schema holds in `extension.reportDsl`, so callers see an identical shape from either
+ * source. Throws if the record carries no dsl so the caller can fall back to the page-schema path.
+ */
+function fromReportDefinition(record: ReportDefinitionRecord): { dsl: ReportDsl; pid: string } {
+  if (!record.dsl) {
+    throw new Error(`Report DSL not found for report-definition: ${record.pid}`);
+  }
+  return { dsl: record.dsl, pid: record.pid };
+}
+
+/**
+ * Best-effort dual-write of the report into the `ab_report` shadow table, keyed by the page `pid`
+ * (Phase 4 slice 2b-1). NEVER throws — a failure is logged and swallowed so the canonical
+ * page-schema save the caller already completed still succeeds (a later backfill reconciles drift).
+ * `PUT /api/report-definitions/{pid}` is an idempotent upsert, so the same pid can be synced whether
+ * or not the shadow row exists yet.
+ */
+async function syncReportShadow(pid: string, code: string, report: ReportDsl): Promise<void> {
+  try {
+    await request<unknown>(`${REPORT_DEFINITIONS_API}/${pid}`, {
+      method: 'put',
+      body: JSON.stringify({
+        code,
+        title: report.title,
+        profile: 'paged-media',
+        dsl: report as unknown as Record<string, unknown>,
+      }),
+    });
+  } catch (error) {
+    // Best-effort shadow: do NOT surface to the user; page-schema remains the source of truth.
+    console.warn('[reportDesignerService] ab_report shadow dual-write failed (non-fatal):', error);
+  }
+}
+
 export const reportDesignerService = {
   /**
-   * Load report by page key
+   * Load report by page key (the runtime viewer read path).
+   *
+   * Phase 4 slice 2b-2: read the first-class `ab_report` store FIRST via
+   * `GET /api/report-definitions/by-code/{pageKey}` (ab_report.code == the report's pageKey).
+   * On a 404 (report not yet in ab_report) or ANY error, fall back to the legacy page-schema
+   * read (`GET /api/pages/key/{pageKey}`) UNCHANGED, so no report becomes unreadable.
    */
   async loadByPageKey(pageKey: string): Promise<{ dsl: ReportDsl; pid: string }> {
-    const record = await request<PageSchemaRecord>(`${PAGES_API}/key/${pageKey}`);
-    const dsl = parseReportDsl(record);
-    return { dsl, pid: record.pid };
+    try {
+      const record = await request<ReportDefinitionRecord>(
+        `${REPORT_DEFINITIONS_API}/by-code/${pageKey}`,
+      );
+      return fromReportDefinition(record);
+    } catch {
+      // Fallback: legacy page-schema viewer read (unchanged behavior).
+      const record = await request<PageSchemaRecord>(`${PAGES_API}/key/${pageKey}`);
+      const dsl = parseReportDsl(record);
+      return { dsl, pid: record.pid };
+    }
   },
 
   /**
-   * Load report by PID
+   * Load report by PID (the designer open path).
+   *
+   * Phase 4 slice 2b-2: read the first-class `ab_report` store FIRST via
+   * `GET /api/report-definitions/{pid}`. On a 404 (report not yet in ab_report) or ANY error,
+   * fall back to the legacy page-schema read (`GET /api/pages/{pid}`) UNCHANGED.
    */
   async loadByPid(pid: string): Promise<{ dsl: ReportDsl; pid: string }> {
-    const record = await request<PageSchemaRecord>(`${PAGES_API}/${pid}`);
-    const dsl = parseReportDsl(record);
-    return { dsl, pid: record.pid };
+    try {
+      const record = await request<ReportDefinitionRecord>(`${REPORT_DEFINITIONS_API}/${pid}`);
+      return fromReportDefinition(record);
+    } catch {
+      // Fallback: legacy page-schema read by pid (unchanged behavior).
+      const record = await request<PageSchemaRecord>(`${PAGES_API}/${pid}`);
+      const dsl = parseReportDsl(record);
+      return { dsl, pid: record.pid };
+    }
   },
 
   /**
@@ -104,19 +179,29 @@ export const reportDesignerService = {
       semver: '0.1.0',
     };
 
+    let pid: string;
     if (existingPid) {
       const result = await request<PageSchemaRecord>(`${PAGES_API}/${existingPid}`, {
         method: 'put',
         body: JSON.stringify(payload),
       });
-      return result.pid;
+      pid = result.pid;
     } else {
       const result = await request<PageSchemaRecord>(PAGES_API, {
         method: 'post',
         body: JSON.stringify(payload),
       });
-      return result.pid;
+      pid = result.pid;
     }
+
+    // Phase 4 transition dual-write — ab_report shadow, reads still use /api/pages until slice 2b-2
+    // switches them. The page-schema store above is canonical; ab_report is kept in sync as a shadow
+    // keyed by the SAME pid (PUT /api/report-definitions/{pid} is an idempotent upsert). This is
+    // best-effort: a shadow-write failure must NOT fail the user's save (a later backfill reconciles
+    // any drift), so syncReportShadow swallows and only warns on errors.
+    await syncReportShadow(pid, pageKey, report);
+
+    return pid;
   },
 
   /**

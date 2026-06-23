@@ -9,13 +9,42 @@ import { get, post, put, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type {
   SavedView,
+  SavedViewAuditEvent,
+  SavedViewCapabilityCheckRequest,
+  SavedViewCapabilityCheckResponse,
   SavedViewCreateRequest,
+  SavedViewCopyToPersonalRequest,
+  SavedViewTeamOption,
+  SavedViewUserOption,
   SavedViewUpdateRequest,
   SavedViewQueryParams,
   ViewConfig,
 } from '~/framework/smart/types/savedView';
 
 const BASE_URL = '/api/views';
+
+interface TenantMemberUserRecord {
+  pid?: string;
+  username?: string;
+  email?: string;
+  realName?: string;
+  avatar?: string;
+}
+
+interface TenantMemberSearchRecord {
+  user?: TenantMemberUserRecord;
+  displayName?: string;
+  email?: string;
+  avatarUrl?: string;
+  departmentName?: string;
+}
+
+type TenantMemberSearchResult =
+  | TenantMemberSearchRecord[]
+  | {
+      records?: TenantMemberSearchRecord[];
+      content?: TenantMemberSearchRecord[];
+    };
 
 /**
  * Helper function to handle API responses
@@ -67,6 +96,74 @@ export class SavedViewService {
   async getGlobalViews(params: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
     const result = await get<SavedView[]>(`${BASE_URL}/global`, params, undefined, request);
     return handleResponse(result, 'Failed to fetch global views');
+  }
+
+  /**
+   * Get teams the current user can use when creating TEAM scoped views.
+   */
+  async getMyTeams(request?: Request): Promise<SavedViewTeamOption[]> {
+    const result = await get<Array<SavedViewTeamOption & {
+      teamPid?: string;
+      teamName?: string;
+      teamCode?: string;
+    }>>(
+      `${BASE_URL}/my-teams`,
+      undefined,
+      undefined,
+      request,
+    );
+    const teams = handleResponse(result, 'Failed to fetch saved view teams');
+    return teams
+      .map((team) => ({
+        pid: team.pid ?? team.teamPid ?? '',
+        name: team.name ?? team.teamName ?? team.teamCode ?? team.pid ?? team.teamPid ?? '',
+        role: team.role,
+        memberCount: team.memberCount,
+      }))
+      .filter((team) => team.pid);
+  }
+
+  /**
+   * Search tenant users for SavedView collaborator assignment.
+   */
+  async searchUsers(
+    keyword: string,
+    size = 10,
+    request?: Request,
+  ): Promise<SavedViewUserOption[]> {
+    const result = await post<TenantMemberSearchResult>(
+      '/api/tenant/members/search',
+      {
+        pageNum: 1,
+        pageSize: size,
+        status: 'active',
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+      },
+      undefined,
+      request,
+    );
+    const data = handleResponse(result, 'Failed to search users');
+    const records = Array.isArray(data) ? data : data.records ?? data.content ?? [];
+    return records.flatMap((record): SavedViewUserOption[] => {
+      const pid = record.user?.pid;
+      if (!pid) {
+        return [];
+      }
+      return [
+        {
+          pid,
+          displayName:
+            record.displayName ||
+            record.user?.realName ||
+            record.user?.username ||
+            record.user?.email ||
+            pid,
+          email: record.email || record.user?.email,
+          avatarUrl: record.avatarUrl || record.user?.avatar,
+          departmentName: record.departmentName,
+        },
+      ];
+    });
   }
 
   /**
@@ -152,6 +249,52 @@ export class SavedViewService {
       request,
     );
     return handleResponse(result, 'Failed to duplicate view');
+  }
+
+  /**
+   * Copy any accessible view into the current user's personal scope.
+   */
+  async copyToPersonal(
+    pid: string,
+    data: SavedViewCopyToPersonalRequest = {},
+    request?: Request,
+  ): Promise<SavedView> {
+    const result = await post<SavedView>(
+      `${BASE_URL}/${pid}/copy-to-personal`,
+      data,
+      undefined,
+      request,
+    );
+    return handleResponse(result, 'Failed to copy view to personal scope');
+  }
+
+  /**
+   * Get audit events for a visible shared/global view.
+   */
+  async getAuditEvents(pid: string, request?: Request): Promise<SavedViewAuditEvent[]> {
+    const result = await get<SavedViewAuditEvent[]>(
+      `${BASE_URL}/${pid}/audit-events`,
+      undefined,
+      undefined,
+      request,
+    );
+    return handleResponse(result, 'Failed to fetch saved view audit events');
+  }
+
+  /**
+   * Check whether a view type has the required backend field mapping before saving.
+   */
+  async checkCapability(
+    data: SavedViewCapabilityCheckRequest,
+    request?: Request,
+  ): Promise<SavedViewCapabilityCheckResponse> {
+    const result = await post<SavedViewCapabilityCheckResponse>(
+      `${BASE_URL}/capability-check`,
+      data,
+      undefined,
+      request,
+    );
+    return handleResponse(result, 'Failed to check saved view capability');
   }
 
   /**

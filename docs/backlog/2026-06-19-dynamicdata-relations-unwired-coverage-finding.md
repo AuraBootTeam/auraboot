@@ -1,8 +1,7 @@
 ---
-title: DynamicData relation/sub-table methods are unreachable (loadModelRelations is a stub)
-date: 2026-06-19
-type: finding
-status: open
+created: 2026-06-19
+type: backlog
+status: shipped
 area: meta/dynamic-data
 related: docs/backlog/2026-06-10-oss-coverage-to-80-tracker.md
 ---

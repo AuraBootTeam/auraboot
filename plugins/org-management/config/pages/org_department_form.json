@@ -87,8 +87,7 @@
             "en": "Save"
           },
           "action": {
-            "type": "command",
-            "command": "org:create_department"
+            "type": "command"
           }
         },
         {

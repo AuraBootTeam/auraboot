@@ -1,9 +1,15 @@
 package com.auraboot.framework.bi;
 
+import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.bi.service.ReportStorageService;
 import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
+import com.auraboot.framework.bi.service.impl.ReportRenderClient;
+import com.auraboot.framework.bi.service.impl.ReportRenderException;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
@@ -13,6 +19,7 @@ import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
+import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -21,6 +28,10 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,12 +66,30 @@ class ReportExportServiceTest {
     @Mock
     private NamedQueryService namedQueryService;
 
+    @Mock
+    private ReportStorageService reportStorageService;
+
+    @Mock
+    private AuditTrailService auditTrailService;
+
+    @Mock
+    private ReportRenderClient reportRenderClient;
+
     private ReportExportServiceImpl reportExportService;
 
     @BeforeEach
     void setUp() {
         reportExportService = new ReportExportServiceImpl(pageSchemaMapper, new ObjectMapper(),
-                dynamicDataService, namedQueryService);
+                dynamicDataService, namedQueryService, reportStorageService, auditTrailService,
+                reportRenderClient);
+        // A successful export records an audit event sourced from MetaContext (set on every real
+        // authenticated request, like the controller's MetaContext.getCurrentTenantId()); simulate it.
+        MetaContext.setContext(7L, 99L, "user-pid", "tester");
+    }
+
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
     }
 
     @Test
@@ -94,6 +124,86 @@ class ReportExportServiceTest {
         }
     }
 
+    // ---------- Phase 4 slice 2b-2: read ab_report first, fall back to page-schema ----------
+
+    @Test
+    void loadReportDsl_readsAbReportFirst_whenShadowRowPresent() throws Exception {
+        // ab_report has the report (the dual-write shadow): the export must read it from there and
+        // must NOT touch the page-schema for the dsl.
+        ReportEntity shadow = new ReportEntity();
+        shadow.setPid("rpt-shadow");
+        shadow.setDsl(new ObjectMapper().writeValueAsString(reportDsl()));
+        when(reportStorageService.findByPid("rpt-shadow")).thenReturn(shadow);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-shadow");
+
+        ReportExportFile file = reportExportService.exportExcel(request);
+
+        // same export content as the page-schema path produces — proves the ab_report dsl shape
+        // is structurally identical to the page-schema reportDsl shape.
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file.getBytes()))) {
+            assertThat(workbook.getSheetName(0)).isEqualTo("Orders Export");
+            var sheet = workbook.getSheetAt(0);
+            assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("Region");
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("North");
+            assertThat(sheet.getRow(2).getCell(1).getNumericCellValue()).isEqualTo(12.0);
+        }
+
+        // the page-schema mapper was never consulted for the dsl (ab_report won)
+        verify(pageSchemaMapper, never()).selectByPid(any());
+    }
+
+    @Test
+    void loadReportDsl_fallsBackToPageSchema_whenNoShadowRow() throws Exception {
+        // ab_report has NO row for this pid (pre-dual-write report): export must fall back to the
+        // legacy page-schema extension.reportDsl, unchanged.
+        when(reportStorageService.findByPid("rpt-legacy")).thenReturn(null);
+
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", reportDsl());
+        page.setExtension(extension);
+        when(pageSchemaMapper.selectByPid("rpt-legacy")).thenReturn(page);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-legacy");
+
+        ReportExportFile file = reportExportService.exportExcel(request);
+
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file.getBytes()))) {
+            assertThat(workbook.getSheetName(0)).isEqualTo("Orders Export");
+            var sheet = workbook.getSheetAt(0);
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("North");
+            assertThat(sheet.getRow(2).getCell(1).getNumericCellValue()).isEqualTo(12.0);
+        }
+    }
+
+    @Test
+    void loadReportDsl_fallsBackToPageSchema_whenShadowRowHasBlankDsl() throws Exception {
+        // Defensive: a shadow row exists but its dsl is blank (never legitimately happens since the
+        // create() default is "{}", but guard the read path) → fall back to page-schema.
+        ReportEntity blankShadow = new ReportEntity();
+        blankShadow.setPid("rpt-blank");
+        blankShadow.setDsl("");
+        when(reportStorageService.findByPid("rpt-blank")).thenReturn(blankShadow);
+
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", reportDsl());
+        page.setExtension(extension);
+        when(pageSchemaMapper.selectByPid("rpt-blank")).thenReturn(page);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-blank");
+
+        ReportExportFile file = reportExportService.exportJson(request);
+
+        Map<String, Object> payload = new ObjectMapper().readValue(file.getBytes(), new TypeReference<>() {});
+        Map<String, Object> exportedDsl = castMap(payload.get("reportDsl"));
+        assertThat(exportedDsl.get("title")).isEqualTo("Operations Export");
+    }
+
     @Test
     void exportPdf_withStaticTableData_rendersPdfArtifact() throws Exception {
         PageSchema page = new PageSchema();
@@ -119,6 +229,45 @@ class ReportExportServiceTest {
             assertThat(text).contains("Region | Cases");
             assertThat(text).contains("North | 12");
             assertThat(text).contains("South | 9");
+        }
+    }
+
+    // ---------- Phase 3: WYSIWYG renderer with PDFBox fallback ----------
+
+    @Test
+    void exportPdf_usesWysiwygRenderer_whenItReturnsPdfBytes() {
+        // The Node renderer (slice 1-2c) produced a real PDF — the export returns it
+        // verbatim, NOT the legacy PDFBox text path.
+        byte[] wysiwyg = "%PDF-1.7 wysiwyg-renderer-output".getBytes();
+        when(reportRenderClient.renderPdf(any(), any())).thenReturn(wysiwyg);
+        stubReportDsl("rpt-wysiwyg");
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-wysiwyg");
+        ReportExportFile file = reportExportService.exportPdf(request);
+
+        assertThat(file.getBytes()).isEqualTo(wysiwyg);
+        assertThat(file.getContentType()).isEqualTo("application/pdf");
+        assertThat(file.getFilename()).isEqualTo("Operations Export.pdf");
+    }
+
+    @Test
+    void exportPdf_fallsBackToPdfBox_whenRendererFails() throws Exception {
+        // Renderer unavailable/failed -> fall back to the legacy PDFBox text export
+        // (logged, never silent), so PDF export never hard-fails on a renderer issue.
+        when(reportRenderClient.renderPdf(any(), any()))
+                .thenThrow(new ReportRenderException("renderer unavailable"));
+        stubReportDsl("rpt-fallback");
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-fallback");
+        ReportExportFile file = reportExportService.exportPdf(request);
+
+        assertThat(file.getBytes()).startsWith((byte) '%', (byte) 'P', (byte) 'D', (byte) 'F', (byte) '-');
+        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(file.getBytes()))) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("Operations Export");
+            assertThat(text).contains("Region | Cases");
         }
     }
 
@@ -257,6 +406,34 @@ class ReportExportServiceTest {
     }
 
     @Test
+    void exportExcel_chartBlock_embedsNativeChart() throws Exception {
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", nonTableReportDsl());
+        page.setExtension(extension);
+        when(pageSchemaMapper.selectByPid("rpt-chart-native")).thenReturn(page);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-chart-native");
+
+        ReportExportFile file = reportExportService.exportExcel(request);
+
+        try (XSSFWorkbook workbook =
+                (XSSFWorkbook) WorkbookFactory.create(new ByteArrayInputStream(file.getBytes()))) {
+            XSSFSheet chartSheet = workbook.getSheet("Status Chart");
+            assertThat(chartSheet).isNotNull();
+            // the Category/Value data (the chart's source) is still present
+            assertThat(chartSheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("Category");
+            // a REAL native Excel chart is embedded over that data — not just a data sheet
+            XSSFDrawing drawing = chartSheet.getDrawingPatriarch();
+            assertThat(drawing).as("chart sheet must carry a drawing").isNotNull();
+            assertThat(drawing.getCharts())
+                    .as("a native XSSF chart must be embedded over the data")
+                    .hasSize(1);
+        }
+    }
+
+    @Test
     void exportExcel_withModelNamedQueryAndApiDataSources_rendersResolvedRows() throws Exception {
         PageSchema page = new PageSchema();
         ExtensionBean extension = new ExtensionBean();
@@ -363,6 +540,88 @@ class ReportExportServiceTest {
         assertThatThrownBy(() -> reportExportService.exportExcel(request))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("Report DSL not found");
+    }
+
+    // ---------- B6 / Q15: a SUCCESSFUL export records a REPORT_EXPORT audit event ----------
+
+    @Test
+    void exportExcel_recordsExportAudit() throws Exception {
+        stubReportDsl("rpt-audit-xlsx");
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-audit-xlsx");
+        reportExportService.exportExcel(request);
+
+        AuditTrailEvent e = capturedExportAudit();
+        assertThat(e.getEventType()).isEqualTo("REPORT_EXPORT");
+        assertThat(e.getEntityType()).isEqualTo("report");
+        assertThat(e.getEntityPid()).isEqualTo("rpt-audit-xlsx");
+        assertThat(e.getOperationType()).isEqualTo("EXPORT_EXCEL");
+        assertThat(e.getTenantId()).isEqualTo(7L);
+        assertThat(e.getActorId()).isEqualTo(99L);
+        assertThat(e.getMetadata().get("format").asText()).isEqualTo("excel");
+        assertThat(e.getMetadata().get("filename").asText()).isEqualTo("Operations Export.xlsx");
+    }
+
+    @Test
+    void exportPdf_recordsExportAudit() {
+        stubReportDsl("rpt-audit-pdf");
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-audit-pdf");
+        reportExportService.exportPdf(request);
+
+        AuditTrailEvent e = capturedExportAudit();
+        assertThat(e.getEventType()).isEqualTo("REPORT_EXPORT");
+        assertThat(e.getOperationType()).isEqualTo("EXPORT_PDF");
+        assertThat(e.getEntityPid()).isEqualTo("rpt-audit-pdf");
+        assertThat(e.getMetadata().get("format").asText()).isEqualTo("pdf");
+        assertThat(e.getMetadata().get("filename").asText()).isEqualTo("Operations Export.pdf");
+    }
+
+    @Test
+    void exportJson_recordsExportAudit() {
+        stubReportDsl("rpt-audit-json");
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-audit-json");
+        reportExportService.exportJson(request);
+
+        AuditTrailEvent e = capturedExportAudit();
+        assertThat(e.getEventType()).isEqualTo("REPORT_EXPORT");
+        assertThat(e.getOperationType()).isEqualTo("EXPORT_JSON");
+        assertThat(e.getEntityPid()).isEqualTo("rpt-audit-json");
+        assertThat(e.getMetadata().get("format").asText()).isEqualTo("json");
+        assertThat(e.getMetadata().get("filename").asText()).isEqualTo("Operations Export.report.json");
+    }
+
+    @Test
+    void export_withoutReportDsl_recordsNoAudit() {
+        // A failed export (missing dsl) must NOT emit an audit event — audit only fires on success.
+        PageSchema page = new PageSchema();
+        page.setExtension(new ExtensionBean());
+        when(pageSchemaMapper.selectByPid("rpt-no-audit")).thenReturn(page);
+
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("rpt-no-audit");
+
+        assertThatThrownBy(() -> reportExportService.exportPdf(request))
+                .isInstanceOf(ValidationException.class);
+        verify(auditTrailService, never()).recordAudit(any());
+    }
+
+    private void stubReportDsl(String reportPid) {
+        PageSchema page = new PageSchema();
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("reportDsl", reportDsl());
+        page.setExtension(extension);
+        when(pageSchemaMapper.selectByPid(reportPid)).thenReturn(page);
+    }
+
+    private AuditTrailEvent capturedExportAudit() {
+        ArgumentCaptor<AuditTrailEvent> c = ArgumentCaptor.forClass(AuditTrailEvent.class);
+        verify(auditTrailService).recordAudit(c.capture());
+        return c.getValue();
     }
 
     private Map<String, Object> reportDsl() {

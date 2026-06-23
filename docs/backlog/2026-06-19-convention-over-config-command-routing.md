@@ -98,3 +98,7 @@ owner: diqi
 - 标准新建/编辑/删除页按钮无 command 配置、URL 无 `commandCode`;create/edit/delete 仍正确走业务命令(真浏览器 golden + DB 反查)。
 - 纯 CRUD 模型不变;显式 override 不变;存量直达链接不破。
 - 单测(解析 by type)+ 全量 golden 绿;enterprise 全量 import success。
+
+## 防回归门禁(2026-06-19,已落地)
+
+`scripts/check-dsl-command-convention.mjs` + `.github/workflows/dsl-command-convention.yml`:扫描 OSS 插件页面,若某标准按钮(create/edit/save/submit/delete)的 `action.command` **正好等于该模型的约定 CRUD 命令**(从 commands.json 的 `type` 静态推导,**仅无歧义模型**),即报错退出——防止未来插件重新引入冗余命令 / `?commandCode=` URL。变体 / state_transition / 跨模型子资源 / 歧义模型(如 wd_leave_request 双 create)永不误报。本地 `node scripts/check-dsl-command-convention.mjs`,CI path-triggered。

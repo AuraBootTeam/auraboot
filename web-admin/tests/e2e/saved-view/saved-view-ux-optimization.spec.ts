@@ -14,18 +14,25 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { uniqueId, navigateToDynamicPage } from '../helpers';
+import {
+  uniqueId,
+  navigateToDynamicPage,
+  openViewSelectorDropdown,
+  selectSavedViewByName,
+  selectSavedViewByType,
+} from '../helpers';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 const MODEL_CODE = 'e2et_order';
-const PAGE_KEY = 'e2et_order';
+const ROUTE_PAGE_KEY = 'e2et_order';
+const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
 
 /** Navigate to the e2et-order dynamic page and wait for the list to load. */
 async function gotoOrderPage(page: Page) {
-  await navigateToDynamicPage(page, PAGE_KEY);
+  await navigateToDynamicPage(page, ROUTE_PAGE_KEY);
   // Wait for the list page content to be visible (table renders by default)
   await page.locator('table, [role="table"], [data-testid="dynamic-list"]').first().waitFor({ state: 'visible', timeout: 15000 });
 }
@@ -41,7 +48,7 @@ async function createViewViaApi(
     data: {
       name,
       modelCode: MODEL_CODE,
-      pageKey: PAGE_KEY,
+      pageKey: SAVED_VIEW_PAGE_KEY,
       viewType,
       scope: 'personal',
       viewConfig,
@@ -57,63 +64,21 @@ async function deleteViewViaApi(page: Page, pid: string): Promise<void> {
   await page.request.delete(`/api/views/${pid}`).catch(() => {});
 }
 
-/** Switch to a specific view type by selecting a saved view of that type via ViewManagePanel.
+/** Switch to a specific view type by selecting a saved view of that type via ViewSelector.
  *  For 'table', the default view is already table, so this is a no-op.
- *  For other types, we open the ViewManagePanel and look for a matching view.
+ *  For other types, we open the Feishu-style dropdown and look for a matching view.
  */
 async function switchToViewType(page: Page, viewType: string) {
   if (viewType === 'table') {
     // Table is the default view type, no switch needed
     return;
   }
-  // Click ViewSelector button to open ViewManagePanel (slide-out dialog)
-  const viewSelector = page.locator('button[aria-haspopup="listbox"]');
-  await viewSelector.click();
-  const panel = page.locator('[role="dialog"]');
-  await panel.waitFor({ state: 'visible', timeout: 5000 });
-  // Find a view with the type badge (non-table views show a purple badge with viewType)
-  const viewTypeBadge = panel.getByText(viewType, { exact: true }).first();
-  const closeBtn = panel.locator('button[aria-label="Close panel"]');
-  if (await viewTypeBadge.isVisible({ timeout: 3000 }).catch(() => false)) {
-    // Click the parent view item (the button containing this badge)
-    const viewRow = viewTypeBadge.locator('xpath=ancestor::button[1]');
-    if (await viewRow.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await viewRow.click();
-    } else {
-      // Fallback: click the badge's nearest clickable ancestor
-      await viewTypeBadge.click();
-    }
-    // Close the panel after selecting (panel does not auto-close)
-    if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await closeBtn.click();
-    }
-    await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-  } else {
-    // Close panel if no matching view found
-    await closeBtn.click();
-    await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-  }
+  await selectSavedViewByType(page, viewType);
 }
 
-/** Select a specific saved view by name via ViewManagePanel. */
+/** Select a specific saved view by name via ViewSelector. */
 async function selectViewByName(page: Page, viewName: string) {
-  const viewSelector = page.locator('button[aria-haspopup="listbox"]');
-  await viewSelector.click();
-  const panel = page.locator('[role="dialog"]');
-  await panel.waitFor({ state: 'visible', timeout: 5000 });
-  const closeBtn = panel.locator('button[aria-label="Close panel"]');
-  const viewOption = panel.getByText(viewName, { exact: false }).first();
-  if (await viewOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await viewOption.click();
-    // Close the panel after selecting (panel does not auto-close)
-    if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await closeBtn.click();
-    }
-    await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-  } else {
-    await closeBtn.click();
-    await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-  }
+  return selectSavedViewByName(page, viewName);
 }
 
 // ===========================================================================
@@ -121,59 +86,33 @@ async function selectViewByName(page: Page, viewName: string) {
 // ===========================================================================
 
 test.describe('ViewEmptyState', () => {
-  let notConfiguredViewPid = '';
-
-  test.beforeAll(async ({ browser }) => {
-    const page = await browser.newPage();
-    await page.goto('/');
-    await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
-
-    // Create a calendar view WITHOUT configuring date fields → triggers "not-configured"
-    notConfiguredViewPid = await createViewViaApi(
-      page,
-      `UX_Empty_NotConfigured_${uniqueId()}`,
-      'calendar',
-      {}, // no dateField configured
-    );
-    await page.close();
-  });
-
-  test('VES-001: shows "not-configured" empty state when calendar view lacks date field mapping', async ({
+  test('VES-001: rejects calendar view creation when date field mapping is missing', async ({
     page,
   }) => {
+    const viewName = `UX_Empty_NotConfigured_${uniqueId()}`;
+
+    const resp = await page.request.post('/api/views', {
+      data: {
+        name: viewName,
+        modelCode: MODEL_CODE,
+        pageKey: SAVED_VIEW_PAGE_KEY,
+        viewType: 'calendar',
+        scope: 'personal',
+        viewConfig: {},
+      },
+    });
+
+    expect(resp.status()).toBe(422);
+    const body = await resp.json();
+    expect(body.code).not.toBe('0');
+    expect(JSON.stringify(body.context ?? {})).toContain('calendarDateField');
+
     await gotoOrderPage(page);
-    await switchToViewType(page, 'calendar');
-
-    if (notConfiguredViewPid) {
-      await selectViewByName(page, 'UX_Empty_NotConfigured_');
-    }
-
-    // Either the calendar renders or shows a not-configured/empty state
-    const notConfigured = page.locator('[data-testid="view-empty-not-configured"]');
-    const noData = page.locator('[data-testid="view-empty-no-data"]');
-    const diagnostics = page.locator('[data-testid="view-diagnostics"]');
-    const calendarContent = page.locator('.fc, [class*="calendar"], [data-testid*="calendar"]');
-
-    const found = await Promise.race([
-      notConfigured.waitFor({ state: 'visible', timeout: 8000 }).then(() => 'not-configured'),
-      noData.waitFor({ state: 'visible', timeout: 8000 }).then(() => 'no-data'),
-      diagnostics.waitFor({ state: 'visible', timeout: 8000 }).then(() => 'diagnostics'),
-      calendarContent
-        .first()
-        .waitFor({ state: 'visible', timeout: 8000 })
-        .then(() => 'calendar'),
-    ]).catch(() => 'timeout');
-
-    // The view should show one of the expected states (not a blank screen)
-    expect(['not-configured', 'no-data', 'diagnostics', 'calendar']).toContain(found);
-
-    // If "not-configured" variant is shown, verify its content
-    if (found === 'not-configured') {
-      await expect(notConfigured).toContainText(/not configured|View not configured/i);
-      // "Configure" button should be present
-      const configureBtn = notConfigured.locator('button', { hasText: 'Configure' });
-      await expect(configureBtn).toBeVisible();
-    }
+    await expect(page.getByTestId('view-selector-trigger')).toHaveAttribute(
+      'data-current-view-type',
+      'table',
+    );
+    expect(await selectViewByName(page, viewName)).toBe(false);
   });
 
   test('VES-002: shows "no-data" empty state variant text correctly', async ({ page }) => {
@@ -510,26 +449,16 @@ test.describe('Cross-component Integration', () => {
     test.setTimeout(60000);
     await gotoOrderPage(page);
 
-    // Open ViewManagePanel to see available views
-    const viewSelector = page.locator('button[aria-haspopup="listbox"]');
-    await viewSelector.click();
-    const panel = page.locator('[role="dialog"]');
-    await panel.waitFor({ state: 'visible', timeout: 5000 });
-
-    // Get all clickable view items in the panel (buttons with view names)
-    const viewButtons = panel.locator('button.min-w-0.flex-1.text-left');
+    const dropdown = await openViewSelectorDropdown(page);
+    const viewButtons = dropdown.getByRole('option');
     const optionCount = await viewButtons.count();
-
-    // Close panel first
-    const closeBtn = panel.locator('button[aria-label="Close panel"]');
-    await closeBtn.click();
-    await panel.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Escape').catch(() => {});
+    await dropdown.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 
     // Click through each available view (up to 5) and verify content renders
     for (let i = 0; i < Math.min(optionCount, 5); i++) {
-      await viewSelector.click();
-      await panel.waitFor({ state: 'visible', timeout: 5000 });
-      const viewBtn = panel.locator('button.min-w-0.flex-1.text-left').nth(i);
+      const currentDropdown = await openViewSelectorDropdown(page);
+      const viewBtn = currentDropdown.getByRole('option').nth(i);
       if (await viewBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
         // Wait for list API response on view switch
         const listResponse = page
@@ -539,12 +468,7 @@ test.describe('Cross-component Integration', () => {
           .catch(() => null);
 
         await viewBtn.click();
-        // Close panel after selection (panel does not auto-close)
-        const innerCloseBtn = panel.locator('button[aria-label="Close panel"]');
-        if (await innerCloseBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-          await innerCloseBtn.click();
-        }
-        await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        await currentDropdown.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         await listResponse;
 
         // Each view should render SOMETHING — not a blank white screen
@@ -563,8 +487,8 @@ test.describe('Cross-component Integration', () => {
         // At minimum the page should not crash
         expect(hasContent || true).toBe(true);
       } else {
-        await closeBtn.click();
-        await panel.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        await page.keyboard.press('Escape').catch(() => {});
+        await currentDropdown.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
       }
     }
   });

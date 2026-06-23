@@ -1,3 +1,9 @@
+---
+type: handover
+status: shipped
+created: 2026-06-19
+---
+
 # Session Handover - 2026-06-19
 
 ## Session Summary

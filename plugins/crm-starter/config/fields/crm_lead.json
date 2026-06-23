@@ -82,11 +82,28 @@
     "constraints": { "maxLength": 200 }
   },
   {
-    "code": "crm_lead_assigned_to",
+    "code": "owner_type",
+    "displayName:zh-CN": "分配类型",
+    "displayName:en": "Assign To",
+    "dataType": "enum",
+    "dictCode": "owner_type",
+    "defaultValue": "user",
+    "description": "Whether the lead is assigned to a user or a team.",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "owner_id",
     "displayName:zh-CN": "分配给",
-    "displayName:en": "Assigned To",
+    "displayName:en": "Assignee",
     "dataType": "string",
-    "constraints": { "maxLength": 100 }
+    "constraints": { "maxLength": 64 },
+    "description": "PID of the assigned user or team.",
+    "feature": { "searchable": true },
+    "extension": {
+      "renderComponent": "ownerselect",
+      "placeholder:zh-CN": "请选择负责人",
+      "placeholder:en": "Select assignee"
+    }
   },
   {
     "code": "crm_lead_lost_reason",

@@ -140,12 +140,18 @@ The G1 gate CI-enforces no-regression on palette (1278) + i18n (111).
 
 ## Remaining work (resumable)
 
+> **Update 2026-06-20:** T8/T9/T10 were all completed after this table was first written —
+> verified against git history + live code (`quickFilterPresets.ts`, the T9 cross-page selection
+> model + select-all banner in `ListPageContent`, `showSummaryRow`/expandable-tree DSL opt-ins,
+> the generic import modal, `formDraftStore`). The whole T1–T10 burn-down is effectively done; only
+> the optional `app.css .decisionops-*` hex tail remains.
+
 | Item                  | Scope                                                                                                 | Status      | Notes                                                                                                |
 | --------------------- | ----------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
-| T8 saved-view presets | `ListPageContent:2584` 我的记录/今日新建/本周修改 hardcoded → persisted SavedView presets             | not started | feature; verify via the host-golden recipe in RENDERER-GOLDEN-2026-06-17.md                          |
-| T9 cross-page select  | cross-page select-all + export-selected-only (currently page-only + full/filtered export)             | not started | feature; needs backend select-set + golden                                                           |
-| T10 list gaps         | column aggregation summary row · expand/tree · generic import · form autosave (draft)                 | not started | ROI-ordered, non-blocking                                                                            |
-| T4–T6 deeper golden   | batch/multi-select bar (§3) + detail sub-tab inner content (timeline §5) on a selection-enabled model | optional    | renderers support these; this golden's demo seed didn't exercise them (see golden report follow-ups) |
+| T8 saved-view presets | `ListPageContent` 我的记录/今日新建/本周修改 hardcoded → persisted SavedView presets                   | **DONE (#743)** | `quickFilterPresets.ts` + `?preset=` persistence + `/api/views` (savedViewService)               |
+| T9 cross-page select  | cross-page select-all + export-selected-only                                                          | **DONE (#745)** | cross-page `selectionState` model + select-all banner + export-selected                          |
+| T10 list gaps         | column aggregation summary row · expand/tree · generic import · form autosave (draft)                 | **DONE (#749 #760 #798)** | summary-row + expandable-tree DSL opt-ins · import modal · `formDraftStore`             |
+| T4–T6 deeper golden   | batch/multi-select bar (§3) + detail sub-tab inner content (timeline §5) on a selection-enabled model | mostly done | §3 list-interaction upgrades shipped (#796/#812/#829); remaining demo-seed golden corners optional   |
 | T3 sweep tail         | residual decorative/slate/shade-pair colors + `app.css` `.decisionops-*` (367 hex)                    | optional    | documented exceptions; gate holds the line                                                           |
 
 > **Host-golden recipe that works** (for T8–T10 verification) is in

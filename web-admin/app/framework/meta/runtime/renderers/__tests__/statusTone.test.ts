@@ -52,4 +52,25 @@ describe('resolveStatusTone', () => {
     expect(STATUS_TONE_DOT.blue).toBe('bg-status-blue');
     expect(STATUS_TONE_DOT.gray).toBe('bg-status-gray');
   });
+
+  // Regression: the crm_lead_status dict hexes were remapped so the 5 funnel
+  // stages land on 5 DISTINCT tones (previously new/contacted/qualified all
+  // collapsed to blue). If this breaks, the lead list loses stage differentiation.
+  it('crm lead status hexes resolve to 5 distinct funnel tones', () => {
+    const tones = {
+      new: resolveStatusTone('#71717A'),
+      contacted: resolveStatusTone('#2563EB'),
+      qualified: resolveStatusTone('#C2750A'),
+      converted: resolveStatusTone('#15A34A'),
+      lost: resolveStatusTone('#DC2626'),
+    };
+    expect(tones).toEqual({
+      new: 'gray',
+      contacted: 'blue',
+      qualified: 'amber',
+      converted: 'green',
+      lost: 'red',
+    });
+    expect(new Set(Object.values(tones)).size).toBe(5); // all distinct
+  });
 });

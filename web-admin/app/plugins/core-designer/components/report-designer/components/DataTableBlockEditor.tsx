@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { useReportStore } from '../store/useReportStore';
+import { useReportDocument } from '../state/ReportDocumentProvider';
 import type { DataTableBlock, ReportColumn, ReportDataSource } from '../types';
 import { ModelPicker, NamedQueryPicker } from '~/shared/designer/datasource';
 
@@ -20,7 +20,7 @@ export const DataTableBlockEditor: React.FC<DataTableBlockEditorProps> = ({
   dataSources,
   onChange,
 }) => {
-  const { addDataSource } = useReportStore();
+  const { addDataSource } = useReportDocument();
   const [newDsKey, setNewDsKey] = useState('');
   const [newDsType, setNewDsType] = useState<'model' | 'namedQuery' | 'api'>('model');
   const [newDsValue, setNewDsValue] = useState('');

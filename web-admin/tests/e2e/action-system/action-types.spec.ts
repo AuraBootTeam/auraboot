@@ -66,7 +66,7 @@ test.describe('Action System — Action Types', () => {
 
     const addBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+        '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
       )
       .first();
     await expect(addBtn).toBeVisible({ timeout: 10000 });
@@ -86,7 +86,7 @@ test.describe('Action System — Action Types', () => {
     // Go to create form
     const addBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+        '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
       )
       .first();
     await expect(addBtn).toBeVisible({ timeout: 10000 });
@@ -273,7 +273,7 @@ test.describe('Action System — Action Types', () => {
 
     const addBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create"), button:has-text("create")',
+        '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create"), button:has-text("create")',
       )
       .first();
     await expect(addBtn).toBeVisible({ timeout: 10000 });
@@ -375,7 +375,7 @@ test.describe('Action System — Action Types', () => {
     await navigateToDynamicPage(page, 'e2et_order');
 
     const addBtn = page
-      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建")')
+      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日"))')
       .first();
     await expect(addBtn).toBeVisible({ timeout: 10000 });
     await addBtn.click();
@@ -424,7 +424,7 @@ test.describe('Action System — Action Types', () => {
     await navigateToDynamicPage(page, 'e2et_order');
 
     const addBtn = page
-      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建")')
+      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日"))')
       .first();
     await expect(addBtn).toBeVisible({ timeout: 10000 });
     await addBtn.click();

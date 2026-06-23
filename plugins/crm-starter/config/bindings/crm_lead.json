@@ -10,6 +10,7 @@
   { "modelCode": "crm_lead", "fieldCode": "crm_lead_status", "sequence": 9, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
   { "modelCode": "crm_lead", "fieldCode": "crm_lead_requirement", "sequence": 10, "required": false, "visible": false, "editable": true },
   { "modelCode": "crm_lead", "fieldCode": "crm_lead_campaign", "sequence": 11, "required": false, "visible": false, "editable": true },
-  { "modelCode": "crm_lead", "fieldCode": "crm_lead_assigned_to", "sequence": 12, "required": false, "visible": true, "editable": true },
-  { "modelCode": "crm_lead", "fieldCode": "crm_lead_lost_reason", "sequence": 13, "required": false, "visible": false, "editable": true }
+  { "modelCode": "crm_lead", "fieldCode": "owner_type", "sequence": 12, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_lead", "fieldCode": "owner_id", "sequence": 13, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_lead", "fieldCode": "crm_lead_lost_reason", "sequence": 14, "required": false, "visible": false, "editable": true }
 ]

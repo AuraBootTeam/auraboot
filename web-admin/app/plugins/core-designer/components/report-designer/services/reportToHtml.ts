@@ -355,6 +355,16 @@ function renderCrossTab(block: CrossTabBlock, data: Record<string, unknown>[]): 
   return html;
 }
 
+// NOTE (B1 Phase 3 sequencing — do NOT route this through chart-spec-svg yet):
+// This renders charts as HTML *tables* on purpose — openhtmltopdf does not render
+// SVG reliably (see the table-based bar/legend below). The B2c ChartSpec→SVG
+// renderer (framework/smart/charts/chart-spec-svg.ts) is the convergence target,
+// but switching report-chart export to it MUST wait for the report PDF engine to
+// move to Chromium-headless-print (DDR/backlog 2026-06-20 delivery decision),
+// which renders SVG faithfully. Wiring B2c here while the engine is still
+// openhtmltopdf would regress PDF chart output. Phase 3 = (PDF engine migration +
+// reportToHtml→ReportExportAdapter using ChartSpec→SVG) together, verified with a
+// real export golden — a running-stack task, not a pure refactor.
 function renderChart(block: ChartBlock, data: Record<string, unknown>[]): string {
   // Aggregate data
   const groups = new Map<string, number[]>();

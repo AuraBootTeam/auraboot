@@ -1,0 +1,13 @@
+{
+  "surface": "bpm-designer-sdk",
+  "role": "surface",
+  "family": "flow",
+  "layer1Kernel": "flow-designer-sdk",
+  "conformance": "conforming",
+  "conformanceNote": "Registers BPMN node types + property editors onto flow-designer-sdk's NodeRegistry (imports ~/plugins/core-designer/components/flow-designer-sdk). No private canvas/store/history.",
+  "layer0": ["PropertySchema", "ExpressionBuilder"],
+  "storage": { "primary": "ab_bpm_process_definition" },
+  "owner": "core-designer",
+  "decision": "DDR-2026-06-18-designer-kernel-boundary",
+  "note": "BPM node pack on the shared flow kernel — the DDR reference for 'same family shares kernel, only registers nodes'."
+}

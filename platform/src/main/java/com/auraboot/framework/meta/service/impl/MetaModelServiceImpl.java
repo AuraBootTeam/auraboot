@@ -1231,9 +1231,89 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     /**
      * 加载模型关联关系
      */
+    /**
+     * Materialize the model's navigable relations from its reference fields.
+     *
+     * <p>A relation is derived from each field whose {@code refTarget} declares a
+     * {@link FieldRefTargetBean.BidirectionalConfig} (relation type + target entity, and — for
+     * many-to-many — the junction table and its source/target FK columns). Models without such
+     * fields yield an empty list, so {@code getModelDefinition} behaves exactly as before for them.
+     * This is what makes the relation/sub-table runtime ({@code getRelationData} /
+     * {@code createRelations} / {@code saveWithRelations} / inverse-field sync) reachable.
+     */
     private List<RelationDefinition> loadModelRelations(Long modelId) {
-        // TODO: 从数据库加载关联关系
-        return Collections.emptyList();
+        Model model = metaModelMapper.selectById(modelId);
+        if (model == null) {
+            return Collections.emptyList();
+        }
+        List<ModelFieldBinding> bindings = fieldBindingMapper.findByModelId(modelId);
+        if (bindings == null || bindings.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> fieldIds = bindings.stream()
+                .map(ModelFieldBinding::getFieldId)
+                .collect(Collectors.toList());
+        List<Field> fields = metaFieldMapper.findByIds(fieldIds);
+        if (fields == null || fields.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String sourceModel = model.getCode();
+        String sourceTable = generateTableName(sourceModel);
+        return fields.stream()
+                .map(field -> buildRelationDefinition(field, sourceModel, sourceTable))
+                .filter(relation -> relation != null)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Build a single {@link RelationDefinition} from a reference field, or {@code null} when the
+     * field does not declare a bidirectional relation (target entity + parseable relation type).
+     */
+    private RelationDefinition buildRelationDefinition(Field field, String sourceModel, String sourceTable) {
+        FieldRefTargetBean refTarget = field.getRefTarget();
+        if (refTarget == null || !StringUtils.hasText(refTarget.getTargetEntity())) {
+            return null;
+        }
+        FieldRefTargetBean.BidirectionalConfig bidi = refTarget.getBidirectional();
+        if (bidi == null) {
+            return null;
+        }
+        RelationDefinition.RelationType relationType = parseRelationType(bidi.getRelationType());
+        if (relationType == null) {
+            return null;
+        }
+        String targetModel = refTarget.getTargetEntity();
+        RelationDefinition.RelationDefinitionBuilder builder = RelationDefinition.builder()
+                .name(field.getCode())
+                .sourceModel(sourceModel)
+                .targetModel(targetModel)
+                .sourceTable(sourceTable)
+                .targetTable(StringUtils.hasText(refTarget.getTargetTable())
+                        ? refTarget.getTargetTable() : generateTableName(targetModel))
+                .relationType(relationType)
+                .lazy(bidi.getLazyFetch() == null || Boolean.TRUE.equals(bidi.getLazyFetch()));
+        if (relationType == RelationDefinition.RelationType.MANY_TO_MANY) {
+            builder.joinTable(bidi.getJunctionTable())
+                    .sourceField(bidi.getJunctionSourceColumn())
+                    .targetField(bidi.getJunctionTargetColumn());
+        } else {
+            builder.sourceField(field.getCode())
+                    .targetField(StringUtils.hasText(refTarget.getTargetField())
+                            ? refTarget.getTargetField() : "pid");
+        }
+        return builder.build();
+    }
+
+    private RelationDefinition.RelationType parseRelationType(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        try {
+            return RelationDefinition.RelationType.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("Unknown relation type '{}' in field bidirectional config; relation skipped", raw);
+            return null;
+        }
     }
     
     /**

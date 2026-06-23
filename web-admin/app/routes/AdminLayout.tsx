@@ -10,6 +10,8 @@ import { recordVisit } from '~/plugins/core-dashboard/widgets/workbench/useRecen
 // chunk had not finished transpiling when the user clicked the toggle,
 // leaving the panel invisible after the first click. See GAP-262.
 import { AuraBotPanel } from '~/plugins/core-aurabot/components-shell/AuraBotPanel';
+import { sanitizeRoute } from '@auraboot/track';
+import { getTracker } from '~/shared/services/trackerInstance';
 
 function inferModelCodeFromPath(pathname: string): string | undefined {
   if (!pathname || pathname === '/') return undefined;
@@ -33,10 +35,19 @@ export default function AdminLayout() {
   const aiPanelOpen = state.panelState === 'expanded';
   const location = useLocation();
 
+  // One-time tracker init: register click-capture and flush-on-hide/pagehide listeners.
+  useEffect(() => {
+    getTracker().init();
+  }, []);
+
   // Record page visits for the workbench "recent visits" widget
+  // and emit a pageview telemetry event on each route change.
   useEffect(() => {
     const skipPaths = ['/home', '/home/settings', '/login', '/', '/register'];
     if (skipPaths.some((p) => location.pathname === p)) return;
+
+    // Emit pageview telemetry alongside the existing engagement logic.
+    getTracker().pageview(sanitizeRoute(location.pathname));
 
     // Small delay to let document.title update
     const timer = setTimeout(() => {

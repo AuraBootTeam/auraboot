@@ -1,0 +1,20 @@
+[
+  {
+    "code": "owner_type",
+    "displayName:zh-CN": "归属类型",
+    "displayName:en": "Owner Type",
+    "dataType": "enum",
+    "dictCode": "owner_type",
+    "description": "Whether the record is owned by a user or a team.",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "owner_id",
+    "displayName:zh-CN": "归属对象",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "constraints": { "maxLength": 64 },
+    "description": "PID of the owning user or team (interpreted per owner_type).",
+    "feature": { "searchable": true }
+  }
+]

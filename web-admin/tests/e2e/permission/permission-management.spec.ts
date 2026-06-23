@@ -18,7 +18,10 @@ function uniqueCode(prefix = 'e2e_role') {
 }
 
 /**
- * Navigate to Permission Management page via sidebar menu.
+ * Navigate to Permission Management page via sidebar menu, falling back to direct navigation when
+ * the sidebar menu isn't seeded (minimal-bootstrap golden stacks have no menus — see
+ * docs/backlog/2026-06-21-permission-v2-capability-ui-golden-findings.md §3). The menu path is still
+ * exercised whenever menus exist.
  */
 async function navigateToPermissions(page: any) {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
@@ -35,38 +38,15 @@ async function navigateToPermissions(page: any) {
     await enterpriseBtn.click();
   }
 
-  // Click the permissions menu link using evaluate to bypass pointer interception
+  // Click the permissions menu link; fall back to direct nav if menus aren't seeded.
   const permLink = sidebar.locator('a[href="/enterprise/permissions"]');
-  await expect(permLink).toBeVisible({ timeout: 5000 });
-  await permLink.evaluate((el: HTMLElement) => el.click());
-  await expect(page).toHaveURL(/\/enterprise\/permissions/);
-}
-
-/**
- * Switch to the assignments tab from the permissions page.
- * Ensures the roles tab has fully loaded first, then clicks and verifies.
- */
-async function switchToAssignmentsTab(page: any) {
-  await expect(page.locator('[data-testid="permission-page"]')).toBeVisible({ timeout: 8000 });
-  // Wait for roles tab to fully load (Create Role button indicates React is ready)
-  await expect(page.locator('[data-testid="role-create-btn"]')).toBeVisible({ timeout: 8000 });
-
-  // Click assignments tab — use Playwright native click with retry
-  const assignTab = page.locator('[data-testid="permission-tab-assignments"]');
-  await expect(assignTab).toBeVisible({ timeout: 5000 });
-  await assignTab.click({ timeout: 5000 });
-
-  // Verify URL changed; if not, retry the click
-  try {
-    await expect(page).toHaveURL(/tab=assignments/, { timeout: 3000 });
-  } catch {
-    // Retry click if first attempt didn't register
-    await assignTab.click({ force: true });
-    await expect(page).toHaveURL(/tab=assignments/, { timeout: 5000 });
+  const menuVisible = await permLink.isVisible({ timeout: 5000 }).catch(() => false);
+  if (menuVisible) {
+    await permLink.evaluate((el: HTMLElement) => el.click());
+  } else {
+    await page.goto('/enterprise/permissions', { waitUntil: 'domcontentloaded' });
   }
-
-  // Wait for assignment tab content
-  await expect(page.locator('[data-testid="assignment-tab"]')).toBeVisible({ timeout: 10000 });
+  await expect(page).toHaveURL(/\/enterprise\/permissions/);
 }
 
 /**
@@ -253,73 +233,22 @@ test.describe('Permission Management Page', () => {
     });
   });
 
-  // ---- PM-UI-06 ----
-  test('PM-UI-06: Switch to assignments tab', async ({ page }) => {
+  // ---- PM-UI-09 ---- (v2 IA: capability editor is the default right tab; switch to members)
+  test('PM-UI-09: Right-panel tab switching (capabilities ↔ members)', async ({ page }) => {
     await navigateToPermissions(page);
-    await switchToAssignmentsTab(page);
-
-    // At least 1 role card visible (TENANT_ADMIN always exists)
-    const roleCards = page.locator('[data-testid^="assignment-role-"]');
-    await expect(roleCards.first()).toBeVisible({ timeout: 5000 });
-    const cardCount = await roleCards.count();
-    expect(cardCount).toBeGreaterThanOrEqual(1);
-  });
-
-  // ---- PM-UI-07 ----
-  test('PM-UI-07: Select role and see permission tree', async ({ page }) => {
-    await navigateToPermissions(page);
-    await switchToAssignmentsTab(page);
-
-    // Click first role card
-    const firstRoleCard = page.locator('[data-testid^="assignment-role-"]').first();
-    await expect(firstRoleCard).toBeVisible({ timeout: 5000 });
-    await firstRoleCard.click();
-
-    // Permission tree visible
-    await expect(page.locator('[data-testid="permission-tree"]')).toBeVisible({ timeout: 8000 });
-
-    // Save button visible
-    await expect(page.locator('[data-testid="assignment-save-btn"]')).toBeVisible();
-
-    // Selected count badge visible
-    await expect(page.locator('[data-testid="assignment-selected-count"]')).toBeVisible();
-  });
-
-  // ---- PM-UI-08 ----
-  test('PM-UI-08: Permission tree search', async ({ page }) => {
-    await navigateToPermissions(page);
-    await switchToAssignmentsTab(page);
-
-    // Select first role
-    const firstRoleCard = page.locator('[data-testid^="assignment-role-"]').first();
-    await expect(firstRoleCard).toBeVisible({ timeout: 5000 });
-    await firstRoleCard.click();
-
-    // Wait for permission tree
-    await expect(page.locator('[data-testid="permission-tree"]')).toBeVisible({ timeout: 8000 });
-
-    // Search for something (use a generic term likely to exist)
-    const searchInput = page.locator('[data-testid="permission-tree-search"]');
-    await expect(searchInput).toBeVisible();
-    await searchInput.fill('model');
-
-    // Tree should still be visible (filtered results)
-    await expect(page.locator('[data-testid="permission-tree"]')).toBeVisible();
-
-    // Clear search
-    await searchInput.clear();
-    await expect(page.locator('[data-testid="permission-tree"]')).toBeVisible();
-  });
-
-  // ---- PM-UI-09 ----
-  test('PM-UI-09: Tab switching preserves navigation', async ({ page }) => {
-    await navigateToPermissions(page);
-    await switchToAssignmentsTab(page);
-
-    // Switch back to roles tab
-    await page.locator('[data-testid="permission-tab-roles"]').click();
-    await expect(page).toHaveURL(/tab=roles/);
     await expect(page.locator('[data-testid="role-table"]')).toBeVisible({ timeout: 8000 });
+
+    // A role auto-selects → the capability editor (default right tab) mounts.
+    await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 15000 });
+    // The retired assignments top-tab and standalone matrix tab are gone.
+    await expect(page.getByTestId('permission-tab-assignments')).toHaveCount(0);
+    await expect(page.getByTestId('permission-right-tab-permissions')).toHaveCount(0);
+
+    // Switch to members, then back to capabilities.
+    await page.getByTestId('permission-right-tab-members').click();
+    await expect(page.getByTestId('role-member-tab')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('permission-right-tab-capabilities').click();
+    await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 10000 });
   });
 
   // ---- PM-UI-10 ----

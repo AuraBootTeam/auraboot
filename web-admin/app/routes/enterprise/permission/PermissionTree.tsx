@@ -161,6 +161,7 @@ const TreeNodeRow = ({
   selectedIds,
   onToggleNode,
 }: TreeNodeRowProps) => {
+  const { t } = useI18n();
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expanded.has(node.code);
   const isChecked = hasChildren
@@ -206,7 +207,7 @@ const TreeNodeRow = ({
             indeterminate={isIndeterminate}
             onChange={(e) => onToggleNode(node, e.target.checked)}
           />
-          <span className="text-sm text-gray-800">{node.name}</span>
+          <span className="text-sm text-gray-800">{t(`permission.${node.code}`, undefined, node.name)}</span>
           <span className="text-xs text-gray-400">({node.code})</span>
           <TypeBadge type={node.type} />
         </label>

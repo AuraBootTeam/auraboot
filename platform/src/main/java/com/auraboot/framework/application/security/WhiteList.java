@@ -25,6 +25,12 @@ public class WhiteList {
             // public context and rate-limits. Non-/public plugin routes stay authenticated.
             "/api/ext/*/public/**",
 
+            // Anonymous behavior ingestion (SP2): keyed by a public site_key, tenant resolved
+            // server-side from the key (never trusts the client). The authenticated /api/collect
+            // stays JWT-only. Protected by KeyedCollectGuard (origin allowlist + per-key/per-IP
+            // rate limit + batch cap), not by auth.
+            "/api/collect/keyed",
+
             // Mobile config — no auth required (app needs config before login)
             "/api/mobile/config",
             "/api/mobile/capabilities",

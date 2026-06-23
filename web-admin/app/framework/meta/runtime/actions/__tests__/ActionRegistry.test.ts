@@ -76,7 +76,6 @@ describe('ActionRegistry record navigation', () => {
         method: 'post',
         params: {
           targetRecordPid: 'PUB-APP-001',
-          targetRecordId: 'PUB-APP-001',
           operationType: 'APPROVE',
           payload: {
             mkt_pa_review_notes: 'Looks ready',
@@ -84,6 +83,75 @@ describe('ActionRegistry record navigation', () => {
         },
         token: undefined,
       },
+    );
+  });
+});
+
+describe('ActionRegistry command.execute inputFields (command-form sugar)', () => {
+  it('pops a form (FormDialog) and merges collected values into the command payload', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { ok: true } });
+    // Simulate the user filling + submitting the FormDialog the action pops.
+    window.addEventListener(
+      'dialog:form',
+      (e) => (e as CustomEvent).detail.onSubmit({ cookies_json: '{"sid":"1"}' }),
+      { once: true },
+    );
+
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      args: {
+        command: 'cr_account:set_credential',
+        targetRecordId: 'A1',
+        operationType: 'update',
+        payload: { keep: 'me' },
+        inputFieldsTitle: 'Set Credential',
+        inputFields: [{ field: 'cookies_json', label: 'Cookies', type: 'textarea', required: true }],
+      },
+    });
+
+    expect(fetchResult).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/cr_account:set_credential',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          operationType: 'UPDATE',
+          payload: { keep: 'me', cookies_json: '{"sid":"1"}' },
+        }),
+      }),
+    );
+  });
+
+  it('aborts (does not submit the command) when the user cancels the form', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
+    window.addEventListener(
+      'dialog:form',
+      (e) => (e as CustomEvent).detail.onCancel(),
+      { once: true },
+    );
+
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      args: {
+        command: 'cr_account:set_credential',
+        targetRecordId: 'A1',
+        inputFields: [{ field: 'cookies_json', type: 'textarea', required: true }],
+      },
+    });
+
+    expect(fetchResult).not.toHaveBeenCalled();
+  });
+
+  it('is unchanged for commands without inputFields (backward compatible)', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
+
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      args: { command: 'x:do', targetRecordId: 'A1', payload: { a: 1 } },
+    });
+
+    expect(fetchResult).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/x:do',
+      expect.objectContaining({ params: expect.objectContaining({ payload: { a: 1 } }) }),
     );
   });
 });

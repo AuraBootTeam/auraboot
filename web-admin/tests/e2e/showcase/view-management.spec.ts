@@ -18,7 +18,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { uniqueId } from '../helpers/index';
+import { openSavedViewManagePanel, uniqueId } from '../helpers/index';
 import {
   createDefaultTableView,
   restoreDefaultTableView,
@@ -72,18 +72,9 @@ async function gotoShowcaseList(page: Page) {
   await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 20_000 });
 }
 
-/** Open the View Management panel by clicking the ViewSelector button. */
+/** Open the View Management panel through the ViewSelector management action. */
 async function openViewManagePanel(page: Page) {
-  // The ViewSelector is a button with the current view name or "Select view"
-  // It has aria-haspopup="listbox" — clicking it opens the manage panel directly
-  const viewBtn = viewSelectorButton(page);
-  await expect(viewBtn).toBeVisible({ timeout: 10_000 });
-  await viewBtn.click();
-
-  // The ViewManagePanel renders as a dialog with role="dialog"
-  const panel = page.locator('[role="dialog"][aria-modal="true"]');
-  await expect(panel).toBeVisible({ timeout: 5_000 });
-  return panel;
+  return openSavedViewManagePanel(page);
 }
 
 /** Close the panel through the explicit close control. */
@@ -418,7 +409,7 @@ test.describe('View Management Panel', () => {
     }
   });
 
-  test('Create Gallery view — config step with optional fields', async ({ page }) => {
+  test('Create Gallery view — config step requires image field', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoShowcaseList(page);
 
@@ -433,25 +424,31 @@ test.describe('View Management Panel', () => {
     const configTitle = panel.getByText(/Configure Gallery View/i);
     await expect(configTitle).toBeVisible({ timeout: 10_000 });
 
-    // Gallery has optional fields only (Image Field, Title Field)
+    // Gallery requires an Image Field; Title Field stays optional.
     await expect(panel.getByText('Image Field')).toBeVisible();
     await expect(panel.getByText('Title Field')).toBeVisible();
 
-    // "Done" should be enabled even without selecting (all fields optional)
     const doneBtn = panel.getByRole('button', { name: /^Done$/ });
-    await expect(doneBtn).toBeEnabled();
+    const selects = panel.locator('select');
 
-    // Wait for model fields to load
+    // Wait for image field options to load.
     await expect(async () => {
-      const selects = panel.locator('select');
       const selectCount = await selects.count();
       expect(selectCount).toBeGreaterThanOrEqual(1);
       const optCount = await selects.first().locator('option').count();
       expect(optCount).toBeGreaterThan(1);
     }).toPass({ timeout: 10_000 });
 
+    const imageSelect = selects.first();
+    await expect(doneBtn).toBeEnabled();
+
+    await imageSelect.selectOption({ index: 0 });
+    await expect(doneBtn).toBeDisabled();
+
+    await imageSelect.selectOption({ index: 1 });
+    await expect(doneBtn).toBeEnabled();
+
     // Select a title field if available
-    const selects = panel.locator('select');
     const selectCount = await selects.count();
     if (selectCount >= 2) {
       const titleSelect = selects.nth(1); // Second select is Title Field

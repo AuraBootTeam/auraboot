@@ -3,14 +3,39 @@ type: handover
 status: active
 created: 2026-06-18
 ---
-<!-- no-precipitation: session handover; code changes merged into PR #820; reusable canonical
-     lessons (jsonb custom-mapper typeHandler; secure-by-default authz migration) tracked as
-     待固化 in the Reflection section for a separate enterprise-canonical PR. -->
+<!-- no-precipitation: session handover. Both 待固化 lessons are now codified: jsonb custom-mapper
+     typeHandler is in enterprise AGENTS.md + check-jsonb-typehandler.sh; secure-by-default authz
+     migration landed in ENT #587 (security-review-discipline.md). Code shipped across OSS
+     #820/#872/#894/#885/#889/#898/#900 — see 全量交付更新 (2026-06-20) below. -->
 
 # Session Handover - 2026-06-18
 
 ## Session Summary
 OSS 全仓深度 code review(五维 + 6 reviewer)→ 修复 verified findings。除修掉一批 P0/P1/P2 外,把根因(`PermissionInterceptor` fail-open)做成 **secure-by-default 的分阶段迁移机制(shadow→deny)**。全部进 PR #820(16 commits,54 测真栈绿,5 本地门禁绿,待 owner merge)。本文核心是 **Next Steps / 后续任务**。
+
+## 全量交付更新(2026-06-20,review line 收口)
+
+本 review 任务线在 #820 之后又交付了一批 follow-up,**全部 merged 到 main**。完整 PR 清单:
+
+| PR | 内容 | 类型 |
+|----|------|------|
+| OSS #820 | 深度 review + 19 修复 + shadow→deny secure-by-default 机制 | /goal 主线 ✅ |
+| OSS #872 | `project-management pm_*` 路由 = **误报甄别**(企业 PM 脚手架,禁删) | review 修正 ✅ |
+| OSS #894 | **AsyncTask list 跨用户枚举修复**(triage §B 第二个 bug,scope `created_by`) | 安全 ✅ |
+| OSS #885 | i18n 响应消息(TenantSelection 6 条)→ controller 边界解析 | i18n ✅ |
+| OSS #889 | i18n 静态异常消息 → `GlobalExceptionHandler` 解析 `$i18n:` | i18n ✅ |
+| OSS #898 | i18n 参数化(`I18nService.getMessage`+`BusinessException.i18n(key,args)`)+ tenant 13 条 | i18n ✅ |
+| OSS #900 | RBAC/category 异常消息迁移(20 条)+ AutomationTrigger 条件求值观测性(P2) | i18n + P2 ✅ |
+| ENT #587 | **固化** secure-by-default authz 迁移 pattern → `security-review-discipline.md` | canonical ✅ |
+
+**i18n 方案(选项 A:单 yaml catalog)基建已全部建成**:service 发 `$i18n:key`(或 `BusinessException.i18n(key,args)`)→ 出站边界(controller / GlobalExceptionHandler)用 `I18nLocaleResolver`+`I18nService.getValue/getMessage` 按请求 locale 解析(resolve-only-`$i18n:` = 未迁移消息零行为变更)。
+
+### 剩余(owner / 排期,非本 line 可自主完成)
+- **🔴 安全 default-deny 全量收尾(最高价值,gated)**:S1 ops 跑 `AURA_AUTHZ_UNANNOTATED_MODE=shadow` 收真实流量 → S2 产品定角色矩阵 → S3 eng 注解剩 48 端点 → S4 ops 翻 deny。机制(#820)+ pattern(ENT #587)已就绪,等真实流量 + 产品决策。
+- **i18n 机械增量**:剩 ~6 条 `RolePermissionServiceImpl` 插值异常用 `(String,Throwable)` ctor,需 **cause-preserving** i18n factory(`BusinessException.i18n` 丢 cause)——独立小增强;其它域零散静态消息照模板增量;前端 R5 7 组件需浏览器验证。
+- **21 测试 gap**:由并发「OSS 覆盖率→80%」campaign 在做,非本 line。
+
+---
 
 ## Tasks Completed(PR #820,16 commits)
 - [x] **3 P0 authz/IDOR**:插件装卸/导入开放任意用户(`plugin.plugin.manage`)、SubjectPermission 写方法提权(`meta.permission.update`)、RecordComment 评论编辑/删除跨用户+跨租户 IDOR(`tenant_id+created_by` scope)

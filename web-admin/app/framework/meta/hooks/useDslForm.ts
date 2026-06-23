@@ -21,7 +21,7 @@
 
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { useSchemaLoader, type UseSchemaLoaderOptions } from './useSchemaLoader';
-import type { PageContentProps } from '~/framework/meta/profiles/types';
+import type { PageContentProps } from '@auraboot/runtime-kernel';
 
 // ---------------------------------------------------------------------------
 // Types

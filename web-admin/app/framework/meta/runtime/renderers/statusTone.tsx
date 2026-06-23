@@ -6,6 +6,7 @@
  * (success / processing / 各种 dict colors) collapse to the 5 canonical tones.
  */
 import React from 'react';
+import { resolveIcon } from '~/utils/icon-resolver';
 
 export type StatusTone = 'gray' | 'blue' | 'amber' | 'green' | 'red';
 
@@ -109,22 +110,37 @@ export function resolveStatusTone(color: string | undefined | null): StatusTone 
   return TONE_BY_NAME[key] ?? hexToTone(key) ?? 'gray';
 }
 
-/** 色点 + 文字 presentation for a status/tag value. */
+/**
+ * 色点 + 文字 presentation for a status/tag value.
+ *
+ * When `icon` is provided (a lucide icon name, typically from a dict item's
+ * `extension.icon`), a muted leading icon replaces the colored dot. This is for
+ * *category* dimensions (e.g. lead source) where color carries no status semantics
+ * (§1.3) — differentiation comes from the icon, text stays neutral.
+ */
 export function StatusDot({
   tone,
   label,
+  icon,
   className = '',
 }: {
   tone: StatusTone;
   label: React.ReactNode;
+  icon?: string | null;
   className?: string;
 }) {
   return (
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
-      <span
-        className={`rounded-pill h-2 w-2 shrink-0 ${STATUS_TONE_DOT[tone]}`}
-        aria-hidden="true"
-      />
+      {icon ? (
+        <span className="text-text-3 inline-flex shrink-0 items-center" aria-hidden="true">
+          {resolveIcon(icon, '', 14)}
+        </span>
+      ) : (
+        <span
+          className={`rounded-pill h-2 w-2 shrink-0 ${STATUS_TONE_DOT[tone]}`}
+          aria-hidden="true"
+        />
+      )}
       <span className="text-text">{label}</span>
     </span>
   );

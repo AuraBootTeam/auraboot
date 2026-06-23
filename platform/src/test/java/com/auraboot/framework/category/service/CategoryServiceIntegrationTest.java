@@ -223,7 +223,7 @@ class CategoryServiceIntegrationTest extends BaseIntegrationTest {
 
         assertThatThrownBy(() -> categoryService.deleteCategory(rootCategoryId))
                 .isInstanceOf(Exception.class)
-                .hasMessageContaining("子类目");
+                .hasMessageContaining("$i18n:category.has_children");
     }
 
     @Test

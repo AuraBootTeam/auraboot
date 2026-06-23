@@ -195,7 +195,7 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
 
     // Click new/create button — prefer toolbar-btn-create data-testid
     const createBtn = page.locator(
-      '[data-testid="toolbar-btn-create"], [data-testid^="toolbar-btn-"], button:has-text("新建"), button:has-text("创建"), button:has-text("New"), [data-testid="btn-create"]',
+      '[data-testid="toolbar-btn-create"], [data-testid^="toolbar-btn-"], button:has-text("新建"):not(:has-text("今日")), button:has-text("创建"), button:has-text("New"), [data-testid="btn-create"]',
     ).first();
     await createBtn.waitFor({ state: 'visible', timeout: 8000 });
     await createBtn.click();

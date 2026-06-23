@@ -1,5 +1,6 @@
 package com.auraboot.framework.integration.meta;
 
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.controller.RecordCapabilityController;
@@ -10,6 +11,7 @@ import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.RecordCapabilityService;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -51,6 +53,9 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private UserPermissionService userPermissionService;
+
     /** Model that has state_transition + CRUD commands in the DB. */
     private static final String MODEL_CODE = "showcase_all_fields";
 
@@ -64,61 +69,30 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     /** Record ID created by this test. */
     private String testRecordId;
 
-    @BeforeAll
+    @BeforeEach
     void createTestRecord() {
-        // Must set context before any DB operation (TenantLineInterceptor needs it)
-        adminTenantId = jdbcTemplate.queryForObject(
-                """
-                SELECT tenant_id
-                FROM ab_command_definition
-                WHERE model_code = ? AND deleted_flag = FALSE
-                GROUP BY tenant_id
-                ORDER BY COUNT(*) DESC
-                LIMIT 1
-                """,
-                Long.class,
-                MODEL_CODE
-        );
-        Map<String, Object> adminIdentity = jdbcTemplate.queryForMap(
-                """
-                SELECT tm.id AS member_id, tm.user_id
-                FROM ab_tenant_member tm
-                LEFT JOIN ab_user u ON u.id = tm.user_id
-                WHERE tm.tenant_id = ?
-                  AND tm.status = 'active'
-                  AND tm.deleted_flag = FALSE
-                ORDER BY CASE WHEN u.email = 'admin@auraboot.com' THEN 0 ELSE 1 END,
-                         tm.created_at ASC
-                LIMIT 1
-                """,
-                adminTenantId
-        );
-        adminMemberId = ((Number) adminIdentity.get("member_id")).longValue();
-        adminUserId = ((Number) adminIdentity.get("user_id")).longValue();
+        adminTenantId = getTestTenant().getId();
+        adminUserId = getTestUser().getId();
+        adminMemberId = getTestTenantMember().getId();
         MetaContext.setContext(adminTenantId, adminUserId, "admin", "admin@test.local");
         MetaContext.setMemberId(adminMemberId);
+        ensureCapabilityFixture();
 
         // Insert a test record directly via SQL to bypass DynamicDataService permissions.
         String pid = "cap_test_" + System.currentTimeMillis();
         String name = "CapTest-" + System.currentTimeMillis();
         String code = "CAP-" + System.currentTimeMillis();
         jdbcTemplate.update(
-                "INSERT INTO mt_showcase_all_fields (pid, tenant_id, sc_status, sc_name, sc_code, created_at, updated_at) "
-                + "VALUES (?, ?, 'draft', ?, ?, NOW(), NOW())",
-                pid, adminTenantId, name, code
+                "INSERT INTO mt_showcase_all_fields "
+                        + "(pid, tenant_id, sc_status, sc_name, sc_code, created_at, created_by, updated_at, updated_by) "
+                        + "VALUES (?, ?, 'draft', ?, ?, NOW(), ?, NOW(), ?)",
+                pid, adminTenantId, name, code, adminUserId.toString(), adminUserId.toString()
         );
         // Get the created record's ID
         testRecordId = jdbcTemplate.queryForObject(
                 "SELECT id::text FROM mt_showcase_all_fields WHERE pid = ?",
                 String.class, pid
         );
-    }
-
-    @BeforeEach
-    public void switchToAdminTenant() {
-        // Override the default test context to use the admin tenant
-        MetaContext.setContext(adminTenantId, adminUserId, "admin", "admin@test.local");
-        MetaContext.setMemberId(adminMemberId);
     }
 
     // ==================== Service-Level Tests ====================
@@ -444,6 +418,140 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     }
 
     // ==================== Helpers ====================
+
+    private void ensureCapabilityFixture() {
+        ensureShowcaseTable();
+        ensureShowcaseModel();
+        ensureShowcasePermission();
+        seedCommand("sc:list_showcase", "List showcase", "query",
+                "{\"type\":\"query\"}");
+        seedCommand("sc:detail_showcase", "Detail showcase", "query",
+                "{\"type\":\"query\"}");
+        seedCommand("sc:create_showcase", "Create showcase", "create",
+                "{\"type\":\"create\"}");
+        seedCommand("sc:update_showcase", "Update showcase", "update",
+                "{\"type\":\"update\",\"permissions\":[\"sc.showcase.manage\"],"
+                        + "\"inputFields\":[\"sc_name\"],\"priority\":10,"
+                        + "\"platforms\":[\"web\",\"mobile\"]}");
+        seedCommand("sc:delete_showcase", "Delete showcase", "delete",
+                "{\"type\":\"delete\",\"permissions\":[\"sc.showcase.manage\"],"
+                        + "\"priority\":99,\"platforms\":[\"web\",\"mobile\"]}");
+        seedCommand("sc:activate_showcase", "Activate showcase", "state_transition",
+                "{\"type\":\"state_transition\",\"permissions\":[\"sc.showcase.manage\"],"
+                        + "\"stateField\":\"sc_status\",\"fromStates\":[\"draft\"],"
+                        + "\"toState\":\"active\",\"priority\":1,\"platforms\":[\"web\",\"mobile\"]}");
+        seedCommand("sc:archive_showcase", "Archive showcase", "state_transition",
+                "{\"type\":\"state_transition\",\"permissions\":[\"sc.showcase.manage\"],"
+                        + "\"stateField\":\"sc_status\",\"fromStates\":[\"active\",\"review\"],"
+                        + "\"toState\":\"archived\",\"priority\":2,\"platforms\":[\"web\",\"mobile\"]}");
+        seedCommand("sc:submit_review_showcase", "Submit showcase", "state_transition",
+                "{\"type\":\"state_transition\",\"permissions\":[\"sc.showcase.manage\"],"
+                        + "\"stateField\":\"sc_status\",\"fromStates\":[\"active\"],"
+                        + "\"toState\":\"review\",\"priority\":3,\"platforms\":[\"web\",\"mobile\"]}");
+        userPermissionService.evictUserPermissions(adminUserId);
+    }
+
+    private void ensureShowcaseTable() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS mt_showcase_all_fields (
+                    id BIGSERIAL PRIMARY KEY,
+                    pid VARCHAR(64) UNIQUE NOT NULL,
+                    tenant_id BIGINT NOT NULL,
+                    sc_status VARCHAR(64),
+                    sc_name VARCHAR(255),
+                    sc_code VARCHAR(128),
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    created_by VARCHAR(255),
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    updated_by VARCHAR(255),
+                    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+                )
+                """);
+        jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS sc_status VARCHAR(64)");
+        jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS sc_name VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS sc_code VARCHAR(128)");
+        jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS created_by VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS deleted_flag BOOLEAN NOT NULL DEFAULT FALSE");
+    }
+
+    private void ensureShowcaseModel() {
+        jdbcTemplate.update("""
+                INSERT INTO ab_meta_model (
+                    pid, tenant_id, code, table_name, extension, capabilities,
+                    version, is_current, status, deleted_flag
+                )
+                SELECT ?, ?, ?, 'mt_showcase_all_fields',
+                       '{"displayName":"Showcase All Fields"}'::jsonb, '{}'::jsonb,
+                       1, TRUE, 'published', FALSE
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM ab_meta_model
+                    WHERE tenant_id = ? AND code = ? AND deleted_flag = FALSE
+                )
+                """, UniqueIdGenerator.generate(), adminTenantId, MODEL_CODE, adminTenantId, MODEL_CODE);
+    }
+
+    private void ensureShowcasePermission() {
+        Long permissionId = jdbcTemplate.queryForObject("""
+                INSERT INTO ab_permission (
+                    pid, tenant_id, code, name, resource_type, resource_code, action,
+                    source, status, deleted_flag
+                )
+                VALUES (?, ?, 'sc.showcase.manage', 'Manage showcase', 'model', ?, 'manage',
+                        'manual', 'active', FALSE)
+                ON CONFLICT (tenant_id, code)
+                DO UPDATE SET name = EXCLUDED.name,
+                              resource_type = EXCLUDED.resource_type,
+                              resource_code = EXCLUDED.resource_code,
+                              action = EXCLUDED.action,
+                              status = 'active',
+                              deleted_flag = FALSE,
+                              updated_at = CURRENT_TIMESTAMP
+                RETURNING id
+                """, Long.class, UniqueIdGenerator.generate(), adminTenantId, MODEL_CODE);
+        jdbcTemplate.update("""
+                INSERT INTO ab_role_permission (
+                    pid, tenant_id, role_id, permission_id, grant_type, status, deleted_flag
+                )
+                SELECT ?, ?, ?, ?, 'grant', 'active', FALSE
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM ab_role_permission
+                    WHERE tenant_id = ? AND role_id = ? AND permission_id = ?
+                      AND deleted_flag = FALSE
+                )
+                """,
+                UniqueIdGenerator.generate(),
+                adminTenantId,
+                getTestRole().getId(),
+                permissionId,
+                adminTenantId,
+                getTestRole().getId(),
+                permissionId);
+    }
+
+    private void seedCommand(String code, String displayName, String type, String executionConfig) {
+        jdbcTemplate.update("""
+                INSERT INTO ab_command_definition (
+                    pid, tenant_id, code, display_name, model_code,
+                    input_schema, target_models, execution_config, extension,
+                    version, is_current, status, deleted_flag
+                )
+                VALUES (?, ?, ?, ?, ?,
+                        '{}'::jsonb, '[]'::jsonb, ?::jsonb, '{}'::jsonb,
+                        1, TRUE, 'published', FALSE)
+                ON CONFLICT (tenant_id, code, version)
+                DO UPDATE SET display_name = EXCLUDED.display_name,
+                              model_code = EXCLUDED.model_code,
+                              execution_config = EXCLUDED.execution_config,
+                              is_current = TRUE,
+                              status = 'published',
+                              deleted_flag = FALSE,
+                              updated_at = CURRENT_TIMESTAMP
+                """,
+                UniqueIdGenerator.generate(), adminTenantId, code, displayName, MODEL_CODE, executionConfig);
+    }
 
     private Set<String> extractCodes(List<ActionCapability> actions) {
         return actions.stream()

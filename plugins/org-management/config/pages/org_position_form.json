@@ -81,8 +81,7 @@
             "en": "Save"
           },
           "action": {
-            "type": "command",
-            "command": "org:create_position"
+            "type": "command"
           }
         },
         {

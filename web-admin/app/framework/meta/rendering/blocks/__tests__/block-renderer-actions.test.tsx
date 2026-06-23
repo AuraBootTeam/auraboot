@@ -387,6 +387,85 @@ describe('TableBlockRenderer', () => {
     expect(passedRecord).toEqual(baseRow);
   });
 
+  it('dispatches action-column buttons from table.columns with disabled gates', () => {
+    const runtime = makeRuntimeWithData();
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        columns: [
+          ...baseColumns,
+          {
+            field: 'actions',
+            label: 'Actions',
+            isActionColumn: true,
+            buttons: [
+              {
+                code: 'delete_source_attachment',
+                label: 'Delete',
+                danger: true,
+                action: { type: 'command', command: 'qo_rfq_source_attachment_common:delete' },
+              },
+              {
+                code: 'confirm_line_exclusion',
+                label: 'Confirm Exclusion',
+                disabledWhen: "record.status !== 'pending_exclusion'",
+                action: { type: 'command', command: 'bom:set_standard_line_exclusion' },
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    const deleteButton = getByTestId('row-action-delete_source_attachment');
+    fireEvent.click(deleteButton);
+
+    expect(handleActionSpy).toHaveBeenCalledTimes(1);
+    const [passedButton, passedRecord] = handleActionSpy.mock.calls[0];
+    expect(passedButton.code).toBe('delete_source_attachment');
+    expect(passedButton.action).toEqual({
+      type: 'command',
+      command: 'qo_rfq_source_attachment_common:delete',
+    });
+    expect(passedRecord).toEqual(baseRow);
+    expect(getByTestId('row-action-confirm_line_exclusion')).toBeDisabled();
+  });
+
+  it('applies configured rowClassRules with record/row aliases', () => {
+    const row = { id: 'row-1', pid: 'row-1', name: 'Alpha', status: 'confirmed_excluded' };
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => [row],
+        has: () => true,
+        register: vi.fn(),
+      }),
+      getEvaluator: () => ({
+        evaluateCondition: (expr: string, ctx: any) => ctx.record.status === 'confirmed_excluded',
+        evaluateTemplate: (tpl: string) => tpl,
+      }),
+    });
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowClassRules: [
+          {
+            when: "record.status === 'confirmed_excluded'",
+            className: 'bg-rose-50 text-rose-800',
+          },
+        ],
+        columns: baseColumns,
+      },
+    };
+
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    expect(getByTestId('table-row-row-1')).toHaveClass('bg-rose-50', 'text-rose-800');
+  });
+
   it('writes clicked row into runtime state when table.selection.bind is configured', () => {
     const runtime = makeRuntimeWithData() as any;
     const block = {

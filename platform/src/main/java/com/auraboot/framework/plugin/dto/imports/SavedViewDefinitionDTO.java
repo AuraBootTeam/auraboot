@@ -57,6 +57,37 @@ public class SavedViewDefinitionDTO {
     private String viewType;
 
     /**
+     * Stable plugin-owned key for upgrade-safe SavedView matching.
+     * When present, plugin imports update the same preset by viewKey even if
+     * its display name changes between plugin versions.
+     */
+    private String viewKey;
+
+    /**
+     * Ownership marker for imported presets. Defaults to "plugin" during import.
+     */
+    private String managedBy;
+
+    /**
+     * Whether the imported preset is read-only in normal runtime editing.
+     * Defaults to true during plugin import.
+     */
+    private Boolean locked;
+
+    /**
+     * Whether users may copy this preset into a personal editable view.
+     * Defaults to true during plugin import.
+     */
+    private Boolean allowUserCopy;
+
+    /**
+     * Whether tenant users may override this preset directly.
+     * Defaults to true for manifest metadata compatibility; runtime behavior
+     * may still require elevated permissions.
+     */
+    private Boolean allowUserOverride;
+
+    /**
      * View configuration as a flexible map (serialized to JSONB).
      * For KANBAN: groupByField, titleField, descriptionField, idField, cardFields, kanbanAggregations, draggable, showCount, showAggregations
      * For CALENDAR: calendarDateField, calendarTitleField, calendarEndDateField, calendarColorField, calendarDefaultView
@@ -95,10 +126,14 @@ public class SavedViewDefinitionDTO {
     }
 
     /**
-     * Get a unique key for deduplication (modelCode + pageKey + name + viewType).
+     * Get a unique key for deduplication. Prefer the stable plugin viewKey when present,
+     * otherwise fall back to the legacy modelCode + pageKey + name + viewType key.
      */
     @JsonIgnore
     public String getUniqueKey() {
+        if (viewKey != null && !viewKey.isBlank()) {
+            return modelCode + "::" + (pageKey != null ? pageKey : "") + "::" + viewKey;
+        }
         return modelCode + "::" + (pageKey != null ? pageKey : "") + "::" + name + "::" + viewType;
     }
 }

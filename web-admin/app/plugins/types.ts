@@ -2,7 +2,7 @@
  * Plugin system type definitions for Module Federation hot-loading.
  */
 
-import type { RuntimeProfile } from '~/framework/runtime';
+import type { RuntimeProfile } from '@auraboot/runtime-kernel';
 
 // ========== Plugin States ==========
 

@@ -6,7 +6,7 @@ created: 2026-05-29
 
 # OSS isolated stack 缺 `TimeSeriesPort` bean — 阻塞所有 OSS E2E
 
-**Status**: OPEN
+**Status**: ✅ RESOLVED (2026-06-20, PR #930) — added a platform-side `@ConditionalOnMissingBean` `NoopTimeSeriesPort` fallback so the OSS context starts without the IoT plugin; the real `TDengineTimeSeriesPort` still wins when the plugin is present, and the no-op throws a clear "not enabled" only when actually called (never silent).
 **Priority**: P1 — 阻塞所有需 OSS isolated stack 的 E2E (B2c phase3 batch2+ / B2d / B1 / 其他 designer/automation/bpm 改动验证)
 **Filed**: 2026-05-29
 **Discovered by**: B2c phase3 batch1 subagent (PR #342) 在跑 bpm-workflow.spec.ts gate 时

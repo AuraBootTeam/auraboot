@@ -1,0 +1,11 @@
+{
+  "name": "@auraboot/runtime-kernel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

@@ -231,6 +231,7 @@ class PageSchemaSystemTabIntegrationTest extends BaseIntegrationTest {
         }
 
         Map<String, Object> tabsBlock = new LinkedHashMap<>();
+        tabsBlock.put("id", "tabs_block");
         tabsBlock.put("blockType", "tabs");
         tabsBlock.put("tabs", tabs);
 

@@ -140,12 +140,27 @@ tasks.register('verifyMultiWorktreeGuard') {
 }
 
 repositories {
-    mavenLocal()      // Must be first — SmartEngine fork jars only exist here
+    mavenLocal()
+    // SmartEngine fork artifacts are published to Maven Central. Keep this
+    // before Aliyun mirrors so Gradle does not stick to a partially synced
+    // mirror that has metadata but not all jars.
+    mavenCentral {
+        name = 'Maven Central SmartEngine'
+        content {
+            includeGroup 'com.auraboot.smart.framework'
+        }
+    }
     maven {
         url = 'https://maven.aliyun.com/repository/public'
+        content {
+            excludeGroup 'com.auraboot.smart.framework'
+        }
     }
     maven {
         url = 'https://maven.aliyun.com/repository/spring'
+        content {
+            excludeGroup 'com.auraboot.smart.framework'
+        }
     }
     mavenCentral()
     // Apache repository for snapshots and releases
@@ -257,6 +272,7 @@ dependencies {
     // or kafka-clients inside a plugin causes split-package classloader errors.
     implementation "org.springframework.kafka:spring-kafka:${springKafkaVersion}"
     implementation "org.apache.kafka:kafka-clients:${kafkaClientsVersion}"
+    runtimeOnly project(':platform-mq-kafka')
 
     // ULID
     implementation 'de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0'
@@ -406,6 +422,9 @@ dependencies {
 
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
     testImplementation 'org.awaitility:awaitility:4.3.0'
+
+    // Avro schema compatibility tests for Kafka-backed telemetry contracts.
+    testImplementation 'org.apache.avro:avro:1.11.3'
 
     // JUnit 5 Platform
     testImplementation 'org.junit.jupiter:junit-jupiter-api'

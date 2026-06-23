@@ -30,11 +30,9 @@ import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
-import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
-import { BlockErrorBoundary } from '~/framework/meta/rendering/BlockErrorBoundary';
+import { BlockRenderer, BlockErrorBoundary, type PageContentProps } from '@auraboot/runtime-kernel';
 import type { SubTableColumn } from '~/framework/meta/components/types';
 import { resolveExtensionDisplayName } from '~/framework/meta/utils/i18nResolver';
-import type { PageContentProps } from '~/framework/meta/profiles/types';
 import { mergeRules as crossFieldMergeRules } from '~/framework/meta/validation/ruleMerger';
 import { evaluateCondition as crossFieldEvalCondition } from '~/framework/meta/validation/conditionEvaluator';
 import { evaluateAssert as crossFieldEvalAssert } from '~/framework/meta/validation/assertEvaluator';
@@ -44,6 +42,7 @@ import { checkKindCompatibility } from '~/shared/utils/kindCapability';
 import type { ComputedFieldDef } from '~/framework/meta/runtime/computed/types';
 import { useFormDraft } from '~/framework/meta/rendering/pages/form/useFormDraft';
 import { RestoreDraftBanner } from '~/framework/meta/rendering/pages/form/RestoreDraftBanner';
+import { buildCommandTargetParams } from '~/framework/meta/utils/publicRecordId';
 
 /**
  * Map field dataType to Smart component name.
@@ -864,8 +863,43 @@ export function FormPageContent(props: PageContentProps) {
       t: (key: string) => t(key),
       fetchResult,
       __dataSourceManager: dataSourceManager,
+      __pageKey: (schema as any)?.pageKey,
+      __modelCode: (schema as any)?.modelCode || tableName,
+      __setFormFieldValue: (fieldCode: string, value: unknown) => {
+        dirtyFieldsRef.current.add(fieldCode);
+        setFormData((prev) => {
+          if (prev[fieldCode] === value) return prev;
+          return {
+            ...prev,
+            [fieldCode]: value,
+          };
+        });
+      },
     });
   }, [locale, t, formData, dataSourceManager, user, permissions, mode]);
+
+  useEffect(() => {
+    const expectedPageKey = (schema as any)?.pageKey;
+    const expectedModelCode = (schema as any)?.modelCode || tableName;
+    const handleReferenceCreated = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail || {};
+      if (detail.pageKey && detail.pageKey !== expectedPageKey) return;
+      if (detail.modelCode && detail.modelCode !== expectedModelCode) return;
+      if (!detail.fieldCode) return;
+      dirtyFieldsRef.current.add(String(detail.fieldCode));
+      setFormData((prev) => {
+        if (prev[detail.fieldCode] === detail.value) return prev;
+        return {
+          ...prev,
+          [detail.fieldCode]: detail.value,
+        };
+      });
+    };
+    window.addEventListener('aura:reference-field-created', handleReferenceCreated);
+    return () => {
+      window.removeEventListener('aura:reference-field-created', handleReferenceCreated);
+    };
+  }, [schema, tableName]);
 
   const [mainRecordLoaded, setMainRecordLoaded] = useState(!isEditMode);
   const fieldDataTypesRef = useRef<Record<string, string>>({});
@@ -1468,7 +1502,7 @@ export function FormPageContent(props: PageContentProps) {
         fetchResult(`/api/meta/commands/execute/${effectiveCommandCode}`, {
           method: 'post',
           params: {
-            targetRecordId,
+            ...buildCommandTargetParams(targetRecordId),
             payload: commandPayload,
             operationType,
           },
@@ -1907,8 +1941,11 @@ export function FormPageContent(props: PageContentProps) {
 
   return (
     <DataSourceProvider manager={dataSourceManager}>
+      {/* Centered, width-capped form: full-width inputs stretched edge-to-edge on
+          wide screens read as sparse and hurt scanability. max-w-6xl (~1152px) keeps
+          a comfortable 2-column line length while staying roomy for sub-tables. */}
       <div
-        className="mx-auto w-full px-2 py-3"
+        className="mx-auto w-full max-w-6xl px-2 py-3"
         data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
       >
         <div className="rounded-card bg-panel shadow-sm">

@@ -81,6 +81,8 @@ export interface BlockLayoutConfig {
 export interface DataSourceConfig {
   id?: string;
   type?: 'api' | 'static' | 'namedQuery'; // 'namedQuery' delegates to nq:{queryCode} format
+  /** Optional model scope for runtime reloads after same-model mutations. */
+  modelCode?: string;
   endpoint?: string; // Default: '/api/datasource/list'
   method?: 'get' | 'post' | 'put' | 'delete'; // Default: 'get'
   params?: string | Record<string, any>;
@@ -169,6 +171,16 @@ export interface FieldConfig {
   dictCode?: string; // 绑定的字典编码，自动使用 SmartSelect 并加载字典数据
   /** Grid column span for this field (shorthand for layout.colSpan) */
   colSpan?: number;
+  /** Reference fields only: show a "+ 新建" affordance to inline-create a target-model record and auto-select it. Default false. */
+  allowCreate?: boolean;
+  /** Override the create command code. Defaults to `${targetModel}:create`. */
+  createCommand?: string;
+  /** Override the DSL form pageKey used by inline quick-create. Defaults to `${targetModel}_new`. */
+  createPageKey?: string;
+  /** Override the permission code used to show inline-create. Defaults to createCommand. */
+  createPermission?: string;
+  /** Reserved (deferred): restrict the create form to a subset of fields. Not yet honored — full target-model form is rendered. */
+  createFields?: string[];
 }
 
 export interface ValidationRule {
