@@ -14,7 +14,7 @@ import java.util.Map;
 /**
  * REST endpoints for record watch/follow/subscribe.
  *
- * Mounted under /api/dynamic/{pageKey}/{recordId}/watch to align with
+ * Mounted under /api/dynamic/{pageKey}/{recordPid}/watch to align with
  * the existing DynamicController URL namespace.
  *
  * @since 6.1.0
@@ -28,23 +28,23 @@ public class WatchController {
 
     private final WatchService watchService;
 
-    @PostMapping("/{pageKey}/{recordId}/watch")
+    @PostMapping("/{pageKey}/{recordPid}/watch")
     @Operation(summary = "Toggle watch", description = "Toggle the current user's watch state on a record. Returns the new state.")
     public ApiResponse<Map<String, Boolean>> toggleWatch(
             @PathVariable String pageKey,
-            @PathVariable Long recordId) {
+            @PathVariable String recordPid) {
         String modelCode = PageKeyConverter.toModelCode(pageKey);
-        boolean isNowWatching = watchService.toggleWatch(modelCode, recordId);
+        boolean isNowWatching = watchService.toggleWatchByRecordPid(modelCode, recordPid);
         return ApiResponse.success(Map.of("watching", isNowWatching));
     }
 
-    @GetMapping("/{pageKey}/{recordId}/watching")
+    @GetMapping("/{pageKey}/{recordPid}/watching")
     @Operation(summary = "Check watch state", description = "Check if the current user is watching a specific record.")
     public ApiResponse<Map<String, Boolean>> isWatching(
             @PathVariable String pageKey,
-            @PathVariable Long recordId) {
+            @PathVariable String recordPid) {
         String modelCode = PageKeyConverter.toModelCode(pageKey);
-        boolean watching = watchService.isWatching(modelCode, recordId);
+        boolean watching = watchService.isWatchingByRecordPid(modelCode, recordPid);
         return ApiResponse.success(Map.of("watching", watching));
     }
 }

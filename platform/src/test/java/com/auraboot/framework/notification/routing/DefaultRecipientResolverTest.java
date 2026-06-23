@@ -1,14 +1,19 @@
 package com.auraboot.framework.notification.routing;
 
 import com.auraboot.module.meta.event.CommandCompletedEvent;
+import com.auraboot.framework.meta.service.WatchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for DefaultRecipientResolver.
@@ -96,6 +101,22 @@ class DefaultRecipientResolverTest {
 
         // Default is OPERATOR, and no MetaContext is present
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void resolve_watchers_usesRecordPidWithoutNumericParsing() {
+        WatchService watchService = mock(WatchService.class);
+        ReflectionTestUtils.setField(resolver, "watchService", watchService);
+        when(watchService.getWatchersByRecordPid("crm_lead", "rec-001"))
+                .thenReturn(List.of(501L, 502L));
+
+        CommandCompletedEvent event = buildEvent(Map.of());
+
+        List<Long> result = resolver.resolve(event, "watchers", null);
+
+        assertThat(result).containsExactly(501L, 502L);
+        verify(watchService).getWatchersByRecordPid("crm_lead", "rec-001");
+        verify(watchService, never()).getWatchers(anyString(), anyLong());
     }
 
     // =========================================================
