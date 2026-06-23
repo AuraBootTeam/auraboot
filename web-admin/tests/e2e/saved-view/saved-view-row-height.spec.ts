@@ -8,6 +8,7 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
+import { cleanupGeneratedSavedViews } from './helpers';
 
 // API helpers — page.request uses storageState cookies from global auth setup
 async function createViewViaApi(
@@ -41,6 +42,14 @@ async function getViewViaApi(page: Page, pid: string): Promise<any> {
 }
 
 test.describe('Row Height Control (GAP-127)', () => {
+  test.beforeEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, { modelCode: 'e2et_order', pageKey: 'e2et_order_list' });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, { modelCode: 'e2et_order', pageKey: 'e2et_order_list' });
+  });
+
   test('RH-001: row height selector shows 4 options (Short/Medium/Tall/Extra Tall)', async ({
     page,
   }) => {

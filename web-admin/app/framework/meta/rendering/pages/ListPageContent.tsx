@@ -277,8 +277,10 @@ export function isPersonalPresetSavedViewEdited(
 ): boolean {
   if (getActiveSavedQuickFilterPresetKey(view) !== presetKey) return false;
   const presetFilters = buildQuickFilterPresetViewFilters(buildQuickFilterPreset(presetKey, ctx));
-  return stableStringify(normalizePresetFilters(view?.viewConfig?.filters)) !==
-    stableStringify(normalizePresetFilters(presetFilters));
+  return (
+    stableStringify(normalizePresetFilters(view?.viewConfig?.filters)) !==
+    stableStringify(normalizePresetFilters(presetFilters))
+  );
 }
 
 export function resolveListSavedViewPageKey(
@@ -425,7 +427,7 @@ export function buildViewManageFieldOptions(
     const fallbackName =
       typeof column.label === 'string'
         ? column.label
-        : byCode.get(column.field)?.name ?? column.field;
+        : (byCode.get(column.field)?.name ?? column.field);
     byCode.set(column.field, {
       code: column.field,
       name: fallbackName,
@@ -929,6 +931,25 @@ function ListPageContentInner(props: PageContentProps) {
     column: ColumnConfig;
   } | null>(null);
   const [activeQuickFilter, setActiveQuickFilter] = useState<QuickFilterKey | null>(null);
+  const activeQuickFilterRef = useRef<QuickFilterKey | null>(null);
+
+  useEffect(() => {
+    activeQuickFilterRef.current = activeQuickFilter;
+  }, [activeQuickFilter]);
+
+  useEffect(() => {
+    if (!urlViewPid || !searchParams.has('preset')) return;
+    setActiveQuickFilter(null);
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('preset');
+        return p;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams, urlViewPid]);
+
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [filterFormVisible, setFilterFormVisible] = useState(false);
   const [activeViewType, setActiveViewType] = useState<ViewType>('table');
@@ -948,10 +969,7 @@ function ListPageContentInner(props: PageContentProps) {
   // When restoring a preset view from ?preset= on mount, skip the first run of
   // the debounced sort/filter effect so it doesn't re-fetch with empty filters.
   const skipFirstSortFilterEffectRef = useRef(false);
-  const loadDataRef = useRef<
-    | ((params?: ListLoadDataParams) => Promise<void>)
-    | null
-  >(null);
+  const loadDataRef = useRef<((params?: ListLoadDataParams) => Promise<void>) | null>(null);
 
   // Record preview drawer state
   const [previewRecordId, setPreviewRecordId] = useState<string | null>(null);
@@ -1017,8 +1035,7 @@ function ListPageContentInner(props: PageContentProps) {
     return false;
   }, [currentView, hasPermission, isCurrentViewLockedPreset, savedViewPersistenceMode, user?.pid]);
   const hasPendingSharedViewConfig =
-    savedViewPersistenceMode === 'shared-draft' &&
-    Object.keys(pendingViewConfig ?? {}).length > 0;
+    savedViewPersistenceMode === 'shared-draft' && Object.keys(pendingViewConfig ?? {}).length > 0;
   const hasPendingPersonalViewConfig =
     savedViewPersistenceMode === 'personal-persist' &&
     Object.keys(pendingViewConfig ?? {}).length > 0;
@@ -1570,7 +1587,12 @@ function ListPageContentInner(props: PageContentProps) {
       },
       { replace: true },
     );
-    loadData({ page: 0, size: pagination.pageSize, filters: restoredFilters, sorts: restoredSorts });
+    loadData({
+      page: 0,
+      size: pagination.pageSize,
+      filters: restoredFilters,
+      sorts: restoredSorts,
+    });
   }, [
     applyViewConfigToListState,
     clearKeyword,
@@ -2783,10 +2805,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Row style from conditional formats
   const getRowStyle = useCallback(
     (record: Record<string, any>): React.CSSProperties | undefined => {
-      const cfStyle = evaluateConditionalFormats(
-        effectiveViewConfig?.conditionalFormats,
-        record,
-      );
+      const cfStyle = evaluateConditionalFormats(effectiveViewConfig?.conditionalFormats, record);
       return buildConditionalStyle(cfStyle);
     },
     [effectiveViewConfig?.conditionalFormats],
@@ -2884,10 +2903,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   const viewManageFields = useMemo(() => {
     const fieldMap = new Map(
-      buildViewManageFieldOptions(tableColumns, modelFieldMap).map((field) => [
-        field.code,
-        field,
-      ]),
+      buildViewManageFieldOptions(tableColumns, modelFieldMap).map((field) => [field.code, field]),
     );
 
     for (const column of tableColumns) {
@@ -2915,10 +2931,7 @@ function ListPageContentInner(props: PageContentProps) {
         const persistenceMode = getSavedViewPersistenceMode(currentView);
         if (persistenceMode === 'personal-persist' || persistenceMode === 'shared-draft') {
           setPendingViewConfig((prev) =>
-            pruneNoopViewConfigPatch(
-              currentView?.viewConfig,
-              mergeViewConfigPatch(prev, config),
-            ),
+            pruneNoopViewConfigPatch(currentView?.viewConfig, mergeViewConfigPatch(prev, config)),
           );
         } else {
           // No explicit view — use backend auto-save (atomic upsert of implicit view)
@@ -2958,9 +2971,7 @@ function ListPageContentInner(props: PageContentProps) {
       });
       setPendingViewConfig(null);
       flashViewSavedHint();
-      showSuccessToast(
-        translateCommon('common.saved_view_current_saved', 'Current view saved'),
-      );
+      showSuccessToast(translateCommon('common.saved_view_current_saved', 'Current view saved'));
     } catch (err) {
       showErrorToast(
         err instanceof Error
@@ -3019,9 +3030,7 @@ function ListPageContentInner(props: PageContentProps) {
   const handleSaveDraftAsPersonalView = useCallback(async () => {
     if (!currentView || !hasPendingViewConfig || !pendingViewConfig) return;
     if (!canCopyCurrentView) {
-      showErrorToast(
-        translateCommon('common.saved_view_copy_disabled_reason', '当前视图不能复制'),
-      );
+      showErrorToast(translateCommon('common.saved_view_copy_disabled_reason', '当前视图不能复制'));
       return;
     }
     setCopyingViewDraft(true);
@@ -3053,9 +3062,7 @@ function ListPageContentInner(props: PageContentProps) {
         },
         { replace: true },
       );
-      showSuccessToast(
-        translateCommon('common.saved_view_copied_to_personal', '已另存为个人视图'),
-      );
+      showSuccessToast(translateCommon('common.saved_view_copied_to_personal', '已另存为个人视图'));
     } catch (err) {
       showErrorToast(
         err instanceof Error
@@ -3112,9 +3119,7 @@ function ListPageContentInner(props: PageContentProps) {
       });
       setPendingViewConfig(null);
       flashViewSavedHint();
-      showSuccessToast(
-        translateCommon('common.saved_view_shared_saved', 'Shared view updated'),
-      );
+      showSuccessToast(translateCommon('common.saved_view_shared_saved', 'Shared view updated'));
     } catch (err) {
       showErrorToast(
         err instanceof Error
@@ -3381,8 +3386,9 @@ function ListPageContentInner(props: PageContentProps) {
   // Quick filter handler — toggle a preset view on/off, apply its filter, reload.
   const handleQuickFilter = useCallback(
     (key: QuickFilterKey) => {
-      if (activeQuickFilter === key) {
+      if (activeQuickFilterRef.current === key) {
         // Toggle off — clear preset filter and reload
+        activeQuickFilterRef.current = null;
         setActiveQuickFilter(null);
         setFilters({});
         syncPresetToUrl(null);
@@ -3390,12 +3396,13 @@ function ListPageContentInner(props: PageContentProps) {
         return;
       }
       const qf = buildQuickFilterPreset(key, { userId: user?.id, now: new Date() }) ?? {};
+      activeQuickFilterRef.current = key;
       setActiveQuickFilter(key);
       setFilters(qf);
       syncPresetToUrl(key);
       loadData({ page: 0, size: pagination.pageSize, filters: qf });
     },
-    [activeQuickFilter, user, setFilters, syncPresetToUrl, loadData, pagination.pageSize],
+    [user, setFilters, syncPresetToUrl, loadData, pagination.pageSize],
   );
 
   const handleSaveActivePreset = useCallback(async () => {
@@ -3427,10 +3434,7 @@ function ListPageContentInner(props: PageContentProps) {
 
     const presetDefinition = getQuickFilterPresetDefinition(activeQuickFilter);
     if (!presetDefinition) return;
-    const presetName = translateCommon(
-      presetDefinition.i18nKey,
-      presetDefinition.fallbackLabel,
-    );
+    const presetName = translateCommon(presetDefinition.i18nKey, presetDefinition.fallbackLabel);
     const request = buildQuickFilterPresetViewRequest(
       activeQuickFilter,
       { userId: user?.id, now: new Date() },
@@ -3504,9 +3508,7 @@ function ListPageContentInner(props: PageContentProps) {
       setFilters(presetFilters);
       loadData({ page: 0, size: pagination.pageSize, filters: presetFilters });
       flashViewSavedHint();
-      showSuccessToast(
-        translateCommon('common.saved_view_preset_reset_done', 'Preset view reset'),
-      );
+      showSuccessToast(translateCommon('common.saved_view_preset_reset_done', 'Preset view reset'));
     } catch (err) {
       showErrorToast(
         err instanceof Error
@@ -3739,43 +3741,35 @@ function ListPageContentInner(props: PageContentProps) {
             >
               <span>
                 {hasPendingPersonalViewConfig
-                  ? translateCommon(
-                      'common.saved_view_personal_draft',
-                      '当前个人视图有本地变更',
-                    )
-                  : translateCommon(
-                      'common.saved_view_shared_draft',
-                      '共享视图有本地变更',
-                    )}
+                  ? translateCommon('common.saved_view_personal_draft', '当前个人视图有本地变更')
+                  : translateCommon('common.saved_view_shared_draft', '共享视图有本地变更')}
                 {pendingViewSummary.length > 0 && (
-                  <span className="ml-1 text-amber-700">
-                    {pendingViewSummary.join(', ')}
-                  </span>
+                  <span className="ml-1 text-amber-700">{pendingViewSummary.join(', ')}</span>
                 )}
               </span>
               <button
                 type="button"
                 className="rounded px-2 py-1 font-medium text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={hasPendingPersonalViewConfig ? handleSaveCurrentViewDraft : handleSaveSharedDraft}
-                disabled={
-                  (hasPendingSharedViewConfig && !canSaveSharedView) || savingViewDraft
+                onClick={
+                  hasPendingPersonalViewConfig ? handleSaveCurrentViewDraft : handleSaveSharedDraft
                 }
+                disabled={(hasPendingSharedViewConfig && !canSaveSharedView) || savingViewDraft}
                 title={
                   hasPendingPersonalViewConfig
                     ? translateCommon('common.saved_view_save_current', '保存当前视图')
                     : canSaveSharedView
-                    ? translateCommon(
-                        'common.saved_view_save_shared_confirm_title',
-                        '保存到共享视图？',
-                      )
-                    : translateCommon(
-                        isCurrentViewLockedPreset
-                          ? 'common.saved_view_locked_preset_reason'
-                          : 'common.saved_view_save_shared_disabled_reason',
-                        isCurrentViewLockedPreset
-                          ? '插件预置视图不能直接保存，请先复制为个人视图。'
-                          : '你可以调整当前视图，但暂不能保存给团队或全员。',
-                      )
+                      ? translateCommon(
+                          'common.saved_view_save_shared_confirm_title',
+                          '保存到共享视图？',
+                        )
+                      : translateCommon(
+                          isCurrentViewLockedPreset
+                            ? 'common.saved_view_locked_preset_reason'
+                            : 'common.saved_view_save_shared_disabled_reason',
+                          isCurrentViewLockedPreset
+                            ? '插件预置视图不能直接保存，请先复制为个人视图。'
+                            : '你可以调整当前视图，但暂不能保存给团队或全员。',
+                        )
                 }
                 data-testid={
                   hasPendingPersonalViewConfig
@@ -3811,10 +3805,7 @@ function ListPageContentInner(props: PageContentProps) {
                 title={
                   canCopyCurrentView
                     ? translateCommon('common.saved_view_save_as_personal', '另存为新视图')
-                    : translateCommon(
-                        'common.saved_view_copy_disabled_reason',
-                        '当前视图不能复制',
-                      )
+                    : translateCommon('common.saved_view_copy_disabled_reason', '当前视图不能复制')
                 }
                 data-testid="personal-view-save-as-new"
               >
