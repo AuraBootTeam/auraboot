@@ -9,6 +9,17 @@ relates_to:
 
 # SavedView Feishu Parity Requirements
 
+> 2026-06-23 baseline 重置：release-candidate 的当前源头改为
+> `docs/plans/2026-06/2026-06-23-saved-view-endgame-baseline.md`。
+> 本文档仍保留为原始需求和分析依据，但其中的验收矩阵不能再解读为
+> SavedView 长期 UX 已完整完成。
+>
+> 2026-06-23 scope 收口：用户已确认本期只需要个人视图。本文中关于
+> 团队共享、全员视图、协作者、共享保存 diff、audit 的内容全部降级为
+> 长期路线，不进入当前 Personal-only release 的开发或验收。当前 release
+> 只验收个人视图新建、切换、保存、另存为、重命名、复制、删除、设为默认、
+> 个人配额 10、快捷筛选另存为个人视图，以及高级视图 capability gate。
+
 ## 背景和目标
 
 SavedView 是 DSL 列表页的视图状态载体: 保存同一业务列表上的列、排序、筛选、密度、视图类型和高级视图字段映射。它不是一个每天必须打开的独立管理页,而是列表页顶部的日常切换入口,管理页只在创建、改名、共享、审计和复制时打开。

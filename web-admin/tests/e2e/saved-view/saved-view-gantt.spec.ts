@@ -58,7 +58,7 @@ test.describe('SavedView — GANTT View', () => {
         modelCode: MODEL_CODE,
         pageKey: SAVED_VIEW_PAGE_KEY,
         viewType: 'gantt',
-        scope: 'global',
+        scope: 'personal',
         viewConfig: {
           ganttStartDateField: 'e2et_order_date',
           ganttEndDateField: 'e2et_order_date',
@@ -109,7 +109,7 @@ test.describe('SavedView — GANTT View', () => {
     // or an "unconfigured" message. Match any of these.
     const content = page
       .getByText(/\d+ tasks/i)
-      .or(page.getByText('Gantt chart not configured'))
+      .or(page.getByText('甘特图未配置'))
       .or(page.locator('[data-testid="gantt-empty-diagnostics"]'))
       .or(page.getByText('not configured'));
     await expect(content.first()).toBeVisible({ timeout: 8000 });
@@ -126,7 +126,7 @@ test.describe('SavedView — GANTT View', () => {
     // Wait for gantt content — toolbar shows "{n} tasks" or unconfigured message
     const ganttContent = page
       .getByText(/\d+ tasks/i)
-      .or(page.getByText('Gantt chart not configured'))
+      .or(page.getByText('甘特图未配置'))
       .or(page.locator('[data-testid="gantt-empty-diagnostics"]'))
       .or(page.getByText('not configured'));
     await expect(ganttContent.first()).toBeVisible({ timeout: 8000 });

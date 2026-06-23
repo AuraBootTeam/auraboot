@@ -1,227 +1,1486 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SavedView Feishu Parity Mockup</title>
-  <style>
-    :root {
-      --blue: #2563eb;
-      --blue-soft: #eff6ff;
-      --green: #16a34a;
-      --amber: #d97706;
-      --red: #dc2626;
-      --ink: #111827;
-      --muted: #64748b;
-      --line: #e5e7eb;
-      --bg: #f7f8fb;
-      --panel: #ffffff;
-      font-family: Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
-    }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--ink); }
-    .app { min-height: 100vh; display: flex; flex-direction: column; }
-    .topbar {
-      height: 68px; display: flex; align-items: center; gap: 18px;
-      padding: 0 22px; border-bottom: 1px solid var(--line); background: #fff;
-    }
-    h1 { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 700; letter-spacing: 0; }
-    .view-trigger {
-      position: relative; display: inline-flex; align-items: center; gap: 8px;
-      min-width: 210px; height: 38px; padding: 0 12px; border: 1px solid #d8dee9;
-      border-radius: 8px; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
-      font-size: 14px; font-weight: 600;
-    }
-    .scope-pill { font-size: 12px; color: var(--blue); background: var(--blue-soft); border-radius: 999px; padding: 2px 7px; }
-    .chev { margin-left: auto; color: var(--muted); }
-    .actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-    .primary { height: 38px; border: 0; border-radius: 8px; padding: 0 16px; background: var(--blue); color: #fff; font-weight: 700; }
-    .icon-btn { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--muted); }
-    .toolbar {
-      height: 58px; display: flex; align-items: center; gap: 12px; padding: 0 22px;
-      border-bottom: 1px solid var(--line); background: #fff;
-    }
-    .search { width: 300px; height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; color: #94a3b8; }
-    .tool { height: 36px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 0 12px; font-weight: 600; color: #475569; }
-    .chips { margin-left: auto; display: flex; gap: 8px; }
-    .chip { height: 34px; border: 0; border-radius: 999px; background: #f3f4f6; padding: 0 15px; font-weight: 700; color: #4b5563; }
-    .content { position: relative; display: grid; grid-template-columns: 1fr 420px; min-height: calc(100vh - 126px); }
-    .main { min-width: 0; background: #fff; }
-    .filter-row { height: 58px; display: flex; align-items: center; padding: 0 22px; border-bottom: 1px solid var(--line); color: var(--blue); font-weight: 700; }
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th, td { height: 54px; padding: 0 22px; border-bottom: 1px solid #eef0f4; text-align: left; white-space: nowrap; }
-    th { height: 48px; background: #f8fafc; color: #667085; font-size: 12px; letter-spacing: 0; }
-    .badge { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-weight: 700; font-size: 12px; }
-    .dropdown {
-      position: absolute; top: 58px; left: 150px; width: 340px; background: #fff; border: 1px solid var(--line);
-      border-radius: 8px; box-shadow: 0 18px 42px rgba(15, 23, 42, .18); z-index: 3; overflow: hidden;
-    }
-    .dd-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
-    .dd-title { font-size: 13px; font-weight: 800; }
-    .dd-action { border: 0; background: transparent; color: var(--blue); font-weight: 700; }
-    .group { padding: 10px 8px; }
-    .group-title { padding: 6px 8px; color: #64748b; font-size: 12px; font-weight: 800; }
-    .option { display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 8px; border-radius: 7px; }
-    .option.active { background: var(--blue-soft); color: #1d4ed8; }
-    .option:hover { background: #f8fafc; }
-    .option-name { min-width: 0; flex: 1; font-size: 13px; font-weight: 650; }
-    .mark { font-size: 11px; border-radius: 999px; padding: 2px 7px; background: #f1f5f9; color: #475569; }
-    .mark.green { background: #dcfce7; color: #15803d; }
-    .mark.red { background: #fee2e2; color: #b91c1c; }
-    .dd-footer { border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; }
-    .footer-btn { border: 0; background: #fff; height: 42px; font-weight: 750; color: #334155; }
-    .footer-btn + .footer-btn { border-left: 1px solid var(--line); }
-    .panel { border-left: 1px solid var(--line); background: var(--panel); box-shadow: -10px 0 30px rgba(15, 23, 42, .05); }
-    .panel-head { height: 62px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--line); }
-    .panel-title { font-size: 16px; font-weight: 800; }
-    .section { padding: 18px; border-bottom: 1px solid var(--line); }
-    .section-title { margin: 0 0 12px; font-size: 12px; font-weight: 850; color: #64748b; text-transform: uppercase; letter-spacing: 0; }
-    .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 4px; border-radius: 8px; background: #f1f5f9; }
-    .seg button { height: 34px; border: 0; border-radius: 6px; background: transparent; font-weight: 750; color: #475569; }
-    .seg button.active { background: #fff; color: var(--blue); box-shadow: 0 1px 2px rgba(15, 23, 42, .08); }
-    .field { margin-top: 12px; }
-    label { display: block; margin-bottom: 6px; color: #64748b; font-size: 12px; font-weight: 750; }
-    select, input { width: 100%; height: 36px; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; background: #fff; }
-    .type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-    .type { height: 62px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 750; color: #475569; }
-    .type.blocked { border-color: #fecaca; background: #fff7f7; color: var(--red); }
-    .type.degraded { border-color: #fed7aa; background: #fff7ed; color: var(--amber); }
-    .notice { margin-top: 12px; border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.5; }
-    .notice.red { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-    .notice.amber { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
-    .view-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid #f1f5f9; }
-    .view-row:last-child { border-bottom: 0; }
-    .view-meta { flex: 1; min-width: 0; }
-    .view-name { font-size: 13px; font-weight: 750; }
-    .view-sub { margin-top: 2px; color: #64748b; font-size: 12px; }
-    .row-actions { display: flex; gap: 4px; }
-    .mini { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: #64748b; }
-    .mini[disabled] { opacity: .45; background: #f8fafc; }
-    @media (max-width: 1000px) {
-      .content { grid-template-columns: 1fr; }
-      .panel { border-left: 0; border-top: 1px solid var(--line); }
-      .dropdown { left: 22px; top: 56px; width: min(340px, calc(100vw - 44px)); }
-      .actions .primary { display: none; }
-      .chips { display: none; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>SavedView 长期方案 Mockup</title>
+<style>
+  :root {
+    --text: #1a1a1e;
+    --text-2: #5a5e66;
+    --text-3: #8f949d;
+    --border: #ecedef;
+    --border-strong: #e2e3e6;
+    --bg: #f7f7f8;
+    --panel: #ffffff;
+    --subtle: #fafafb;
+    --hover: #f3f4f6;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-weak: #eff4ff;
+    --green: #15a34a;
+    --green-weak: #edf8f0;
+    --amber: #c2750a;
+    --amber-weak: #fff6e7;
+    --red: #dc2626;
+    --red-weak: #fff0f0;
+    --purple: #7c3aed;
+    --purple-weak: #f3efff;
+    --shadow-pop: 0 1px 2px rgba(0,0,0,.04), 0 14px 32px -12px rgba(24,32,56,.22);
+    --radius: 8px;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--text);
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 13.5px;
+    letter-spacing: 0;
+  }
+  button, input, select { font: inherit; }
+  button { cursor: pointer; }
+  .app { min-height: 100vh; display: flex; }
+
+  .nav {
+    width: 224px;
+    flex: 0 0 224px;
+    background: #151923;
+    color: #d8dce5;
+    display: flex;
+    flex-direction: column;
+  }
+  .brand { height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .brand-mark { width: 28px; height: 28px; border-radius: 7px; background: #2563eb; display: grid; place-items: center; color: #fff; font-weight: 700; }
+  .brand-title { font-size: 14px; font-weight: 650; }
+  .nav-section { padding: 14px 10px 4px; font-size: 11.5px; color: #8b92a2; text-transform: uppercase; }
+  .nav-item {
+    margin: 2px 8px;
+    min-height: 34px;
+    padding: 0 10px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: #c5cad6;
+  }
+  .nav-item.active { background: rgba(37,99,235,.18); color: #fff; }
+  .nav-icon { width: 18px; color: #9aa2b3; text-align: center; }
+
+  .main { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+  .topbar {
+    min-height: 68px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+  }
+  .page-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .page-title h1 { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 660; }
+  .title-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .crumb { color: var(--text-3); font-size: 12.5px; }
+  .top-actions { display: flex; align-items: center; gap: 8px; }
+
+  .view-selector-wrap { position: relative; flex: 0 0 auto; }
+  .view-trigger {
+    min-width: 198px;
+    height: 40px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+  .view-trigger:hover,
+  .view-trigger.open { border-color: #adc4ff; box-shadow: 0 0 0 3px var(--accent-weak); }
+  .view-trigger-main { min-width: 0; display: inline-flex; align-items: center; gap: 8px; }
+  .view-icon { color: var(--accent); }
+  .view-label { max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+  .dirty-star { color: var(--accent); font-weight: 760; }
+  .chevron { color: var(--text-3); }
+  .view-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 386px;
+    max-width: calc(100vw - 32px);
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    box-shadow: var(--shadow-pop);
+    z-index: 30;
+    display: none;
+    overflow: hidden;
+  }
+  .view-menu.open { display: block; animation: fade .16s ease-out; }
+  .view-menu-head { padding: 12px; border-bottom: 1px solid var(--border); display: grid; gap: 10px; }
+  .view-menu-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 650; }
+  .view-search {
+    height: 32px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 0 10px;
+    color: var(--text);
+    background: var(--subtle);
+  }
+  .view-menu-scroll { max-height: 372px; overflow: auto; padding: 10px 8px; }
+  .view-menu-footer {
+    border-top: 1px solid var(--border);
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: var(--subtle);
+  }
+  .view-option { cursor: pointer; }
+  .view-option.selected { background: var(--accent-weak); border-color: #c7d7ff; }
+  .view-type { color: var(--text-3); font-size: 12px; }
+  .view-inline-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .compact-note {
+    border: 1px solid #f0cc91;
+    background: var(--amber-weak);
+    color: #6f4600;
+    border-radius: 8px;
+    padding: 9px 10px;
+    line-height: 1.45;
+    font-size: 12.5px;
+  }
+
+  .btn {
+    height: 32px;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: #b8c7f3; color: var(--accent); background: #fbfdff; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent-hover); color: #fff; }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--text-2); }
+  .btn.ghost:hover { background: var(--hover); color: var(--accent); }
+  .btn.danger { color: var(--red); border-color: #f4caca; background: #fffafa; }
+  .btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+  .view-header { background: var(--panel); border-bottom: 1px solid var(--border); }
+  .product-toolbar {
+    min-height: 60px;
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .search-box {
+    width: 300px;
+    max-width: 100%;
+    height: 38px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--subtle);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    color: var(--text-3);
+  }
+  .quick-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .quick-pill {
+    height: 32px;
+    border: 1px solid transparent;
+    background: var(--subtle);
+    border-radius: 999px;
+    padding: 0 12px;
+    color: var(--text-2);
+    font-weight: 600;
+  }
+  .view-strip {
+    min-height: 52px;
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .view-current {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .view-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 650;
+    font-size: 14.5px;
+  }
+  .scope {
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0 8px;
+    font-size: 12px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-2);
+    background: var(--subtle);
+  }
+  .scope.global { background: var(--purple-weak); border-color: #d8ccff; color: var(--purple); }
+  .scope.team { background: var(--accent-weak); border-color: #c7d7ff; color: var(--accent); }
+  .scope.personal { background: var(--green-weak); border-color: #bee7c8; color: var(--green); }
+  .scope.warning { background: var(--amber-weak); border-color: #f5d599; color: var(--amber); }
+  .muted { color: var(--text-3); }
+
+  .segmented {
+    padding: 0 24px 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+  }
+  .scenario-label { color: var(--text-3); font-size: 12px; margin-right: 4px; white-space: nowrap; }
+  .seg-btn {
+    height: 30px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0 12px;
+    background: transparent;
+    color: var(--text-2);
+    white-space: nowrap;
+  }
+  .seg-btn.active { background: var(--accent-weak); border-color: #cad8ff; color: var(--accent); font-weight: 600; }
+
+  .dirty-bar {
+    margin: 0 24px 12px;
+    border: 1px solid #f0cc91;
+    background: var(--amber-weak);
+    color: #6f4600;
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .dirty-main { min-width: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .dirty-title { font-weight: 650; }
+  .dirty-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .dirty-bar .btn { height: 28px; background: #fff; }
+  .dirty-bar .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .dirty-bar .btn.primary:hover { background: var(--accent-hover); color: #fff; }
+
+  .workspace { flex: 1; min-height: 0; padding: 18px 24px 24px; overflow: auto; }
+  .scene { display: none; }
+  .scene.active { display: block; }
+  .grid { display: grid; gap: 16px; }
+  .grid.data-layout { grid-template-columns: minmax(620px,1fr) 302px; align-items: start; }
+  .grid.two { grid-template-columns: minmax(0,1.1fr) minmax(320px,.9fr); align-items: start; }
+  .grid.three { grid-template-columns: repeat(3, minmax(0,1fr)); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+  .panel-head {
+    min-height: 48px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-title { font-weight: 650; font-size: 14.5px; }
+  .panel-subtitle { color: var(--text-3); font-size: 12.5px; margin-top: 2px; }
+  .panel-body { padding: 14px; }
+
+  .view-group { margin-bottom: 14px; }
+  .group-title { color: var(--text-3); font-size: 12px; font-weight: 650; margin: 0 0 6px; }
+  .view-row {
+    border: 1px solid transparent;
+    border-radius: 7px;
+    padding: 9px 10px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+  }
+  .view-row:hover { background: var(--hover); }
+  .view-row.selected { background: var(--accent-weak); border-color: #c7d7ff; }
+  .view-row-main { min-width: 0; }
+  .view-row-name { display: flex; align-items: center; gap: 7px; font-weight: 600; min-width: 0; }
+  .view-row-meta { margin-top: 4px; color: var(--text-3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lock { color: var(--text-3); }
+
+  .toolbar {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text-2);
+    white-space: nowrap;
+  }
+  .chip.active { background: var(--accent-weak); border-color: #c7d7ff; color: var(--accent); }
+
+  .kanban { display: grid; grid-template-columns: repeat(4, minmax(190px,1fr)); gap: 12px; padding: 14px; overflow-x: auto; }
+  .lane { min-width: 190px; background: #f6f7f9; border: 1px solid var(--border); border-radius: 8px; }
+  .lane-head { height: 40px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .lane-name { display: flex; align-items: center; gap: 7px; font-weight: 650; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: 0 0 auto; }
+  .dot.green { background: var(--green); }
+  .dot.amber { background: var(--amber); }
+  .dot.red { background: var(--red); }
+  .count { color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .cards { padding: 10px; display: grid; gap: 9px; }
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 10px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.03);
+  }
+  .card-title { font-weight: 650; line-height: 1.35; }
+  .card-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--text-3); font-size: 12.5px; }
+  .money { font-variant-numeric: tabular-nums; color: var(--text-2); }
+
+  .table-panel { overflow: hidden; }
+  .table-wrap { overflow: auto; }
+  .data-table { width: 100%; border-collapse: collapse; min-width: 760px; table-layout: fixed; }
+  .data-table th,
+  .data-table td {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .data-table th:nth-child(1), .data-table td:nth-child(1) { width: 124px; }
+  .data-table th:nth-child(2), .data-table td:nth-child(2) { width: 190px; }
+  .data-table th:nth-child(4), .data-table td:nth-child(4) { width: 150px; }
+  .data-table th:nth-child(5), .data-table td:nth-child(5) { width: 112px; }
+  .data-table th:nth-child(6), .data-table td:nth-child(6) { width: 72px; }
+  .data-table th {
+    color: var(--text-2);
+    background: var(--subtle);
+    font-weight: 650;
+  }
+  .data-table tbody tr:hover td { background: #fbfcff; }
+  .data-table .empty-cell { color: var(--text-3); }
+  .source-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: #dce9ff;
+    color: #1d4ed8;
+    font-weight: 650;
+  }
+  .row-actions { display: flex; align-items: center; gap: 12px; color: var(--accent); }
+
+  .insight-list { display: grid; gap: 10px; }
+  .insight {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    background: var(--subtle);
+  }
+  .insight strong { display: block; margin-bottom: 4px; }
+  .ok { color: var(--green); }
+  .warn { color: var(--amber); }
+  .bad { color: var(--red); }
+
+  .type-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+  .type-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 13px;
+    background: #fff;
+    min-height: 142px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .type-card.selected { border-color: #a9befa; box-shadow: 0 0 0 3px var(--accent-weak); }
+  .type-card.blocked { background: #fffafa; border-color: #f2cccc; }
+  .type-card.degraded { background: #fffdf7; border-color: #efd6a7; }
+  .type-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .type-title { font-weight: 650; font-size: 14px; }
+  .type-desc { color: var(--text-2); line-height: 1.45; flex: 1; }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .pill.ok { color: var(--green); background: var(--green-weak); }
+  .pill.warn { color: var(--amber); background: var(--amber-weak); }
+  .pill.bad { color: var(--red); background: var(--red-weak); }
+  .pill.info { color: var(--accent); background: var(--accent-weak); }
+
+  .form-grid { display: grid; grid-template-columns: 140px 1fr; gap: 12px 14px; align-items: center; }
+  .label { color: var(--text-2); }
+  .field {
+    min-height: 32px;
+    width: 100%;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: #fff;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    color: var(--text);
+  }
+  select.field, input.field { display: block; }
+  .field.disabled { color: var(--text-3); background: var(--hover); }
+  .divider { height: 1px; background: var(--border); margin: 14px 0; }
+  .callout {
+    border: 1px solid #c7d7ff;
+    background: var(--accent-weak);
+    border-radius: 8px;
+    padding: 11px 12px;
+    color: #24417d;
+    line-height: 1.5;
+  }
+  .callout.warning { border-color: #f0cc91; background: var(--amber-weak); color: #6f4600; }
+  .callout.danger { border-color: #f2cccc; background: var(--red-weak); color: #7c1d1d; }
+
+  .steps { display: flex; gap: 8px; flex-wrap: wrap; }
+  .step {
+    min-height: 34px;
+    border: 1px solid var(--border);
+    background: var(--subtle);
+    border-radius: 999px;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-2);
+  }
+  .step.active { background: var(--accent-weak); border-color: #c7d7ff; color: var(--accent); font-weight: 650; }
+
+  .team-list { display: grid; gap: 10px; }
+  .team-item {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+  }
+  .team-item.selected { border-color: #a9befa; background: var(--accent-weak); }
+  .team-name { font-weight: 650; }
+  .team-meta { color: var(--text-3); margin-top: 3px; font-size: 12.5px; }
+  .permission-table { width: 100%; border-collapse: collapse; }
+  .permission-table th, .permission-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+  .permission-table th { color: var(--text-2); font-weight: 650; background: var(--subtle); }
+
+  .management-layout { grid-template-columns: 300px minmax(460px,1fr) 330px; align-items: start; }
+  .manage-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .manage-tab {
+    height: 30px;
+    border: 1px solid var(--border);
+    background: var(--subtle);
+    color: var(--text-2);
+    border-radius: 999px;
+    padding: 0 10px;
+  }
+  .manage-tab.active { background: var(--accent-weak); border-color: #c7d7ff; color: var(--accent); font-weight: 650; }
+  .quota-stack { display: grid; gap: 10px; }
+  .quota-item {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    background: #fff;
+  }
+  .quota-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .saved-view-list { display: grid; gap: 10px; }
+  .saved-view-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    background: #fff;
+    display: grid;
+    gap: 8px;
+  }
+  .saved-view-card.selected { border-color: #a9befa; box-shadow: 0 0 0 3px var(--accent-weak); }
+  .saved-view-title {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .saved-view-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .view-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .audit-feed { display: grid; gap: 10px; }
+  .audit-item {
+    border-left: 3px solid #c7d7ff;
+    background: var(--subtle);
+    border-radius: 6px;
+    padding: 9px 10px;
+    line-height: 1.45;
+  }
+  .collab-list { display: grid; gap: 9px; }
+  .collab-item {
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px;
+  }
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    background: var(--accent-weak);
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .contract-list { display: grid; gap: 9px; }
+  .contract-item {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    background: #fff;
+  }
+  .contract-key { color: var(--text-2); font-weight: 650; }
+
+  .metric-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+  .metric {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    padding: 12px;
+  }
+  .metric-label { color: var(--text-3); font-size: 12.5px; }
+  .metric-value { margin-top: 6px; font-size: 24px; font-weight: 720; font-variant-numeric: tabular-nums; }
+  .bar {
+    height: 10px;
+    background: var(--hover);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+  .bar > span.warn { background: var(--amber); }
+  .issue-table { width: 100%; border-collapse: collapse; }
+  .issue-table th, .issue-table td { padding: 11px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  .issue-table th { color: var(--text-2); background: var(--subtle); font-weight: 650; }
+
+  .preview-frame {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .mini-gantt { padding: 14px; display: grid; gap: 12px; }
+  .gantt-line { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: center; }
+  .gantt-label { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .timeline { height: 22px; background: var(--hover); border-radius: 999px; position: relative; overflow: hidden; }
+  .timeline span { position: absolute; height: 100%; border-radius: 999px; background: var(--accent); }
+  .timeline span.green { background: var(--green); }
+  .timeline span.amber { background: var(--amber); }
+
+  .footer-note { margin-top: 12px; color: var(--text-3); line-height: 1.5; }
+  .toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    min-width: 260px;
+    max-width: min(420px, calc(100vw - 48px));
+    border: 1px solid #bee7c8;
+    background: #fff;
+    box-shadow: var(--shadow-pop);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: none;
+    z-index: 20;
+  }
+  .toast.show { display: block; animation: fade .18s ease-out; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 1180px) {
+    .grid.data-layout { grid-template-columns: minmax(420px,1fr); }
+    .right-panel { grid-column: 1 / -1; }
+    .type-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .metric-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .management-layout { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 820px) {
+    .app { display: block; }
+    .nav { width: auto; min-height: auto; flex-direction: row; overflow-x: auto; }
+    .brand { flex: 0 0 auto; border-bottom: 0; border-right: 1px solid rgba(255,255,255,.08); }
+    .nav-section { display: none; }
+    .nav-item { flex: 0 0 auto; margin: 10px 2px; }
+    .topbar { height: auto; min-height: 56px; padding: 12px 14px; align-items: flex-start; gap: 12px; flex-direction: column; }
+    .title-row { align-items: flex-start; flex-direction: column; gap: 8px; width: 100%; }
+    .view-trigger { width: 100%; min-width: 0; }
+    .view-selector-wrap { width: 100%; }
+    .view-menu { width: 100%; }
+    .product-toolbar { padding: 10px 14px; align-items: flex-start; flex-direction: column; }
+    .search-box { width: 100%; }
+    .view-strip { padding: 10px 14px; align-items: flex-start; flex-direction: column; }
+    .segmented { padding: 0 14px 10px; }
+    .dirty-bar { margin: 0 14px 12px; align-items: flex-start; flex-direction: column; }
+    .workspace { padding: 14px; }
+    .grid.data-layout, .grid.two, .grid.three { grid-template-columns: 1fr; }
+    .type-grid { grid-template-columns: 1fr; }
+    .metric-row { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+    .contract-item { grid-template-columns: 1fr; }
+    .kanban { grid-template-columns: repeat(4, minmax(210px, 1fr)); }
+  }
+</style>
 </head>
 <body>
-  <div class="app">
+<div class="app">
+  <aside class="nav" aria-label="主导航">
+    <div class="brand">
+      <div class="brand-mark">A</div>
+      <div>
+        <div class="brand-title">AuraBoot</div>
+        <div class="crumb">Enterprise</div>
+      </div>
+    </div>
+    <div class="nav-section">BOM</div>
+    <div class="nav-item active"><span class="nav-icon">▦</span> 项目与版本</div>
+    <div class="nav-item"><span class="nav-icon">▤</span> 物料库</div>
+    <div class="nav-item"><span class="nav-icon">◷</span> 变更记录</div>
+    <div class="nav-section">平台</div>
+    <div class="nav-item"><span class="nav-icon">⚙</span> DSL 页面</div>
+    <div class="nav-item"><span class="nav-icon">◇</span> 插件中心</div>
+  </aside>
+
+  <main class="main">
     <header class="topbar">
-      <h1>项目与版本</h1>
-      <button class="view-trigger" aria-label="当前视图">
-        <span class="scope-pill">我的</span>
-        Default View
-        <span class="mark green">默认</span>
-        <span class="chev">⌄</span>
-      </button>
-      <div class="actions">
-        <button class="primary">新建 BOM 项目</button>
-        <button class="icon-btn">⋯</button>
+      <div class="title-row">
+        <h1>项目与版本</h1>
+        <div class="view-selector-wrap">
+          <button class="view-trigger" id="viewTrigger" aria-expanded="false" aria-controls="viewMenu">
+            <span class="view-trigger-main">
+              <span class="view-icon">👤</span>
+              <span class="view-label">默认视图</span>
+              <span class="dirty-star" title="有本地变更">*</span>
+            </span>
+            <span class="chevron">⌄</span>
+          </button>
+          <div class="view-menu" id="viewMenu">
+            <div class="view-menu-head">
+              <div class="view-menu-title">
+                <span>切换视图</span>
+                <span class="scope warning">本地变更</span>
+              </div>
+              <input class="view-search" aria-label="搜索视图" placeholder="搜索视图...">
+              <div class="compact-note">
+                当前在个人视图里调整了筛选和字段。保存只影响你自己,不会影响团队或全员。
+                <div class="view-inline-actions">
+                  <button class="btn primary" id="copyFromMenuBtn">另存为新视图</button>
+                  <button class="btn">保存到当前视图</button>
+                </div>
+              </div>
+            </div>
+            <div class="view-menu-scroll">
+              <div class="view-group">
+                <p class="group-title">我的视图</p>
+                <div class="view-row view-option selected" data-view-name="默认视图">
+                  <div class="view-row-main">
+                    <div class="view-row-name">默认视图 <span class="scope personal">我的</span></div>
+                    <div class="view-row-meta">表格 · 自动保存 · 有本地变更</div>
+                  </div>
+                  <span class="view-type">表格</span>
+                </div>
+                <div class="view-row view-option" data-view-name="本周修改">
+                  <div class="view-row-main">
+                    <div class="view-row-name">本周修改 <span class="scope personal">我的</span></div>
+                    <div class="view-row-meta">表格 · 筛选更新时间</div>
+                  </div>
+                  <span class="view-type">表格</span>
+                </div>
+              </div>
+              <div class="view-group">
+                <p class="group-title">后续路线</p>
+                <div class="compact-note">
+                  团队共享、全员视图、协作者和审计暂不进入本期。当前 release 只显示和保存个人视图。
+                </div>
+              </div>
+            </div>
+            <div class="view-menu-footer">
+              <button class="btn primary" data-switch="create">新建视图</button>
+              <button class="btn" data-switch="manage">管理视图</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="btn ghost" title="刷新">↻</button>
+        <button class="btn">导出</button>
+        <button class="btn primary">新建 BOM 项目</button>
       </div>
     </header>
 
-    <div class="dropdown" role="listbox" aria-label="选择视图">
-      <div class="dd-head">
-        <span class="dd-title">切换视图</span>
-        <button class="dd-action">+ 新建</button>
+    <section class="view-header">
+      <div class="product-toolbar">
+        <div class="toolbar-left">
+          <div class="search-box"><span>⌕</span><span>查询...</span></div>
+          <button class="btn">筛选</button>
+          <button class="btn">排序</button>
+          <button class="btn">字段</button>
+        </div>
+        <div class="quick-filters">
+          <button class="quick-pill">我的记录</button>
+          <button class="quick-pill">今日新建</button>
+          <button class="quick-pill">本周修改</button>
+          <button class="btn ghost" title="更多">☰</button>
+        </div>
       </div>
-      <div class="group">
-        <div class="group-title">个人视图</div>
-        <div class="option active"><span>✓</span><span class="option-name">Default View</span><span class="mark green">默认</span></div>
-        <div class="option"><span>≡</span><span class="option-name">我的待处理</span></div>
+      <nav class="segmented" aria-label="mockup 场景">
+        <span class="scenario-label">终局场景</span>
+        <button class="seg-btn active" data-scene="data">数据视图</button>
+        <button class="seg-btn" data-scene="selector">个人视图选择器</button>
+        <button class="seg-btn" data-scene="manage">个人管理中心</button>
+        <button class="seg-btn" data-scene="create">新建个人视图</button>
+        <button class="seg-btn" data-scene="quality">数据能力诊断</button>
+        <button class="seg-btn" data-scene="share">后续路线</button>
+      </nav>
+      <div class="dirty-bar" id="dirtyBar">
+        <div class="dirty-main">
+          <span class="dirty-title">当前有本地变更</span>
+          <span>筛选 1 项、隐藏字段 2 个、列宽调整 1 处。</span>
+          <span class="scope personal">当前视图: 我的默认视图</span>
+        </div>
+        <div class="dirty-actions">
+          <button class="btn">保存到当前视图</button>
+          <button class="btn primary" id="copyPersonalBtn">另存为新视图</button>
+          <button class="btn ghost" id="discardBtn">放弃变更</button>
+        </div>
       </div>
-      <div class="group">
-        <div class="group-title">团队共享</div>
-        <div class="option"><span>▦</span><span class="option-name">研发团队看板</span><span class="mark">Team A</span></div>
-        <div class="option"><span>━</span><span class="option-name">项目甘特</span><span class="mark red">需配置</span></div>
-      </div>
-      <div class="group">
-        <div class="group-title">全员 / 预置</div>
-        <div class="option"><span>🔒</span><span class="option-name">插件预置: 本周修改</span><span class="mark">可复制</span></div>
-      </div>
-      <div class="dd-footer">
-        <button class="footer-btn">新建视图</button>
-        <button class="footer-btn">管理视图</button>
-      </div>
-    </div>
+    </section>
 
-    <nav class="toolbar">
-      <input class="search" value="查询..." readonly />
-      <button class="tool">排序</button>
-      <button class="tool">字段</button>
-      <div class="chips">
-        <button class="chip">我的记录</button>
-        <button class="chip">今日新建</button>
-        <button class="chip">本周修改</button>
-      </div>
-    </nav>
+    <div class="workspace">
+      <section class="scene active" id="scene-data">
+        <div class="grid data-layout">
+          <section class="panel table-panel">
+            <div class="toolbar">
+              <div class="toolbar-left">
+                <span class="chip active">表格视图</span>
+                <span class="chip">筛选: 我的记录</span>
+                <span class="chip">排序: 更新时间倒序</span>
+                <span class="chip">字段: 默认列</span>
+              </div>
+              <div class="toolbar-right">
+                <span class="muted">共 5 条</span>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table" aria-label="BOM 项目列表">
+                <thead>
+                  <tr>
+                    <th>PCBA 编码</th>
+                    <th>项目名称</th>
+                    <th>产品名称</th>
+                    <th>物料库来源</th>
+                    <th>视图影响</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>444</td>
+                    <td>444</td>
+                    <td class="empty-cell">-</td>
+                    <td><span class="source-tag">当前 Excel 物料库</span></td>
+                    <td><span class="scope personal">只影响我</span></td>
+                    <td><span class="row-actions">查看 ⋯</span></td>
+                  </tr>
+                  <tr>
+                    <td>A100270003400</td>
+                    <td>ESG-B-MAIN03-V1 PCBA成品</td>
+                    <td>ESG-B-MAIN03-V1 PCBA成品（客户编码: 1030-042231）</td>
+                    <td><span class="source-tag">当前 Excel 物料库</span></td>
+                    <td><span class="scope warning">本地变更</span></td>
+                    <td><span class="row-actions">查看 ⋯</span></td>
+                  </tr>
+                  <tr>
+                    <td>66</td>
+                    <td>66</td>
+                    <td class="empty-cell">-</td>
+                    <td><span class="source-tag">当前 Excel 物料库</span></td>
+                    <td><span class="scope personal">只影响我</span></td>
+                    <td><span class="row-actions">查看 ⋯</span></td>
+                  </tr>
+                  <tr>
+                    <td>A1</td>
+                    <td>A1</td>
+                    <td class="empty-cell">-</td>
+                    <td><span class="source-tag">当前 Excel 物料库</span></td>
+                    <td><span class="scope personal">只影响我</span></td>
+                    <td><span class="row-actions">查看 ⋯</span></td>
+                  </tr>
+                  <tr>
+                    <td>test1</td>
+                    <td>test1</td>
+                    <td class="empty-cell">-</td>
+                    <td><span class="source-tag">当前 Excel 物料库</span></td>
+                    <td><span class="scope personal">只影响我</span></td>
+                    <td><span class="row-actions">查看 ⋯</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
 
-    <main class="content">
-      <section class="main">
-        <div class="filter-row">+ 添加筛选</div>
-        <table>
-          <thead>
-            <tr><th>PCBA 编码</th><th>项目名称</th><th>产品名称</th><th>物料库来源</th><th>操作</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>444</td><td>444</td><td>-</td><td><span class="badge">当前 Excel 物料库</span></td><td></td></tr>
-            <tr><td>A100270003400</td><td>ESG-B-MAIN03-V1 PCBA成品</td><td>客户编码: 1030-042231</td><td><span class="badge">当前 Excel 物料库</span></td><td>查看</td></tr>
-            <tr><td>66</td><td>66</td><td>-</td><td><span class="badge">当前 Excel 物料库</span></td><td></td></tr>
-            <tr><td>A1</td><td>A1</td><td>-</td><td><span class="badge">当前 Excel 物料库</span></td><td>查看</td></tr>
-          </tbody>
-        </table>
+          <aside class="panel right-panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">场景分层</div>
+                <div class="panel-subtitle">日常只看入口,低频能力按需展开</div>
+              </div>
+            </div>
+            <div class="panel-body insight-list">
+              <div class="insight">
+                <strong>日常使用</strong>
+                <span class="muted">标题旁选择当前视图;查询、筛选、排序、字段调整都在列表工具栏完成。</span>
+              </div>
+              <div class="insight">
+                <strong>切换/新建视图</strong>
+                <span class="muted">点击标题旁视图选择器后出现个人视图下拉,可切换、搜索、新建或管理我的视图。</span>
+              </div>
+              <div class="insight">
+                <strong>个人管理</strong>
+                <span class="muted">重命名、复制、删除、设为默认和配额提示都是低频二级入口。</span>
+              </div>
+              <div class="insight">
+                <strong>异常诊断</strong>
+                <span class="muted">甘特、看板等高级视图只有在字段或命令能力不足时才进入诊断态。</span>
+              </div>
+            </div>
+          </aside>
+        </div>
       </section>
 
-      <aside class="panel" aria-label="管理视图">
-        <div class="panel-head">
-          <div class="panel-title">管理视图</div>
-          <button class="icon-btn">×</button>
+      <section class="scene" id="scene-selector">
+        <div class="grid two">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">个人视图选择器</div>
+                <div class="panel-subtitle">日常入口固定在标题旁,不把用户带进管理页</div>
+              </div>
+              <span class="scope personal">高频入口</span>
+            </div>
+            <div class="panel-body">
+              <div class="view-menu open" style="position:static;display:block;width:100%;max-width:none;box-shadow:none;">
+                <div class="view-menu-head">
+                  <div class="view-menu-title">
+                    <span>切换视图</span>
+                    <span class="scope warning">有本地变更</span>
+                  </div>
+                  <input class="view-search" aria-label="搜索视图" placeholder="搜索我的视图...">
+                  <div class="compact-note">
+                    当前 release 只支持个人视图。团队共享和全员视图保留为后续路线,不会出现在本期主链路。
+                    <div class="view-inline-actions">
+                      <button class="btn primary">另存为新视图</button>
+                      <button class="btn">保存到当前视图</button>
+                      <button class="btn">放弃变更</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="view-menu-scroll">
+                  <div class="view-group">
+                    <p class="group-title">我的视图</p>
+                    <div class="view-row selected">
+                      <div class="view-row-main">
+                        <div class="view-row-name">默认视图 <span class="scope personal">我的</span></div>
+                        <div class="view-row-meta">表格 · 默认 · 10/10</div>
+                      </div>
+                      <span class="view-type">表格</span>
+                    </div>
+                    <div class="view-row">
+                      <div class="view-row-main">
+                        <div class="view-row-name">我的待处理 <span class="scope personal">我的</span></div>
+                        <div class="view-row-meta">筛选: 负责人 = 我 · 今日更新</div>
+                      </div>
+                      <span class="view-type">表格</span>
+                    </div>
+                  </div>
+                  <div class="view-group">
+                    <p class="group-title">配额和状态</p>
+                    <div class="view-row">
+                      <div class="view-row-main">
+                        <div class="view-row-name">个人视图额度 <span class="scope personal">6 / 10</span></div>
+                        <div class="view-row-meta">达到 10 个后禁用新建,提示删除或复用已有视图</div>
+                      </div>
+                      <span class="view-type">限制</span>
+                    </div>
+                    <div class="view-row">
+                      <div class="view-row-main">
+                        <div class="view-row-name">甘特视图草稿 <span class="scope warning">需补字段</span></div>
+                        <div class="view-row-meta">缺结束日期字段,blocked 类型不可保存</div>
+                      </div>
+                      <span class="view-type">诊断</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="view-menu-footer">
+                  <button class="btn primary" data-switch="create">新建视图</button>
+                  <button class="btn" data-switch="manage">管理视图</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">入口规则</div>
+                <div class="panel-subtitle">防止重复按钮和管理能力前置</div>
+              </div>
+            </div>
+            <div class="panel-body contract-list">
+              <div class="contract-item"><div class="contract-key">放哪里</div><div>标题旁只放当前视图选择器;工具栏只放查询、筛选、排序、字段和快捷筛选。</div></div>
+              <div class="contract-item"><div class="contract-key">不重复</div><div>“我的记录/今日新建/本周修改”只出现在工具栏,不再出现在标题右侧。</div></div>
+              <div class="contract-item"><div class="contract-key">默认打开</div><div>日常只打开数据列表,个人管理中心必须由用户主动进入。</div></div>
+              <div class="contract-item"><div class="contract-key">异常视图</div><div>blocked 视图显示原因和建议动作,不能保存为会空白的视图。</div></div>
+              <div class="contract-item"><div class="contract-key">权限</div><div>本期不展示团队/全员保存入口,避免出现可误点但无完整链路的按钮。</div></div>
+            </div>
+          </aside>
         </div>
-        <div class="section">
-          <p class="section-title">新建视图</p>
-          <div class="seg">
-            <button class="active">个人</button>
-            <button>团队</button>
-            <button>全员</button>
-          </div>
-          <div class="field">
-            <label>团队</label>
-            <select><option>研发团队 Team A</option><option>供应链 Team B</option></select>
-          </div>
-          <div class="type-grid" style="margin-top:14px">
-            <button class="type">表格</button>
-            <button class="type degraded">看板</button>
-            <button class="type">日历</button>
-            <button class="type blocked">画册</button>
-            <button class="type degraded">甘特</button>
-            <button class="type degraded">树形</button>
-            <button class="type">时间线</button>
-            <button class="type">表单</button>
-          </div>
-          <div class="notice red">画册需要图片/附件字段,当前 BOM 项目数据无法支撑,不会创建半成品视图。</div>
-          <div class="notice amber">甘特只有一个日期字段时可降级创建,开始和结束日期会复用同一字段。</div>
+      </section>
+
+      <section class="scene" id="scene-manage">
+        <div class="grid management-layout">
+          <aside class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">个人管理中心</div>
+                <div class="panel-subtitle">只管理我的视图,不展示团队/全员入口</div>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="manage-tabs" aria-label="视图范围">
+                <button class="manage-tab active">我的视图</button>
+                <button class="manage-tab">已编辑</button>
+                <button class="manage-tab">默认</button>
+              </div>
+              <div class="divider"></div>
+              <div class="search-box" style="width:100%;"><span>⌕</span><span>搜索我的视图...</span></div>
+              <div class="divider"></div>
+              <div class="quota-stack">
+                <div class="quota-item">
+                  <div class="quota-line"><strong>我的视图</strong><span class="muted">6 / 10</span></div>
+                  <div class="bar"><span style="width:60%"></span></div>
+                </div>
+                <div class="quota-item">
+                  <div class="quota-line"><strong>剩余额度</strong><span class="muted">4 个</span></div>
+                  <div class="muted">达到 10 个后禁用“新建个人视图”,引导删除或复用已有视图。</div>
+                </div>
+              </div>
+              <p class="footer-note">超限前展示剩余额度;达到上限时禁用新建并给出清理建议。</p>
+            </div>
+          </aside>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">视图清单</div>
+                <div class="panel-subtitle">大量测试/历史视图下仍然可搜索、分组和识别来源</div>
+              </div>
+              <button class="btn primary" data-switch="create">新建个人视图</button>
+            </div>
+            <div class="panel-body saved-view-list">
+              <div class="saved-view-card selected">
+                <div class="saved-view-title"><strong>我的默认视图</strong><span class="scope personal">默认</span></div>
+                <div class="muted">表格 · 筛选: 我的记录 · 最后更新 10 分钟前</div>
+                <div class="view-actions">
+                  <button class="btn primary">保存当前变更</button>
+                  <button class="btn">重命名</button>
+                  <button class="btn">复制</button>
+                  <button class="btn danger">删除</button>
+                </div>
+              </div>
+              <div class="saved-view-card">
+                <div class="saved-view-title"><strong>量产风险看板</strong><span class="scope warning">只读看板</span></div>
+                <div class="muted">看板 · 分组字段: 项目状态 · 未配置状态更新命令,拖拽关闭</div>
+                <div class="view-actions">
+                  <button class="btn">编辑字段映射</button>
+                  <button class="btn">另存为新视图</button>
+                  <button class="btn">查看诊断</button>
+                </div>
+              </div>
+              <div class="saved-view-card">
+                <div class="saved-view-title"><strong>本周修改</strong><span class="scope personal">快捷筛选副本</span></div>
+                <div class="muted">表格 · 来自快捷筛选 · 可重置到 preset 条件</div>
+                <div class="view-actions">
+                  <button class="btn">设为默认</button>
+                  <button class="btn">重置筛选</button>
+                  <button class="btn danger">删除</button>
+                </div>
+              </div>
+              <div class="saved-view-card">
+                <div class="saved-view-title"><strong>我关注的 BOM</strong><span class="scope personal">我的</span></div>
+                <div class="muted">表格 · 个人视图 · 只影响我</div>
+                <div class="view-actions">
+                  <button class="btn">编辑</button>
+                  <button class="btn">复制</button>
+                  <button class="btn danger">删除</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">本期边界</div>
+                <div class="panel-subtitle">团队/全员能力只保留为后续路线</div>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="contract-list">
+                <div class="contract-item"><div class="contract-key">本期支持</div><div>个人视图的新建、切换、保存、另存为、重命名、复制、删除、设为默认。</div></div>
+                <div class="contract-item"><div class="contract-key">本期不做</div><div>团队视图、全员视图、协作者、共享保存 diff、共享 audit。</div></div>
+                <div class="contract-item"><div class="contract-key">配额规则</div><div>个人视图最多 10 个。团队/全员 20 个是后续路线规则,不进入当前 UI 验收。</div></div>
+              </div>
+              <div class="divider"></div>
+              <div class="audit-feed">
+                <div class="audit-item"><strong>保存当前个人视图</strong><br><span class="muted">字段 -2,筛选 +1,列宽 +1 · 只影响当前用户</span></div>
+                <div class="audit-item"><strong>另存为新视图</strong><br><span class="muted">从快捷筛选“本周修改”创建个人副本 · 5 分钟前</span></div>
+                <div class="audit-item"><strong>系统阻止创建甘特图</strong><br><span class="muted">reason: missing_end_date_field · 14 分钟前</span></div>
+              </div>
+            </div>
+          </aside>
         </div>
-        <div class="section">
-          <p class="section-title">当前视图操作</p>
-          <div class="view-row">
-            <div class="view-meta"><div class="view-name">研发团队看板</div><div class="view-sub">Team A · 共享 draft · 可复制为个人</div></div>
-            <div class="row-actions"><button class="mini">☆</button><button class="mini">⧉</button><button class="mini">↗</button></div>
-          </div>
-          <div class="view-row">
-            <div class="view-meta"><div class="view-name">插件预置: 本周修改</div><div class="view-sub">locked preset · 直接编辑禁用</div></div>
-            <div class="row-actions"><button class="mini" disabled>✎</button><button class="mini">⧉</button><button class="mini">◎</button></div>
-          </div>
+      </section>
+
+      <section class="scene" id="scene-create">
+        <div class="grid two">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">新建个人视图</div>
+                <div class="panel-subtitle">先判断数据是否支撑,再保存到我的视图</div>
+              </div>
+              <div class="steps">
+                <span class="step active">1 类型</span>
+                <span class="step">2 字段映射</span>
+                <span class="step">3 保存</span>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="type-grid">
+                <button class="type-card selected" data-type="table">
+                  <span class="type-top"><span class="type-title">表格</span><span class="pill ok">可用</span></span>
+                  <span class="type-desc">所有模型默认可用,支持筛选、排序、字段、行高和列宽。</span>
+                  <span class="muted">无需额外字段</span>
+                </button>
+                <button class="type-card degraded" data-type="kanban">
+                  <span class="type-top"><span class="type-title">看板</span><span class="pill warn">可创建</span></span>
+                  <span class="type-desc">检测到“项目状态”字段,但未配置状态更新命令。</span>
+                  <span class="muted">拖拽将被禁用</span>
+                </button>
+                <button class="type-card blocked" data-type="gantt">
+                  <span class="type-top"><span class="type-title">甘特图</span><span class="pill bad">需补字段</span></span>
+                  <span class="type-desc">缺少结束日期字段,无法稳定渲染任务区间。</span>
+                  <span class="muted">不可保存 blocked 视图</span>
+                </button>
+                <button class="type-card" data-type="calendar">
+                  <span class="type-top"><span class="type-title">日历</span><span class="pill ok">可用</span></span>
+                  <span class="type-desc">可用“预计完成日期”作为日期字段,支持月/周视图。</span>
+                  <span class="muted">推荐配置颜色字段</span>
+                </button>
+                <button class="type-card blocked" data-type="gallery">
+                  <span class="type-top"><span class="type-title">画册</span><span class="pill bad">不适合</span></span>
+                  <span class="type-desc">当前模型没有图片、附件或头像字段。</span>
+                  <span class="muted">建议继续使用表格</span>
+                </button>
+                <button class="type-card blocked" data-type="tree">
+                  <span class="type-top"><span class="type-title">树视图</span><span class="pill bad">不适合</span></span>
+                  <span class="type-desc">当前模型没有 parentId、path 或 level 字段。</span>
+                  <span class="muted">不创建半配置视图</span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <aside class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title" id="configTitle">表格配置</div>
+                <div class="panel-subtitle" id="configSubtitle">默认视图无需能力补齐</div>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="form-grid" id="configForm">
+                <label class="label">视图名称</label>
+                <input class="field" value="我的表格视图">
+                <label class="label">保存位置</label>
+                <div class="field disabled">我的视图 · 当前用户 · 6/10</div>
+                <label class="label">默认行高</label>
+                <select class="field">
+                  <option>标准 40px</option>
+                  <option>紧凑 32px</option>
+                  <option>宽松 56px</option>
+                </select>
+              </div>
+              <div class="divider"></div>
+              <div class="callout" id="configCallout">这个视图会保存为个人视图,只影响当前用户。团队共享和全员视图属于后续路线。</div>
+              <div class="divider"></div>
+              <div class="top-actions">
+                <button class="btn">取消</button>
+                <button class="btn primary" id="createSaveBtn">保存视图</button>
+              </div>
+            </div>
+          </aside>
         </div>
-        <div class="section">
-          <p class="section-title">审计</p>
-          <div class="view-row">
-            <div class="view-meta"><div class="view-name">UPDATE · Alice</div><div class="view-sub">viewConfig · 2026-06-22 14:05</div></div>
-          </div>
+      </section>
+
+      <section class="scene" id="scene-share">
+        <div class="grid two">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">后续路线:团队/全员视图</div>
+                <div class="panel-subtitle">本期不开发,不进入 Personal-only 验收</div>
+              </div>
+              <span class="scope warning">后续</span>
+            </div>
+            <div class="panel-body">
+              <div class="callout warning">
+                团队共享、全员视图、协作者和审计仍是长期方向,但当前 release 只做个人视图。这里用于说明未来边界,不是本期可点击链路。
+              </div>
+              <div class="divider"></div>
+              <table class="permission-table">
+                <thead><tr><th>未来能力</th><th>底层依赖</th><th>进入条件</th></tr></thead>
+                <tbody>
+                  <tr><td>团队视图</td><td>`ab_team` / `ab_team_member`</td><td>重新打开团队 scope 文档和 E2E 矩阵</td></tr>
+                  <tr><td>全员视图</td><td>全局管理权限</td><td>明确全员发布、锁定和回滚策略</td></tr>
+                  <tr><td>协作者</td><td>principal pid / ACL</td><td>完成用户、团队、角色 principal 合同</td></tr>
+                  <tr><td>共享审计</td><td>audit event pid-only</td><td>保存 diff、actor、scope 都能在 UI 中解释</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <aside class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">本期不做什么</div>
+                <div class="panel-subtitle">防止后续开发误把 roadmap 当 P0</div>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="insight-list">
+                <div class="insight"><strong>不展示团队分组</strong><span class="muted">当前 selector 只展示“我的视图”,不展示团队共享或全员预置。</span></div>
+                <div class="insight"><strong>不保存共享源</strong><span class="muted">所有保存动作只写入当前用户个人视图,不会影响其他人。</span></div>
+                <div class="insight"><strong>不做协作者</strong><span class="muted">添加/移除协作者、权限矩阵和共享 audit 不进入本期。</span></div>
+                <div class="insight"><strong>不验收 team/global 20</strong><span class="muted">本期只验收 personal 10 的配额和禁用状态。</span></div>
+              </div>
+              <div class="divider"></div>
+              <div class="top-actions">
+                <button class="btn primary" data-switch="manage">返回个人管理中心</button>
+                <button class="btn" data-switch="create">新建个人视图</button>
+              </div>
+              <p class="footer-note">后续若恢复团队/全员能力,必须重新补 mockup、baseline、FEATURE_MATRIX 和浏览器截图。</p>
+            </div>
+          </aside>
         </div>
-      </aside>
-    </main>
-  </div>
+      </section>
+
+      <section class="scene" id="scene-quality">
+        <div class="grid two">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">甘特视图数据诊断</div>
+                <div class="panel-subtitle">数据不支撑时不进入空白图,先解释原因</div>
+              </div>
+              <span class="pill bad">blocked</span>
+            </div>
+            <div class="panel-body">
+              <div class="metric-row">
+                <div class="metric"><div class="metric-label">总记录</div><div class="metric-value">80</div></div>
+                <div class="metric"><div class="metric-label">可渲染</div><div class="metric-value bad">12</div></div>
+                <div class="metric"><div class="metric-label">缺结束日期</div><div class="metric-value warn">48</div></div>
+                <div class="metric"><div class="metric-label">日期无效</div><div class="metric-value bad">9</div></div>
+              </div>
+              <div class="divider"></div>
+              <div class="bar" aria-label="可渲染比例"><span class="warn" style="width:15%"></span></div>
+              <p class="footer-note">只有 15% 记录可渲染。默认显示诊断态,不强行渲染缺失严重的甘特图。</p>
+              <div class="divider"></div>
+              <table class="issue-table">
+                <thead><tr><th>问题</th><th>影响</th><th>建议动作</th></tr></thead>
+                <tbody>
+                  <tr><td>缺少结束日期字段</td><td>48 条记录无法计算区间</td><td>返回表格补齐字段,或改用日历视图</td></tr>
+                  <tr><td>结束早于开始</td><td>9 条记录显示异常</td><td>筛选异常记录批量修正</td></tr>
+                  <tr><td>无日期编辑权限</td><td>11 条记录不可拖动调整</td><td>只读渲染,隐藏拖拽手柄</td></tr>
+                </tbody>
+              </table>
+              <div class="divider"></div>
+              <div class="top-actions">
+                <button class="btn primary">筛选不可渲染记录</button>
+                <button class="btn">返回表格补字段</button>
+              </div>
+            </div>
+          </section>
+
+          <aside class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">降级预览</div>
+                <div class="panel-subtitle">看板可读但拖拽关闭,甘特只展示有效记录</div>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="callout warning">
+                看板没有配置 `dragCommandCode`,卡片拖动已关闭。用户仍可查看分栏,不会误以为拖动能改变状态。
+              </div>
+              <div class="divider"></div>
+              <div class="preview-frame">
+                <div class="mini-gantt">
+                  <div class="gantt-line"><div class="gantt-label">ERP 升级</div><div class="timeline"><span style="left:8%;width:42%"></span></div></div>
+                  <div class="gantt-line"><div class="gantt-label">采购平台</div><div class="timeline"><span class="green" style="left:24%;width:35%"></span></div></div>
+                  <div class="gantt-line"><div class="gantt-label">私有化部署</div><div class="timeline"><span class="amber" style="left:50%;width:28%"></span></div></div>
+                  <div class="gantt-line"><div class="gantt-label muted">缺结束日期</div><div class="timeline"></div></div>
+                </div>
+              </div>
+              <p class="footer-note">诊断结果会写入 capability response:`available / degraded / blocked + reasons`,前端只展示后端声明的可行动作。</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast">
+  <strong id="toastTitle">已完成</strong>
+  <div class="muted" id="toastText">操作已记录。</div>
+</div>
+
+<script>
+  const scenes = document.querySelectorAll(".scene");
+  const sceneButtons = document.querySelectorAll(".seg-btn");
+  const switchButtons = document.querySelectorAll("[data-switch]");
+  const toast = document.getElementById("toast");
+  const toastTitle = document.getElementById("toastTitle");
+  const toastText = document.getElementById("toastText");
+  const configTitle = document.getElementById("configTitle");
+  const configSubtitle = document.getElementById("configSubtitle");
+  const configForm = document.getElementById("configForm");
+  const configCallout = document.getElementById("configCallout");
+  const createSaveBtn = document.getElementById("createSaveBtn");
+  const viewTrigger = document.getElementById("viewTrigger");
+  const viewMenu = document.getElementById("viewMenu");
+
+  function showScene(name) {
+    scenes.forEach(scene => scene.classList.toggle("active", scene.id === "scene-" + name));
+    sceneButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.scene === name));
+  }
+
+  function showToast(title, text) {
+    toastTitle.textContent = title;
+    toastText.textContent = text;
+    toast.classList.add("show");
+    window.clearTimeout(showToast.timer);
+    showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2600);
+  }
+
+  sceneButtons.forEach(btn => btn.addEventListener("click", () => showScene(btn.dataset.scene)));
+  switchButtons.forEach(btn => btn.addEventListener("click", () => {
+    showScene(btn.dataset.switch);
+    closeViewMenu();
+  }));
+
+  function openViewMenu() {
+    viewMenu.classList.add("open");
+    viewTrigger.classList.add("open");
+    viewTrigger.setAttribute("aria-expanded", "true");
+  }
+
+  function closeViewMenu() {
+    viewMenu.classList.remove("open");
+    viewTrigger.classList.remove("open");
+    viewTrigger.setAttribute("aria-expanded", "false");
+  }
+
+  viewTrigger.addEventListener("click", event => {
+    event.stopPropagation();
+    if (viewMenu.classList.contains("open")) closeViewMenu();
+    else openViewMenu();
+  });
+
+  viewMenu.addEventListener("click", event => event.stopPropagation());
+  document.addEventListener("click", closeViewMenu);
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeViewMenu();
+  });
+
+  document.querySelectorAll(".view-option").forEach(option => {
+    option.addEventListener("click", () => {
+      document.querySelectorAll(".view-option").forEach(item => item.classList.remove("selected"));
+      option.classList.add("selected");
+      document.querySelector(".view-label").textContent = option.dataset.viewName;
+      closeViewMenu();
+      showToast("已切换视图", option.dataset.viewName + " 已成为当前视图。");
+    });
+  });
+
+  document.getElementById("copyPersonalBtn").addEventListener("click", () => {
+    showToast("已另存为新视图", "当前本地变更已保存到新的个人视图。");
+  });
+  document.getElementById("copyFromMenuBtn").addEventListener("click", () => {
+    closeViewMenu();
+    showToast("已另存为新视图", "当前筛选、字段和列宽已保存到新的个人视图。");
+  });
+  document.getElementById("discardBtn").addEventListener("click", () => {
+    document.getElementById("dirtyBar").style.display = "none";
+    showToast("已放弃本地变更", "页面恢复到当前个人视图配置。");
+  });
+
+  const configs = {
+    table: {
+      title: "表格配置",
+      subtitle: "默认视图无需能力补齐",
+      html: `
+        <label class="label">视图名称</label>
+        <input class="field" value="我的表格视图">
+        <label class="label">保存位置</label>
+        <div class="field disabled">我的视图 · 当前用户 · 6/10</div>
+        <label class="label">默认行高</label>
+        <select class="field"><option>标准 40px</option><option>紧凑 32px</option><option>宽松 56px</option></select>`,
+      callout: "这个视图会保存为个人视图,只影响当前用户。团队共享和全员视图属于后续路线。",
+      disabled: false
+    },
+    kanban: {
+      title: "看板配置",
+      subtitle: "可渲染,但拖拽能力降级",
+      html: `
+        <label class="label">分组字段</label>
+        <select class="field"><option>项目状态 · enum/status</option></select>
+        <label class="label">卡片标题</label>
+        <select class="field"><option>项目名称</option></select>
+        <label class="label">拖拽命令</label>
+        <div class="field disabled">未配置 dragCommandCode</div>`,
+      callout: "可以创建只读看板。因为没有状态更新命令,卡片拖拽会禁用并显示解释。",
+      disabled: false
+    },
+    gantt: {
+      title: "甘特图配置",
+      subtitle: "blocked:缺少结束日期字段",
+      html: `
+        <label class="label">开始日期</label>
+        <select class="field"><option>预计启动日期</option></select>
+        <label class="label">结束日期</label>
+        <div class="field disabled">没有可用 date/datetime 字段</div>
+        <label class="label">标题字段</label>
+        <select class="field"><option>项目名称</option></select>`,
+      callout: "缺少结束日期字段,无法创建甘特图。请先在模型中添加日期字段,或改用表格/日历视图。",
+      disabled: true
+    },
+    calendar: {
+      title: "日历配置",
+      subtitle: "available:可用日期字段已检测",
+      html: `
+        <label class="label">日期字段</label>
+        <select class="field"><option>预计完成日期</option></select>
+        <label class="label">标题字段</label>
+        <select class="field"><option>项目名称</option></select>
+        <label class="label">颜色字段</label>
+        <select class="field"><option>项目状态</option></select>`,
+      callout: "日历视图可创建。结束时间字段可选,未配置时按全天事件展示。",
+      disabled: false
+    },
+    gallery: {
+      title: "画册配置",
+      subtitle: "blocked:缺少图片/附件字段",
+      html: `
+        <label class="label">封面字段</label>
+        <div class="field disabled">没有 image/file/avatar 字段</div>
+        <label class="label">标题字段</label>
+        <select class="field"><option>项目名称</option></select>`,
+      callout: "当前模型不适合画册视图。系统不会创建进入后空白的半配置视图。",
+      disabled: true
+    },
+    tree: {
+      title: "树视图配置",
+      subtitle: "blocked:缺少层级结构字段",
+      html: `
+        <label class="label">父级字段</label>
+        <div class="field disabled">没有 parentId/path/level 字段</div>
+        <label class="label">标题字段</label>
+        <select class="field"><option>项目名称</option></select>`,
+      callout: "当前模型没有树结构字段。请先扩展模型,或继续使用表格视图。",
+      disabled: true
+    }
+  };
+
+  document.querySelectorAll(".type-card").forEach(card => {
+    card.addEventListener("click", () => {
+      document.querySelectorAll(".type-card").forEach(item => item.classList.remove("selected"));
+      card.classList.add("selected");
+      const config = configs[card.dataset.type];
+      configTitle.textContent = config.title;
+      configSubtitle.textContent = config.subtitle;
+      configForm.innerHTML = config.html;
+      configCallout.textContent = config.callout;
+      configCallout.className = "callout" + (config.disabled ? " danger" : card.classList.contains("degraded") ? " warning" : "");
+      createSaveBtn.disabled = config.disabled;
+      createSaveBtn.textContent = config.disabled ? "不可保存" : "保存视图";
+    });
+  });
+
+  createSaveBtn.addEventListener("click", () => {
+    if (createSaveBtn.disabled) return;
+    showToast("视图已创建", "已通过 capability check,不会产生半配置 SavedView。");
+  });
+</script>
 </body>
 </html>

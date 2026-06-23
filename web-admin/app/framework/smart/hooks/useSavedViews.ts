@@ -24,6 +24,8 @@ export interface UseSavedViewsOptions {
   modelCode: string;
   /** Page key to filter views (optional) */
   pageKey?: string;
+  /** Optional scope filter for release-scoped user experiences */
+  scopeFilter?: ViewScope | 'all';
   /** Whether to automatically load views on mount (default: true) */
   autoLoad?: boolean;
 }
@@ -95,7 +97,7 @@ export interface UseSavedViewsResult {
  * });
  */
 export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResult {
-  const { modelCode, pageKey, autoLoad = true } = options;
+  const { modelCode, pageKey, scopeFilter = 'all', autoLoad = true } = options;
 
   const [views, setViews] = useState<SavedView[]>([]);
   const [currentView, setCurrentView] = useState<SavedView | null>(null);
@@ -122,12 +124,19 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
 
       if (!mountedRef.current) return;
 
-      setViews(accessibleViews);
+      const scopedViews =
+        scopeFilter === 'all'
+          ? accessibleViews
+          : accessibleViews.filter((view) => view.scope === scopeFilter);
+      const scopedDefaultView =
+        scopeFilter === 'all' || defaultView?.scope === scopeFilter ? defaultView : null;
+
+      setViews(scopedViews);
 
       const preservedView = selectedViewPidRef.current
-        ? accessibleViews.find((view) => view.pid === selectedViewPidRef.current)
+        ? scopedViews.find((view) => view.pid === selectedViewPidRef.current)
         : undefined;
-      const nextView = preservedView ?? defaultView ?? accessibleViews[0] ?? null;
+      const nextView = preservedView ?? scopedDefaultView ?? scopedViews[0] ?? null;
       selectedViewPidRef.current = nextView?.pid ?? null;
       setCurrentView(nextView);
     } catch (err) {
@@ -139,7 +148,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
         setLoading(false);
       }
     }
-  }, [modelCode, pageKey]);
+  }, [modelCode, pageKey, scopeFilter]);
 
   /**
    * Select a view by PID

@@ -163,14 +163,14 @@ test.describe('DataLimitBanner', () => {
       // Verify the banner text contains the "Showing X of Y records" pattern
       const text = await banner.innerText();
       expect(text).toMatch(/Showing \d+ of \d+ records/);
-      // Verify "Switch to Table view" link is present
-      const switchBtn = banner.locator('button', { hasText: /Switch to Table/i });
+      // Verify the "switch to table" link is present
+      const switchBtn = banner.locator('button', { hasText: /切换到表格/i });
       await expect(switchBtn).toBeVisible();
     }
     // If not visible, totalCount <= fetchedCount — that's valid behavior
   });
 
-  test('DLB-003: "Switch to Table" link in banner switches back to table view', async ({
+  test('DLB-003: data-limit banner switches back to table view', async ({
     page,
   }) => {
     await gotoOrderPage(page);
@@ -180,7 +180,7 @@ test.describe('DataLimitBanner', () => {
     const visible = await banner.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (visible) {
-      const switchBtn = banner.locator('button', { hasText: /Switch to Table/i });
+      const switchBtn = banner.locator('button', { hasText: /切换到表格/i });
       await expect(switchBtn).toBeVisible();
       await switchBtn.click();
 
@@ -377,12 +377,12 @@ test.describe('ViewDiagnostics', () => {
       // Verify diagnostics content structure
       await expect(diagnostics).toContainText(/records/i);
       // Should show total and valid record counts
-      await expect(diagnostics).toContainText(/Total records/i);
+      await expect(diagnostics).toContainText(/记录总数/);
       await expect(diagnostics).toContainText(/Valid records/i);
 
       // Should have action buttons
-      const configureBtn = diagnostics.locator('button', { hasText: 'Configure' });
-      const switchBtn = diagnostics.locator('button', { hasText: 'Switch to Table' });
+      const configureBtn = diagnostics.locator('button', { hasText: '配置' });
+      const switchBtn = diagnostics.locator('button', { hasText: '切换到表格' });
       const refreshBtn = diagnostics.locator('button', { hasText: 'Refresh' });
 
       // At least one action button should be present

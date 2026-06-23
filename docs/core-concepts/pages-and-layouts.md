@@ -864,7 +864,45 @@ There are no `page_type`, `page_category`, or `dsl_schema` columns.
 
 ## Saved Views
 
-A **SavedView** (`ab_saved_view`) stores a user-configured column/sort/filter/density preset for a specific page. Users can name and share these presets as "personal", "team", or "global" views.
+A **SavedView** (`ab_saved_view`) 保存某个页面上的用户视图状态，包括列、排序、筛选、密度和视图类型配置。
+
+截至 2026-06-23 Personal-only release baseline，OSS 列表页 UI 只验收个人视图：
+
+- SavedView 主入口固定在页面标题旁。
+- "我的记录"、"今日新建"、"本周修改" 等日常快捷筛选保留在列表工具栏，并且可以另存为个人视图。
+- 个人视图支持新建、切换、保存当前变更、另存为新视图、重命名、复制、删除、设为默认。
+- 当前可见配额是个人 `10/10`；达到上限后禁用新建个人视图，并提示用户清理已有视图。
+- 高级视图类型必须经过 capability gate。`blocked` 视图不能保存；`degraded` 视图保存前必须解释限制。
+
+后端模型和历史 API 契约仍可能保留 `team`、`global` scope，用于后续共享视图路线；但它们不属于当前 OSS Personal-only UI 验收面。重新引入团队/全员视图时，必须单独开 scope 文档、mockup 和 E2E 矩阵。
+
+### 隐藏 SavedView 入口
+
+当页面不是日常记录工作台时，例如平台元数据页面、或者不加载列表数据的页面，可以隐藏 SavedView UI。
+
+当前支持两个开关：
+
+```ts
+const listExtensions = {
+  hideSavedViews: true,
+  hideQuickFilters: true,
+};
+```
+
+```json
+{
+  "extension": {
+    "hideSavedViews": true,
+    "hideQuickFilters": true
+  }
+}
+```
+
+`hideSavedViews: true` 会隐藏标题旁 SavedView selector，并停止当前列表页的 SavedView 自动加载。由于 selector 不渲染，普通用户也不会看到新建、管理、配置入口。
+
+`hideQuickFilters: true` 是独立开关。"我的记录"、"今日新建"、"本周修改" 等快捷筛选位于列表工具栏，不会因为 `hideSavedViews` 自动隐藏。
+
+这是整页 SavedView 入口开关，不是只读模式。当前平台还没有独立支持"保留视图切换，但隐藏新建/管理/配置"；如果页面需要这种行为，应新增专门能力开关，不要复用 `hideSavedViews`。
 
 ### pageKey contract
 

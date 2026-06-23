@@ -93,9 +93,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         style={{ minHeight: 400 }}
       >
         <div className="text-center text-gray-500">
-          <div className="mb-2 text-lg">Kanban not configured</div>
+          <div className="mb-2 text-lg">看板视图未配置</div>
           <div className="text-sm">
-            Please configure the Group By field and Title field to display the Kanban board.
+            请配置分组字段和标题字段后再显示看板。
           </div>
         </div>
       </div>

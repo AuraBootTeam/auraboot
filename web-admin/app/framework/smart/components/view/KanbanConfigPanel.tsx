@@ -118,14 +118,14 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
       {/* Group By Field (required) */}
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
-          Group By Field <span className="text-red-500">*</span>
+          分组字段 <span className="text-red-500">*</span>
         </label>
         <select
           value={viewConfig.groupByField || ''}
           onChange={(e) => updateConfig({ groupByField: e.target.value })}
           className={selectClassName}
         >
-          <option value="">Select field...</option>
+          <option value="">选择字段...</option>
           {fields.map((f) => (
             <option key={f.code} value={f.code}>
               {f.name} ({f.dataType})
@@ -133,21 +133,21 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
           ))}
         </select>
         <p className="mt-1 text-xs text-gray-500">
-          Cards will be grouped into columns by this field value.
+          看板卡片会按这个字段的取值分组。
         </p>
       </div>
 
       {/* Title Field (required) */}
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
-          Title Field <span className="text-red-500">*</span>
+          标题字段 <span className="text-red-500">*</span>
         </label>
         <select
           value={viewConfig.titleField || ''}
           onChange={(e) => updateConfig({ titleField: e.target.value })}
           className={selectClassName}
         >
-          <option value="">Select field...</option>
+          <option value="">选择字段...</option>
           {fields.map((f) => (
             <option key={f.code} value={f.code}>
               {f.name}
@@ -158,7 +158,7 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
 
       {/* Description Field (optional) */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Description Field</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">描述字段</label>
         <select
           value={viewConfig.descriptionField || ''}
           onChange={(e) =>
@@ -168,7 +168,7 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
           }
           className={selectClassName}
         >
-          <option value="">None</option>
+          <option value="">不显示</option>
           {fields.map((f) => (
             <option key={f.code} value={f.code}>
               {f.name}
@@ -180,13 +180,13 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
       {/* Card Fields */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700">Card Fields</label>
+          <label className="text-sm font-medium text-gray-700">卡片字段</label>
           <button
             type="button"
             onClick={handleAddCardField}
             className="text-sm text-blue-600 hover:text-blue-700"
           >
-            + Add Field
+            + 添加字段
           </button>
         </div>
         {(viewConfig.cardFields || []).map((cf, index) => (
@@ -196,7 +196,7 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
               onChange={(e) => handleUpdateCardField(index, { field: e.target.value })}
               className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
             >
-              <option value="">Select field...</option>
+              <option value="">选择字段...</option>
               {fields.map((f) => (
                 <option key={f.code} value={f.code}>
                   {f.name}
@@ -208,17 +208,17 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
               onChange={(e) => handleUpdateCardField(index, { type: e.target.value })}
               className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
             >
-              <option value="text">Text</option>
-              <option value="number">Number</option>
-              <option value="date">Date</option>
-              <option value="tag">Tag</option>
-              <option value="avatar">Avatar</option>
+              <option value="text">文本</option>
+              <option value="number">数字</option>
+              <option value="date">日期</option>
+              <option value="tag">标签</option>
+              <option value="avatar">头像</option>
             </select>
             <button
               type="button"
               onClick={() => handleRemoveCardField(index)}
               className="p-1.5 text-gray-400 hover:text-red-500"
-              title="Remove"
+              title="移除"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -236,13 +236,13 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
       {/* Aggregations */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700">Column Aggregations</label>
+          <label className="text-sm font-medium text-gray-700">列聚合</label>
           <button
             type="button"
             onClick={handleAddAggregation}
             className="text-sm text-blue-600 hover:text-blue-700"
           >
-            + Add Aggregation
+            + 添加聚合
           </button>
         </div>
         {(viewConfig.kanbanAggregations || []).map((agg, index) => (
@@ -252,7 +252,7 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
               onChange={(e) => handleUpdateAggregation(index, { field: e.target.value })}
               className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
             >
-              <option value="">Select field...</option>
+              <option value="">选择字段...</option>
               {fields
                 .filter(
                   (f) =>
@@ -275,17 +275,17 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
               }
               className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
             >
-              <option value="count">Count</option>
-              <option value="sum">Sum</option>
-              <option value="avg">Avg</option>
-              <option value="min">Min</option>
-              <option value="max">Max</option>
+              <option value="count">计数</option>
+              <option value="sum">求和</option>
+              <option value="avg">平均值</option>
+              <option value="min">最小值</option>
+              <option value="max">最大值</option>
             </select>
             <button
               type="button"
               onClick={() => handleRemoveAggregation(index)}
               className="p-1.5 text-gray-400 hover:text-red-500"
-              title="Remove"
+              title="移除"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -309,7 +309,7 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
             onChange={(e) => updateConfig({ draggable: e.target.checked })}
             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm text-gray-700">Enable drag & drop</span>
+          <span className="text-sm text-gray-700">启用拖拽</span>
         </label>
         <label className="flex cursor-pointer items-center gap-3">
           <input
@@ -318,7 +318,7 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
             onChange={(e) => updateConfig({ showCount: e.target.checked })}
             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm text-gray-700">Show card count</span>
+          <span className="text-sm text-gray-700">显示卡片数量</span>
         </label>
         <label className="flex cursor-pointer items-center gap-3">
           <input
@@ -327,7 +327,7 @@ export const KanbanConfigPanel: React.FC<KanbanConfigPanelProps> = ({
             onChange={(e) => updateConfig({ showAggregations: e.target.checked })}
             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm text-gray-700">Show aggregation values</span>
+          <span className="text-sm text-gray-700">显示聚合值</span>
         </label>
       </div>
     </div>
