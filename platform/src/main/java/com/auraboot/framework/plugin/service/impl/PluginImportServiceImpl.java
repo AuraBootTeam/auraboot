@@ -6,6 +6,8 @@ import com.auraboot.framework.i18n.service.I18nResourceService;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.notification.entity.NotificationTemplate;
 import com.auraboot.framework.notification.mapper.NotificationTemplateMapper;
+import com.auraboot.framework.meta.entity.PageSchema;
+import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.view.entity.SavedView;
 import com.auraboot.framework.view.entity.ViewConfig;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
@@ -98,6 +100,8 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final MetaModelService metaModelService;
     private final com.auraboot.framework.meta.service.MetaFieldService metaFieldService;
     private final com.auraboot.framework.meta.service.CommandService commandService;
+    private final com.auraboot.framework.meta.service.FieldMaskService fieldMaskService;
+    private final com.auraboot.framework.permission.capability.CapabilityRegistryService capabilityRegistryService;
     private final SchemaManagementService schemaManagementService;
     private final PermissionService permissionService;
     private final UserPermissionService userPermissionService;
@@ -113,6 +117,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final PluginQualityScorer qualityScorer;
     private final com.auraboot.framework.plugin.validation.PageSchemaImportGate pageSchemaImportGate;
     private final SavedViewMapper savedViewMapper;
+    private final PageSchemaMapper pageSchemaMapper;
     private final NotificationTemplateMapper notificationTemplateMapper;
     private final AutoPermissionAssignmentService autoPermissionAssignmentService;
     private final ApplicationEventPublisher applicationEventPublisher;
@@ -419,6 +424,22 @@ public class PluginImportServiceImpl implements PluginImportService {
                 List<RoleDefinitionDTO> roles = loadResourceListFromZip(files, resourceDirs.get("roles"), RoleDefinitionDTO.class);
                 if (!roles.isEmpty()) {
                     manifest.setRoles(mergeResourceList(manifest.getRoles(), roles));
+                }
+            }
+
+            // Load field masks
+            if (resourceDirs.containsKey("fieldMasks")) {
+                List<FieldMaskDefinitionDTO> fieldMasks = loadResourceListFromZip(files, resourceDirs.get("fieldMasks"), FieldMaskDefinitionDTO.class);
+                if (!fieldMasks.isEmpty()) {
+                    manifest.setFieldMasks(mergeResourceList(manifest.getFieldMasks(), fieldMasks));
+                }
+            }
+
+            // Load capabilities
+            if (resourceDirs.containsKey("capabilities")) {
+                List<CapabilityDefinitionDTO> capabilities = loadResourceListFromZip(files, resourceDirs.get("capabilities"), CapabilityDefinitionDTO.class);
+                if (!capabilities.isEmpty()) {
+                    manifest.setCapabilities(mergeResourceList(manifest.getCapabilities(), capabilities));
                 }
             }
 
@@ -953,7 +974,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             for (SavedViewDefinitionDTO savedView : manifest.getSavedViews()) {
                 List<SavedView> existingViews = savedViewMapper.findGlobalViews(savedView.getModelCode(), savedView.getPageKey());
                 boolean exists = existingViews.stream()
-                        .anyMatch(v -> v.getName().equals(savedView.getName()) && v.getViewType().equals(savedView.getViewType()));
+                        .anyMatch(v -> matchesPluginSavedView(savedView, v));
                 result.addChange(ResourceType.SAVED_VIEW, ImportPreviewResult.ResourceChange.builder()
                         .resourceType(ResourceType.SAVED_VIEW)
                         .resourceCode(savedView.getUniqueKey())
@@ -1480,6 +1501,8 @@ public class PluginImportServiceImpl implements PluginImportService {
         // PluginResource / ResourceType to avoid enum/DB check-constraint churn).
         importRules(manifest);
         importSlaConfigs(manifest);
+        importFieldMasks(manifest);
+        importCapabilities(manifest);
 
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
         autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace(), tenantId);
@@ -1693,6 +1716,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             }
         }
 
+        generatePermissionI18nRecords(manifest.getPermissions(), tenantId);
         bindImportedPermissionsToTenantAdmin(manifest.getPermissions(), tenantId);
     }
 
@@ -1835,6 +1859,43 @@ public class PluginImportServiceImpl implements PluginImportService {
             i18nService.clearCache(null);
             log.info("Auto-generated {} menu i18n records from localized names", count);
         }
+    }
+
+    /**
+     * Auto-generate i18n records for permissions from their localized name/description fields.
+     * Key format: permission.{CODE} (name) and permission.{CODE}.description (description),
+     * matching frontend consumption in routes/enterprise/permission (PermissionTree/PermissionTab).
+     */
+    private void generatePermissionI18nRecords(List<PermissionDefinitionDTO> permissions, Long tenantId) {
+        List<I18nResource> resources = new ArrayList<>();
+        for (PermissionDefinitionDTO permission : permissions) {
+            if (permission.getCode() == null || permission.getCode().isBlank()) continue;
+            String nameKey = "permission." + permission.getCode();
+            for (Map.Entry<String, String> entry : permission.getAllLocalizedNames().entrySet()) {
+                resources.add(buildImportI18nResource(nameKey, entry.getKey(), entry.getValue(), "permission"));
+            }
+            String descKey = "permission." + permission.getCode() + ".description";
+            for (Map.Entry<String, String> entry : permission.getAllLocalizedDescriptions().entrySet()) {
+                resources.add(buildImportI18nResource(descKey, entry.getKey(), entry.getValue(), "permission"));
+            }
+        }
+
+        if (!resources.isEmpty()) {
+            int count = i18nResourceService.batchUpsert(resources);
+            i18nService.clearCache(null);
+            log.info("Auto-generated {} permission i18n records from localized names/descriptions", count);
+        }
+    }
+
+    private I18nResource buildImportI18nResource(String i18nKey, String lang, String value, String refType) {
+        I18nResource res = new I18nResource();
+        res.setI18nKey(i18nKey);
+        res.setLang(lang);
+        res.setValue(value);
+        res.setSource(I18nResource.SOURCE_IMPORT);
+        res.setRefType(refType);
+        res.setStatus(I18nResource.STATUS_APPROVED);
+        return res;
     }
 
     /**
@@ -2138,6 +2199,63 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
     }
 
+    /**
+     * Import field-mask declarations (config/fieldMasks.json) into ab_field_mask_config. Upserts by
+     * (tenant, model, field) via FieldMaskService.saveConfig, so re-import is additive/idempotent.
+     */
+    private void importFieldMasks(PluginManifestExtended manifest) {
+        if (manifest.getFieldMasks() == null || manifest.getFieldMasks().isEmpty()) return;
+        int created = 0;
+        for (FieldMaskDefinitionDTO dto : manifest.getFieldMasks()) {
+            if (!dto.isValid()) {
+                log.warn("Skipping invalid field-mask config (missing modelCode/fieldCode/maskType): index={}",
+                        manifest.getFieldMasks().indexOf(dto));
+                continue;
+            }
+            com.auraboot.framework.meta.entity.FieldMaskConfig config =
+                    new com.auraboot.framework.meta.entity.FieldMaskConfig();
+            config.setModelCode(dto.getModelCode());
+            config.setFieldCode(dto.getFieldCode());
+            config.setMaskType(dto.getMaskType());
+            config.setMaskPattern(dto.getMaskPattern());
+            if (dto.getReplacementChar() != null) {
+                config.setReplacementChar(dto.getReplacementChar());
+            }
+            config.setApplyToList(dto.getApplyToList());
+            config.setApplyToDetail(dto.getApplyToDetail());
+            config.setApplyToExport(dto.getApplyToExport());
+            config.setEnabled(dto.getEnabled());
+            config.setExemptRoles(dto.getExemptRoles());
+            config.setExemptPermissionCodes(dto.getExemptPermissionCodes());
+            fieldMaskService.saveConfig(config);
+            created++;
+        }
+        if (created > 0) {
+            log.info("Imported {} field-mask config(s) for plugin {}", created, logSafe(manifest.getPluginId()));
+        }
+    }
+
+    /**
+     * Import capability declarations (config/capabilities.json) into ab_capability via the
+     * capability registry. Upserts by (tenant, code), so re-import is additive/idempotent.
+     */
+    private void importCapabilities(PluginManifestExtended manifest) {
+        if (manifest.getCapabilities() == null || manifest.getCapabilities().isEmpty()) return;
+        int created = 0;
+        for (CapabilityDefinitionDTO dto : manifest.getCapabilities()) {
+            if (!dto.isValid()) {
+                log.warn("Skipping invalid capability (missing code/includes): index={}",
+                        manifest.getCapabilities().indexOf(dto));
+                continue;
+            }
+            capabilityRegistryService.saveDefinition(dto);
+            created++;
+        }
+        if (created > 0) {
+            log.info("Imported {} capability declaration(s) for plugin {}", created, logSafe(manifest.getPluginId()));
+        }
+    }
+
     private void importI18nResources(PluginManifestExtended manifest, ImportExecuteResult result, Long tenantId) {
         if (manifest.getI18nResources() == null || manifest.getI18nResources().isEmpty()) return;
 
@@ -2182,18 +2300,35 @@ public class PluginImportServiceImpl implements PluginImportService {
             String scope = dto.getScope() != null ? dto.getScope() : "global";
             String pageKey = dto.getPageKey();
 
-            // Check if a view with same name+modelCode+viewType+scope already exists
+            // Validate pageKey references an existing page in ab_page_schema.
+            // A SavedView with a dangling pageKey will be permanently invisible to users
+            // because useSavedViews does a strict-equals match on pageKey.
+            if (pageKey != null && !pageKey.isBlank()) {
+                PageSchema page = pageSchemaMapper.selectAnyByPageKey(pageKey);
+                if (page == null) {
+                    String msg = "[S-SAVED-VIEW] pageKey '" + logSafe(pageKey) + "' does not exist in ab_page_schema; "
+                            + "define it as config/pages/" + logSafe(pageKey) + ".json in your plugin before declaring a SavedView";
+                    log.warn("Skipping saved view '{}': {}", logSafe(dto.getName()), msg);
+                    result.addWarning(msg);
+                    continue;
+                }
+            }
+
+            // Check if a plugin preset already exists. Stable viewKey takes precedence
+            // so plugin upgrades can rename presets without creating duplicates.
             List<SavedView> existing = savedViewMapper.findGlobalViews(dto.getModelCode(), pageKey);
             SavedView existingView = existing.stream()
-                    .filter(v -> v.getName().equals(dto.getName()) && v.getViewType().equals(dto.getViewType()))
+                    .filter(v -> matchesPluginSavedView(dto, v))
                     .findFirst()
                     .orElse(null);
 
             if (existingView != null) {
                 // Update existing view config
-                ViewConfig viewConfig = objectMapper.convertValue(dto.getViewConfig(), ViewConfig.class);
+                ViewConfig viewConfig = buildPluginSavedViewConfig(dto);
+                existingView.setName(dto.getName());
                 existingView.setViewConfig(viewConfig);
                 existingView.setDescription(dto.getDescription());
+                existingView.setViewType(dto.getViewType());
                 existingView.setUpdatedAt(Instant.now());
                 if (dto.getIsDefault() != null) existingView.setIsDefault(dto.getIsDefault());
                 if (dto.getSortOrder() != null) existingView.setSortOrder(dto.getSortOrder());
@@ -2211,7 +2346,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 savedView.setPageKey(pageKey);
                 savedView.setScope(scope);
                 savedView.setViewType(dto.getViewType());
-                ViewConfig viewConfig = objectMapper.convertValue(dto.getViewConfig(), ViewConfig.class);
+                ViewConfig viewConfig = buildPluginSavedViewConfig(dto);
                 savedView.setViewConfig(viewConfig);
                 savedView.setIsDefault(dto.getIsDefault() != null ? dto.getIsDefault() : false);
                 savedView.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
@@ -2223,6 +2358,83 @@ public class PluginImportServiceImpl implements PluginImportService {
                 log.info("Created saved view: {} ({})", logSafe(dto.getName()), logSafe(dto.getViewType()));
             }
         }
+    }
+
+    private boolean matchesPluginSavedView(SavedViewDefinitionDTO dto, SavedView savedView) {
+        if (dto == null || savedView == null) {
+            return false;
+        }
+
+        String incomingKey = resolvePluginSavedViewKey(dto);
+        String existingKey = getSavedViewMetaKey(savedView);
+        if (!isBlank(incomingKey) && !isBlank(existingKey)) {
+            return Objects.equals(incomingKey, existingKey);
+        }
+
+        return Objects.equals(savedView.getName(), dto.getName())
+                && Objects.equals(savedView.getViewType(), dto.getViewType());
+    }
+
+    private ViewConfig buildPluginSavedViewConfig(SavedViewDefinitionDTO dto) {
+        Map<String, Object> rawConfig = dto.getViewConfig() != null ? dto.getViewConfig() : Collections.emptyMap();
+        ViewConfig viewConfig = objectMapper.convertValue(rawConfig, ViewConfig.class);
+        if (viewConfig == null) {
+            viewConfig = new ViewConfig();
+        }
+
+        ViewConfig.Meta incomingMeta = viewConfig.getMeta();
+        viewConfig.setMeta(ViewConfig.Meta.builder()
+                .viewKey(resolvePluginSavedViewKey(dto))
+                .managedBy(firstNonBlank(dto.getManagedBy(), incomingMeta != null ? incomingMeta.getManagedBy() : null, "plugin"))
+                .locked(firstNonNull(dto.getLocked(), incomingMeta != null ? incomingMeta.getLocked() : null, true))
+                .allowUserCopy(firstNonNull(dto.getAllowUserCopy(), incomingMeta != null ? incomingMeta.getAllowUserCopy() : null, true))
+                .allowUserOverride(firstNonNull(dto.getAllowUserOverride(), incomingMeta != null ? incomingMeta.getAllowUserOverride() : null, true))
+                .originViewPid(incomingMeta != null ? incomingMeta.getOriginViewPid() : null)
+                .capabilityStatus(incomingMeta != null ? incomingMeta.getCapabilityStatus() : null)
+                .build());
+        return viewConfig;
+    }
+
+    private String resolvePluginSavedViewKey(SavedViewDefinitionDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        if (!isBlank(dto.getViewKey())) {
+            return dto.getViewKey().trim();
+        }
+        return dto.getUniqueKey();
+    }
+
+    private String getSavedViewMetaKey(SavedView savedView) {
+        if (savedView == null || savedView.getViewConfig() == null || savedView.getViewConfig().getMeta() == null) {
+            return null;
+        }
+        return savedView.getViewConfig().getMeta().getViewKey();
+    }
+
+    @SafeVarargs
+    private final <T> T firstNonNull(T... values) {
+        if (values == null) {
+            return null;
+        }
+        for (T value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (!isBlank(value)) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     /**

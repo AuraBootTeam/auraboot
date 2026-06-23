@@ -76,7 +76,6 @@ describe('ActionRegistry record navigation', () => {
         method: 'post',
         params: {
           targetRecordPid: 'PUB-APP-001',
-          targetRecordId: 'PUB-APP-001',
           operationType: 'APPROVE',
           payload: {
             mkt_pa_review_notes: 'Looks ready',
@@ -85,6 +84,108 @@ describe('ActionRegistry record navigation', () => {
         token: undefined,
       },
     );
+  });
+});
+
+describe('ActionRegistry command.execute inputFields (command-form sugar)', () => {
+  it('pops a form (FormDialog) and merges collected values into the command payload', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { ok: true } });
+    // Simulate the user filling + submitting the FormDialog the action pops.
+    window.addEventListener(
+      'dialog:form',
+      (e) => (e as CustomEvent).detail.onSubmit({ cookies_json: '{"sid":"1"}' }),
+      { once: true },
+    );
+
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      args: {
+        command: 'cr_account:set_credential',
+        targetRecordId: 'A1',
+        operationType: 'update',
+        payload: { keep: 'me' },
+        inputFieldsTitle: 'Set Credential',
+        inputFields: [{ field: 'cookies_json', label: 'Cookies', type: 'textarea', required: true }],
+      },
+    });
+
+    expect(fetchResult).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/cr_account:set_credential',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          operationType: 'UPDATE',
+          payload: { keep: 'me', cookies_json: '{"sid":"1"}' },
+        }),
+      }),
+    );
+  });
+
+  it('aborts (does not submit the command) when the user cancels the form', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
+    window.addEventListener(
+      'dialog:form',
+      (e) => (e as CustomEvent).detail.onCancel(),
+      { once: true },
+    );
+
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      args: {
+        command: 'cr_account:set_credential',
+        targetRecordId: 'A1',
+        inputFields: [{ field: 'cookies_json', type: 'textarea', required: true }],
+      },
+    });
+
+    expect(fetchResult).not.toHaveBeenCalled();
+  });
+
+  it('is unchanged for commands without inputFields (backward compatible)', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
+
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      args: { command: 'x:do', targetRecordId: 'A1', payload: { a: 1 } },
+    });
+
+    expect(fetchResult).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/x:do',
+      expect.objectContaining({ params: expect.objectContaining({ payload: { a: 1 } }) }),
+    );
+  });
+});
+
+describe('ActionRegistry dialog.confirm', () => {
+  it('resolves object-form message to zh-CN string before passing to confirm dialog', async () => {
+    const confirm = vi.fn().mockResolvedValue(true);
+
+    await actionRegistry.execute('dialog.confirm', {
+      confirm,
+      args: {
+        message: {
+          'zh-CN': '确认应用此模板？这将在当前租户创建模板包含的模型与页面。',
+          'en-US': "Install this template? It will create the template's models and pages in your tenant.",
+        },
+      },
+    });
+
+    expect(confirm).toHaveBeenCalledWith({
+      content: '确认应用此模板？这将在当前租户创建模板包含的模型与页面。',
+    });
+  });
+
+  it('throws when user cancels (object-form message)', async () => {
+    const confirm = vi.fn().mockResolvedValue(false);
+
+    await expect(
+      actionRegistry.execute('dialog.confirm', {
+        confirm,
+        args: {
+          message: { 'zh-CN': '确认？', 'en-US': 'Confirm?' },
+        },
+      }),
+    ).rejects.toThrow('User cancelled');
   });
 });
 
@@ -101,5 +202,113 @@ describe('ActionRegistry refresh', () => {
 
     expect(reload).toHaveBeenCalledWith('ds_orders');
     expect(loadData).not.toHaveBeenCalled();
+  });
+});
+
+describe('ActionRegistry navigate / new / router.push handlers', () => {
+  it('navigate jumps to args.path', async () => {
+    const navigate = vi.fn();
+    await actionRegistry.execute('navigate', { navigate, args: { path: '/p/orders' } });
+    expect(navigate).toHaveBeenCalledWith('/p/orders');
+  });
+
+  it('navigate logs and is a no-op when the navigate fn is missing', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await actionRegistry.execute('navigate', { args: { path: '/p/orders' } });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('navigate logs and is a no-op when path is missing', async () => {
+    const navigate = vi.fn();
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await actionRegistry.execute('navigate', { navigate, args: {} });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('new jumps to the model new route', async () => {
+    const navigate = vi.fn();
+    await actionRegistry.execute('new', { navigate, tableName: 'sl_order' });
+    expect(navigate).toHaveBeenCalledWith('/p/sl_order/new');
+  });
+
+  it('new logs and is a no-op without tableName', async () => {
+    const navigate = vi.fn();
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await actionRegistry.execute('new', { navigate });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('router.push navigates to args.path', async () => {
+    const navigate = vi.fn();
+    await actionRegistry.execute('router.push', { navigate, args: { path: '/p/x' } });
+    expect(navigate).toHaveBeenCalledWith('/p/x');
+  });
+});
+
+describe('ActionRegistry search / reset / setState handlers', () => {
+  it('search resets to page 1 and reloads with the current filters', async () => {
+    const loadData = vi.fn();
+    const setPagination = vi.fn();
+    await actionRegistry.execute('search', {
+      loadData,
+      setPagination,
+      filters: { status: 'open' },
+    });
+    expect(loadData).toHaveBeenCalledWith({ page: 0, filters: { status: 'open' } });
+    const updater = setPagination.mock.calls[0][0];
+    expect(updater({ current: 5, pageSize: 10 })).toEqual({ current: 1, pageSize: 10 });
+  });
+
+  it('reset clears filters and reloads from page 1', async () => {
+    const loadData = vi.fn();
+    const setPagination = vi.fn();
+    const setFilters = vi.fn();
+    await actionRegistry.execute('reset', { loadData, setPagination, setFilters });
+    expect(setFilters).toHaveBeenCalledWith({});
+    expect(loadData).toHaveBeenCalledWith({ page: 0, filters: {} });
+    const updater = setPagination.mock.calls[0][0];
+    expect(updater({ current: 3, pageSize: 20 })).toEqual({ current: 1, pageSize: 20 });
+  });
+
+  it('setState merges args into the filter state', async () => {
+    const setFilters = vi.fn();
+    await actionRegistry.execute('setState', { setFilters, args: { region: 'EMEA' } });
+    const updater = setFilters.mock.calls[0][0];
+    expect(updater({ status: 'open' })).toEqual({ status: 'open', region: 'EMEA' });
+  });
+
+  it('search/reset/setState log and no-op when required context is missing', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await actionRegistry.execute('search', {});
+    await actionRegistry.execute('reset', {});
+    await actionRegistry.execute('setState', { setFilters: vi.fn() }); // missing args
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+});
+
+describe('ActionRegistry registry API', () => {
+  it('register / has / getRegisteredTypes / unregister round-trip', () => {
+    const handler = vi.fn();
+    actionRegistry.register('__unit_test_action__', handler);
+    expect(actionRegistry.has('__unit_test_action__')).toBe(true);
+    expect(actionRegistry.getRegisteredTypes()).toContain('__unit_test_action__');
+    actionRegistry.unregister('__unit_test_action__');
+    expect(actionRegistry.has('__unit_test_action__')).toBe(false);
+  });
+
+  it('registerBatch registers multiple handlers at once', () => {
+    const a = vi.fn();
+    const b = vi.fn();
+    actionRegistry.registerBatch({ __unit_batch_a__: a, __unit_batch_b__: b });
+    expect(actionRegistry.has('__unit_batch_a__')).toBe(true);
+    expect(actionRegistry.has('__unit_batch_b__')).toBe(true);
+    actionRegistry.unregister('__unit_batch_a__');
+    actionRegistry.unregister('__unit_batch_b__');
   });
 });

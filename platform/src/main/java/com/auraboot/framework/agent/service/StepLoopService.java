@@ -349,6 +349,16 @@ public class StepLoopService {
             // produced during this step with the matching execution_plan[i] index.
             StepContext.setStepIndex(i);
             AgentPlanStep step = plan.get(i);
+            if (step.isTerminal()) {
+                continue;
+            }
+            if (skipApprovalForResumedStep && i == startStep
+                    && step.getStatus() == AgentPlanStep.StepStatus.AWAITING_APPROVAL
+                    && resumeApprovedToolStep(step, plan, i, tenantId, runPid, taskPid, agentCode, tools,
+                    traceCtx, toolCallLog)) {
+                persistPlan(tenantId, runPid, plan, i + 1, "approval_tool_resumed");
+                continue;
+            }
             step.setStatus(AgentPlanStep.StepStatus.RUNNING);
             step.setStartedAt(LocalDateTime.now());
             if (step.getSkillCode() == null && step.getToolCode() != null) {
@@ -486,6 +496,22 @@ public class StepLoopService {
                 persistPlan(tenantId, runPid, plan, i + 1, "step_completed");
 
             } catch (AgentApprovalPendingException e) {
+                step.setStatus(AgentPlanStep.StepStatus.AWAITING_APPROVAL);
+                step.setError(e.getMessage());
+                step.setFinishedAt(LocalDateTime.now());
+                step.setDurationMs(System.currentTimeMillis() - stepStart);
+                Map<String, Object> approvalSummary = new java.util.LinkedHashMap<>();
+                approvalSummary.put("status", "approval_pending");
+                approvalSummary.put("approvalPid", e.getApprovalPid());
+                approvalSummary.put("message", truncate(e.getMessage(), 200));
+                if (e.getToolName() != null && !e.getToolName().isBlank()) {
+                    approvalSummary.put("approvalToolName", e.getToolName());
+                }
+                if (e.getInput() != null) {
+                    approvalSummary.put("approvalInput", e.getInput());
+                }
+                step.setOutput(approvalSummary);
+                persistPlan(tenantId, runPid, plan, i, "approval_pending");
                 throw e;
             } catch (Exception e) {
                 step.setStatus(AgentPlanStep.StepStatus.FAILED);
@@ -925,6 +951,7 @@ public class StepLoopService {
                 LlmChatResponse.ContentBlock b = toolBlocks.get(i);
                 String r = toolLoopService.executeToolCall(tenantId, runPid, taskPid, agentCode,
                         b.getName(), b.getInput(), tools, traceCtx);
+                throwIfApprovalRequiredToolResult(r, b.getName(), b.getInput());
                 results[i] = new ToolResult(b.getId(), b.getName(), r);
             }
             return Arrays.asList(results);
@@ -951,6 +978,7 @@ public class StepLoopService {
             LlmChatResponse.ContentBlock b = toolBlocks.get(i);
             String r = toolLoopService.executeToolCall(tenantId, runPid, taskPid, agentCode,
                     b.getName(), b.getInput(), tools, traceCtx);
+            throwIfApprovalRequiredToolResult(r, b.getName(), b.getInput());
             results[i] = new ToolResult(b.getId(), b.getName(), r);
         }
 
@@ -962,6 +990,7 @@ public class StepLoopService {
             LlmChatResponse.ContentBlock b = toolBlocks.get(i);
             String r = toolLoopService.executeToolCall(tenantId, runPid, taskPid, agentCode,
                     b.getName(), b.getInput(), tools, traceCtx);
+            throwIfApprovalRequiredToolResult(r, b.getName(), b.getInput());
             results[i] = new ToolResult(b.getId(), b.getName(), r);
         } else if (!parallelIdx.isEmpty()) {
             String groupId = UniqueIdGenerator.generate();
@@ -1050,7 +1079,145 @@ public class StepLoopService {
             }
         }
 
+        for (ToolResult result : results) {
+            if (result != null) {
+                throwIfApprovalRequiredToolResult(result.result(), result.name(), null);
+            }
+        }
         return Arrays.asList(results);
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean resumeApprovedToolStep(AgentPlanStep step,
+                                           List<AgentPlanStep> plan,
+                                           int stepIndex,
+                                           Long tenantId,
+                                           String runPid,
+                                           String taskPid,
+                                           String agentCode,
+                                           List<AgentToolDefinition> tools,
+                                           TraceContext traceCtx,
+                                           List<Map<String, Object>> toolCallLog) {
+        Map<String, Object> output = step.getOutput();
+        if (output == null) {
+            return false;
+        }
+        Object rawToolName = output.get("approvalToolName");
+        String toolName = rawToolName != null ? String.valueOf(rawToolName) : null;
+        if (toolName == null || toolName.isBlank()) {
+            return false;
+        }
+        Object rawInput = output.get("approvalInput");
+        Map<String, Object> approvedInput = rawInput instanceof Map<?, ?> rawMap
+                ? (Map<String, Object>) rawMap
+                : Map.of();
+
+        long started = System.currentTimeMillis();
+        step.setStatus(AgentPlanStep.StepStatus.RUNNING);
+        step.setStartedAt(LocalDateTime.now());
+        List<AgentToolDefinition> approvedTools = markToolApproved(tools, toolName);
+        String result = toolLoopService.executeToolCall(
+                tenantId, runPid, taskPid, agentCode, toolName, approvedInput, approvedTools, traceCtx);
+        throwIfApprovalRequiredToolResult(result, toolName, approvedInput);
+
+        step.setStatus(AgentPlanStep.StepStatus.COMPLETED);
+        step.setError(null);
+        step.setResult(truncate(result, 200));
+        step.setFinishedAt(LocalDateTime.now());
+        step.setDurationMs(System.currentTimeMillis() - started);
+        Map<String, Object> success = new LinkedHashMap<>();
+        success.put("status", "success");
+        success.put("approvalPid", output.get("approvalPid"));
+        success.put("approvalToolName", toolName);
+        success.put("result", truncate(result, 200));
+        step.setOutput(success);
+
+        toolCallLog.add(Map.of(
+                "tool", toolName,
+                "input", approvedInput,
+                "output", result,
+                "step", stepIndex,
+                "resumedApproval", true));
+        markFutureDuplicateToolStepsCompleted(plan, stepIndex, toolName);
+        return true;
+    }
+
+    private void markFutureDuplicateToolStepsCompleted(List<AgentPlanStep> plan, int approvedStepIndex, String toolName) {
+        if (plan == null || toolName == null || toolName.isBlank()) {
+            return;
+        }
+        for (int j = approvedStepIndex + 1; j < plan.size(); j++) {
+            AgentPlanStep future = plan.get(j);
+            if (future == null || future.isTerminal() || !toolName.equals(future.getToolCode())) {
+                continue;
+            }
+            future.setStatus(AgentPlanStep.StepStatus.COMPLETED);
+            future.setError(null);
+            future.setStartedAt(LocalDateTime.now());
+            future.setFinishedAt(LocalDateTime.now());
+            future.setDurationMs(0);
+            future.setResult("Tool already executed after approval on step " + approvedStepIndex);
+            Map<String, Object> reused = new LinkedHashMap<>();
+            reused.put("status", "success");
+            reused.put("approvalToolName", toolName);
+            reused.put("reusedFromStep", approvedStepIndex);
+            future.setOutput(reused);
+        }
+    }
+
+    private List<AgentToolDefinition> markToolApproved(List<AgentToolDefinition> tools, String approvedToolName) {
+        if (tools == null || tools.isEmpty()) {
+            return List.of();
+        }
+        List<AgentToolDefinition> approved = new ArrayList<>(tools.size());
+        for (AgentToolDefinition def : tools) {
+            if (def == null) {
+                continue;
+            }
+            boolean approvedTarget = approvedToolName != null && approvedToolName.equals(def.getName());
+            approved.add(AgentToolDefinition.builder()
+                    .name(def.getName())
+                    .description(def.getDescription())
+                    .inputSchema(def.getInputSchema())
+                    .toolType(def.getToolType())
+                    .sourceCode(def.getSourceCode())
+                    .requiresApproval(approvedTarget ? false : def.isRequiresApproval())
+                    .requiresConfirmation(def.isRequiresConfirmation())
+                    .riskLevel(def.getRiskLevel())
+                    .requiredPermissions(def.getRequiredPermissions())
+                    .confirmationPolicy(def.getConfirmationPolicy())
+                    .nativeToolConfig(def.getNativeToolConfig())
+                    .build());
+        }
+        return approved;
+    }
+
+    private void throwIfApprovalRequiredToolResult(String rawResult, String toolName, Map<String, Object> input) {
+        if (rawResult == null || rawResult.isBlank()) {
+            return;
+        }
+        String trimmed = rawResult.trim();
+        if (!trimmed.startsWith("{")) {
+            return;
+        }
+        try {
+            Map<String, Object> parsed = objectMapper.readValue(trimmed, new TypeReference<>() {});
+            if (!Boolean.TRUE.equals(parsed.get("approvalRequired"))) {
+                return;
+            }
+            String message = String.valueOf(parsed.getOrDefault("message",
+                    parsed.getOrDefault("error", "Tool requires human approval.")));
+            Object rawPid = parsed.get("approvalPid");
+            String approvalPid = rawPid != null ? String.valueOf(rawPid) : null;
+            if (approvalPid == null || approvalPid.isBlank()) {
+                throw new IllegalStateException(message);
+            }
+            throw new AgentApprovalPendingException(approvalPid, message, toolName, input);
+        } catch (AgentApprovalPendingException | IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            log.debug("Failed to inspect tool result approval state: {}", e.getClass().getSimpleName());
+        }
     }
 
     private AgentToolDefinition findToolDef(List<AgentToolDefinition> tools, String name) {

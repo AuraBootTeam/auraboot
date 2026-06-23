@@ -61,9 +61,11 @@ public class CapabilityEvalServiceTest extends BaseIntegrationTest {
         assertNotNull(result, "evaluateToolSelection must return a result map");
 
         String status = (String) result.get("status");
-        if ("no_cases".equals(status)) {
-            // No capabilities in test DB — acceptable, just verify the graceful response
-            assertNotNull(result.get("message"), "NO_CASES result must include a message");
+        if ("no_cases".equals(status) || "no_scoreable_cases".equals(status)) {
+            // Either no capabilities in the test DB ("no_cases"), or none of the generated
+            // cases' expected tools are in this environment's tool catalog so every case is
+            // unavailable ("no_scoreable_cases", the D3a short-circuit). Both are valid
+            // graceful outcomes that do not produce a full 5-dimension metric report.
             return;
         }
 
@@ -93,21 +95,24 @@ public class CapabilityEvalServiceTest extends BaseIntegrationTest {
                 new LambdaQueryWrapper<AbCapabilityEvalRun>()
                         .eq(AbCapabilityEvalRun::getTenantId, tenantId));
 
-        capabilityEvalService.evaluateToolSelection(tenantId, "keyword");
+        Map<String, Object> result = capabilityEvalService.evaluateToolSelection(tenantId, "keyword");
 
         long countAfter = evalRunMapper.selectCount(
                 new LambdaQueryWrapper<AbCapabilityEvalRun>()
                         .eq(AbCapabilityEvalRun::getTenantId, tenantId));
 
-        // When NO_CASES is returned early, no record is persisted — that is expected.
-        // When cases exist, a record must have been inserted.
-        List<CapabilityEvalCase> cases = capabilityEvalService
-                .generateEvalCases(tenantId, null, 20);
-        if (!cases.isEmpty()) {
+        // A run is persisted only when the evaluation actually scored cases. Two non-scoring
+        // outcomes skip persistence: "no_cases" (none generated) and "no_scoreable_cases"
+        // (all generated cases' tools absent from this environment's catalog — D3a short-circuit).
+        String status = (String) result.get("status");
+        boolean scored = !"no_cases".equals(status) && !"no_scoreable_cases".equals(status);
+        if (scored) {
             assertTrue(countAfter > countBefore,
-                    "A new AbCapabilityEvalRun record must be persisted after evaluation");
+                    "A scored evaluation must persist a new AbCapabilityEvalRun record");
+        } else {
+            assertEquals(countBefore, countAfter,
+                    "A non-scoring outcome (no_cases / no_scoreable_cases) must not persist a run");
         }
-        // If cases were empty, persistence is skipped — both counts remain equal
     }
 
     // ========== Test 4: weightedScore is in [0, 1] range ==========
@@ -133,8 +138,16 @@ public class CapabilityEvalServiceTest extends BaseIntegrationTest {
                 .evaluateToolSelection(tenantId, "keyword", manualCases);
 
         assertNotNull(result);
+        String status = (String) result.get("status");
+        if ("no_cases".equals(status) || "no_scoreable_cases".equals(status)) {
+            // 'cmd_some_tool' is not in this environment's tool catalog, so the only manual
+            // case is unavailable and no weighted score is produced (D3a). Graceful outcome.
+            // (Actual weighted-score computation is covered by CapabilityEvalUnavailableCaseTest's
+            // mixed run, where a scoreable case exists.)
+            return;
+        }
         Object weightedScore = result.get("weightedScore");
-        assertNotNull(weightedScore, "weightedScore must be present in the report");
+        assertNotNull(weightedScore, "weightedScore must be present in a scored report");
         double score = ((Number) weightedScore).doubleValue();
         assertTrue(score >= 0.0 && score <= 1.0,
                 "weightedScore must be in [0, 1] range, got: " + score);
@@ -195,10 +208,13 @@ public class CapabilityEvalServiceTest extends BaseIntegrationTest {
 
         assertNotNull(result, "Result must not be null");
         // regression_warning is only added when accuracy drops > 5% vs previous run.
-        // If there is no previous run (or this is the first run for this tenant),
-        // the key must be absent.
-        // We cannot guarantee a fresh DB for each run, so just verify no exception occurred.
-        // We verify the report structure regardless.
+        // If there is no previous run (or this is the first run for this tenant), the key is absent.
+        String status = (String) result.get("status");
+        if ("no_cases".equals(status) || "no_scoreable_cases".equals(status)) {
+            // 'cmd_view_task' not in this environment's catalog → case unavailable → no scored
+            // report. Graceful outcome; nothing to regress against on a non-scoring run.
+            return;
+        }
         assertTrue(result.containsKey("toolSelectionAccuracy"),
                 "Report must contain toolSelectionAccuracy even in regression check path");
     }

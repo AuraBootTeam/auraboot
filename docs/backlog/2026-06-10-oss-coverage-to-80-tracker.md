@@ -25,6 +25,7 @@ not by mock-heavy unit tests chasing a line number (that would violate AGENTS.md
 | Frontend `web-admin` | 285 spec files / 2099 tests, all pass | **LINE 19.08%** (13631/71413), Stmts 18.79%, Funcs 16.43%, Branches 16.44% |
 | Frontend `web-admin` (after Phase 1, 2026-06-11) | 327 spec files / 2905 tests | **LINE 22.48%** (15904/70716) — +814 tests via #529/#531/#532/#533/#534 (services+hooks+server/stores); ratchet floor 22 |
 | Frontend `web-admin` (after Phase 1 round 2, 2026-06-11) | 351 spec files / 3599 tests | **LINE 25.61%** (18112/70716), Stmts 25.13%, Funcs 22.35%, Branches 19.9% — +697 tests via #540/#541/#542/#543 (designer runtime engines + studio/plugin hooks + useTaskCenter/useDslForm); ratchet floor raised to 25 |
+| Frontend `web-admin` (wave 4 consolidation, 2026-06-19) | 423 spec files / 4354 tests | **LINE 30.28%** (23248/76754), Stmts 29.73%, Funcs 27.47%, Branches 24.64% — the floors had lagged actual by ~5pt (later rounds raised coverage but left the floors at round-2 values); ratchet raised to **28/27/25/22** (lines/stmts/funcs/branches) to lock in achieved coverage, + ActionRegistry handler tests (navigate/new/search/reset/setState + error branches, 18.6%→26.6%). Logic layer near-exhausted (~5 `.ts` modules left); 80% line needs the E2E coverage merge (#14). |
 | Infra subprojects | 1–7 tests each | not yet measured (need Docker for testcontainers) |
 
 **⚠️ Frontend vitest ceiling ≈ 30%.** Two rounds drove vitest line coverage 19.08% → 25.61% by exhausting the unit-testable *logic* layer (services, hooks, engines, stores, utils). The remaining ~74% of `web-admin` lines are React presentation components / routes / pages — covered by **Playwright E2E**, not vitest (unit-testing them = mock-heavy brittle anti-pattern, AGENTS.md §2.2/§10). **Reaching 80% line on the frontend requires E2E coverage collection (the `coverage:e2e` harness already exists) merged with vitest, OR redefining the frontend target as "vitest logic + E2E UI". This is an owner decision (tracked as task #14), not more component unit tests.**
@@ -240,8 +241,10 @@ passes. (Earlier intermediate states for the record: snapshot=stale billing→51
 fresh baseline=no seed→75 fails — neither was used for the bump.) Full evidence:
 `docs/retro/2026-06-18-oss-coverage-gate-consolidation-testing-gate-acceptance-report.md`.
 
-**Frontend** — wired in `web-admin/vitest.config.ts` `coverage.thresholds` (lines 19 /
-stmts 18 / funcs 16 / branches 16 today). Raise in lockstep with new tests.
+**Frontend** — wired in `web-admin/vitest.config.ts` `coverage.thresholds`. Floors raised
+in lockstep: 19/18/16/16 → 22 → 25 → **28/27/25/22** (lines/stmts/funcs/branches, 2026-06-19
+wave-4 consolidation, locking in the measured 30.28/29.73/27.47/24.64). The vitest logic layer
+is near-exhausted (~5 `.ts` modules left); further line gains need the E2E coverage merge (#14).
 
 ## 6. How to run the baseline / coverage reliably
 
@@ -268,3 +271,117 @@ only needed for the ~9 testcontainers tests + infra subprojects.
 - **Phase 4:** frontend hooks/util/renderers to 80%; subproject (storage/mq) IT under Docker.
 
 Each phase lands as a feature branch + PR, raises the ratchet floor, never regresses.
+
+## 8. Session progress log — 2026-06-18/19 (waves 5–14)
+
+JaCoCo measurement was first fixed (#838 offline instrumentation: the on-the-fly agent +
+CGLIB classdump read a bogus ~5% bundle because proxy class IDs diverge across the many
+evicted/recreated `@SpringBootTest` contexts; offline instruments `build/classes` at build
+time → coverage on stable on-disk IDs). Backend BUNDLE floor then ratcheted **0.73 → 0.75 →
+0.76**; frontend vitest floors consolidated to **28/27/25/22**.
+
+Real-stack IT waves (all merged, each measured against a clean `aura_boot_clean` snapshot via
+the path-B recipe + offline jacoco):
+
+| wave | PR | class | before→after | note |
+|---|---|---|---|---|
+| 5 | #847 | DataDomainServiceImpl | 7%→96% | **2 prod bugs fixed**: missing `userDataDomainIds` cache region + tenant interceptor injecting `dt.tenant_id` into a recursive CTE (`ignoreTable("domain_tree")`) |
+| 6 | #848 | FieldMaskServiceImpl | 22%→84% | **prod bug**: missing `fieldMaskConfig` cache region; + systemic cache-name audit (every `@Cacheable`/`@CacheEvict` name now in the fixed `CaffeineCacheManager` allowlist) |
+| 7 | #849 | VirtualFieldEngine.evaluate, ApiConnectorServiceImpl | — | SpEL evaluate paths + connector CRUD |
+| 8 | #850 | JdbcConnectorServiceImpl | →44% | connector + endpoint CRUD (invoke() needs a live pool, out of scope) |
+| 9 | #852 | SodService | 39%→77% | rule CRUD + validation + checkSod(pass) |
+| 10 | #854 | DrtDefinitionServiceImpl | 42%→97% | decision-definition CRUD |
+| 11 | #856 | CloudConfigServiceImpl | 47%→92% | cloud-config CRUD |
+| 12 | #857 | FieldValidationServiceImpl | pure validators | code/dataType/refTarget |
+| 13 | #858 | FieldBindingContextServiceImpl | 1%→73% | **model+field harness** (reusable) |
+| 14 | #859 | RelationSyncServiceImpl | 8%→17% | non-relation branches only |
+| consolidation | #851 | — | bundle 0.7769 → floor 0.76 | — |
+
+**Current state:** bundle ≈ **0.781**, floor 0.76, security packages 0.85–0.99.
+
+**Remaining gap to 0.80 (~+1250 covered lines) is dominated by hard-to-test classes** that need
+heavy fixtures (genuinely multi-session, diminishing per-wave returns — RelationSync's bulk, the
+inverse-sync path, needs bidirectional reference metadata; the cheap branches alone gave only ~17
+lines):
+
+- `PluginPackageServiceImpl` (631) — plugin zip/jar parse + PF4J install; needs real package fixtures.
+- `saas/bootstrap/BootstrapRepairService` (250) + `BootstrapEngineService` (132) — startup repair/seed state.
+- `im/websocket/ImWebSocketHandler` (198) — websocket session harness.
+- `meta/service/impl/pipeline/phases/AssertPhase` (185) — command-pipeline phase context.
+- `meta/service/impl/ActivityEventListener` (144) — needs the activity events published + asserted.
+- `RelationSyncServiceImpl` inverse-sync (~175 remaining) — bidirectional reference metadata.
+- external: `email/service/GmailApiClient` (117), `iot/tsport/.../TDengineTimeSeriesPort` (112).
+
+The next floor bump (0.76 → 0.77) needs bundle ≥ ~0.79 for the conventional ~2pt flaky margin,
+so it should follow the next batch of these heavier waves rather than land per-wave.
+
+**Reusable assets:** worktree `auraboot-cov6` + `aura_boot_clean`/`aura_boot_base` DBs (kept),
+the path-B clean-DB recipe, offline-jacoco gradle wiring, and the model+field IT harness (see
+`FieldBindingContextServiceImplCoverageIT` / `RelationSyncServiceImplCoverageIT`).
+
+## 9. Session progress log — 2026-06-19 (waves 9–23, floor -> 0.77)
+
+Continued from §8. Waves 9–23 (#852–#870), all merged, each real-stack IT against `aura_boot_clean`:
+
+| wave(s) | classes | result |
+|---|---|---|
+| 9–12 | SodService 39→77, DrtDefinition 42→97, CloudConfig 47→92, FieldValidation pure validators | clean CRUD/pure |
+| 13 | FieldBindingContextServiceImpl | 1→73% (model+field harness, reusable) |
+| 14 | RelationSyncServiceImpl | 8→17% (non-relation branches only — see §10) |
+| 15 | ActivityEventListener | 7→58% (**@Async unwrapped via `AopTestUtils.getTargetObject`** so onCommandCompleted runs sync in-thread) |
+| 16 | AsyncTaskServiceImpl | 38→58% (read/cancel/delete over a seeded task) |
+| 17 | AssertPhase | 18→28% (SpEL assert + precondition via hand-built CommandPipelineContext) |
+| 18 | VirtualFieldEngine graph | →82% (validateDependencyGraph cycle/acyclic + getComputationOrder via virtual-field harness) |
+| 19 | DynamicDataServiceImpl typed coercion + Excel export | convertFieldValue + exportAsExcel(0%); notes update() doesn't string→type coerce like create() |
+| 20 | CategoryServiceImpl CRUD + AuditTrailService | AuditTrail 52→86% |
+| 21 | DataPermissionEngine no-policy + PostExecutionPhase dry-run | branch coverage |
+| consolidation #868 | — | bundle 0.7869 → **floor 0.76→0.77** (1.69pt margin; security pkgs 0.85–0.99) |
+| 22 | InvariantDefinitionServiceImpl | 1→89% (CRUD; note: type/severity/scope valid sets are lowercase despite uppercase error text) |
+| 23 | SemanticQueryService | 1→24% (empty/cross-model/unknown-model rejects; happy path needs ab_semantic_model harness) |
+
+**Current state:** floor **0.77**, bundle ≈ **0.787**, security packages 0.85–0.99, 26 PRs this run.
+
+## 10. Blocker for the 0.80 target: the biggest gap is unreachable code
+
+The single largest remaining line gap — `DynamicDataServiceImpl`'s relation/sub-table cluster
+(~336 lines: getRelationData / saveWithRelations / createRelations / removeRelations / reference
+enrichment) — is **unreachable**: `MetaModelServiceImpl.loadModelRelations` is a TODO stub returning
+an empty list, so `model.getRelations()` is always empty and the relation happy paths never run.
+See [`2026-06-19-dynamicdata-relations-unwired-coverage-finding.md`](2026-06-19-dynamicdata-relations-unwired-coverage-finding.md).
+
+Consequence: ~336 "missed" lines cannot be closed by tests. Reaching 0.80 from 0.787 therefore needs
+either (a) implementing `loadModelRelations` (a product change, then those lines become testable), or
+(b) excluding the unreachable relation methods from the jacoco denominator with that finding as
+justification — **plus** continuing the heavy-fixture waves (PluginPackage 631 / Bootstrap 382 /
+ImWebSocket 198), each a multi-hour harness. The quick/medium/model-harness service wins are now
+exhausted; the remaining addressable surface is heavy-harness or cheap-branch-only (~17–30 lines/wave).
+
+## 11. Session progress log — 2026-06-19 (waves 24–31) + the PLATEAU finding
+
+Waves 24–31 (#869–#880, ~34 coverage PRs total this run): InvariantDefinition 1→89, SemanticQuery
+1→24, Idempotency 57→82, OutboxWorker 13→49, SchemaAccessProjector (dynamic-access + field-filter),
+DataPermissionEngine (no-policy + effective-row-policy via a seeded role/policy/binding/user-role
+chain), DynamicTableOeeAdapter 1→36, ActivityEventListener branches, FieldValidation branches.
+
+**Measured plateau (decisive):** the consolidation bundle moved 0.7847 (w18) → 0.7869 (w21) →
+0.7878 (w27) → **0.7884 (w31)**. Waves 28–31 added only **+0.06% net**. Root cause: the all-new
+0–7%-coverage classes are exhausted; the remaining waves cover the *second half* of
+already-partially-covered classes (DataPermission 55%, OEE, AEL 58%, FieldValidation 46%), so new
+ITs overlap heavily with existing coverage and net bundle gain has collapsed to ~6–10 lines/wave.
+
+**Conclusion — 0.80 is NOT reachable by more incremental ITs.** At ~6–10 net lines/wave, +774 lines
+to 0.80 ≈ 80+ waves. The remaining uncovered lines are concentrated in:
+- **Unreachable code** — DynamicData relation cluster (~336, `loadModelRelations` stub, §10).
+- **Heavy-harness classes** — PluginPackageServiceImpl (631, plugin zip/PF4J), BootstrapRepair/Engine
+  (382, startup state), ImWebSocketHandler (198, ws session) — each a major multi-session harness.
+- **Deep branches of partially-covered classes** — high overlap, tiny net gain per IT.
+
+**Recommended paths to 0.80 (require a decision, not more ITs):**
+1. Implement `loadModelRelations` (product) → unlocks the 336 relation lines + makes the feature real.
+2. A gate-denominator decision: exclude genuinely-unreachable (relation stub) + infra-only code from
+   the jacoco denominator with this finding as justification (note: do NOT exclude reachable business
+   logic — that's the anti-pattern).
+3. Commit to the heavy-harness classes (PluginPackage/Bootstrap/ImWebSocket) across multiple sessions.
+
+Floor held at **0.77** (bundle 0.7884; a 0.78 floor would have only 0.84pt margin, below the ~1.69pt
+ratchet precedent). Security packages remain 0.85–0.99.

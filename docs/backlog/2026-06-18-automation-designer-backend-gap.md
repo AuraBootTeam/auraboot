@@ -144,4 +144,4 @@ Out of scope / not gaps: the 30-case node golden, picker coverage, IT 81.3% — 
 - **G6**: drive the rule-binding widget in the designer + assert backend condition binding; confirm
   every visual-feedback state has at least one asserting test.
 - **Acceptance**: `/e2e-feature-coverage` matrix clean + `/e2e-truth` 5-dim + full suite 3× flake-clean
-  + screenshots +完成前全量复核五项.
+  - screenshots +完成前全量复核五项.

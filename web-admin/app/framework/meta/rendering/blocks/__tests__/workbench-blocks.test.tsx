@@ -850,7 +850,10 @@ describe('ReviewDrawerBlockRenderer', () => {
     bom_std_parse_json: '{"profileCode":"JIEJIA_WB_FLEX_MAIN_V1","llm":{"mode":"field_parse"}}',
   };
 
-  function makeReviewDrawerRuntime(line: Record<string, unknown> = selectedLine) {
+  function makeReviewDrawerRuntime(
+    line: Record<string, unknown> = selectedLine,
+    candidatePatch: Record<string, unknown> = {},
+  ) {
     return makeRuntime({
       data: {
         rawItems: [
@@ -878,6 +881,7 @@ describe('ReviewDrawerBlockRenderer', () => {
             bom_me_candidate_snapshot_json:
               '{"materialCode":"D410000006100","materialName":"贴片电阻","specModel":"贴片电阻 240Ω ±1% 0201","brand":"","mpn":"","packageCode":"0201","attributes":{"resistance":"240Ω","tolerance_pct":0.01}}',
             bom_me_evidence_json: '{"matchSource":"mpn_exact"}',
+            ...candidatePatch,
           },
         ],
         exports: [
@@ -1006,6 +1010,7 @@ describe('ReviewDrawerBlockRenderer', () => {
       item: {
         titleField: 'bom_me_material_code',
         scoreField: 'bom_me_score',
+        statusColorField: 'bom_me_status_color',
         detailFields: [
           {
             key: 'name',
@@ -1096,7 +1101,10 @@ describe('ReviewDrawerBlockRenderer', () => {
   };
 
   it('renders the selected row in a unified floating review drawer', () => {
-    const runtime = makeReviewDrawerRuntime();
+    const runtime = makeReviewDrawerRuntime(selectedLine, {
+      bom_me_evidence_json:
+        '{"matchSource":"mpn_brand_exact","comparisons":[{"key":"brand","reason":"source and candidate brand differ"}]}',
+    });
 
     render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
 
@@ -1291,14 +1299,18 @@ describe('ReviewDrawerBlockRenderer', () => {
   });
 
   it('selects a candidate and runs candidate/export actions from the drawer', async () => {
-    const runtime = makeReviewDrawerRuntime();
+    const runtime = makeReviewDrawerRuntime(selectedLine);
 
     render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
 
     const candidateCard = screen.getByTestId('review-drawer-candidate-ME-1');
     expect(screen.getByTestId('review-drawer-candidate-list')).toHaveClass('flex-1');
     expect(screen.getByTestId('review-drawer-tab-candidates')).toHaveClass('h-full');
-    expect(candidateCard).toHaveClass('block', 'p-2');
+    expect(screen.getByTestId('review-drawer-decision-panel')).toHaveClass(
+      'max-h-[48%]',
+      'overflow-auto',
+    );
+    expect(candidateCard).toHaveClass('block', 'p-3');
     expect(candidateCard).toHaveTextContent('D410000006100');
     expect(candidateCard).toHaveTextContent('贴片电阻 240Ω ±1% 0201');
     expect(candidateCard).toHaveTextContent('0201');
@@ -1333,6 +1345,19 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByText('导出状态')).not.toBeVisible();
     fireEvent.click(screen.getByTestId('review-drawer-export-action-download_new_bom'));
     expect(runtime.__reload).toHaveBeenCalledWith(['exports']);
+  });
+
+  it('wraps long candidate detail values instead of truncating price and BOM evidence', () => {
+    const runtime = makeReviewDrawerRuntime();
+
+    render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+
+    const specField = screen.getByTestId('review-drawer-candidate-ME-1-field-spec');
+    expect(specField).toHaveClass('grid-cols-[72px_minmax(0,1fr)]');
+    const specValue = specField.querySelector('dd');
+    expect(specValue).not.toBeNull();
+    expect(specValue).toHaveClass('break-words', 'whitespace-normal');
+    expect(specValue).not.toHaveClass('truncate');
   });
 
   it('opens a configured candidate action form and merges values into command payload', async () => {
@@ -1441,6 +1466,64 @@ describe('ReviewDrawerBlockRenderer', () => {
 
     expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).toBeDisabled();
     expect(screen.getByTestId('review-drawer-candidate-action-undo_decision')).not.toBeDisabled();
+  });
+
+  it('renders grouped candidate evidence fields so operators can see why a match failed', () => {
+    const runtime = makeReviewDrawerRuntime(selectedLine, {
+      bom_me_status_color: 'yellow',
+      bom_me_evidence_json:
+        '{"matchSource":"mpn_brand_exact","groups":{"brand":{"status":"mismatch","comparisons":[{"key":"brand","label":"brand","sourceValue":"Murata","candidateValue":"Yageo","status":"mismatch","reason":"source and candidate brand differ"}]},"mpn":{"status":"matched","comparisons":[{"key":"mpn","label":"mpn","sourceValue":"BL-HG034A-TRB","candidateValue":"BL-HG034A-TRB","status":"matched","reason":"exact"}]}}}',
+    });
+    const groupedBlock = {
+      ...reviewDrawerBlock,
+      candidates: {
+        ...(reviewDrawerBlock as any).candidates,
+        selectedFields: [],
+        selectedGroups: [
+          {
+            key: 'brand',
+            label: '品牌',
+            fields: [
+              {
+                key: 'brand_diff',
+                label: '品牌差异',
+                sourceField: 'bom_me_evidence_json',
+                field: 'groups.brand.comparisons',
+                emptyText: '无差异',
+              },
+            ],
+          },
+          {
+            key: 'mpn',
+            label: '型号(MPN)',
+            fields: [
+              {
+                key: 'match_source',
+                label: '匹配来源',
+                sourceField: 'bom_me_evidence_json',
+                field: 'matchSource',
+              },
+            ],
+          },
+        ],
+      },
+    } as BlockConfig;
+    render(<ReviewDrawerBlockRenderer block={groupedBlock} runtime={runtime} />);
+
+    fireEvent.click(screen.getByTestId('review-drawer-candidate-ME-1'));
+
+    expect(screen.getByTestId('review-drawer-candidate-ME-1').querySelector('.bg-amber-50')).toBeTruthy();
+    expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent('品牌');
+    expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent(
+      'source and candidate brand differ',
+    );
+    expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent('不一致');
+    expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent('Murata');
+    expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent('Yageo');
+    expect(screen.getByTestId('review-drawer-selected-group-mpn')).toHaveTextContent('型号(MPN)');
+    expect(screen.getByTestId('review-drawer-selected-group-mpn')).toHaveTextContent(
+      'mpn_brand_exact',
+    );
   });
 
   it('refreshes the selected row from its backing data source after reloads', () => {

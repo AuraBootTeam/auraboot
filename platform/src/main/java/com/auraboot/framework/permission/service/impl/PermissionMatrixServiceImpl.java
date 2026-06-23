@@ -100,6 +100,25 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             roleId, toGrant.size(), toRevoke.size());
     }
 
+    @Override
+    @Transactional
+    public void applyDefaultScopeToCurrentGrants(Long tenantId, Long roleId, String scopeType) {
+        Set<Long> grantedIds = rolePermissionService.getPermissionIdsByRoleId(roleId);
+        if (grantedIds.isEmpty()) {
+            return;
+        }
+        // Materialize the scope onto each granted (resourceCode, actionCode). Reuses the already-loaded
+        // active permission set (same source the matrix builds from).
+        List<PermissionDTO> granted = permissionService.findAllActive().stream()
+                .filter(p -> p.getId() != null && grantedIds.contains(p.getId()))
+                .filter(p -> p.getResourceCode() != null && p.getAction() != null)
+                .toList();
+        for (PermissionDTO p : granted) {
+            dataScopeService.setScope(tenantId, roleId, p.getResourceCode(), p.getAction(), scopeType, "MAX");
+        }
+        log.info("Applied default data scope '{}' to {} current grants: roleId={}", scopeType, granted.size(), roleId);
+    }
+
     // ========================================================================
     // Matrix Building
     // ========================================================================

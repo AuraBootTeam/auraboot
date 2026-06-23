@@ -131,7 +131,7 @@ async function clickCreateButton(page: Page): Promise<void> {
   // Try data-testid pattern first, then text-based fallbacks
   const createBtn = page
     .locator(
-      '[data-testid^="toolbar-btn-"], button:has-text("新建"), button:has-text("创建"), button:has-text("New"), button:has-text("Create")',
+      '[data-testid^="toolbar-btn-"], button:has-text("新建"):not(:has-text("今日")), button:has-text("创建"), button:has-text("New"), button:has-text("Create")',
     )
     .first();
   await createBtn.waitFor({ state: 'visible', timeout: 8_000 });

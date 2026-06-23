@@ -20,7 +20,7 @@ vi.mock('~/ui/inbox/InboxDropdown', () => ({
 vi.mock('~/ui/CommandPalette', () => ({
   CommandPalette: () => (
     <button
-      data-testid="cmd-k-trigger"
+      data-testid="header-search-trigger"
       className="hidden h-[34px] w-[360px] items-center gap-2 rounded-md border border-[#e3e8ee] bg-white px-3 text-sm text-gray-500 sm:flex"
     >
       Search...
@@ -57,7 +57,7 @@ describe('Header — polish', () => {
         <Header />
       </MemoryRouter>,
     );
-    const trigger = screen.getByTestId('cmd-k-trigger');
+    const trigger = screen.getByTestId('header-search-trigger');
     expect(trigger.className).toMatch(/w-\[360px\]/);
   });
 

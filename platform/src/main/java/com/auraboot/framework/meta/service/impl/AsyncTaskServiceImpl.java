@@ -121,12 +121,18 @@ public class AsyncTaskServiceImpl {
     }
 
     /**
-     * List tasks with filtering and pagination.
+     * List tasks with filtering and pagination, scoped to the caller's own tasks.
+     *
+     * <p>{@code ab_async_task} is registered in {@code MybatisPlusConfig.ignoreTable} (pool
+     * threads have no MetaContext), so the tenant/user line interceptor does NOT auto-filter it.
+     * Both {@code tenant_id} and {@code created_by} must be applied explicitly here — otherwise
+     * any tenant member could enumerate every other member's async tasks.
      */
-    public IPage<AsyncTaskDTO> listTasks(Long tenantId, String status, String taskType,
+    public IPage<AsyncTaskDTO> listTasks(Long tenantId, Long userId, String status, String taskType,
                                           int pageNum, int pageSize) {
         LambdaQueryWrapper<AsyncTask> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AsyncTask::getTenantId, tenantId);
+        wrapper.eq(AsyncTask::getCreatedBy, userId);
         if (status != null && !status.isBlank()) {
             wrapper.eq(AsyncTask::getStatus, status);
         }

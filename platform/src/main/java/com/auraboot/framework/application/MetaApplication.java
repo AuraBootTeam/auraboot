@@ -12,12 +12,22 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     scanBasePackages = {"com.auraboot.framework", "com.auraboot.module"},
     exclude = {RedisAutoConfiguration.class, RedisRepositoriesAutoConfiguration.class}
 )
-@MapperScan({"com.auraboot.framework.*.mapper", "com.auraboot.framework.*.dao.mapper", "com.auraboot.framework.*.dao", "com.auraboot.framework.agent.trace.mapper", "com.auraboot.framework.aurabot.skill.mapper", "com.auraboot.framework.bpm.connector", "com.auraboot.framework.chatbi.v2.mapper", "com.auraboot.framework.connector.jdbc.mapper", "com.auraboot.framework.connector.saas.oauth.mapper", "com.auraboot.framework.connector.airflow.mapper", "com.auraboot.framework.connector.airflow.secret.mapper", "com.auraboot.framework.plugin.marketplace.mapper", "com.auraboot.framework.saas.config.mapper", "com.auraboot.framework.saas.account.mapper", "com.auraboot.framework.saas.license.mapper", "com.auraboot.framework.saas.bootstrap.mapper", "com.auraboot.framework.promotion.reference.dao.mapper", "com.auraboot.module.*.mapper", "com.auraboot.module.meta.excel.mapper", "com.auraboot.smart.framework.engine.persister.database",
-        "com.auraboot.framework.dataquality.ge.mapper",
-        "com.auraboot.framework.billing.catalog.mapper",
-        "com.auraboot.framework.billing.quota.mapper",
-        "com.auraboot.framework.billing.metering.mapper",
-        "com.auraboot.framework.billing.account.mapper"})
+@MapperScan({
+        // Covers all com.auraboot.framework.**.<anything>.mapper paths recursively,
+        // including previously hand-enumerated nested packages such as
+        // connector.jdbc.mapper, connector.saas.oauth.mapper, connector.airflow.mapper,
+        // connector.airflow.secret.mapper, aurabot.skill.mapper, agent.trace.mapper,
+        // chatbi.v2.mapper, plugin.marketplace.mapper, billing.*.mapper,
+        // dataquality.ge.mapper, promotion.reference.dao.mapper, saas.*.mapper, etc.
+        "com.auraboot.framework.**.mapper",
+        // Leaf is 'dao', not 'mapper' — not covered by **.mapper above.
+        "com.auraboot.framework.*.dao",
+        // Retained for safety: leaf is 'connector', not 'mapper'.
+        "com.auraboot.framework.bpm.connector",
+        // Non-framework packages — must be listed explicitly.
+        "com.auraboot.module.*.mapper",
+        "com.auraboot.module.meta.excel.mapper",
+        "com.auraboot.smart.framework.engine.persister.database"})
 @EnableTransactionManagement
 @EnableScheduling
 public class MetaApplication {

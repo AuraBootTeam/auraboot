@@ -297,6 +297,7 @@ public final class DslRegistry {
         RICH_TEXT("rich-text", "Rich-text block (sanitized HTML / markdown content)", "1.5"),
         SELECTION_INFO("selection-info", "Selection info block (bound multi-select summary)", "1.5"),
         GERBER_VIEWER("gerber-viewer", "Gerber viewer block (PCB board + CPL inspection)", "1.5"),
+        CARD_GRID("card-grid", "Card grid block (responsive catalog of cards with per-card actions)", "1.6"),
         CUSTOM("custom", "Custom block", "1.0");
 
         private final String code, label, since;

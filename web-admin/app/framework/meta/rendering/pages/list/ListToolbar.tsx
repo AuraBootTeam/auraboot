@@ -5,13 +5,18 @@
  * Below:  <FilterChipBar .../>
  */
 import React, { useCallback } from 'react';
+import { ArrowPathIcon, CheckCircleIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { RowHeightSelector } from '~/framework/smart/components/view/RowHeightSelector';
 import { FilterChipBar } from '~/framework/smart/components/view/FilterChipBar';
 import type { SortConfig, ViewFilterConfig, RowHeight } from '~/framework/smart/types/savedView';
 import { SortPopover, type SortableColumn } from './SortPopover';
 import { useI18n } from '~/contexts/I18nContext';
+import {
+  type QuickFilterPresetKey,
+  getQuickFilterPresetDefinitions,
+} from './quickFilterPresets';
 
-type QuickFilterKey = 'my_records' | 'created_today' | 'modified_this_week';
+type QuickFilterKey = QuickFilterPresetKey;
 
 export interface ListToolbarProps {
   /** Current keyword search value */
@@ -22,6 +27,16 @@ export interface ListToolbarProps {
   /** Quick filters */
   activeQuickFilter: QuickFilterKey | null;
   onQuickFilter: (key: QuickFilterKey) => void;
+  /** Save the active system preset as a personal SavedView. */
+  onSaveActivePreset?: () => void;
+  /** Presets that already have a personal SavedView copy. */
+  savedPresetKeys?: QuickFilterKey[];
+  /** Origin preset key of the active personal SavedView copy. */
+  activeSavedPresetKey?: QuickFilterKey | null;
+  /** Whether the active personal copy differs from the current system preset definition. */
+  activeSavedPresetEdited?: boolean;
+  /** Reset the active personal copy to the current system preset definition. */
+  onResetActiveSavedPreset?: () => void;
 
   /** Sort */
   activeSorts: SortConfig[];
@@ -68,6 +83,11 @@ export function ListToolbar({
   onSearch,
   activeQuickFilter,
   onQuickFilter,
+  onSaveActivePreset,
+  savedPresetKeys = [],
+  activeSavedPresetKey = null,
+  activeSavedPresetEdited = false,
+  onResetActiveSavedPreset,
   activeSorts,
   onSortsChange,
   sortableColumns,
@@ -91,6 +111,7 @@ export function ListToolbar({
   hideFilterChips,
 }: ListToolbarProps) {
   const { t } = useI18n();
+  const savedPresetSet = new Set(savedPresetKeys);
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter') onSearch();
@@ -98,23 +119,29 @@ export function ListToolbar({
     [onSearch],
   );
 
-  const quickFilters: Array<{ key: QuickFilterKey; label: string; icon: string }> = [
-    {
-      key: 'my_records',
-      label: t('common.my_records', undefined, 'My Records'),
-      icon: '\uD83D\uDC64',
-    },
-    {
-      key: 'created_today',
-      label: t('common.created_today', undefined, 'Created Today'),
-      icon: '\uD83D\uDCC5',
-    },
-    {
-      key: 'modified_this_week',
-      label: t('common.modified_this_week', undefined, 'Modified This Week'),
-      icon: '\uD83D\uDD50',
-    },
-  ];
+  const quickFilterIcons: Record<string, string> = {
+    my_records: '\uD83D\uDC64',
+    created_today: '\uD83D\uDCC5',
+    modified_this_week: '\uD83D\uDD50',
+  };
+  const quickFilters: Array<{ key: QuickFilterKey; label: string; icon: string }> =
+    getQuickFilterPresetDefinitions().map((definition) => ({
+      key: definition.key,
+      label: t(definition.i18nKey, undefined, definition.fallbackLabel),
+      icon: quickFilterIcons[definition.key] ?? '\u25CF',
+    }));
+  const savePresetLabel = t(
+    'common.saved_view_save_preset_to_personal',
+    undefined,
+    'Save preset as my view',
+  );
+  const savedBadgeLabel = t('common.saved_view_preset_saved_badge', undefined, 'Saved');
+  const editedBadgeLabel = t('common.saved_view_preset_edited_badge', undefined, 'Edited');
+  const resetPresetLabel = t(
+    'common.saved_view_preset_reset',
+    undefined,
+    'Reset saved preset',
+  );
   const showInlineControls =
     !hideSort ||
     !hideColumnSettings ||
@@ -265,21 +292,64 @@ export function ListToolbar({
             className="flex max-w-full basis-full gap-1.5 overflow-x-auto sm:basis-auto"
             data-testid="quick-filters"
           >
-            {quickFilters.map((qf) => (
+            {quickFilters.map((qf) => {
+              const active = activeQuickFilter === qf.key || activeSavedPresetKey === qf.key;
+              const saved = savedPresetSet.has(qf.key);
+              const edited = activeSavedPresetKey === qf.key && activeSavedPresetEdited;
+              return (
+                <button
+                  key={qf.key}
+                  type="button"
+                  onClick={() => onQuickFilter(qf.key)}
+                  data-testid={`quick-filter-${qf.key}`}
+                  data-preset-active={active ? 'true' : 'false'}
+                  data-preset-saved={saved ? 'true' : 'false'}
+                  data-preset-edited={edited ? 'true' : 'false'}
+                  aria-pressed={active}
+                  className={`rounded-pill inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium transition-colors ${
+                    active
+                      ? 'bg-accent-weak text-accent ring-1 ring-blue-300'
+                      : 'bg-subtle text-text-2 hover:bg-hover'
+                  }`}
+                >
+                  <span>{qf.label}</span>
+                  {saved && (
+                    <span
+                      className="text-success inline-flex items-center gap-0.5 text-[10px] font-semibold"
+                      data-testid={`quick-filter-${qf.key}-saved`}
+                      title={savedBadgeLabel}
+                    >
+                      <CheckCircleIcon className="h-3 w-3" aria-hidden />
+                      {edited ? editedBadgeLabel : savedBadgeLabel}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            {activeQuickFilter && onSaveActivePreset && (
               <button
-                key={qf.key}
                 type="button"
-                onClick={() => onQuickFilter(qf.key)}
-                data-testid={`quick-filter-${qf.key}`}
-                className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
-                  activeQuickFilter === qf.key
-                    ? 'bg-accent-weak text-accent ring-1 ring-blue-300'
-                    : 'bg-subtle text-text-2 hover:bg-hover'
-                }`}
+                onClick={onSaveActivePreset}
+                data-testid="preset-view-save-as-personal"
+                aria-label={savePresetLabel}
+                title={savePresetLabel}
+                className="rounded-control text-text-2 hover:bg-hover hover:text-text focus-visible:shadow-focus inline-flex h-7 w-7 items-center justify-center transition-colors focus:outline-none"
               >
-                {qf.label}
+                <PlusIcon className="h-3.5 w-3.5" aria-hidden />
               </button>
-            ))}
+            )}
+            {activeSavedPresetKey && activeSavedPresetEdited && onResetActiveSavedPreset && (
+              <button
+                type="button"
+                onClick={onResetActiveSavedPreset}
+                data-testid="preset-view-reset-saved"
+                aria-label={resetPresetLabel}
+                title={resetPresetLabel}
+                className="rounded-control text-text-2 hover:bg-hover hover:text-text focus-visible:shadow-focus inline-flex h-7 w-7 items-center justify-center transition-colors focus:outline-none"
+              >
+                <ArrowPathIcon className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            )}
           </div>
         )}
 

@@ -35,8 +35,8 @@ class OutboxIntegrationTest extends BaseIntegrationTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
-    private void publishNotifyPolicy(String code) throws Exception {
-        definitionService.create(code, "Outbox IT", "FORM_SUBMITTED", "FORM", "complaint");
+    private void publishNotifyPolicy(String code, String targetKey) throws Exception {
+        definitionService.create(code, "Outbox IT", "FORM_SUBMITTED", "FORM", targetKey);
         JsonNode rules = mapper.readTree("""
             [{"ruleCode":"R-N","ruleName":"n","priority":100,"enabled":true,
               "condition":{"type":"compare",
@@ -52,18 +52,19 @@ class OutboxIntegrationTest extends BaseIntegrationTest {
         versionService.publish(draft.getPid());
     }
 
-    private JsonNode ctx() throws Exception {
+    private JsonNode ctx(String targetKey) throws Exception {
         return mapper.readTree("""
-            {"record":{"entityCode":"complaint","recordId":"CMP-OB-1","data":{"priority":"HIGH"}}}""");
+            {"record":{"entityCode":"%s","recordId":"CMP-OB-1","data":{"priority":"HIGH"}}}""".formatted(targetKey));
     }
 
     @Test
     void enqueueThenProcess_runsPolicyChain_andMarksProcessed() throws Exception {
-        publishNotifyPolicy("it_outbox_" + System.nanoTime());
+        String targetKey = "it_outbox_form_" + System.nanoTime();
+        publishNotifyPolicy("it_outbox_" + System.nanoTime(), targetKey);
         Long tid = getTestTenant().getId();
         String eventId = "evt-ob-" + System.nanoTime();
 
-        outboxService.enqueue(eventId, "FORM_SUBMITTED", "FORM", "complaint", ctx());
+        outboxService.enqueue(eventId, "FORM_SUBMITTED", "FORM", targetKey, ctx(targetKey));
         assertThat(jdbcTemplate.queryForObject(
                 "select status from ab_drt_outbox where tenant_id=? and event_id=?", String.class, tid, eventId))
                 .isEqualTo("PENDING");
@@ -80,7 +81,7 @@ class OutboxIntegrationTest extends BaseIntegrationTest {
         // an exec-log row exists for the rule's resolved idempotency key (proves outbox->runAndExecute->executor)
         Integer execRows = jdbcTemplate.queryForObject(
                 "select count(*) from ab_drt_policy_exec_log where tenant_id=? and idempotency_key=?",
-                Integer.class, tid, "complaint:CMP-OB-1:R-N:NOTIFY");
+                Integer.class, tid, targetKey + ":CMP-OB-1:R-N:NOTIFY");
         assertThat(execRows).isEqualTo(1);
     }
 
@@ -88,8 +89,9 @@ class OutboxIntegrationTest extends BaseIntegrationTest {
     void enqueueIsIdempotentOnEventId() throws Exception {
         Long tid = getTestTenant().getId();
         String eventId = "evt-ob-dup-" + System.nanoTime();
-        outboxService.enqueue(eventId, "FORM_SUBMITTED", "FORM", "complaint", ctx());
-        outboxService.enqueue(eventId, "FORM_SUBMITTED", "FORM", "complaint", ctx());
+        String targetKey = "it_outbox_dup_form_" + System.nanoTime();
+        outboxService.enqueue(eventId, "FORM_SUBMITTED", "FORM", targetKey, ctx(targetKey));
+        outboxService.enqueue(eventId, "FORM_SUBMITTED", "FORM", targetKey, ctx(targetKey));
         Integer rows = jdbcTemplate.queryForObject(
                 "select count(*) from ab_drt_outbox where tenant_id=? and event_id=?", Integer.class, tid, eventId);
         assertThat(rows).isEqualTo(1);

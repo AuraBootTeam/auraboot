@@ -4,6 +4,7 @@ import com.auraboot.framework.agentchat.event.ImMessageSentEvent;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.im.dto.ImMessageResponse;
 import com.auraboot.framework.im.dto.MessageSearchResult;
 import com.auraboot.framework.im.dto.ForwardMessageRequest;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/im")
+@AuthenticatedAccess("message operations require conversation membership (isMember + userId/tenantId)")
 public class ImMessageController {
 
     private final ImMessageService messageService;

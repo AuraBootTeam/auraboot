@@ -1,0 +1,56 @@
+{
+  "pageKey": "behavior_site_key_form",
+  "modelCode": "behavior_site_key",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "基本信息",
+        "en-US": "Basic Information"
+      },
+      "fields": [
+        {
+          "field": "name",
+          "colSpan": 12,
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": {
+            "zh-CN": "保存",
+            "en-US": "Save"
+          },
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": {
+            "zh-CN": "取消",
+            "en-US": "Cancel"
+          }
+        }
+      ]
+    }
+  ],
+  "name:zh-CN": "新建站点密钥",
+  "name:en": "Create Site Key",
+  "title": {
+    "zh-CN": "新建站点密钥",
+    "en": "Create Site Key"
+  }
+}

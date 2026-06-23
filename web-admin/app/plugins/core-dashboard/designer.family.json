@@ -1,0 +1,13 @@
+{
+  "surface": "core-dashboard",
+  "role": "kernel-and-surface",
+  "family": "grid",
+  "layer1Kernel": "dashboard-grid",
+  "conformance": "conforming",
+  "conformanceNote": "Dashboard owns the grid family kernel (DashboardDesigner + DesignerCanvas + grid layout store); WidgetRenderer goes through SharedChartFactory and local chart components are @deprecated. Single grid surface so the kernel is not yet extracted to a standalone SDK (DDR non-goal until a 2nd grid surface appears).",
+  "layer0": ["PropertySchema", "DataSourcePicker", "ChartSpec"],
+  "storage": { "primary": "ab_dashboard" },
+  "owner": "core-dashboard",
+  "decision": "DDR-2026-06-18-designer-kernel-boundary",
+  "note": "Grid family reference implementation. Page may consume-only embed a dashboard via a dashboardEmbed block (B4) without owning dashboard DSL."
+}

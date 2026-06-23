@@ -105,4 +105,32 @@ class ScheduledCapabilityEvalJobTest {
         verify(evalService, times(1)).evaluateToolSelection(eq(1L), eq("keyword"));
         verify(observationService, never()).publish(anyLong(), anyString(), anyString(), any(), any(), any());
     }
+
+    @Test
+    void includeArchetypeCases_callsLoadRegisteredCasesByAgent() {
+        // Set includeArchetypeCases=true so the D3b per-agent branch is exercised.
+        ReflectionTestUtils.setField(job, "includeArchetypeCases", true);
+        // generateEvalCases returns empty (per @BeforeEach), so the aggregate run hits the
+        // 2-arg evaluateToolSelection shortcut.
+        CapabilityEvalCase stubbedCase = CapabilityEvalCase.builder()
+                .taskDescription("what tools list orders?")
+                .expectedToolCodes(List.of("order:list"))
+                .build();
+        // loadRegisteredCasesByAgent returns one agent with one case.
+        when(evalService.loadRegisteredCasesByAgent(1L))
+                .thenReturn(Map.of("order-agent", List.of(stubbedCase)));
+        // 4-arg overload used for per-agent scoped run.
+        when(evalService.evaluateToolSelection(eq(1L), eq("keyword"), any(), eq("order-agent")))
+                .thenReturn(Map.of("evalMode", "keyword", "toolSelectionAccuracy", 0.92));
+
+        job.runOnce(1L);
+
+        // Verify D3b wiring: loadRegisteredCasesByAgent is called (not the old flat loadRegisteredCases)
+        verify(evalService, times(1)).loadRegisteredCasesByAgent(1L);
+        // Verify the 4-arg scoped overload was invoked for the agent's cases
+        verify(evalService, times(1))
+                .evaluateToolSelection(eq(1L), eq("keyword"), any(), eq("order-agent"));
+        // The 2-arg overload must have been called for the empty aggregate (generateEvalCases empty)
+        verify(evalService, times(1)).evaluateToolSelection(eq(1L), eq("keyword"));
+    }
 }

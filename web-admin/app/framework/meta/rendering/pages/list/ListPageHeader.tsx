@@ -11,8 +11,6 @@ import type { ToolbarActionConfig, SavedView, ViewType } from '~/framework/smart
 import { ViewSelector } from '~/framework/smart/components/view/ViewSelector';
 import { ToolbarActionGroup } from './ToolbarActionGroup';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
-import { PresetViewBar } from './PresetViewBar';
-import type { QuickFilterPresetKey } from './quickFilterPresets';
 
 export interface ListPageHeaderProps {
   /** Page title (already localized) */
@@ -39,12 +37,6 @@ export interface ListPageHeaderProps {
   evaluateVisible: (button: ButtonConfig) => boolean;
   onImport: () => void;
   onExport: (format: 'xlsx' | 'csv') => void;
-  /** Active preset view (T8); null when none selected */
-  activePreset?: QuickFilterPresetKey | null;
-  /** Toggle a preset view on/off */
-  onSelectPreset?: (key: QuickFilterPresetKey) => void;
-  /** Hide the preset-view bar (e.g. config-only pages) */
-  hidePresetViews?: boolean;
   /** Current filter conditions for export */
   exportFilters?: Array<{ field: string; operator: string; value: unknown }>;
   /** Whether this is a tenant member page (shows Invite button) */
@@ -76,9 +68,6 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   evaluateVisible,
   onImport,
   onExport,
-  activePreset,
-  onSelectPreset,
-  hidePresetViews,
   exportFilters,
   isTenantMemberPage,
   onInvite,
@@ -90,9 +79,11 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
 }) => {
   return (
     <div className="border-border border-b px-6 py-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-text text-lg font-semibold">{title}</h2>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <h2 className="text-text flex-shrink-0 whitespace-nowrap text-lg font-semibold">
+            {title}
+          </h2>
           {!hideSavedViews && (
             <ViewSelector
               views={savedViews}
@@ -105,15 +96,9 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               onViewTypeChange={onViewTypeChange}
             />
           )}
-          {!hidePresetViews && onSelectPreset && (
-            <>
-              <div className="bg-border hidden h-5 w-px sm:block" aria-hidden />
-              <PresetViewBar activePreset={activePreset ?? null} onSelectPreset={onSelectPreset} />
-            </>
-          )}
         </div>
         <div
-          className="print-hide flex items-center gap-2"
+          className="print-hide flex flex-wrap items-center gap-2 lg:justify-end"
           data-print="hide"
           data-testid={deriveTestId('list', modelCode, 'toolbar')}
         >

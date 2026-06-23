@@ -49,6 +49,12 @@ class LlmToolSelectionServiceTest {
         return t;
     }
 
+    private static ToolDefinition tool(String code, String description, String riskLevel) {
+        ToolDefinition t = tool(code, description);
+        t.setRiskLevel(riskLevel);
+        return t;
+    }
+
     @BeforeEach
     void setUp() {
         service = new LlmToolSelectionService(llmProviderFactory, new ObjectMapper());
@@ -121,6 +127,50 @@ class LlmToolSelectionServiceTest {
         ArgumentCaptor<LlmChatRequest> captor = ArgumentCaptor.forClass(LlmChatRequest.class);
         org.mockito.Mockito.verify(provider).chat(captor.capture(), anyString(), any());
         String prompt = captor.getValue().getSystemPrompt();
-        assertThat(prompt).contains("cmd_order_create").contains("nq_order_list").contains("Never invent codes");
+        assertThat(prompt)
+                .contains("cmd_order_create")
+                .contains("nq_order_list")
+                .contains("Never invent codes")
+                .contains("query, diagnose, gather context");
+    }
+
+    @Test
+    void readOnlyIntentDropsMutatingSelections() throws Exception {
+        List<ToolDefinition> qualityCatalog = List.of(
+                tool("dsl.query", "Query/read quality records and CAPA history (read-only)", "L0"),
+                tool("qc:create_capa", "Create a CAPA draft — WRITE, needs confirmation", "L3"),
+                tool("qc:close_quality", "Close a quality exception record — WRITE", "L2"));
+        stubProvider("{\"tools\": [\"dsl.query\", \"qc:create_capa\", \"qc:close_quality\"]}");
+
+        LlmToolSelectionService.Selection selection =
+                service.selectTools(1L, "先获取质量异常趋势和 CAPA 上下文,不要直接动质量记录。", qualityCatalog, 5);
+
+        assertThat(selection.selected()).containsExactly("dsl.query");
+    }
+
+    @Test
+    void readOnlyIntentFallsBackToCatalogReadToolWhenModelOnlySelectsMutating() throws Exception {
+        List<ToolDefinition> qualityCatalog = List.of(
+                tool("dsl.query", "Query/read quality records and CAPA history (read-only)", "L0"),
+                tool("qc:create_capa", "Create a CAPA draft — WRITE, needs confirmation", "L3"));
+        stubProvider("{\"tools\": [\"qc:create_capa\"]}");
+
+        LlmToolSelectionService.Selection selection =
+                service.selectTools(1L, "gather context first, do not act yet", qualityCatalog, 5);
+
+        assertThat(selection.selected()).containsExactly("dsl.query");
+    }
+
+    @Test
+    void actionIntentKeepsMutatingTool() throws Exception {
+        List<ToolDefinition> qualityCatalog = List.of(
+                tool("dsl.query", "Query/read quality records and CAPA history (read-only)", "L0"),
+                tool("qc:create_capa", "Create a CAPA draft — WRITE, needs confirmation", "L3"));
+        stubProvider("{\"tools\": [\"qc:create_capa\"]}");
+
+        LlmToolSelectionService.Selection selection =
+                service.selectTools(1L, "针对缺陷记录 PE-DEF-001,生成一份 CAPA 草稿。", qualityCatalog, 5);
+
+        assertThat(selection.selected()).containsExactly("qc:create_capa");
     }
 }

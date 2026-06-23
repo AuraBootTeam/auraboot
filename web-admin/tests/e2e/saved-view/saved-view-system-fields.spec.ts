@@ -8,6 +8,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
+const MODEL_CODE = 'e2et_order';
+const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
+
 // API helpers
 async function createViewViaApi(
   page: Page,
@@ -19,6 +22,7 @@ async function createViewViaApi(
     data: {
       name,
       modelCode,
+      pageKey: SAVED_VIEW_PAGE_KEY,
       viewType: 'table',
       scope: 'personal',
       viewConfig: columns ? { columns } : {},
@@ -45,8 +49,8 @@ test.describe('System Fields Visible (GAP-126)', () => {
     const resp = await page.request.post('/api/views', {
       data: {
         name: `SF_Clean_${uniqueId()}`,
-        modelCode: 'e2et_order',
-        pageKey: 'e2et_order',
+        modelCode: MODEL_CODE,
+        pageKey: SAVED_VIEW_PAGE_KEY,
         viewType: 'table',
         scope: 'personal',
         viewConfig: {}, // empty config — system fields not configured → hidden by default
@@ -58,7 +62,7 @@ test.describe('System Fields Visible (GAP-126)', () => {
       if (pid) {
         // Set as default so useSavedViews auto-selects it on page load
         await page.request.post(`/api/views/${pid}/set-default`, {
-          data: { modelCode: 'e2et_order', pageKey: 'e2et_order' },
+          data: { modelCode: MODEL_CODE, pageKey: SAVED_VIEW_PAGE_KEY },
         });
       }
     }
@@ -120,7 +124,7 @@ test.describe('System Fields Visible (GAP-126)', () => {
       { fieldCode: 'created_by', visible: false, order: 4 },
       { fieldCode: 'updated_by', visible: false, order: 5 },
     ];
-    const pid = await createViewViaApi(page, 'e2et_order', viewName, columns);
+    const pid = await createViewViaApi(page, MODEL_CODE, viewName, columns);
     expect(pid).toBeTruthy();
 
     const view = await getViewViaApi(page, pid);

@@ -1,0 +1,18 @@
+{
+  "surface": "report-designer",
+  "role": "surface",
+  "family": "block-tree",
+  "layer1Kernel": "unified-designer",
+  "layoutProfile": "paged-media",
+  "conformance": "non-conforming",
+  "conformanceNote": "Currently self-built: own ReportDesigner canvas + useReportStore (selection/dnd/history) instead of unified-designer CanvasHost. This is the DDR's single identified misconfiguration. B1 (4-phase) migrates it onto the block-tree kernel; until then B3b's import check is expected to fail this surface by design.",
+  "layer0": ["PropertySchema", "InspectorSchemaRegistry", "DataSourcePicker", "ChartSpec", "Versioning"],
+  "storage": {
+    "primary": "ab_report",
+    "legacy": ["ab_page_schema.extension.reportDsl (kind:'list' shell)"],
+    "migration": "required"
+  },
+  "owner": "core-designer",
+  "decision": "DDR-2026-06-18-designer-kernel-boundary",
+  "note": "Block tree + paged-media layout profile — NOT a new family. Storage migration (ab_page_schema.extension.reportDsl -> ab_report) is B1 Phase 4."
+}

@@ -322,7 +322,7 @@ export class DynamicPageHelper {
   }
 
   get createButton() {
-    return this.page.locator('button:has-text("新建"), button:has-text("创建")').first();
+    return this.page.locator('button:has-text("新建"):not(:has-text("今日")), button:has-text("创建")').first();
   }
 
   get searchInput() {

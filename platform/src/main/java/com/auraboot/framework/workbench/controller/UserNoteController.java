@@ -1,6 +1,7 @@
 package com.auraboot.framework.workbench.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.workbench.dto.UserNoteDTO;
 import com.auraboot.framework.workbench.dto.UserNoteRequest;
 import com.auraboot.framework.workbench.service.UserNoteService;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/user-notes")
 @RequiredArgsConstructor
 @Tag(name = "User Notes", description = "Personal quick notes for the workbench")
+@AuthenticatedAccess("operates only on the caller's own notes (MetaContext userId)")
 public class UserNoteController {
 
     private final UserNoteService userNoteService;

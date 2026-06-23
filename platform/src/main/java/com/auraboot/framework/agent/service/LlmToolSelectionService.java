@@ -95,6 +95,7 @@ public class LlmToolSelectionService {
             if (t.getToolCode() != null) knownCodes.add(t.getToolCode());
         }
 
+        boolean readOnlyIntent = isReadOnlyIntent(taskDescription);
         List<String> selected = new ArrayList<>();
         List<String> hallucinated = new ArrayList<>();
         for (Object item : toolList) {
@@ -106,6 +107,9 @@ public class LlmToolSelectionService {
                 hallucinated.add(code);
                 log.warn("LLM tool selection hallucinated unknown tool code '{}'", code);
             }
+        }
+        if (readOnlyIntent) {
+            selected = enforceReadOnlyIntent(selected, candidates, maxTools);
         }
         return new Selection(selected, hallucinated);
     }
@@ -133,7 +137,111 @@ public class LlmToolSelectionService {
             }
             sb.append('\n');
         }
+        sb.append("\nSafety rules:\n");
+        sb.append("- If the task asks to query, diagnose, gather context, or explicitly says not to act, ");
+        sb.append("prefer read-only/low-risk tools and do not include write/control/approval tools.\n");
+        sb.append("- Only include mutating tools when the task explicitly asks to create, update, approve, close, release, or execute an action.\n");
         return sb.toString();
+    }
+
+    private List<String> enforceReadOnlyIntent(List<String> selected,
+                                               List<ToolDefinition> candidates,
+                                               int maxTools) {
+        List<String> filtered = new ArrayList<>();
+        for (String code : selected) {
+            ToolDefinition tool = findByCode(candidates, code);
+            if (tool == null || isMutatingTool(tool)) {
+                if (tool != null) {
+                    log.info("Dropping mutating tool '{}' from read-only intent selection", code);
+                }
+                continue;
+            }
+            filtered.add(code);
+        }
+        if (filtered.isEmpty()) {
+            for (ToolDefinition tool : candidates) {
+                if (tool == null || tool.getToolCode() == null || isMutatingTool(tool)) continue;
+                if (isReadTool(tool)) {
+                    filtered.add(tool.getToolCode());
+                    break;
+                }
+            }
+        }
+        if (filtered.size() > maxTools) {
+            return new ArrayList<>(filtered.subList(0, maxTools));
+        }
+        return filtered;
+    }
+
+    private ToolDefinition findByCode(List<ToolDefinition> candidates, String code) {
+        if (candidates == null || code == null) return null;
+        for (ToolDefinition tool : candidates) {
+            if (tool != null && code.equals(tool.getToolCode())) return tool;
+        }
+        return null;
+    }
+
+    private boolean isReadOnlyIntent(String taskDescription) {
+        if (taskDescription == null || taskDescription.isBlank()) return false;
+        String t = taskDescription.toLowerCase();
+        boolean explicitNoAction = containsAny(t,
+                "不要直接", "不要动", "不要操作", "不要执行", "不要修改", "不要更新",
+                "不要创建", "不要处理", "只读", "先获取", "先查询", "先查",
+                "do not act", "don't act", "do not execute", "don't execute",
+                "do not modify", "don't modify", "do not update", "don't update",
+                "read-only", "read only", "gather context");
+        if (explicitNoAction) return true;
+
+        boolean readCue = containsAny(t,
+                "查询", "获取", "查看", "读取", "诊断", "分析", "上下文", "趋势",
+                "query", "read", "lookup", "inspect", "diagnose", "analyze", "analyse",
+                "gather", "context", "trend");
+        boolean actionCue = containsAny(t,
+                "创建", "生成", "更新", "修改", "删除", "审批", "批准", "释放", "关闭", "执行",
+                "create", "generate", "update", "modify", "delete", "approve", "release",
+                "close", "execute", "invoke", "run");
+        return readCue && !actionCue;
+    }
+
+    private boolean isMutatingTool(ToolDefinition tool) {
+        if (tool == null) return false;
+        String risk = tool.getRiskLevel();
+        if (risk != null) {
+            String normalized = risk.trim().toUpperCase();
+            if ("L2".equals(normalized) || "L3".equals(normalized) || "L4".equals(normalized)) {
+                return true;
+            }
+        }
+        if (tool.isRequiresApproval() || tool.isRequiresConfirmation()) return true;
+        String haystack = (safeLower(tool.getToolCode()) + " "
+                + safeLower(tool.getToolName()) + " "
+                + safeLower(tool.getDescription()));
+        return containsAny(haystack,
+                "write", "control", "mutating", "create", "update", "delete", "approve",
+                "release", "dispose", "close", "execute", "invoke", "restart", "reset",
+                "写", "控制", "创建", "更新", "修改", "删除", "审批", "批准", "释放", "处置", "关闭", "执行");
+    }
+
+    private boolean isReadTool(ToolDefinition tool) {
+        if (tool == null) return false;
+        String haystack = (safeLower(tool.getToolCode()) + " "
+                + safeLower(tool.getToolName()) + " "
+                + safeLower(tool.getDescription()));
+        return containsAny(haystack,
+                "query", "read", "list", "get", "lookup", "search", "inspect", "diagnose",
+                "查询", "读取", "列表", "获取", "查看", "诊断");
+    }
+
+    private boolean containsAny(String text, String... needles) {
+        if (text == null) return false;
+        for (String needle : needles) {
+            if (needle != null && !needle.isBlank() && text.contains(needle)) return true;
+        }
+        return false;
+    }
+
+    private String safeLower(String text) {
+        return text == null ? "" : text.toLowerCase();
     }
 
     // =========================================================================

@@ -38,6 +38,12 @@ export interface PageSchemaDTO {
   description?: string | null;
   kind: string;
   commandCode?: string;
+  /**
+   * Convention-resolved CRUD command codes for this page's model, keyed by
+   * operation type (create/update/delete). Server-attached so standard forms
+   * route through the business command without per-page config or a URL param.
+   */
+  commands?: Record<string, string> | null;
   blocks?: any[];
   layout?: Record<string, any> | null;
   dataSources?: Record<string, DataSourceConfig> | null;
@@ -463,6 +469,9 @@ export function canonicalizePageSchemaDto(pageSchemaDTO: PageSchemaDTO): Unified
     blocks,
     ...(Object.keys(dataSources).length > 0 && { dataSources }),
     layout: migrated.layout || { type: 'stack' },
+    // Carry the server-resolved convention CRUD command map straight from the
+    // DTO (it is not part of the DSL migrator surface).
+    ...(pageSchemaDTO.commands && { commands: pageSchemaDTO.commands }),
   } as UnifiedSchema;
 }
 

@@ -140,12 +140,27 @@ tasks.register('verifyMultiWorktreeGuard') {
 }
 
 repositories {
-    mavenLocal()      // Must be first — SmartEngine fork jars only exist here
+    mavenLocal()
+    // SmartEngine fork artifacts are published to Maven Central. Keep this
+    // before Aliyun mirrors so Gradle does not stick to a partially synced
+    // mirror that has metadata but not all jars.
+    mavenCentral {
+        name = 'Maven Central SmartEngine'
+        content {
+            includeGroup 'com.auraboot.smart.framework'
+        }
+    }
     maven {
         url = 'https://maven.aliyun.com/repository/public'
+        content {
+            excludeGroup 'com.auraboot.smart.framework'
+        }
     }
     maven {
         url = 'https://maven.aliyun.com/repository/spring'
+        content {
+            excludeGroup 'com.auraboot.smart.framework'
+        }
     }
     mavenCentral()
     // Apache repository for snapshots and releases
@@ -257,6 +272,7 @@ dependencies {
     // or kafka-clients inside a plugin causes split-package classloader errors.
     implementation "org.springframework.kafka:spring-kafka:${springKafkaVersion}"
     implementation "org.apache.kafka:kafka-clients:${kafkaClientsVersion}"
+    runtimeOnly project(':platform-mq-kafka')
 
     // ULID
     implementation 'de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0'
@@ -406,6 +422,9 @@ dependencies {
 
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
     testImplementation 'org.awaitility:awaitility:4.3.0'
+
+    // Avro schema compatibility tests for Kafka-backed telemetry contracts.
+    testImplementation 'org.apache.avro:avro:1.11.3'
 
     // JUnit 5 Platform
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
@@ -778,13 +797,26 @@ jacocoTestCoverageVerification {
         // (51452/66519); security service packages 0.85-0.99. Floor raised 0.73->0.75 (same ~2pt
         // flaky margin; conservative — 73 pre-existing/env failures still undercount coverage).
         // Evidence: docs/retro/2026-06-18-oss-coverage-gate-consolidation-testing-gate-acceptance-report.md.
+        // 2026-06-19 backend IT waves 5-8 (#847-#850): real-stack ITs for DataDomainServiceImpl
+        // (7->96%), FieldMaskServiceImpl (22->84%), VirtualFieldEngine.evaluate, ApiConnector +
+        // JdbcConnector CRUD, plus three live bugs fixed (two missing cache regions + a
+        // tenant-interceptor recursive-CTE break, all surfaced by the ITs) and a systemic
+        // cache-name audit (every @Cacheable/@CacheEvict name now registered). The clean full
+        // suite now measures 77.69% (51718/66566); floor raised 0.75->0.76 (security packages
+        // still 0.85-0.99). Keep raising it per wave toward the 0.80 target.
+        // 2026-06-19 backend IT waves 9-21 (#852-#867): SodService/DrtDefinition/CloudConfig CRUD,
+        // FieldValidation, FieldBindingContext (1->73%), RelationSync, ActivityEventListener
+        // (7->58%, @Async unwrapped via AopTestUtils), AsyncTask, AssertPhase, VirtualFieldEngine
+        // graph (->82%), DynamicData typed-coercion + Excel export, AuditTrail (52->86%), Category,
+        // DataPermission/PostExecution branches. Clean full suite now 78.69% (52380/66566); floor
+        // raised 0.76->0.77 (1.69pt margin, same as the 0.76 bump; security packages 0.85-0.99).
         rule {
             enabled = true
             element = 'BUNDLE'
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.75
+                minimum = 0.77
             }
         }
         // Lock the already-strong security/identity domains so they cannot rot.

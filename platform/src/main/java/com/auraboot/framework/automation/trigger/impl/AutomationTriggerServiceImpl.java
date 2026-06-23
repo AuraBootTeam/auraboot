@@ -350,6 +350,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
         // Delegate safety checks (length + dangerous pattern) to the shared guard
         if (!SpelSafetyGuard.isSafe(condition)) {
+            // Previously a silent skip — surface it so a mis-authored / blocked condition is
+            // diagnosable instead of an automation silently never firing for no visible reason.
+            log.warn("Automation condition rejected by SpEL safety guard, treating as not-matched: '{}'", condition);
             return false;
         }
 

@@ -2,6 +2,7 @@ package com.auraboot.framework.saas.bootstrap;
 
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
+import com.auraboot.framework.saas.config.service.SystemConfigService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,6 +52,9 @@ class BootstrapBillingAccountIT {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private SystemConfigService systemConfigService;
+
     /** Always mocked per project convention — never send real mail in tests. */
     @MockitoBean
     @SuppressWarnings("unused")
@@ -69,7 +73,10 @@ class BootstrapBillingAccountIT {
      * pass this gate.
      */
     @BeforeEach
-    void assertUninitialized() {
+    void resetBootstrapState() {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        tx.executeWithoutResult(status -> cleanupBootstrapRows());
+        systemConfigService.evictCache();
         Integer initialized = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_system_config WHERE config_key = 'system.initialized' AND config_value = 'true'",
                 Integer.class);
@@ -89,21 +96,8 @@ class BootstrapBillingAccountIT {
             return;
         }
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
-        tx.executeWithoutResult(status -> {
-            // Remove user-roles, roles, menus, tenant-members (cascade via delete)
-            jdbcTemplate.update("DELETE FROM ab_user_role WHERE 1=1");
-            jdbcTemplate.update("DELETE FROM ab_role WHERE 1=1");
-            jdbcTemplate.update("DELETE FROM ab_menu WHERE 1=1");
-            jdbcTemplate.update("DELETE FROM ab_tenant_member WHERE 1=1");
-            // Detach billing_account_id FK before deleting tenants / accounts
-            jdbcTemplate.update("UPDATE ab_tenant SET billing_account_id = NULL WHERE 1=1");
-            jdbcTemplate.update("DELETE FROM ab_tenant WHERE 1=1");
-            jdbcTemplate.update("DELETE FROM ab_billing_account WHERE 1=1");
-            jdbcTemplate.update("DELETE FROM ab_user WHERE 1=1");
-            jdbcTemplate.update("DELETE FROM ab_system_config WHERE 1=1");
-            jdbcTemplate.update("DELETE FROM ab_bootstrap WHERE 1=1");
-            jdbcTemplate.update("DELETE FROM ab_permission WHERE 1=1");
-        });
+        tx.executeWithoutResult(status -> cleanupBootstrapRows());
+        systemConfigService.evictCache();
     }
 
     // ── test ─────────────────────────────────────────────────────────────────
@@ -156,5 +150,23 @@ class BootstrapBillingAccountIT {
         assertThat(accountStatus)
                 .as("ab_billing_account.status should be 'active'")
                 .isEqualTo("active");
+    }
+
+    private void cleanupBootstrapRows() {
+        jdbcTemplate.update("DELETE FROM ab_user_role WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_role_permission WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_subject_permission WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_menu WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_invitation WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_tenant_member WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_role WHERE 1=1");
+        // Detach billing_account_id FK before deleting tenants / accounts
+        jdbcTemplate.update("UPDATE ab_tenant SET billing_account_id = NULL WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_tenant WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_billing_account WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_user WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_system_config WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_bootstrap WHERE 1=1");
+        jdbcTemplate.update("DELETE FROM ab_permission WHERE 1=1");
     }
 }

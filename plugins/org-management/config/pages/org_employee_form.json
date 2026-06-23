@@ -126,8 +126,7 @@
             "en": "Save"
           },
           "action": {
-            "type": "command",
-            "command": "org:create_employee"
+            "type": "command"
           }
         },
         {

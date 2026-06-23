@@ -69,7 +69,7 @@ public class TenantMemberServiceImpl extends ServiceImpl<TenantMemberMapper, Ten
         TenantMember byTenantIdAndUserId = tenantMemberMapper.findByTenantIdAndUserId(tenantId, userId);
         // 检查用户是否已经是该租户的成员
         if (null != byTenantIdAndUserId) {
-            throw new BusinessException("用户已经是该租户的成员");
+            throw new BusinessException("$i18n:tenant.member.already_member");
         }
 
         TenantMember member = new TenantMember();
@@ -95,7 +95,7 @@ public class TenantMemberServiceImpl extends ServiceImpl<TenantMemberMapper, Ten
         
         TenantMember existingMember = getById(member.getId());
         if (existingMember == null) {
-            throw new BusinessException("成员不存在: " + member.getId());
+            throw BusinessException.i18n("tenant.member.not_found", member.getId());
         }
         
         validateAndNormalizeTeamProfile(member, existingMember);
@@ -151,7 +151,7 @@ public class TenantMemberServiceImpl extends ServiceImpl<TenantMemberMapper, Ten
         
         TenantMember member = getById(memberId);
         if (member == null) {
-            throw new BusinessException("成员不存在: " + memberId);
+            throw BusinessException.i18n("tenant.member.not_found", memberId);
         }
         
         member.setStatus(StatusConstants.ACTIVE);
@@ -167,7 +167,7 @@ public class TenantMemberServiceImpl extends ServiceImpl<TenantMemberMapper, Ten
 
         TenantMember member = getById(memberId);
         if (member == null) {
-            throw new BusinessException("成员不存在: " + memberId);
+            throw BusinessException.i18n("tenant.member.not_found", memberId);
         }
 
         member.setStatus(StatusConstants.INACTIVE);
@@ -184,7 +184,7 @@ public class TenantMemberServiceImpl extends ServiceImpl<TenantMemberMapper, Ten
         
         TenantMember member = getById(memberId);
         if (member == null) {
-            throw new BusinessException("成员不存在: " + memberId);
+            throw BusinessException.i18n("tenant.member.not_found", memberId);
         }
         
         member.setStatus(StatusConstants.SUSPENDED);
@@ -201,7 +201,7 @@ public class TenantMemberServiceImpl extends ServiceImpl<TenantMemberMapper, Ten
 
         TenantMember member = getById(memberId);
         if (member == null) {
-            throw new BusinessException("成员不存在: " + memberId);
+            throw BusinessException.i18n("tenant.member.not_found", memberId);
         }
 
         // Set leaveDate before logical delete

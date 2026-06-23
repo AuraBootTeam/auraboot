@@ -8,11 +8,17 @@ import com.auraboot.framework.exception.PermissionDeniedException;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.bpm.converter.BpmnConversionException;
+import com.auraboot.framework.i18n.service.I18nService;
+import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import com.auraboot.framework.meta.exception.TemporalParseException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -57,6 +63,11 @@ public class GlobalExceptionHandler {
 
     @Value("${spring.profiles.active:prod}")
     private String activeProfile;
+
+    @Autowired
+    private I18nService i18nService;
+    @Autowired
+    private I18nLocaleResolver i18nLocaleResolver;
 
     private boolean isDevEnvironment() {
         return activeProfile.contains("dev") || activeProfile.contains("local");
@@ -242,17 +253,78 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
+    /**
+     * Honor a Spring {@link ResponseStatusException}'s own status instead of letting it fall through
+     * to the catch-all 500. Without this, any code raising {@code ResponseStatusException} (the
+     * public keyed-collect guard's 403/429/400, the authenticated collect's 401) was silently
+     * mapped to 500 because the {@code @ExceptionHandler(Exception.class)} catch-all matched first.
+     * The reason phrase is a stable token (e.g. {@code site_key_invalid}) returned as the message.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleResponseStatusException(ResponseStatusException ex) {
+        HttpStatusCode status = ex.getStatusCode();
+        String reason = ex.getReason() != null ? ex.getReason() : ex.getMessage();
+        log.warn("ResponseStatusException {}: {}", status, reason);
+        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BUSINESS_ERROR, reason);
+        return ResponseEntity.status(status).body(response);
+    }
+
     @ExceptionHandler(BusinessException.class)
     @ResponseBody
-    public ResponseEntity<ApiResponse<Object>> handleBusinessException(BusinessException ex) {
+    public ResponseEntity<ApiResponse<Object>> handleBusinessException(BusinessException ex,
+                                                                       HttpServletRequest request) {
         log.error("Business exception:", ex);
 
         ResponseCode responseCode = ex.getResponseCode() != null
                 ? ex.getResponseCode()
                 : ResponseCode.BUSINESS_ERROR;
-        Object detail = isDevEnvironment() ? buildDevDetail(ex) : ex.getMessage();
+        Object detail = isDevEnvironment() ? buildDevDetail(ex) : localizeBusinessMessage(ex, request);
         ApiResponse<Object> response = ApiResponse.errorWithContext(responseCode, detail);
         return ResponseEntity.status(mapResponseCodeToStatus(responseCode)).body(response);
+    }
+
+    /**
+     * Localize a BusinessException's user-facing message. Static {@code $i18n:<key>} messages go
+     * through {@link #localizeI18nMessage}; parameterized ones (constructed via
+     * {@code BusinessException.i18n(key, args)}) substitute {@code {0}} via
+     * {@link I18nService#getMessage}. Non-{@code $i18n:} messages pass through unchanged.
+     */
+    String localizeBusinessMessage(BusinessException ex, HttpServletRequest request) {
+        Object[] args = ex.getI18nArgs();
+        String text = ex.getMessage();
+        if (args == null || args.length == 0) {
+            return localizeI18nMessage(text, request);
+        }
+        if (text == null || !text.startsWith("$i18n:")) {
+            return text;
+        }
+        String key = text.substring("$i18n:".length());
+        String locale = i18nLocaleResolver.resolveLocale(request);
+        String value = i18nService.getMessage(locale, key, args);
+        if (value == null) {
+            value = i18nService.getMessage("zh-CN", key, args); // base-locale fallback (ja/ko gaps)
+        }
+        return value != null ? value : key;
+    }
+
+    /**
+     * Resolve a {@code $i18n:<key>} message to the request locale via the existing i18n catalog
+     * (I18nLocaleResolver + I18nService), mirroring TenantSelectionController (#885). Messages
+     * NOT prefixed with {@code $i18n:} pass through unchanged, so this is a no-op for every
+     * BusinessException message not yet migrated to a key — zero behavior change for those.
+     */
+    String localizeI18nMessage(String text, HttpServletRequest request) {
+        if (text == null || !text.startsWith("$i18n:")) {
+            return text;
+        }
+        String key = text.substring("$i18n:".length());
+        String locale = i18nLocaleResolver.resolveLocale(request);
+        String value = i18nService.getValue(locale, key);
+        if (value == null) {
+            value = i18nService.getValue("zh-CN", key); // base-locale fallback (ja/ko gaps)
+        }
+        return value != null ? value : key;
     }
 
     /**

@@ -17,6 +17,7 @@ import type {
   KanbanAggregation,
 } from '~/framework/smart/types/kanban';
 import type { AggregateQueryRequest, FilterConfig } from '~/framework/smart/types/chart';
+import { getPublicRecordKey } from '~/framework/meta/utils/publicRecordId';
 
 /**
  * Options for the useKanbanData hook
@@ -163,7 +164,7 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
   const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
-  const { groupByField, idField = 'id', aggregations } = dataSource;
+  const { groupByField, idField = 'pid', aggregations } = dataSource;
 
   /**
    * Fetch data from the API
@@ -322,11 +323,10 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
       const { key: groupKey, title: groupTitle } = resolveGroup(groupValue);
 
       // Note: spread row first, then override `id` last so the configured
-      // idField (e.g. "pid") wins over a row's numeric primary-key `id`.
-      // Reversing this order would let `row.id = 1` clobber `String(row.pid)`.
+      // idField (e.g. "pid") wins over any legacy compatibility field.
       const card: KanbanCard = {
         ...row,
-        id: String(row[idField] ?? ''),
+        id: getPublicRecordKey(row, undefined, idField) ?? '',
       };
 
       if (!groupedData.has(groupKey)) {
@@ -390,7 +390,7 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
       // Step 1: optimistic update
       setRawData((prevData) =>
         prevData.map((row) => {
-          const rowId = String(row[idField] ?? '');
+          const rowId = getPublicRecordKey(row, undefined, idField) ?? '';
           if (rowId === cardId) {
             return { ...row, [groupByField]: targetColumnId };
           }
@@ -406,7 +406,7 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
       const rollback = () => {
         setRawData((prevData) =>
           prevData.map((row) => {
-            const rowId = String(row[idField] ?? '');
+            const rowId = getPublicRecordKey(row, undefined, idField) ?? '';
             if (rowId === cardId) {
               return { ...row, [groupByField]: sourceColumnId };
             }

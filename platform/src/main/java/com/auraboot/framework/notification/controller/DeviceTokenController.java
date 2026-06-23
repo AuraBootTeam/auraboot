@@ -3,6 +3,7 @@ package com.auraboot.framework.notification.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.notification.service.DeviceTokenService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import java.util.Map;
 @RequestMapping("/api/mobile/device-tokens")
 @RequiredArgsConstructor
 @Tag(name = "Device Tokens", description = "Push notification device token management")
+@AuthenticatedAccess("operates only on the caller's own device push tokens (MetaContext userId)")
 public class DeviceTokenController {
 
     private final DeviceTokenService deviceTokenService;

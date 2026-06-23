@@ -21,8 +21,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "crm_activity_form",
-            "command": "crm:create_activity"
+            "to": "crm_activity_form"
           }
         }
       ]
@@ -138,8 +137,7 @@
               },
               "confirm": "delete.confirm",
               "action": {
-                "type": "command",
-                "command": "crm:delete_activity"
+                "type": "command"
               }
             }
           ],

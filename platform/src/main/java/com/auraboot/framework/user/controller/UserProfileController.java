@@ -6,6 +6,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.file.dto.FileUploadResponseDTO;
 import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.user.dto.ChangePasswordRequest;
 import com.auraboot.framework.user.dto.UpdateUserProfileRequest;
 import com.auraboot.framework.user.dto.UserProfileResponse;
@@ -26,6 +27,7 @@ import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 @RequestMapping("/api/user")
 @RequiredArgsConstructor
 @Tag(name = "用户个人资料", description = "用户个人资料管理相关接口")
+@AuthenticatedAccess("operates only on the caller's own profile/password/avatar (@CurrentUserId)")
 public class UserProfileController {
     
     private final UserProfileService userProfileService;

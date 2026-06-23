@@ -38,12 +38,22 @@ public class AiTraceService {
 
     public TraceContext createTrace(Long tenantId, String sessionId, String userMessage,
                                     Long userId, Map<String, Object> metadata) {
+        return createTrace(tenantId, sessionId, userMessage, userId, metadata, null);
+    }
+
+    /**
+     * @param otelTraceId OTel W3C traceId snapshotted at the request-thread seam (A-G1,
+     *                    P1); null for background runs with no active span.
+     */
+    public TraceContext createTrace(Long tenantId, String sessionId, String userMessage,
+                                    Long userId, Map<String, Object> metadata, String otelTraceId) {
         try {
             Instant now = Instant.now();
             String traceId = UUID.randomUUID().toString();
 
             traceMapper.insertTraceRecord(
                     traceId,
+                    otelTraceId,
                     tenantId,
                     sessionId,
                     "chat",
@@ -168,6 +178,7 @@ public class AiTraceService {
                                 .setSql(outputTokens != null, "total_output_tokens = total_output_tokens + " + outputTokens)
                                 .setSql(cost != null, "total_cost = total_cost + " + cost));
             }
+
         } catch (Exception e) {
             log.warn("Failed to record generation {}: {}", ctx.getSpanId(), e.getMessage());
         }

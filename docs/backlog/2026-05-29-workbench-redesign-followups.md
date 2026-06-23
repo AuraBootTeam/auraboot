@@ -28,6 +28,7 @@ created: 2026-05-29
 - **Owner:** product decision needed before implementation.
 
 ### W-FU-4 · Drop deprecated `gradient` prop from `StatsCardWidget`
+- ✅ **DONE (2026-06-20, PR #915)** — pre-req re-confirmed (zero seed/JSX consumers across OSS + enterprise), prop + stale comments removed; tsc-safe.
 - **Why:** Kept as a typed no-op for backward compatibility with any dashboard JSON that still sets it. Plan recommended removing once OSS + enterprise overlay dashboards are migrated.
 - **Pre-req:** confirm no dashboard JSON in `platform/src/main/resources/seed/` or `auraboot-enterprise/` sets `gradient` on a workbench Stats widget. (Initial audit found none — re-confirm before removal.)
 
@@ -38,10 +39,12 @@ created: 2026-05-29
 - **Suggestions:** "Export" → trigger an existing dashboard-export-excel flow if applicable; "+ New" → open a command palette filtered to "create" actions.
 
 ### W-FU-6 · Sparkline tooltip on hover
+- ✅ **DONE (2026-06-20, PR #934)** — hover tooltip added (transparent per-point hit-areas, design-system tokens, optional labels, boundary-clamped); 10 vitest.
 - **Current state:** SVG `polyline` with no interactivity.
 - **Cost vs value:** small, but only worth adding if users actually inspect 7-day numbers (probably not in the workbench summary context). Defer until asked.
 
 ### W-FU-7 · i18n parity audit for new workbench keys
+- ✅ **DONE (2026-06-20, verified)** — all 7 keys present with non-empty zh-CN + en-US (also ja-JP/ko-KR) in `seed/i18n-base.json`; `validate-plugin-i18n.mjs` 15 files 0 fail. No change needed.
 - **New keys added this round:** `workbench.title`, `workbench.subline`, `workbench.export`, `workbench.new`, `workbench.inbox.col.task`, `workbench.inbox.col.type`, `workbench.inbox.col.due`.
 - **Verify:** `node scripts/validate-i18n-parity.mjs` (if it exists) — confirm all 7 keys have non-empty `zh-CN` and `en-US` values.
 
@@ -52,6 +55,7 @@ created: 2026-05-29
 ## P3 — track but don't implement now
 
 ### W-FU-9 · Stale `cmd-k-trigger` testid name
+- ✅ **DONE (2026-06-20, PR #916)** — renamed `cmd-k-trigger` → `header-search-trigger` across CommandPalette.tsx + Header.test.tsx + the 3 e2e specs (11 occurrences); `Header.test.tsx` 3 pass, 0 remaining.
 - The CommandPalette trigger keeps its 1.x-era testid `cmd-k-trigger`. The Header redesign almost renamed it (caught in code review). Long-term we could rename to `header-search-trigger` for clarity, but it requires updating 4 existing E2E specs:
   - `web-admin/tests/e2e/search/global-search.spec.ts` (4×)
   - `web-admin/tests/e2e/search/command-palette-docs.spec.ts` (2×)

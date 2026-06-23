@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderChartSpecToSvg > snapshot goldens > bar 1`] = `"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" viewBox="0 0 400 240" font-family="sans-serif"><g data-orientation="vertical"><rect x="34.4" y="149.3" width="85.9" height="62.7" fill="#3b82f6" /><text x="77.3" y="228" text-anchor="middle" font-size="11" fill="#1e293b">A</text><rect x="157.1" y="24" width="85.9" height="188" fill="#3b82f6" /><text x="200" y="228" text-anchor="middle" font-size="11" fill="#1e293b">B</text><rect x="279.7" y="86.7" width="85.9" height="125.3" fill="#3b82f6" /><text x="322.7" y="228" text-anchor="middle" font-size="11" fill="#1e293b">C</text></g></svg>"`;
+
+exports[`renderChartSpecToSvg > snapshot goldens > pie 1`] = `"<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300" font-family="sans-serif"><g data-render="pie"><path d="M 150 158 L 150 32 A 126 126 0 0 1 259.1 95 Z" fill="#3b82f6" /><path d="M 150 158 L 259.1 95 A 126 126 0 0 1 40.9 221 Z" fill="#ef4444" /><path d="M 150 158 L 40.9 221 A 126 126 0 0 1 150 32 Z" fill="#22c55e" /></g></svg>"`;

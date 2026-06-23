@@ -35,6 +35,8 @@ const variantStyles = fieldVariantStyles;
 
 const EMPTY_OPTIONS: SelectProps['options'] = [];
 
+export const CREATE_NEW_VALUE = '__aura_create_new__';
+
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   (
     {
@@ -63,6 +65,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       onChange,
       onBlur,
       onClear,
+      canCreateNew = false,
+      createNewLabel,
+      onCreateNew,
       className,
       ...restProps
     },
@@ -142,6 +147,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 
     // Radix Select value change handler (single-select mode)
     const handleRadixValueChange = (newValue: string) => {
+      if (newValue === CREATE_NEW_VALUE) {
+        onCreateNew?.();
+        return;
+      }
+      if (newValue === '' && field.value != null && String(field.value) !== '') {
+        return;
+      }
       field.setValue(newValue);
     };
 
@@ -206,6 +218,21 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                   {option.label}
                 </SelectItem>
               ))}
+              {canCreateNew && (
+                <SelectItem
+                  key={CREATE_NEW_VALUE}
+                  value={CREATE_NEW_VALUE}
+                  data-testid={`select-create-new-${name}`}
+                  className="text-accent font-medium"
+                >
+                  {createNewLabel ??
+                    (t('action.createNew') !== 'action.createNew'
+                      ? t('action.createNew')
+                      : locale === 'zh-CN'
+                        ? '+ 新建'
+                        : '+ New')}
+                </SelectItem>
+              )}
             </SelectContent>
           </BaseSelect>
           {/* Clear button overlaid on trigger */}
@@ -216,7 +243,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 e.stopPropagation();
                 handleClearClick();
               }}
-              className="absolute top-1/2 right-8 -translate-y-1/2 rounded-sm p-0.5 text-gray-400 hover:text-gray-600"
+              className="text-text-3 hover:text-text-2 absolute top-1/2 right-8 -translate-y-1/2 rounded-sm p-0.5"
               tabIndex={-1}
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -268,8 +295,25 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 </svg>
               </FieldActionButton>
             )}
+            {canCreateNew && !disabledValue && !loading && (
+              <FieldActionButton
+                type="button"
+                onClick={() => onCreateNew?.()}
+                data-testid={`select-create-new-${name}`}
+                iconOnly
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+              </FieldActionButton>
+            )}
             {loading && (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+              <div className="border-accent h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"></div>
             )}
           </FieldActionGroup>
         }
@@ -348,8 +392,8 @@ export function SelectSideBar({
   focusItem: any;
 }) {
   return (
-    <div className="w-full rounded-lg bg-white p-4 shadow-sm dark:bg-gray-800">
-      <h2 className="mb-6 border-b pb-3 text-center text-xl font-bold text-gray-900 dark:text-white">
+    <div className="rounded-card bg-panel shadow-card w-full p-4">
+      <h2 className="border-border text-text mb-6 border-b pb-3 text-center text-xl font-bold">
         下拉框属性设置
       </h2>
 
@@ -357,7 +401,7 @@ export function SelectSideBar({
         <div className="flex items-center">
           <label
             htmlFor="props.label"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium"
           >
             标签：
           </label>
@@ -365,14 +409,14 @@ export function SelectSideBar({
             name="props.label"
             onChange={onChange}
             value={focusItem.props?.label || ''}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong bg-panel text-text shadow-card focus:border-accent focus-visible:shadow-focus flex-1 border px-3 py-2 focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.placeholder"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium"
           >
             占位符：
           </label>
@@ -380,14 +424,14 @@ export function SelectSideBar({
             name="props.placeholder"
             onChange={onChange}
             value={focusItem.props?.placeholder || ''}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong bg-panel text-text shadow-card focus:border-accent focus-visible:shadow-focus flex-1 border px-3 py-2 focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.size"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium"
           >
             尺寸：
           </label>
@@ -395,7 +439,7 @@ export function SelectSideBar({
             name="props.size"
             onChange={onChange}
             value={focusItem.props?.size || 'medium'}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong bg-panel text-text shadow-card focus:border-accent focus-visible:shadow-focus flex-1 border px-3 py-2 focus:outline-none"
           >
             <option value="small">小</option>
             <option value="medium">中</option>
@@ -406,7 +450,7 @@ export function SelectSideBar({
         <div className="flex items-center">
           <label
             htmlFor="props.variant"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium"
           >
             样式：
           </label>
@@ -414,7 +458,7 @@ export function SelectSideBar({
             name="props.variant"
             onChange={onChange}
             value={focusItem.props?.variant || 'default'}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong bg-panel text-text shadow-card focus:border-accent focus-visible:shadow-focus flex-1 border px-3 py-2 focus:outline-none"
           >
             <option value="default">默认</option>
             <option value="outline">轮廓</option>
@@ -425,7 +469,7 @@ export function SelectSideBar({
         <div className="flex items-center">
           <label
             htmlFor="props.inline"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium"
           >
             内联显示：
           </label>
@@ -434,14 +478,14 @@ export function SelectSideBar({
             name="props.inline"
             onChange={onChange}
             checked={focusItem.props?.inline || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.multiple"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium"
           >
             多选：
           </label>
@@ -450,14 +494,14 @@ export function SelectSideBar({
             name="props.multiple"
             onChange={onChange}
             checked={focusItem.props?.multiple || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.clearable"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium"
           >
             可清除：
           </label>
@@ -466,14 +510,14 @@ export function SelectSideBar({
             name="props.clearable"
             onChange={onChange}
             checked={focusItem.props?.clearable || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div className="flex items-center">
           <label
             htmlFor="props.required"
-            className="w-1/4 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="text-text-2 w-1/4 text-sm font-medium"
           >
             必填：
           </label>
@@ -482,12 +526,12 @@ export function SelectSideBar({
             name="props.required"
             onChange={onChange}
             checked={focusItem.props?.required || false}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
           />
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-text-2 mb-2 block text-sm font-medium">
             选项配置：
           </label>
           <textarea
@@ -499,9 +543,9 @@ export function SelectSideBar({
             }
             placeholder='[{"key":"1","value":"option1","label":"选项1"}]'
             rows={4}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-control border-border-strong bg-panel text-text shadow-card focus:border-accent focus-visible:shadow-focus w-full border px-3 py-2 font-mono text-sm focus:outline-none"
           />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-text-3 mt-1 text-xs">
             JSON 格式的选项数据，支持 key、value、label、disabled 字段
           </p>
         </div>

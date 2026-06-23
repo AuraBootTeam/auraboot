@@ -10,6 +10,7 @@
  */
 
 import React from 'react';
+import { setBlockResolver, setCustomBlockComponent } from '@auraboot/runtime-kernel';
 import { createRegistry } from './createRegistry';
 
 export interface BlockSpec {
@@ -190,4 +191,27 @@ export function initBlockRegistry(): void {
       'TraceGraphBlockRenderer',
     ),
   });
+
+  // Generic card grid — used by Template Marketplace gallery and any block
+  // that needs a responsive grid of cards with per-card action buttons.
+  BlockRegistry.register('card-grid', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/CardGridBlockRenderer'),
+      'CardGridBlockRenderer',
+    ),
+  });
+
+  // Wire the kernel BlockRenderer dispatcher's host-injected slots: this
+  // BlockRegistry is the fallback resolver, and ComponentLoader (lazy, so it
+  // stays out of the entry chunk) renders `custom` blocks. Done here so every
+  // entry point that initialises blocks — boot (createKernel) and tests — also
+  // wires the dispatcher: "blocks registered" ⟺ "dispatcher ready".
+  setBlockResolver(BlockRegistry);
+  setCustomBlockComponent(
+    React.lazy(() =>
+      import('~/framework/meta/rendering/components/ComponentLoader').then((m) => ({
+        default: m.ComponentLoader,
+      })),
+    ),
+  );
 }

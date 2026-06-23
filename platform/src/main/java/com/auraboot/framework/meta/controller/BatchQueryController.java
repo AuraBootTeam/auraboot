@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/datasource")
 @RequiredArgsConstructor
 @Tag(name = "Batch Query", description = "Execute multiple datasource queries in parallel")
+@AuthenticatedAccess("read-only POST-as-query (named queries); data-level access enforced by ABAC, not RBAC action codes")
 public class BatchQueryController {
 
     private final NamedQueryService namedQueryService;

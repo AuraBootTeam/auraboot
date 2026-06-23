@@ -20,7 +20,7 @@ import { Link, useLocation, useNavigate as useRouterNavigate } from 'react-route
 import { PrintButton } from '~/framework/meta/rendering/components/PrintButton';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { RecordShareDialog } from '~/ui/shared/RecordShareDialog';
-import type { PageContentProps } from '~/framework/meta/profiles/types';
+import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import {
   getLocalizedText,
@@ -47,7 +47,6 @@ import { ActivityTimeline } from '~/framework/meta/rendering/blocks/ActivityTime
 import { RecordComments } from '~/framework/meta/rendering/blocks/RecordComments';
 import { NbaSuggestionBar } from '~/framework/meta/rendering/blocks/NbaSuggestionBar';
 import { BpmPanelBlock } from '~/framework/meta/rendering/blocks/BpmPanelBlock';
-import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
 import { LayoutRenderer } from '~/framework/meta/rendering/layout/LayoutRenderer';
 import { resolveRecordParams } from '~/framework/meta/rendering/blocks/ChartBlockRenderer';
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
@@ -59,6 +58,7 @@ import type {
   DetailTabConfig,
   FieldConfig,
 } from '~/framework/meta/schemas/types';
+import { getPublicRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 
@@ -66,6 +66,10 @@ interface RecordData {
   [key: string]: any;
   id?: string;
   pid?: string;
+}
+
+interface DetailListResult {
+  records?: RecordData[];
 }
 
 export function resolveDetailFieldComponent(meta?: {
@@ -206,6 +210,54 @@ export function unwrapDetailRecord(rawData: any, recordPath?: string): Record<st
   if (!recordPath) return typeof rawData === 'object' ? rawData : {};
   const val = getByDataPath(rawData, recordPath);
   return val && typeof val === 'object' ? val : {};
+}
+
+export function mergeDetailDisplayFields(
+  record: Record<string, any>,
+  listRecord: Record<string, any> | undefined | null,
+): Record<string, any> {
+  if (!listRecord) return record;
+  const displayEntries = Object.entries(listRecord).filter(
+    ([key, value]) => key.endsWith('_display') && value !== null && value !== undefined,
+  );
+  if (displayEntries.length === 0) return record;
+  return {
+    ...record,
+    ...Object.fromEntries(displayEntries),
+  };
+}
+
+async function resolveDetailListDisplayRecord(
+  modelCode: string,
+  recordPid: string,
+  token?: string,
+): Promise<RecordData | undefined> {
+  try {
+    const result = await fetchResult<DetailListResult>(buildApiEndpoint(modelCode) + '/list', {
+      method: 'get',
+      params: {
+        pageNum: 1,
+        pageSize: 1,
+        filters: JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: recordPid }]),
+      },
+      token: token || undefined,
+    });
+    if (!ResultHelper.isSuccess(result)) return undefined;
+    const records = result.data?.records;
+    return Array.isArray(records) ? records[0] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function enrichDetailRecordDisplayFields(
+  modelCode: string,
+  recordPid: string,
+  record: Record<string, any>,
+  token?: string,
+): Promise<Record<string, any>> {
+  const listRecord = await resolveDetailListDisplayRecord(modelCode, recordPid, token);
+  return mergeDetailDisplayFields(record, listRecord);
 }
 
 /**
@@ -400,6 +452,7 @@ function DetailPageContentInner(props: PageContentProps) {
   const location = useLocation();
   const routerNavigate = useRouterNavigate();
   const recordModelCode = schema?.modelCode || tableName;
+  const routeRecordPid = useMemo(() => getPublicRecordPid({ pid: recordId }) || '', [recordId]);
 
   // Client-side record + model field loading (parallelized)
   const [recordData, setRecordData] = useState<RecordData>({});
@@ -411,16 +464,18 @@ function DetailPageContentInner(props: PageContentProps) {
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
 
   useEffect(() => {
-    if (!recordId || !tableName) {
+    if (!routeRecordPid || !recordModelCode) {
       setRecordLoading(false);
       return;
     }
+    const currentRecordPid = routeRecordPid;
+    const currentModelCode = recordModelCode;
     let cancelled = false;
 
     async function loadModelFields(): Promise<void> {
       // Use /api/dynamic/{pageKey}/field-meta which requires model-level read permission
       // instead of /api/meta/models/{pid}/fields which requires management permission
-      const pageKey = schema?.modelCode || tableName;
+      const pageKey = currentModelCode;
       if (!pageKey || shouldSkipDetailModelFieldMeta(schema)) return;
       const fieldsRes = await fetchResult<any[]>(`/api/dynamic/${pageKey}/field-meta`, {
         method: 'get',
@@ -436,7 +491,11 @@ function DetailPageContentInner(props: PageContentProps) {
     }
 
     async function loadRecord(): Promise<void> {
-      const { endpoint, method } = resolveDetailRecordEndpoint(schema, recordModelCode, recordId!);
+      const { endpoint, method } = resolveDetailRecordEndpoint(
+        schema,
+        currentModelCode,
+        currentRecordPid,
+      );
       const result = await fetchResult<RecordData>(endpoint, {
         method,
         token: token || undefined,
@@ -444,8 +503,16 @@ function DetailPageContentInner(props: PageContentProps) {
       if (cancelled) return;
       if (ResultHelper.isSuccess(result) && result.data) {
         const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
+        const unwrappedRecord = unwrapDetailRecord(result.data, recordPath);
         setRawData(result.data);
-        setRecordData(unwrapDetailRecord(result.data, recordPath));
+        setRecordData(
+          await enrichDetailRecordDisplayFields(
+            currentModelCode,
+            currentRecordPid,
+            unwrappedRecord,
+            token || undefined,
+          ),
+        );
       }
     }
 
@@ -461,22 +528,34 @@ function DetailPageContentInner(props: PageContentProps) {
     return () => {
       cancelled = true;
     };
-  }, [recordId, tableName, recordModelCode, schema, schema?.modelCode, token]);
+  }, [routeRecordPid, tableName, recordModelCode, schema, schema?.modelCode, token]);
 
   // Stable callback to reload the parent record (used after sub-table command execution)
   const reloadRecord = useCallback(() => {
-    if (!recordId || !tableName) return;
-    const { endpoint, method } = resolveDetailRecordEndpoint(schema, recordModelCode, recordId);
+    if (!routeRecordPid || !recordModelCode) return;
+    const currentRecordPid = routeRecordPid;
+    const currentModelCode = recordModelCode;
+    const { endpoint, method } = resolveDetailRecordEndpoint(
+      schema,
+      currentModelCode,
+      currentRecordPid,
+    );
     fetchResult<RecordData>(endpoint, { method, token: token || undefined })
       .then((result) => {
         if (ResultHelper.isSuccess(result) && result.data) {
           const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
+          const unwrappedRecord = unwrapDetailRecord(result.data, recordPath);
           setRawData(result.data);
-          setRecordData(unwrapDetailRecord(result.data, recordPath));
+          enrichDetailRecordDisplayFields(
+            currentModelCode,
+            currentRecordPid,
+            unwrappedRecord,
+            token || undefined,
+          ).then(setRecordData);
         }
       })
       .catch(() => {});
-  }, [recordId, tableName, recordModelCode, token, schema]);
+  }, [routeRecordPid, recordModelCode, token, schema]);
 
   // Enrich a page-schema field with model field metadata (dictCode, component, dataType)
   const enrichField = useCallback(
@@ -1350,6 +1429,9 @@ function DetailBlockRenderer({
                   <DynamicField
                     field={enrichedField}
                     value={sectionRecord ? sectionRecord[field.field] : undefined}
+                    displayValue={
+                      sectionRecord ? sectionRecord[`${field.field}_display`] : undefined
+                    }
                     onChange={() => {}}
                     readOnly={true}
                     locale={locale}
@@ -1570,6 +1652,7 @@ function FallbackDetailView({
           <DynamicField
             field={field}
             value={recordData ? recordData[field.field] : undefined}
+            displayValue={recordData ? recordData[`${field.field}_display`] : undefined}
             onChange={() => {}}
             readOnly={true}
             locale={locale}

@@ -9,6 +9,7 @@ import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.dto.DataScopeUpdateRequest;
 import com.auraboot.framework.permission.dto.PermissionGrantRequest;
+import com.auraboot.framework.permission.dto.RoleDefaultScopeRequest;
 import com.auraboot.framework.permission.dto.PermissionMatrixDTO;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
@@ -124,6 +125,47 @@ public class PermissionMatrixController {
         dataScopeService.setScope(tenantId, role.getId(),
             request.resourceCode(), request.actionCode(),
             request.scopeType(), request.mergeStrategy());
+        return ApiResponse.success();
+    }
+
+    /**
+     * Get the role's default DATA-scope tier (permission v2 ② dimension). Null = no default
+     * (per-action, deny-by-default).
+     *
+     * @param rolePid Role PID
+     */
+    @GetMapping("/{rolePid}/default-scope")
+    @Operation(summary = "Get role default data scope")
+    public ApiResponse<String> getDefaultScope(@PathVariable String rolePid) {
+        Role role = roleService.findByPid(rolePid);
+        if (role == null) {
+            throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
+        }
+        return ApiResponse.success(role.getDefaultDataScopeType());
+    }
+
+    /**
+     * Set the role's default DATA-scope tier: persists the default (newly-granted permissions inherit
+     * it) AND materializes it onto the role's current grants.
+     *
+     * @param rolePid Role PID
+     * @param request Body with scopeType (all/dept_and_sub/dept/self/none; null clears)
+     */
+    @PutMapping("/{rolePid}/default-scope")
+    @Operation(summary = "Set role default data scope")
+    public ApiResponse<Void> setDefaultScope(
+            @PathVariable String rolePid,
+            @RequestBody RoleDefaultScopeRequest request) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Role role = roleService.findByPid(rolePid);
+        if (role == null) {
+            throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
+        }
+        log.info("Setting role default data scope: rolePid={}, scopeType={}", rolePid, request.scopeType());
+        roleService.setDefaultDataScopeType(role.getId(), request.scopeType());
+        if (request.scopeType() != null && !request.scopeType().isBlank()) {
+            matrixService.applyDefaultScopeToCurrentGrants(tenantId, role.getId(), request.scopeType());
+        }
         return ApiResponse.success();
     }
 

@@ -81,6 +81,8 @@ export interface BlockLayoutConfig {
 export interface DataSourceConfig {
   id?: string;
   type?: 'api' | 'static' | 'namedQuery'; // 'namedQuery' delegates to nq:{queryCode} format
+  /** Optional model scope for runtime reloads after same-model mutations. */
+  modelCode?: string;
   endpoint?: string; // Default: '/api/datasource/list'
   method?: 'get' | 'post' | 'put' | 'delete'; // Default: 'get'
   params?: string | Record<string, any>;
@@ -169,6 +171,16 @@ export interface FieldConfig {
   dictCode?: string; // 绑定的字典编码，自动使用 SmartSelect 并加载字典数据
   /** Grid column span for this field (shorthand for layout.colSpan) */
   colSpan?: number;
+  /** Reference fields only: show a "+ 新建" affordance to inline-create a target-model record and auto-select it. Default false. */
+  allowCreate?: boolean;
+  /** Override the create command code. Defaults to `${targetModel}:create`. */
+  createCommand?: string;
+  /** Override the DSL form pageKey used by inline quick-create. Defaults to `${targetModel}_new`. */
+  createPageKey?: string;
+  /** Override the permission code used to show inline-create. Defaults to createCommand. */
+  createPermission?: string;
+  /** Reserved (deferred): restrict the create form to a subset of fields. Not yet honored — full target-model form is rendered. */
+  createFields?: string[];
 }
 
 export interface ValidationRule {
@@ -598,6 +610,15 @@ export interface UnifiedSchema {
   /** Default command associated with the page, when provided by PageSchemaDTO. */
   commandCode?: string;
 
+  /**
+   * Convention-resolved CRUD command codes for this page's model, keyed by
+   * operation type (create/update/delete). Server-attached so standard
+   * create/edit/delete forms route through the business command without
+   * per-page config or a URL `?commandCode=` param. Absent/empty → the runtime
+   * falls back to the dynamic CRUD API.
+   */
+  commands?: Record<string, string>;
+
   // Page-level data source (overrides default model table query)
   dataSource?: PageDataSourceConfig;
 
@@ -644,6 +665,16 @@ export interface UnifiedSchema {
 
   // Page-level extension properties (e.g., showShare, showReport for detail pages)
   extension?: Record<string, any>;
+
+  /**
+   * Optional override for the edit-mode record-prefill fetch. When set, the form
+   * loads the existing record from this endpoint instead of the default
+   * `/api/dynamic/<modelCode>/<recordPid>`. Required for skipTableCreation models
+   * whose reads are served by a custom REST endpoint (e.g. `/api/qr/{recordPid}`).
+   * `{recordPid}` / `${recordPid}` / `{pid}` / `${pid}` in `endpoint` are
+   * interpolated with the URL record pid.
+   */
+  recordSource?: { endpoint: string; method?: string };
 }
 
 export interface ThemeConfig {

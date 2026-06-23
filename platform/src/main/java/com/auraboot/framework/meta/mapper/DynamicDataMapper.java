@@ -72,6 +72,30 @@ public interface DynamicDataMapper {
                         @Param("jsonbColumns") Set<String> jsonbColumns);
 
     /**
+     * Atomic counter increment via UPDATE … RETURNING. A NEW seam: the existing
+     * raw-SQL methods (selectByQuery/countByQuery/executeCustomSql) enforce
+     * SELECT-only and would reject this. Bypasses the tenant interceptor because
+     * the tenant predicate is built explicitly (AND tenant_id = #{tenantId}) and
+     * the JSqlParser-based interceptor cannot parse RETURNING.
+     *
+     * <p><b>SECURITY: tenant bypass — identifiers come from the meta-model
+     * whitelist (DynamicDataServiceImpl), values are bound. New callers require
+     * security review.</b>
+     */
+    @SelectProvider(type = DynamicSqlProvider.class, method = "atomicIncrementReturning")
+    @InterceptorIgnore(tenantLine = "true")
+    List<Map<String, Object>> atomicIncrementReturning(
+            @Param("tableName") String tableName,
+            @Param("counterCol") String counterCol,
+            @Param("capCol") String capCol,
+            @Param("pkColumn") String pkColumn,
+            @Param("softDeleteClause") String softDeleteClause,
+            @Param("delta") long delta,
+            @Param("recordId") String recordId,
+            @Param("tenantId") long tenantId,
+            @Param("currentUserId") Long currentUserId);
+
+    /**
      * 删除数据
      * @param tableName 表名
      * @param conditions 删除条件

@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.notification.dto.NotificationDTO;
 import com.auraboot.framework.notification.dto.NotificationPreferenceDTO;
 import com.auraboot.framework.notification.dto.NotificationPreferenceUpdateRequest;
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
 @Tag(name = "Notifications", description = "Notification management")
+@AuthenticatedAccess("operates only on the caller's own notifications/preferences (MetaContext userId)")
 public class NotificationController {
 
     private final NotificationQueryService notificationQueryService;

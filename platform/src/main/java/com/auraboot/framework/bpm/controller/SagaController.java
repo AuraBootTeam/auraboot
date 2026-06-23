@@ -8,6 +8,7 @@ import com.auraboot.framework.bpm.chain.saga.SagaStep;
 import com.auraboot.framework.bpm.dto.SagaExecutionDTO;
 import com.auraboot.framework.bpm.mapper.SagaExecutionMapper;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,6 +42,7 @@ public class SagaController {
     }
 
     @PostMapping("/{sagaId}/retry")
+    @RequirePermission("bpm.process.execute")
     @Operation(summary = "Retry a failed saga from the failed step")
     public ApiResponse<CommandChainResult> retrySaga(@PathVariable String sagaId) {
         try {

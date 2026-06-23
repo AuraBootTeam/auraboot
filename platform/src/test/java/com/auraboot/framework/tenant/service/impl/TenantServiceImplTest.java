@@ -82,7 +82,9 @@ class TenantServiceImplTest {
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> spyService.createTenant(input));
-        assertTrue(ex.getMessage().contains("acme"));
+        // Message is now a parameterized i18n key; the tenant name is carried as a substitution arg.
+        assertTrue(ex.getMessage().startsWith("$i18n:tenant.name_exists"));
+        assertTrue(java.util.Arrays.asList(ex.getI18nArgs()).contains("acme"));
     }
 
     @Test

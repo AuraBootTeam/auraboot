@@ -5,13 +5,17 @@ import com.auraboot.framework.bpm.rule.DroolsRuleService;
 import com.auraboot.framework.bpm.service.SlaConfigService;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.i18n.compiler.I18nCompiler;
+import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.service.I18nResourceService;
+import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.lock.DistributedLock;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.SchemaManagementService;
+import com.auraboot.framework.meta.entity.PageSchema;
+import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.template.generator.DocumentCommandGenerator;
 import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
 import com.auraboot.framework.permission.service.PermissionService;
@@ -20,10 +24,12 @@ import com.auraboot.framework.plugin.config.PlatformProperties;
 import com.auraboot.framework.plugin.dto.PluginManifest;
 import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
+import com.auraboot.framework.plugin.dto.imports.ImportExecuteResult;
 import com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ModelDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
+import com.auraboot.framework.plugin.dto.imports.SavedViewDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
 import com.auraboot.framework.plugin.entity.PluginImportHistory;
@@ -41,6 +47,8 @@ import com.auraboot.framework.plugin.validation.PluginValidationPipeline;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
+import com.auraboot.framework.view.entity.SavedView;
+import com.auraboot.framework.view.entity.ViewConfig;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +66,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import org.mockito.ArgumentCaptor;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashMap;
@@ -102,6 +111,7 @@ class PluginImportServiceImplCoreTest {
     @Mock private RolePermissionMapper rolePermissionMapper;
     @Mock private DistributedLock distributedLock;
     @Mock private I18nResourceService i18nResourceService;
+    @Mock private I18nService i18nService;
     @Mock private I18nCompiler i18nCompiler;
     @Mock private PlatformProperties platformProperties;
     @Mock private PlatformVersionChecker platformVersionChecker;
@@ -109,6 +119,7 @@ class PluginImportServiceImplCoreTest {
     @Mock private PluginQualityScorer qualityScorer;
     @Mock private com.auraboot.framework.plugin.validation.PageSchemaImportGate pageSchemaImportGate;
     @Mock private SavedViewMapper savedViewMapper;
+    @Mock private PageSchemaMapper pageSchemaMapper;
     @Mock private AutoPermissionAssignmentService autoPermissionAssignmentService;
     @Mock private ApplicationEventPublisher applicationEventPublisher;
     @Mock private DocumentCommandGenerator documentCommandGenerator;
@@ -945,5 +956,124 @@ class PluginImportServiceImplCoreTest {
         h.setStatus("success");
         when(importHistoryMapper.findByImportId("ok")).thenReturn(h);
         assertThat(service.canRollback("ok")).isTrue();
+    }
+
+    // ---------- permission i18n record generation ----------
+
+    @Test
+    @DisplayName("generatePermissionI18nRecords emits permission.{code} and .description records per locale")
+    void generatePermissionI18nRecords_emitsRecords() {
+        PermissionDefinitionDTO perm = PermissionDefinitionDTO.builder()
+                .code("meta_management")
+                .nameZhCN("元数据管理")
+                .nameEn("Metadata Management")
+                .localizedDescriptions(new java.util.LinkedHashMap<>(Map.of(
+                        "zh-CN", "访问元数据管理模块",
+                        "en-US", "Access the metadata management module")))
+                .build();
+
+        invokeGeneratePermissionI18nRecords(List.of(perm), 1L);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<I18nResource>> captor = ArgumentCaptor.forClass(List.class);
+        verify(i18nResourceService).batchUpsert(captor.capture());
+        List<I18nResource> emitted = captor.getValue();
+
+        // 2 name records (zh-CN/en-US) + 2 description records (zh-CN/en-US)
+        assertThat(emitted).hasSize(4);
+        assertThat(emitted).allSatisfy(r -> {
+            assertThat(r.getRefType()).isEqualTo("permission");
+            assertThat(r.getSource()).isEqualTo(I18nResource.SOURCE_IMPORT);
+            assertThat(r.getStatus()).isEqualTo(I18nResource.STATUS_APPROVED);
+        });
+        assertThat(emitted).anySatisfy(r -> {
+            assertThat(r.getI18nKey()).isEqualTo("permission.meta_management");
+            assertThat(r.getLang()).isEqualTo("en-US");
+            assertThat(r.getValue()).isEqualTo("Metadata Management");
+        });
+        assertThat(emitted).anySatisfy(r -> {
+            assertThat(r.getI18nKey()).isEqualTo("permission.meta_management.description");
+            assertThat(r.getLang()).isEqualTo("zh-CN");
+            assertThat(r.getValue()).isEqualTo("访问元数据管理模块");
+        });
+    }
+
+    @Test
+    @DisplayName("plugin saved views are locked presets and update by stable viewKey")
+    void importSavedViewsTagsPluginPresetAndUpdatesByViewKey() {
+        PluginManifestExtended manifest = baseManifest();
+        SavedViewDefinitionDTO dto = SavedViewDefinitionDTO.builder()
+                .name("Pipeline Board")
+                .description("Plugin baseline board")
+                .modelCode("crm.opportunity")
+                .pageKey("crm_opportunity_list")
+                .viewType("table")
+                .viewKey("crm.opportunity.pipeline")
+                .viewConfig(Map.of("rowHeight", "medium"))
+                .build();
+        manifest.setSavedViews(List.of(dto));
+
+        when(pageSchemaMapper.selectAnyByPageKey("crm_opportunity_list")).thenReturn(new PageSchema());
+        ViewConfig existingConfig = new ViewConfig();
+        existingConfig.setMeta(ViewConfig.Meta.builder()
+                .viewKey("crm.opportunity.pipeline")
+                .managedBy("plugin")
+                .locked(true)
+                .allowUserCopy(true)
+                .build());
+        SavedView existing = new SavedView();
+        existing.setPid("existing-view");
+        existing.setName("Old Plugin Board");
+        existing.setViewType("table");
+        existing.setViewConfig(existingConfig);
+        when(savedViewMapper.findGlobalViews("crm.opportunity", "crm_opportunity_list"))
+                .thenReturn(List.of(existing));
+
+        invokeImportSavedViews(manifest, new ImportExecuteResult(), 1L);
+
+        ArgumentCaptor<SavedView> captor = ArgumentCaptor.forClass(SavedView.class);
+        verify(savedViewMapper).updateSavedView(captor.capture());
+        SavedView updated = captor.getValue();
+        assertThat(updated.getName()).isEqualTo("Pipeline Board");
+        assertThat(updated.getViewConfig().getRowHeight()).isEqualTo("medium");
+        assertThat(updated.getViewConfig().getMeta().getViewKey())
+                .isEqualTo("crm.opportunity.pipeline");
+        assertThat(updated.getViewConfig().getMeta().getManagedBy()).isEqualTo("plugin");
+        assertThat(updated.getViewConfig().getMeta().getLocked()).isTrue();
+        assertThat(updated.getViewConfig().getMeta().getAllowUserCopy()).isTrue();
+    }
+
+    private void invokeGeneratePermissionI18nRecords(List<PermissionDefinitionDTO> permissions, Long tenantId) {
+        try {
+            Method method = PluginImportServiceImpl.class.getDeclaredMethod(
+                    "generatePermissionI18nRecords", List.class, Long.class);
+            method.setAccessible(true);
+            method.invoke(service, permissions, tenantId);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void invokeImportSavedViews(PluginManifestExtended manifest, ImportExecuteResult result, Long tenantId) {
+        try {
+            Method method = PluginImportServiceImpl.class.getDeclaredMethod(
+                    "importSavedViews", PluginManifestExtended.class, ImportExecuteResult.class, Long.class);
+            method.setAccessible(true);
+            method.invoke(service, manifest, result, tenantId);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

@@ -1,0 +1,20 @@
+[
+  {
+    "code": "behavior_site_key",
+    "displayName:zh-CN": "站点密钥",
+    "displayName:en": "Site Key",
+    "description": "Public site key mapping for anonymous behavior telemetry",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Key",
+      "category": "behavior",
+      "titleField": "name",
+      "subtitleField": "site_key"
+    },
+    "semantic_description": "A public, non-secret site key (abk_...) bound to a single tenant. Embedded in published low-code apps / public sites to attribute anonymous telemetry events to the owning tenant. The key is server-generated on create and never edited; the tenant binding is immutable (rotate = create a new key + disable the old one).",
+    "domain_category": "behavior",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Status lifecycle: active -> disabled. Disabling stops the key from resolving to its tenant (anonymous ingestion is rejected). Disable is reversible at the data level but treated as terminal operationally."
+  }
+]

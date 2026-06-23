@@ -1,0 +1,13 @@
+{
+  "surface": "core-automation",
+  "role": "surface",
+  "family": "flow",
+  "layer1Kernel": "flow-designer-sdk",
+  "conformance": "conforming",
+  "conformanceNote": "Automation flow editor mounts flow-designer-sdk (imports it in pages/automation.$id.tsx); only registers automation node types. No private canvas/store/history.",
+  "layer0": ["PropertySchema", "DataSourcePicker", "ExpressionBuilder"],
+  "storage": { "primary": "ab_automation" },
+  "owner": "core-automation",
+  "decision": "DDR-2026-06-18-designer-kernel-boundary",
+  "note": "Flow family. With BPM, the DDR reference for 'same family shares flow-designer-sdk kernel, only registers nodes'."
+}

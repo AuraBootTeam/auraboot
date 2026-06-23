@@ -37,4 +37,16 @@ public interface PermissionMatrixService {
      * @param grants List of permission grant/revoke requests
      */
     void batchUpdateRolePermissions(Long roleId, List<PermissionGrantRequest> grants);
+
+    /**
+     * Apply (overwrite) a data-scope tier onto every permission the role currently holds. Backs the
+     * ② "modify scope" drawer: the chosen scope becomes the role's effective scope across all current
+     * grants. The role-level default ({@code RoleService#setDefaultDataScopeType}) governs future
+     * grants; this materializes it onto the existing ones.
+     *
+     * @param tenantId  Tenant ID
+     * @param roleId    Role ID
+     * @param scopeType Data-scope tier (all/dept_and_sub/dept/self/none)
+     */
+    void applyDefaultScopeToCurrentGrants(Long tenantId, Long roleId, String scopeType);
 }

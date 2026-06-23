@@ -32,11 +32,16 @@ if [[ ! -f "$COMMITTED" ]]; then
 fi
 
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
+COMMITTED_NORM="$(mktemp)"
+TMP_NORM="$(mktemp)"
+trap 'rm -f "$TMP" "$COMMITTED_NORM" "$TMP_NORM"' EXIT
 "$SCRIPT_DIR/generate-schema-snapshot.sh" --edition "$EDITION" \
   ${ENTERPRISE_ROOT:+--enterprise-root "$ENTERPRISE_ROOT"} --out "$TMP" >&2
 
-if diff -u "$COMMITTED" "$TMP"; then
+perl -0pe 's/\n+\z/\n/' "$COMMITTED" > "$COMMITTED_NORM"
+perl -0pe 's/\n+\z/\n/' "$TMP" > "$TMP_NORM"
+
+if diff -u "$COMMITTED_NORM" "$TMP_NORM"; then
   echo "[drift] OK — committed snapshot matches the Flyway result." >&2
 else
   echo "[drift] DRIFT: committed snapshot differs from the regenerated one." >&2

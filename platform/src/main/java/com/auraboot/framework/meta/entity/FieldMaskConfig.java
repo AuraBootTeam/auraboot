@@ -73,6 +73,14 @@ public class FieldMaskConfig {
     @TableField("exempt_roles")
     private String exemptRoles;
 
+    /**
+     * Comma-separated permission codes that bypass masking. A user holding ANY of these
+     * permission codes sees the unmasked value, evaluated in addition to {@link #exemptRoles}.
+     * Enables capability-driven field unmasking (e.g. {@code crm.account.contact_unmask}).
+     */
+    @TableField("exempt_permission_codes")
+    private String exemptPermissionCodes;
+
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private Instant createdAt;
 

@@ -15,6 +15,8 @@ import type {
   LinkageConfig,
   FilterConfig,
 } from '~/framework/smart/types/chart';
+import type { ChartSpec } from '~/framework/smart/charts/chart-spec';
+import { chartSpecToEChartsOption } from '~/framework/smart/charts/chart-spec-echarts';
 import { cn } from '~/utils/cn';
 
 export interface SmartScatterChartProps {
@@ -37,6 +39,178 @@ export interface SmartScatterChartProps {
   className?: string;
   style?: React.CSSProperties;
   chartOptions?: Partial<EChartsOption>;
+}
+
+/**
+ * Subset of the resolved chart data this component reads when building options.
+ * (Mirrors the shape returned by `useChartData`.)
+ */
+export interface ScatterChartData {
+  rows: Record<string, unknown>[];
+  meta?: {
+    dimensions?: string[];
+    metrics?: string[];
+  };
+}
+
+/** Visual props that influence option building (subset of SmartScatterChartProps). */
+export interface ScatterOptionProps {
+  title?: string;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
+  bubbleMode?: boolean;
+  symbolSizeRange?: [number, number];
+  chartOptions?: Partial<EChartsOption>;
+}
+
+/**
+ * Build a renderer-agnostic `ChartSpec` from SmartScatterChart's runtime data + visual
+ * props. Unlike bar/line (one series PER measure), a scatter plot maps measures onto
+ * AXIS ROLES within a SINGLE series: `measures[0]` → X, `measures[1]` → Y (falling back
+ * to `measures[0]` when absent), `measures[2]` → bubble size; the category dimension
+ * (← `data.meta.dimensions[0]`) is the per-point label. So there is NO multi-measure
+ * "drop" bug to fix here — the measures are never independent series.
+ *
+ * The axis labels (`xAxisLabel`/`yAxisLabel`) and bubble sizing (`bubbleMode`/
+ * `symbolSizeRange`) are scatter-specific renderer affordances that have no neutral
+ * `ChartVisualOptions` field; they are carried on the spec's `scatter` extension below
+ * and consumed only by the echarts adapter's scatter branch. `dataSource` is required by
+ * the ChartSpec type but unused by the scatter option-builder, so a minimal aggregate
+ * placeholder is supplied.
+ */
+function specFromScatterChartData(
+  data: ScatterChartData | null | undefined,
+  props: ScatterOptionProps,
+): ChartSpec {
+  const {
+    title,
+    xAxisLabel,
+    yAxisLabel,
+    bubbleMode = false,
+    symbolSizeRange = [10, 60],
+  } = props;
+  const dimensions = data?.meta?.dimensions ?? [];
+  const metrics = data?.meta?.metrics ?? [];
+  return {
+    type: 'scatter',
+    title,
+    dataSource: { type: 'aggregate', modelCode: '', dimensions, metrics: [] },
+    dimensions: dimensions.map((field, i) => ({
+      field,
+      role: i === 0 ? 'category' : 'series',
+    })),
+    measures: metrics.map((field) => ({ field })),
+    scatter: { xAxisLabel, yAxisLabel, bubbleMode, symbolSizeRange },
+  };
+}
+
+/**
+ * Build the ECharts `option` exactly the way SmartScatterChart historically built it
+ * inline. Extracted verbatim (no behavior change) as a pure, exported helper.
+ *
+ * As of B2d this is NO LONGER on SmartScatterChart's render path — the component now
+ * builds the option via the shared `chartSpecToEChartsOption` adapter (which the
+ * `chart-spec-echarts-smartscatterchart-equivalence.test.ts` gate proves equivalent to
+ * this builder's BASE option). This helper is retained as the equivalence test's ORACLE;
+ * its output MUST stay identical to the pre-B2d inline builder.
+ *
+ * NOTE on the closure members: `tooltip.formatter` and (in bubble mode) the single
+ * series' `symbolSize` are FUNCTIONS — they capture the axis labels / data rows. Two
+ * structurally identical function instances are NOT reference-equal under vitest
+ * `toEqual`, so the equivalence gate compares the non-function structure deep-equal AND
+ * proves the function members behave identically (invoking them with representative
+ * inputs). No scatter behavior is changed; the functions are byte-identical in source.
+ */
+export function buildScatterOptionLegacy(
+  data: ScatterChartData | null | undefined,
+  props: ScatterOptionProps,
+): EChartsOption {
+  const {
+    title,
+    xAxisLabel,
+    yAxisLabel,
+    bubbleMode = false,
+    symbolSizeRange = [10, 60],
+    chartOptions,
+  } = props;
+
+  if (!data?.rows?.length) {
+    return {
+      title: title ? { text: title, left: 'center', textStyle: { fontSize: 14 } } : undefined,
+      xAxis: { type: 'value' },
+      yAxis: { type: 'value' },
+      series: [{ type: 'scatter', data: [] }],
+    };
+  }
+
+  const metrics = data.meta?.metrics || [];
+  const dimensions = data.meta?.dimensions || [];
+  const xKey = metrics[0];
+  const yKey = metrics[1] || metrics[0];
+  const sizeKey = metrics[2];
+  const labelKey = dimensions[0];
+
+  // Calculate size range for bubble mode
+  let maxSize = 1;
+  if (bubbleMode && sizeKey) {
+    maxSize = Math.max(...data.rows.map((r) => Number(r[sizeKey]) || 0), 1);
+  }
+
+  const scatterData = data.rows.map((row) => {
+    const point: (number | string)[] = [Number(row[xKey]) || 0, Number(row[yKey]) || 0];
+    if (labelKey) point.push(String(row[labelKey] ?? ''));
+    return point;
+  });
+
+  const baseOptions: EChartsOption = {
+    title: title
+      ? { text: title, left: 'center', textStyle: { fontSize: 14, fontWeight: 500 } }
+      : undefined,
+    tooltip: {
+      trigger: 'item',
+      formatter: (params: unknown) => {
+        const p = params as { data?: (number | string)[] };
+        if (!p.data) return '';
+        const label = p.data[2] ? `${p.data[2]}<br/>` : '';
+        return `${label}${xAxisLabel || xKey}: ${p.data[0]}<br/>${yAxisLabel || yKey}: ${p.data[1]}`;
+      },
+    },
+    xAxis: {
+      type: 'value',
+      name: xAxisLabel || xKey,
+      splitLine: { show: true, lineStyle: { type: 'dashed' } },
+    },
+    yAxis: {
+      type: 'value',
+      name: yAxisLabel || yKey,
+      splitLine: { show: true, lineStyle: { type: 'dashed' } },
+    },
+    series: [
+      {
+        type: 'scatter',
+        data: scatterData,
+        symbolSize:
+          bubbleMode && sizeKey
+            ? (val: number[]) => {
+                const size =
+                  Number(
+                    data.rows.find(
+                      (r) => Number(r[xKey]) === val[0] && Number(r[yKey]) === val[1],
+                    )?.[sizeKey],
+                  ) || 0;
+                return (
+                  symbolSizeRange[0] +
+                  (size / maxSize) * (symbolSizeRange[1] - symbolSizeRange[0])
+                );
+              }
+            : 14,
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } },
+      },
+    ],
+  };
+
+  // Merge with custom options
+  return chartOptions ? { ...baseOptions, ...chartOptions } : baseOptions;
 }
 
 function isDataSourceConfigured(ds: ChartDataSource): boolean {
@@ -96,83 +270,26 @@ export const SmartScatterChart: React.FC<SmartScatterChartProps> = ({
     [data, drillDown, linkage, onDrillDown, onLinkageEmit],
   );
 
+  /**
+   * Build ECharts options from data via the shared ChartSpec→ECharts adapter (B2d).
+   *
+   * Provably-neutral refactor: `chartSpecToEChartsOption` produces an option equivalent
+   * to the legacy `buildScatterOptionLegacy` BASE option (pinned by
+   * chart-spec-echarts-smartscatterchart-equivalence.test.ts — non-function structure
+   * deep-equal + function members behavior-equal). The `chartOptions` renderer-leak is
+   * applied HERE at the call site exactly as before — it is NOT baked into the
+   * renderer-agnostic adapter.
+   */
   const options: EChartsOption = useMemo(() => {
-    if (!data?.rows?.length) {
-      return {
-        title: title ? { text: title, left: 'center', textStyle: { fontSize: 14 } } : undefined,
-        xAxis: { type: 'value' },
-        yAxis: { type: 'value' },
-        series: [{ type: 'scatter', data: [] }],
-      };
-    }
-
-    const metrics = data.meta?.metrics || [];
-    const dimensions = data.meta?.dimensions || [];
-    const xKey = metrics[0];
-    const yKey = metrics[1] || metrics[0];
-    const sizeKey = metrics[2];
-    const labelKey = dimensions[0];
-
-    // Calculate size range for bubble mode
-    let maxSize = 1;
-    if (bubbleMode && sizeKey) {
-      maxSize = Math.max(...data.rows.map((r) => Number(r[sizeKey]) || 0), 1);
-    }
-
-    const scatterData = data.rows.map((row) => {
-      const point: (number | string)[] = [Number(row[xKey]) || 0, Number(row[yKey]) || 0];
-      if (labelKey) point.push(String(row[labelKey] ?? ''));
-      return point;
+    const spec = specFromScatterChartData(data, {
+      title,
+      xAxisLabel,
+      yAxisLabel,
+      bubbleMode,
+      symbolSizeRange,
     });
-
-    const baseOptions: EChartsOption = {
-      title: title
-        ? { text: title, left: 'center', textStyle: { fontSize: 14, fontWeight: 500 } }
-        : undefined,
-      tooltip: {
-        trigger: 'item',
-        formatter: (params: unknown) => {
-          const p = params as { data?: (number | string)[] };
-          if (!p.data) return '';
-          const label = p.data[2] ? `${p.data[2]}<br/>` : '';
-          return `${label}${xAxisLabel || xKey}: ${p.data[0]}<br/>${yAxisLabel || yKey}: ${p.data[1]}`;
-        },
-      },
-      xAxis: {
-        type: 'value',
-        name: xAxisLabel || xKey,
-        splitLine: { show: true, lineStyle: { type: 'dashed' } },
-      },
-      yAxis: {
-        type: 'value',
-        name: yAxisLabel || yKey,
-        splitLine: { show: true, lineStyle: { type: 'dashed' } },
-      },
-      series: [
-        {
-          type: 'scatter',
-          data: scatterData,
-          symbolSize:
-            bubbleMode && sizeKey
-              ? (val: number[]) => {
-                  const size =
-                    Number(
-                      data.rows.find(
-                        (r) => Number(r[xKey]) === val[0] && Number(r[yKey]) === val[1],
-                      )?.[sizeKey],
-                    ) || 0;
-                  return (
-                    symbolSizeRange[0] +
-                    (size / maxSize) * (symbolSizeRange[1] - symbolSizeRange[0])
-                  );
-                }
-              : 14,
-          emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } },
-        },
-      ],
-    };
-
-    return chartOptions ? { ...baseOptions, ...chartOptions } : baseOptions;
+    const adapterOption = chartSpecToEChartsOption(spec, data?.rows ?? []) as EChartsOption;
+    return chartOptions ? { ...adapterOption, ...chartOptions } : adapterOption;
   }, [data, title, xAxisLabel, yAxisLabel, bubbleMode, symbolSizeRange, chartOptions]);
 
   const onEvents = useMemo(() => ({ click: handleChartClick }), [handleChartClick]);

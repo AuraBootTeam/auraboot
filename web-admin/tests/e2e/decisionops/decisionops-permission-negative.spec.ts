@@ -317,7 +317,11 @@ test('DecisionOps definition lifecycle actions show role-level permission negati
   await page.getByTestId('role-search-input').fill(readRole.code);
   await expect(page.getByTestId(`role-item-${readRole.code}`)).toBeVisible({ timeout: 10_000 });
   await page.getByTestId(`role-item-${readRole.code}`).click();
-  await expect(page.getByTestId('permission-matrix')).toBeVisible({ timeout: 10_000 });
+  // v2 IA: the platform permission surface is the capability editor; the raw matrix is folded into
+  // its ③ advanced atomic-actions escape hatch.
+  await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId('advanced-atomic-toggle').click();
+  await expect(page.getByTestId('advanced-atomic-body')).toBeVisible({ timeout: 10_000 });
   await page.screenshot({
     path: testInfo.outputPath('decisionops-permission-platform-reuse.png'),
     fullPage: true,

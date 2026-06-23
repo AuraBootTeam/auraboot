@@ -14,6 +14,7 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,6 +73,7 @@ class AgentRunServiceSyncTest {
     @Mock private AiTraceService aiTraceService;
     @Mock private ToolLoopService toolLoopService;
     @Mock private DynamicDataMapper dynamicDataMapper;
+    @Mock private DeclaredAgentToolResolver declaredAgentToolResolver;
     @Mock private CommandExecutor commandExecutor;
     @Mock private NamedQueryService namedQueryService;
     @Mock private LlmProviderFactory providerFactory;
@@ -102,6 +104,7 @@ class AgentRunServiceSyncTest {
                 aiTraceService,
                 toolLoopService,
                 dynamicDataMapper,
+                declaredAgentToolResolver,
                 commandExecutor,
                 namedQueryService,
                 objectMapper,
@@ -391,6 +394,49 @@ class AgentRunServiceSyncTest {
                 .doesNotContain("https://api.example.com")
                 .doesNotContain("You are a test agent.")
                 .doesNotContain("Test description");
+    }
+
+    @Test
+    @DisplayName("declared tools are additively merged into the run plan tool set")
+    void declaredToolsAreMergedIntoPlanTools() throws Exception {
+        primeHappyPath();
+        Map<String, Object> agentDef = baseAgentDef();
+        agentDef.put("tools", "[\"cmd:crm:create_activity\"]");
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
+                anyMap()))
+                .thenReturn(List.of(agentDef));
+        when(toolProviderRegistry.discoverAll(any())).thenReturn(List.of(
+                ToolDefinition.builder()
+                        .toolCode("list:crm_complaint")
+                        .toolType("dsl_query")
+                        .sourceCode("crm_complaint")
+                        .build()
+        ));
+        when(declaredAgentToolResolver.resolveDeclaredTools(eq(TENANT_ID), any(), eq(AGENT_CODE),
+                eq(List.of("cmd:crm:create_activity"))))
+                .thenReturn(List.of(
+                        ToolDefinition.builder()
+                                .toolCode("cmd:crm:create_activity")
+                                .toolType("dsl_command")
+                                .sourceCode("crm:create_activity")
+                                .riskLevel("L1")
+                                .build()
+                ));
+        AgentRunService.AgentLoopResult ok = new AgentRunService.AgentLoopResult();
+        ok.success = true;
+        ok.lastResponse = "done";
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+                .thenReturn(ok);
+        when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenReturn(true);
+
+        service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        ArgumentCaptor<List<AgentToolDefinition>> toolsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(planService).generatePlan(any(), any(), anyString(), anyString(), anyString(), toolsCaptor.capture());
+        assertThat(toolsCaptor.getValue()).extracting(AgentToolDefinition::getName)
+                .contains("list:crm_complaint", "cmd:crm:create_activity");
     }
 
     @Test

@@ -44,7 +44,42 @@ common:
   created_today: 今日新建
   modified_this_week: 本周修改
   preset_views: 预设视图
-  view_saved: 已保存到当前视图
+  view_saved: 已保存到我的视图
+  saved_view_select: 选择视图
+  saved_view_personal_group: 个人视图
+  saved_view_team_group: 团队共享
+  saved_view_global_group: 全员视图
+  saved_view_scope_personal: 我的
+  saved_view_scope_team: 团队
+  saved_view_scope_global: 全员
+  saved_view_default: 默认
+  saved_view_new: 新建视图
+  saved_view_manage: 管理视图
+  saved_view_empty: 暂无保存视图
+  saved_view_locked_preset: 预置
+  saved_view_capability_blocked: 需要配置
+  saved_view_shared_draft: 共享视图已产生本地改动
+  saved_view_save_shared: 保存到共享视图
+  saved_view_save_shared_disabled_reason: 你可以调整当前视图，但暂不能保存给团队或全员
+  saved_view_locked_preset_reason: 插件预置视图不能直接保存，请先复制为我的视图
+  saved_view_save_shared_confirm_title: 保存到共享视图？
+  saved_view_save_shared_confirm_content: 这会更新 {target} 可见的共享视图。变更：{changes}。
+  saved_view_shared_changes: 视图配置
+  saved_view_shared_saved: 共享视图已更新
+  saved_view_shared_save_failed: 保存共享视图失败
+  saved_view_copy_to_personal: 复制为我的视图
+  saved_view_dismiss_draft: 放弃变更
+  saved_view_copied_to_personal: 已复制为个人视图
+  saved_view_copy_failed: 复制视图失败
+  saved_view_copy_disabled_reason: 此视图不允许复制
+  saved_view_save_preset_to_personal: 保存为我的视图
+  saved_view_preset_saved_to_personal: 已保存为个人视图
+  saved_view_preset_save_failed: 保存预设视图失败
+  saved_view_preset_saved_badge: 已保存
+  saved_view_preset_edited_badge: 已编辑
+  saved_view_preset_reset: 重置预设视图
+  saved_view_preset_reset_done: 预设视图已重置
+  saved_view_preset_reset_failed: 重置预设视图失败
   options_load_failed: 选项加载失败
   retry: 重试
 
@@ -1147,3 +1182,133 @@ bpmn:
     exclusive_gateway_min_outgoing: 排他网关至少需要两条出边
     exclusive_gateway_edge_missing_condition: '排他网关 "{name}" 的出边缺少条件'
     exclusive_gateway_multiple_defaults: '排他网关 "{name}" 配置了多个默认流向'
+
+tenant:
+  application:
+    create_success: 租户创建成功，您已成为该租户的管理员
+    invite_invalid: 无效的邀请码
+    invite_revoked: 邀请码已失效
+    invite_expired: 邀请码已过期
+    join_pending: 加入申请已提交，等待租户管理员审批
+    unknown_tenant: 未知租户
+  member:
+    already_member: 用户已经是该租户的成员
+    not_in_tenant: 用户未加入任何租户
+    not_found: "成员不存在: {0}"
+  not_found: "租户不存在: {0}"
+  name_exists: "租户名称已存在: {0}"
+
+role:
+  not_found: "角色不存在: {0}"
+  original_not_found: "原角色不存在: {0}"
+  system_no_disable: 系统角色不允许禁用
+  system_no_delete: 系统角色不允许删除
+  in_use: 该角色正在被使用，无法删除
+  code_exists: "角色编码已存在: {0}"
+
+category:
+  code_exists: "类目编码在该租户下已存在: {0}"
+  parent_not_found: 父类目不存在
+  not_found: 类目不存在
+  cross_tenant_modify: 不允许修改其他租户的类目
+  has_children: 存在子类目，无法删除
+  new_parent_not_found: 新父类目不存在
+  cross_tenant_move: 不允许移动到其他租户的类目下
+  move_to_descendant: 不能移动到自己的子类目下
+
+permission:
+  assign_failed: 分配权限失败
+  remove_failed: 移除权限失败
+  remove_all_failed: 移除所有权限失败
+  sync_failed: 同步权限失败
+  copy_failed: 复制权限失败
+
+chart:
+  configure_datasource: 请在右侧配置数据源
+  load_failed: 数据加载失败
+  no_data: 暂无数据
+
+header:
+  workspaces: 工作空间
+  platform_console: 平台控制台
+
+permission_guard:
+  no_access: 无权限
+
+qr_scanner:
+  camera_access_failed: 无法访问摄像头，请检查权限设置
+  enter_login_code: 请输入设备登录码
+  unknown_device: 未知设备
+  close: 关闭
+  title: 扫描设备二维码
+  instruction: 请将摄像头对准TV设备上显示的二维码，或手动输入设备登录码
+  scan_tab: 扫描二维码
+  manual_tab: 手动输入
+  frame_hint: 将二维码放在框内
+  camera_tip: 提示：如果无法使用摄像头，可以切换到手动输入模式
+  input_label: 设备登录码或二维码内容
+  input_placeholder: 请输入设备登录码或粘贴二维码的完整内容...
+  cancel: 取消
+  confirm: 确认
+
+notification_rule:
+  preset_overdue_payment: 逾期付款提醒
+  preset_low_stock: 低库存预警
+  preset_approval_overdue: 审批超时提醒
+  trigger_scheduled: 定时触发
+  trigger_scheduled_desc: 按固定时间周期执行规则
+  trigger_event: 事件触发
+  trigger_event_desc: 当记录发生变化时执行规则
+  schedule_hourly: 每小时
+  schedule_daily: 每天
+  schedule_weekly: 每周
+  event_created: 记录创建
+  event_updated: 记录更新
+  event_deleted: 记录删除
+  channel_in_app: 站内消息
+  channel_email: 邮件
+  recipient_operator: 操作人
+  recipient_record_owner: 记录负责人
+  recipient_specific_users: 指定用户
+  op_eq: 等于
+  op_ne: 不等于
+  op_gt: 大于
+  op_ge: 大于等于
+  op_lt: 小于
+  op_le: 小于等于
+  op_like: 包含
+  op_is_null: 为空
+  op_is_not_null: 不为空
+  err_code_required: 规则代码不能为空
+  err_name_required: 规则名称不能为空
+  save_failed_retry: 保存失败，请重试
+  save_failed: 保存失败
+  quick_start: 快速开始 — 选择模板
+  start_blank: 从空白创建 →
+  section_basic: 基础信息
+  label_code: 规则代码
+  label_name: 规则名称
+  ph_name: 规则显示名称
+  label_description: 描述
+  ph_description: 可选描述...
+  enable_rule: 启用规则
+  section_trigger: 触发方式
+  label_frequency: 执行频率
+  label_trigger_event: 触发事件
+  section_condition: 触发条件
+  label_model: 数据模型
+  select_model: "-- 选择模型 --"
+  ph_field: 字段名
+  ph_value: 值
+  add_condition: 添加条件
+  section_action: 通知动作
+  label_channel: 通知渠道
+  label_template: 消息模板代码
+  ph_template: template-code（可选）
+  label_recipient: 接收人策略
+  label_owner_field: 负责人字段名
+  label_user_ids: 用户ID（逗号分隔）
+  cancel: 取消
+  saving: 保存中...
+  update_rule: 更新规则
+  create_rule: 创建规则

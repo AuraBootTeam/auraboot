@@ -45,4 +45,17 @@ class CommandExecuteRequestDryRunTest {
         assertThat(req.getTargetRecordId()).isEqualTo("ID123");
         assertThat(req.getOperationType()).isEqualTo("UPDATE");
     }
+
+    @Test
+    @DisplayName("targetRecordPid is the pid-first public alias while targetRecordId remains compatible")
+    void target_record_pid_alias() {
+        CommandExecuteRequest req = new CommandExecuteRequest();
+
+        req.setTargetRecordId("legacy-pid");
+        assertThat(req.getTargetRecordPid()).isEqualTo("legacy-pid");
+
+        req.setTargetRecordPid("public-pid");
+        assertThat(req.getTargetRecordPid()).isEqualTo("public-pid");
+        assertThat(req.getTargetRecordId()).isEqualTo("public-pid");
+    }
 }

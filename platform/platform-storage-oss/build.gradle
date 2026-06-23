@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'maven-publish'
 }
 
 group = 'com.auraboot'
@@ -42,6 +43,7 @@ dependencies {
     testImplementation 'org.springframework:spring-beans:6.2.18'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.14.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.14.4'
     testImplementation 'org.mockito:mockito-core:5.23.0'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.23.0'
 }
@@ -53,4 +55,17 @@ compileJava {
 
 test {
     useJUnitPlatform()
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'platform-storage-oss'
+        }
+    }
+
+    repositories {
+        mavenLocal()
+    }
 }

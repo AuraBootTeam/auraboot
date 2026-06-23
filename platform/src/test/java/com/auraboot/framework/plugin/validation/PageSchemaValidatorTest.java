@@ -580,6 +580,63 @@ class PageSchemaValidatorTest {
     }
 
     @Test
+    void recordSourceTopLevelFieldDoesNotProduceUnknownFieldsError() {
+        // Regression guard: a form page that declares a top-level "recordSource" object
+        // must NOT be rejected with S-PAGE-UNKNOWN-FIELDS.  Before this fix the field
+        // was not declared on PageSchemaDTO (imports) so Jackson routed it to
+        // @JsonAnySetter → unknownFields → validator flagged it as unknown.
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        PageSchemaDTO p = page("qr_code_form", "form", "pe_order", List.of(Map.of(
+                "id", "basic_section",
+                "blockType", "form-section",
+                "fields", List.of(Map.of(
+                        "field", "pe_order_no",
+                        "component", "input",
+                        "required", true
+                ))
+        )));
+        p.setRecordSource(Map.of("endpoint", "/api/qr/{recordPid}"));
+        manifest.setPages(List.of(p));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-UNKNOWN-FIELDS".equals(m.getCode())),
+                () -> "Expected recordSource to be a first-class page field (no S-PAGE-UNKNOWN-FIELDS) but got " + messages);
+    }
+
+    @Test
+    void recordSourceDeserializesAsFirstClassPageProperty() throws Exception {
+        // Verify the imports DTO deserialization path: a JSON page with "recordSource"
+        // must bind to PageSchemaDTO.recordSource (non-null getRecordSource()) and must
+        // NOT appear in getUnknownFields().
+        PageSchemaDTO page = new ObjectMapper().readValue("""
+                {
+                  "pageKey": "qr_code_form",
+                  "kind": "form",
+                  "schemaVersion": 4,
+                  "modelCode": "ab_qr_code",
+                  "layout": { "type": "stack" },
+                  "recordSource": { "endpoint": "/api/qr/{recordPid}" },
+                  "blocks": [
+                    {
+                      "id": "basic_section",
+                      "blockType": "form-section",
+                      "fields": [
+                        { "field": "name", "component": "input", "required": true }
+                      ]
+                    }
+                  ]
+                }
+                """, PageSchemaDTO.class);
+
+        assertTrue(page.getRecordSource() != null,
+                "Expected getRecordSource() to be non-null after deserialization");
+        assertTrue(page.getRecordSource().containsKey("endpoint"),
+                () -> "Expected recordSource to contain 'endpoint' key but got: " + page.getRecordSource());
+        assertTrue(page.getUnknownFields() == null || !page.getUnknownFields().containsKey("recordSource"),
+                () -> "Expected recordSource NOT to be treated as an unknown field: " + page.getUnknownFields());
+    }
+
+    @Test
     void traceGraphBlockIsAccepted() {
         // Regression: TraceGraphBlockRenderer (#450) registered the "trace-graph" block
         // in the frontend BlockRegistry but left DslRegistry.BlockType untouched, so

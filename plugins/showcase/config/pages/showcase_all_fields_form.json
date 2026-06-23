@@ -261,8 +261,7 @@
             "en": "Save"
           },
           "action": {
-            "type": "command",
-            "command": "sc:update_showcase"
+            "type": "command"
           }
         },
         {

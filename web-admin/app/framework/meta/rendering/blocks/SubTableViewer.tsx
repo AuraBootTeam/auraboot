@@ -21,7 +21,7 @@ import type {
   SubTableConfig,
   ValidationRule,
 } from '~/framework/meta/schemas/types';
-import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useTreeData } from '~/framework/meta/hooks/useTreeData';
@@ -39,6 +39,10 @@ import {
   type DateTimeFormatPreferences,
 } from '~/shared/services/dateTimeFormatService';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from '~/framework/meta/rendering/pages/utils/visibleWhen';
+import {
+  buildCommandTargetParams,
+  getLegacyCompatibleRecordPid,
+} from '~/framework/meta/utils/publicRecordId';
 
 export interface SubTableViewerProps {
   config: SubTableConfig;
@@ -49,6 +53,36 @@ export interface SubTableViewerProps {
   t?: (key: string) => string;
   isEditable?: boolean;
   onDataChange?: () => void;
+}
+
+interface ChildFieldMeta {
+  code: string;
+  displayName?: string;
+  dataType?: string;
+  dictCode?: string;
+  referenceModelCode?: string;
+  refTarget?: Record<string, any>;
+  constraints?: { required?: boolean };
+  extension?: Record<string, any>;
+}
+
+type EnrichedColumnConfig = ColumnConfig & {
+  dataType?: string;
+  refTarget?: Record<string, any>;
+  referenceModelCode?: string;
+  extension?: Record<string, any>;
+};
+
+interface SubTableReferenceDisplayConfig {
+  field: string;
+  modelCode: string;
+  valueField: string;
+  displayField: string;
+  displayKey: string;
+}
+
+interface PaginationResult<T> {
+  records?: T[];
 }
 
 export const SubTableViewer: React.FC<SubTableViewerProps> = ({
@@ -83,6 +117,71 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   const [editSaving, setEditSaving] = useState(false);
   const [crossRowErrors, setCrossRowErrors] = useState<string[]>([]);
   const originalEditDataRef = useRef<Record<string, any>>({});
+  const [childFieldMap, setChildFieldMap] = useState<Map<string, ChildFieldMeta>>(new Map());
+  const [columnMetaLoading, setColumnMetaLoading] = useState(false);
+  const [referenceDisplayCache, setReferenceDisplayCache] = useState<
+    Record<string, Record<string, string>>
+  >({});
+
+  const shouldLoadChildFieldMeta = useMemo(() => {
+    if (!config.childModel) return false;
+    return config.columns.some((col) => {
+      const anyCol = col as EnrichedColumnConfig;
+      return (
+        !col.label ||
+        col.field.endsWith('_id') ||
+        col.field.endsWith('_pid') ||
+        col.valueType === 'reference' ||
+        anyCol.dataType === 'reference' ||
+        Boolean(anyCol.refTarget || anyCol.referenceModelCode)
+      );
+    });
+  }, [config.childModel, config.columns]);
+
+  useEffect(() => {
+    if (!shouldLoadChildFieldMeta || !config.childModel) {
+      setChildFieldMap(new Map());
+      setColumnMetaLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setColumnMetaLoading(true);
+
+    async function loadChildFieldMeta(): Promise<void> {
+      try {
+        const fieldsRes = await fetchResult<ChildFieldMeta[]>(
+          `/api/dynamic/${config.childModel}/field-meta`,
+          {
+            method: 'get',
+            token: token || undefined,
+          },
+        );
+        if (cancelled) return;
+        if (!ResultHelper.isSuccess(fieldsRes) || !Array.isArray(fieldsRes.data)) {
+          setChildFieldMap(new Map());
+          return;
+        }
+        const next = new Map<string, ChildFieldMeta>();
+        for (const field of fieldsRes.data) {
+          if (field?.code) next.set(field.code, field);
+        }
+        setChildFieldMap(next);
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('[SubTableViewer] Failed to load child field metadata:', err);
+          setChildFieldMap(new Map());
+        }
+      } finally {
+        if (!cancelled) setColumnMetaLoading(false);
+      }
+    }
+
+    loadChildFieldMeta();
+    return () => {
+      cancelled = true;
+    };
+  }, [config.childModel, shouldLoadChildFieldMeta, token]);
 
   // Determine if inline edit is enabled
   const canInlineEdit = isEditable && config.commands?.update && config.allowInlineEdit !== false;
@@ -101,18 +200,79 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     [config.editableColumns],
   );
 
+  const effectiveColumns = useMemo<EnrichedColumnConfig[]>(() => {
+    if (childFieldMap.size === 0) return config.columns as EnrichedColumnConfig[];
+
+    return config.columns.map((col) => {
+      const meta = childFieldMap.get(col.field);
+      if (!meta) return col as EnrichedColumnConfig;
+
+      const anyCol = col as EnrichedColumnConfig;
+      const metaExtension = getFieldMetaExtension(meta);
+      const refTarget = {
+        ...(metaExtension.refTarget || {}),
+        ...(meta.refTarget || {}),
+        ...((anyCol.extension as any)?.refTarget || {}),
+        ...((anyCol as any).props?.refTarget || {}),
+        ...(anyCol.refTarget || {}),
+      };
+      const displayName = resolveChildFieldDisplayName(meta);
+      const dataType = anyCol.dataType || meta.dataType || metaExtension.dataType;
+      const enriched: EnrichedColumnConfig = { ...anyCol };
+
+      if (displayName && shouldReplaceGeneratedLabel(enriched.label, col.field)) {
+        enriched.label = displayName;
+      }
+      if (!enriched.dictCode && (meta.dictCode || metaExtension.dictCode)) {
+        enriched.dictCode = meta.dictCode || metaExtension.dictCode;
+      }
+      if (dataType) {
+        enriched.dataType = String(dataType);
+        if (String(dataType).toLowerCase() === 'reference' && !enriched.valueType) {
+          enriched.valueType = 'reference';
+        }
+      }
+      if (Object.keys(refTarget).length > 0) {
+        enriched.refTarget = refTarget;
+      }
+      if (!enriched.referenceModelCode) {
+        enriched.referenceModelCode =
+          meta.referenceModelCode ||
+          metaExtension.referenceModelCode ||
+          metaExtension.refModelCode ||
+          refTarget.targetModel ||
+          refTarget.modelCode;
+      }
+      if (!enriched.required && meta.constraints?.required) {
+        enriched.required = true;
+      }
+
+      return enriched;
+    });
+  }, [childFieldMap, config.columns]);
+
   // Ordered list of editable field names (for Tab navigation)
   const editableFields = useMemo(
-    () => config.columns.filter((c) => isColumnEditable(c)).map((c) => c.field),
-    [config.columns, isColumnEditable],
+    () => effectiveColumns.filter((c) => isColumnEditable(c)).map((c) => c.field),
+    [effectiveColumns, isColumnEditable],
   );
 
   // Dict cache for columns with dictCode (used in inline edit dropdowns)
   const dictCodes = useMemo(
-    () => config.columns.filter((c) => c.dictCode).map((c) => c.dictCode!),
-    [config.columns],
+    () => effectiveColumns.filter((c) => c.dictCode).map((c) => c.dictCode!),
+    [effectiveColumns],
   );
   const { getDictItems, getDictLabel } = useDictCache({ dictCodes, token });
+
+  const referenceDisplayConfigs = useMemo(
+    () => collectSubTableReferenceDisplayConfigs(effectiveColumns),
+    [effectiveColumns],
+  );
+
+  const referenceDisplayByField = useMemo(
+    () => new Map(referenceDisplayConfigs.map((entry) => [entry.field, entry])),
+    [referenceDisplayConfigs],
+  );
 
   const reloadRows = useCallback(() => {
     setRefreshCounter((c) => c + 1);
@@ -298,9 +458,108 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       const fieldKey = `field.${fieldCode}.label`;
       const fieldResolved = t(fieldKey);
       if (fieldResolved !== fieldKey) return fieldResolved;
+      const metaDisplayName = resolveChildFieldDisplayName(childFieldMap.get(fieldCode));
+      if (metaDisplayName) return metaDisplayName;
       return fieldCode;
     },
-    [config.childModel, t],
+    [childFieldMap, config.childModel, t],
+  );
+
+  useEffect(() => {
+    if (referenceDisplayConfigs.length === 0 || rows.length === 0) return;
+    let cancelled = false;
+
+    async function loadReferenceDisplays(): Promise<void> {
+      const pendingByConfig = referenceDisplayConfigs
+        .map((refConfig) => {
+          const cacheKey = buildSubTableReferenceDisplayCacheKey(refConfig);
+          const cached = referenceDisplayCache[cacheKey] || {};
+          const values = Array.from(
+            new Set(
+              rows
+                .map((row) => row[refConfig.field])
+                .filter((value) => value !== null && value !== undefined && value !== '')
+                .map((value) => String(value)),
+            ),
+          ).filter((value) => cached[value] === undefined);
+          return { refConfig, cacheKey, values };
+        })
+        .filter((entry) => entry.values.length > 0);
+
+      if (pendingByConfig.length === 0) return;
+
+      const updates: Record<string, Record<string, string>> = {};
+      await Promise.all(
+        pendingByConfig.map(async ({ refConfig, cacheKey, values }) => {
+          try {
+            const result = await fetchResult<
+              PaginationResult<Record<string, any>> | Record<string, any>[]
+            >(`${buildApiEndpoint(refConfig.modelCode)}/list`, {
+              method: 'get',
+              params: {
+                pageNum: 1,
+                pageSize: Math.max(values.length, 1),
+                filters: JSON.stringify([
+                  { fieldName: refConfig.valueField, operator: 'IN', value: values },
+                ]),
+              },
+              token: token || undefined,
+            });
+            if (cancelled || !ResultHelper.isSuccess(result) || !result.data) return;
+
+            const responseData = result.data;
+            const referenceRows = Array.isArray(responseData)
+              ? responseData
+              : responseData.records || [];
+            for (const row of referenceRows) {
+              const value = row[refConfig.valueField];
+              const label = row[refConfig.displayField];
+              if (value === null || value === undefined || label === null || label === undefined) {
+                continue;
+              }
+              const text = String(label).trim();
+              if (!text) continue;
+              updates[cacheKey] = updates[cacheKey] || {};
+              updates[cacheKey][String(value)] = text;
+            }
+          } catch (err) {
+            console.warn(
+              `[SubTableViewer] Failed to resolve reference labels for ${refConfig.field}:`,
+              err,
+            );
+          }
+        }),
+      );
+
+      if (cancelled || Object.keys(updates).length === 0) return;
+      setReferenceDisplayCache((prev) => {
+        const next = { ...prev };
+        for (const [cacheKey, labels] of Object.entries(updates)) {
+          next[cacheKey] = { ...(next[cacheKey] || {}), ...labels };
+        }
+        return next;
+      });
+    }
+
+    loadReferenceDisplays();
+    return () => {
+      cancelled = true;
+    };
+  }, [referenceDisplayCache, referenceDisplayConfigs, rows, token]);
+
+  const getReferenceDisplayValue = useCallback(
+    (row: Record<string, any>, col: EnrichedColumnConfig): string | undefined => {
+      const refConfig = referenceDisplayByField.get(col.field);
+      if (!refConfig) return undefined;
+      const rawValue = row[col.field];
+      if (rawValue === null || rawValue === undefined || rawValue === '') return undefined;
+      const resolvedDisplay =
+        referenceDisplayCache[buildSubTableReferenceDisplayCacheKey(refConfig)]?.[String(rawValue)];
+      if (resolvedDisplay) return resolvedDisplay;
+      if (row[refConfig.displayKey]) return String(row[refConfig.displayKey]);
+      return undefined;
+    },
+    [referenceDisplayByField, referenceDisplayCache],
   );
 
   // ------- Field Validation -------
@@ -427,7 +686,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
     // Validate all editable fields (required, min/max, pattern, custom rules)
     const errors: Record<string, string> = {};
-    for (const col of config.columns) {
+    for (const col of effectiveColumns) {
       if (col.editable !== false) {
         const fieldError = validateFieldValue(col, newRowData[col.field]);
         if (fieldError) errors[col.field] = fieldError;
@@ -471,13 +730,13 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     }
   }, [
     config,
+    effectiveColumns,
     newRowData,
     parentRecordId,
     token,
     reloadRows,
     onDataChange,
     resolvedDefaultValues,
-    resolveColumnLabel,
   ]);
 
   // Delete command handler
@@ -490,7 +749,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
         const result = await fetchResult(`/api/meta/commands/execute/${config.commands.delete}`, {
           method: 'post',
           params: {
-            targetRecordId: rowPid,
+            ...buildCommandTargetParams(rowPid),
             operationType: 'delete',
           },
           token,
@@ -541,7 +800,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   }, []);
 
   const interpolateRowPath = useCallback((raw: string, row: Record<string, any>): string => {
-    const rowId = row.pid || row.id || '';
+    const rowId = getLegacyCompatibleRecordPid(row) || '';
     let value = raw.replace(/\{(\w+)\}/g, (_: string, field: string) => {
       if (field === 'pid' || field === 'id') return encodeURIComponent(String(rowId));
       return encodeURIComponent(String(row[field] ?? ''));
@@ -558,7 +817,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   const resolveNavigatePath = useCallback(
     (target: string, row: Record<string, any>): string => {
-      const rowId = row.pid || row.id;
+      const rowId = getLegacyCompatibleRecordPid(row);
       if (target.startsWith('/')) return interpolateRowPath(target, row);
 
       const lastUnderscoreIdx = target.lastIndexOf('_');
@@ -610,7 +869,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   const handleRowAction = useCallback(
     async (button: ButtonConfig, row: Record<string, any>, rowIndex: number) => {
-      const rowPid = row.pid || row.id;
+      const rowPid = getLegacyCompatibleRecordPid(row);
       const actionDef = button.action && typeof button.action === 'object' ? button.action : null;
       const actionType = (actionDef as any)?.type || (button.commandCode ? 'command' : null);
       if (actionType === 'navigate') {
@@ -644,7 +903,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
         const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
           method: 'post',
           params: {
-            targetRecordId: rowPid,
+            ...buildCommandTargetParams(rowPid),
             payload: row,
             operationType: actionType === 'state_transition' ? 'UPDATE' : 'update',
           },
@@ -672,9 +931,10 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   const handleStartEdit = useCallback(
     (row: Record<string, any>) => {
       if (!canInlineEdit) return;
-      const rowId = row.pid || String(row.id);
+      const rowId = getLegacyCompatibleRecordPid(row);
+      if (!rowId) return;
       const values: Record<string, any> = {};
-      for (const col of config.columns) {
+      for (const col of effectiveColumns) {
         values[col.field] = row[col.field] ?? '';
       }
       setEditingRowId(rowId);
@@ -683,7 +943,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       setEditErrors({});
       setCrossRowErrors([]);
     },
-    [config.columns, canInlineEdit],
+    [effectiveColumns, canInlineEdit],
   );
 
   // Cancel edit mode
@@ -700,7 +960,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
     // Row-level field validation (required, min/max, pattern, custom rules)
     const errors: Record<string, string> = {};
-    for (const col of config.columns) {
+    for (const col of effectiveColumns) {
       if (isColumnEditable(col)) {
         const fieldError = validateFieldValue(col, editingValues[col.field]);
         if (fieldError) errors[col.field] = fieldError;
@@ -714,7 +974,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     // Cross-row validation (merge edited row into full dataset)
     if (config.crossRowRules && config.crossRowRules.length > 0) {
       const mergedRows = rows.map((r) => {
-        if ((r.pid || String(r.id)) === editingRowId) {
+        if (getLegacyCompatibleRecordPid(r) === editingRowId) {
           return { ...r, ...editingValues };
         }
         return r;
@@ -745,7 +1005,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       const result = await fetchResult(`/api/meta/commands/execute/${config.commands.update}`, {
         method: 'post',
         params: {
-          targetRecordId: editingRowId,
+          ...buildCommandTargetParams(editingRowId),
           payload: changed,
           operationType: 'update',
         },
@@ -779,6 +1039,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     editingRowId,
     editingValues,
     config,
+    effectiveColumns,
     rows,
     token,
     reloadRows,
@@ -831,7 +1092,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     (isEditable && (config.commands?.create || config.commands?.delete || canInlineEdit));
   const isSortable = config.sortable && isEditable;
   const sortField = config.sortField || 'sort_order';
-  const totalCols = config.columns.length + (hasActions ? 1 : 0) + (isSortable ? 1 : 0);
+  const totalCols = effectiveColumns.length + (hasActions ? 1 : 0) + (isSortable ? 1 : 0);
   const extraColCount = (hasActions ? 1 : 0) + (isSortable ? 1 : 0);
   const emptyStateTitle = config.emptyState?.title
     ? getLocalizedText(config.emptyState.title, locale, t)
@@ -843,7 +1104,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     ? getLocalizedText(config.emptyState.actionLabel, locale, t)
     : t('common.addLine') !== 'common.addLine'
       ? t('common.addLine')
-      : 'Add Line';
+      : '添加明细';
 
   // Tree data management
   const { visibleRows: treeRows, toggleExpand } = useTreeData(rows, config.treeConfig);
@@ -899,7 +1160,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     [isSortable, displayRows, treeRows, config, sortField, token, reloadRows],
   );
 
-  if (loading) {
+  if (loading || columnMetaLoading) {
     return (
       <div className="text-text-3 py-8 text-center text-sm">
         {t('common.loading') || 'Loading...'}
@@ -955,7 +1216,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           <thead className="bg-subtle">
             <tr>
               {isSortable && <th className="text-text-3 w-10 px-1 py-2.5 text-xs font-medium"></th>}
-              {config.columns.map((col: ColumnConfig) => (
+              {effectiveColumns.map((col: EnrichedColumnConfig) => (
                 <th
                   key={col.field}
                   className={`text-text-2 px-4 py-2.5 text-xs font-medium tracking-wider uppercase ${
@@ -1003,7 +1264,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                     onToggleExpand={() => toggleExpand(rowId)}
                     sortable={!!isSortable && !editingRowId}
                   >
-                    {config.columns.map((col: ColumnConfig) => {
+                    {effectiveColumns.map((col: EnrichedColumnConfig) => {
                       const cellAlign =
                         col.align === 'right'
                           ? 'text-right'
@@ -1014,6 +1275,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                       // --- Editing mode ---
                       if (isEditingThis) {
                         const editable = isColumnEditable(col);
+                        const referenceDisplayValue = getReferenceDisplayValue(row, col);
                         const dictOptions = col.dictCode
                           ? (getDictItems(col.dictCode) || []).map((d) => ({
                               value: d.value,
@@ -1034,6 +1296,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                                 getDictLabel,
                                 timezone,
                                 formats,
+                                referenceDisplayValue,
                               )}
                               isEditing={editable}
                               error={editErrors[col.field]}
@@ -1057,6 +1320,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                       }
 
                       // --- Read mode ---
+                      const referenceDisplayValue = getReferenceDisplayValue(row, col);
                       return (
                         <td
                           key={col.field}
@@ -1065,7 +1329,14 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                           }`}
                           onDoubleClick={canInlineEdit ? () => handleStartEdit(row) : undefined}
                         >
-                          {formatCellValue(row[col.field], col, getDictLabel, timezone, formats)}
+                          {formatCellValue(
+                            row[col.field],
+                            col,
+                            getDictLabel,
+                            timezone,
+                            formats,
+                            referenceDisplayValue,
+                          )}
                         </td>
                       );
                     })}
@@ -1103,7 +1374,8 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                                 return isRowActionVisible(button, row);
                               })
                               .map((button) => {
-                                const loadingKey = `${row.pid || row.id}:${button.code}:${rowIndex}`;
+                                const rowPid = getLegacyCompatibleRecordPid(row);
+                                const loadingKey = `${rowPid || rowIndex}:${button.code}:${rowIndex}`;
                                 const isLoading = rowActionLoadingKey === loadingKey;
                                 const disabled =
                                   !!editingRowId || isLoading || isRowActionDisabled(button, row);
@@ -1151,12 +1423,14 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                             )}
                             {config.commands?.delete && (
                               <button
-                                onClick={() => handleDeleteRow(row.pid)}
-                                disabled={deletingId === row.pid || !!editingRowId}
+                                onClick={() => handleDeleteRow(getLegacyCompatibleRecordPid(row) || '')}
+                                disabled={
+                                  deletingId === getLegacyCompatibleRecordPid(row) || !!editingRowId
+                                }
                                 data-testid={`subtable-delete-${rowIndex}`}
                                 className="text-status-red text-xs hover:text-red-700 disabled:opacity-50"
                               >
-                                {deletingId === row.pid
+                                {deletingId === getLegacyCompatibleRecordPid(row)
                                   ? '...'
                                   : t('common.delete') !== 'common.delete'
                                     ? t('common.delete')
@@ -1178,7 +1452,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                 className="border-t border-blue-100 bg-blue-50/30"
                 data-testid="subtable-add-form"
               >
-                {config.columns.map((col: ColumnConfig) => (
+                {effectiveColumns.map((col: EnrichedColumnConfig) => (
                   <td
                     key={col.field}
                     className={`px-4 py-2 ${col.align === 'right' ? 'text-right' : 'text-left'}`}
@@ -1290,7 +1564,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           {/* Summary row — reactive during inline editing */}
           {config.summary && (
             <SubTableSummaryRow
-              columns={config.columns}
+              columns={effectiveColumns}
               rows={
                 editingRowId
                   ? rows.map((r) =>
@@ -1327,12 +1601,17 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
 export function formatCellValue(
   value: any,
-  col: ColumnConfig,
+  col: ColumnConfig | EnrichedColumnConfig,
   getDictLabel?: (code: string, value: string) => string | undefined,
   timeZone?: string,
   formats?: Partial<DateTimeFormatPreferences>,
+  referenceDisplayValue?: string,
 ): string {
   if (value == null) return '-';
+
+  if (isReferenceColumn(col as EnrichedColumnConfig)) {
+    return referenceDisplayValue || '-';
+  }
 
   // Dict label lookup
   if (col.dictCode && getDictLabel) {
@@ -1365,6 +1644,109 @@ export function formatCellValue(
   }
 
   return String(value);
+}
+
+function getFieldMetaExtension(meta?: ChildFieldMeta): Record<string, any> {
+  const extension = meta?.extension || {};
+  const nested =
+    extension.extension && typeof extension.extension === 'object'
+      ? (extension.extension as Record<string, any>)
+      : {};
+  return { ...nested, ...extension };
+}
+
+function resolveChildFieldDisplayName(meta?: ChildFieldMeta): string | undefined {
+  if (!meta) return undefined;
+  const extension = getFieldMetaExtension(meta);
+  const candidate =
+    meta.displayName ||
+    extension.displayName ||
+    (meta as any)['displayName:zh-CN'] ||
+    (meta as any)['displayName:en'] ||
+    (meta as any)['displayName:en-US'];
+  if (typeof candidate !== 'string') return undefined;
+  const trimmed = candidate.trim();
+  return trimmed && trimmed !== meta.code ? trimmed : undefined;
+}
+
+function shouldReplaceGeneratedLabel(label: ColumnConfig['label'], fieldCode: string): boolean {
+  if (!label) return true;
+  if (typeof label === 'string') {
+    const trimmed = label.trim();
+    return !trimmed || trimmed === fieldCode;
+  }
+  const values = Object.values(label).filter((value): value is string => typeof value === 'string');
+  if (values.length === 0) return true;
+  return values.every((value) => !value.trim() || value.trim() === fieldCode);
+}
+
+function readSubTableRefTargetConfig(column: EnrichedColumnConfig): Record<string, any> {
+  return {
+    ...((column.extension as any)?.refTarget || {}),
+    ...((column as any).props?.refTarget || {}),
+    ...(column.refTarget || {}),
+  };
+}
+
+function collectSubTableReferenceDisplayConfigs(
+  columns: EnrichedColumnConfig[],
+): SubTableReferenceDisplayConfig[] {
+  const configs: SubTableReferenceDisplayConfig[] = [];
+  const seen = new Set<string>();
+
+  for (const column of columns) {
+    if (!column.field || column.isActionColumn) continue;
+    const refTarget = readSubTableRefTargetConfig(column);
+    const dataType = String(column.dataType || column.valueType || '').toLowerCase();
+    const hasReferenceShape =
+      dataType === 'reference' ||
+      column.valueType === 'reference' ||
+      Object.keys(refTarget).length > 0;
+    if (!hasReferenceShape) continue;
+
+    const modelCode = String(
+      refTarget.modelCode ||
+        refTarget.targetModel ||
+        refTarget.targetEntity ||
+        column.referenceModelCode ||
+        '',
+    ).trim();
+    const displayField = String(
+      refTarget.displayField || refTarget.labelField || refTarget.targetField || '',
+    ).trim();
+    const valueField = String(
+      refTarget.valueField || refTarget.targetValueField || refTarget.idField || 'pid',
+    ).trim();
+    if (!modelCode || !displayField || !valueField) continue;
+
+    const config: SubTableReferenceDisplayConfig = {
+      field: column.field,
+      modelCode,
+      valueField,
+      displayField,
+      displayKey: `${column.field}_display`,
+    };
+    const key = buildSubTableReferenceDisplayCacheKey(config);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    configs.push(config);
+  }
+
+  return configs;
+}
+
+function buildSubTableReferenceDisplayCacheKey(config: SubTableReferenceDisplayConfig): string {
+  return `${config.field}|${config.modelCode}|${config.valueField}|${config.displayField}`;
+}
+
+function isReferenceColumn(col: EnrichedColumnConfig): boolean {
+  const dataType = String(col.dataType || col.valueType || '').toLowerCase();
+  return (
+    dataType === 'reference' ||
+    col.valueType === 'reference' ||
+    Object.keys(readSubTableRefTargetConfig(col)).length > 0 ||
+    Boolean(col.referenceModelCode)
+  );
 }
 
 function formatNumber(num: number): string {

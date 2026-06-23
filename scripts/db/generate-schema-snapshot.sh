@@ -50,10 +50,12 @@ mkdir -p "$(dirname "$OUT")"
   echo
   # Strip lines that vary per run / per pg_dump version so the snapshot is
   # byte-stable for drift checks: pg17 \restrict/\unrestrict session tokens
-  # (randomized each run) and the "Dumped ... version" header comments.
+  # (randomized each run), pg17-only transaction_timeout, and the "Dumped ..."
+  # version header comments.
   PGPASSWORD="$PG_PASSWORD" pg_dump -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" \
     --schema-only --no-owner --no-privileges \
     --exclude-table=ab_flyway_schema_history "$SNAP_DB" \
-    | grep -vE '^\\(un)?restrict |^-- Dumped (from database|by pg_dump) version '
+    | grep -vE '^\\(un)?restrict |^SET transaction_timeout = |^-- Dumped (from database|by pg_dump) version '
 } > "$OUT"
+perl -0pi -e 's/\n+\z/\n/' "$OUT"
 echo "[snapshot] wrote $OUT ($(wc -l < "$OUT" | tr -d ' ') lines)" >&2

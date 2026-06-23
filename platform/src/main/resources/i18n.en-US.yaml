@@ -785,6 +785,14 @@ common:
   modified_this_week: Modified This Week
   preset_views: Preset Views
   view_saved: Saved to current view
+  saved_view_save_preset_to_personal: Save preset as my view
+  saved_view_preset_saved_to_personal: Saved as personal view
+  saved_view_preset_save_failed: Failed to save preset
+  saved_view_preset_saved_badge: Saved
+  saved_view_preset_edited_badge: Edited
+  saved_view_preset_reset: Reset saved preset
+  saved_view_preset_reset_done: Preset view reset
+  saved_view_preset_reset_failed: Failed to reset preset view
   options_load_failed: Failed to load options
   retry: Retry
 admin:
@@ -1136,3 +1144,133 @@ bpmn:
     exclusive_gateway_min_outgoing: Exclusive gateway requires at least two outgoing edges
     exclusive_gateway_edge_missing_condition: 'Exclusive gateway "{name}" has an outgoing edge without a condition'
     exclusive_gateway_multiple_defaults: 'Exclusive gateway "{name}" has multiple default flows'
+
+tenant:
+  application:
+    create_success: Tenant created — you are now its administrator
+    invite_invalid: Invalid invite code
+    invite_revoked: Invite code is no longer active
+    invite_expired: Invite code has expired
+    join_pending: Your join request has been submitted and is awaiting tenant admin approval
+    unknown_tenant: Unknown tenant
+  member:
+    already_member: User is already a member of this tenant
+    not_in_tenant: User does not belong to any tenant
+    not_found: "Member not found: {0}"
+  not_found: "Tenant not found: {0}"
+  name_exists: "Tenant name already exists: {0}"
+
+role:
+  not_found: "Role not found: {0}"
+  original_not_found: "Original role not found: {0}"
+  system_no_disable: System roles cannot be disabled
+  system_no_delete: System roles cannot be deleted
+  in_use: Role is in use and cannot be deleted
+  code_exists: "Role code already exists: {0}"
+
+category:
+  code_exists: "Category code already exists in this tenant: {0}"
+  parent_not_found: Parent category not found
+  not_found: Category not found
+  cross_tenant_modify: Modifying categories of another tenant is not allowed
+  has_children: Category has child categories and cannot be deleted
+  new_parent_not_found: New parent category not found
+  cross_tenant_move: Moving under a category of another tenant is not allowed
+  move_to_descendant: A category cannot be moved under its own descendant
+
+permission:
+  assign_failed: Failed to assign permission
+  remove_failed: Failed to remove permission
+  remove_all_failed: Failed to remove all permissions
+  sync_failed: Failed to sync permissions
+  copy_failed: Failed to copy permissions
+
+chart:
+  configure_datasource: Configure a data source
+  load_failed: Failed to load data
+  no_data: No data
+
+header:
+  workspaces: Workspaces
+  platform_console: Platform Console
+
+permission_guard:
+  no_access: No permission
+
+qr_scanner:
+  camera_access_failed: Unable to access camera. Please check permission settings.
+  enter_login_code: Please enter the device login code
+  unknown_device: Unknown device
+  close: Close
+  title: Scan device QR code
+  instruction: Point your camera at the QR code shown on the TV device, or enter the device login code manually
+  scan_tab: Scan QR code
+  manual_tab: Manual input
+  frame_hint: Place the QR code within the frame
+  camera_tip: "Tip: if the camera is unavailable, switch to manual input mode"
+  input_label: Device login code or QR code content
+  input_placeholder: Enter the device login code or paste the full QR code content...
+  cancel: Cancel
+  confirm: Confirm
+
+notification_rule:
+  preset_overdue_payment: Overdue payment reminder
+  preset_low_stock: Low stock warning
+  preset_approval_overdue: Approval overdue reminder
+  trigger_scheduled: Scheduled
+  trigger_scheduled_desc: Run the rule on a fixed time schedule
+  trigger_event: Event
+  trigger_event_desc: Run the rule when a record changes
+  schedule_hourly: Hourly
+  schedule_daily: Daily
+  schedule_weekly: Weekly
+  event_created: Record created
+  event_updated: Record updated
+  event_deleted: Record deleted
+  channel_in_app: In-app message
+  channel_email: Email
+  recipient_operator: Operator
+  recipient_record_owner: Record owner
+  recipient_specific_users: Specific users
+  op_eq: Equals
+  op_ne: Not equals
+  op_gt: Greater than
+  op_ge: Greater or equal
+  op_lt: Less than
+  op_le: Less or equal
+  op_like: Contains
+  op_is_null: Is empty
+  op_is_not_null: Is not empty
+  err_code_required: Rule code is required
+  err_name_required: Rule name is required
+  save_failed_retry: Save failed, please retry
+  save_failed: Save failed
+  quick_start: Quick start — choose a template
+  start_blank: Start from blank →
+  section_basic: Basic info
+  label_code: Rule code
+  label_name: Rule name
+  ph_name: Rule display name
+  label_description: Description
+  ph_description: Optional description...
+  enable_rule: Enable rule
+  section_trigger: Trigger
+  label_frequency: Frequency
+  label_trigger_event: Trigger event
+  section_condition: Condition
+  label_model: Data model
+  select_model: "-- Select model --"
+  ph_field: Field name
+  ph_value: Value
+  add_condition: Add condition
+  section_action: Notification action
+  label_channel: Notification channel
+  label_template: Message template code
+  ph_template: template-code (optional)
+  label_recipient: Recipient strategy
+  label_owner_field: Owner field name
+  label_user_ids: User IDs (comma separated)
+  cancel: Cancel
+  saving: Saving...
+  update_rule: Update rule
+  create_rule: Create rule

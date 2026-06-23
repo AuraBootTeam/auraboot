@@ -27,6 +27,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.pf4j.BiTemporalAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
+import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.FileAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
@@ -358,6 +359,10 @@ public class HandlerPhase implements CommandPhase {
             if (fileService != null && storageProvider != null) {
                 pluginSettings.put(CommandHandlerExtension.FILE_ACCESSOR_KEY,
                         new FileAccessorImpl(fileService, storageProvider, userId));
+            }
+            if (asyncTaskService != null && objectMapper != null) {
+                pluginSettings.put(CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,
+                        new AsyncTaskAccessorImpl(asyncTaskService, objectMapper, tenantId, userId));
             }
             CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
                     .tenantId(tenantId)

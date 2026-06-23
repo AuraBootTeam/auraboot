@@ -130,6 +130,19 @@ test('status:closed with broken distilled_to -> S-DOCS-DISTILL-UNRESOLVED', () =
   assert.ok(codes(result).includes('S-DOCS-DISTILL-UNRESOLVED'));
 });
 
+test('status:closed with cross-repo (auraboot-enterprise/) distilled_to -> accepted (sibling repo not checked out in CI)', () => {
+  const root = makeRepo();
+  write(root, 'docs/retro/2026-06-10-bar.md',
+    fm({ type: 'retro', status: 'closed', created: '2026-06-10',
+      distilled_to: ['auraboot-enterprise/docs/agent-rules/engineering-gotchas/backend-spring-db.md (the lesson)'] }));
+  const result = auditRepo(root);
+  // The sibling canonical repo can't be resolved from this repo's CI checkout, but a recognized
+  // cross-repo precipitation target is a valid reference, not a dead link.
+  assert.ok(!codes(result).includes('S-DOCS-DISTILL-UNRESOLVED'));
+  assert.ok(!codes(result).includes('S-DOCS-CLOSED-NO-DISTILL'));
+  assert.ok(!codes(result).includes('S-DOCS-LINK-RELATES'));
+});
+
 test('distilled_to on canonical doc -> S-DOCS-DISTILL-ON-CANONICAL', () => {
   const root = makeRepo();
   write(root, 'docs/standards/core/x.md',

@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.tool.SendCustomerReplyToolHandler;
 import com.auraboot.framework.common.util.PinnedHttpRequests;
 import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CustomToolProvider implements ToolProvider {
 
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+
     private final DynamicDataMapper dynamicDataMapper;
     private final ObjectMapper objectMapper;
     private final SendCustomerReplyToolHandler sendCustomerReplyToolHandler;
@@ -47,7 +50,8 @@ public class CustomToolProvider implements ToolProvider {
         // Query user-defined tools that are not DSL-backed (those are handled by DslToolProvider).
         // Tenant isolation is handled explicitly via #{params.tenantId} — using WithoutTenant variant
         // to avoid JSqlParser issues with the NOT IN clause on a non-mt_ table.
-        String sql = "SELECT tool_code, tool_name, tool_description, tool_type " +
+        String sql = "SELECT tool_code, tool_name, tool_description, tool_type, " +
+                "input_schema, requires_approval, risk_level " +
                 "FROM ab_agent_tool " +
                 "WHERE tenant_id = #{params.tenantId} " +
                 "AND tool_type NOT IN ('dsl_command', 'dsl_query') " +
@@ -66,6 +70,9 @@ public class CustomToolProvider implements ToolProvider {
                 .description((String) row.get("tool_description"))
                 .providerCode("custom")
                 .toolType((String) row.getOrDefault("tool_type", "custom"))
+                .riskLevel((String) row.get("risk_level"))
+                .requiresApproval(Boolean.TRUE.equals(row.get("requires_approval")))
+                .parameterSchema(parseInputSchema((String) row.get("input_schema"), (String) row.get("tool_code")))
                 .build()
         ).collect(Collectors.toList());
     }
@@ -186,5 +193,17 @@ public class CustomToolProvider implements ToolProvider {
         List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(
                 sql, Map.of("tenantId", tenantId, "toolCode", toolCode));
         return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    private Map<String, Object> parseInputSchema(String inputSchema, String toolCode) {
+        if (inputSchema == null || inputSchema.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(inputSchema, MAP_TYPE);
+        } catch (Exception e) {
+            log.warn("Custom tool {} has invalid input_schema: {}", toolCode, e.getMessage());
+            return null;
+        }
     }
 }

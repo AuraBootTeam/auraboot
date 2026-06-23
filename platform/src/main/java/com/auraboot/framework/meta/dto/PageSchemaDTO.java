@@ -84,6 +84,18 @@ public class PageSchemaDTO extends AbstractResponse {
     private Map<String, Object> dataSources;
 
     /**
+     * Optional override for the edit-mode record-prefill fetch (e.g.
+     * {@code {"endpoint": "/api/qr/{recordPid}"}}). When set, a form page loads
+     * the existing record from this endpoint instead of the default
+     * {@code /api/dynamic/<modelCode>/<recordPid>} — required for skipTableCreation
+     * models whose reads are served by a custom REST endpoint. Declaring it here
+     * keeps it a recognized top-level field so import validation does not reject it
+     * as {@code S-PAGE-UNKNOWN-FIELDS}.
+     */
+    @JsonProperty("recordSource")
+    private Map<String, Object> recordSource;
+
+    /**
      * Ordered list of page blocks (toolbar, filters, table, form-section, etc.).
      */
     @JsonProperty("blocks")
@@ -168,6 +180,18 @@ public class PageSchemaDTO extends AbstractResponse {
      */
     @JsonProperty("mobileUx")
     private Map<String, Object> mobileUx;
+
+    /**
+     * Convention-resolved CRUD command codes for this page's model, keyed by
+     * operation type ({@code create}/{@code update}/{@code delete}). Populated
+     * server-side from the model's command definitions (by
+     * {@code execution_config.type}) so standard create/edit/delete forms can
+     * route through the business command without hard-coding it in the page DSL
+     * or carrying it in the URL ({@code ?commandCode=}). Empty for pure-CRUD
+     * models (the runtime then falls back to the dynamic CRUD API).
+     */
+    @JsonProperty("commands")
+    private Map<String, String> commands;
 
     // 状态字段已在父类 AbstractResponse 中定义，无需重复声明
 
