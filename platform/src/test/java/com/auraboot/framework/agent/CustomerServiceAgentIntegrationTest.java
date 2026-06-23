@@ -81,12 +81,9 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
 
     @BeforeAll
     void ensureCrmTables() {
-        ensureAccountTable("mt_crm_account_common");
         ensureAccountTable("mt_crm_account");
-        ensureContactTable("mt_crm_contact_common");
         ensureContactTable("mt_crm_contact");
         ensureActivityTable();
-        ensureComplaintTable();
     }
 
     private void ensureAccountTable(String tableName) {
@@ -193,37 +190,6 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS updated_by BIGINT");
         jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
         jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS deleted_flag BOOLEAN NOT NULL DEFAULT FALSE");
-    }
-
-    private void ensureComplaintTable() {
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS mt_crm_complaint (
-                    id BIGSERIAL PRIMARY KEY,
-                    pid VARCHAR(64) UNIQUE NOT NULL,
-                    tenant_id BIGINT NOT NULL,
-                    crm_cp_title VARCHAR(500),
-                    crm_cp_description TEXT,
-                    crm_cp_status VARCHAR(50) DEFAULT 'open',
-                    crm_cp_priority VARCHAR(50),
-                    crm_cp_customer_email VARCHAR(255),
-                    crm_complaint_subject VARCHAR(500),
-                    crm_complaint_description TEXT,
-                    crm_complaint_status VARCHAR(50),
-                    crm_complaint_priority VARCHAR(50),
-                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                    created_by BIGINT,
-                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                    updated_by BIGINT,
-                    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
-                )
-                """);
-        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS crm_complaint_subject VARCHAR(500)");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS crm_complaint_description TEXT");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS crm_complaint_status VARCHAR(50)");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS crm_complaint_priority VARCHAR(50)");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS deleted_flag BOOLEAN NOT NULL DEFAULT FALSE");
     }
 
     // ========== Test 1: Seed CRM Account + Contact ==========
