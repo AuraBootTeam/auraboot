@@ -46,24 +46,24 @@ public class RecordCommentController {
         return ApiResponse.success(commentService.addComment(modelCode, recordPid, content, mentions));
     }
 
-    @PutMapping("/{modelCode}/{recordPid}/comments/{commentId}")
+    @PutMapping("/{modelCode}/{recordPid}/comments/{commentPid}")
     @Operation(summary = "Edit a comment")
     public ApiResponse<Map<String, Object>> editComment(
             @PathVariable String modelCode,
             @PathVariable String recordPid,
-            @PathVariable Long commentId,
+            @PathVariable String commentPid,
             @RequestBody Map<String, Object> body) {
         String content = (String) body.get("content");
-        return ApiResponse.success(commentService.editComment(commentId, content));
+        return ApiResponse.success(commentService.editComment(commentPid, content));
     }
 
-    @DeleteMapping("/{modelCode}/{recordPid}/comments/{commentId}")
+    @DeleteMapping("/{modelCode}/{recordPid}/comments/{commentPid}")
     @Operation(summary = "Delete a comment")
     public ApiResponse<Boolean> deleteComment(
             @PathVariable String modelCode,
             @PathVariable String recordPid,
-            @PathVariable Long commentId) {
-        commentService.deleteComment(commentId);
+            @PathVariable String commentPid) {
+        commentService.deleteComment(commentPid);
         return ApiResponse.success(true);
     }
 

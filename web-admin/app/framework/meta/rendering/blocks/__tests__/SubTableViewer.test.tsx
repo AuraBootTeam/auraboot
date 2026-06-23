@@ -203,6 +203,47 @@ describe('SubTableViewer', () => {
     expect(screen.getByTestId('subtable-viewer').textContent).toContain('D5 DataSource Row');
   });
 
+  it('resolves recordPid placeholders in API dataSource URLs and params', async () => {
+    fetchResultMock.mockResolvedValue({
+      code: '0',
+      data: {
+        records: [{ pid: 'row-pid', taskName: 'Record PID DataSource Row', status: 'active' }],
+      },
+    });
+
+    render(
+      <SubTableViewer
+        config={
+          {
+            ...buildConfig(),
+            dataSource: {
+              type: 'api',
+              url: '/api/scheduled-tasks/${recordPid}/logs',
+              params: {
+                owner: '${recordPid}',
+              },
+            },
+          } as any
+        }
+        parentRecordId="01KR8WEQZ0EXXF28KMA2B06YEN"
+        parentRecordData={{ pid: '01KR8WEQZ0EXXF28KMA2B06YEN' }}
+        t={(key) => (key === 'common.noData' ? 'No data' : key)}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchResultMock).toHaveBeenCalledWith('/api/scheduled-tasks/01KR8WEQZ0EXXF28KMA2B06YEN/logs', {
+        method: 'get',
+        params: {
+          owner: '01KR8WEQZ0EXXF28KMA2B06YEN',
+        },
+        token: undefined,
+      });
+    });
+
+    await expect(screen.findByTestId('sortable-row-row-pid')).resolves.toBeInTheDocument();
+  });
+
   it('uses child field metadata for raw-code-free labels and reference display values', async () => {
     fetchResultMock.mockImplementation((endpoint: string) => {
       if (endpoint === '/api/dynamic/inv_inbound_line/field-meta') {

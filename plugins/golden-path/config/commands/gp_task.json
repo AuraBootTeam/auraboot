@@ -108,7 +108,7 @@
         "type": "create",
         "targetModel": "gp_task_comment",
         "fieldMap": {
-          "gp_tc_task_id": "${recordId}",
+          "gp_tc_task_id": "${recordPid}",
           "gp_tc_content": "Task completed.",
           "gp_tc_author": "${currentUser}"
         }

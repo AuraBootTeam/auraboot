@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-22T15:34:36.514Z",
+  "generatedAt": "2026-06-23T06:22:28.398Z",
   "accepted": [
     {
       "key": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK|platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java||dynamic-record-map|@Parameter(description = \"Cursor for keyset pagination. Pass the nextCursor value from the previous response to fetch the next page efficiently. When provided, pageNum is ignored a",
@@ -1335,24 +1335,6 @@
       "evidence": "return String(row.title ?? row.name ?? row.pid ?? row.id ?? '');"
     },
     {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/blocks/SubTableViewer.tsx||recordId|// Interpolate ${recordId} and ${record.field} placeholders in URL",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/blocks/SubTableViewer.tsx",
-      "line": 177,
-      "field": "recordId",
-      "evidence": "// Interpolate ${recordId} and ${record.field} placeholders in URL"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/blocks/SubTableViewer.tsx||recordId|let value = raw.replace(/\\$\\{recordId\\}/g, parentRecordId);",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/blocks/SubTableViewer.tsx",
-      "line": 127,
-      "field": "recordId",
-      "evidence": "let value = raw.replace(/\\$\\{recordId\\}/g, parentRecordId);"
-    },
-    {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/blocks/workbenchBlockUtils.ts||recordId|targetRecordId: args.targetRecordId ?? args.targetRecordPid,",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
@@ -1362,20 +1344,11 @@
       "evidence": "targetRecordId: args.targetRecordId ?? args.targetRecordPid,"
     },
     {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|.replace(/\\{recordId\\}/g, encoded)",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 123,
-      "field": "recordId",
-      "evidence": ".replace(/\\{recordId\\}/g, encoded)"
-    },
-    {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|[recordData, recordId, schema],",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 532,
+      "line": 617,
       "field": "recordId",
       "evidence": "[recordData, recordId, schema],"
     },
@@ -1384,45 +1357,18 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1112,
+      "line": 1197,
       "field": "recordId",
       "evidence": "{shareDialogOpen && recordId && ("
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|}, [recordId, tableName, recordModelCode, schema, schema?.modelCode, token]);",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 463,
-      "field": "recordId",
-      "evidence": "}, [recordId, tableName, recordModelCode, schema, schema?.modelCode, token]);"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|}, [recordId, tableName, recordModelCode, token, schema]);",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 478,
-      "field": "recordId",
-      "evidence": "}, [recordId, tableName, recordModelCode, token, schema]);"
     },
     {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|* (where recordData/recordId are available) before the block is dispatched to BlockRenderer.",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1139,
+      "line": 1224,
       "field": "recordId",
       "evidence": "* (where recordData/recordId are available) before the block is dispatched to BlockRenderer."
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|* Endpoint templating: `{id}`, `{recordId}`, or `${recordId}` placeholders are replaced with the",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 169,
-      "field": "recordId",
-      "evidence": "* Endpoint templating: `{id}`, `{recordId}`, or `${recordId}` placeholders are replaced with the"
     },
     {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|* Receives schema + tableName + recordId + token from DynamicPageRenderer,",
@@ -1434,20 +1380,11 @@
       "evidence": "* Receives schema + tableName + recordId + token from DynamicPageRenderer,"
     },
     {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|* recordId; if none is present, `/{recordId}` is appended. Mirrors the list page's API datasource",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 170,
-      "field": "recordId",
-      "evidence": "* recordId; if none is present, `/{recordId}` is appended. Mirrors the list page's API datasource"
-    },
-    {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|* Resolve `${record.*}` / `${recordId}` templates in a chart block's namedQuery dataSource",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1136,
+      "line": 1221,
       "field": "recordId",
       "evidence": "* Resolve `${record.*}` / `${recordId}` templates in a chart block's namedQuery dataSource"
     },
@@ -1456,7 +1393,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1514,
+      "line": 1602,
       "field": "recordId",
       "evidence": "// Chart blocks fed by a record-scoped namedQuery need their ${record.*}/${recordId}"
     },
@@ -1465,52 +1402,25 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 689,
+      "line": 774,
       "field": "recordId",
       "evidence": "// System tabs are injected by backend into dsl_schema. Filter out system tabs when no recordId (new record)."
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|/\\{id\\}|\\{recordId\\}|\\$\\{recordId\\}/g,",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 186,
-      "field": "recordId",
-      "evidence": "/\\{id\\}|\\{recordId\\}|\\$\\{recordId\\}/g,"
     },
     {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|block={resolveChartBlockRecordParams(block, recordData, recordId!)}",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 883,
+      "line": 968,
       "field": "recordId",
       "evidence": "block={resolveChartBlockRecordParams(block, recordData, recordId!)}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|const { endpoint, method } = resolveDetailRecordEndpoint(schema, recordModelCode, recordId!);",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 438,
-      "field": "recordId",
-      "evidence": "const { endpoint, method } = resolveDetailRecordEndpoint(schema, recordModelCode, recordId!);"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|const { endpoint, method } = resolveDetailRecordEndpoint(schema, recordModelCode, recordId);",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 468,
-      "field": "recordId",
-      "evidence": "const { endpoint, method } = resolveDetailRecordEndpoint(schema, recordModelCode, recordId);"
     },
     {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|const { schema, tableName, recordId, token } = props;",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 398,
+      "line": 456,
       "field": "recordId",
       "evidence": "const { schema, tableName, recordId, token } = props;"
     },
@@ -1519,7 +1429,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1516,
+      "line": 1604,
       "field": "recordId",
       "evidence": "const dispatchBlock = resolveChartBlockRecordParams(block, recordData, recordId);"
     },
@@ -1528,7 +1438,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 120,
+      "line": 125,
       "field": "recordId",
       "evidence": "const encoded = encodeURIComponent(recordId);"
     },
@@ -1537,7 +1447,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1474,
+      "line": 1562,
       "field": "recordId",
       "evidence": "const numericId = recordData?.id || recordId;"
     },
@@ -1546,7 +1456,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1447,
+      "line": 1535,
       "field": "recordId",
       "evidence": "const pid = recordData?.pid || recordId;"
     },
@@ -1555,7 +1465,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1152,
+      "line": 1237,
       "field": "recordId",
       "evidence": "const resolved = resolveRecordParams(rawParams, recordData as Record<string, unknown>, recordId);"
     },
@@ -1564,70 +1474,25 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 692,
+      "line": 777,
       "field": "recordId",
       "evidence": "const tabs = resolveVisibleDetailTabs(allTabs, recordId, schema);"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|encodeURIComponent(recordId),",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 187,
-      "field": "recordId",
-      "evidence": "encodeURIComponent(recordId),"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|endpoint = `${endpoint.replace(/\\/+$/, '')}/${encodeURIComponent(recordId)}`;",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 190,
-      "field": "recordId",
-      "evidence": "endpoint = `${endpoint.replace(/\\/+$/, '')}/${encodeURIComponent(recordId)}`;"
     },
     {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|function applyRecordEndpointTemplate(template: string, recordId: string): string {",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 119,
+      "line": 124,
       "field": "recordId",
       "evidence": "function applyRecordEndpointTemplate(template: string, recordId: string): string {"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|if (!recordId || !tableName) {",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 413,
-      "field": "recordId",
-      "evidence": "if (!recordId || !tableName) {"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|if (!recordId || !tableName) return;",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 467,
-      "field": "recordId",
-      "evidence": "if (!recordId || !tableName) return;"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|if (/\\{id\\}|\\{recordId\\}|\\$\\{recordId\\}/.test(endpoint)) {",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 184,
-      "field": "recordId",
-      "evidence": "if (/\\{id\\}|\\{recordId\\}|\\$\\{recordId\\}/.test(endpoint)) {"
     },
     {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|parentRecordId={recordId}",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1420,
+      "line": 1508,
       "field": "recordId",
       "evidence": "parentRecordId={recordId}"
     },
@@ -1636,7 +1501,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1266,
+      "line": 1351,
       "field": "recordId",
       "evidence": "recordId,"
     },
@@ -1645,7 +1510,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 529,
+      "line": 614,
       "field": "recordId",
       "evidence": "recordId: recordId || undefined,"
     },
@@ -1654,7 +1519,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 357,
+      "line": 415,
       "field": "recordId",
       "evidence": "recordId: string | undefined,"
     },
@@ -1663,7 +1528,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 129,
+      "line": 1230,
       "field": "recordId",
       "evidence": "recordId: string,"
     },
@@ -1672,7 +1537,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1282,
+      "line": 1367,
       "field": "recordId",
       "evidence": "recordId: string;"
     },
@@ -1681,7 +1546,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 931,
+      "line": 1016,
       "field": "recordId",
       "evidence": "recordId={recordId!}"
     },
@@ -1690,7 +1555,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1117,
+      "line": 1202,
       "field": "recordId",
       "evidence": "recordId={recordId}"
     },
@@ -1699,7 +1564,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1478,
+      "line": 1566,
       "field": "recordId",
       "evidence": "recordId={String(numericId)}"
     },
@@ -1708,61 +1573,25 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 361,
+      "line": 419,
       "field": "recordId",
       "evidence": "return (recordId ? allTabs : allTabs.filter((tab) => !tab.system)).filter((tab) => {"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|return { endpoint: buildDetailRecordEndpoint(model, recordId), method: 'get' };",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 195,
-      "field": "recordId",
-      "evidence": "return { endpoint: buildDetailRecordEndpoint(model, recordId), method: 'get' };"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|return `${dataSource.endpoint.replace(/\\/+$/, '')}/${encodeURIComponent(recordId)}`;",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 139,
-      "field": "recordId",
-      "evidence": "return `${dataSource.endpoint.replace(/\\/+$/, '')}/${encodeURIComponent(recordId)}`;"
     },
     {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|return <BpmPanelBlock block={block as any} record={recordData} recordId={recordId} />;",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1487,
+      "line": 1575,
       "field": "recordId",
       "evidence": "return <BpmPanelBlock block={block as any} record={recordData} recordId={recordId} />;"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|return applyRecordEndpointTemplate(template.trim(), recordId);",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 136,
-      "field": "recordId",
-      "evidence": "return applyRecordEndpointTemplate(template.trim(), recordId);"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|return buildApiEndpoint(tableName, recordId);",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 142,
-      "field": "recordId",
-      "evidence": "return buildApiEndpoint(tableName, recordId);"
     },
     {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx||recordId|to={`/p/${tableName}/edit/${recordId}`}",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx",
-      "line": 1099,
+      "line": 1184,
       "field": "recordId",
       "evidence": "to={`/p/${tableName}/edit/${recordId}`}"
     },
@@ -1870,7 +1699,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1373,
+      "line": 1407,
       "field": "recordId",
       "evidence": "? { ...(initialFormData || {}), ...formData, pid: recordId }"
     },
@@ -1879,7 +1708,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1530,
+      "line": 1564,
       "field": "recordId",
       "evidence": "? `/api/dynamic/${targetModelCode}/${recordId}`"
     },
@@ -1888,7 +1717,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1466,
+      "line": 1500,
       "field": "recordId",
       "evidence": "? recordId"
     },
@@ -1897,25 +1726,16 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 938,
+      "line": 972,
       "field": "recordId",
       "evidence": "...(recordId ? { pid: recordId } : {}),"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx||recordId|[recordId, tableName, token],",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 912,
-      "field": "recordId",
-      "evidence": "[recordId, tableName, token],"
     },
     {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx||recordId|[runtime, recordId],",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 927,
+      "line": 961,
       "field": "recordId",
       "evidence": "[runtime, recordId],"
     },
@@ -1924,7 +1744,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1631,
+      "line": 1665,
       "field": "recordId",
       "evidence": "}, [recordId, loadMainRecord]);"
     },
@@ -1933,7 +1753,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1799,
+      "line": 1833,
       "field": "recordId",
       "evidence": "}, [recordId, schema, token]);"
     },
@@ -1951,7 +1771,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1860,
+      "line": 1894,
       "field": "recordId",
       "evidence": "// still scopes by recordId, so enabling edit later is a one-line change.)"
     },
@@ -1960,7 +1780,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1412,
+      "line": 1446,
       "field": "recordId",
       "evidence": "Boolean(recordId),"
     },
@@ -1969,7 +1789,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1375,
+      "line": 1409,
       "field": "recordId",
       "evidence": "const actionRecord = recordId"
     },
@@ -1978,7 +1798,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 693,
+      "line": 725,
       "field": "recordId",
       "evidence": "const isEditMode = !!recordId;"
     },
@@ -1987,7 +1807,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1372,
+      "line": 1406,
       "field": "recordId",
       "evidence": "const mergedEditData = recordId"
     },
@@ -1996,25 +1816,16 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 692,
+      "line": 724,
       "field": "recordId",
       "evidence": "const recordId = props.recordId;"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx||recordId|const resp = await fetchResult<any>(`/api/dynamic/${tableName}/${recordId}`, {",
-      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
-      "category": "frontend-runtime",
-      "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 889,
-      "field": "recordId",
-      "evidence": "const resp = await fetchResult<any>(`/api/dynamic/${tableName}/${recordId}`, {"
     },
     {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx||recordId|const submissionData = recordId ? { ...(initialFormData || {}), ...formData } : formData;",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1165,
+      "line": 1199,
       "field": "recordId",
       "evidence": "const submissionData = recordId ? { ...(initialFormData || {}), ...formData } : formData;"
     },
@@ -2023,7 +1834,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1470,
+      "line": 1504,
       "field": "recordId",
       "evidence": "const targetRecordId = recordId || undefined;"
     },
@@ -2032,7 +1843,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 924,
+      "line": 958,
       "field": "recordId",
       "evidence": "form: recordId ? { ...nextFormData, pid: recordId } : nextFormData,"
     },
@@ -2041,7 +1852,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 884,
+      "line": 1663,
       "field": "recordId",
       "evidence": "if (!recordId) return;"
     },
@@ -2050,7 +1861,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1746,
+      "line": 1780,
       "field": "recordId",
       "evidence": "if (!recordId) return; // Create mode -- no children to load"
     },
@@ -2059,7 +1870,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1472,
+      "line": 1506,
       "field": "recordId",
       "evidence": "if ((operationType === 'update' || operationType === 'delete') && !targetRecordId) {"
     },
@@ -2104,7 +1915,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 2225,
+      "line": 2259,
       "field": "recordId",
       "evidence": "key={`${blockKey}-${recordId || 'new'}`}"
     },
@@ -2113,7 +1924,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 2204,
+      "line": 2238,
       "field": "recordId",
       "evidence": "key={`${blockKey}-${recordId}`}"
     },
@@ -2122,7 +1933,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1512,
+      "line": 1546,
       "field": "recordId",
       "evidence": "navigate(resolveAfterSubmitRedirect(schema, tableName, responseData, recordId));"
     },
@@ -2131,7 +1942,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1586,
+      "line": 1620,
       "field": "recordId",
       "evidence": "navigate(resolveAfterSubmitRedirect(schema, targetModelCode, result.data, recordId));"
     },
@@ -2140,7 +1951,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 2206,
+      "line": 2240,
       "field": "recordId",
       "evidence": "parentRecordId={recordId!}"
     },
@@ -2149,7 +1960,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1307,
+      "line": 1341,
       "field": "recordId",
       "evidence": "recordId,"
     },
@@ -2158,7 +1969,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 779,
+      "line": 812,
       "field": "recordId",
       "evidence": "recordId: recordId || undefined,"
     },
@@ -2176,7 +1987,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/FormPageContent.tsx",
-      "line": 1774,
+      "line": 1808,
       "field": "recordId",
       "evidence": "value: recordId,"
     },
@@ -2194,7 +2005,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/ListPageContent.tsx",
-      "line": 647,
+      "line": 836,
       "field": "recordId",
       "evidence": "(recordId: string | number | null | undefined) => {"
     },
@@ -2203,7 +2014,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/ListPageContent.tsx",
-      "line": 1657,
+      "line": 1924,
       "field": "recordId",
       "evidence": "const toggleRowSelection = useCallback((recordId: string) => {"
     },
@@ -2212,7 +2023,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/ListPageContent.tsx",
-      "line": 648,
+      "line": 837,
       "field": "recordId",
       "evidence": "if (recordId == null || recordId === '') {"
     },
@@ -2221,7 +2032,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/ListPageContent.tsx",
-      "line": 651,
+      "line": 840,
       "field": "recordId",
       "evidence": "navigate(`/p/${tableName}/view/${String(recordId)}`);"
     },
@@ -2230,7 +2041,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/pages/ListPageContent.tsx",
-      "line": 1658,
+      "line": 1925,
       "field": "recordId",
       "evidence": "setSelectionState((prev) => selectionToggleRow(prev, recordId));"
     },
@@ -2608,7 +2419,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/smart/components/report/ReportGenerateButton.tsx",
-      "line": 82,
+      "line": 87,
       "field": "recordId",
       "evidence": "params.recordId = recordPid;"
     },
@@ -2752,7 +2563,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/smart/components/view/GanttView.tsx",
-      "line": 504,
+      "line": 503,
       "field": "recordId",
       "evidence": "recordId: ir.recordId,"
     },
@@ -2779,7 +2590,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/smart/components/view/shared/ViewDiagnostics.tsx",
-      "line": 167,
+      "line": 181,
       "field": "recordId",
       "evidence": "key={`${item.recordId}-${idx}`}"
     },
@@ -2788,7 +2599,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/smart/components/view/shared/ViewDiagnostics.tsx",
-      "line": 172,
+      "line": 186,
       "field": "recordId",
       "evidence": "onClick={onRecordClick ? () => onRecordClick(item.recordId) : undefined}"
     },
@@ -2797,7 +2608,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/smart/components/view/shared/ViewDiagnostics.tsx",
-      "line": 30,
+      "line": 31,
       "field": "recordId",
       "evidence": "onRecordClick?: (recordId: string) => void;"
     },
@@ -2806,7 +2617,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/smart/components/view/shared/ViewDiagnostics.tsx",
-      "line": 193,
+      "line": 207,
       "field": "recordId",
       "evidence": "onRecordClick(item.recordId);"
     },
@@ -2815,7 +2626,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/smart/components/view/shared/ViewDiagnostics.tsx",
-      "line": 18,
+      "line": 19,
       "field": "recordId",
       "evidence": "recordId: string;"
     },
@@ -5113,393 +4924,6 @@
       "line": 110,
       "field": "recordId",
       "evidence": "throw new RootUnCheckedException(BadParam, \"subjectId is required when sharing by recordId\");"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/asset-management/config/commands/tasset_asset.json|$[6].sideEffects[0].fieldMapping.tasset_mn_asset_id|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/asset-management/config/commands/tasset_asset.json",
-      "jsonPath": "$[6].sideEffects[0].fieldMapping.tasset_mn_asset_id",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/core-decisionops/config/pages.json|$[1].extension.dataSource.detailEndpoint|recordId-placeholder|/api/decision/definitions/{recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/core-decisionops/config/pages.json",
-      "jsonPath": "$[1].extension.dataSource.detailEndpoint",
-      "field": "recordId-placeholder",
-      "evidence": "/api/decision/definitions/{recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/core-decisionops/config/pages.json|$[13].extension.dataSource.detailEndpoint|recordId-placeholder|/api/decision/logs/{recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/core-decisionops/config/pages.json",
-      "jsonPath": "$[13].extension.dataSource.detailEndpoint",
-      "field": "recordId-placeholder",
-      "evidence": "/api/decision/logs/{recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/core-decisionops/config/pages.json|$[4].extension.dataSource.detailEndpoint|recordId-placeholder|/api/event-policy/definitions/{recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/core-decisionops/config/pages.json",
-      "jsonPath": "$[4].extension.dataSource.detailEndpoint",
-      "field": "recordId-placeholder",
-      "evidence": "/api/event-policy/definitions/{recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/core-decisionops/config/pages.json|$[9].extension.dataSource.detailEndpoint|recordId-placeholder|/api/connectors/{recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/core-decisionops/config/pages.json",
-      "jsonPath": "$[9].extension.dataSource.detailEndpoint",
-      "field": "recordId-placeholder",
-      "evidence": "/api/connectors/{recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/golden-path/config/commands/gp_task.json|$[3].sideEffects[0].fieldMap.gp_tc_task_id|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/golden-path/config/commands/gp_task.json",
-      "jsonPath": "$[3].sideEffects[0].fieldMap.gp_tc_task_id",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/platform-admin/config/pages.json|$[16].blocks[2].dataSource.url|recordId-placeholder|/api/scheduled-tasks/${recordId}/logs?limit=50",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/platform-admin/config/pages.json",
-      "jsonPath": "$[16].blocks[2].dataSource.url",
-      "field": "recordId-placeholder",
-      "evidence": "/api/scheduled-tasks/${recordId}/logs?limit=50"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/platform-admin/config/pages.json|$[5].blocks[1].dataSource.url|recordId-placeholder|/api/meta/data-permissions/${recordId}/roles/list",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/platform-admin/config/pages.json",
-      "jsonPath": "$[5].blocks[1].dataSource.url",
-      "field": "recordId-placeholder",
-      "evidence": "/api/meta/data-permissions/${recordId}/roles/list"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/test-fixtures/config/commands.json|$[4].sideEffects[0].actions[0].fields.e2et_log_order_id|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/test-fixtures/config/commands.json",
-      "jsonPath": "$[4].sideEffects[0].actions[0].fields.e2et_log_order_id",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/test-fixtures/config/commands.json|$[5].sideEffects[0].actions[0].fields.e2et_log_order_id|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/test-fixtures/config/commands.json",
-      "jsonPath": "$[5].sideEffects[0].actions[0].fields.e2et_log_order_id",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/test-fixtures/config/commands.json|$[6].sideEffects[0].actions[0].fields.e2et_log_order_id|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/test-fixtures/config/commands.json",
-      "jsonPath": "$[6].sideEffects[0].actions[0].fields.e2et_log_order_id",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/test-fixtures/config/commands.json|$[7].sideEffects[0].actions[0].fields.e2et_log_order_id|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/test-fixtures/config/commands.json",
-      "jsonPath": "$[7].sideEffects[0].actions[0].fields.e2et_log_order_id",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/test-fixtures/config/commands.json|$[8].sideEffects[0].actions[0].fields.e2et_log_order_id|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/test-fixtures/config/commands.json",
-      "jsonPath": "$[8].sideEffects[0].actions[0].fields.e2et_log_order_id",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/workflow-demo/config/commands.json|$[2].postActions[0].businessKey|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/workflow-demo/config/commands.json",
-      "jsonPath": "$[2].postActions[0].businessKey",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/workflow-demo/config/commands.json|$[2].postActions[0].title|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/workflow-demo/config/commands.json",
-      "jsonPath": "$[2].postActions[0].title",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/workflow-demo/config/commands.json|$[2].postActions[0].variables.recordId|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/workflow-demo/config/commands.json",
-      "jsonPath": "$[2].postActions[0].variables.recordId",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/workflow-demo/config/commands.json|$[4].postActions[0].businessKey|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/workflow-demo/config/commands.json",
-      "jsonPath": "$[4].postActions[0].businessKey",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/workflow-demo/config/commands.json|$[4].postActions[0].title|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/workflow-demo/config/commands.json",
-      "jsonPath": "$[4].postActions[0].title",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY|plugins/workflow-demo/config/commands.json|$[4].postActions[0].variables.recordId|recordId-placeholder|${recordId}",
-      "code": "S-PUBLIC-RECORD-PLACEHOLDER-LEGACY",
-      "category": "dsl-config",
-      "file": "plugins/workflow-demo/config/commands.json",
-      "jsonPath": "$[4].postActions[0].variables.recordId",
-      "field": "recordId-placeholder",
-      "evidence": "${recordId}"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[0].fromSql|sql|SELECT (SELECT COUNT(*) FROM ab_agent_task WHERE tenant_id = #{params.tenantId} AND (deleted_flag = FALSE OR deleted_flag IS NULL) AND task_status NOT IN ('done','cancelled')) AS a",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[0].fromSql",
-      "field": "sql",
-      "evidence": "SELECT (SELECT COUNT(*) FROM ab_agent_task WHERE tenant_id = #{params.tenantId} AND (deleted_flag = FALSE OR deleted_flag IS NULL) AND task_status NOT IN ('done','cancelled')) AS a"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[1].fromSql|sql|SELECT r.pid, r.run_status, r.run_model, r.started_at, r.completed_at, r.duration_ms, r.input_tokens, r.output_tokens, r.total_cost, r.error_message, r.messages, r.metadata, COALES",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[1].fromSql",
-      "field": "sql",
-      "evidence": "SELECT r.pid, r.run_status, r.run_model, r.started_at, r.completed_at, r.duration_ms, r.input_tokens, r.output_tokens, r.total_cost, r.error_message, r.messages, r.metadata, COALES"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[10].fromSql|sql|SELECT a.pid, a.approval_type, a.title, a.description, a.approval_status, a.request_data, a.created_at, a.expires_at, t.title AS task_title, d.name AS agent_name, d.agent_code FROM",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[10].fromSql",
-      "field": "sql",
-      "evidence": "SELECT a.pid, a.approval_type, a.title, a.description, a.approval_status, a.request_data, a.created_at, a.expires_at, t.title AS task_title, d.name AS agent_name, d.agent_code FROM"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[11].fromSql|sql|SELECT m.pid, m.memory_type, m.category, m.memory_title, m.memory_content, m.importance, m.memory_agent_id, d.name AS agent_name, m.access_count, m.created_at, m.updated_at FROM ab",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[11].fromSql",
-      "field": "sql",
-      "evidence": "SELECT m.pid, m.memory_type, m.category, m.memory_title, m.memory_content, m.importance, m.memory_agent_id, d.name AS agent_name, m.access_count, m.created_at, m.updated_at FROM ab"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[2].fromSql|sql|SELECT t.pid, t.title, t.description, t.task_status, t.task_priority, t.assignee_type, t.assignee_id, t.due_date, t.estimated_cost, t.actual_cost, t.retry_count, t.created_at, m.ti",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[2].fromSql",
-      "field": "sql",
-      "evidence": "SELECT t.pid, t.title, t.description, t.task_status, t.task_priority, t.assignee_type, t.assignee_id, t.due_date, t.estimated_cost, t.actual_cost, t.retry_count, t.created_at, m.ti"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[3].fromSql|sql|SELECT r.pid, r.run_status, r.run_model, r.started_at, r.completed_at, r.duration_ms, r.input_tokens, r.output_tokens, r.total_cost, r.error_message, r.tool_calls, r.messages, r.me",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[3].fromSql",
-      "field": "sql",
-      "evidence": "SELECT r.pid, r.run_status, r.run_model, r.started_at, r.completed_at, r.duration_ms, r.input_tokens, r.output_tokens, r.total_cost, r.error_message, r.tool_calls, r.messages, r.me"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[4].fromSql|sql|SELECT d.pid, d.agent_code, d.name AS agent_name, d.agent_type, d.model, d.status AS agent_status, COALESCE(s.total_runs, 0) AS total_runs, COALESCE(s.success_runs, 0) AS success_r",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[4].fromSql",
-      "field": "sql",
-      "evidence": "SELECT d.pid, d.agent_code, d.name AS agent_name, d.agent_type, d.model, d.status AS agent_status, COALESCE(s.total_runs, 0) AS total_runs, COALESCE(s.success_runs, 0) AS success_r"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[5].fromSql|sql|SELECT d.name AS agent_name, r.agent_id, DATE(r.started_at) AS run_date, COUNT(*) AS run_count, COALESCE(SUM(r.total_cost), 0) AS daily_cost, COALESCE(SUM(r.input_tokens), 0) AS da",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[5].fromSql",
-      "field": "sql",
-      "evidence": "SELECT d.name AS agent_name, r.agent_id, DATE(r.started_at) AS run_date, COUNT(*) AS run_count, COALESCE(SUM(r.total_cost), 0) AS daily_cost, COALESCE(SUM(r.input_tokens), 0) AS da"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[6].fromSql|sql|SELECT DATE(created_at) AS activity_date, COUNT(*) FILTER (WHERE observation_type = 'activity') AS activity_count, COUNT(*) FILTER (WHERE observation_type = 'error') AS error_count",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[6].fromSql",
-      "field": "sql",
-      "evidence": "SELECT DATE(created_at) AS activity_date, COUNT(*) FILTER (WHERE observation_type = 'activity') AS activity_count, COUNT(*) FILTER (WHERE observation_type = 'error') AS error_count"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[7].fromSql|sql|SELECT r.pid, r.agent_id, d.name AS agent_name, r.run_model, r.started_at, r.duration_ms, r.total_cost, r.error_message, t.title AS task_title FROM ab_agent_run r LEFT JOIN ab_agen",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[7].fromSql",
-      "field": "sql",
-      "evidence": "SELECT r.pid, r.agent_id, d.name AS agent_name, r.run_model, r.started_at, r.duration_ms, r.total_cost, r.error_message, t.title AS task_title FROM ab_agent_run r LEFT JOIN ab_agen"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[8].fromSql|sql|SELECT pid, tool_code, tool_type, tool_name, tool_description, tool_status, source_type FROM ab_agent_tool WHERE tenant_id = #{params.tenantId} AND (deleted_flag = FALSE OR deleted",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[8].fromSql",
-      "field": "sql",
-      "evidence": "SELECT pid, tool_code, tool_type, tool_name, tool_description, tool_status, source_type FROM ab_agent_tool WHERE tenant_id = #{params.tenantId} AND (deleted_flag = FALSE OR deleted"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/agent-control-plane/config/named-queries.json|$[9].fromSql|sql|SELECT m.pid, m.title, m.mission_status, m.acp_priority, m.kpis, m.target_date, COUNT(t.pid) AS total_tasks, COUNT(t.pid) FILTER (WHERE t.task_status = 'done') AS done_tasks, COUNT",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/agent-control-plane/config/named-queries.json",
-      "jsonPath": "$[9].fromSql",
-      "field": "sql",
-      "evidence": "SELECT m.pid, m.title, m.mission_status, m.acp_priority, m.kpis, m.target_date, COUNT(t.pid) AS total_tasks, COUNT(t.pid) FILTER (WHERE t.task_status = 'done') AS done_tasks, COUNT"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/asset-management/config/named-queries.json|$[0].fromSql|sql|SELECT tasset_as_category AS category, COUNT(*) AS asset_count, COALESCE(SUM(tasset_as_purchase_cost), 0) AS total_value FROM mt_tasset_asset WHERE tenant_id = #{params.tenantId} A",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/asset-management/config/named-queries.json",
-      "jsonPath": "$[0].fromSql",
-      "field": "sql",
-      "evidence": "SELECT tasset_as_category AS category, COUNT(*) AS asset_count, COALESCE(SUM(tasset_as_purchase_cost), 0) AS total_value FROM mt_tasset_asset WHERE tenant_id = #{params.tenantId} A"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/crm-quick-start/config/named-queries.json|$[0].fromSql|sql|SELECT tcrm_op_stage AS stage, COUNT(*) AS deal_count, COALESCE(SUM(tcrm_op_amount), 0) AS total_amount FROM mt_tcrm_opportunity WHERE tenant_id = #{params.tenantId} GROUP BY tcrm_",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/crm-quick-start/config/named-queries.json",
-      "jsonPath": "$[0].fromSql",
-      "field": "sql",
-      "evidence": "SELECT tcrm_op_stage AS stage, COUNT(*) AS deal_count, COALESCE(SUM(tcrm_op_amount), 0) AS total_amount FROM mt_tcrm_opportunity WHERE tenant_id = #{params.tenantId} GROUP BY tcrm_"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/crm-quick-start/config/named-queries.json|$[1].fromSql|sql|SELECT tcrm_ld_status AS status, COUNT(*) AS count FROM mt_tcrm_lead WHERE tenant_id = #{params.tenantId} GROUP BY tcrm_ld_status ORDER BY CASE tcrm_ld_status WHEN 'new' THEN 1 WHE",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/crm-quick-start/config/named-queries.json",
-      "jsonPath": "$[1].fromSql",
-      "field": "sql",
-      "evidence": "SELECT tcrm_ld_status AS status, COUNT(*) AS count FROM mt_tcrm_lead WHERE tenant_id = #{params.tenantId} GROUP BY tcrm_ld_status ORDER BY CASE tcrm_ld_status WHEN 'new' THEN 1 WHE"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/crm-starter/config/named-queries/crm_lead_status_stats.json|$.fromSql|sql|SELECT COUNT(*) AS total_count, COUNT(*) FILTER (WHERE crm_lead_status = 'new') AS new_count, COUNT(*) FILTER (WHERE crm_lead_status = 'contacted') AS contacted_count, COUNT(*) FIL",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/crm-starter/config/named-queries/crm_lead_status_stats.json",
-      "jsonPath": "$.fromSql",
-      "field": "sql",
-      "evidence": "SELECT COUNT(*) AS total_count, COUNT(*) FILTER (WHERE crm_lead_status = 'new') AS new_count, COUNT(*) FILTER (WHERE crm_lead_status = 'contacted') AS contacted_count, COUNT(*) FIL"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/golden-path/config/named-queries.json|$[0].fromSql|sql|SELECT gp_task_status AS status, COUNT(*) AS count FROM mt_gp_task WHERE tenant_id = #{params.tenantId} GROUP BY gp_task_status ORDER BY CASE gp_task_status WHEN 'new' THEN 1 WHEN ",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/golden-path/config/named-queries.json",
-      "jsonPath": "$[0].fromSql",
-      "field": "sql",
-      "evidence": "SELECT gp_task_status AS status, COUNT(*) AS count FROM mt_gp_task WHERE tenant_id = #{params.tenantId} GROUP BY gp_task_status ORDER BY CASE gp_task_status WHEN 'new' THEN 1 WHEN "
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/golden-path/config/named-queries.json|$[1].fromSql|sql|SELECT pid, gp_task_code, gp_task_title, gp_task_status, gp_task_priority, gp_task_assignee, gp_task_due_date FROM mt_gp_task WHERE tenant_id = #{params.tenantId} AND gp_task_due_d",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/golden-path/config/named-queries.json",
-      "jsonPath": "$[1].fromSql",
-      "field": "sql",
-      "evidence": "SELECT pid, gp_task_code, gp_task_title, gp_task_status, gp_task_priority, gp_task_assignee, gp_task_due_date FROM mt_gp_task WHERE tenant_id = #{params.tenantId} AND gp_task_due_d"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/hr-essentials/config/named-queries.json|$[0].fromSql|sql|SELECT e.thr_em_name AS employee_name, lr.thr_lv_leave_type AS leave_type, COUNT(*) AS request_count, COALESCE(SUM(lr.thr_lv_days), 0) AS total_days FROM mt_thr_leave_request lr JO",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/hr-essentials/config/named-queries.json",
-      "jsonPath": "$[0].fromSql",
-      "field": "sql",
-      "evidence": "SELECT e.thr_em_name AS employee_name, lr.thr_lv_leave_type AS leave_type, COUNT(*) AS request_count, COALESCE(SUM(lr.thr_lv_days), 0) AS total_days FROM mt_thr_leave_request lr JO"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/project-management/config/named-queries.json|$[0].fromSql|sql|SELECT tpm_ts_project_id AS project_id, tpm_ts_status AS status, COUNT(*) AS count FROM mt_tpm_task WHERE tenant_id = #{params.tenantId} GROUP BY tpm_ts_project_id, tpm_ts_status O",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/project-management/config/named-queries.json",
-      "jsonPath": "$[0].fromSql",
-      "field": "sql",
-      "evidence": "SELECT tpm_ts_project_id AS project_id, tpm_ts_status AS status, COUNT(*) AS count FROM mt_tpm_task WHERE tenant_id = #{params.tenantId} GROUP BY tpm_ts_project_id, tpm_ts_status O"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/showcase/config/named-queries.json|$[0].fromSql|sql|SELECT id, sc_name, sc_code, sc_status FROM mt_showcase_all_fields WHERE tenant_id = #{params.tenantId} ORDER BY id DESC LIMIT 100",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/showcase/config/named-queries.json",
-      "jsonPath": "$[0].fromSql",
-      "field": "sql",
-      "evidence": "SELECT id, sc_name, sc_code, sc_status FROM mt_showcase_all_fields WHERE tenant_id = #{params.tenantId} ORDER BY id DESC LIMIT 100"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/simple-inventory/config/named-queries.json|$[0].fromSql|sql|SELECT p.tinv_pd_code AS product_code, p.tinv_pd_name AS product_name, COALESCE(si.total_in, 0) AS total_in, COALESCE(so.total_out, 0) AS total_out, COALESCE(si.total_in, 0) - COAL",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/simple-inventory/config/named-queries.json",
-      "jsonPath": "$[0].fromSql",
-      "field": "sql",
-      "evidence": "SELECT p.tinv_pd_code AS product_code, p.tinv_pd_name AS product_name, COALESCE(si.total_in, 0) AS total_in, COALESCE(so.total_out, 0) AS total_out, COALESCE(si.total_in, 0) - COAL"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/workflow-demo/config/named-queries.json|$[0].fromSql|sql|SELECT CAST(t.id AS VARCHAR) AS pid, t.process_definition_activity_id AS \"nodeId\", COALESCE(NULLIF(t.title, ''), t.process_definition_activity_id) AS \"taskName\", t.claim_user_id AS",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/workflow-demo/config/named-queries.json",
-      "jsonPath": "$[0].fromSql",
-      "field": "sql",
-      "evidence": "SELECT CAST(t.id AS VARCHAR) AS pid, t.process_definition_activity_id AS \"nodeId\", COALESCE(NULLIF(t.title, ''), t.process_definition_activity_id) AS \"taskName\", t.claim_user_id AS"
-    },
-    {
-      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/workflow-demo/config/namedQueries.json|$[0].fromSql|sql|SELECT CAST(t.id AS VARCHAR) AS pid, t.process_definition_activity_id AS \"nodeId\", COALESCE(NULLIF(t.title, ''), t.process_definition_activity_id) AS \"taskName\", t.claim_user_id AS",
-      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
-      "category": "named-query-export",
-      "file": "plugins/workflow-demo/config/namedQueries.json",
-      "jsonPath": "$[0].fromSql",
-      "field": "sql",
-      "evidence": "SELECT CAST(t.id AS VARCHAR) AS pid, t.process_definition_activity_id AS \"nodeId\", COALESCE(NULLIF(t.title, ''), t.process_definition_activity_id) AS \"taskName\", t.claim_user_id AS"
     }
   ]
 }

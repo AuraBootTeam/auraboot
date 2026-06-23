@@ -120,12 +120,12 @@
       {
         "type": "start_process",
         "processKey": "wd_leave_approval",
-        "businessKey": "${recordId}",
-        "title": "${recordId}",
+        "businessKey": "${recordPid}",
+        "title": "${recordPid}",
         "variables": {
           "days": "${payload.wd_req_days}",
           "type": "${payload.wd_req_type}",
-          "recordId": "${recordId}",
+          "recordId": "${recordPid}",
           "applicantUserId": "${payload.wd_req_applicant}"
         },
         "storeInstanceIdIn": "wd_req_process_instance"
@@ -191,12 +191,12 @@
       {
         "type": "start_process",
         "processKey": "wd_leave_approval",
-        "businessKey": "${recordId}",
-        "title": "${recordId}",
+        "businessKey": "${recordPid}",
+        "title": "${recordPid}",
         "variables": {
           "days": "${payload.wd_req_days}",
           "type": "${payload.wd_req_type}",
-          "recordId": "${recordId}",
+          "recordId": "${recordPid}",
           "applicantUserId": "${payload.wd_req_applicant}"
         },
         "storeInstanceIdIn": "wd_req_process_instance"

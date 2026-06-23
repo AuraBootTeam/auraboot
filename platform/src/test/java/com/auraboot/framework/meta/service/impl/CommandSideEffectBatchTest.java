@@ -94,6 +94,20 @@ class CommandSideEffectBatchTest {
         }
 
         @Test
+        @DisplayName("${recordPid} resolves to current record's public pid")
+        void testRecordPidReference() {
+            Map<String, Object> fieldMapping = Map.of(
+                    "order_pid", "${recordPid}"
+            );
+            Map<String, Object> currentRecord = Map.of("pid", "01KR8WEQZ0EXXF28KMA2B06YEN");
+            Map<String, Object> item = Map.of("product_code", "SKU-100");
+
+            Map<String, Object> result = executor.resolveItemFieldMapping(fieldMapping, currentRecord, item);
+
+            assertEquals("01KR8WEQZ0EXXF28KMA2B06YEN", result.get("order_pid"));
+        }
+
+        @Test
         @DisplayName("${fieldName} resolves from current record")
         void testCurrentRecordReference() {
             Map<String, Object> fieldMapping = Map.of(

@@ -140,7 +140,7 @@
       "dataSource": {
         "type": "api",
         "endpoint": "/api/decision/definitions",
-        "detailEndpoint": "/api/decision/definitions/{recordId}",
+        "detailEndpoint": "/api/decision/definitions/{recordPid}",
         "method": "get"
       },
       "skipFieldMeta": true,
@@ -513,7 +513,7 @@
       "dataSource": {
         "type": "api",
         "endpoint": "/api/event-policy/definitions",
-        "detailEndpoint": "/api/event-policy/definitions/{recordId}",
+        "detailEndpoint": "/api/event-policy/definitions/{recordPid}",
         "method": "get"
       },
       "skipFieldMeta": true,
@@ -974,7 +974,7 @@
       "dataSource": {
         "type": "api",
         "endpoint": "/api/connectors",
-        "detailEndpoint": "/api/connectors/{recordId}",
+        "detailEndpoint": "/api/connectors/{recordPid}",
         "method": "get"
       },
       "skipFieldMeta": true,
@@ -1433,7 +1433,7 @@
       "dataSource": {
         "type": "api",
         "endpoint": "/api/decision/logs/recent",
-        "detailEndpoint": "/api/decision/logs/{recordId}",
+        "detailEndpoint": "/api/decision/logs/{recordPid}",
         "method": "get"
       },
       "skipFieldMeta": true,

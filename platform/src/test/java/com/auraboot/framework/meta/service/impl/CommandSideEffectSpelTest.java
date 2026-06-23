@@ -71,6 +71,17 @@ class CommandSideEffectSpelTest {
     }
 
     @Test
+    @DisplayName("${recordPid} resolves to the current public record pid")
+    void recordPidReference() {
+        Map<String, Object> mapping = Map.of("ref_pid", "${recordPid}");
+        Map<String, Object> record = Map.of("pid", "01KR8WEQZ0EXXF28KMA2B06YEN");
+
+        Map<String, Object> result = executor.resolveFieldMapping(mapping, record);
+
+        assertEquals("01KR8WEQZ0EXXF28KMA2B06YEN", result.get("ref_pid"));
+    }
+
+    @Test
     @DisplayName("Arithmetic expression ${a + b} evaluates correctly")
     void arithmeticAddition() {
         Map<String, Object> mapping = Map.of(
