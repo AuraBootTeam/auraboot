@@ -9,6 +9,16 @@ vi.mock('~/shared/services/savedViewService', () => ({
   savedViewService: {
     getMyTeams: vi.fn(async () => [{ pid: 'team-a', name: 'Team A' }]),
     getAuditEvents: vi.fn(async () => []),
+    searchUsers: vi.fn(async () => []),
+    updateView: vi.fn(async (pid, data) => ({
+      pid,
+      name: 'Team Board',
+      modelCode: 'order',
+      pageKey: 'order_list',
+      scope: 'team',
+      viewType: 'table',
+      viewConfig: data.viewConfig,
+    })),
   },
 }));
 
@@ -63,6 +73,14 @@ describe('ViewManagePanel capability gate', () => {
       { pid: 'team-a', name: 'Team A' },
     ]);
     vi.mocked(savedViewService.getAuditEvents).mockResolvedValue([]);
+    vi.mocked(savedViewService.searchUsers).mockResolvedValue([]);
+    vi.mocked(savedViewService.updateView).mockImplementation(async (pid, data) =>
+      makeView({
+        pid,
+        scope: 'team',
+        viewConfig: data.viewConfig,
+      }),
+    );
   });
 
   it('creates a team view with a real selected team id', async () => {
@@ -257,5 +275,113 @@ describe('ViewManagePanel capability gate', () => {
     expect(screen.getByTitle('Duplicate view')).toBeEnabled();
     expect(screen.getByTitle('Share view')).toBeDisabled();
     expect(screen.getByTitle('Delete view')).toBeDisabled();
+  });
+
+  it('shows and enforces the personal view quota before creating a view', () => {
+    const personalViews = Array.from({ length: 10 }, (_, index) =>
+      makeView({
+        pid: `personal-${index}`,
+        name: `Personal ${index}`,
+        scope: 'personal',
+        isImplicit: false,
+      }),
+    );
+    const props = renderPanel({ views: personalViews });
+
+    fireEvent.click(screen.getByRole('button', { name: /New View/i }));
+
+    expect(screen.getByTestId('saved-view-quota-status')).toHaveTextContent('Personal views: 10/10');
+    expect(screen.getByTestId('saved-view-quota-limit-reached')).toHaveTextContent('Limit reached');
+    const tableButton = screen.getByRole('button', { name: /Table/i });
+    expect(tableButton).toBeDisabled();
+    fireEvent.click(tableButton);
+    expect(props.onCreateView).not.toHaveBeenCalled();
+  });
+
+  it('adds a user collaborator from the share panel', async () => {
+    const teamView = makeView({
+      pid: 'team-view',
+      name: 'Team Board',
+      scope: 'team',
+      teamId: 'team-a',
+      actions: ['view', 'copy', 'save', 'manage', 'share', 'delete', 'setDefault'],
+      viewConfig: { meta: { collaborators: [] } },
+    });
+    vi.mocked(savedViewService.searchUsers).mockResolvedValueOnce([
+      { pid: 'bob_pid', displayName: 'Bob' },
+    ]);
+
+    renderPanel({ views: [teamView], currentView: teamView });
+
+    fireEvent.click(screen.getByTestId('view-share-team-view'));
+    expect(screen.getByTestId('saved-view-collaborator-panel')).toHaveTextContent(
+      'Share: Team Board',
+    );
+
+    fireEvent.change(screen.getByLabelText('User'), { target: { value: 'bob' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+    await waitFor(() => expect(savedViewService.searchUsers).toHaveBeenCalledWith('bob', 10));
+    fireEvent.click(await screen.findByTestId('saved-view-collaborator-user-option'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add collaborator' }));
+
+    await waitFor(() =>
+      expect(savedViewService.updateView).toHaveBeenCalledWith(
+        'team-view',
+        {
+          viewConfig: expect.objectContaining({
+            meta: expect.objectContaining({
+              collaborators: [
+                {
+                  principalType: 'user',
+                  principalPid: 'bob_pid',
+                  permission: 'save',
+                },
+              ],
+            }),
+          }),
+        },
+      ),
+    );
+  });
+
+  it('removes an existing collaborator from the share panel', async () => {
+    const teamView = makeView({
+      pid: 'team-view',
+      name: 'Team Board',
+      scope: 'team',
+      teamId: 'team-a',
+      actions: ['view', 'copy', 'save', 'manage', 'share', 'delete', 'setDefault'],
+      viewConfig: {
+        meta: {
+          collaborators: [
+            {
+              principalType: 'user',
+              principalPid: 'bob_pid',
+              permission: 'save',
+            },
+          ],
+        },
+      },
+    });
+
+    renderPanel({ views: [teamView], currentView: teamView });
+
+    fireEvent.click(screen.getByTestId('view-share-team-view'));
+    expect(screen.getByTestId('saved-view-collaborator-row')).toHaveTextContent('bob_pid');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() =>
+      expect(savedViewService.updateView).toHaveBeenCalledWith(
+        'team-view',
+        {
+          viewConfig: expect.objectContaining({
+            meta: expect.objectContaining({
+              collaborators: [],
+            }),
+          }),
+        },
+      ),
+    );
   });
 });

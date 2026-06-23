@@ -15,12 +15,36 @@ import type {
   SavedViewCreateRequest,
   SavedViewCopyToPersonalRequest,
   SavedViewTeamOption,
+  SavedViewUserOption,
   SavedViewUpdateRequest,
   SavedViewQueryParams,
   ViewConfig,
 } from '~/framework/smart/types/savedView';
 
 const BASE_URL = '/api/views';
+
+interface TenantMemberUserRecord {
+  pid?: string;
+  username?: string;
+  email?: string;
+  realName?: string;
+  avatar?: string;
+}
+
+interface TenantMemberSearchRecord {
+  user?: TenantMemberUserRecord;
+  displayName?: string;
+  email?: string;
+  avatarUrl?: string;
+  departmentName?: string;
+}
+
+type TenantMemberSearchResult =
+  | TenantMemberSearchRecord[]
+  | {
+      records?: TenantMemberSearchRecord[];
+      content?: TenantMemberSearchRecord[];
+    };
 
 /**
  * Helper function to handle API responses
@@ -78,13 +102,68 @@ export class SavedViewService {
    * Get teams the current user can use when creating TEAM scoped views.
    */
   async getMyTeams(request?: Request): Promise<SavedViewTeamOption[]> {
-    const result = await get<SavedViewTeamOption[]>(
+    const result = await get<Array<SavedViewTeamOption & {
+      teamPid?: string;
+      teamName?: string;
+      teamCode?: string;
+    }>>(
       `${BASE_URL}/my-teams`,
       undefined,
       undefined,
       request,
     );
-    return handleResponse(result, 'Failed to fetch saved view teams');
+    const teams = handleResponse(result, 'Failed to fetch saved view teams');
+    return teams
+      .map((team) => ({
+        pid: team.pid ?? team.teamPid ?? '',
+        name: team.name ?? team.teamName ?? team.teamCode ?? team.pid ?? team.teamPid ?? '',
+        role: team.role,
+        memberCount: team.memberCount,
+      }))
+      .filter((team) => team.pid);
+  }
+
+  /**
+   * Search tenant users for SavedView collaborator assignment.
+   */
+  async searchUsers(
+    keyword: string,
+    size = 10,
+    request?: Request,
+  ): Promise<SavedViewUserOption[]> {
+    const result = await post<TenantMemberSearchResult>(
+      '/api/tenant/members/search',
+      {
+        pageNum: 1,
+        pageSize: size,
+        status: 'active',
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+      },
+      undefined,
+      request,
+    );
+    const data = handleResponse(result, 'Failed to search users');
+    const records = Array.isArray(data) ? data : data.records ?? data.content ?? [];
+    return records.flatMap((record): SavedViewUserOption[] => {
+      const pid = record.user?.pid;
+      if (!pid) {
+        return [];
+      }
+      return [
+        {
+          pid,
+          displayName:
+            record.displayName ||
+            record.user?.realName ||
+            record.user?.username ||
+            record.user?.email ||
+            pid,
+          email: record.email || record.user?.email,
+          avatarUrl: record.avatarUrl || record.user?.avatar,
+          departmentName: record.departmentName,
+        },
+      ];
+    });
   }
 
   /**

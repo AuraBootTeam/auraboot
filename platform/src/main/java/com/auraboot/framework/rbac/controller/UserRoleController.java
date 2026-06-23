@@ -23,7 +23,9 @@ import static com.auraboot.framework.common.constant.ResponseCode.*;
 
 /**
  * User-role management controller.
- * Public read contracts return PIDs only; legacy ID-based mutation paths are kept for compatibility.
+ * Public read contracts return PIDs only. PID/code mutation paths are the
+ * supported contract; ID-based mutation paths are kept temporarily for
+ * compatibility and marked deprecated for removal after the migration window.
  */
 @Slf4j
 @RestController
@@ -68,6 +70,7 @@ public class UserRoleController {
 
     @PostMapping("/assign")
     @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    @Deprecated
     public ApiResponse<Boolean> assignRolesToMember(
             @RequestParam Long memberId,
             @RequestBody List<Long> roleIds,
@@ -104,6 +107,7 @@ public class UserRoleController {
 
     @DeleteMapping("/remove")
     @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    @Deprecated
     public ApiResponse<Boolean> removeRolesFromMember(
             @RequestParam Long memberId,
             @RequestBody List<Long> roleIds) {
@@ -113,8 +117,20 @@ public class UserRoleController {
         return ApiResponse.success(result);
     }
 
+    @DeleteMapping("/remove-by-pid")
+    @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    public ApiResponse<Boolean> removeRolesFromMemberByPid(
+            @RequestBody AssignRolesByPidRequest request) {
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        boolean result = userRoleService.removeRolesFromMemberByRolePids(
+                request.getMemberPid(), request.getRolePids(), tenantId);
+        return ApiResponse.success(result);
+    }
+
     @PutMapping("/sync")
     @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    @Deprecated
     public ApiResponse<Boolean> syncMemberRoles(
             @RequestParam Long memberId,
             @RequestBody List<Long> roleIds,
@@ -122,6 +138,18 @@ public class UserRoleController {
 
         Long tenantId = MetaContext.getCurrentTenantId();
         boolean result = userRoleService.syncMemberRoles(memberId, roleIds, tenantId, operatorId);
+        return ApiResponse.success(result);
+    }
+
+    @PutMapping("/sync-by-pid")
+    @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    public ApiResponse<Boolean> syncMemberRolesByPid(
+            @RequestBody AssignRolesByPidRequest request,
+            @CurrentUserId Long operatorId) {
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        boolean result = userRoleService.syncMemberRolesByRolePids(
+                request.getMemberPid(), request.getRolePids(), tenantId, operatorId);
         return ApiResponse.success(result);
     }
 
@@ -164,6 +192,7 @@ public class UserRoleController {
 
     @PostMapping("/batch-assign")
     @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    @Deprecated
     public ApiResponse<Boolean> batchAssignRoles(
             @RequestBody List<UserRole> userRoles,
             @CurrentUserId Long operatorId) {
@@ -179,10 +208,32 @@ public class UserRoleController {
         return ApiResponse.success(result > 0);
     }
 
+    @PostMapping("/batch-assign-by-pid")
+    @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    public ApiResponse<Boolean> batchAssignRolesByPid(
+            @RequestBody List<AssignRolesByPidRequest> requests,
+            @CurrentUserId Long operatorId) {
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        boolean result = requests.stream()
+                .allMatch(request -> userRoleService.assignRolesToMemberByRolePids(
+                        request.getMemberPid(), request.getRolePids(), tenantId, operatorId));
+        return ApiResponse.success(result);
+    }
+
     @DeleteMapping("/batch-remove")
     @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    @Deprecated
     public ApiResponse<Boolean> batchRemoveUserRoles(@RequestBody List<Long> userRoleIds) {
         int result = userRoleService.batchRemoveRoles(userRoleIds);
+        return ApiResponse.success(result > 0);
+    }
+
+    @DeleteMapping("/batch-remove-by-pid")
+    @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    public ApiResponse<Boolean> batchRemoveUserRolesByPid(@RequestBody List<String> userRolePids) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        int result = userRoleService.batchRemoveRolesByPids(userRolePids, tenantId);
         return ApiResponse.success(result > 0);
     }
 }
