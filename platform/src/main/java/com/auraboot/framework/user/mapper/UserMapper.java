@@ -92,6 +92,27 @@ public interface UserMapper extends BaseMapper<User> {
     String findPidByUserId(@Param("userId") Long userId);
 
     /**
+     * Look up a user's internal ID by public PID within a tenant membership scope.
+     * Includes human users and system/service identities so audit queries can resolve
+     * every actor type recorded in ab_audit_trail.
+     */
+    @Select("""
+            SELECT u.id
+            FROM ab_user u
+            INNER JOIN ab_tenant_member tm
+                    ON tm.user_id = u.id
+                   AND tm.tenant_id = #{tenantId}
+                   AND tm.status = 'active'
+                   AND tm.deleted_flag = FALSE
+            WHERE u.deleted_flag = FALSE
+              AND u.pid = #{pid}
+            LIMIT 1
+            """)
+    Long findUserIdInTenantByPid(
+            @Param("tenantId") Long tenantId,
+            @Param("pid") String pid);
+
+    /**
      * Single-user lookup with the same tenant-scoped projection as
      * {@link #searchUsersByTenant}, used by picker resolve-name flows.
      * Returns null when the user does not exist or is not a member of the tenant.

@@ -16,11 +16,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -87,5 +90,77 @@ class AuditTrailControllerTest {
         assertFalse(first.has("afterSnapshot"));
         assertFalse(first.has("previousHash"));
         assertFalse(first.has("recordHash"));
+    }
+
+    @Test
+    void getByActor_prefersActorPidAndReturnsPublicDto() {
+        LocalDateTime start = LocalDateTime.parse("2026-06-22T00:00:00");
+        LocalDateTime end = LocalDateTime.parse("2026-06-23T00:00:00");
+        AuditTrail trail = trailForActor();
+        when(auditTrailService.getAuditByActorPid(
+                100L,
+                "actor_pid",
+                Instant.parse("2026-06-22T00:00:00Z"),
+                Instant.parse("2026-06-23T00:00:00Z")))
+                .thenReturn(List.of(trail));
+
+        ApiResponse<List<AuditTrailPublicDTO>> response = controller.getByActor(
+                "actor_pid", null, start, end);
+
+        assertTrue(response.isSuccess());
+        assertEquals("operator", response.getData().get(0).getActorName());
+        verify(auditTrailService).getAuditByActorPid(
+                100L,
+                "actor_pid",
+                Instant.parse("2026-06-22T00:00:00Z"),
+                Instant.parse("2026-06-23T00:00:00Z"));
+        verify(auditTrailService, never()).getAuditByActor(
+                100L,
+                700L,
+                Instant.parse("2026-06-22T00:00:00Z"),
+                Instant.parse("2026-06-23T00:00:00Z"));
+    }
+
+    @Test
+    void getByActor_keepsLegacyActorIdCompatibility() {
+        LocalDateTime start = LocalDateTime.parse("2026-06-22T00:00:00");
+        LocalDateTime end = LocalDateTime.parse("2026-06-23T00:00:00");
+        AuditTrail trail = trailForActor();
+        when(auditTrailService.getAuditByActor(
+                100L,
+                700L,
+                Instant.parse("2026-06-22T00:00:00Z"),
+                Instant.parse("2026-06-23T00:00:00Z")))
+                .thenReturn(List.of(trail));
+
+        ApiResponse<List<AuditTrailPublicDTO>> response = controller.getByActor(
+                null, 700L, start, end);
+
+        assertTrue(response.isSuccess());
+        assertEquals("operator", response.getData().get(0).getActorName());
+        verify(auditTrailService).getAuditByActor(
+                100L,
+                700L,
+                Instant.parse("2026-06-22T00:00:00Z"),
+                Instant.parse("2026-06-23T00:00:00Z"));
+        verify(auditTrailService, never()).getAuditByActorPid(
+                100L,
+                "actor_pid",
+                Instant.parse("2026-06-22T00:00:00Z"),
+                Instant.parse("2026-06-23T00:00:00Z"));
+    }
+
+    private static AuditTrail trailForActor() {
+        AuditTrail trail = new AuditTrail();
+        trail.setId(12L);
+        trail.setTenantId(100L);
+        trail.setSequenceNo(4L);
+        trail.setEventType("SAVED_VIEW");
+        trail.setEntityType("saved_view");
+        trail.setEntityPid("view_pid");
+        trail.setActorId(700L);
+        trail.setActorName("operator");
+        trail.setTimestamp(Instant.parse("2026-06-22T12:00:00Z"));
+        return trail;
     }
 }
