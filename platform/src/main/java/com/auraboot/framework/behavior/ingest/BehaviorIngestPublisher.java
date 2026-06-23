@@ -2,10 +2,11 @@ package com.auraboot.framework.behavior.ingest;
 
 import com.auraboot.framework.behavior.dto.BehaviorEventInput;
 import com.auraboot.framework.infrastructure.mq.MqProvider;
+import com.auraboot.framework.observability.W3cTraceparent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -20,7 +21,6 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class BehaviorIngestPublisher {
 
     /** SoT §2.7 frozen topic names. */
@@ -29,6 +29,20 @@ public class BehaviorIngestPublisher {
 
     private final MqProvider mqProvider;
     private final ObjectMapper objectMapper;
+    private final BehaviorIngestMetrics metrics;
+
+    @Autowired
+    public BehaviorIngestPublisher(MqProvider mqProvider,
+                                   ObjectMapper objectMapper,
+                                   BehaviorIngestMetrics metrics) {
+        this.mqProvider = mqProvider;
+        this.objectMapper = objectMapper;
+        this.metrics = metrics;
+    }
+
+    BehaviorIngestPublisher(MqProvider mqProvider, ObjectMapper objectMapper) {
+        this(mqProvider, objectMapper, BehaviorIngestMetrics.noop());
+    }
 
     /** Publish a validated batch (tenant/user already resolved) to the events topic; returns count enqueued. */
     public int publish(long tenantId, Long userId, List<BehaviorEventInput> events) {
@@ -38,7 +52,12 @@ public class BehaviorIngestPublisher {
         Map<String, String> headers = new HashMap<>();
         headers.put("tenantId", Long.toString(tenantId));
         headers.put("eventCount", Integer.toString(events.size()));
+        String traceparent = traceparent(events);
+        if (traceparent != null) {
+            headers.put(W3cTraceparent.HEADER, traceparent);
+        }
         send(TOPIC_EVENTS, new BehaviorIngestEnvelope(tenantId, userId, events), headers);
+        metrics.recordEnqueued(TOPIC_EVENTS, events.size());
         return events.size();
     }
 
@@ -48,14 +67,32 @@ public class BehaviorIngestPublisher {
         headers.put("tenantId", Long.toString(tenantId));
         headers.put("reason", reason);
         send(TOPIC_QUARANTINE, new BehaviorQuarantineEnvelope(tenantId, userId, reason, detail, event), headers);
+        metrics.recordEnqueued(TOPIC_QUARANTINE, 1);
     }
 
     private void send(String topic, Object payload, Map<String, String> headers) {
         try {
             mqProvider.send(topic, objectMapper.writeValueAsString(payload), headers);
         } catch (JsonProcessingException e) {
+            metrics.recordPublishFailure(topic, "serialization");
             // Serialization of our own envelope should never fail; surface loudly rather than drop silently.
             throw new IllegalStateException("Failed to serialize behavior ingest payload for topic " + topic, e);
+        } catch (RuntimeException e) {
+            metrics.recordPublishFailure(topic, "runtime");
+            throw e;
         }
+    }
+
+    private String traceparent(List<BehaviorEventInput> events) {
+        for (BehaviorEventInput event : events) {
+            if (event == null) {
+                continue;
+            }
+            String traceparent = W3cTraceparent.format(event.getTraceId(), event.getSourceSpanId(), true);
+            if (traceparent != null) {
+                return traceparent;
+            }
+        }
+        return null;
     }
 }

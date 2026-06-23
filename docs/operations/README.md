@@ -6,10 +6,26 @@ Observability assets for AuraBoot platform operators.
 
 - [Behavior Kafka Ingest Runbook](behavior-kafka-ingest-runbook.md) — local
   validation and operations notes for `/api/collect` / `/api/collect/keyed`
-  enqueue, native Kafka IT, and quarantine sink checks without Docker.
+  enqueue, native Kafka IT, keyed load/backpressure checks, metrics, alerts,
+  server outcome outbox, traceparent propagation, and quarantine retention
+  checks without Docker.
 - [OEE Host Golden](oee-host-golden.md) — repeatable local validation for the
   PCBA OEE dashboard using host PostgreSQL, Greptime, backend, BFF, and Vite
   without Docker.
+
+## Behavior Kafka Ingest
+
+`BehaviorIngestMetrics` exports the following custom Micrometer meters through
+`/actuator/prometheus`:
+
+- `auraboot_behavior_ingest_accepted_total{path}`
+- `auraboot_behavior_ingest_enqueued_total{topic}`
+- `auraboot_behavior_ingest_persisted_total{outcome}`
+- `auraboot_behavior_ingest_quarantined_total{reason}`
+- `auraboot_behavior_ingest_publish_failures_total{topic,error}`
+- `auraboot_behavior_ingest_consumer_lag{topic,consumer_group}`
+
+Prometheus alert rules live in `behavior-kafka-alerts.yaml`.
 
 ## Learning Loop (ACP, PR-49/51)
 

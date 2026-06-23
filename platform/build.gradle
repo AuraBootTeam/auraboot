@@ -423,6 +423,9 @@ dependencies {
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
     testImplementation 'org.awaitility:awaitility:4.3.0'
 
+    // Avro schema compatibility tests for Kafka-backed telemetry contracts.
+    testImplementation 'org.apache.avro:avro:1.11.3'
+
     // JUnit 5 Platform
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
     testImplementation 'org.junit.jupiter:junit-jupiter-engine'

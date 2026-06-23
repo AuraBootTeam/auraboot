@@ -35,6 +35,10 @@ public class BehaviorQuarantine {
     @TableField(value = "raw_event", typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)
     private String rawEvent;
 
+    private String replayStatus;       // pending|replayed|duplicate|failed
+    private String replayDetail;
+    private Long replayedBehaviorEventId;
+    private Instant replayedAt;
     private Instant quarantinedAt;     // null on insert -> DB default
     private Instant createdAt;
 }
