@@ -343,9 +343,8 @@ test.describe('BOM standardization workbench golden', () => {
       await expect(page.getByTestId('artifact-timeline')).toContainText('Rev 2');
       await expect(page.getByTestId('artifact-timeline')).toContainText(`standard-bom-${created.taskId}.xlsx`);
 
-      await clickSidebarPage(page, '/p/bom_review_queue', /BOM 评审队列|Review Queue/i);
-      await expect(page.locator('main')).toContainText(created.marker, { timeout: 20_000 });
-      await expect(page.getByText(/评审|Review/).first()).toBeVisible({ timeout: 20_000 });
+      await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('a[href="/p/bom_review_queue"]')).toHaveCount(0);
       await expect(consoleIssues).toEqual([]);
     } finally {
       await cleanupRows(page, created);

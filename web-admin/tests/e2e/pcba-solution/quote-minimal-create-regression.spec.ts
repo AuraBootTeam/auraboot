@@ -3,9 +3,11 @@ import { test, expect } from '../../fixtures';
 import { navigateToDynamicPage, queryFilteredList, waitForFormReady } from '../helpers';
 import {
   cleanupRows,
+  createCorrectedBomWorkbook,
   executeCommand,
   openQuoteCreateFormFromList,
   openQuoteDetailFromList,
+  queryDynamicRecords,
   type CreatedRows,
 } from './quote-e2e-helpers';
 
@@ -33,6 +35,45 @@ async function selectCustomer(page: Page, accountId: string, accountName: string
   });
   await option.click();
   await expect(trigger).toContainText(accountName, { timeout: 5_000 });
+}
+
+async function selectProject(page: Page, projectId: string, projectName: string): Promise<void> {
+  const trigger = page.getByTestId('select-trigger-qo_quote_project_id');
+  await expect(trigger).toBeVisible({ timeout: 15_000 });
+  await trigger.click();
+
+  const option = page.locator(`[role="option"][data-value="${projectId}"]`).first();
+  await expect(option, `project option ${projectId} should be loaded`).toBeVisible({
+    timeout: 15_000,
+  });
+  await option.click();
+  await expect(trigger).toContainText(projectName, { timeout: 5_000 });
+}
+
+async function uploadSmartUploadFile(
+  page: Page,
+  fieldTestId: string,
+  filePath: string,
+  filename: string,
+): Promise<void> {
+  const field = page.getByTestId(fieldTestId);
+  await expect(field).toBeVisible({ timeout: 15_000 });
+  const uploadResponsePromise = page.waitForResponse(
+    (response) => response.url().includes('/api/file/upload') && response.request().method() === 'POST',
+    { timeout: 30_000 },
+  );
+  const input = field.locator('input[type="file"]').first();
+  if ((await input.count()) > 0) {
+    await input.setInputFiles(filePath);
+  } else {
+    const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 10_000 });
+    await field.locator('button, [role="button"]').first().click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles(filePath);
+  }
+  const uploadResponse = await uploadResponsePromise;
+  expect(uploadResponse.ok(), `file upload HTTP ${uploadResponse.status()}`).toBe(true);
+  await expect(field).toContainText(filename, { timeout: 10_000 });
 }
 
 async function visibleFormFieldIds(page: Page): Promise<string[]> {
@@ -107,14 +148,18 @@ async function tableHeaders(page: Page): Promise<string[]> {
 }
 
 test.describe('PCBA quote minimal create regression', () => {
-  test.describe.configure({ timeout: 90_000 });
+  test.describe.configure({ timeout: 120_000 });
 
-  test('creates a quote from only customer and notes while preserving hidden RFQ links and simplified pages', async ({
+  test('creates a quote from customer, linked BOM project and converted BOM while preserving hidden RFQ links', async ({
     page,
-  }) => {
+  }, testInfo) => {
     const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
     const accountName = `ZZZ E2E Minimal Customer ${suffix}`;
+    const projectName = `ZZZ E2E Quote Project ${suffix}`;
     const notes = `Minimal quote note ${suffix}`;
+    const workbookPath = createCorrectedBomWorkbook(
+      testInfo.outputPath('create-quote-converted-bom.xlsx'),
+    );
     const created: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
 
     try {
@@ -134,6 +179,25 @@ test.describe('PCBA quote minimal create regression', () => {
       );
       expect(accountId, 'crm:create_account should return recordId').toBeTruthy();
       created.rows.push({ model: 'crm_account_common', pid: accountId });
+
+      const projectResult = await executeCommand(
+        page,
+        'bom:create_project',
+        {
+          bom_project_name: projectName,
+          bom_project_customer_id: accountId,
+          bom_project_quality_level: 'industrial',
+          bom_pcba_code: `PCBA-${suffix}`,
+          bom_project_remark: 'Created by quote create regression E2E',
+        },
+        undefined,
+        'create',
+      );
+      const projectId = String(
+        projectResult.recordId ?? projectResult.pid ?? projectResult.projectId ?? '',
+      );
+      expect(projectId, 'bom:create_project should return recordId').toBeTruthy();
+      created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
 
       const accountOptionsLoaded = page
         .waitForResponse(
@@ -155,15 +219,26 @@ test.describe('PCBA quote minimal create regression', () => {
         'form-field-gerber_source_file',
         'form-field-qo_quote_crm_account_id',
         'form-field-qo_quote_notes',
+        'form-field-qo_quote_project_id',
       ]);
       await expect(page.getByTestId('form-field-gerber_source_file')).toBeVisible();
       await expect(page.getByTestId('form-field-cpl_source_file')).toBeVisible();
       await expect(page.getByTestId('form-field-corrected_bom_file')).toBeVisible();
+      await expect(page.getByTestId('form-field-corrected_bom_file')).toContainText(
+        'BOM资料(必填,必须是转化过的BOM)',
+      );
       await expect(page.getByTestId('form-field-qo_quote_customer')).toHaveCount(0);
       await expect(page.getByTestId('form-field-qo_quote_tax_rate')).toHaveCount(0);
       await expect(page.getByTestId('form-field-qo_quote_valid_until')).toHaveCount(0);
 
       await selectCustomer(page, accountId, accountName);
+      await selectProject(page, projectId, projectName);
+      await uploadSmartUploadFile(
+        page,
+        'form-field-corrected_bom_file',
+        workbookPath,
+        'create-quote-converted-bom.xlsx',
+      );
       await page
         .getByTestId('form-field-qo_quote_notes')
         .locator('textarea, input')
@@ -190,12 +265,18 @@ test.describe('PCBA quote minimal create regression', () => {
       const quoteId = String(quoteData.recordId ?? quoteData.quoteId ?? quoteData.pid ?? '');
       expect(quoteId, 'quote create should return quote id').toBeTruthy();
       expect(quoteData.uploadedSourceCount).toBe(0);
+      expect(quoteData.correctedBomImported).toBe(true);
+      const correctedBomImport = (quoteData.correctedBomImport ?? {}) as Record<string, unknown>;
+      if (correctedBomImport.async === true && typeof correctedBomImport.taskCode === 'string') {
+        await pollAsyncTaskResult(page, correctedBomImport.taskCode);
+      }
       created.quoteId = quoteId;
       created.rows.push({ model: 'qo_quote_common', pid: quoteId });
 
       const quote = await readDynamicRecord(page, 'qo_quote_common', quoteId);
       created.quoteCode = String(quote.qo_quote_code ?? '');
       expect(quote.qo_quote_crm_account_id).toBe(accountId);
+      expect(quote.qo_quote_project_id).toBe(projectId);
       expect(quote.qo_quote_customer).toBe(accountName);
       expect(quote.qo_quote_notes).toBe(notes);
       expect(quote.qo_quote_status).toBe('draft');
@@ -203,6 +284,7 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(customerRequestId, 'quote should keep hidden customer request id').toBeTruthy();
       created.rows = [
         { model: 'crm_account_common', pid: accountId },
+        { model: 'req_requirement_set_pcba_bom', pid: projectId },
         { model: 'crm_customer_request_common', pid: customerRequestId },
         { model: 'qo_quote_common', pid: quoteId },
       ];
@@ -233,13 +315,45 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(pcbaRfqId, 'pcba rfq id should be known for cleanup').toBeTruthy();
       created.rows = [
         { model: 'crm_account_common', pid: accountId },
+        { model: 'req_requirement_set_pcba_bom', pid: projectId },
         { model: 'crm_customer_request_common', pid: customerRequestId },
         { model: 'crm_customer_request_pcba_rfq', pid: pcbaRfqId },
         { model: 'qo_quote_common', pid: quoteId },
       ];
 
+      const quoteLines = await queryDynamicRecords(page, 'qo_quote_line_common', [
+        { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: quoteId },
+      ]);
+      expect(quoteLines.length, 'converted BOM upload should create quote lines').toBeGreaterThan(0);
+      const importRows = await queryDynamicRecords(page, 'qo_bom_import_row_common', [
+        { fieldName: 'qo_bir_quote_id', operator: 'EQ', value: quoteId },
+      ]);
+      const importHeaders = await queryDynamicRecords(page, 'qo_bom_import_common', [
+        { fieldName: 'qo_bi_quote_id', operator: 'EQ', value: quoteId },
+      ]);
+      for (const row of [...quoteLines, ...importRows]) {
+        const pid = String(row.pid ?? '');
+        if (pid) {
+          created.rows.push({
+            model: row.qo_ql_quote_id ? 'qo_quote_line_common' : 'qo_bom_import_row_common',
+            pid,
+          });
+        }
+      }
+      for (const row of importHeaders) {
+        const pid = String(row.pid ?? '');
+        if (pid) created.rows.push({ model: 'qo_bom_import_common', pid });
+      }
+
       await navigateToDynamicPage(page, 'qo_quote_common');
-      expect(await tableHeaders(page)).toEqual(['报价单编号', '客户信息', '状态', '操作']);
+      expect(await tableHeaders(page)).toEqual([
+        '报价单编号',
+        '客户信息',
+        '项目',
+        '报价修改日期',
+        '操作',
+      ]);
+      await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('状态');
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('CRM客户ID');
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('折扣%');
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('有效期至');
