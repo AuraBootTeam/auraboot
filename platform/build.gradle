@@ -424,7 +424,7 @@ dependencies {
     testImplementation 'org.awaitility:awaitility:4.3.0'
 
     // Avro schema compatibility tests for Kafka-backed telemetry contracts.
-    testImplementation 'org.apache.avro:avro:1.11.3'
+    testImplementation 'org.apache.avro:avro:1.12.1'
 
     // JUnit 5 Platform
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
