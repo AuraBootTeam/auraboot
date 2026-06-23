@@ -163,11 +163,20 @@ test.describe('Tenant Switch in Avatar Menu', () => {
     // Wait for React hydration — avatar button must be interactive
     const avatarButton = page.locator('[data-testid="user-menu"] button').first();
     await expect(avatarButton).toBeVisible({ timeout: 15_000 });
-    // Wait a beat for React hydration to complete
-    await page.waitForTimeout(1000);
-    await avatarButton.click();
 
     const dropdown = page.locator('[data-testid="user-dropdown"]');
+    await expect
+      .poll(
+        async () => {
+          if (await dropdown.isVisible({ timeout: 250 }).catch(() => false)) {
+            return true;
+          }
+          await avatarButton.click().catch(() => null);
+          return dropdown.isVisible({ timeout: 500 }).catch(() => false);
+        },
+        { timeout: 5_000, intervals: [100, 250, 500, 1000] },
+      )
+      .toBe(true);
     await expect(dropdown).toBeVisible({ timeout: 5_000 });
 
     // Should show user email

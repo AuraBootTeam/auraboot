@@ -39,7 +39,7 @@ async function uiLogin(page: Page): Promise<void> {
   // flake in auth.setup.ts). Explicit retry — not a product fallback.
   for (let attempt = 1; attempt <= 3; attempt++) {
     await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
-    const emailInput = page.locator('input#email');
+    const emailInput = page.locator('input#identifier, input#email');
     const hasLogin = await emailInput.isVisible({ timeout: 8000 }).catch(() => false);
     if (!hasLogin) break; // already authenticated
 
@@ -66,7 +66,7 @@ async function uiLogin(page: Page): Promise<void> {
     if (attempt === 3) throw new Error('UI login failed after 3 attempts (still on login form)');
   }
   // Confirm authenticated (login form gone).
-  await expect(page.locator('input#email')).toHaveCount(0, { timeout: 5000 });
+  await expect(page.locator('input#identifier, input#email')).toHaveCount(0, { timeout: 5000 });
 }
 
 /** Click a sidebar menu item by its visible text, expanding parents as needed. */

@@ -64,4 +64,5 @@ tests/storage/admin.json
 # (was previously gitignored, breaking CI typecheck on app/middleware/sessionMiddlewareFactory.ts)
 vite.config.ts.timestamp-*.mjs
 tests/storage/ga/
+tests/storage/local-auth-*/
 tests/storage/*/admin.json

@@ -242,10 +242,9 @@ test.describe('Role Assignment', () => {
 
 test.describe('Password Management', () => {
   /**
-   * UM-008: Change password
-   * Verify that password can be changed
+   * UM-008: Password changes are admin-managed.
    */
-  test('UM-008: should access password change', async ({ page }) => {
+  test('UM-008: should not expose self-service password change', async ({ page }) => {
     await page.goto('/personal/security');
     await page.waitForLoadState('domcontentloaded');
 
@@ -253,16 +252,10 @@ test.describe('Password Management', () => {
       timeout: 10000,
     });
 
-    await expect(page.getByText('Current Password', { exact: true })).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.getByText('New Password', { exact: true })).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Confirm New Password', { exact: true })).toBeVisible({
-      timeout: 5000,
-    });
-
-    const changeBtn = page.getByRole('button', { name: 'Change Password' }).last();
-    await expect(changeBtn).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Current Password', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('New Password', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Confirm New Password', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Change Password' })).toHaveCount(0);
   });
 });
 

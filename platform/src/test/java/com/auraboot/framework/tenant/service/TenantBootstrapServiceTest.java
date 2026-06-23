@@ -1,11 +1,16 @@
 package com.auraboot.framework.tenant.service;
 
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.tenant.dto.bootstrap.PermissionTemplate;
+import com.auraboot.framework.tenant.dto.bootstrap.RolePermissionBinding;
 import com.auraboot.framework.tenant.dto.bootstrap.TenantBootstrapTemplate;
 import com.auraboot.framework.tenant.exception.TemplateNotFoundException;
 import com.auraboot.framework.tenant.exception.TemplateValidationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -92,5 +97,27 @@ class TenantBootstrapServiceTest extends BaseIntegrationTest {
         assertThat(template.getRolePermissionBindings().get(0).getPermissionCodes())
             .hasSize(1)
             .contains("*");
+    }
+
+    @Test
+    void defaultTemplateGrantsTenantInviteManagePermission() {
+        TenantBootstrapTemplate template = tenantBootstrapService.loadTemplate("default-bootstrap");
+
+        Set<String> permissionCodes = template.getPermissions().stream()
+            .map(PermissionTemplate::getCode)
+            .collect(Collectors.toSet());
+        assertThat(permissionCodes).contains("org.tenant.invite.manage");
+
+        RolePermissionBinding tenantAdminBinding = template.getRolePermissionBindings().stream()
+            .filter(binding -> "tenant_admin".equals(binding.getRoleCode()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(tenantAdminBinding.getPermissionCodes()).contains("*");
+
+        RolePermissionBinding operatorBinding = template.getRolePermissionBindings().stream()
+            .filter(binding -> "operator".equals(binding.getRoleCode()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(operatorBinding.getPermissionCodes()).contains("org.tenant.invite.manage");
     }
 }

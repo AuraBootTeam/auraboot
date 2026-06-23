@@ -312,7 +312,7 @@ async function loginViaUI(
 
     const emailInput = page
       .locator(
-        'input#email, input[name="email"], input[type="email"], input[placeholder*="邮箱"], input[placeholder*="Email"]',
+        'input#identifier, input[name="identifier"], input#email, input[name="email"], input[type="email"], input[placeholder*="用户名"], input[placeholder*="账号"], input[placeholder*="邮箱"], input[placeholder*="Email"]',
       )
       .first();
     const visible = await emailInput.isVisible({ timeout: 3000 }).catch(() => false);

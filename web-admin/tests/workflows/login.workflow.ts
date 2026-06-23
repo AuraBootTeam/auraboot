@@ -30,7 +30,7 @@ export const TEST_CREDENTIALS = {
 export async function ensureLoggedIn(page: Page): Promise<void> {
   // Check if on login page by looking for login form
   const hasLoginForm = await page
-    .locator('input#email')
+    .locator('input#identifier, input#email')
     .isVisible({ timeout: 2000 })
     .catch(() => false);
 
@@ -58,7 +58,7 @@ export async function performLogin(
 
   // Check if already logged in
   const hasLoginForm = await page
-    .locator('input#email')
+    .locator('input#identifier, input#email')
     .isVisible({ timeout: 3000 })
     .catch(() => false);
 
@@ -68,7 +68,7 @@ export async function performLogin(
   }
 
   // Fill and submit login form
-  await page.locator('input#email').fill(credentials.email);
+  await page.locator('input#identifier, input#email').first().fill(credentials.email);
   await page.locator('input#password').fill(credentials.password);
   await page.locator('button:has-text("立即登录")').click();
 
@@ -77,7 +77,7 @@ export async function performLogin(
 
   // Verify login succeeded
   const stillOnLogin = await page
-    .locator('input#email')
+    .locator('input#identifier, input#email')
     .isVisible()
     .catch(() => false);
   if (stillOnLogin) {

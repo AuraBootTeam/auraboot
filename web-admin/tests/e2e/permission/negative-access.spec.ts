@@ -34,7 +34,7 @@ baseTest.describe('Permission - Unauthenticated Access', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // The app should redirect to login or show the login form
-    const loginForm = page.locator('input#email, input[type="email"]');
+    const loginForm = page.locator('input#identifier, input#email, input[type="email"]');
     const hasLoginForm = await loginForm.isVisible({ timeout: 5000 }).catch(() => false);
 
     const url = page.url();

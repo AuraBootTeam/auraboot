@@ -45,6 +45,7 @@ test.describe.serial('Employee Account Login Policy @auth @critical', () => {
     const adminPage = await newPublicPage(browser);
     try {
       const adminHeaders = await loginAdminHeaders(adminPage);
+      await ensureEmailPasswordLoginChannel(adminPage, adminHeaders);
       jsonEmployee = await provisionEmployee(adminPage, JSON_EMPLOYEE_NAME, adminHeaders);
       xlsxEmployee = await importEmployeeWorkbook(adminPage, XLSX_EMPLOYEE_NAME, adminHeaders);
       resetEmployee = await provisionEmployee(adminPage, RESET_EMPLOYEE_NAME, adminHeaders);
@@ -265,6 +266,28 @@ async function loginAdminHeaders(page: Page): Promise<Record<string, string>> {
   }
 
   return bearerHeaders(jwt);
+}
+
+async function ensureEmailPasswordLoginChannel(page: Page, headers: Record<string, string>) {
+  const response = await page.request.put('/api/admin/login-channels', {
+    headers,
+    data: [
+      { channel: 'email_password', enabled: true, sortOrder: 0 },
+      { channel: 'sms', enabled: false, sortOrder: 1 },
+      { channel: 'email_code', enabled: false, sortOrder: 2 },
+    ],
+  });
+  const raw = await response.text();
+  let body: ApiEnvelope<unknown>;
+  try {
+    body = JSON.parse(raw) as ApiEnvelope<unknown>;
+  } catch {
+    body = { code: String(response.status()), message: raw };
+  }
+  expect(response.ok(), `ensure account/password login channel: HTTP ${response.status()} ${body.message ?? ''}`).toBe(
+    true,
+  );
+  expect(body.code, 'ensure account/password login channel: business code').toBe('0');
 }
 
 function bearerHeaders(jwt: string): Record<string, string> {
