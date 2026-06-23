@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { useI18n } from '~/contexts/I18nContext';
 
 export type EmptyStateVariant = 'not-configured' | 'no-data' | 'error';
 
@@ -76,6 +77,7 @@ export const ViewEmptyState: React.FC<ViewEmptyStateProps> = ({
   onRetry,
   className,
 }) => {
+  const { t } = useI18n();
   const borderColor =
     variant === 'error'
       ? 'border-red-200 dark:border-red-800'
@@ -92,7 +94,7 @@ export const ViewEmptyState: React.FC<ViewEmptyStateProps> = ({
           <>
             <CogIcon className="mb-4 h-12 w-12 text-gray-400 dark:text-gray-500" />
             <h3 className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-              {title || 'View not configured'}
+              {title || t('common.saved_view_not_configured', undefined, '视图未配置')}
             </h3>
             {description && (
               <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">{description}</p>
@@ -104,7 +106,7 @@ export const ViewEmptyState: React.FC<ViewEmptyStateProps> = ({
                   onClick={onConfigure}
                   className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
                 >
-                  Configure
+                  {t('common.saved_view_configure', undefined, '配置')}
                 </button>
               )}
               {onSwitchToTableView && (
@@ -113,7 +115,7 @@ export const ViewEmptyState: React.FC<ViewEmptyStateProps> = ({
                   onClick={onSwitchToTableView}
                   className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                 >
-                  Switch to Table
+                  {t('common.saved_view_switch_to_table', undefined, '切换到表格')}
                 </button>
               )}
             </div>
@@ -124,7 +126,7 @@ export const ViewEmptyState: React.FC<ViewEmptyStateProps> = ({
           <>
             <InboxIcon className="mb-4 h-12 w-12 text-gray-400 dark:text-gray-500" />
             <h3 className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-              {title || 'No data'}
+              {title || t('common.no_data', undefined, '暂无数据')}
             </h3>
             {description && (
               <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
@@ -136,7 +138,7 @@ export const ViewEmptyState: React.FC<ViewEmptyStateProps> = ({
           <>
             <ExclamationIcon className="mb-4 h-12 w-12 text-red-400 dark:text-red-500" />
             <h3 className="mb-1 text-sm font-medium text-red-800 dark:text-red-300">
-              {title || 'Something went wrong'}
+              {title || t('common.saved_view_error', undefined, '出现错误')}
             </h3>
             {error && (
               <p className="mb-4 rounded bg-red-50 px-3 py-1.5 text-xs text-red-600 dark:bg-red-900/30 dark:text-red-400">
@@ -149,7 +151,7 @@ export const ViewEmptyState: React.FC<ViewEmptyStateProps> = ({
                 onClick={onRetry}
                 className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
               >
-                Retry
+                {t('common.retry', undefined, '重试')}
               </button>
             )}
           </>

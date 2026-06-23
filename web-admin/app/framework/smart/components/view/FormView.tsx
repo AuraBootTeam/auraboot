@@ -193,8 +193,8 @@ export const FormView: React.FC<FormViewProps> = ({
     return (
       <ViewEmptyState
         variant="not-configured"
-        title="Form view not configured"
-        description="No fields available for this model."
+        title="表单视图未配置"
+        description="当前模型没有可用于表单的字段。"
         onConfigure={onOpenViewConfig}
         className={className}
       />

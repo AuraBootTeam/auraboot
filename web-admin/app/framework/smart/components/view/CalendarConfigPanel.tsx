@@ -25,9 +25,9 @@ export interface CalendarConfigPanelProps {
 }
 
 const CALENDAR_VIEW_OPTIONS = [
-  { value: 'dayGridMonth', label: 'Month' },
-  { value: 'timeGridWeek', label: 'Week' },
-  { value: 'listWeek', label: 'List' },
+  { value: 'dayGridMonth', label: '月' },
+  { value: 'timeGridWeek', label: '周' },
+  { value: 'listWeek', label: '列表' },
 ] as const;
 
 /**
@@ -59,14 +59,14 @@ export const CalendarConfigPanel: React.FC<CalendarConfigPanelProps> = ({
       {/* Date Field (required) */}
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
-          Date Field <span className="text-red-500">*</span>
+          日期字段 <span className="text-red-500">*</span>
         </label>
         <select
           value={viewConfig.calendarDateField || ''}
           onChange={(e) => updateConfig({ calendarDateField: e.target.value })}
           className={selectClassName}
         >
-          <option value="">Select date field...</option>
+          <option value="">选择日期字段...</option>
           {dateFields.length > 0
             ? dateFields.map((f) => (
                 <option key={f.code} value={f.code}>
@@ -81,19 +81,19 @@ export const CalendarConfigPanel: React.FC<CalendarConfigPanelProps> = ({
               ))}
         </select>
         <p className="mt-1 text-xs text-gray-500">
-          Events will be placed on the calendar by this date field.
+          事件会根据这个日期字段显示在日历中。
         </p>
       </div>
 
       {/* Title Field */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Title Field</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">标题字段</label>
         <select
           value={viewConfig.calendarTitleField || ''}
           onChange={(e) => updateConfig({ calendarTitleField: e.target.value || undefined })}
           className={selectClassName}
         >
-          <option value="">Default (name)</option>
+          <option value="">默认名称字段</option>
           {fields.map((f) => (
             <option key={f.code} value={f.code}>
               {f.name}
@@ -104,13 +104,13 @@ export const CalendarConfigPanel: React.FC<CalendarConfigPanelProps> = ({
 
       {/* End Date Field (optional) */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">End Date Field</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">结束日期字段</label>
         <select
           value={viewConfig.calendarEndDateField || ''}
           onChange={(e) => updateConfig({ calendarEndDateField: e.target.value || undefined })}
           className={selectClassName}
         >
-          <option value="">None (single-day events)</option>
+          <option value="">不设置（单日事件）</option>
           {dateFields.length > 0
             ? dateFields.map((f) => (
                 <option key={f.code} value={f.code}>
@@ -124,19 +124,19 @@ export const CalendarConfigPanel: React.FC<CalendarConfigPanelProps> = ({
               ))}
         </select>
         <p className="mt-1 text-xs text-gray-500">
-          For multi-day events, select a field for the end date.
+          多日事件可选择结束日期字段。
         </p>
       </div>
 
       {/* Color Field (optional) */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Color By Field</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">颜色分组字段</label>
         <select
           value={viewConfig.calendarColorField || ''}
           onChange={(e) => updateConfig({ calendarColorField: e.target.value || undefined })}
           className={selectClassName}
         >
-          <option value="">Default color</option>
+          <option value="">默认颜色</option>
           {fields.map((f) => (
             <option key={f.code} value={f.code}>
               {f.name}
@@ -144,13 +144,13 @@ export const CalendarConfigPanel: React.FC<CalendarConfigPanelProps> = ({
           ))}
         </select>
         <p className="mt-1 text-xs text-gray-500">
-          Events will be color-coded by distinct values of this field.
+          事件会按该字段的不同取值显示颜色。
         </p>
       </div>
 
       {/* Default View */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Default View</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">默认视图</label>
         <div className="flex gap-2">
           {CALENDAR_VIEW_OPTIONS.map((opt) => (
             <button

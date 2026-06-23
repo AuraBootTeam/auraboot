@@ -35,7 +35,7 @@ const ASPECT_RATIO_OPTIONS = [
   { value: 'square', label: '1:1' },
   { value: '4:3', label: '4:3' },
   { value: '16:9', label: '16:9' },
-  { value: 'auto', label: 'Auto' },
+  { value: 'auto', label: '自适应' },
 ] as const;
 
 /**
@@ -62,32 +62,32 @@ export const GalleryConfigPanel: React.FC<GalleryConfigPanelProps> = ({
       {/* Image Field (required) */}
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
-          Image Field <span className="text-red-500">*</span>
+          图片字段 <span className="text-red-500">*</span>
         </label>
         <select
           value={viewConfig.galleryImageField || ''}
           onChange={(e) => updateConfig({ galleryImageField: e.target.value })}
           className={selectClassName}
         >
-          <option value="">Select image field...</option>
+          <option value="">选择图片字段...</option>
           {fields.map((f) => (
             <option key={f.code} value={f.code}>
               {f.name} ({f.dataType})
             </option>
           ))}
         </select>
-        <p className="mt-1 text-xs text-gray-500">Select the field containing image URLs.</p>
+        <p className="mt-1 text-xs text-gray-500">选择包含图片地址或附件的字段。</p>
       </div>
 
       {/* Title Field */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Title Field</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">标题字段</label>
         <select
           value={viewConfig.galleryTitleField || ''}
           onChange={(e) => updateConfig({ galleryTitleField: e.target.value || undefined })}
           className={selectClassName}
         >
-          <option value="">Default (name)</option>
+          <option value="">默认名称字段</option>
           {fields.map((f) => (
             <option key={f.code} value={f.code}>
               {f.name}
@@ -98,13 +98,13 @@ export const GalleryConfigPanel: React.FC<GalleryConfigPanelProps> = ({
 
       {/* Description Field (optional) */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Description Field</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">描述字段</label>
         <select
           value={viewConfig.galleryDescriptionField || ''}
           onChange={(e) => updateConfig({ galleryDescriptionField: e.target.value || undefined })}
           className={selectClassName}
         >
-          <option value="">None</option>
+          <option value="">不显示</option>
           {fields.map((f) => (
             <option key={f.code} value={f.code}>
               {f.name}
@@ -115,7 +115,7 @@ export const GalleryConfigPanel: React.FC<GalleryConfigPanelProps> = ({
 
       {/* Columns */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Columns</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">列数</label>
         <div className="flex gap-2">
           {COLUMN_OPTIONS.map((opt) => (
             <button
@@ -137,7 +137,7 @@ export const GalleryConfigPanel: React.FC<GalleryConfigPanelProps> = ({
 
       {/* Aspect Ratio */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Image Aspect Ratio</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">图片比例</label>
         <div className="flex gap-2">
           {ASPECT_RATIO_OPTIONS.map((opt) => (
             <button
@@ -168,7 +168,7 @@ export const GalleryConfigPanel: React.FC<GalleryConfigPanelProps> = ({
             onChange={(e) => updateConfig({ galleryShowTitle: e.target.checked })}
             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm text-gray-700">Show title on cards</span>
+          <span className="text-sm text-gray-700">在卡片上显示标题</span>
         </label>
         <label className="flex cursor-pointer items-center gap-3">
           <input
@@ -177,7 +177,7 @@ export const GalleryConfigPanel: React.FC<GalleryConfigPanelProps> = ({
             onChange={(e) => updateConfig({ galleryShowDescription: e.target.checked })}
             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm text-gray-700">Show description on cards</span>
+          <span className="text-sm text-gray-700">在卡片上显示描述</span>
         </label>
       </div>
     </div>

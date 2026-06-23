@@ -5,7 +5,34 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { uniqueId } from '../helpers';
+import { navigateToDynamicPage, uniqueId } from '../helpers';
+
+const MODEL_CODE = 'e2et_order';
+const PAGE_KEY = 'e2et_order_list';
+const FORM_VIEW_PREFIX = 'FV_';
+
+interface SavedViewApiRecord {
+  pid: string;
+  name: string;
+  scope?: string;
+}
+
+async function listViews(page: Page): Promise<SavedViewApiRecord[]> {
+  const params = new URLSearchParams({ modelCode: MODEL_CODE, pageKey: PAGE_KEY });
+  const resp = await page.request.get(`/api/views/accessible?${params.toString()}`);
+  if (!resp.ok()) return [];
+  const body = await resp.json();
+  return Array.isArray(body.data) ? body.data : [];
+}
+
+async function cleanupFormViews(page: Page): Promise<void> {
+  const views = await listViews(page);
+  for (const view of views) {
+    if (view.scope === 'personal' && view.pid && view.name?.startsWith(FORM_VIEW_PREFIX)) {
+      await page.request.delete(`/api/views/${view.pid}`).catch(() => null);
+    }
+  }
+}
 
 async function createViewViaApi(
   page: Page,
@@ -14,9 +41,19 @@ async function createViewViaApi(
   viewConfig: any,
 ): Promise<string> {
   const resp = await page.request.post('/api/views', {
-    data: { name, modelCode, viewType: 'form', scope: 'personal', viewConfig },
+    data: {
+      name,
+      modelCode,
+      pageKey: `${modelCode}_list`,
+      viewType: 'form',
+      scope: 'personal',
+      viewConfig,
+    },
   });
-  if (!resp.ok()) return '';
+  if (!resp.ok()) {
+    const body = await resp.text().catch(() => '<body unavailable>');
+    throw new Error(`Create form SavedView failed: ${resp.status()} ${body}`);
+  }
   const body = await resp.json();
   return body.data?.pid ?? '';
 }
@@ -29,6 +66,14 @@ async function getViewViaApi(page: Page, pid: string): Promise<any> {
 }
 
 test.describe('Form View (GAP-120)', () => {
+  test.beforeEach(async ({ page }) => {
+    await cleanupFormViews(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupFormViews(page);
+  });
+
   test('FV-001: FORM viewType accepted by API', async ({ page }) => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
@@ -63,8 +108,8 @@ test.describe('Form View (GAP-120)', () => {
   });
 
   test('FV-003: form view renders in browser', async ({ page }) => {
-    await page.goto('/p/e2et_order');
-    await page.getByTestId('row-height-btn').waitFor({ state: 'visible', timeout: 30000 });
+    await navigateToDynamicPage(page, 'e2et_order');
+    await page.getByTestId('view-selector-trigger').waitFor({ state: 'visible', timeout: 5000 });
 
     // Switch to Form view type
     const formBtn = page.getByTestId('view-type-form');
@@ -72,7 +117,7 @@ test.describe('Form View (GAP-120)', () => {
       await formBtn.click();
       // Should show form view or "not configured" message
       const formView = page.getByTestId('form-view');
-      const notConfigured = page.locator('text=Form view not configured');
+      const notConfigured = page.locator('text=表单视图未配置');
       const visible = await Promise.race([
         formView.waitFor({ timeout: 5000 }).then(() => 'form'),
         notConfigured.waitFor({ timeout: 5000 }).then(() => 'not-configured'),
@@ -98,11 +143,11 @@ test.describe('Form View (GAP-120)', () => {
   });
 
   test('FV-005: FORM in VIEW_TYPE_CONFIGS', async ({ page }) => {
-    await page.goto('/p/e2et_order');
-    await page.getByTestId('row-height-btn').waitFor({ state: 'visible', timeout: 30000 });
+    await navigateToDynamicPage(page, 'e2et_order');
+    await page.getByTestId('view-selector-trigger').waitFor({ state: 'visible', timeout: 5000 });
 
-    // Look for Form in view type bar
-    const formOption = page.locator('text=Form').first();
+    // Look for Form in view type bar.
+    const formOption = page.getByText(/表单|Form/).first();
     if (await formOption.isVisible({ timeout: 3000 }).catch(() => false)) {
       expect(await formOption.isVisible()).toBe(true);
     }

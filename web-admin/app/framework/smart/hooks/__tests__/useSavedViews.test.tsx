@@ -72,6 +72,29 @@ describe('useSavedViews', () => {
     expect(result.current.currentView?.pid).toBe('v2');
   });
 
+  it('filters to personal views and ignores non-personal defaults when requested', async () => {
+    const personal = makeView({ pid: 'personal', name: 'My View', scope: 'personal' });
+    const team = makeView({ pid: 'team', name: 'Team View', scope: 'team' });
+    const globalDefault = makeView({
+      pid: 'global',
+      name: 'Global Default',
+      scope: 'global',
+      isDefault: true,
+    });
+    mockService.getAccessibleViews.mockResolvedValue([team, globalDefault, personal]);
+    mockService.getDefaultView.mockResolvedValue(globalDefault);
+
+    const { result } = renderHook(() =>
+      useSavedViews({ modelCode: 'order', scopeFilter: 'personal' }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.views.map((view: SavedView) => view.pid)).toEqual(['personal']);
+    expect(result.current.currentView?.pid).toBe('personal');
+    expect(result.current.groupedViews.team).toEqual([]);
+    expect(result.current.groupedViews.global).toEqual([]);
+  });
+
   it('auto-selects first view when no default view', async () => {
     const v1 = makeView({ pid: 'v1' });
     mockService.getAccessibleViews.mockResolvedValue([v1]);

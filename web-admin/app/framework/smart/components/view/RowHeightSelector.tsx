@@ -18,6 +18,9 @@ export interface RowHeightSelectorProps {
 
 const ROW_HEIGHT_OPTIONS: RowHeight[] = ['short', 'medium', 'tall', 'extra-tall'];
 
+const normalizeRowHeight = (value: unknown): RowHeight =>
+  typeof value === 'string' && value in ROW_HEIGHT_CONFIG ? (value as RowHeight) : DEFAULT_ROW_HEIGHT;
+
 /** Visual indicator: horizontal lines with varying gaps */
 function HeightIcon({ height }: { height: RowHeight }) {
   const gap = height === 'short' ? 2 : height === 'medium' ? 3 : height === 'tall' ? 4 : 5;
@@ -39,7 +42,7 @@ function HeightIcon({ height }: { height: RowHeight }) {
 export const RowHeightSelector: React.FC<RowHeightSelectorProps> = ({ value, onChange }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const current = value || DEFAULT_ROW_HEIGHT;
+  const current = normalizeRowHeight(value);
 
   // Close on click outside
   useEffect(() => {

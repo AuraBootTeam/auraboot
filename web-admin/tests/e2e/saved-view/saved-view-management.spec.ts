@@ -1,311 +1,362 @@
 /**
- * E2E Test: SavedView Management
+ * SavedView Personal-only management golden path.
  *
- * Tests view CRUD operations: create, delete, switch,
- * share, default, duplicate, persistence.
- *
- * @since 7.0.0
+ * API calls in this file are limited to setup/readback/cleanup. User-visible
+ * create, switch, rename, duplicate, set-default, delete, quota, and capability
+ * diagnostics are driven through the actual list-page UI.
  */
 
-import { test, expect, type Page } from '@playwright/test';
-import { ModelTestHelper } from '../../helpers/model-test-helper';
-import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
-import { uniqueId } from '../helpers';
+import { expect, test, type Page } from '@playwright/test';
+import { selectSavedViewByName, uniqueId } from '../helpers';
+import { navigateToOrderViaSidebar } from './helpers';
 
-// Helper to manage views via API
-async function createViewViaApi(
-  page: Page,
-  modelCode: string,
-  name: string,
-  viewType = 'table',
-  scope = 'personal',
-): Promise<string> {
-  const resp = await page.request.post('/api/views', {
-    data: {
-      name,
-      modelCode,
-      viewType,
-      scope,
-      viewConfig: {},
-    },
-  });
-  if (!resp.ok()) return '';
-  const body = await resp.json();
-  return body.data?.pid ?? body.pid ?? '';
+const MODEL_CODE = 'e2et_order';
+const PAGE_KEY = 'e2et_order_list';
+const SHOTS = 'test-results/saved-view-personal-golden';
+const RUN_PREFIX = `SV个人视图${uniqueId()}`;
+const CLEANUP_PREFIXES = [
+  'SV个人视图',
+  'SV Showcase',
+  'TL_',
+  'Modified This Week preset_',
+  'Default View',
+  'E2E Calendar View',
+  'E2E Kanban Board',
+  'E2E Gantt Timeline',
+  'FV_',
+  'SV_Tree_',
+  RUN_PREFIX,
+  'TestView_',
+  'DeleteMe_',
+  'FilterView1_',
+  'FilterView2_',
+  'Personal_',
+  'Global_',
+  'DefaultTest_',
+  'Original_',
+  'Copy_Original_',
+  'Persist_',
+  'SortPersist_',
+  'GroupPersist_',
+  'Density_',
+  'PageSize_',
+  'Frozen_',
+];
+
+interface SavedViewApiRecord {
+  pid: string;
+  name: string;
+  scope?: string;
+  viewType?: string;
+  isDefault?: boolean;
+  viewConfig?: Record<string, unknown>;
 }
 
-async function deleteViewViaApi(
+async function apiJson<T>(page: Page, method: 'get' | 'post' | 'put' | 'delete', url: string, data?: unknown): Promise<T> {
+  const response = await page.request[method](url, data == null ? undefined : { data });
+  if (!response.ok()) {
+    const body = await response.text().catch(() => '<body unavailable>');
+    throw new Error(`${method.toUpperCase()} ${url} failed: ${response.status()} ${body}`);
+  }
+  if (method === 'delete') return undefined as T;
+  const body = await response.json();
+  return (body.data ?? body) as T;
+}
+
+async function listViews(page: Page): Promise<SavedViewApiRecord[]> {
+  const params = new URLSearchParams({ modelCode: MODEL_CODE, pageKey: PAGE_KEY });
+  return apiJson<SavedViewApiRecord[]>(page, 'get', `/api/views/accessible?${params.toString()}`);
+}
+
+async function getView(page: Page, pid: string): Promise<SavedViewApiRecord> {
+  return apiJson<SavedViewApiRecord>(page, 'get', `/api/views/${pid}`);
+}
+
+async function createView(
+  page: Page,
+  name: string,
+  options: Partial<SavedViewApiRecord> = {},
+): Promise<string> {
+  const body = await apiJson<SavedViewApiRecord>(page, 'post', '/api/views', {
+    name,
+    modelCode: MODEL_CODE,
+    pageKey: PAGE_KEY,
+    scope: options.scope ?? 'personal',
+    viewType: options.viewType ?? 'table',
+    viewConfig: options.viewConfig ?? {},
+    isDefault: options.isDefault ?? false,
+  });
+  expect(body.pid, `created view pid for ${name}`).toBeTruthy();
+  return body.pid;
+}
+
+async function deleteView(
   page: Page,
   pid: string,
-  options: { allowMissing?: boolean } = {},
+  options: { bestEffort?: boolean } = {},
 ): Promise<void> {
-  const resp = await page.request.delete(`/api/views/${pid}`);
-  if (resp.ok() || (options.allowMissing && resp.status() === 404)) {
+  const response = await page.request.delete(`/api/views/${pid}`);
+  if (options.bestEffort && (response.ok() || response.status() === 400 || response.status() === 404)) {
     return;
   }
-  const body = await resp.text().catch(() => '<body unavailable>');
-  throw new Error(`deleteViewViaApi(${pid}) failed: HTTP ${resp.status()} ${body}`);
+  if (!response.ok() && response.status() !== 404) {
+    const body = await response.text().catch(() => '<body unavailable>');
+    throw new Error(`DELETE /api/views/${pid} failed: ${response.status()} ${body}`);
+  }
 }
 
-async function listViewsViaApi(page: Page, modelCode: string): Promise<any[]> {
-  const resp = await page.request.get(`/api/views/accessible?modelCode=${modelCode}`);
-  if (!resp.ok()) return [];
-  const body = await resp.json();
-  return body.data ?? [];
+async function cleanupRunViews(page: Page): Promise<void> {
+  const views = await listViews(page).catch(() => []);
+  for (const view of views) {
+    if (view.pid && CLEANUP_PREFIXES.some((prefix) => view.name?.startsWith(prefix))) {
+      await deleteView(page, view.pid, { bestEffort: true });
+    }
+  }
 }
 
-test.describe('SavedView — Management', () => {
-  const createdViewPids: string[] = [];
+async function personalManualViewCount(page: Page): Promise<number> {
+  const views = await listViews(page);
+  return views.filter((view) => view.scope === 'personal' && !(view as any).isImplicit).length;
+}
 
-  test.afterAll(async ({ browser }) => {
-    const page = await browser.newPage();
-    for (const pid of createdViewPids) {
-      await deleteViewViaApi(page, pid, { allowMissing: true }).catch(() => {});
-    }
-    await page.close();
+async function fillPersonalQuota(page: Page): Promise<void> {
+  const currentCount = await personalManualViewCount(page);
+  for (let index = currentCount; index < 10; index += 1) {
+    await createView(page, `${RUN_PREFIX}-配额-${index + 1}`);
+  }
+}
+
+async function openSelector(page: Page): Promise<void> {
+  await page.getByTestId('view-selector-trigger').click();
+  await expect(page.getByTestId('view-selector-search')).toBeVisible();
+}
+
+async function openManagePanel(page: Page): Promise<void> {
+  await openSelector(page);
+  await page.getByTestId('view-selector-manage').click();
+  await expect(page.getByTestId('saved-view-manage-panel')).toBeVisible();
+}
+
+async function clickStableTestId(page: Page, testId: string): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        try {
+          await page.getByTestId(testId).click({ trial: true, timeout: 750 });
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 5000 },
+    )
+    .toBe(true);
+  await page.getByTestId(testId).click({ timeout: 5000 });
+}
+
+async function navigateToPersonalTableView(page: Page, nameSuffix: string): Promise<string> {
+  const viewName = `${RUN_PREFIX}-${nameSuffix}`;
+  const pid = await createView(page, viewName, {
+    viewType: 'table',
+    viewConfig: { rowHeight: 'medium' },
+  });
+  await navigateToOrderViaSidebar(page);
+  expect(await selectSavedViewByName(page, viewName)).toBe(true);
+  await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 5000 });
+  return pid;
+}
+
+async function createTableViewThroughUi(page: Page): Promise<string> {
+  const responsePromise = page.waitForResponse(
+    (response) => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
+    { timeout: 5000 },
+  );
+  await page.getByTestId('saved-view-create-personal').click();
+  await expect(page.getByTestId('saved-view-quota-status')).toContainText('个人视图:');
+  await page.getByTestId('saved-view-type-table').click();
+  const response = await responsePromise;
+  expect(response.ok()).toBeTruthy();
+  const body = await response.json();
+  const pid = body.data?.pid ?? body.pid;
+  expect(pid).toBeTruthy();
+  await expect(page).toHaveURL(new RegExp(`view=${pid}`), { timeout: 5000 });
+  return String(pid);
+}
+
+test.describe.serial('SavedView Personal-only management', () => {
+  test.beforeEach(async ({ page }) => {
+    await cleanupRunViews(page);
   });
 
-  test('SV-050: create new view and name it @smoke', async ({ page }) => {
-    const viewName = `TestView_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName);
-    if (pid) {
-      createdViewPids.push(pid);
-      // Verify view was created
-      const views = await listViewsViaApi(page, 'e2et_order');
-      const found = views.find((v: any) => v.name === viewName);
-      expect(found).toBeTruthy();
-    }
+  test.afterEach(async ({ page }) => {
+    await cleanupRunViews(page);
   });
 
-  test('SV-051: delete custom view @smoke', async ({ page }) => {
-    const viewName = `DeleteMe_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName);
+  test('SV-PER-001: selector and management panel expose only personal views @smoke', async ({ page }) => {
+    const personalName = `${RUN_PREFIX}-选择器`;
+    const globalName = `${RUN_PREFIX}-全员不应出现`;
+    const personalPid = await createView(page, personalName);
+    await createView(page, globalName, { scope: 'global' }).catch(() => '');
+
+    await navigateToOrderViaSidebar(page);
+    await expect(page.getByTestId('dynamic-list')).toBeVisible();
+    await expect(page.getByTestId('quick-filters')).toHaveCount(1);
+    await page.screenshot({ path: `${SHOTS}/01-data-view.png`, fullPage: true });
+
+    await openSelector(page);
+    const selector = page.getByRole('listbox', { name: /选择视图|Select View/ });
+    await expect(selector).toContainText('个人视图');
+    await expect(selector).toContainText(personalName);
+    await expect(selector).not.toContainText(globalName);
+    await expect(selector).not.toContainText(/团队共享|全员视图|Team Views|Global Views|New View|Manage Views/);
+    await page.getByTestId('view-selector-search').fill('选择器');
+    await expect(page.getByTestId(`view-option-${personalPid}`)).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/02-personal-selector.png`, fullPage: true });
+
+    await page.getByTestId('view-selector-manage').click();
+    const panel = page.getByTestId('saved-view-manage-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('管理视图');
+    await expect(panel).toContainText('新建个人视图');
+    await expect(panel).toContainText(personalName);
+    await expect(panel).not.toContainText(globalName);
+    await expect(panel).not.toContainText(/View Management|New View|Configure|Skip|Done|Team Views|Global Views/);
+    await panel.getByTestId('saved-view-manage-search').fill(RUN_PREFIX);
+    await expect(panel).toContainText(personalName);
+    await expect(panel).not.toContainText('Default View');
+    await page.screenshot({ path: `${SHOTS}/03-personal-management.png`, fullPage: true });
+  });
+
+  test('SV-PER-002: create, switch, rename, duplicate, set default, and delete through UI', async ({ page }) => {
+    await navigateToOrderViaSidebar(page);
+    await openManagePanel(page);
+
+    const createdPid = await createTableViewThroughUi(page);
+    const created = await getView(page, createdPid);
+    expect(created.scope).toBe('personal');
+    expect(created.viewType ?? 'table').toBe('table');
+
+    await openManagePanel(page);
+    const renamed = `${RUN_PREFIX}-已重命名`;
+    await page.getByTestId(`saved-view-action-edit-${createdPid}`).click();
+    await page.getByTestId(`saved-view-edit-name-${createdPid}`).fill(renamed);
+    await page.getByTestId(`saved-view-edit-save-${createdPid}`).click();
+    await expect(page.getByTestId(`saved-view-row-${createdPid}`)).toContainText(renamed);
+    expect((await getView(page, createdPid)).name).toBe(renamed);
+
+    const duplicateName = `${RUN_PREFIX}-副本`;
+    const duplicateResponse = page.waitForResponse(
+      (response) => response.request().method() === 'POST' && response.url().includes(`/api/views/${createdPid}/duplicate`),
+      { timeout: 5000 },
+    );
+    await page.getByTestId(`saved-view-action-copy-${createdPid}`).click();
+    await page.getByTestId(`saved-view-duplicate-name-${createdPid}`).fill(duplicateName);
+    await page.getByTestId(`saved-view-duplicate-submit-${createdPid}`).click();
+    const duplicateBody = await (await duplicateResponse).json();
+    const duplicatePid = duplicateBody.data?.pid ?? duplicateBody.pid;
+    expect(duplicatePid).toBeTruthy();
+    await expect(page.getByTestId(`saved-view-row-${duplicatePid}`)).toContainText(duplicateName);
+
+    await page.getByTestId(`saved-view-action-set-default-${duplicatePid}`).click();
+    await expect.poll(async () => (await getView(page, duplicatePid)).isDefault === true).toBe(true);
+
+    await page.getByTestId(`saved-view-select-${createdPid}`).click();
+    await expect(page).toHaveURL(new RegExp(`view=${createdPid}`), { timeout: 5000 });
+
+    await page.getByTestId(`saved-view-action-delete-${createdPid}`).click();
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+    await page.getByTestId('confirm-ok').click();
+    await expect(page.getByTestId(`saved-view-row-${createdPid}`)).toHaveCount(0);
+    await expect.poll(async () => (await listViews(page)).some((view) => view.pid === createdPid)).toBe(false);
+  });
+
+  test('SV-PER-003: personal view local changes can be saved current or as a new personal view', async ({ page }) => {
+    const sourceName = `${RUN_PREFIX}-保存链路`;
+    const sourcePid = await createView(page, sourceName);
+
+    await navigateToOrderViaSidebar(page);
+    await openSelector(page);
+    await page.getByTestId(`view-option-${sourcePid}`).click();
+    await expect(page).toHaveURL(new RegExp(`view=${sourcePid}`), { timeout: 5000 });
+
+    await page.getByTestId('row-height-btn').click();
+    await page.getByTestId('row-height-option-tall').click();
+    await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
+    await expect(page.getByTestId('personal-view-draft-banner')).toContainText('当前个人视图');
+    await page.screenshot({ path: `${SHOTS}/04-personal-draft-save.png`, fullPage: true });
+
+    await page.getByTestId('personal-view-save-current').click();
+    await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
+    await expect.poll(async () => (await getView(page, sourcePid)).viewConfig?.rowHeight).toBe('tall');
+
+    await page.getByTestId('row-height-btn').click();
+    await page.getByTestId('row-height-option-extra-tall').click();
+    await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
+    const createCopyResponse = page.waitForResponse(
+      (response) => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
+      { timeout: 5000 },
+    );
+    await page.getByTestId('personal-view-save-as-new').click();
+    const body = await (await createCopyResponse).json();
+    const copiedPid = body.data?.pid ?? body.pid;
+    expect(copiedPid).toBeTruthy();
+    await expect(page).toHaveURL(new RegExp(`view=${copiedPid}`), { timeout: 5000 });
+    const copied = await getView(page, copiedPid);
+    expect(copied.scope).toBe('personal');
+    expect(copied.name).toContain('副本');
+    expect(copied.viewConfig?.rowHeight).toBe('extra-tall');
+  });
+
+  test('SV-PER-004: quick filter can be saved as a personal view from the toolbar', async ({ page }) => {
+    await navigateToPersonalTableView(page, '快捷筛选表格');
+    await expect(page.getByTestId('quick-filters')).toBeVisible();
+
+    const listReload = page.waitForResponse(
+      (response) => response.url().includes('/api/dynamic/e2et_order/list') && response.status() === 200,
+      { timeout: 5000 },
+    ).catch(() => null);
+    await clickStableTestId(page, 'quick-filter-my_records');
+    await listReload;
+
+    const createResponse = page.waitForResponse(
+      (response) => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views',
+      { timeout: 5000 },
+    );
+    await page.getByTestId('preset-view-save-as-personal').click();
+    const body = await (await createResponse).json();
+    const pid = body.data?.pid ?? body.pid;
     expect(pid).toBeTruthy();
-    if (pid) {
-      createdViewPids.push(pid);
-      await deleteViewViaApi(page, pid);
-      // Verify it's gone
-      const views = await listViewsViaApi(page, 'e2et_order');
-      const found = views.find((v: any) => v.pid === pid);
-      expect(found).toBeFalsy();
-    }
+    await expect(page).toHaveURL(new RegExp(`view=${pid}`), { timeout: 5000 });
+    const savedPreset = await getView(page, pid);
+    expect(savedPreset.scope).toBe('personal');
+    expect(savedPreset.viewConfig?.meta).toMatchObject({ originPresetKey: 'my_records' });
+    await deleteView(page, pid);
   });
 
-  test('SV-052: switching views preserves filter state', async ({ page }) => {
-    // Create two views with different filters
-    const view1Name = `FilterView1_${uniqueId()}`;
-    const view2Name = `FilterView2_${uniqueId()}`;
-    const pid1 = await createViewViaApi(page, 'e2et_order', view1Name);
-    const pid2 = await createViewViaApi(page, 'e2et_order', view2Name);
-    if (pid1) createdViewPids.push(pid1);
-    if (pid2) createdViewPids.push(pid2);
+  test('SV-PER-005: personal quota blocks new views and capability gate explains blocked/degraded views', async ({ page }) => {
+    await navigateToOrderViaSidebar(page);
+    await openManagePanel(page);
+    await page.getByTestId('saved-view-create-personal').click();
+    await page.getByTestId('saved-view-type-gallery').click();
+    await expect(page.getByTestId('view-capability-blocked-gallery')).toBeVisible();
+    await expect(page.getByTestId('view-capability-blocked-gallery')).toContainText(/缺少|图片|附件|封面/);
+    await page.screenshot({ path: `${SHOTS}/05-capability-blocked.png`, fullPage: true });
 
-    // Update view1 with filter config
-    if (pid1) {
-      await page.request.put(`/api/views/${pid1}`, {
-        data: {
-          viewConfig: {
-            filters: [{ fieldCode: 'e2et_order_type', operator: 'eq', value: 'bulk' }],
-          },
-        },
-      });
-    }
-    // Verify the filter was saved
-    if (pid1) {
-      const resp = await page.request.get(`/api/views/${pid1}`);
-      if (resp.ok()) {
-        const body = await resp.json();
-        const viewData = body.data ?? body;
-        const filters = viewData.viewConfig?.filters ?? [];
-        expect(filters.length).toBeGreaterThan(0);
-      }
-    }
-  });
+    await page.getByTestId('saved-view-type-kanban').click();
+    await expect(page.getByTestId('view-capability-degraded-kanban')).toBeVisible();
+    await expect(page.getByTestId('view-capability-degraded-kanban')).toContainText(/拖拽|状态更新/);
+    await page.screenshot({ path: `${SHOTS}/06-capability-degraded-create.png`, fullPage: true });
 
-  test('SV-053: view scope — personal to team to global', async ({ page }) => {
-    // Create views with different scopes
-    const personalView = await createViewViaApi(
-      page,
-      'e2et_order',
-      `Personal_${uniqueId()}`,
-      'table',
-      'personal',
-    );
-    const globalView = await createViewViaApi(
-      page,
-      'e2et_order',
-      `Global_${uniqueId()}`,
-      'table',
-      'global',
-    );
-    if (personalView) createdViewPids.push(personalView);
-    if (globalView) createdViewPids.push(globalView);
-
-    // Verify both accessible
-    const views = await listViewsViaApi(page, 'e2et_order');
-    if (personalView) {
-      expect(views.find((v: any) => v.pid === personalView)).toBeTruthy();
-    }
-    if (globalView) {
-      expect(views.find((v: any) => v.pid === globalView)).toBeTruthy();
-    }
-  });
-
-  test('SV-054: default view cannot be deleted', async ({ page }) => {
-    // Create a view and set as default
-    const viewName = `DefaultTest_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName);
-    if (!pid) return;
-    createdViewPids.push(pid);
-
-    // Set as default
-    const setResp = await page.request.post(`/api/views/${pid}/set-default`);
-    // Now try to delete it — should fail or succeed depending on business rules
-    const delResp = await page.request.delete(`/api/views/${pid}`);
-    // The behavior depends on backend rules - document it
-    expect(delResp.status()).toBeDefined();
-  });
-
-  test('SV-055: duplicate existing view', async ({ page }) => {
-    const originalName = `Original_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', originalName);
-    if (!pid) return;
-    createdViewPids.push(pid);
-
-    const dupName = `Copy_${originalName}`;
-    const dupResp = await page.request.post(`/api/views/${pid}/duplicate`, {
-      data: { name: dupName },
-    });
-    if (dupResp.ok()) {
-      const body = await dupResp.json();
-      const dupPid = body.data?.pid ?? body.pid;
-      if (dupPid) createdViewPids.push(dupPid);
-      // Verify copy exists
-      const views = await listViewsViaApi(page, 'e2et_order');
-      expect(views.find((v: any) => v.name === dupName)).toBeTruthy();
-    }
-  });
-
-  test('SV-056: filter persistence — survives page refresh', async ({ page }) => {
-    const viewName = `Persist_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName);
-    if (!pid) return;
-    createdViewPids.push(pid);
-
-    // Set filter config
-    await page.request.put(`/api/views/${pid}`, {
-      data: {
-        viewConfig: {
-          filters: [{ fieldCode: 'e2et_order_status', operator: 'eq', value: 'draft' }],
-        },
-      },
-    });
-
-    // Fetch again and verify
-    const resp = await page.request.get(`/api/views/${pid}`);
-    expect(resp.ok()).toBe(true);
-    const body = await resp.json();
-    const filters = (body.data ?? body).viewConfig?.filters ?? [];
-    expect(filters.length).toBe(1);
-    expect(filters[0].fieldCode).toBe('e2et_order_status');
-  });
-
-  test('SV-057: sort persistence', async ({ page }) => {
-    const viewName = `SortPersist_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName);
-    if (!pid) return;
-    createdViewPids.push(pid);
-
-    await page.request.put(`/api/views/${pid}`, {
-      data: {
-        viewConfig: {
-          sorts: [{ fieldCode: 'e2et_order_title', direction: 'asc' }],
-        },
-      },
-    });
-
-    const resp = await page.request.get(`/api/views/${pid}`);
-    const body = await resp.json();
-    const sorts = (body.data ?? body).viewConfig?.sorts ?? [];
-    expect(sorts.length).toBe(1);
-  });
-
-  test('SV-058: groupBy persistence', async ({ page }) => {
-    const viewName = `GroupPersist_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName);
-    if (!pid) return;
-    createdViewPids.push(pid);
-
-    await page.request.put(`/api/views/${pid}`, {
-      data: {
-        viewConfig: {
-          groupByField: 'e2et_order_status',
-        },
-      },
-    });
-
-    const resp = await page.request.get(`/api/views/${pid}`);
-    const body = await resp.json();
-    const groupByField = (body.data ?? body).viewConfig?.groupByField;
-    expect(groupByField).toBe('e2et_order_status');
-  });
-
-  test('SV-059: density setting (compact/default/comfortable)', async ({ page }) => {
-    const viewName = `Density_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName);
-    if (!pid) return;
-    createdViewPids.push(pid);
-
-    for (const density of ['compact', 'default', 'comfortable']) {
-      await page.request.put(`/api/views/${pid}`, {
-        data: { viewConfig: { density } },
-      });
-      const resp = await page.request.get(`/api/views/${pid}`);
-      const body = await resp.json();
-      expect((body.data ?? body).viewConfig?.density).toBe(density);
-    }
-  });
-
-  test('SV-060: page size setting', async ({ page }) => {
-    const viewName = `PageSize_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName);
-    if (!pid) return;
-    createdViewPids.push(pid);
-
-    await page.request.put(`/api/views/${pid}`, {
-      data: {
-        viewConfig: {
-          pagination: { pageSize: 25 },
-        },
-      },
-    });
-
-    const resp = await page.request.get(`/api/views/${pid}`);
-    const body = await resp.json();
-    expect((body.data ?? body).viewConfig?.pagination?.pageSize).toBe(25);
-  });
-
-  test('SV-061: frozen column setting', async ({ page }) => {
-    const viewName = `Frozen_${uniqueId()}`;
-    const pid = await createViewViaApi(page, 'e2et_order', viewName);
-    if (!pid) return;
-    createdViewPids.push(pid);
-
-    await page.request.put(`/api/views/${pid}`, {
-      data: {
-        viewConfig: {
-          columns: [
-            { fieldCode: 'e2et_order_no', visible: true, frozen: true },
-            { fieldCode: 'e2et_order_title', visible: true },
-          ],
-        },
-      },
-    });
-
-    const resp = await page.request.get(`/api/views/${pid}`);
-    const body = await resp.json();
-    const columns = (body.data ?? body).viewConfig?.columns ?? [];
-    const frozenCol = columns.find((c: any) => c.fieldCode === 'e2et_order_no');
-    expect(frozenCol?.frozen).toBe(true);
+    await cleanupRunViews(page);
+    await fillPersonalQuota(page);
+    await page.reload();
+    await expect(page.getByTestId('view-selector-trigger')).toBeVisible({ timeout: 5000 });
+    await navigateToOrderViaSidebar(page);
+    await openManagePanel(page);
+    await page.getByTestId('saved-view-create-personal').click();
+    await expect(page.getByTestId('saved-view-quota-status')).toContainText('个人视图: 10/10');
+    await expect(page.getByTestId('saved-view-quota-limit-reached')).toContainText('已达到个人视图上限');
+    await expect(page.getByTestId('saved-view-type-table')).toBeDisabled();
+    await page.screenshot({ path: `${SHOTS}/07-personal-quota.png`, fullPage: true });
   });
 });

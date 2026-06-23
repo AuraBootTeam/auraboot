@@ -76,14 +76,14 @@ export const GanttConfigPanel: React.FC<GanttConfigPanelProps> = ({
       {/* Start Date Field (required) */}
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">
-          Start Date Field <span className="text-red-500">*</span>
+          开始日期字段 <span className="text-red-500">*</span>
         </label>
         <select
           value={viewConfig.ganttStartDateField || ''}
           onChange={(e) => handleFieldChange('ganttStartDateField', e.target.value)}
           className={selectClass}
         >
-          <option value="">Select start date field...</option>
+          <option value="">选择开始日期字段...</option>
           {(dateFields.length > 0 ? dateFields : fields).map((f) => (
             <option key={f.code} value={f.code}>
               {f.name || f.code}
@@ -95,14 +95,14 @@ export const GanttConfigPanel: React.FC<GanttConfigPanelProps> = ({
       {/* End Date Field (required) */}
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">
-          End Date Field <span className="text-red-500">*</span>
+          结束日期字段 <span className="text-red-500">*</span>
         </label>
         <select
           value={viewConfig.ganttEndDateField || ''}
           onChange={(e) => handleFieldChange('ganttEndDateField', e.target.value)}
           className={selectClass}
         >
-          <option value="">Select end date field...</option>
+          <option value="">选择结束日期字段...</option>
           {(dateFields.length > 0 ? dateFields : fields).map((f) => (
             <option key={f.code} value={f.code}>
               {f.name || f.code}
@@ -113,13 +113,13 @@ export const GanttConfigPanel: React.FC<GanttConfigPanelProps> = ({
 
       {/* Title Field */}
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-600">Title Field</label>
+        <label className="mb-1 block text-xs font-medium text-gray-600">标题字段</label>
         <select
           value={viewConfig.ganttTitleField || ''}
           onChange={(e) => handleFieldChange('ganttTitleField', e.target.value)}
           className={selectClass}
         >
-          <option value="">Default (name)</option>
+          <option value="">默认名称字段</option>
           {fields.map((f) => (
             <option key={f.code} value={f.code}>
               {f.name || f.code}
@@ -131,14 +131,14 @@ export const GanttConfigPanel: React.FC<GanttConfigPanelProps> = ({
       {/* Progress Field */}
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">
-          Progress Field (0-100)
+          进度字段（0-100）
         </label>
         <select
           value={viewConfig.ganttProgressField || ''}
           onChange={(e) => handleFieldChange('ganttProgressField', e.target.value)}
           className={selectClass}
         >
-          <option value="">None</option>
+          <option value="">不设置</option>
           {(numberFields.length > 0 ? numberFields : fields).map((f) => (
             <option key={f.code} value={f.code}>
               {f.name || f.code}
@@ -149,13 +149,13 @@ export const GanttConfigPanel: React.FC<GanttConfigPanelProps> = ({
 
       {/* Dependency Field */}
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-600">Dependency Field</label>
+        <label className="mb-1 block text-xs font-medium text-gray-600">依赖字段</label>
         <select
           value={viewConfig.ganttDependencyField || ''}
           onChange={(e) => handleFieldChange('ganttDependencyField', e.target.value)}
           className={selectClass}
         >
-          <option value="">None</option>
+          <option value="">不设置</option>
           {fields.map((f) => (
             <option key={f.code} value={f.code}>
               {f.name || f.code}
@@ -166,15 +166,15 @@ export const GanttConfigPanel: React.FC<GanttConfigPanelProps> = ({
 
       {/* Default View Mode */}
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-600">Default View</label>
+        <label className="mb-1 block text-xs font-medium text-gray-600">默认视图</label>
         <select
           value={viewConfig.ganttDefaultView || 'Day'}
           onChange={(e) => handleFieldChange('ganttDefaultView', e.target.value)}
           className={selectClass}
         >
-          <option value="Day">Day</option>
-          <option value="Week">Week</option>
-          <option value="Month">Month</option>
+          <option value="Day">日</option>
+          <option value="Week">周</option>
+          <option value="Month">月</option>
         </select>
       </div>
     </div>

@@ -207,8 +207,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     return (
       <ViewEmptyState
         variant="not-configured"
-        title="Timeline view not configured"
-        description="Set start date and resource fields."
+        title="时间线视图未配置"
+        description="请设置开始日期字段和泳道字段。"
         onConfigure={onOpenViewConfig}
         onSwitchToTableView={onSwitchToTableView}
         className={className}
@@ -337,17 +337,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             totalRecords={diagnostics.totalRecords}
             validRecords={diagnostics.validRecords}
             categories={[
-              { key: 'missing_both', label: 'Missing both dates', count: diagnostics.missingBoth },
+              { key: 'missing_both', label: '缺少开始和结束日期', count: diagnostics.missingBoth },
               {
                 key: 'missing_start',
-                label: 'Missing start date',
+                label: '缺少开始日期',
                 count: diagnostics.missingStart,
               },
-              { key: 'missing_end', label: 'Missing end date', count: diagnostics.missingEnd },
-              { key: 'invalid_date', label: 'Invalid date value', count: diagnostics.invalidDate },
+              { key: 'missing_end', label: '缺少结束日期', count: diagnostics.missingEnd },
+              { key: 'invalid_date', label: '日期值无效', count: diagnostics.invalidDate },
             ]}
             issues={issueRecords}
-            fieldMapping={{ 'Start Field': startField!, 'End Field': endField! }}
+            fieldMapping={{ 开始字段: startField!, 结束字段: endField! }}
             onRecordClick={onItemClick}
             onOpenViewConfig={onOpenViewConfig}
             onSwitchToTableView={onSwitchToTableView}

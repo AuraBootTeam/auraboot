@@ -274,8 +274,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return (
       <ViewEmptyState
         variant="not-configured"
-        title="Calendar not configured"
-        description="Please configure the Date Field to display the calendar view."
+        title="日历视图未配置"
+        description="请配置日期字段后再显示日历视图。"
         onConfigure={onOpenViewConfig}
         onSwitchToTableView={onSwitchToTableView}
         className={className}

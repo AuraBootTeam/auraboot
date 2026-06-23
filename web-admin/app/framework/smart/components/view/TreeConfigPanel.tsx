@@ -65,14 +65,14 @@ export const TreeConfigPanel: React.FC<TreeConfigPanelProps> = ({
       {/* Parent Field (required) */}
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">
-          Parent Field <span className="text-red-500">*</span>
+          父级字段 <span className="text-red-500">*</span>
         </label>
         <select
           value={viewConfig.treeParentField || ''}
           onChange={(e) => handleFieldChange('treeParentField', e.target.value)}
           className={selectClass}
         >
-          <option value="">Select parent field...</option>
+          <option value="">选择父级字段...</option>
           {(referenceFields.length > 0 ? referenceFields : fields).map((f) => (
             <option key={f.code} value={f.code}>
               {f.name || f.code}
@@ -83,13 +83,13 @@ export const TreeConfigPanel: React.FC<TreeConfigPanelProps> = ({
 
       {/* Title Field */}
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-600">Title Field</label>
+        <label className="mb-1 block text-xs font-medium text-gray-600">标题字段</label>
         <select
           value={viewConfig.treeTitleField || ''}
           onChange={(e) => handleFieldChange('treeTitleField', e.target.value)}
           className={selectClass}
         >
-          <option value="">Default (name)</option>
+          <option value="">默认名称字段</option>
           {fields.map((f) => (
             <option key={f.code} value={f.code}>
               {f.name || f.code}
@@ -101,7 +101,7 @@ export const TreeConfigPanel: React.FC<TreeConfigPanelProps> = ({
       {/* Display Fields (multi-select checkboxes) */}
       {fields.length > 0 && (
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Display Fields</label>
+          <label className="mb-1 block text-xs font-medium text-gray-600">显示字段</label>
           <div className="max-h-32 space-y-1 overflow-y-auto rounded-md border border-gray-200 p-2">
             {fields.map((f) => (
               <label

@@ -70,11 +70,11 @@ describe('savedViewPersistence', () => {
   });
 
   it('builds a stable default name for a personal copy', () => {
-    expect(buildPersonalCopyName('Team Board')).toBe('Team Board - My Copy');
-    expect(buildPersonalCopyName('')).toBe('View - My Copy');
+    expect(buildPersonalCopyName('我的视图')).toBe('我的视图 副本');
+    expect(buildPersonalCopyName('')).toBe('视图 副本');
   });
 
-  it('summarizes local shared-view changes by config section', () => {
+  it('summarizes local view changes by config section in user-facing Chinese', () => {
     expect(
       summarizeViewConfigPatch({
         filters: [{ fieldCode: 'status', operator: 'eq', value: 'active' }],
@@ -85,6 +85,6 @@ describe('savedViewPersistence', () => {
         ],
         rowHeight: 'tall',
       }),
-    ).toEqual(['filters 1', 'sorts 1', 'columns 2', 'row height']);
+    ).toEqual(['筛选 1 项', '排序 1 项', '字段 2 项', '行高']);
   });
 });

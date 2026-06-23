@@ -12,6 +12,15 @@ relates_to:
 
 # SavedView Post-PR Follow-up Gap Tracker
 
+> 2026-06-23 baseline 重置：后续 SavedView 开发必须以
+> `docs/plans/2026-06/2026-06-23-saved-view-endgame-baseline.md`
+> 作为 release-candidate baseline。下方 DONE 行只代表局部能力实现历史，
+> 不能再作为 enterprise 长期 mockup 或完整管理链路已完成的结论。
+>
+> 2026-06-23 scope 收口：当前 release 改为 Personal-only。下方涉及
+> team/global、协作者、共享保存、team quota、audit 的 DONE/证据行保留为
+> 历史能力记录，不进入本期开发验收，也不能阻塞个人视图链路收口。
+
 ## Context
 
 SavedView Feishu parity has been split into a stacked delivery:
@@ -28,6 +37,36 @@ This document tracks follow-up gaps that remain after PR `#1028`. It is intentio
 Related PR: `https://github.com/AuraBootTeam/auraboot/pull/1028`
 
 Dynamic business record pid-only migration has been removed from this SavedView tracker because it is owned by another workspace and is not a blocker for the SavedView feature completion decision.
+
+## 2026-06-23 Personal-only Release Convergence
+
+本轮在 `codex/saved-view-endgame-baseline` 上重新收口后，当前 SavedView 发布判断改为 Personal-only：
+
+- 已完成：个人视图新建、切换、保存当前变更、另存为新视图、重命名、复制、删除、设为默认。
+- 已完成：快捷筛选另存为个人视图，且快捷筛选只保留在 toolbar，不再出现重复按钮区。
+- 已完成：个人视图配额 10 个；达到上限时禁用新建并给出清理提示。
+- 已完成：高级视图 capability gate；blocked 不可保存，degraded 有明确中文说明。
+- 已完成：管理链路中文化，当前 golden 不再接受 `View Management` / `New View` / `Configure` / `Skip` / `Done` 旧英文控制链路。
+- 已完成：Personal-only golden 截图 7 张，路径为 `web-admin/test-results/saved-view-personal-golden/*.png`。
+
+本期不再追踪为阻塞项：
+
+| Roadmap item | Current treatment |
+| --- | --- |
+| Team/global scope selector | 后续单独 scope，当前 UI 不展示 |
+| Shared save diff confirmation | 依赖 team/global source views，当前不做 |
+| Collaborator management | 历史能力证据保留，当前 release 不展示 |
+| Shared audit UI | 历史能力证据保留，当前 release 不展示 |
+| Team/global quota 20 | 后续 team/global 创建流程重开后再验收 |
+| Platform dynamic record pid-only migration | 已移出 SavedView tracker，由其他工作区处理 |
+
+当前完成证据同步到：
+
+- `docs/plans/2026-06/2026-06-23-saved-view-endgame-baseline.md`
+- `web-admin/tests/e2e/saved-view/FEATURE_MATRIX.md`
+- `docs/core-concepts/pages-and-layouts.md`
+
+后续如果重新打开团队/全员能力，必须新开 scope 文档和 E2E 矩阵，不能复用本期 Personal-only 完成口径。
 
 ## Scope Boundary And Source Of Truth
 

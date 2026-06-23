@@ -75,14 +75,13 @@ test.describe('SavedView — GALLERY View', () => {
     });
 
     const panel = await openSavedViewManagePanel(page);
-    await panel.getByRole('button', { name: /New View/i }).click();
-    await expect(panel.getByText('Choose type')).toBeVisible();
-    await panel.locator('.grid button').filter({ hasText: 'Gallery' }).click();
+    await panel.getByTestId('saved-view-create-personal').click();
+    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图:');
+    await panel.getByTestId('saved-view-type-gallery').click();
 
     const blocked = panel.getByTestId('view-capability-blocked-gallery');
     await expect(blocked).toBeVisible({ timeout: 5000 });
-    await expect(blocked).toContainText(/image|file|attachment|avatar|cover/i);
-    await expect(panel.locator('[role="alert"]').first()).toContainText(/Gallery requires/i);
+    await expect(blocked).toContainText(/缺少|图片|附件|头像|封面/);
     expect(createRequests).toHaveLength(0);
 
     await mkdir(SCREENSHOT_DIR, { recursive: true });
@@ -111,17 +110,16 @@ test.describe('SavedView — GALLERY View', () => {
     });
 
     const panel = await openSavedViewManagePanel(page);
-    await panel.getByRole('button', { name: /New View/i }).click();
-    await expect(panel.getByText('Choose type')).toBeVisible();
-    await panel.locator('.grid button').filter({ hasText: 'Gallery' }).click();
+    await panel.getByTestId('saved-view-create-personal').click();
+    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图:');
+    await panel.getByTestId('saved-view-type-gallery').click();
 
-    await expect(panel.getByText(/Configure Gallery View/i)).toBeVisible({ timeout: 5000 });
-    const selects = panel.locator('select');
-    await selects.first().selectOption(GALLERY_IMAGE_FIELD);
-    await selects.nth(1).selectOption(GALLERY_TITLE_FIELD);
+    await expect(panel.getByText(/配置画册视图/)).toBeVisible({ timeout: 5000 });
+    await panel.getByTestId('saved-view-config-field-galleryImageField').selectOption(GALLERY_IMAGE_FIELD);
+    await panel.getByTestId('saved-view-config-field-galleryTitleField').selectOption(GALLERY_TITLE_FIELD);
 
-    const done = panel.getByRole('button', { name: /^Done$/i });
-    await expect(done).toBeEnabled();
+    const save = panel.getByTestId('saved-view-config-save');
+    await expect(save).toBeEnabled();
 
     const createResponsePromise = page.waitForResponse(
       (response) =>
@@ -130,7 +128,7 @@ test.describe('SavedView — GALLERY View', () => {
       { timeout: 10000 },
     );
 
-    await done.click();
+    await save.click();
     const createResponse = await createResponsePromise;
     expect(createResponse.ok(), `create Gallery view failed: ${createResponse.status()}`).toBe(true);
 

@@ -222,6 +222,8 @@ export interface ViewConfigMeta {
   originPresetKey?: string;
   /** Optional capability state captured at import/build time */
   capabilityStatus?: string;
+  /** Stable capability reason codes captured at import/build time */
+  capabilityReasonCodes?: string[];
   /** Per-view collaborator ACL for shared team views */
   collaborators?: ViewCollaboratorAcl[];
 }

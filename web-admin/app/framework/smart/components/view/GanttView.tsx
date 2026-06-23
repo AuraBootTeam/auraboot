@@ -381,8 +381,8 @@ export const GanttView: React.FC<GanttViewProps> = ({
     return (
       <ViewEmptyState
         variant="not-configured"
-        title="Gantt chart not configured"
-        description="Please configure Start Date Field and End Date Field to display the Gantt view."
+        title="甘特图未配置"
+        description="请配置开始日期字段和结束日期字段后再显示甘特图。"
         onConfigure={onOpenViewConfig}
         onSwitchToTableView={onSwitchToTableView}
         className={className}
@@ -457,9 +457,8 @@ export const GanttView: React.FC<GanttViewProps> = ({
           data-testid="gantt-config-warning"
           className="mx-4 mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
         >
-          Gantt configuration warning: Start Date Field and End Date Field are both
-          <span className="font-semibold"> {startDateField}</span>. You usually need two different
-          fields.
+          甘特图配置提醒：开始日期字段和结束日期字段都使用
+          <span className="font-semibold"> {startDateField}</span>。通常需要选择两个不同字段。
         </div>
       )}
 
@@ -487,16 +486,16 @@ export const GanttView: React.FC<GanttViewProps> = ({
             totalRecords={diagnostics.totalRecords}
             validRecords={diagnostics.validRecords}
             categories={[
-              { key: 'missing_both', label: 'Missing both dates', count: diagnostics.missingBoth },
+              { key: 'missing_both', label: '缺少开始和结束日期', count: diagnostics.missingBoth },
               {
                 key: 'missing_start',
-                label: 'Missing start date',
+                label: '缺少开始日期',
                 count: diagnostics.missingStartOnly,
               },
-              { key: 'missing_end', label: 'Missing end date', count: diagnostics.missingEndOnly },
+              { key: 'missing_end', label: '缺少结束日期', count: diagnostics.missingEndOnly },
               {
                 key: 'invalid_date',
-                label: 'Invalid date value',
+                label: '日期值无效',
                 count: diagnostics.invalidDateRecords,
               },
             ]}
@@ -506,7 +505,7 @@ export const GanttView: React.FC<GanttViewProps> = ({
               reason: ir.reason,
               details: { startValue: ir.startValue, endValue: ir.endValue },
             }))}
-            fieldMapping={{ 'Start Date': startDateField!, 'End Date': endDateField! }}
+            fieldMapping={{ 开始日期: startDateField!, 结束日期: endDateField! }}
             onRecordClick={onTaskClick}
             onOpenViewConfig={onOpenViewConfig}
             onSwitchToTableView={onSwitchToTableView}
