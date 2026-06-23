@@ -5,6 +5,13 @@
   "description": "Schema for AuraBoot unified plugin package manifest (plugin.json)",
   "type": "object",
   "required": ["pluginId", "namespace", "version"],
+  "allOf": [
+    {
+      "not": {
+        "required": ["entryPoint"]
+      }
+    }
+  ],
   "properties": {
     "pluginId": {
       "type": "string",
@@ -109,7 +116,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["model", "command", "query", "automation", "api"],
+            "enum": ["model", "field", "dict", "command", "process", "query", "automation", "api"],
             "description": "Capability type"
           },
           "code": {
@@ -129,7 +136,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["model", "command", "query", "automation", "api"],
+            "enum": ["model", "field", "dict", "command", "process", "query", "automation", "api"],
             "description": "Required capability type"
           },
           "code": {
@@ -174,10 +181,6 @@
         "type": "string"
       }
     },
-    "entryPoint": {
-      "type": "string",
-      "description": "Plugin entry point class name (fully qualified)"
-    },
     "metadata": {
       "type": "object",
       "description": "Additional metadata"
@@ -190,14 +193,23 @@
         "fields": { "type": "string" },
         "models": { "type": "string" },
         "modelFieldBindings": { "type": "string" },
+        "bindings": { "type": "string" },
         "commands": { "type": "string" },
+        "bindingRules": { "type": "string" },
         "processes": { "type": "string" },
         "permissions": { "type": "string" },
         "roles": { "type": "string" },
         "menus": { "type": "string" },
         "pages": { "type": "string" },
+        "dashboards": { "type": "string" },
         "reports": { "type": "string" },
         "namedQueries": { "type": "string" },
+        "rules": { "type": "string" },
+        "sla": { "type": "string" },
+        "savedViews": { "type": "string" },
+        "fieldMasks": { "type": "string" },
+        "i18n": { "type": "string" },
+        "defaultBootstrap": { "type": "string" },
         "data": { "type": "string" }
       },
       "additionalProperties": false
@@ -302,6 +314,7 @@
     "backend": {
       "type": "object",
       "description": "Backend plugin configuration",
+      "required": ["jarPath", "entryClass"],
       "properties": {
         "jarPath": {
           "type": "string",
@@ -310,16 +323,6 @@
         "entryClass": {
           "type": "string",
           "description": "Canonical fully qualified class name of the plugin entry class"
-        },
-        "jarFile": {
-          "type": "string",
-          "deprecated": true,
-          "description": "Deprecated alias for jarPath"
-        },
-        "entryPoint": {
-          "type": "string",
-          "deprecated": true,
-          "description": "Deprecated alias for entryClass"
         }
       },
       "additionalProperties": false
@@ -451,6 +454,21 @@
           "type": "boolean",
           "default": false,
           "description": "Whether to auto-publish page definitions"
+        },
+        "autoPublishModels": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to auto-publish model definitions"
+        },
+        "autoPublishFields": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to auto-publish field definitions"
+        },
+        "autoPublishCommands": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to auto-publish command definitions"
         }
       },
       "additionalProperties": false

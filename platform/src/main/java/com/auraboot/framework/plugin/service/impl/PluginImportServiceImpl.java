@@ -1441,7 +1441,6 @@ public class PluginImportServiceImpl implements PluginImportService {
                 .requiredPermissions(extended.getRequiredPermissions())
                 .providedModels(extended.getProvidedModels())
                 .providedCommands(extended.getProvidedCommands())
-                .entryPoint(extended.getEntryPoint())
                 .metadata(extended.getMetadata())
                 .build();
     }

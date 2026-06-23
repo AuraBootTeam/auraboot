@@ -15,10 +15,6 @@ export interface PluginManifest {
   backend?: {
     jarPath?: string;
     entryClass?: string;
-    /** @deprecated Use backend.jarPath. */
-    jarFile?: string;
-    /** @deprecated Use backend.entryClass. */
-    entryPoint?: string;
   };
 }
 
