@@ -43,7 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Reflection trail: ida/docs/25 §3.1 (80% of session bugs traced to
  * missing runtime smoke gate); ida/docs/23 §B.5.1.
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
         classes = TestApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.NONE

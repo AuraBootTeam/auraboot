@@ -38,8 +38,9 @@ class AddCommentActionHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     void addCommentAction_persistsRecordComment_viaRealService() throws Exception {
         String code = "it_comment_" + System.nanoTime();
+        String targetKey = code + "_form";
         String recordPid = "CMP-CMT-" + System.nanoTime();
-        definitionService.create(code, "Comment IT", "FORM_SUBMITTED", "FORM", "complaint");
+        definitionService.create(code, "Comment IT", "FORM_SUBMITTED", "FORM", targetKey);
         JsonNode rules = mapper.readTree("""
             [{"ruleCode":"R-CMT","ruleName":"comment high","priority":100,"enabled":true,
               "condition":{"type":"compare",
@@ -56,8 +57,10 @@ class AddCommentActionHandlerIntegrationTest extends BaseIntegrationTest {
         versionService.publish(draft.getPid());
 
         Long tid = getTestTenant().getId();
-        EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", "complaint",
-                Map.of("record", Map.of("entityCode", "complaint", "recordId", recordPid,
+        EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
+                Map.of("record", Map.of(
+                        "entityCode", targetKey,
+                        "recordId", recordPid,
                         "data", Map.of("priority", "HIGH"))));
 
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");
@@ -68,6 +71,6 @@ class AddCommentActionHandlerIntegrationTest extends BaseIntegrationTest {
                 "select content, model_code from ab_record_comment where tenant_id=? and record_pid=?",
                 tid, recordPid);
         assertThat(c.get("content")).isEqualTo("auto: high-priority — please triage");
-        assertThat(c.get("model_code")).isEqualTo("complaint");
+        assertThat(c.get("model_code")).isEqualTo(targetKey);
     }
 }

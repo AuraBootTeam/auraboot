@@ -124,19 +124,15 @@ class CloudConfigSeederEnvProvisionTest {
     }
 
     @Test
-    @DisplayName("env set, provider absent AND no known default → skipped (no guessed config)")
-    void skipsWhenAbsentAndUnknown() {
-        // seed_llm_minimaxi has an env mapping but no LLM_PROVIDER_SEEDS default,
-        // so an absent row cannot be synthesized.
+    @DisplayName("unregistered env provider → skipped (no guessed config)")
+    void skipsWhenEnvProviderIsNotRegistered() {
+        // MINIMAX_API_KEY is not in LLM_PROVIDER_ENV_KEYS. Setting an arbitrary
+        // env var must not make the seeder guess provider rows or config shape.
         env.put("MINIMAX_API_KEY", "sk-minimax");
-        when(jdbcTemplate.queryForList(eq(SELECT_SQL), eq(String.class), eq("seed_llm_minimaxi")))
-                .thenReturn(List.of());
 
         seeder.provisionLlmApiKeysFromEnv();
 
-        verify(jdbcTemplate, times(1))
-                .queryForList(eq(SELECT_SQL), eq(String.class), eq("seed_llm_minimaxi"));
-        verify(jdbcTemplate, never()).update(eq(UPDATE_SQL), any(), any());
+        verifyNoInteractions(jdbcTemplate);
     }
 
     @Test

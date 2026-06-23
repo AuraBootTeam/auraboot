@@ -40,7 +40,8 @@ class NotifyActionHandlerIntegrationTest extends BaseIntegrationTest {
     void notifyAction_persistsInAppNotification_viaRealNotificationService() throws Exception {
         long userId = 880000L + (System.nanoTime() % 100000);
         String code = "it_notify_" + System.nanoTime();
-        definitionService.create(code, "Notify IT", "FORM_SUBMITTED", "FORM", "complaint");
+        String targetKey = code + "_form";
+        definitionService.create(code, "Notify IT", "FORM_SUBMITTED", "FORM", targetKey);
         JsonNode rules = mapper.readTree("""
             [{"ruleCode":"R-NOTIFY","ruleName":"notify high","priority":100,"enabled":true,
               "condition":{"type":"compare",
@@ -57,8 +58,8 @@ class NotifyActionHandlerIntegrationTest extends BaseIntegrationTest {
         versionService.publish(draft.getPid());
 
         Long tid = getTestTenant().getId();
-        EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", "complaint",
-                Map.of("record", Map.of("entityCode", "complaint", "recordId", "CMP-N-1",
+        EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
+                Map.of("record", Map.of("entityCode", targetKey, "recordId", "CMP-N-1",
                         "data", Map.of("priority", "HIGH"))));
 
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");

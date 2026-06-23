@@ -26,6 +26,7 @@ import {
   useDataSourceSubscription,
   writeRuntimeState,
 } from './workbenchBlockUtils';
+import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 
 export interface TableBlockRendererProps {
   block: BlockConfig;
@@ -528,10 +529,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                toggleExpand(row.pid || row.id);
+                                toggleExpand(getLegacyCompatibleRecordPid(row) || '');
                               }}
                               className="text-text-3 hover:text-text-2 flex h-4 w-4 items-center justify-center"
-                              data-testid={`tree-toggle-${row.pid || row.id}`}
+                              data-testid={`tree-toggle-${getLegacyCompatibleRecordPid(row)}`}
                             >
                               {row._expanded ? '▼' : '▶'}
                             </button>

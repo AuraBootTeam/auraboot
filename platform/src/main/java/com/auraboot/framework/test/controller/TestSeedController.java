@@ -404,12 +404,20 @@ public class TestSeedController {
             }
             jdbcTemplate.update("""
                     DELETE FROM mt_showcase_all_fields
-                    WHERE tenant_id = ?
-                      AND pid IN (
+                    WHERE pid IN (
                         'mobile_showcase_iot_gateway',
                         'mobile_showcase_flexible_pc',
                         'mobile_showcase_sensor_module',
                         'mobile_showcase_power_unit'
+                    )
+                    OR (
+                        tenant_id = ?
+                        AND sc_code IN (
+                            'SC-20260513-005',
+                            'SC-20260513-006',
+                            'SC-20260513-004',
+                            'SC-20260513-007'
+                        )
                     )
                     """, tenant.getId());
 

@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'maven-publish'
 }
 
 group = 'com.auraboot'
@@ -67,4 +68,17 @@ compileJava {
 
 test {
     useJUnitPlatform()
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'platform-mq-kafka'
+        }
+    }
+
+    repositories {
+        mavenLocal()
+    }
 }

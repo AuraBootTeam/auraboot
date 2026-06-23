@@ -2,6 +2,7 @@ package com.auraboot.framework.crm.service;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,31 @@ class CrmPrimaryContactServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @BeforeEach
+    void ensureCrmContactTable() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS mt_crm_contact (
+                    id BIGSERIAL PRIMARY KEY,
+                    pid VARCHAR(64) UNIQUE NOT NULL,
+                    tenant_id BIGINT NOT NULL,
+                    crm_ct_account_id VARCHAR(128),
+                    crm_ct_name VARCHAR(255),
+                    crm_ct_email VARCHAR(255),
+                    crm_ct_is_primary BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+                )
+                """);
+        jdbcTemplate.execute("ALTER TABLE mt_crm_contact ADD COLUMN IF NOT EXISTS crm_ct_account_id VARCHAR(128)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_contact ADD COLUMN IF NOT EXISTS crm_ct_name VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_contact ADD COLUMN IF NOT EXISTS crm_ct_email VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_contact ADD COLUMN IF NOT EXISTS crm_ct_is_primary BOOLEAN DEFAULT FALSE");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_contact ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_contact ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_contact ADD COLUMN IF NOT EXISTS deleted_flag BOOLEAN NOT NULL DEFAULT FALSE");
+    }
 
     @Test
     @DisplayName("CRM primary contact normalization demotes other primaries under the same account")
