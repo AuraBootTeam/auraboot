@@ -52,6 +52,7 @@ interface SavedViewApiRecord {
   scope?: string;
   viewType?: string;
   isDefault?: boolean;
+  isImplicit?: boolean;
   viewConfig?: Record<string, unknown>;
 }
 
@@ -111,7 +112,10 @@ async function deleteView(
 async function cleanupRunViews(page: Page): Promise<void> {
   const views = await listViews(page).catch(() => []);
   for (const view of views) {
-    if (view.pid && CLEANUP_PREFIXES.some((prefix) => view.name?.startsWith(prefix))) {
+    if (
+      view.pid &&
+      (view.isImplicit || CLEANUP_PREFIXES.some((prefix) => view.name?.startsWith(prefix)))
+    ) {
       await deleteView(page, view.pid, { bestEffort: true });
     }
   }
@@ -341,6 +345,40 @@ test.describe.serial('SavedView Personal-only management', () => {
     );
     await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
     await expect(page).not.toHaveURL(/sort=/);
+  });
+
+  test('SV-PER-003c: default view column context hide updates immediately and persists', async ({ page }) => {
+    const fieldCode = 'e2et_order_title';
+
+    await navigateToOrderViaSidebar(page);
+    await expect(page.getByTestId('dynamic-list')).toBeVisible();
+    await expect(page.getByTestId(`table-header-${fieldCode}`)).toBeVisible();
+
+    const header = page.getByTestId(`table-header-${fieldCode}`);
+    const menuTrigger = header.locator('button');
+    await expect(menuTrigger).toHaveCount(1);
+    await menuTrigger.click({ force: true });
+    await expect(page.getByTestId('column-context-menu')).toBeVisible();
+    await page.getByTestId('column-context-menu-hide-column').click();
+
+    await expect(page.getByTestId('column-context-menu')).toHaveCount(0);
+    await expect(page.getByTestId(`table-header-${fieldCode}`)).toHaveCount(0);
+    await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
+
+    await expect
+      .poll(async () => {
+        const implicitView = (await listViews(page)).find((view) => view.isImplicit);
+        const columns = (implicitView?.viewConfig?.columns ?? []) as Array<{
+          fieldCode?: string;
+          visible?: boolean;
+        }>;
+        return columns.find((column) => column.fieldCode === fieldCode)?.visible;
+      })
+      .toBe(false);
+
+    await page.reload();
+    await expect(page.getByTestId('dynamic-list')).toBeVisible();
+    await expect(page.getByTestId(`table-header-${fieldCode}`)).toHaveCount(0);
   });
 
   test('SV-PER-004: quick filter can be saved as a personal view from the toolbar', async ({ page }) => {

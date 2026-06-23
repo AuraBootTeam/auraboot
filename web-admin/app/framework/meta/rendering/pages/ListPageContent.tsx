@@ -971,6 +971,7 @@ function ListPageContentInner(props: PageContentProps) {
     currentView,
     selectView,
     selectDefaultView,
+    upsertView,
     createView,
     updateView,
     deleteView: deleteSavedView,
@@ -2926,9 +2927,9 @@ function ListPageContentInner(props: PageContentProps) {
             pageKey,
             viewConfig: config,
           });
-          // Select the newly created implicit view so subsequent saves go through updateViewConfig
+          // Apply the returned implicit view immediately; reloading should not be required.
           if (view) {
-            selectView(view.pid);
+            upsertView(view);
           }
         }
         if (!options?.isStale?.() && persistenceMode === 'implicit-autosave') {
@@ -2944,7 +2945,7 @@ function ListPageContentInner(props: PageContentProps) {
         }
       }
     },
-    [currentView, modelCode, pageKey, selectView, flashViewSavedHint],
+    [currentView, modelCode, pageKey, upsertView, flashViewSavedHint],
   );
 
   const handleSaveCurrentViewDraft = useCallback(async () => {
@@ -4775,7 +4776,7 @@ function ListPageContentInner(props: PageContentProps) {
               // This would require extending ViewColumnConfig with frozen support
             }}
             onHide={() => {
-              if (!currentView || !contextMenu) return;
+              if (!contextMenu) return;
               const cols = (effectiveViewConfig?.columns || []).map((c) =>
                 c.fieldCode === contextMenu.column.field ? { ...c, visible: false } : c,
               );
