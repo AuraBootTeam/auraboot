@@ -60,6 +60,7 @@ import type {
 } from '~/framework/meta/schemas/types';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
+import { getPublicRecordKey } from '~/framework/meta/utils/publicRecordId';
 
 interface RecordData {
   [key: string]: any;
@@ -228,7 +229,7 @@ export function mergeDetailDisplayFields(
 
 async function resolveDetailListDisplayRecord(
   modelCode: string,
-  recordId: string,
+  recordPid: string,
   token?: string,
 ): Promise<RecordData | undefined> {
   try {
@@ -237,7 +238,7 @@ async function resolveDetailListDisplayRecord(
       params: {
         pageNum: 1,
         pageSize: 1,
-        filters: JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: recordId }]),
+        filters: JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: recordPid }]),
       },
       token: token || undefined,
     });
@@ -251,11 +252,11 @@ async function resolveDetailListDisplayRecord(
 
 async function enrichDetailRecordDisplayFields(
   modelCode: string,
-  recordId: string,
+  recordPid: string,
   record: Record<string, any>,
   token?: string,
 ): Promise<Record<string, any>> {
-  const listRecord = await resolveDetailListDisplayRecord(modelCode, recordId, token);
+  const listRecord = await resolveDetailListDisplayRecord(modelCode, recordPid, token);
   return mergeDetailDisplayFields(record, listRecord);
 }
 
@@ -451,6 +452,7 @@ function DetailPageContentInner(props: PageContentProps) {
   const location = useLocation();
   const routerNavigate = useRouterNavigate();
   const recordModelCode = schema?.modelCode || tableName;
+  const routeRecordPid = getPublicRecordKey(null, recordId);
 
   // Client-side record + model field loading (parallelized)
   const [recordData, setRecordData] = useState<RecordData>({});
@@ -462,11 +464,11 @@ function DetailPageContentInner(props: PageContentProps) {
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
 
   useEffect(() => {
-    if (!recordId || !recordModelCode) {
+    if (!routeRecordPid || !recordModelCode) {
       setRecordLoading(false);
       return;
     }
-    const currentRecordId = recordId;
+    const currentRecordPid = routeRecordPid;
     const currentModelCode = recordModelCode;
     let cancelled = false;
 
@@ -492,7 +494,7 @@ function DetailPageContentInner(props: PageContentProps) {
       const { endpoint, method } = resolveDetailRecordEndpoint(
         schema,
         currentModelCode,
-        currentRecordId,
+        currentRecordPid,
       );
       const result = await fetchResult<RecordData>(endpoint, {
         method,
@@ -506,7 +508,7 @@ function DetailPageContentInner(props: PageContentProps) {
         setRecordData(
           await enrichDetailRecordDisplayFields(
             currentModelCode,
-            currentRecordId,
+            currentRecordPid,
             unwrappedRecord,
             token || undefined,
           ),
@@ -526,17 +528,17 @@ function DetailPageContentInner(props: PageContentProps) {
     return () => {
       cancelled = true;
     };
-  }, [recordId, tableName, recordModelCode, schema, schema?.modelCode, token]);
+  }, [routeRecordPid, tableName, recordModelCode, schema, schema?.modelCode, token]);
 
   // Stable callback to reload the parent record (used after sub-table command execution)
   const reloadRecord = useCallback(() => {
-    if (!recordId || !recordModelCode) return;
-    const currentRecordId = recordId;
+    if (!routeRecordPid || !recordModelCode) return;
+    const currentRecordPid = routeRecordPid;
     const currentModelCode = recordModelCode;
     const { endpoint, method } = resolveDetailRecordEndpoint(
       schema,
       currentModelCode,
-      currentRecordId,
+      currentRecordPid,
     );
     fetchResult<RecordData>(endpoint, { method, token: token || undefined })
       .then((result) => {
@@ -546,14 +548,14 @@ function DetailPageContentInner(props: PageContentProps) {
           setRawData(result.data);
           enrichDetailRecordDisplayFields(
             currentModelCode,
-            currentRecordId,
+            currentRecordPid,
             unwrappedRecord,
             token || undefined,
           ).then(setRecordData);
         }
       })
       .catch(() => {});
-  }, [recordId, recordModelCode, token, schema]);
+  }, [routeRecordPid, recordModelCode, token, schema]);
 
   // Enrich a page-schema field with model field metadata (dictCode, component, dataType)
   const enrichField = useCallback(
