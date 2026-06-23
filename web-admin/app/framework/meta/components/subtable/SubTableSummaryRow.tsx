@@ -63,11 +63,11 @@ export const SubTableSummaryRow: React.FC<SubTableSummaryRowProps> = ({
               </td>
             );
           }
-          // First column without a summary value shows "Total" label
+          // First column without a summary value shows the summary label.
           if (colIndex === 0 && !summaryValues.some((s) => s.field === col.field)) {
             return (
               <td key={col.field} className="px-4 py-2.5 text-sm font-semibold text-gray-500">
-                {t('common.total') !== 'common.total' ? t('common.total') : 'Total'}
+                {t('common.total') !== 'common.total' ? t('common.total') : '合计'}
               </td>
             );
           }

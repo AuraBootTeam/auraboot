@@ -196,6 +196,7 @@ interface ValidationRule {
 interface DynamicFieldProps {
   field: FieldConfig;
   value: any;
+  displayValue?: any;
   onChange: (value: any) => void;
   readOnly?: boolean;
   locale?: string;
@@ -260,6 +261,31 @@ function pickReferenceLabel(
     }
   }
   return fallbackId;
+}
+
+function normalizeReadonlyDisplayValue(value: unknown, multiple?: boolean): string | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  if (Array.isArray(value)) {
+    const labels = value
+      .map((item) => normalizeReadonlyDisplayValue(item, multiple))
+      .filter((item): item is string => Boolean(item));
+    return labels.length > 0 ? labels.join('、') : undefined;
+  }
+  if (typeof value === 'object') {
+    const direct = value as Record<string, unknown>;
+    const candidate =
+      direct.label ?? direct.displayName ?? direct.name ?? direct.title ?? direct.value;
+    return normalizeReadonlyDisplayValue(candidate, multiple);
+  }
+  if (multiple && typeof value === 'string' && value.includes(',')) {
+    const labels = value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return labels.length > 0 ? labels.join('、') : undefined;
+  }
+  const text = String(value).trim();
+  return text || undefined;
 }
 
 async function resolveReferenceLabel(
@@ -431,6 +457,7 @@ const ReadonlyOrganizationValue: React.FC<{ value: unknown; multiple?: boolean }
 export const DynamicField: React.FC<DynamicFieldProps> = ({
   field,
   value,
+  displayValue,
   onChange,
   readOnly = false,
   locale = 'zh-CN',
@@ -466,6 +493,22 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         componentType === 'organizationselect' ||
         componentType === 'smartorganizationselect' ||
         (componentType === 'reference' && referenceModel === 'org_department');
+      const isReferenceComponent =
+        componentType === 'reference' ||
+        componentType === 'referenceselect' ||
+        componentType === 'smartreference' ||
+        componentType === 'relationfield' ||
+        componentType === 'relationselect';
+      const resolvedDisplayValue = normalizeReadonlyDisplayValue(
+        displayValue,
+        Boolean(field.props?.multiple),
+      );
+      if (
+        resolvedDisplayValue &&
+        (isUserSelect || isOrganizationSelect || isReferenceComponent || referenceModel)
+      ) {
+        return <div className="py-1 text-sm text-gray-900">{resolvedDisplayValue}</div>;
+      }
 
       if (componentType === 'memberpicker' || isUserSelect) {
         const memberValue = parseMemberPickerValue(value, Boolean(field.props?.multiple));
@@ -488,12 +531,6 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       // Generic reference field — resolve the target record's display name instead of
       // leaking the raw ULID. sys_user / org_department are handled by their dedicated
       // renderers above; this covers every other refTarget.targetModel / referenceModelCode.
-      const isReferenceComponent =
-        componentType === 'reference' ||
-        componentType === 'referenceselect' ||
-        componentType === 'smartreference' ||
-        componentType === 'relationfield' ||
-        componentType === 'relationselect';
       if (
         (isReferenceComponent || (referenceModel && !effectiveDictCode)) &&
         referenceModel &&
@@ -511,10 +548,14 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       }
 
       if (componentType === 'addressfield') {
-        const displayValue = formatAddressValue(value);
+        const formattedAddressValue = formatAddressValue(value);
         return (
           <div className="py-1 text-sm text-gray-900">
-            {displayValue === '-' ? <span className="text-gray-400">&mdash;</span> : displayValue}
+            {formattedAddressValue === '-' ? (
+              <span className="text-gray-400">&mdash;</span>
+            ) : (
+              formattedAddressValue
+            )}
           </div>
         );
       }
@@ -667,40 +708,40 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       }
 
       // 8. Date/time formatting, options lookup, null handling
-      let displayValue = value;
+      let formattedDisplayValue = value;
       const options = field.props?.options || [];
 
       if (['smartdate', 'date'].includes(componentType) && value) {
-        displayValue = new Date(value).toLocaleDateString(locale);
+        formattedDisplayValue = new Date(value).toLocaleDateString(locale);
       } else if (['smartdatetime', 'datetime'].includes(componentType) && value) {
-        displayValue = new Date(value).toLocaleString(locale);
+        formattedDisplayValue = new Date(value).toLocaleString(locale);
       } else if (options.length > 0) {
         const matchedOption = options.find((opt: any) => String(opt?.value) === String(value));
         if (matchedOption) {
-          displayValue =
+          formattedDisplayValue =
             typeof matchedOption.label === 'string'
               ? matchedOption.label
               : getLocalizedText(matchedOption.label, locale) || matchedOption.value;
         }
       } else if (value === null || value === undefined) {
-        displayValue = '-';
+        formattedDisplayValue = '-';
       }
 
       // 9. URL detection - render as clickable link
       if (
-        displayValue &&
-        typeof displayValue === 'string' &&
-        /^https?:\/\/.+/i.test(displayValue)
+        formattedDisplayValue &&
+        typeof formattedDisplayValue === 'string' &&
+        /^https?:\/\/.+/i.test(formattedDisplayValue)
       ) {
         return (
           <div className="py-1 text-sm">
             <a
-              href={displayValue}
+              href={formattedDisplayValue}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-600 hover:text-blue-800 hover:underline"
             >
-              {displayValue}
+              {formattedDisplayValue}
             </a>
           </div>
         );
@@ -708,17 +749,17 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
 
       // 10. Email detection - render as mailto link
       if (
-        displayValue &&
-        typeof displayValue === 'string' &&
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(displayValue)
+        formattedDisplayValue &&
+        typeof formattedDisplayValue === 'string' &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formattedDisplayValue)
       ) {
         return (
           <div className="py-1 text-sm">
             <a
-              href={`mailto:${displayValue}`}
+              href={`mailto:${formattedDisplayValue}`}
               className="text-blue-600 hover:text-blue-800 hover:underline"
             >
-              {displayValue}
+              {formattedDisplayValue}
             </a>
           </div>
         );
@@ -727,20 +768,24 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       // 11. Object / jsonb values would stringify to "[object Object]" — render
       // formatted JSON instead (e.g. cr_cd_metadata spec_table on detail pages).
       // Unwraps the { type:'jsonb', value:'<json string>' } envelope some APIs return.
-      if (displayValue != null && typeof displayValue === 'object') {
+      if (formattedDisplayValue != null && typeof formattedDisplayValue === 'object') {
         const envelope =
-          !Array.isArray(displayValue) &&
-          typeof (displayValue as { value?: unknown }).value === 'string' &&
+          !Array.isArray(formattedDisplayValue) &&
+          typeof (formattedDisplayValue as { value?: unknown }).value === 'string' &&
           ['json', 'jsonb'].includes(
-            String((displayValue as { type?: unknown }).type ?? '').toLowerCase(),
+            String((formattedDisplayValue as { type?: unknown }).type ?? '').toLowerCase(),
           )
-            ? ((displayValue as { value: string }).value as string)
+            ? ((formattedDisplayValue as { value: string }).value as string)
             : null;
         let pretty: string;
         try {
-          pretty = JSON.stringify(envelope != null ? JSON.parse(envelope) : displayValue, null, 2);
+          pretty = JSON.stringify(
+            envelope != null ? JSON.parse(envelope) : formattedDisplayValue,
+            null,
+            2,
+          );
         } catch {
-          pretty = envelope != null ? envelope : String(displayValue);
+          pretty = envelope != null ? envelope : String(formattedDisplayValue);
         }
         return (
           <pre className="max-h-80 overflow-auto rounded-md border border-gray-200 bg-gray-50 p-3 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-gray-900">
@@ -751,10 +796,10 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
 
       return (
         <div className="py-1 text-sm text-gray-900">
-          {displayValue === '-' ? (
+          {formattedDisplayValue === '-' ? (
             <span className="text-gray-400">&mdash;</span>
           ) : (
-            String(displayValue)
+            String(formattedDisplayValue)
           )}
         </div>
       );

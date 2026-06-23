@@ -9,7 +9,11 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { cn } from '~/utils/cn';
 import { useToastContext } from '~/contexts/ToastContext';
-import { reportTemplateService, type ReportTemplateDTO } from '~/shared/services/reportTemplateService';
+import { useI18n } from '~/contexts/I18nContext';
+import {
+  reportTemplateService,
+  type ReportTemplateDTO,
+} from '~/shared/services/reportTemplateService';
 import { ResultHelper } from '~/utils/type';
 
 export interface ReportGenerateButtonProps {
@@ -34,6 +38,7 @@ export const ReportGenerateButton: React.FC<ReportGenerateButtonProps> = ({
   const [generating, setGenerating] = useState(false);
   const [templates, setTemplates] = useState<ReportTemplateDTO[]>([]);
   const { showErrorToast, showSuccessToast } = useToastContext();
+  const { t } = useI18n();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -95,15 +100,21 @@ export const ReportGenerateButton: React.FC<ReportGenerateButtonProps> = ({
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        showSuccessToast(`Report generated: ${template.name}`);
+        showSuccessToast(
+          t('report.generated', { name: template.name }, `报告已生成：${template.name}`),
+        );
       } catch (err) {
         console.error('Report generation failed:', err);
-        showErrorToast(err instanceof Error ? err.message : 'Report generation failed');
+        showErrorToast(
+          err instanceof Error
+            ? err.message
+            : t('report.generationFailed', undefined, '报告生成失败'),
+        );
       } finally {
         setGenerating(false);
       }
     },
-    [recordPid, parameters, showSuccessToast, showErrorToast],
+    [recordPid, parameters, showSuccessToast, showErrorToast, t],
   );
 
   return (
@@ -133,7 +144,7 @@ export const ReportGenerateButton: React.FC<ReportGenerateButtonProps> = ({
             />
           </svg>
         )}
-        Report
+        <span className="whitespace-nowrap">{t('report.generate', undefined, '报告')}</span>
         <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -144,10 +155,14 @@ export const ReportGenerateButton: React.FC<ReportGenerateButtonProps> = ({
           data-testid="report-generate-dropdown"
           className="absolute right-0 z-50 mt-1 max-h-64 w-56 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg"
         >
-          {loading && <div className="px-4 py-3 text-center text-sm text-gray-500">Loading...</div>}
+          {loading && (
+            <div className="px-4 py-3 text-center text-sm text-gray-500">
+              {t('common.loading', undefined, '加载中...')}
+            </div>
+          )}
           {!loading && templates.length === 0 && (
             <div className="px-4 py-3 text-center text-sm text-gray-500">
-              No published templates
+              {t('report.noPublishedTemplates', undefined, '暂无已发布模板')}
             </div>
           )}
           {templates.map((tpl) => (

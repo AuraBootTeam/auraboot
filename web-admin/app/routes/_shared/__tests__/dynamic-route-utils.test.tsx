@@ -30,10 +30,12 @@ describe('resolveLocalMenuRedirect', () => {
   });
 
   it('rejects external and protocol-relative redirects', () => {
-    expect(resolveLocalMenuRedirect('https://example.com', { pathname: '/crawler' })).toMatchObject({
-      shouldRedirect: false,
-      error: expect.stringContaining('app-local'),
-    });
+    expect(resolveLocalMenuRedirect('https://example.com', { pathname: '/crawler' })).toMatchObject(
+      {
+        shouldRedirect: false,
+        error: expect.stringContaining('app-local'),
+      },
+    );
     expect(resolveLocalMenuRedirect('//example.com/app', { pathname: '/crawler' })).toMatchObject({
       shouldRedirect: false,
       error: expect.stringContaining('app-local'),
@@ -248,6 +250,30 @@ describe('DynamicField', () => {
     expect(screen.queryByText(ulid)).not.toBeInTheDocument();
   });
 
+  it('prefers readonly reference display values over resolving raw ids', () => {
+    const ulid = '01KVR37707ZCV3ADJMHFGPDMGP';
+    globalThis.fetch = vi.fn() as unknown as typeof fetch;
+
+    render(
+      <DynamicField
+        field={{
+          field: 'crm_lead_assigned_to',
+          label: '分配给',
+          component: 'user-select',
+          refTarget: { targetModel: 'ab_user', targetField: 'user_name' },
+        }}
+        value={ulid}
+        displayValue="e2e-operator"
+        onChange={vi.fn()}
+        readOnly
+      />,
+    );
+
+    expect(screen.getByText('e2e-operator')).toBeInTheDocument();
+    expect(screen.queryByText(ulid)).not.toBeInTheDocument();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it('falls back to the raw id when the referenced record cannot be loaded', async () => {
     const ulid = '01KT4MISSING000000000000000';
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -291,9 +317,7 @@ describe('DynamicField', () => {
         onChange={vi.fn()}
         readOnly
         getDictItems={(code) =>
-          code === 'crm_opp_stage_dict'
-            ? [{ value: 'negotiation', label: '谈判中' }]
-            : []
+          code === 'crm_opp_stage_dict' ? [{ value: 'negotiation', label: '谈判中' }] : []
         }
       />,
     );

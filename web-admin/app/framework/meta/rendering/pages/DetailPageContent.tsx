@@ -67,6 +67,10 @@ interface RecordData {
   pid?: string;
 }
 
+interface DetailListResult {
+  records?: RecordData[];
+}
+
 export function resolveDetailFieldComponent(meta?: {
   dataType?: string;
   referenceModelCode?: string;
@@ -205,6 +209,54 @@ export function unwrapDetailRecord(rawData: any, recordPath?: string): Record<st
   if (!recordPath) return typeof rawData === 'object' ? rawData : {};
   const val = getByDataPath(rawData, recordPath);
   return val && typeof val === 'object' ? val : {};
+}
+
+export function mergeDetailDisplayFields(
+  record: Record<string, any>,
+  listRecord: Record<string, any> | undefined | null,
+): Record<string, any> {
+  if (!listRecord) return record;
+  const displayEntries = Object.entries(listRecord).filter(
+    ([key, value]) => key.endsWith('_display') && value !== null && value !== undefined,
+  );
+  if (displayEntries.length === 0) return record;
+  return {
+    ...record,
+    ...Object.fromEntries(displayEntries),
+  };
+}
+
+async function resolveDetailListDisplayRecord(
+  modelCode: string,
+  recordId: string,
+  token?: string,
+): Promise<RecordData | undefined> {
+  try {
+    const result = await fetchResult<DetailListResult>(buildApiEndpoint(modelCode) + '/list', {
+      method: 'get',
+      params: {
+        pageNum: 1,
+        pageSize: 1,
+        filters: JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: recordId }]),
+      },
+      token: token || undefined,
+    });
+    if (!ResultHelper.isSuccess(result)) return undefined;
+    const records = result.data?.records;
+    return Array.isArray(records) ? records[0] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function enrichDetailRecordDisplayFields(
+  modelCode: string,
+  recordId: string,
+  record: Record<string, any>,
+  token?: string,
+): Promise<Record<string, any>> {
+  const listRecord = await resolveDetailListDisplayRecord(modelCode, recordId, token);
+  return mergeDetailDisplayFields(record, listRecord);
 }
 
 /**
@@ -410,16 +462,18 @@ function DetailPageContentInner(props: PageContentProps) {
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
 
   useEffect(() => {
-    if (!recordId || !tableName) {
+    if (!recordId || !recordModelCode) {
       setRecordLoading(false);
       return;
     }
+    const currentRecordId = recordId;
+    const currentModelCode = recordModelCode;
     let cancelled = false;
 
     async function loadModelFields(): Promise<void> {
       // Use /api/dynamic/{pageKey}/field-meta which requires model-level read permission
       // instead of /api/meta/models/{pid}/fields which requires management permission
-      const pageKey = schema?.modelCode || tableName;
+      const pageKey = currentModelCode;
       if (!pageKey || shouldSkipDetailModelFieldMeta(schema)) return;
       const fieldsRes = await fetchResult<any[]>(`/api/dynamic/${pageKey}/field-meta`, {
         method: 'get',
@@ -435,7 +489,11 @@ function DetailPageContentInner(props: PageContentProps) {
     }
 
     async function loadRecord(): Promise<void> {
-      const { endpoint, method } = resolveDetailRecordEndpoint(schema, recordModelCode, recordId!);
+      const { endpoint, method } = resolveDetailRecordEndpoint(
+        schema,
+        currentModelCode,
+        currentRecordId,
+      );
       const result = await fetchResult<RecordData>(endpoint, {
         method,
         token: token || undefined,
@@ -443,8 +501,16 @@ function DetailPageContentInner(props: PageContentProps) {
       if (cancelled) return;
       if (ResultHelper.isSuccess(result) && result.data) {
         const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
+        const unwrappedRecord = unwrapDetailRecord(result.data, recordPath);
         setRawData(result.data);
-        setRecordData(unwrapDetailRecord(result.data, recordPath));
+        setRecordData(
+          await enrichDetailRecordDisplayFields(
+            currentModelCode,
+            currentRecordId,
+            unwrappedRecord,
+            token || undefined,
+          ),
+        );
       }
     }
 
@@ -464,18 +530,30 @@ function DetailPageContentInner(props: PageContentProps) {
 
   // Stable callback to reload the parent record (used after sub-table command execution)
   const reloadRecord = useCallback(() => {
-    if (!recordId || !tableName) return;
-    const { endpoint, method } = resolveDetailRecordEndpoint(schema, recordModelCode, recordId);
+    if (!recordId || !recordModelCode) return;
+    const currentRecordId = recordId;
+    const currentModelCode = recordModelCode;
+    const { endpoint, method } = resolveDetailRecordEndpoint(
+      schema,
+      currentModelCode,
+      currentRecordId,
+    );
     fetchResult<RecordData>(endpoint, { method, token: token || undefined })
       .then((result) => {
         if (ResultHelper.isSuccess(result) && result.data) {
           const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
+          const unwrappedRecord = unwrapDetailRecord(result.data, recordPath);
           setRawData(result.data);
-          setRecordData(unwrapDetailRecord(result.data, recordPath));
+          enrichDetailRecordDisplayFields(
+            currentModelCode,
+            currentRecordId,
+            unwrappedRecord,
+            token || undefined,
+          ).then(setRecordData);
         }
       })
       .catch(() => {});
-  }, [recordId, tableName, recordModelCode, token, schema]);
+  }, [recordId, recordModelCode, token, schema]);
 
   // Enrich a page-schema field with model field metadata (dictCode, component, dataType)
   const enrichField = useCallback(
@@ -1349,6 +1427,9 @@ function DetailBlockRenderer({
                   <DynamicField
                     field={enrichedField}
                     value={sectionRecord ? sectionRecord[field.field] : undefined}
+                    displayValue={
+                      sectionRecord ? sectionRecord[`${field.field}_display`] : undefined
+                    }
                     onChange={() => {}}
                     readOnly={true}
                     locale={locale}
@@ -1569,6 +1650,7 @@ function FallbackDetailView({
           <DynamicField
             field={field}
             value={recordData ? recordData[field.field] : undefined}
+            displayValue={recordData ? recordData[`${field.field}_display`] : undefined}
             onChange={() => {}}
             readOnly={true}
             locale={locale}
