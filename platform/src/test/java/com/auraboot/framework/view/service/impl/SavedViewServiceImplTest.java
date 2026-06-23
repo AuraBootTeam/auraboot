@@ -127,6 +127,61 @@ class SavedViewServiceImplTest {
     }
 
     @Test
+    void create_personalAtLimit_failsBeforeInsert() {
+        PageSchema page = new PageSchema();
+        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(page);
+        when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
+                .thenReturn(0);
+        when(savedViewMapper.countActiveNonImplicitViewsForScope(
+                eq("crm.lead"), eq("crm/leads"), eq("personal"), eq("user_pid"), isNull()))
+                .thenReturn(10);
+
+        ValidationException ex = assertThrows(
+                ValidationException.class,
+                () -> service.create(createReq("personal", null)));
+
+        assertThat(ex.getMessage()).contains("limit").contains("10");
+        verify(savedViewMapper, never()).insertSavedView(any());
+    }
+
+    @Test
+    void create_teamAtLimit_failsBeforeInsert() {
+        PageSchema page = new PageSchema();
+        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(page);
+        when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of("teamA"));
+        when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
+                .thenReturn(0);
+        when(savedViewMapper.countActiveNonImplicitViewsForScope(
+                eq("crm.lead"), eq("crm/leads"), eq("team"), isNull(), eq("teamA")))
+                .thenReturn(20);
+
+        ValidationException ex = assertThrows(
+                ValidationException.class,
+                () -> service.create(createReq("team", "teamA")));
+
+        assertThat(ex.getMessage()).contains("limit").contains("20");
+        verify(savedViewMapper, never()).insertSavedView(any());
+    }
+
+    @Test
+    void create_globalAtLimit_failsBeforeInsert() {
+        PageSchema page = new PageSchema();
+        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(page);
+        when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
+                .thenReturn(0);
+        when(savedViewMapper.countActiveNonImplicitViewsForScope(
+                eq("crm.lead"), eq("crm/leads"), eq("global"), isNull(), isNull()))
+                .thenReturn(20);
+
+        ValidationException ex = assertThrows(
+                ValidationException.class,
+                () -> service.create(createReq("global", null)));
+
+        assertThat(ex.getMessage()).contains("limit").contains("20");
+        verify(savedViewMapper, never()).insertSavedView(any());
+    }
+
+    @Test
     void create_advancedViewWithoutRequiredConfig_fails() {
         PageSchema page = new PageSchema();
         when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(page);
@@ -653,6 +708,32 @@ class SavedViewServiceImplTest {
     }
 
     @Test
+    void copyToPersonal_atPersonalLimit_failsBeforeInsert() {
+        SavedView src = new SavedView();
+        src.setPid("global1");
+        src.setScope("global");
+        src.setModelCode("m");
+        src.setPageKey("k");
+        src.setViewType("table");
+        src.setViewConfig(new ViewConfig());
+        when(savedViewMapper.findByPid("global1")).thenReturn(src);
+        when(savedViewMapper.countByNameForUser(eq("m"), eq("k"), eq("My Copy"), eq("user_pid"), isNull()))
+                .thenReturn(0);
+        when(savedViewMapper.countActiveNonImplicitViewsForScope(
+                eq("m"), eq("k"), eq("personal"), eq("user_pid"), isNull()))
+                .thenReturn(10);
+        PageSchema page = new PageSchema();
+        when(pageSchemaMapper.selectAnyByPageKey("k")).thenReturn(page);
+
+        ValidationException ex = assertThrows(
+                ValidationException.class,
+                () -> service.copyToPersonal("global1", "My Copy", null));
+
+        assertThat(ex.getMessage()).contains("limit").contains("10");
+        verify(savedViewMapper, never()).insertSavedView(any());
+    }
+
+    @Test
     void copyToPersonal_disallowedWhenPresetBlocksCopy() {
         SavedView src = new SavedView();
         src.setPid("plugin1");
@@ -707,6 +788,7 @@ class SavedViewServiceImplTest {
 
         verify(savedViewMapper).clearPersonalDefaultFlag("m", "k", "user_pid");
         verify(savedViewMapper).insertSavedView(any(SavedView.class));
+        verify(savedViewMapper, never()).countActiveNonImplicitViewsForScope(any(), any(), any(), any(), any());
     }
 
     @Test
