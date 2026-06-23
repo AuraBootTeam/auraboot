@@ -23,6 +23,8 @@ const CLEANUP_PREFIXES = [
   'SV_Tree_',
   'SV Tree Table View',
   '树视图表格视图',
+  '树视图视图',
+  'UX_FormView_e2e_',
 ];
 
 async function cleanupSavedViewFixtures(page: import('@playwright/test').Page): Promise<void> {
