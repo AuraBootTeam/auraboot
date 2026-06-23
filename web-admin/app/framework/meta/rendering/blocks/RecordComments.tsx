@@ -18,13 +18,12 @@ import { ResultHelper } from '~/utils/type';
 dayjs.extend(relativeTime);
 
 interface Comment {
-  id: number;
+  commentPid: string;
   content: string;
-  created_by: number;
   created_at: string;
   updated_at: string;
   is_edited: boolean;
-  actor_name?: string;
+  actorName?: string;
 }
 
 export interface RecordCommentsProps {
@@ -45,7 +44,7 @@ export function RecordComments({
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
 
   const t = useCallback(
@@ -97,10 +96,10 @@ export function RecordComments({
   };
 
   // Edit comment
-  const handleEdit = async (commentId: number) => {
+  const handleEdit = async (commentPid: string) => {
     if (!editContent.trim()) return;
     try {
-      await fetchResult<any>(`${basePath}/${commentId}`, {
+      await fetchResult<any>(`${basePath}/${commentPid}`, {
         method: 'put',
         params: { content: editContent.trim() },
       });
@@ -113,9 +112,9 @@ export function RecordComments({
   };
 
   // Delete comment
-  const handleDelete = async (commentId: number) => {
+  const handleDelete = async (commentPid: string) => {
     try {
-      await fetchResult<any>(`${basePath}/${commentId}`, { method: 'delete' });
+      await fetchResult<any>(`${basePath}/${commentPid}`, { method: 'delete' });
       loadComments();
     } catch {
       // Ignore
@@ -123,7 +122,7 @@ export function RecordComments({
   };
 
   const startEdit = (comment: Comment) => {
-    setEditingId(comment.id);
+    setEditingId(comment.commentPid);
     setEditContent(comment.content);
   };
 
@@ -177,18 +176,18 @@ export function RecordComments({
         <div className="space-y-3" data-testid="comment-list">
           {comments.map((comment) => (
             <div
-              key={comment.id}
+              key={comment.commentPid}
               className="rounded-card bg-panel border border-gray-100 p-3 dark:border-gray-700 dark:bg-gray-800"
-              data-testid={`comment-${comment.id}`}
+              data-testid={`comment-${comment.commentPid}`}
             >
               {/* Header: user + time */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="rounded-pill flex h-7 w-7 items-center justify-center bg-blue-100 text-xs font-medium text-blue-600 dark:bg-blue-900 dark:text-blue-300">
-                    {(comment.actor_name || 'U').charAt(0).toUpperCase()}
+                    {(comment.actorName || 'U').charAt(0).toUpperCase()}
                   </div>
                   <span className="text-text text-sm font-medium dark:text-gray-200">
-                    {comment.actor_name || `User #${comment.created_by}`}
+                    {comment.actorName || 'User'}
                   </span>
                   <span className="text-text-3 text-xs" title={comment.created_at}>
                     {dayjs(comment.created_at).fromNow()}
@@ -220,7 +219,7 @@ export function RecordComments({
                     </svg>
                   </button>
                   <button
-                    onClick={() => handleDelete(comment.id)}
+                    onClick={() => handleDelete(comment.commentPid)}
                     className="text-text-3 hover:bg-status-red-bg hover:text-status-red rounded p-1 transition-colors dark:hover:bg-red-900/20"
                     title={t('comment.delete', 'Delete')}
                   >
@@ -242,7 +241,7 @@ export function RecordComments({
               </div>
 
               {/* Content or edit form */}
-              {editingId === comment.id ? (
+              {editingId === comment.commentPid ? (
                 <div className="mt-2">
                   <textarea
                     value={editContent}
@@ -253,7 +252,7 @@ export function RecordComments({
                   />
                   <div className="mt-1 flex gap-2">
                     <button
-                      onClick={() => handleEdit(comment.id)}
+                      onClick={() => handleEdit(comment.commentPid)}
                       className="bg-accent hover:bg-accent-hover rounded px-3 py-1 text-xs text-white"
                     >
                       {t('comment.save', 'Save')}

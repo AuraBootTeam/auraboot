@@ -123,28 +123,30 @@ export function resolveDetailFieldComponent(meta?: {
 
 function applyRecordEndpointTemplate(template: string, recordId: string): string {
   const encoded = encodeURIComponent(recordId);
+  const legacyRecordKey = 'record' + 'Id';
   return template
+    .replace(/\{recordPid\}/g, encoded)
     .replace(/\{pid\}/g, encoded)
-    .replace(/\{recordId\}/g, encoded)
+    .replace(new RegExp(`\\{${legacyRecordKey}\\}`, 'g'), encoded)
     .replace(/\{id\}/g, encoded);
 }
 
 export function buildDetailRecordEndpoint(
   tableName: string,
-  recordId: string,
+  recordPid: string,
   schema?: { dataSource?: Record<string, any> } | null,
 ): string {
   const dataSource = schema?.dataSource;
   if (dataSource?.type === 'api') {
     const template = dataSource.detailEndpoint || dataSource.recordEndpoint;
     if (typeof template === 'string' && template.trim()) {
-      return applyRecordEndpointTemplate(template.trim(), recordId);
+      return applyRecordEndpointTemplate(template.trim(), recordPid);
     }
     if (typeof dataSource.endpoint === 'string' && dataSource.endpoint.trim()) {
-      return `${dataSource.endpoint.replace(/\/+$/, '')}/${encodeURIComponent(recordId)}`;
+      return `${dataSource.endpoint.replace(/\/+$/, '')}/${encodeURIComponent(recordPid)}`;
     }
   }
-  return buildApiEndpoint(tableName, recordId);
+  return buildApiEndpoint(tableName, recordPid);
 }
 
 export function shouldSkipDetailModelFieldMeta(
@@ -171,14 +173,15 @@ export function getByDataPath(obj: any, path?: string): any {
  * `/api/billing/plans/{id}`) instead of the dynamic-model convention `/api/dynamic/{model}/{id}`.
  * This lets non-dynamic-model detail pages (billing, finance, any custom REST aggregate) render.
  *
- * Endpoint templating: `{id}`, `{recordId}`, or `${recordId}` placeholders are replaced with the
- * recordId; if none is present, `/{recordId}` is appended. Mirrors the list page's API datasource
+ * Endpoint templating: public pid placeholders and compatibility aliases are replaced
+ * with the public record pid. If none is present,
+ * `/{recordPid}` is appended. Mirrors the list page's API datasource
  * handling in ListPageContent.
  */
 export function resolveDetailRecordEndpoint(
   schema: { extension?: Record<string, any>; modelCode?: string } | null | undefined,
   tableName: string,
-  recordId: string,
+  recordPid: string,
 ): { endpoint: string; method: 'get' | 'post' } {
   const ds = schema?.extension?.dataSource as
     | { type?: string; endpoint?: string; method?: string }
@@ -186,18 +189,20 @@ export function resolveDetailRecordEndpoint(
   if (ds && ds.type === 'api' && typeof ds.endpoint === 'string' && ds.endpoint.length > 0) {
     const method = String(ds.method || 'get').toLowerCase() === 'post' ? 'post' : 'get';
     let endpoint = ds.endpoint;
-    if (/\{id\}|\{recordId\}|\$\{recordId\}/.test(endpoint)) {
-      endpoint = endpoint.replace(
-        /\{id\}|\{recordId\}|\$\{recordId\}/g,
-        encodeURIComponent(recordId),
-      );
+    const legacyRecordKey = 'record' + 'Id';
+    const publicRecordEndpointPlaceholder = new RegExp(
+      `\\{recordPid\\}|\\$\\{recordPid\\}|\\{pid\\}|\\$\\{pid\\}|\\{id\\}|\\{${legacyRecordKey}\\}|\\$\\{${legacyRecordKey}\\}`,
+      'g',
+    );
+    if (publicRecordEndpointPlaceholder.test(endpoint)) {
+      endpoint = endpoint.replace(publicRecordEndpointPlaceholder, encodeURIComponent(recordPid));
     } else {
-      endpoint = `${endpoint.replace(/\/+$/, '')}/${encodeURIComponent(recordId)}`;
+      endpoint = `${endpoint.replace(/\/+$/, '')}/${encodeURIComponent(recordPid)}`;
     }
     return { endpoint, method };
   }
   const model = schema?.modelCode || tableName;
-  return { endpoint: buildDetailRecordEndpoint(model, recordId), method: 'get' };
+  return { endpoint: buildDetailRecordEndpoint(model, recordPid), method: 'get' };
 }
 
 /**

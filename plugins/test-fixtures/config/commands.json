@@ -173,7 +173,7 @@
             "type": "create_record",
             "modelCode": "e2et_order_log",
             "fields": {
-              "e2et_log_order_id": "${recordId}",
+              "e2et_log_order_id": "${recordPid}",
               "e2et_log_action": "submit",
               "e2et_log_remark": "Order submitted for approval"
             }
@@ -209,7 +209,7 @@
             "type": "create_record",
             "modelCode": "e2et_order_log",
             "fields": {
-              "e2et_log_order_id": "${recordId}",
+              "e2et_log_order_id": "${recordPid}",
               "e2et_log_action": "approve",
               "e2et_log_remark": "Order approved"
             }
@@ -248,7 +248,7 @@
             "type": "create_record",
             "modelCode": "e2et_order_log",
             "fields": {
-              "e2et_log_order_id": "${recordId}",
+              "e2et_log_order_id": "${recordPid}",
               "e2et_log_action": "reject",
               "e2et_log_remark": "Order rejected"
             }
@@ -284,7 +284,7 @@
             "type": "create_record",
             "modelCode": "e2et_order_log",
             "fields": {
-              "e2et_log_order_id": "${recordId}",
+              "e2et_log_order_id": "${recordPid}",
               "e2et_log_action": "complete",
               "e2et_log_remark": "Order completed"
             }
@@ -321,7 +321,7 @@
             "type": "create_record",
             "modelCode": "e2et_order_log",
             "fields": {
-              "e2et_log_order_id": "${recordId}",
+              "e2et_log_order_id": "${recordPid}",
               "e2et_log_action": "cancel",
               "e2et_log_remark": "Order cancelled"
             }

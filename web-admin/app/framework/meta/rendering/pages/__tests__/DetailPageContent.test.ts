@@ -35,6 +35,17 @@ describe('buildDetailRecordEndpoint', () => {
     ).toBe('/api/decision/rollouts/01KTPDRQ6TD9JAXRCPZ2KY3ZS7');
   });
 
+  it('prefers recordPid placeholders for API data source detail endpoint templates', () => {
+    expect(
+      buildDetailRecordEndpoint('decision_rollout_policy', '01KTPDRQ6TD9JAXRCPZ2KY3ZS7', {
+        dataSource: {
+          type: 'api',
+          detailEndpoint: '/api/decision/rollouts/{recordPid}',
+        },
+      } as any),
+    ).toBe('/api/decision/rollouts/01KTPDRQ6TD9JAXRCPZ2KY3ZS7');
+  });
+
   it('falls back to appending the record id to an API data source endpoint', () => {
     expect(
       buildDetailRecordEndpoint('decision_rollout_policy', 'rollout-pid', {
@@ -330,6 +341,31 @@ describe('resolveDetailRecordEndpoint', () => {
         '900202',
       ),
     ).toEqual({ endpoint: '/api/billing/plans/900202', method: 'get' });
+  });
+  it('uses recordPid placeholders for custom api dataSource endpoints', () => {
+    expect(
+      resolveDetailRecordEndpoint(
+        {
+          extension: {
+            dataSource: { type: 'api', endpoint: '/api/billing/plans/{recordPid}' },
+          },
+        },
+        'billing_plan_catalog_detail',
+        '900202',
+      ),
+    ).toEqual({ endpoint: '/api/billing/plans/900202', method: 'get' });
+
+    expect(
+      resolveDetailRecordEndpoint(
+        {
+          extension: {
+            dataSource: { type: 'api', endpoint: '/api/billing/plans/${recordPid}' },
+          },
+        },
+        'billing_plan_catalog_detail',
+        'abc/def',
+      ),
+    ).toEqual({ endpoint: '/api/billing/plans/abc%2Fdef', method: 'get' });
   });
   it('appends /{recordId} when the api endpoint has no placeholder, and honors post', () => {
     expect(
