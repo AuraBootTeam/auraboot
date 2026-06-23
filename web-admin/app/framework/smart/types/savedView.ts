@@ -28,6 +28,7 @@ export interface SavedViewTeamOption {
  * Audit trail entry for shared/global SavedView changes.
  */
 export interface SavedViewAuditEvent {
+  id?: string;
   sequenceNo?: number;
   eventType?: string;
   entityType?: string;

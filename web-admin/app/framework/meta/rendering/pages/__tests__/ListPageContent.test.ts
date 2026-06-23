@@ -266,16 +266,10 @@ describe('resolveTableBlockRowActions', () => {
         blockType: 'table',
         rowActions: [{ code: 'detail', label: 'Block Detail' }],
         table: {
-          rowActions: [
-            { code: 'detail', label: 'Nested Detail' },
-            { code: 'console' },
-          ],
+          rowActions: [{ code: 'detail', label: 'Nested Detail' }, { code: 'console' }],
         },
       }),
-    ).toEqual([
-      { code: 'detail', label: 'Block Detail' },
-      { code: 'console' },
-    ]);
+    ).toEqual([{ code: 'detail', label: 'Block Detail' }, { code: 'console' }]);
   });
 });
 
@@ -381,9 +375,9 @@ describe('resolveListMiscBlocksPosition', () => {
   });
 
   it('allows DSL pages to place custom blocks before the table', () => {
-    expect(resolveListMiscBlocksPosition({ extension: { miscBlocksPosition: 'beforeTable' } })).toBe(
-      'beforeTable',
-    );
+    expect(
+      resolveListMiscBlocksPosition({ extension: { miscBlocksPosition: 'beforeTable' } }),
+    ).toBe('beforeTable');
   });
 });
 
