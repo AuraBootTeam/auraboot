@@ -82,7 +82,7 @@ public class PageSchemaDTO {
 
     /**
      * Optional override for the edit-mode record-prefill fetch (e.g.
-     * {@code {"endpoint": "/api/qr/{recordId}"}}). Declared as a first-class field so
+     * {@code {"endpoint": "/api/qr/{recordPid}"}}). Declared as a first-class field so
      * import validation recognizes it instead of rejecting it as
      * {@code S-PAGE-UNKNOWN-FIELDS}. Consumed by the form renderer to load the existing
      * record from a custom endpoint (skipTableCreation models served by a custom REST API).

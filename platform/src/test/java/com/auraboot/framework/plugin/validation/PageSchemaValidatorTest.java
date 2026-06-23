@@ -595,7 +595,7 @@ class PageSchemaValidatorTest {
                         "required", true
                 ))
         )));
-        p.setRecordSource(Map.of("endpoint", "/api/qr/{recordId}"));
+        p.setRecordSource(Map.of("endpoint", "/api/qr/{recordPid}"));
         manifest.setPages(List.of(p));
 
         List<PluginValidationMessage> messages = validate(manifest);
@@ -615,7 +615,7 @@ class PageSchemaValidatorTest {
                   "schemaVersion": 4,
                   "modelCode": "ab_qr_code",
                   "layout": { "type": "stack" },
-                  "recordSource": { "endpoint": "/api/qr/{recordId}" },
+                  "recordSource": { "endpoint": "/api/qr/{recordPid}" },
                   "blocks": [
                     {
                       "id": "basic_section",

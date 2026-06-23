@@ -42,7 +42,7 @@ import { checkKindCompatibility } from '~/shared/utils/kindCapability';
 import type { ComputedFieldDef } from '~/framework/meta/runtime/computed/types';
 import { useFormDraft } from '~/framework/meta/rendering/pages/form/useFormDraft';
 import { RestoreDraftBanner } from '~/framework/meta/rendering/pages/form/RestoreDraftBanner';
-import { buildCommandTargetParams } from '~/framework/meta/utils/publicRecordId';
+import { buildCommandTargetParams, getPublicRecordPid } from '~/framework/meta/utils/publicRecordId';
 
 /**
  * Map field dataType to Smart component name.
@@ -535,24 +535,32 @@ export function resolveAfterSubmitRedirect(
  * Resolve the edit-mode record-prefill fetch endpoint.
  *
  * When the schema declares a `recordSource.endpoint`, that custom URL is used
- * and `{recordId}` / `${recordId}` placeholders are interpolated with the
- * URL-encoded record id. This unblocks `skipTableCreation` models (e.g.
+ * and public pid placeholders are interpolated with the URL-encoded record pid.
+ * This unblocks `skipTableCreation` models (e.g.
  * `ab_qr_code`) whose reads are served by a custom REST endpoint and would
  * otherwise 400/500 against the generic `/api/dynamic/<model>/<id>` route.
  *
- * Falls back to the default `/api/dynamic/<tableName>/<recordId>` when no
+ * Falls back to the default `/api/dynamic/<tableName>/<recordPid>` when no
  * `recordSource` is configured — preserving 100 % backward compatibility.
  */
+function replaceRecordEndpointPlaceholders(template: string, recordPid: string): string {
+  const encoded = encodeURIComponent(recordPid);
+  const legacyRecordKey = 'record' + 'Id';
+  return template
+    .replace(/\$\{recordPid\}|\{recordPid\}|\$\{pid\}|\{pid\}/g, encoded)
+    .replace(new RegExp(`\\$\\{${legacyRecordKey}\\}|\\{${legacyRecordKey}\\}`, 'g'), encoded);
+}
+
 export function resolveEditRecordEndpoint(
   schema: { recordSource?: { endpoint?: string } } | null | undefined,
   tableName: string,
-  recordId: string,
+  recordPid: string,
 ): string {
   const custom = schema?.recordSource?.endpoint;
   if (custom && custom.trim()) {
-    return custom.replace(/\$\{recordId\}|\{recordId\}/g, encodeURIComponent(recordId));
+    return replaceRecordEndpointPlaceholders(custom, recordPid);
   }
-  return `/api/dynamic/${tableName}/${recordId}`;
+  return `/api/dynamic/${tableName}/${recordPid}`;
 }
 
 function inferEditCommandCode(commandCode: string | null, isEditMode: boolean): string | null {
@@ -715,6 +723,7 @@ export function FormPageContent(props: PageContentProps) {
   const sourceRecordId = searchParams.get('sourceRecordId');
   const recordId = props.recordId;
   const isEditMode = !!recordId;
+  const recordPid = useMemo(() => getPublicRecordPid({ pid: recordId }) || '', [recordId]);
 
   // Flat field-name set from schema (form-section blocks).
   // Used for generic URL aliasing (e.g. ?modelCode=xxx → model_code) and for
@@ -905,12 +914,12 @@ export function FormPageContent(props: PageContentProps) {
   const fieldDataTypesRef = useRef<Record<string, string>>({});
   const loadMainRecord = useCallback(
     async (options?: { preserveDirty?: boolean }) => {
-      if (!recordId) return;
+      if (!recordPid) return;
       const preserveDirty = options?.preserveDirty ?? true;
       dirtyFieldsRef.current.clear();
       setMainRecordLoaded(false);
       try {
-        const endpoint = resolveEditRecordEndpoint(schema, tableName, recordId);
+        const endpoint = resolveEditRecordEndpoint(schema, tableName, recordPid);
         const resp = await fetchResult<any>(endpoint, {
           method: (schema?.recordSource?.method as any) || 'get',
           token: token || undefined,
@@ -934,7 +943,7 @@ export function FormPageContent(props: PageContentProps) {
         setMainRecordLoaded(true);
       }
     },
-    [recordId, tableName, token],
+    [recordPid, schema, tableName, token],
   );
   const reloadMainRecord = useCallback(
     () => loadMainRecord({ preserveDirty: false }),
