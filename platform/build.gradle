@@ -223,7 +223,7 @@ ext {
     // Drools Rule Engine
     droolsVersion = '8.44.2.Final'
     xxlJobVersion = '3.4.0'
-    springKafkaVersion = '3.2.0'
+    springKafkaVersion = '3.3.16'
     kafkaClientsVersion = '3.7.0'
     testWorkerNum = project.findProperty('workerNum') ?: '1'
 }
