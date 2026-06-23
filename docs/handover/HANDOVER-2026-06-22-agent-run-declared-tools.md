@@ -156,8 +156,8 @@ on Gradle Plugin Portal availability.
   resolution, verification, and gold evidence.
 - [x] 已写入 `docs/backlog/2026-06-22-ci-smartengine-402-mavenlocal.md`: clean CI cannot resolve
   SmartEngine 4.0.2 artifacts without routing the SmartEngine group to Maven Central before mirrors.
-- [ ] 待 owner 拍板 `markdownlint` MD025 config: consider `MD025: { front_matter_title: "" }`
-  to stop frontmatter title from counting as a duplicate H1.
+- [x] Fixed `markdownlint` MD025 config with `MD025: { front_matter_title: "" }`, so
+  frontmatter title no longer counts as a duplicate H1 while the single-H1 rule remains active.
 
 ## Operational State
 
