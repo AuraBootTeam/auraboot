@@ -407,8 +407,8 @@ dependencies {
     // approach for CGLIB-proxied Spring beans, which mis-attributes coverage across the many
     // @SpringBootTest contexts in the full suite (proxy class IDs differ per evicted/recreated
     // context, so the dumped proxy no longer matches the exec — the bundle then reads ~5%).
-    jacocoAnt 'org.jacoco:org.jacoco.ant:0.8.12'
-    jacocoRuntime 'org.jacoco:org.jacoco.agent:0.8.12:runtime'
+    jacocoAnt 'org.jacoco:org.jacoco.ant:0.8.15'
+    jacocoRuntime 'org.jacoco:org.jacoco.agent:0.8.15:runtime'
 
     // PostgreSQL 数据库用于测试
     testImplementation 'org.postgresql:postgresql:42.7.11'
