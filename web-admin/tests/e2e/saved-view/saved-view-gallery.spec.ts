@@ -76,7 +76,7 @@ test.describe('SavedView — GALLERY View', () => {
 
     const panel = await openSavedViewManagePanel(page);
     await panel.getByTestId('saved-view-create-personal').click();
-    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图:');
+    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图：');
     await panel.getByTestId('saved-view-type-gallery').click();
 
     const blocked = panel.getByTestId('view-capability-blocked-gallery');
@@ -111,7 +111,7 @@ test.describe('SavedView — GALLERY View', () => {
 
     const panel = await openSavedViewManagePanel(page);
     await panel.getByTestId('saved-view-create-personal').click();
-    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图:');
+    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图：');
     await panel.getByTestId('saved-view-type-gallery').click();
 
     await expect(panel.getByText(/配置画册视图/)).toBeVisible({ timeout: 5000 });

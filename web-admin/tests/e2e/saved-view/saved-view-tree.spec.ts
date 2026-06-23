@@ -8,16 +8,57 @@
  * @since 7.0.0
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_CUSTOMER_CONFIG } from '../../helpers/configs/e2et-customer.config';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
-import { navigateToDynamicPage, openSavedViewManagePanel, uniqueId } from '../helpers';
+import {
+  navigateToDynamicPage,
+  openSavedViewManagePanel,
+  uniqueId,
+} from '../helpers';
 
 const ROUTE_PAGE_KEY = 'e2et_order';
 const CUSTOMER_PAGE_KEY = 'e2et_customer';
 const SCREENSHOT_DIR = 'test-results/saved-view-vnext';
+const ORDER_LIST_PAGE_KEY = 'e2et_order_list';
+
+async function ensureOrderTableView(page: Page): Promise<string> {
+  const params = new URLSearchParams({
+    modelCode: ROUTE_PAGE_KEY,
+    pageKey: ORDER_LIST_PAGE_KEY,
+  });
+  const accessible = await page.request.get(`/api/views/accessible?${params.toString()}`);
+  expect(accessible.ok(), `load table views failed: ${accessible.status()}`).toBe(true);
+  const accessibleBody = await accessible.json();
+  const views = Array.isArray(accessibleBody.data) ? accessibleBody.data : [];
+  const personalTable = views.find(
+    (view: any) =>
+      view?.pid && view.scope === 'personal' && (view.viewType || 'table') === 'table',
+  );
+  if (personalTable?.pid) {
+    return String(personalTable.pid);
+  }
+
+  const create = await page.request.post('/api/views', {
+    data: {
+      name: '树视图表格视图',
+      modelCode: ROUTE_PAGE_KEY,
+      pageKey: ORDER_LIST_PAGE_KEY,
+      scope: 'personal',
+      viewType: 'table',
+      viewConfig: {},
+    },
+  });
+  if (!create.ok()) {
+    throw new Error(`create table view failed: ${create.status()} ${await create.text()}`);
+  }
+  const createBody = await create.json();
+  const pid = createBody.data?.pid ?? createBody.data?.view?.pid ?? createBody.pid;
+  expect(pid, `create table view returned no pid: ${JSON.stringify(createBody)}`).toBeTruthy();
+  return String(pid);
+}
 
 test.describe('SavedView — TREE View', () => {
   test('SV-033: TREE — blocks creation when no hierarchy field exists @smoke', async ({
@@ -42,7 +83,7 @@ test.describe('SavedView — TREE View', () => {
 
     const panel = await openSavedViewManagePanel(page);
     await panel.getByTestId('saved-view-create-personal').click();
-    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图:');
+    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图：');
     await panel.getByTestId('saved-view-type-tree').click();
 
     const blocked = panel.getByTestId('view-capability-blocked-tree');
@@ -67,7 +108,20 @@ test.describe('SavedView — TREE View', () => {
       e2et_order_customer: '',
     });
 
-    await navigateToDynamicPage(page, ROUTE_PAGE_KEY);
+    const tableViewPid = await ensureOrderTableView(page);
+    await navigateToDynamicPage(page, ROUTE_PAGE_KEY, { viewPid: tableViewPid });
+    const searchResponsePromise = page
+      .waitForResponse(
+        (response) =>
+          response.url().includes('/api/dynamic/e2et_order/list') && response.status() === 200,
+        {
+          timeout: 10000,
+        },
+      )
+      .catch(() => null);
+    await page.getByTestId('list-search-input').fill(orderTitle);
+    await page.getByTestId('list-search-input').press('Enter');
+    await searchResponsePromise;
     await expect(page.getByText(orderTitle)).toBeVisible({ timeout: 15000 });
 
     const createPayloads: Array<Record<string, unknown>> = [];
@@ -81,12 +135,12 @@ test.describe('SavedView — TREE View', () => {
 
     const panel = await openSavedViewManagePanel(page);
     await panel.getByTestId('saved-view-create-personal').click();
-    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图:');
+    await expect(panel.getByTestId('saved-view-quota-status')).toContainText('个人视图：');
     await panel.getByTestId('saved-view-type-tree').click();
 
     const degraded = panel.getByTestId('view-capability-degraded-tree');
     await expect(degraded).toBeVisible({ timeout: 5000 });
-    await expect(degraded).toContainText(/拖拽排序|更新命令/);
+    await expect(degraded).toContainText(/排序命令|只读展示/);
     await expect(panel.getByText(/配置树视图/)).toBeVisible();
     expect(createPayloads).toHaveLength(0);
 
