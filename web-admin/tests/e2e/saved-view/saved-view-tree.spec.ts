@@ -23,6 +23,27 @@ const ROUTE_PAGE_KEY = 'e2et_order';
 const CUSTOMER_PAGE_KEY = 'e2et_customer';
 const SCREENSHOT_DIR = 'test-results/saved-view-vnext';
 const ORDER_LIST_PAGE_KEY = 'e2et_order_list';
+const CLEANUP_PREFIXES = ['树视图视图', '树视图表格视图', 'SV Tree Table View'];
+
+async function cleanupTreeViews(page: Page): Promise<void> {
+  const params = new URLSearchParams({
+    modelCode: ROUTE_PAGE_KEY,
+    pageKey: ORDER_LIST_PAGE_KEY,
+  });
+  const accessible = await page.request.get(`/api/views/accessible?${params.toString()}`);
+  if (!accessible.ok()) return;
+  const body = await accessible.json().catch(() => ({}));
+  const views = Array.isArray(body.data) ? body.data : [];
+  for (const view of views) {
+    if (
+      view?.pid &&
+      view.scope === 'personal' &&
+      CLEANUP_PREFIXES.some((prefix) => String(view.name ?? '').startsWith(prefix))
+    ) {
+      await page.request.delete(`/api/views/${view.pid}`).catch(() => {});
+    }
+  }
+}
 
 async function ensureOrderTableView(page: Page): Promise<string> {
   const params = new URLSearchParams({
@@ -61,6 +82,10 @@ async function ensureOrderTableView(page: Page): Promise<string> {
 }
 
 test.describe('SavedView — TREE View', () => {
+  test.beforeEach(async ({ page }) => {
+    await cleanupTreeViews(page);
+  });
+
   test('SV-033: TREE — blocks creation when no hierarchy field exists @smoke', async ({
     page,
   }) => {
