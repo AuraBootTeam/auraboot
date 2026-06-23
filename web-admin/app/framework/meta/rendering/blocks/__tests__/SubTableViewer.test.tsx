@@ -235,6 +235,7 @@ describe('SubTableViewer', () => {
                 pid: 'line-1',
                 inv_in_line_receipt_id: 'receipt-1',
                 inv_in_line_product_id: 'prod-1',
+                inv_in_line_product_id_display: 'P-RAW-CODE-001',
                 inv_in_line_qty: 12,
               },
             ],
@@ -274,6 +275,7 @@ describe('SubTableViewer', () => {
       expect(text).toContain('商品');
       expect(text).toContain('数量');
       expect(text).toContain('示范电源模块');
+      expect(text).not.toContain('P-RAW-CODE-001');
       expect(text).not.toContain('inv_in_line_product_id');
       expect(text).not.toContain('prod-1');
     });
@@ -313,6 +315,31 @@ describe('SubTableViewer', () => {
       '该客户尚未录入对接人，建议先添加主联系人。',
     );
     expect(screen.getByTestId('subtable-empty-action').textContent).toContain('添加联系人');
+  });
+
+  it('uses a Chinese fallback label for the add-line action when i18n is missing', async () => {
+    fetchResultMock.mockResolvedValue({
+      code: '0',
+      data: {
+        records: [],
+      },
+    });
+
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          commands: { create: 'crm:create_contact' },
+        }}
+        parentRecordId="record-1"
+        isEditable
+        t={(key) => (key === 'common.noData' ? '暂无数据' : key)}
+      />,
+    );
+
+    await expect(screen.findByTestId('subtable-empty-state')).resolves.toBeInTheDocument();
+    expect(screen.getByTestId('subtable-empty-action').textContent).toContain('添加明细');
+    expect(screen.getByTestId('subtable-empty-action').textContent).not.toContain('Add Line');
   });
 
   it('uses configured action label for the add-row button when rows already exist', async () => {
