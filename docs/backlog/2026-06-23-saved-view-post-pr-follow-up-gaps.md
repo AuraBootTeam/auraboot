@@ -41,8 +41,8 @@ Dynamic business record pid-only migration has been removed from this SavedView 
 
 | Lane | Included | Excluded |
 | --- | --- | --- |
-| Current SavedView follow-up | WP1-WP5:高级视图语义校验、E2E 矩阵治理、协作者产品化、配额 UX/fixture、quick preset 生命周期 | UserRole legacy endpoint removal、audit actorPid public query、OpenAPI pid 清理 |
-| Non-blocking platform/public-contract notes | RBAC endpoint deprecation、audit query public contract、docs/OpenAPI cleanup | 不在当前 SavedView 分支里顺手改 audit 公共契约或全仓文档命名 |
+| Current SavedView follow-up | WP1-WP5:高级视图语义校验、E2E 矩阵治理、协作者产品化、配额 UX/fixture、quick preset 生命周期 | UserRole legacy endpoint removal、OpenAPI pid 清理 |
+| Non-blocking platform/public-contract notes | RBAC endpoint deprecation、docs/OpenAPI cleanup; audit actorPid query closed by dedicated audit branch | 不在当前 SavedView 分支里顺手改全仓文档命名或删除兼容端点 |
 
 当前文档状态是 `active backlog`:WP1-WP5 已在 `codex/saved-view-p2-remaining` 完成实现和目标验证;dynamic record pid-only migration 不再纳入本文档 backlog。
 
@@ -79,7 +79,7 @@ Dynamic business record pid-only migration has been removed from this SavedView 
 | Gap | 外部原因 | 当前分支规则 |
 | --- | --- | --- |
 | GAP-SV-FU-004 | UserRole legacy ID endpoint 退役需要 telemetry、兼容窗口、OpenAPI 策略 | 当前分支不删除兼容端点 |
-| GAP-SV-FU-006 | audit actorPid 查询和 internal actor id 边界属于审计公共契约治理 | 不和 SavedView sharing UI 混在同一 PR |
+| GAP-SV-FU-006 | audit actorPid 查询和 internal actor id 边界属于审计公共契约治理 | done in `codex/public-record-pid-latest-repair-v2`: public `actorPid` query added; legacy `actorId` remains compatibility-only |
 | GAP-SV-FU-010 | 文档/OpenAPI pid 清理依赖平台迁移命名决策 | 等 migration 决策落地后再统一清理 |
 
 ## Origin Decisions
@@ -113,7 +113,7 @@ These follow-up gaps come from the Feishu parity analysis and the subsequent PR 
 | Gap | Reason for exclusion from current branch | Source of truth |
 | --- | --- | --- |
 | GAP-SV-FU-004 ID-based UserRole mutation endpoint retirement | pid/code 契约治理,需要兼容窗口、运行时 telemetry 和 OpenAPI deprecation 策略 | 本文档保留 backlog,开发单独分支 |
-| GAP-SV-FU-006 Audit actor public query contract | `actorPid`/internal actor id 边界属于审计公共契约治理,应和 pid migration 统一口径 | 本文档保留 backlog,开发单独分支 |
+| GAP-SV-FU-006 Audit actor public query contract | `actorPid`/internal actor id 边界属于审计公共契约治理,应和 pid migration 统一口径 | done in separate audit/public-contract branch; keep `actorId` compatibility until deprecation policy removes it |
 | GAP-SV-FU-010 Documentation/OpenAPI pid cleanup | 依赖 pid migration 完成后的全局命名和 OpenAPI 决策 | 跟随 pid migration 后置收口 |
 
 ## Backlog Operating Model
@@ -144,7 +144,7 @@ These follow-up gaps come from the Feishu parity analysis and the subsequent PR 
 | P1 | View quota UX and test isolation | Current SavedView follow-up | Done in current branch; count/limit UI, personal/team/global limits, and quota-safe helper evidence are present | Keep long-lived runtime tests on create-or-reuse policy |
 | P2 | Quick filter preset lifecycle | Current SavedView follow-up | Done in current branch; provider registry, saved/edited/reset UI, and browser evidence are present | Plugin-contributed preset examples remain optional future expansion |
 | External P1 | ID-based UserRole mutation endpoint retirement | Separate governance branch | PID endpoints exist; old ID endpoints are only `@Deprecated` | Add deprecation telemetry, docs, compatibility window, then remove/admin-gate legacy endpoints |
-| External P1 | Audit actor public query contract | Separate audit/public-contract branch | Audit responses are public DTOs; `/by-actor` still uses `actorId` query | Add `actorPid` query path/alias and restrict full internal audit DTOs to admin/verification endpoints |
+| External P1 | Audit actor public query contract | Separate audit/public-contract branch | Done locally in `codex/public-record-pid-latest-repair-v2`; `/by-actor` accepts public `actorPid` and keeps `actorId` deprecated for compatibility | Watch PR/CI, then keep any remaining hard removal with UserRole-style deprecation governance |
 | External P2 | Documentation/OpenAPI pid cleanup | Follows pid migration | Code paths changed faster than public docs | Update API docs, examples, and generated schema language to pid-first contracts after migration decisions land |
 
 ## Backlog Index
@@ -155,7 +155,7 @@ These follow-up gaps come from the Feishu parity analysis and the subsequent PR 
 | GAP-SV-FU-003 | P0 | WP2 | SavedView E2E governance | done | existing historical specs and fixture routes | `FEATURE_MATRIX.md`, direct-route audit, e2e-truth notes |
 | GAP-SV-FU-004 | External P1 | UserRole pid endpoint retirement | RBAC/API governance | blocked_external | legacy caller telemetry and compatibility window | Deprecation telemetry, docs, zero-usage evidence before removal |
 | GAP-SV-FU-005 | P1 | WP3 | SavedView sharing UX/API | done | collaborator validator, audit event shape | Share panel E2E, backend ACL tests, audit row evidence |
-| GAP-SV-FU-006 | External P1 | Audit public actor query | Audit/API governance | blocked_external | actorPid query contract and admin/public split | `actorPid` public query tests and docs |
+| GAP-SV-FU-006 | External P1 | Audit public actor query | Audit/API governance | done | actorPid query contract and admin/public split | `AuditTrailControllerTest`, `AuditTrailServiceTest`, OpenAPI parameter descriptions |
 | GAP-SV-FU-007 | P1 | WP4 | SavedView quota UX/tests | done | manual view limits from count-limit branch | Limit UI tests, quota-safe fixture helper, reuse evidence |
 | GAP-SV-FU-008 | P2 | WP5 | Quick preset lifecycle | done | preset origin metadata and provider extraction | Provider registry tests, save/repeat/reset E2E; rename/delete covered by normal management rows |
 | GAP-SV-FU-009 | P1 | WP3 | Collaborator ACL contract | done | principal lookup and tenant/team membership rules | Invalid ACL backend tests and documented DTO |
@@ -184,7 +184,7 @@ This section is the handoff-level summary after the current coding and verificat
 | WP3 Collaborator productization | Share panel exists in `ViewManagePanel`; tenant-member search service and component tests cover add/remove; backend validates user principal pid, permission, tenant membership, and audits collaborator changes | done for current user-principal collaborator contract; future team/role principals require a separate contract branch |
 | WP4 Quota UX and fixtures | Create/manage flow shows current count/limit and disables create when limit is reached; component test covers limit state; E2E helper can create or reuse matching SavedViews | done for personal 10 and team/global 20; long-lived runtime policy is create-or-reuse, not destructive cleanup |
 | WP5 Quick preset lifecycle | Preset definitions are provider-based; duplicate provider/key behavior has tests; system preset chip can show saved/edited state; reset-to-system handler and i18n keys are wired; unit/component tests cover state derivation | done for save/repeat/personal copy/edited/reset lifecycle; rename/delete are normal management-path behavior in the matrix |
-| Non-blocking platform governance notes | UserRole legacy endpoint retirement, audit actorPid query, and OpenAPI cleanup are documented here with owner boundaries | Keep out of this branch; open separate branches for telemetry/docs cleanup |
+| Non-blocking platform governance notes | UserRole legacy endpoint retirement and OpenAPI cleanup are documented here with owner boundaries; audit actorPid query has a dedicated fix branch | Keep UserRole/OpenAPI cleanup out of this branch; audit actorPid now has focused tests |
 
 ## Latest Verification Fallout And Follow-up Tasks
 
@@ -216,7 +216,7 @@ Immediate next action order after Checkpoint D:
 
 1. Do not reopen WP1-WP5 in this branch unless a regression appears; use the commands in the validation report as the repeatable gate.
 2. Keep historical `tests/e2e/saved-view` debt classified in `FEATURE_MATRIX.md`; convert old direct-route/API-heavy rows opportunistically when those feature areas are next touched.
-3. Do not reopen WP1-WP5 for non-blocking platform/public-contract notes such as UserRole legacy endpoint retirement, audit actorPid public query, and OpenAPI/docs cleanup.
+3. Do not reopen WP1-WP5 for non-blocking platform/public-contract notes such as UserRole legacy endpoint retirement and OpenAPI/docs cleanup. Audit actorPid public query is tracked by the separate audit/public-contract branch.
 
 Current status after Checkpoint D:
 
@@ -251,7 +251,7 @@ The table below is the actionable backlog. `Evidence owner` means where the clos
 | SV-WP5-B | GAP-SV-FU-008 | Prove saved/edited/reset lifecycle from real list-page entry | follow-up golden E2E + screenshot | done |
 | SV-WP5-C | GAP-SV-FU-008 | Tie normal rename/delete management paths back to personal preset copy lifecycle in the matrix | feature matrix | done |
 | SV-EXT-B | GAP-SV-FU-004 | Add UserRole legacy endpoint telemetry/deprecation window before removal | separate RBAC/API branch | blocked_external |
-| SV-EXT-C | GAP-SV-FU-006 | Add public `actorPid` audit query and document internal/admin split | separate audit branch | blocked_external |
+| SV-EXT-C | GAP-SV-FU-006 | Add public `actorPid` audit query and document internal/admin split | separate audit branch | done in `codex/public-record-pid-latest-repair-v2` |
 | SV-EXT-D | GAP-SV-FU-010 | Clean docs/OpenAPI pid language after migration naming settles | follow-up docs branch | blocked_external |
 
 ## Current Work Package Contracts
@@ -412,7 +412,7 @@ Current branch note: `FEATURE_MATRIX.md` and timeline direct-route cleanup are c
 | External gap | Required follow-up | Current branch rule |
 | --- | --- | --- |
 | GAP-SV-FU-004 UserRole legacy ID endpoint retirement | Add telemetry/warning headers/docs, prove zero first-party legacy callers, then remove or admin-gate deprecated endpoints | Do not remove compatibility endpoints in this branch |
-| GAP-SV-FU-006 Audit actor public query | Add `actorPid` public query and document admin/internal actor-id boundary | Do not mix with SavedView collaborator UI unless audit API branch lands first |
+| GAP-SV-FU-006 Audit actor public query | Add `actorPid` public query and document admin/internal actor-id boundary | done in `codex/public-record-pid-latest-repair-v2`; legacy `actorId` stays only as deprecated compatibility |
 | GAP-SV-FU-010 Docs/OpenAPI pid cleanup | Rewrite public examples after pid migration naming decisions settle | Do not mass-rename docs before platform migration contract is final |
 
 ## Gap Details
@@ -555,17 +555,19 @@ Acceptance criteria:
 
 ### GAP-SV-FU-006: Audit Query Public Contract and Admin Split
 
-Status: blocked_external.
+Status: done.
 
 Current state:
 
 - `/api/audit/trail`, `/api/audit/by-actor`, and `/api/audit/by-command` return `AuditTrailPublicDTO`.
 - Public DTO hides `id`, `tenantId`, `entityId`, `actorId`, actor IP, snapshots, and hash chain internals.
 - SavedView audit events expose `sequenceNo` for stable UI keys.
+- `/api/audit/by-actor` accepts public `actorPid` and resolves it through active tenant membership before querying `ab_audit_trail.actor_id`.
+- Legacy `actorId` remains accepted for compatibility and is marked deprecated in OpenAPI parameter metadata.
 
 Gap:
 
-- `/api/audit/by-actor` still takes `actorId` as a query input.
+- `actorId` hard removal is intentionally not part of this gap; it should follow the same telemetry/compatibility-window governance as other legacy ID endpoints.
 - Compliance and verification endpoints still use internal audit entities by design, but the admin/internal boundary is not yet documented clearly enough.
 - SavedView management UI may eventually need actor pid/display filters instead of internal actor ids.
 
@@ -577,10 +579,10 @@ Target behavior:
 
 Acceptance criteria:
 
-- Public actor audit can be queried with `actorPid`.
-- Response remains public DTO.
-- Tests assert internal ids are not exposed in public actor query response.
-- OpenAPI/docs mark actor-id path as legacy or admin-only.
+- Public actor audit can be queried with `actorPid`: covered by `AuditTrailControllerTest.getByActor_prefersActorPidAndReturnsPublicDto`.
+- Response remains public DTO and internal ids are not exposed: covered by existing `AuditTrailControllerTest` public DTO serialization assertions.
+- Actor PID resolves tenant-scoped internal user id before audit lookup, including empty result for missing PID: covered by `AuditTrailServiceTest`.
+- OpenAPI metadata marks `actorId` as deprecated compatibility and `actorPid` as preferred.
 
 ### GAP-SV-FU-007: View Quota UX and Quota-Aware Test Fixtures
 
@@ -750,7 +752,7 @@ For any current-window package:
 | Order | Work package | Suggested branch | Reason |
 | --- | --- | --- | --- |
 | external-2 | UserRole legacy endpoint retirement telemetry | `codex/user-role-pid-endpoint-deprecation` | Governance work tied to pid/code contract migration |
-| external-3 | Audit actorPid public query | `codex/audit-public-actor-pid-query` | Audit public-contract cleanup should align with pid migration language |
+| external-3 | Audit actorPid public query | `codex/public-record-pid-latest-repair-v2` | done locally; merge after focused tests and CI |
 | external-4 | Documentation/OpenAPI pid cleanup | follows pid migration | Avoids rewriting docs before public-id naming decisions settle |
 
 ## Reporting Rules

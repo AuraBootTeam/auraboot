@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.entity.AuditTrail;
 import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
+import io.swagger.v3.oas.annotations.Parameter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.util.StringUtils;
@@ -51,18 +52,31 @@ public class AuditTrailController {
 
     /**
      * Get audit records by actor within a time range.
-     * GET /api/audit/by-actor?actorId=1&start=2026-01-01T00:00:00&end=2026-12-31T23:59:59
+     * GET /api/audit/by-actor?actorPid=01K...&start=2026-01-01T00:00:00&end=2026-12-31T23:59:59
+     * Legacy actorId is still accepted for compatibility.
      */
     @GetMapping("/by-actor")
     @RequirePermission(MetaPermission.META_AUDIT_TRAIL_READ)
     public ApiResponse<List<AuditTrailPublicDTO>> getByActor(
-            @RequestParam Long actorId,
+            @Parameter(description = "Public actor PID. Preferred for UI/public callers.")
+            @RequestParam(required = false) String actorPid,
+            @Parameter(description = "Legacy internal actor ID. Kept for compatibility; prefer actorPid.",
+                    deprecated = true)
+            @RequestParam(required = false) Long actorId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Instant startInstant = start.toInstant(ZoneOffset.UTC);
         Instant endInstant = end.toInstant(ZoneOffset.UTC);
-        List<AuditTrail> trail = auditTrailService.getAuditByActor(tenantId, actorId, startInstant, endInstant);
+        List<AuditTrail> trail;
+        if (StringUtils.hasText(actorPid)) {
+            trail = auditTrailService.getAuditByActorPid(tenantId, actorPid, startInstant, endInstant);
+        } else {
+            if (actorId == null) {
+                throw new IllegalArgumentException("actorPid is required");
+            }
+            trail = auditTrailService.getAuditByActor(tenantId, actorId, startInstant, endInstant);
+        }
         return ApiResponse.success(toPublicTrail(trail));
     }
 

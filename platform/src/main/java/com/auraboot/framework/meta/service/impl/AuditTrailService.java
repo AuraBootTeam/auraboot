@@ -5,10 +5,12 @@ import com.auraboot.framework.meta.dto.AuditComplianceReport;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.entity.AuditTrail;
 import com.auraboot.framework.meta.mapper.AuditTrailMapper;
+import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.util.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -43,6 +46,7 @@ public class AuditTrailService {
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final AuditTrailMapper auditTrailMapper;
+    private final UserMapper userMapper;
 
     /**
      * Record an audit trail entry with SHA-256 chain hashing.
@@ -203,6 +207,21 @@ public class AuditTrailService {
      */
     public List<AuditTrail> getAuditByActor(Long tenantId, Long actorId,
                                               Instant startTime, Instant endTime) {
+        return auditTrailMapper.getByActor(tenantId, actorId, startTime, endTime);
+    }
+
+    /**
+     * Get audit records for a public actor PID within a time range.
+     */
+    public List<AuditTrail> getAuditByActorPid(Long tenantId, String actorPid,
+                                                Instant startTime, Instant endTime) {
+        if (!StringUtils.hasText(actorPid)) {
+            return Collections.emptyList();
+        }
+        Long actorId = userMapper.findUserIdInTenantByPid(tenantId, actorPid);
+        if (actorId == null) {
+            return Collections.emptyList();
+        }
         return auditTrailMapper.getByActor(tenantId, actorId, startTime, endTime);
     }
 
