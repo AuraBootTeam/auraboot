@@ -244,6 +244,6 @@
     "vite": "^8.0.16",
     "vite-plugin-istanbul": "^9.0.1",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   }
 }
