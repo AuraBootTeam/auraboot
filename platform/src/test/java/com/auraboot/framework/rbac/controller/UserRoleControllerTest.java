@@ -5,6 +5,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.rbac.dto.AssignRolesByCodeRequest;
 import com.auraboot.framework.rbac.dto.AssignRolesByPidRequest;
 import com.auraboot.framework.rbac.dto.UserRoleResponse;
+import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,13 +16,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,6 +50,7 @@ class UserRoleControllerTest {
     @AfterEach
     void tearDown() {
         MetaContext.clear();
+        RequestContextHolder.resetRequestAttributes();
     }
 
     @Test
@@ -184,5 +191,52 @@ class UserRoleControllerTest {
         assertTrue(response.isSuccess());
         assertEquals(List.of("role_e2et_viewer"), response.getData());
         verify(userRoleService).getRolePidsByMemberPidAndTenantId("member_e2e_viewer", 100L);
+    }
+
+    @Test
+    void legacyIdMutationEndpoints_emitDeprecationHeaders() {
+        when(userRoleService.assignRolesToMember(1L, List.of(10L), 100L, 700L)).thenReturn(true);
+        when(userRoleService.removeRolesFromMember(1L, List.of(10L), 100L)).thenReturn(true);
+        when(userRoleService.syncMemberRoles(1L, List.of(10L), 100L, 700L)).thenReturn(true);
+        when(userRoleService.batchAssignRoles(anyList())).thenReturn(1);
+        when(userRoleService.batchRemoveRoles(List.of(99L))).thenReturn(1);
+
+        MockHttpServletResponse assign = bindResponse();
+        controller.assignRolesToMember(1L, List.of(10L), 700L);
+        assertLegacyDeprecation(assign, "/api/user-roles/assign", "/api/user-roles/assign-by-pid");
+
+        MockHttpServletResponse remove = bindResponse();
+        controller.removeRolesFromMember(1L, List.of(10L));
+        assertLegacyDeprecation(remove, "/api/user-roles/remove", "/api/user-roles/remove-by-pid");
+
+        MockHttpServletResponse sync = bindResponse();
+        controller.syncMemberRoles(1L, List.of(10L), 700L);
+        assertLegacyDeprecation(sync, "/api/user-roles/sync", "/api/user-roles/sync-by-pid");
+
+        MockHttpServletResponse batchAssign = bindResponse();
+        controller.batchAssignRoles(List.of(new UserRole()), 700L);
+        assertLegacyDeprecation(batchAssign, "/api/user-roles/batch-assign", "/api/user-roles/batch-assign-by-pid");
+
+        MockHttpServletResponse batchRemove = bindResponse();
+        controller.batchRemoveUserRoles(List.of(99L));
+        assertLegacyDeprecation(batchRemove, "/api/user-roles/batch-remove", "/api/user-roles/batch-remove-by-pid");
+    }
+
+    private static MockHttpServletResponse bindResponse() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request, response));
+        return response;
+    }
+
+    private static void assertLegacyDeprecation(
+            MockHttpServletResponse response,
+            String legacyPath,
+            String replacementPath) {
+        assertEquals("true", response.getHeader("Deprecation"));
+        assertEquals(legacyPath, response.getHeader("X-Aura-Deprecated-Endpoint"));
+        assertEquals(replacementPath, response.getHeader("X-Aura-Replacement-Endpoint"));
+        assertEquals("299 AuraBoot \"Deprecated endpoint; use " + replacementPath + "\"",
+                response.getHeader("Warning"));
     }
 }
