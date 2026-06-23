@@ -33,7 +33,8 @@ Closed the Behavior Kafka decouple ingestion follow-up line end to end. OSS PR #
   - Status: MERGED to `main`
   - Commit: `b0509485e0471add9628d98202339be5f4cbf0a0`
   - Merge commit: `8cb87fb2cac0e23593f1051d551ee24a4b5a42c7`
-- **OSS handover PR**: TBD in this same closeout session.
+- **OSS handover PR #1031** `https://github.com/AuraBootTeam/auraboot/pull/1031`
+  - Status: OPEN at document update time; expected to be admin-merged in this same closeout session.
 
 ## Verification Evidence
 - `git diff --check origin/main...HEAD`
