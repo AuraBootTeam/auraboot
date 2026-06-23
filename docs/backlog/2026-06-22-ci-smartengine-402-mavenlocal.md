@@ -70,6 +70,11 @@ This keeps SmartEngine fork resolution on Maven Central while preserving the exi
 for the rest of the build, and gives Gradle plugin marker resolution the same Maven Central-first
 fallback.
 
+Follow-up on 2026-06-23: SmartEngine 4.0.2 is now published to the remote Maven repository, so the
+temporary Maven-local install fallback has been removed from CI and Docker builds. The
+`install-smartengine-maven-local.sh` scripts were deleted, and contract tests now assert that
+backend/codeql workflows and `platform/Dockerfile` no longer invoke the Maven-local workaround.
+
 ## Verification
 
 Clean remote artifact checks:

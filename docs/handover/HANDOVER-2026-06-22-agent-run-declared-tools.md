@@ -159,6 +159,18 @@ on Gradle Plugin Portal availability.
 - [x] Fixed `markdownlint` MD025 config with `MD025: { front_matter_title: "" }`, so
   frontmatter title no longer counts as a duplicate H1 while the single-H1 rule remains active.
 
+## 2026-06-23 Follow-up
+
+- [x] Removed the temporary SmartEngine Maven-local install fallback after SmartEngine 4.0.2 was
+  published to the remote Maven repository. Backend/codeql CI and `platform/Dockerfile` no longer
+  call `install-smartengine-maven-local.sh`, and both fallback scripts were deleted.
+- [x] Closed the declared-tool cap follow-up: declared `custom:` tools now load directly by exact
+  `ab_agent_tool.tool_code`, and provider-prefixed declared tools fall back to provider-specific
+  discovery instead of the globally capped aggregate catalog.
+- [x] Hardened run-path planning prompts with a structured tool catalog and an explicit
+  `platform.execute_sql` fallback-only rule so DeepSeek sees declared DSL/custom tools as the
+  preferred path. This is covered by `PlanServiceTest`; no new live-model gold is claimed here.
+
 ## Operational State
 
 ### 分支 / Worktree / PR
@@ -192,7 +204,7 @@ on Gradle Plugin Portal availability.
 - `cd platform && GRADLE_USER_HOME=/tmp/auraboot-smartengine-402-gradle-fix ./gradlew --no-daemon --refresh-dependencies clean compileJava -Dmaven.repo.local=/tmp/auraboot-smartengine-402-m2-fix`
 - `cd platform && GRADLE_USER_HOME=/tmp/auraboot-smartengine-402-gradle-fix ./gradlew --no-daemon compileTestJava -Dmaven.repo.local=/tmp/auraboot-smartengine-402-m2-fix`
 - `cd platform && ./gradlew --no-daemon compileJava compileTestJava compileIntegrationTestJava checkstyleMain pmdMain jar`
-- `node --test scripts/reset-init-contracts.test.mjs` (22/22)
+- `node --test scripts/reset-init-contracts.test.mjs` (24/24)
 
 ### Verification Limits
 
