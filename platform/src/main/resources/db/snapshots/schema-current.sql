@@ -3047,6 +3047,60 @@ ALTER SEQUENCE public.ab_behavior_event_id_seq OWNED BY public.ab_behavior_event
 
 
 --
+-- Name: ab_behavior_outcome_outbox; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_behavior_outcome_outbox (
+    id bigint NOT NULL,
+    tenant_id bigint NOT NULL,
+    event_id character varying(40) NOT NULL,
+    user_id bigint,
+    event_name character varying(120) NOT NULL,
+    target_type character varying(64),
+    target_key character varying(120),
+    payload jsonb NOT NULL,
+    trace_id character varying(36),
+    source_span_id character varying(36),
+    run_id character varying(64),
+    interaction_id character varying(64),
+    caused_by_event_id character varying(40),
+    occurred_at timestamp with time zone NOT NULL,
+    status character varying(24) DEFAULT 'pending'::character varying NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    next_attempt_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    last_error text,
+    published_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: TABLE ab_behavior_outcome_outbox; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_behavior_outcome_outbox IS 'Transactional outbox for server-side behavior business outcome events';
+
+
+--
+-- Name: ab_behavior_outcome_outbox_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_behavior_outcome_outbox_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_behavior_outcome_outbox_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_behavior_outcome_outbox_id_seq OWNED BY public.ab_behavior_outcome_outbox.id;
+
+
+--
 -- Name: ab_behavior_quarantine; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3061,7 +3115,11 @@ CREATE TABLE public.ab_behavior_quarantine (
     detail text,
     raw_event jsonb,
     quarantined_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    replay_status character varying(24) DEFAULT 'pending'::character varying NOT NULL,
+    replay_detail text,
+    replayed_behavior_event_id bigint,
+    replayed_at timestamp with time zone
 );
 
 
@@ -3070,6 +3128,20 @@ CREATE TABLE public.ab_behavior_quarantine (
 --
 
 COMMENT ON TABLE public.ab_behavior_quarantine IS 'Behavior ingest DLQ sink (SoT §2.7 quarantine.v1) — observable + replayable bad-event store';
+
+
+--
+-- Name: COLUMN ab_behavior_quarantine.replay_status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_behavior_quarantine.replay_status IS 'Replay status: pending|replayed|duplicate|failed';
+
+
+--
+-- Name: COLUMN ab_behavior_quarantine.replayed_behavior_event_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_behavior_quarantine.replayed_behavior_event_id IS 'ab_behavior_event.id produced or matched by replay';
 
 
 --
@@ -14946,6 +15018,13 @@ ALTER TABLE ONLY public.ab_behavior_event ALTER COLUMN id SET DEFAULT nextval('p
 
 
 --
+-- Name: ab_behavior_outcome_outbox id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_behavior_outcome_outbox ALTER COLUMN id SET DEFAULT nextval('public.ab_behavior_outcome_outbox_id_seq'::regclass);
+
+
+--
 -- Name: ab_behavior_quarantine id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -16123,6 +16202,14 @@ ALTER TABLE ONLY public.ab_automation
 
 ALTER TABLE ONLY public.ab_behavior_event
     ADD CONSTRAINT ab_behavior_event_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_behavior_outcome_outbox ab_behavior_outcome_outbox_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_behavior_outcome_outbox
+    ADD CONSTRAINT ab_behavior_outcome_outbox_pkey PRIMARY KEY (id);
 
 
 --
@@ -19867,10 +19954,38 @@ CREATE INDEX idx_ab_behavior_event_trace ON public.ab_behavior_event USING btree
 
 
 --
+-- Name: idx_ab_behavior_outcome_outbox_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_behavior_outcome_outbox_pending ON public.ab_behavior_outcome_outbox USING btree (status, next_attempt_at, created_at) WHERE ((status)::text = 'pending'::text);
+
+
+--
+-- Name: idx_ab_behavior_outcome_outbox_tenant_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_behavior_outcome_outbox_tenant_time ON public.ab_behavior_outcome_outbox USING btree (tenant_id, created_at);
+
+
+--
 -- Name: idx_ab_behavior_quarantine_reason; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_ab_behavior_quarantine_reason ON public.ab_behavior_quarantine USING btree (reason);
+
+
+--
+-- Name: idx_ab_behavior_quarantine_retention; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_behavior_quarantine_retention ON public.ab_behavior_quarantine USING btree (quarantined_at, id);
+
+
+--
+-- Name: idx_ab_behavior_quarantine_tenant_replay; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_behavior_quarantine_tenant_replay ON public.ab_behavior_quarantine USING btree (tenant_id, replay_status, quarantined_at);
 
 
 --
@@ -24683,6 +24798,13 @@ CREATE UNIQUE INDEX uk_ab_behavior_event_tenant_eventid ON public.ab_behavior_ev
 
 
 --
+-- Name: uk_ab_behavior_outcome_outbox_tenant_event; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_ab_behavior_outcome_outbox_tenant_event ON public.ab_behavior_outcome_outbox USING btree (tenant_id, event_id);
+
+
+--
 -- Name: uk_ab_im_conv_bound; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -25517,4 +25639,3 @@ ALTER TABLE ONLY public.ab_user_role
 --
 -- PostgreSQL database dump complete
 --
-
