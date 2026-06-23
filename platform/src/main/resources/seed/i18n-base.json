@@ -1093,8 +1093,8 @@
   },
   {
     "key": "auth.channel.emailPassword",
-    "zh-CN": "邮箱密码",
-    "en-US": "Email & Password"
+    "zh-CN": "账号密码",
+    "en-US": "Username/Email & Password"
   },
   {
     "key": "auth.channel.sms",
@@ -1114,9 +1114,23 @@
     "ko-KR": "이메일"
   },
   {
+    "key": "auth.identifier",
+    "zh-CN": "用户名或邮箱",
+    "en-US": "Username or email",
+    "ja-JP": "ユーザー名またはメールアドレス",
+    "ko-KR": "사용자 이름 또는 이메일"
+  },
+  {
     "key": "auth.emailPlaceholder",
     "zh-CN": "请输入邮箱地址",
     "en-US": "Enter your email"
+  },
+  {
+    "key": "auth.identifierPlaceholder",
+    "zh-CN": "请输入用户名或邮箱",
+    "en-US": "Enter username or email",
+    "ja-JP": "ユーザー名またはメールアドレスを入力",
+    "ko-KR": "사용자 이름 또는 이메일을 입력하세요"
   },
   {
     "key": "auth.error.codeInvalid",
@@ -1130,8 +1144,17 @@
   },
   {
     "key": "auth.error.invalidCredentials",
-    "zh-CN": "邮箱或密码错误，请重试",
-    "en-US": "Invalid email or password. Please try again."
+    "zh-CN": "账号或密码错误，请重试",
+    "en-US": "Invalid username/email or password. Please try again.",
+    "ja-JP": "ユーザー名/メールアドレスまたはパスワードが正しくありません",
+    "ko-KR": "사용자 이름/이메일 또는 비밀번호가 올바르지 않습니다"
+  },
+  {
+    "key": "auth.error.identifierRequired",
+    "zh-CN": "请输入用户名或邮箱",
+    "en-US": "Enter username or email",
+    "ja-JP": "ユーザー名またはメールアドレスを入力してください",
+    "ko-KR": "사용자 이름 또는 이메일을 입력해 주세요"
   },
   {
     "key": "auth.error.invalidMobile",

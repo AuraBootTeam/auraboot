@@ -48,8 +48,8 @@ interface ChannelDisplay {
 
 const CHANNEL_DISPLAY: Record<ChannelCode, Omit<ChannelDisplay, 'code'>> = {
   email_password: {
-    label: '邮箱密码登录',
-    description: '使用邮箱和密码进行登录',
+    label: '账号密码登录',
+    description: '使用用户名或邮箱和密码进行登录',
     icon: EnvelopeIcon,
     iconColor: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400',
   },
