@@ -2,11 +2,13 @@ package com.auraboot.framework.behavior.ingest;
 
 import com.auraboot.framework.behavior.dto.BehaviorEventInput;
 import com.auraboot.framework.infrastructure.mq.memory.InMemoryMqProvider;
+import com.auraboot.framework.observability.W3cTraceparent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,6 +58,25 @@ class BehaviorIngestPublisherTest {
 
         assertThat(enqueued).isZero();
         assertThat(captured.get()).isNull(); // an empty batch publishes nothing
+    }
+
+    @Test
+    void publish_injectsTraceparentHeaderFromFirstTraceContextEvent() {
+        InMemoryMqProvider mq = new InMemoryMqProvider();
+        AtomicReference<Map<String, String>> capturedHeaders = new AtomicReference<>();
+        mq.subscribe(BehaviorIngestPublisher.TOPIC_EVENTS, "test", (t, body, h) -> capturedHeaders.set(h));
+        BehaviorIngestPublisher publisher = new BehaviorIngestPublisher(mq, objectMapper);
+
+        BehaviorEventInput traced = new BehaviorEventInput();
+        traced.setEventId("01TRC");
+        traced.setEventName("agent.task.completed");
+        traced.setTraceId("0af7651916cd43dd8448eb211c80319c");
+        traced.setSourceSpanId("b7ad6b7169203331");
+
+        assertThat(publisher.publish(42L, 7L, List.of(traced))).isEqualTo(1);
+
+        assertThat(capturedHeaders.get()).containsEntry(W3cTraceparent.HEADER,
+                "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01");
     }
 
     @Test
