@@ -44,6 +44,22 @@ public interface DataPermissionEngine {
     String buildRowFilter(Long tenantId, String modelCode, Long userId);
 
     /**
+     * Build SQL WHERE clause fragment for row-level filtering with an explicit action.
+     * Existing Dynamic callers use {@link #buildRowFilter(Long, String, Long)} which
+     * defaults to {@code read}; non-Dynamic surfaces such as NamedQuery can declare the
+     * protected resource/action pair explicitly.
+     *
+     * @param tenantId     tenant ID
+     * @param resourceCode protected resource/model code
+     * @param actionCode   action identifier, for example {@code read}
+     * @param userId       current user ID
+     * @return SQL fragment (e.g. "AND (created_by = 123 OR ...)") or empty string
+     */
+    default String buildRowFilter(Long tenantId, String resourceCode, String actionCode, Long userId) {
+        return buildRowFilter(tenantId, resourceCode, userId);
+    }
+
+    /**
      * Filter a list of records post-query based on data permission policies.
      * Used when SQL-level filtering is not possible (e.g., cross-model joins).
      *
@@ -67,6 +83,24 @@ public interface DataPermissionEngine {
      */
     boolean canAccessRecord(Long tenantId, String modelCode, Long userId,
                             Map<String, Object> record);
+
+    /**
+     * Check if a single record is accessible for an explicit action.
+     * Dynamic CRUD callers use {@link #canAccessRecord(Long, String, Long, Map)}
+     * which defaults to {@code read}; custom handlers can pass the action they
+     * are protecting.
+     *
+     * @param tenantId     tenant ID
+     * @param resourceCode protected resource/model code
+     * @param actionCode   action identifier, for example {@code read} or {@code delete}
+     * @param userId       current user ID
+     * @param record       the record to check
+     * @return true if the user can access the record
+     */
+    default boolean canAccessRecord(Long tenantId, String resourceCode, String actionCode, Long userId,
+                                    Map<String, Object> record) {
+        return canAccessRecord(tenantId, resourceCode, userId, record);
+    }
 
     /**
      * Get field mask rules applicable for the current user on the given model.

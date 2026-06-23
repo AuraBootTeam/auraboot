@@ -51,6 +51,16 @@ public class NamedQueryDTO {
     private String description;
 
     /**
+     * Protected business resource used for DataScope calculation.
+     */
+    private String resourceCode;
+
+    /**
+     * Protected action used with resourceCode.
+     */
+    private String actionCode;
+
+    /**
      * FROM子句SQL — null when connector_pid is set
      */
     private String fromSql;

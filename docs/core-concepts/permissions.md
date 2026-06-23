@@ -124,6 +124,8 @@ Custom roles (like `sc_admin`) are not in the template -- they must be explicitl
 
 The `tenant_admin` role receives `"*"` during tenant bootstrap, which grants all current and future permissions. This is set in `default-bootstrap.json` and processed by `TenantBootstrapServiceImpl`.
 
+`"*"` is a functional-permission wildcard. Business data access still uses tenant isolation and data scope evaluation. In normal tenant business data, a tenant administrator sees all records because the role has `ALL` data scope for the resource, not because business code branches on an administrator role name.
+
 ## Multi-Tenant Isolation
 
 Every record in AuraBoot is scoped to a tenant via the `tenant_id` column.
@@ -155,13 +157,15 @@ ab_user (Identity -- who can log in)
 
 | Scope | Records Visible |
 |---|---|
-| `ALL` | All records in the tenant |
+| `ALL` | All records in the current tenant |
 | `DEPARTMENT` | Records belonging to the user's department |
 | `DEPARTMENT_AND_CHILD` | Records belonging to the user's department and all child departments |
-| `SELF` | Only records created by the user |
+| `SELF` | Only records created by the user; M1 standard owner field is `created_by` |
 | `CUSTOM` | Custom SpEL expression |
 
-Data scopes are configured per role per resource in `ab_role_data_scope`. When a user has multiple roles, scopes are merged using a configurable strategy (MAX or MIN).
+Data scopes are configured per role per resource in `ab_role_data_scope`. Plugin roles can also declare `defaultDataScopeType` so newly granted permissions inherit the intended default scope. When a user has multiple roles, scopes are merged using a configurable strategy (MAX or MIN).
+
+Standard Dynamic list/count/detail/write, relation, aggregate/chart, export, and scoped bulk delete paths use the unified data-scope runtime. NamedQuery is protected only when the query explicitly declares `resourceCode` and `actionCode`; the platform does not infer a protected resource from SQL text. Custom controllers and PF4J handlers should use `DataAccessAuthorizationHelper` for list filters or record verdicts instead of hardcoding `created_by` or an administrator branch.
 
 ## Menu System
 
@@ -405,8 +409,8 @@ Buttons with a `permissionCode` are automatically hidden if the current user lac
 
 4. **Always set `permissionCode` on leaf menus.** Otherwise, the menu is visible to all users regardless of role.
 
-5. **Test with a non-admin role.** The `tenant_admin` wildcard `*` bypasses all checks. Create a `viewer` role test to verify permission gating works.
+5. **Test with a non-admin role.** The `tenant_admin` wildcard `*` can mask functional-permission gaps. Always include a self-scoped role test to verify row visibility, detail access, and aggregate results.
 
 6. **Never hardcode permission checks.** Use `@RequirePermission` on the backend and `permissionCode` in page JSON. The framework handles the rest.
 
-7. **Data scope for row-level security.** Use `SELF` scope for personal data, `DEPARTMENT` for team data, and `ALL` for managers. Configure in `ab_role_data_scope`.
+7. **Data scope for row-level security.** Use `SELF` scope for personal data and `ALL` for current-tenant managers. Department/team scopes need an explicit data source and evaluator design before runtime changes. Configure effective scopes in `ab_role_data_scope` or inherit them from plugin role `defaultDataScopeType`.

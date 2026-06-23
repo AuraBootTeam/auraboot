@@ -7,7 +7,7 @@
  * bootstrap (it is marked `internal: true` in plugin.json).
  *
  * Gate: runs when `AURA_ENV=test`, `IMPORT_TEST_FIXTURES=true`,
- * `PW_PROFILE=oss`, or `PW_PROFILE=full`.
+ * `PW_PROFILE=oss`, `PW_PROFILE=full`, or `PW_PROFILE=rbac`.
  * Otherwise the test body is skipped — matching the backend-side
  * `BuiltinPluginImportService` behaviour described in
  * `auraboot-enterprise/AGENTS.md` §「系统目录」.
@@ -49,7 +49,8 @@ const SHOULD_IMPORT =
   AURA_ENV === 'test' ||
   IMPORT_TEST_FIXTURES.toLowerCase() === 'true' ||
   PW_PROFILE === 'oss' ||
-  PW_PROFILE === 'full';
+  PW_PROFILE === 'full' ||
+  PW_PROFILE === 'rbac';
 
 type RoleRecord = { code?: string; pid?: string };
 type MemberRecord = {
@@ -144,7 +145,7 @@ test.describe.configure({ mode: 'serial' });
 test('import test-fixtures plugin (gated)', async ({ request }) => {
   test.skip(
     !SHOULD_IMPORT,
-    'AURA_ENV=test, IMPORT_TEST_FIXTURES=true, PW_PROFILE=oss, or PW_PROFILE=full not set — skipping internal test-fixtures import',
+    'AURA_ENV=test, IMPORT_TEST_FIXTURES=true, PW_PROFILE=oss, PW_PROFILE=full, or PW_PROFILE=rbac not set — skipping internal test-fixtures import',
   );
 
   // Sanity: refuse to run if the manifest is missing (tells the operator

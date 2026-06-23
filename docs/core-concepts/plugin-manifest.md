@@ -83,11 +83,11 @@ The `resourceDirs` object maps a logical resource type to a file or directory pa
 - **`commands`** — Command definitions covering CRUD, state transitions, batch operations, and custom actions, along with their handlers, side effects, validation rules, and post-actions.
 - **`processes`** — BPM process definitions delivered as BPMN files or as designer JSON consumed by the workflow engine.
 - **`permissions`** — Permission codes with category, resource type, action, module, and data scope.
-- **`roles`** — Predefined RBAC roles that bundle permission codes.
+- **`roles`** — Predefined RBAC roles that bundle permission codes; roles can declare `defaultDataScopeType` so granted permissions inherit `self`, `all`, or another supported data scope.
 - **`menus`** — Navigation tree entries with path, icon, parent code, permission gating, and page binding.
 - **`pages`** — DSL-driven page definitions: list, form, detail, dashboard, or custom pages with their schema.
 - **`reports`** — Report definitions for the reporting subsystem.
-- **`namedQueries`** — Stored, parameterized queries with declared fields, default ordering, and operator whitelists.
+- **`namedQueries`** — Stored, parameterized queries with declared fields, default ordering, operator whitelists, and optional `resourceCode` / `actionCode` declarations for DataScope protection.
 - **`dicts`** — Dictionary (enumerated value set) definitions used by `dict`-typed fields.
 - **`data`** — Seed data to import alongside metadata.
 
