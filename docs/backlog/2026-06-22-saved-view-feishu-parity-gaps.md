@@ -38,6 +38,12 @@ relates_to:
 | 需要完整 mockup | DONE | `docs/assets/mockups/saved-view-vnext-mockup.html` |
 | 需要系统性需求文档 | DONE | `docs/plans/2026-06/2026-06-22-saved-view-feishu-parity-requirements.md` |
 
+## P2 Progress
+
+| Gap | 状态 | 当前处理 |
+| --- | --- | --- |
+| View 数量上限 | DONE in `codex/saved-view-count-limit` | 后端 `create` 路径限制手动视图数量:personal 每用户/模型/页面 10 个,team/global 每 scope/模型/页面 20 个;`duplicate`/`copyToPersonal` 继承限制,implicit autosave 不计入 |
+
 ## P2 / Deferred
 
 | Gap | 为什么不是本轮 P0/P1 | 建议 |
@@ -45,7 +51,6 @@ relates_to:
 | Dynamic business record API 仍可能返回 `id` | 动态数据表历史契约广,列表/详情/子表/评论均可能依赖 `id` fallback;强行隐藏会破坏通用 renderer | 单独做 platform-wide public-id migration,先 inventory 再迁移 |
 | 旧 ID-based UserRole mutation endpoints 仍保留 | 兼容已有脚本和后台调用;本轮重点是 public response 和新增 pid/code mutation path | 新 UI 禁用旧接口;发布后一个周期标 deprecated,再移除 |
 | 其他 audit/governance endpoints 可能暴露 `AuditTrail.id` | 非 SavedView surface;不同页面可能需要审计链细节 | 建统一 `AuditTrailPublicDTO` 和 admin-only full DTO |
-| View 数量上限未实现 | 飞书开放平台视图有数量限制;AuraBoot 当前没有 tenant/page-level cap | 增加 per page cap + warning + import guard |
 | Team view 更细粒度 ACL | 当前 team scope = team 成员可见,manage 受全局权限/owner/action 控制;没有每个 view 的协作者 ACL | 增加 view collaborators 或 team role policy |
 | Timeline capability gate 仍宽松 | 当前允许创建后在视图内显示 setup/empty state | 对 timeline 增加 date/resource 字段 required mapping |
 | Quick filter preset 化 | 当前 chips 是轻量 daily filters,未沉到 SavedView preset region | 长期统一为 preset filter provider,并允许保存为个人视图 |
