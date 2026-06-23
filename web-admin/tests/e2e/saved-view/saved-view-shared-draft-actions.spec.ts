@@ -71,9 +71,7 @@ async function navigateToOrderList(page: Page): Promise<void> {
   const nav = page.locator('nav');
   await nav.first().waitFor({ state: 'visible', timeout: 10_000 });
 
-  const rootBtn = nav
-    .getByRole('button', { name: /E2E测试|E2E Test|移动端测试/i })
-    .first();
+  const rootBtn = nav.getByRole('button', { name: /E2E测试|E2E Test|移动端测试/i }).first();
   await rootBtn.scrollIntoViewIfNeeded();
   await rootBtn.evaluate((el: HTMLElement) => el.click());
 
@@ -82,9 +80,7 @@ async function navigateToOrderList(page: Page): Promise<void> {
 
   const listResponsePromise = page.waitForResponse(
     (r) =>
-      r.url().includes('/api/dynamic/e2et_order') &&
-      r.url().includes('list') &&
-      r.status() === 200,
+      r.url().includes('/api/dynamic/e2et_order') && r.url().includes('list') && r.status() === 200,
     { timeout: 20_000 },
   );
   await Promise.all([
@@ -265,9 +261,10 @@ test.describe('SavedView shared local draft actions', () => {
       await expect(page.getByTestId('shared-view-save-disabled')).toBeVisible();
       await expect(page.getByTestId('shared-view-save-disabled')).toBeDisabled();
       await expect(page.getByTestId('shared-view-copy-to-personal')).toBeEnabled();
-      expect(sourceWrites, 'viewer must not mutate source global view or implicit autosave').toEqual(
-        [],
-      );
+      expect(
+        sourceWrites,
+        'viewer must not mutate source global view or implicit autosave',
+      ).toEqual([]);
 
       const copyResponsePromise = page.waitForResponse(
         (response) =>
@@ -291,7 +288,9 @@ test.describe('SavedView shared local draft actions', () => {
       await expect(page.getByTestId('view-selector-trigger')).toContainText('My Copy', {
         timeout: 8_000,
       });
-      expect(sourceWrites, 'copying a local draft still must not mutate the source view').toEqual([]);
+      expect(sourceWrites, 'copying a local draft still must not mutate the source view').toEqual(
+        [],
+      );
       await screenshot(page, 'shared-draft-actions-viewer.png');
     });
   });
@@ -315,9 +314,10 @@ test.describe('SavedView shared local draft actions', () => {
       await expect(page.getByTestId('shared-view-draft-banner')).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId('shared-view-save')).toBeVisible();
       await expect(page.getByTestId('shared-view-save')).toBeEnabled();
-      expect(sourceWrites, 'admin column-setting save must stage a draft before confirmation').toEqual(
-        [],
-      );
+      expect(
+        sourceWrites,
+        'admin column-setting save must stage a draft before confirmation',
+      ).toEqual([]);
 
       const updateResponsePromise = page.waitForResponse(
         (response) =>

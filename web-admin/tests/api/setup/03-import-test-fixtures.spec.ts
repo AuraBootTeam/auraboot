@@ -125,14 +125,12 @@ async function assignFixtureRole(
   ).toBe(true);
 }
 
-async function ensureFixtureUserRoles(
-  request: APIRequestContext,
-  token: string,
-): Promise<void> {
+async function ensureFixtureUserRoles(request: APIRequestContext, token: string): Promise<void> {
   const roleCodes = await loadRoleCodes(request, token, ['e2et_operator', 'e2et_viewer']);
-  expect(roleCodes.has('e2et_operator'), 'e2et_operator role missing after test-fixtures import').toBe(
-    true,
-  );
+  expect(
+    roleCodes.has('e2et_operator'),
+    'e2et_operator role missing after test-fixtures import',
+  ).toBe(true);
   expect(roleCodes.has('e2et_viewer'), 'e2et_viewer role missing after test-fixtures import').toBe(
     true,
   );
@@ -193,27 +191,24 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
     }
   }
 
-  const importRes = await request.post(
-    `${BACKEND_URL}/api/plugins/import/import-directory-sync`,
-    {
-      data: {
-        path: BACKEND_PLUGIN_DIR,
-        conflictStrategy: 'OVERWRITE',
-        validateReferences: true,
-        autoDeployProcesses: true,
-        autoPublishModels: true,
-        autoPublishFields: true,
-        autoPublishCommands: true,
-        autoPublishPages: true,
-        createResourcePermissions: true,
-      },
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      timeout: 120_000,
+  const importRes = await request.post(`${BACKEND_URL}/api/plugins/import/import-directory-sync`, {
+    data: {
+      path: BACKEND_PLUGIN_DIR,
+      conflictStrategy: 'OVERWRITE',
+      validateReferences: true,
+      autoDeployProcesses: true,
+      autoPublishModels: true,
+      autoPublishFields: true,
+      autoPublishCommands: true,
+      autoPublishPages: true,
+      createResourcePermissions: true,
     },
-  );
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    timeout: 120_000,
+  });
 
   const rawBody = await importRes.text();
   expect(importRes.ok(), `import returned HTTP ${importRes.status()}: ${rawBody}`).toBe(true);
