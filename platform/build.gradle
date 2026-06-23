@@ -140,12 +140,27 @@ tasks.register('verifyMultiWorktreeGuard') {
 }
 
 repositories {
-    mavenLocal()      // Must be first — SmartEngine fork jars only exist here
+    mavenLocal()
+    // SmartEngine fork artifacts are published to Maven Central. Keep this
+    // before Aliyun mirrors so Gradle does not stick to a partially synced
+    // mirror that has metadata but not all jars.
+    mavenCentral {
+        name = 'Maven Central SmartEngine'
+        content {
+            includeGroup 'com.auraboot.smart.framework'
+        }
+    }
     maven {
         url = 'https://maven.aliyun.com/repository/public'
+        content {
+            excludeGroup 'com.auraboot.smart.framework'
+        }
     }
     maven {
         url = 'https://maven.aliyun.com/repository/spring'
+        content {
+            excludeGroup 'com.auraboot.smart.framework'
+        }
     }
     mavenCentral()
     // Apache repository for snapshots and releases

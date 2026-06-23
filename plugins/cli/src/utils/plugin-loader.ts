@@ -12,6 +12,14 @@ export interface PluginManifest {
   pluginType?: string;
   minPlatformVersion?: string;
   dependencies?: Array<string | { pluginId: string; version?: string }>;
+  backend?: {
+    jarPath?: string;
+    entryClass?: string;
+    /** @deprecated Use backend.jarPath. */
+    jarFile?: string;
+    /** @deprecated Use backend.entryClass. */
+    entryPoint?: string;
+  };
 }
 
 export interface PluginFiles {

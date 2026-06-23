@@ -89,4 +89,5 @@ class CustomToolProviderExecutionTest extends BaseIntegrationTest {
         var rows = dynamicDataMapper.selectByQueryWithoutTenant(sql, Map.of("tenantId", tenantId));
         assertThat(rows).isNotNull(); // table exists, query succeeds (may be empty)
     }
+
 }

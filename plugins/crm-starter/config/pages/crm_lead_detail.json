@@ -129,7 +129,7 @@
                   "readOnly": true
                 },
                 {
-                  "field": "crm_lead_assigned_to",
+                  "field": "owner_id",
                   "readOnly": true
                 },
                 {
