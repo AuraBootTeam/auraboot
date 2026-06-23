@@ -4,13 +4,10 @@ import com.auraboot.framework.behavior.dto.BehaviorEventInput;
 import com.auraboot.framework.behavior.entity.BehaviorEvent;
 import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
-
-import java.util.Map;
 
 /**
  * Persists ingested behavior events to {@code ab_behavior_event} with per-event idempotency
@@ -19,9 +16,7 @@ import java.util.Map;
  * instead of dropping them. Runs on the MQ consumer thread (no request MetaContext); the
  * tenant is always carried in the envelope and set explicitly on the entity.
  */
-@Slf4j
 @Component
-@RequiredArgsConstructor
 public class BehaviorEventPersister {
 
     private static final int MAX_DETAIL = 500;
@@ -29,6 +24,24 @@ public class BehaviorEventPersister {
     private final BehaviorEventMapper behaviorEventMapper;
     private final BehaviorIngestPublisher publisher;
     private final ObjectMapper objectMapper;
+    private final BehaviorIngestMetrics metrics;
+
+    @Autowired
+    public BehaviorEventPersister(BehaviorEventMapper behaviorEventMapper,
+                                  BehaviorIngestPublisher publisher,
+                                  ObjectMapper objectMapper,
+                                  BehaviorIngestMetrics metrics) {
+        this.behaviorEventMapper = behaviorEventMapper;
+        this.publisher = publisher;
+        this.objectMapper = objectMapper;
+        this.metrics = metrics;
+    }
+
+    BehaviorEventPersister(BehaviorEventMapper behaviorEventMapper,
+                           BehaviorIngestPublisher publisher,
+                           ObjectMapper objectMapper) {
+        this(behaviorEventMapper, publisher, objectMapper, BehaviorIngestMetrics.noop());
+    }
 
     /** Persist every event in the envelope; returns the number durably stored (or idempotently present). */
     public int persistBatch(BehaviorIngestEnvelope env) {
@@ -56,9 +69,11 @@ public class BehaviorEventPersister {
         }
         try {
             behaviorEventMapper.insert(toEntity(in, tenantId, userId));
+            metrics.recordPersisted("inserted");
             return true;
         } catch (DuplicateKeyException dup) {
             // idempotent: same (tenant_id, event_id) already stored — at-least-once redelivery
+            metrics.recordPersisted("duplicate");
             return true;
         } catch (DataIntegrityViolationException ex) {
             // deterministic bad data (e.g. an over-long client field) — retrying won't help; quarantine it
@@ -78,47 +93,6 @@ public class BehaviorEventPersister {
     }
 
     private BehaviorEvent toEntity(BehaviorEventInput in, Long tenantId, Long userId) {
-        BehaviorEvent e = new BehaviorEvent();
-        e.setEventId(in.getEventId());
-        e.setSchemaVersion(in.getSchemaVersion());
-        e.setEventName(in.getEventName());
-        e.setEventCategory(in.getEventCategory());
-        e.setSource(in.getSource());
-        e.setIdentityQuality(in.getIdentityQuality());
-        e.setOccurredAt(in.getOccurredAt());
-        e.setTenantId(tenantId);
-        e.setUserId(userId);
-        e.setAnonId(in.getAnonId());
-        e.setClientSessionId(in.getClientSessionId());
-        e.setInteractionId(in.getInteractionId());
-        e.setCausedByEventId(in.getCausedByEventId());
-        e.setTraceId(in.getTraceId());
-        e.setSourceSpanId(in.getSourceSpanId());
-        e.setRunId(in.getRunId());
-        e.setUiElementId(in.getUiElementId());
-        e.setAppId(in.getAppId());
-        e.setPageId(in.getPageId());
-        e.setBlockId(in.getBlockId());
-        e.setElementCode(in.getElementCode());
-        e.setProps(writeProps(in.getProps()));
-        e.setConsentState(in.getConsentState());
-        e.setConsentVersion(in.getConsentVersion());
-        e.setSamplingUnit(in.getSamplingUnit());
-        e.setSamplingProbability(in.getSamplingProbability());
-        e.setProducerName(in.getProducerName());
-        e.setProducerVersion(in.getProducerVersion());
-        return e;
-    }
-
-    private String writeProps(Map<String, Object> props) {
-        if (props == null || props.isEmpty()) {
-            return null;
-        }
-        try {
-            return objectMapper.writeValueAsString(props);
-        } catch (Exception ex) {
-            log.warn("Failed to serialize behavior props: {}", ex.getMessage());
-            return null;
-        }
+        return BehaviorEventEntityFactory.toEntity(in, tenantId, userId, objectMapper);
     }
 }

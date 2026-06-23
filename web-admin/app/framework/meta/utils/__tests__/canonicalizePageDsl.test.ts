@@ -659,6 +659,49 @@ describe('canonicalizePageSchemaDto', () => {
       props: { mode: 'detail' },
     });
   });
+
+  it('hosts Behavior Quarantine as an API-backed DSL list with replay action', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/core-dashboard/config/pages.json');
+    const page = readPages(pagesFile).find(
+      (candidate) => candidate.pageKey === 'behavior_quarantine_list',
+    );
+
+    expect(page).toBeDefined();
+    expect(page!.extension).toMatchObject({
+      dataSource: {
+        type: 'api',
+        endpoint: '/api/analytics/behavior/quarantine',
+        method: 'get',
+      },
+      skipFieldMeta: true,
+    });
+
+    const schema = canonicalizePageSchemaDto(page!);
+    const filterBlock = schema.blocks.find((block: any) => block.blockType === 'filters') as any;
+    const tableBlock = schema.blocks.find((block: any) => block.blockType === 'table') as any;
+    const columns = tableBlock.table.columns.map((column: any) => column.field);
+    const replayAction = tableBlock.table.rowActions.find((action: any) => action.code === 'replay');
+
+    expect(filterBlock.fields.map((field: any) => field.field)).toEqual([
+      'reason',
+      'replayStatus',
+    ]);
+    expect(columns).toEqual(
+      expect.arrayContaining(['reason', 'replayStatus', 'eventId', 'detail', 'rawEvent']),
+    );
+    expect(replayAction.visibleWhen).toBe("record.replayStatus == 'pending'");
+    expect(replayAction.action.type).toBe('flow');
+    expect(replayAction.action.steps[0]).toMatchObject({
+      action: 'api.request',
+      endpoint: '/api/analytics/behavior/quarantine/{id}/replay',
+      method: 'post',
+    });
+    expect(replayAction.action.steps.at(-1)).toMatchObject({
+      action: 'dataSource.reload',
+      args: { target: 'list' },
+    });
+  });
 });
 
 describe('canonicalizePageSchemaDto — convention command map carry-through', () => {

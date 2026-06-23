@@ -1,0 +1,52 @@
+package com.auraboot.framework.behavior.controller;
+
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.behavior.dto.BehaviorQuarantineReplayBatchResult;
+import com.auraboot.framework.behavior.dto.BehaviorQuarantineReplayResult;
+import com.auraboot.framework.behavior.entity.BehaviorQuarantine;
+import com.auraboot.framework.behavior.service.BehaviorQuarantineService;
+import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.dto.PageResult;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Tenant-scoped operator API for inspecting and replaying the behavior ingest quarantine sink.
+ */
+@RestController
+@RequestMapping("/api/analytics/behavior/quarantine")
+@RequiredArgsConstructor
+public class BehaviorQuarantineController {
+
+    private final BehaviorQuarantineService service;
+
+    @GetMapping
+    public ApiResponse<PageResult<BehaviorQuarantine>> list(
+            @RequestParam(required = false) String reason,
+            @RequestParam(required = false) String replayStatus,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Integer pageNum,
+            @RequestParam(required = false) Integer pageSize) {
+        int apiPage = pageNum != null ? Math.max(pageNum - 1, 0) : page;
+        int apiSize = pageSize != null ? pageSize : size;
+        return ApiResponse.success(service.list(MetaContext.getCurrentTenantId(), reason, replayStatus, apiPage, apiSize));
+    }
+
+    @PostMapping("/{id}/replay")
+    public ApiResponse<BehaviorQuarantineReplayResult> replayOne(@PathVariable Long id) {
+        return ApiResponse.success(service.replayOne(MetaContext.getCurrentTenantId(), id));
+    }
+
+    @PostMapping("/replay")
+    public ApiResponse<BehaviorQuarantineReplayBatchResult> replayPending(
+            @RequestParam(required = false) String reason,
+            @RequestParam(defaultValue = "100") int limit) {
+        return ApiResponse.success(service.replayPending(MetaContext.getCurrentTenantId(), reason, limit));
+    }
+}

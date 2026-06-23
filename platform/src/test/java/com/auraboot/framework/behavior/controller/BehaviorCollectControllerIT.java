@@ -114,12 +114,20 @@ class BehaviorCollectControllerIT {
                 reason VARCHAR(64) NOT NULL,
                 detail TEXT,
                 raw_event JSONB,
+                replay_status VARCHAR(24) NOT NULL DEFAULT 'pending',
+                replay_detail TEXT,
+                replayed_behavior_event_id BIGINT,
+                replayed_at TIMESTAMPTZ,
                 quarantined_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             )""");
         jdbc.execute("ALTER TABLE ab_behavior_quarantine ALTER COLUMN anon_id TYPE TEXT");
         jdbc.execute("ALTER TABLE ab_behavior_quarantine ALTER COLUMN event_id TYPE TEXT");
         jdbc.execute("ALTER TABLE ab_behavior_quarantine ALTER COLUMN event_name TYPE TEXT");
+        jdbc.execute("ALTER TABLE ab_behavior_quarantine ADD COLUMN IF NOT EXISTS replay_status VARCHAR(24) NOT NULL DEFAULT 'pending'");
+        jdbc.execute("ALTER TABLE ab_behavior_quarantine ADD COLUMN IF NOT EXISTS replay_detail TEXT");
+        jdbc.execute("ALTER TABLE ab_behavior_quarantine ADD COLUMN IF NOT EXISTS replayed_behavior_event_id BIGINT");
+        jdbc.execute("ALTER TABLE ab_behavior_quarantine ADD COLUMN IF NOT EXISTS replayed_at TIMESTAMPTZ");
         cleanup();
     }
 

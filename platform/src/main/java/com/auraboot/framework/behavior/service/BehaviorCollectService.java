@@ -2,9 +2,10 @@ package com.auraboot.framework.behavior.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.behavior.dto.BehaviorEventInput;
+import com.auraboot.framework.behavior.ingest.BehaviorIngestMetrics;
 import com.auraboot.framework.behavior.ingest.BehaviorIngestPublisher;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,10 +23,20 @@ import java.util.List;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class BehaviorCollectService {
 
     private final BehaviorIngestPublisher publisher;
+    private final BehaviorIngestMetrics metrics;
+
+    @Autowired
+    public BehaviorCollectService(BehaviorIngestPublisher publisher, BehaviorIngestMetrics metrics) {
+        this.publisher = publisher;
+        this.metrics = metrics;
+    }
+
+    BehaviorCollectService(BehaviorIngestPublisher publisher) {
+        this(publisher, BehaviorIngestMetrics.noop());
+    }
 
     /**
      * Authenticated path (M1): tenant/user from the auth context (never trusts the client).
@@ -42,7 +53,9 @@ public class BehaviorCollectService {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "tenant_required");
         }
-        return publisher.publish(tenantId, MetaContext.getCurrentUserId(), events);
+        int enqueued = publisher.publish(tenantId, MetaContext.getCurrentUserId(), events);
+        metrics.recordAccepted("authenticated", enqueued);
+        return enqueued;
     }
 
     /**
@@ -54,6 +67,8 @@ public class BehaviorCollectService {
         if (events == null || events.isEmpty()) {
             return 0;
         }
-        return publisher.publish(tenantId, null, events);
+        int enqueued = publisher.publish(tenantId, null, events);
+        metrics.recordAccepted("keyed", enqueued);
+        return enqueued;
     }
 }
