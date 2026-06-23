@@ -1,0 +1,42 @@
+groups:
+  - name: auraboot.behavior_kafka_ingest
+    rules:
+      - alert: BehaviorIngestPublishFailures
+        expr: sum(rate(auraboot_behavior_ingest_publish_failures_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: behavior-ingest
+        annotations:
+          summary: "Behavior ingest publish failures"
+          description: "Behavior ingest cannot publish to one or more MQ topics; check aura.mq provider health and recent backend logs."
+
+      - alert: BehaviorIngestNoPersistence
+        expr: sum(rate(auraboot_behavior_ingest_enqueued_total{topic="aura.behavior.events.v1"}[10m])) > 0 and sum(rate(auraboot_behavior_ingest_persisted_total[10m])) == 0
+        for: 10m
+        labels:
+          severity: critical
+          component: behavior-ingest
+        annotations:
+          summary: "Behavior ingest enqueued events are not being persisted"
+          description: "Events are accepted and enqueued but no behavior rows are being persisted; check consumer group aura-behavior-ingest."
+
+      - alert: BehaviorIngestHighQuarantineRate
+        expr: sum(rate(auraboot_behavior_ingest_quarantined_total[15m])) / clamp_min(sum(rate(auraboot_behavior_ingest_enqueued_total{topic="aura.behavior.events.v1"}[15m])), 1) > 0.02
+        for: 15m
+        labels:
+          severity: warning
+          component: behavior-ingest
+        annotations:
+          summary: "Behavior ingest quarantine rate > 2%"
+          description: "More than 2% of recent behavior events are being quarantined; inspect ab_behavior_quarantine by reason."
+
+      - alert: BehaviorIngestConsumerLagHigh
+        expr: max(auraboot_behavior_ingest_consumer_lag{topic="aura.behavior.events.v1",consumer_group="aura-behavior-ingest"}) > 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: behavior-ingest
+        annotations:
+          summary: "Behavior ingest consumer lag is high"
+          description: "Consumer group aura-behavior-ingest lag is above 1000 messages; scale consumers or inspect broker/DB latency."

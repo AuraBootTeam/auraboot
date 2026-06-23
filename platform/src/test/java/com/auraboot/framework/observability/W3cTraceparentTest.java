@@ -29,4 +29,19 @@ class W3cTraceparentTest {
         assertNull(W3cTraceparent.format(TRACE_ID, null, true));
         assertNull(W3cTraceparent.format(TRACE_ID, "badspanid", true));
     }
+
+    @Test
+    void parsesTraceAndParentSpanIds() {
+        W3cTraceparent.TraceIds ids = W3cTraceparent.parse("00-" + TRACE_ID + "-" + SPAN_ID + "-01");
+
+        assertEquals(TRACE_ID, ids.traceId());
+        assertEquals(SPAN_ID, ids.spanId());
+    }
+
+    @Test
+    void returnsNullForMalformedTraceparent() {
+        assertNull(W3cTraceparent.parse(null));
+        assertNull(W3cTraceparent.parse("bad"));
+        assertNull(W3cTraceparent.parse("00-" + TRACE_ID + "-badspanid-01"));
+    }
 }

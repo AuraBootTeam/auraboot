@@ -11,34 +11,21 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { navigateToDynamicPage, dateOffsetStr } from '../helpers';
+import { navigateToDynamicPage, dateOffsetStr, selectSavedViewByName } from '../helpers';
 import { BASE_URL } from '../../helpers/environments';
 
 const VIEW_NAME = 'E2E Gantt Timeline';
 const MODEL_CODE = 'e2et_order';
-const PAGE_KEY = 'e2et_order';
+const ROUTE_PAGE_KEY = 'e2et_order';
+const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
 
-/** Navigate to e2et-order page and select the gantt view via ViewManagePanel */
+/** Navigate to e2et-order page and select the gantt view via ViewSelector dropdown. */
 async function gotoAndSelectGanttView(page: import('@playwright/test').Page) {
-  await navigateToDynamicPage(page, PAGE_KEY);
+  await navigateToDynamicPage(page, ROUTE_PAGE_KEY);
   // Wait for the list page content to be visible (table renders by default)
   await page.locator('table, [role="table"], [data-testid="dynamic-list"]').first().waitFor({ state: 'visible', timeout: 15000 });
 
-  // Click ViewSelector button to open ViewManagePanel (slide-out dialog)
-  const viewSelector = page.locator('button[aria-haspopup="listbox"]');
-  await viewSelector.click();
-  const panel = page.locator('[role="dialog"]');
-  await panel.waitFor({ state: 'visible', timeout: 5000 });
-  // Find and click the gantt view by name in the panel
-  const viewOption = panel.getByText(VIEW_NAME, { exact: false }).first();
-  await viewOption.waitFor({ state: 'visible', timeout: 5000 });
-  await viewOption.click();
-  // Close the panel after selecting the view (panel does not auto-close)
-  const closeBtn = panel.locator('button[aria-label="Close panel"]');
-  if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await closeBtn.click();
-  }
-  await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  expect(await selectSavedViewByName(page, VIEW_NAME)).toBe(true);
 }
 
 test.describe('SavedView — GANTT View', () => {
@@ -53,7 +40,7 @@ test.describe('SavedView — GANTT View', () => {
 
     // Clean up leftover views from previous runs
     const existing = await page.request.get(
-      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
+      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${SAVED_VIEW_PAGE_KEY}`,
     );
     if (existing.ok()) {
       const body = await existing.json();
@@ -69,7 +56,7 @@ test.describe('SavedView — GANTT View', () => {
       data: {
         name: VIEW_NAME,
         modelCode: MODEL_CODE,
-        pageKey: PAGE_KEY,
+        pageKey: SAVED_VIEW_PAGE_KEY,
         viewType: 'gantt',
         scope: 'global',
         viewConfig: {
@@ -100,7 +87,7 @@ test.describe('SavedView — GANTT View', () => {
       await page.request.delete(`/api/views/${ganttViewPid}`).catch(() => {});
     }
     const cleanup = await page.request.get(
-      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
+      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${SAVED_VIEW_PAGE_KEY}`,
     );
     if (cleanup.ok()) {
       const body = await cleanup.json();

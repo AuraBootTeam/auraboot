@@ -58,6 +58,36 @@ Fixed in `fix/agent-run-declared-tools`.
 - Approval pause/resume now preserves the exact approved tool input and replays that input after
   approval instead of asking the LLM to regenerate the step.
 
+## Follow-up resolution: declared tool cap
+
+Fixed on 2026-06-23 in `codex/ci-smartengine-cleanup`.
+
+The earlier fix merged declared tools after grounded discovery, but one lower-level edge remained:
+`ToolProviderRegistry.discoverAll(ctx)` and provider-specific SQL can cap discovery before a
+declared `custom:` / provider-prefixed tool appears. `DeclaredAgentToolResolver` now treats declared
+tools as pinned:
+
+- `custom:` tools are loaded directly from `ab_agent_tool` by exact `tool_code`, preserving schema,
+  approval, risk, source, and description metadata.
+- provider-prefixed tools without a direct table lookup, such as `platform.`, `mcp:`, and
+  `aurabot:`, fall back to provider-specific discovery instead of the globally capped aggregate
+  catalog.
+- Regression tests cover a declared `custom:send_customer_reply` missing from the first 100
+  aggregate-discovered tools and a declared `platform.delegate_task` recovered by provider-specific
+  discovery.
+
+## Follow-up resolution: planning prompt tool choice
+
+Fixed on 2026-06-23 in `codex/ci-smartengine-cleanup`.
+
+The run-path planning prompt previously exposed tools as a comma-separated code list only. We now
+render a structured tool catalog with each tool's code, type, risk, approval/confirmation marker, and
+description. The planning prompt also explicitly requires exact `toolCode` values, prefers
+purpose-built DSL/query/custom tools, and reserves `platform.execute_sql` for cases where no listed
+DSL/query/custom tool can satisfy the task. This is a deterministic prompt-contract hardening for
+DeepSeek's tendency to pick generic SQL over declared CRM/custom tools; it is not a substitute for a
+fresh live-model gold run.
+
 ## Gold evidence
 
 Host-first isolated stack `cs-inbound-gold-77` (backend `6477`, DB `auraboot_77`) verified the full
@@ -85,10 +115,8 @@ The isolated runtime was destroyed after verification.
 - `cd platform && ./gradlew :test --tests com.auraboot.framework.agent.CustomerServiceAgentIntegrationTest --no-daemon`
 - `cd platform && ./gradlew bootJar -x test --no-daemon`
 
-## Also surfaced (separate, lower priority)
+## Remaining live-model caveat
 
-- The tool-selector (`d1`) caps the per-run tool set (~9), which can drop declared tools on
-  multi-tool agents even when they are discovered.
-- `deepseek-chat` reliability on the full 9-step cs_agent prompt is weak — it improvises with
-  `platform.execute_sql` instead of the `crm:` commands and loops out. A constrained prompt /
-  stronger model is needed for a deterministic full-flow run; this is model quality, not a bug.
+- `deepseek-chat` reliability on the full 9-step cs_agent prompt is still model-dependent. The
+  prompt now strongly biases toward declared DSL/custom tools and away from generic SQL, but a fresh
+  live-model run is required before claiming deterministic full-flow reliability.

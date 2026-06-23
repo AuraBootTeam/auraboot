@@ -7,7 +7,7 @@
  *
  * ViewConfig fields:
  * - timelineStartField: start date/datetime field
- * - timelineEndField: end date/datetime field
+ * - timelineEndField: optional end date/datetime field; defaults to start
  * - timelineResourceField: field to group rows by (resource)
  * - timelineTitleField: label shown on bars (defaults to "name")
  */
@@ -61,7 +61,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
   // Fetch data
   useEffect(() => {
-    if (!startField || !endField || !modelCode) {
+    if (!startField || !resourceField || !modelCode) {
       setLoading(false);
       return;
     }
@@ -76,7 +76,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [modelCode, startField, endField, refreshKey]);
+  }, [modelCode, startField, resourceField, refreshKey]);
 
   const handleRefresh = () => setRefreshKey((k) => k + 1);
 
@@ -101,7 +101,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
     for (const record of data) {
       const startVal = record[startField || ''];
-      const endVal = record[endField || ''];
+      const endVal = endField ? record[endField] : startVal;
       const recordId = getLegacyCompatibleRecordPid(record) || '';
       const titleVal = String(record[titleField] || recordId);
       const hasStart = startVal != null && startVal !== '';
@@ -134,7 +134,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           });
         continue;
       }
-      if (!hasEnd) {
+      if (endField && !hasEnd) {
         missingEnd++;
         if (issues.length < 10)
           issues.push({
@@ -203,12 +203,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   }, [data, startField, endField, resourceField, titleField]);
 
   // Not configured
-  if (!startField || !endField) {
+  if (!startField || !resourceField) {
     return (
       <ViewEmptyState
         variant="not-configured"
         title="Timeline view not configured"
-        description="Set start date, end date, and resource fields."
+        description="Set start date and resource fields."
         onConfigure={onOpenViewConfig}
         onSwitchToTableView={onSwitchToTableView}
         className={className}

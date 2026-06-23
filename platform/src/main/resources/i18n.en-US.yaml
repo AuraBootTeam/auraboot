@@ -785,6 +785,14 @@ common:
   modified_this_week: Modified This Week
   preset_views: Preset Views
   view_saved: Saved to current view
+  saved_view_save_preset_to_personal: Save preset as my view
+  saved_view_preset_saved_to_personal: Saved as personal view
+  saved_view_preset_save_failed: Failed to save preset
+  saved_view_preset_saved_badge: Saved
+  saved_view_preset_edited_badge: Edited
+  saved_view_preset_reset: Reset saved preset
+  saved_view_preset_reset_done: Preset view reset
+  saved_view_preset_reset_failed: Failed to reset preset view
   options_load_failed: Failed to load options
   retry: Retry
 admin:

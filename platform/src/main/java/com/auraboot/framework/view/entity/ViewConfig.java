@@ -71,6 +71,12 @@ public class ViewConfig {
      */
     private List<ToolbarActionConfig> toolbarActions;
 
+    /**
+     * Saved-view lifecycle metadata. This keeps plugin preset ownership and
+     * copy/lock semantics inside the JSONB config so older rows remain schema-compatible.
+     */
+    private Meta meta;
+
     // ==================== Kanban Fields ====================
 
     /**
@@ -316,6 +322,40 @@ public class ViewConfig {
      * Fields to show in each tree node row (for TREE view)
      */
     private List<String> treeDisplayFields;
+
+    /**
+     * SavedView metadata used by plugin imports and copy/edit policies.
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Meta {
+        private String viewKey;
+        private String managedBy;
+        private Boolean locked;
+        private Boolean allowUserCopy;
+        private Boolean allowUserOverride;
+        private String originViewPid;
+        private String originPresetKey;
+        private String capabilityStatus;
+        private List<CollaboratorAcl> collaborators;
+    }
+
+    /**
+     * Per-view collaborator ACL stored inside viewConfig.meta.
+     *
+     * principalType is currently "user"; permission is one of view/save/manage.
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CollaboratorAcl {
+        private String principalType;
+        private String principalPid;
+        private String permission;
+    }
 
     /**
      * Kanban card field display configuration

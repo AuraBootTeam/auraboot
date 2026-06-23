@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SavedView Feishu Parity Mockup</title>
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --green: #16a34a;
+      --amber: #d97706;
+      --red: #dc2626;
+      --ink: #111827;
+      --muted: #64748b;
+      --line: #e5e7eb;
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      font-family: Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); }
+    .app { min-height: 100vh; display: flex; flex-direction: column; }
+    .topbar {
+      height: 68px; display: flex; align-items: center; gap: 18px;
+      padding: 0 22px; border-bottom: 1px solid var(--line); background: #fff;
+    }
+    h1 { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 700; letter-spacing: 0; }
+    .view-trigger {
+      position: relative; display: inline-flex; align-items: center; gap: 8px;
+      min-width: 210px; height: 38px; padding: 0 12px; border: 1px solid #d8dee9;
+      border-radius: 8px; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+      font-size: 14px; font-weight: 600;
+    }
+    .scope-pill { font-size: 12px; color: var(--blue); background: var(--blue-soft); border-radius: 999px; padding: 2px 7px; }
+    .chev { margin-left: auto; color: var(--muted); }
+    .actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .primary { height: 38px; border: 0; border-radius: 8px; padding: 0 16px; background: var(--blue); color: #fff; font-weight: 700; }
+    .icon-btn { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--muted); }
+    .toolbar {
+      height: 58px; display: flex; align-items: center; gap: 12px; padding: 0 22px;
+      border-bottom: 1px solid var(--line); background: #fff;
+    }
+    .search { width: 300px; height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; color: #94a3b8; }
+    .tool { height: 36px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 0 12px; font-weight: 600; color: #475569; }
+    .chips { margin-left: auto; display: flex; gap: 8px; }
+    .chip { height: 34px; border: 0; border-radius: 999px; background: #f3f4f6; padding: 0 15px; font-weight: 700; color: #4b5563; }
+    .content { position: relative; display: grid; grid-template-columns: 1fr 420px; min-height: calc(100vh - 126px); }
+    .main { min-width: 0; background: #fff; }
+    .filter-row { height: 58px; display: flex; align-items: center; padding: 0 22px; border-bottom: 1px solid var(--line); color: var(--blue); font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { height: 54px; padding: 0 22px; border-bottom: 1px solid #eef0f4; text-align: left; white-space: nowrap; }
+    th { height: 48px; background: #f8fafc; color: #667085; font-size: 12px; letter-spacing: 0; }
+    .badge { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-weight: 700; font-size: 12px; }
+    .dropdown {
+      position: absolute; top: 58px; left: 150px; width: 340px; background: #fff; border: 1px solid var(--line);
+      border-radius: 8px; box-shadow: 0 18px 42px rgba(15, 23, 42, .18); z-index: 3; overflow: hidden;
+    }
+    .dd-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+    .dd-title { font-size: 13px; font-weight: 800; }
+    .dd-action { border: 0; background: transparent; color: var(--blue); font-weight: 700; }
+    .group { padding: 10px 8px; }
+    .group-title { padding: 6px 8px; color: #64748b; font-size: 12px; font-weight: 800; }
+    .option { display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 8px; border-radius: 7px; }
+    .option.active { background: var(--blue-soft); color: #1d4ed8; }
+    .option:hover { background: #f8fafc; }
+    .option-name { min-width: 0; flex: 1; font-size: 13px; font-weight: 650; }
+    .mark { font-size: 11px; border-radius: 999px; padding: 2px 7px; background: #f1f5f9; color: #475569; }
+    .mark.green { background: #dcfce7; color: #15803d; }
+    .mark.red { background: #fee2e2; color: #b91c1c; }
+    .dd-footer { border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; }
+    .footer-btn { border: 0; background: #fff; height: 42px; font-weight: 750; color: #334155; }
+    .footer-btn + .footer-btn { border-left: 1px solid var(--line); }
+    .panel { border-left: 1px solid var(--line); background: var(--panel); box-shadow: -10px 0 30px rgba(15, 23, 42, .05); }
+    .panel-head { height: 62px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--line); }
+    .panel-title { font-size: 16px; font-weight: 800; }
+    .section { padding: 18px; border-bottom: 1px solid var(--line); }
+    .section-title { margin: 0 0 12px; font-size: 12px; font-weight: 850; color: #64748b; text-transform: uppercase; letter-spacing: 0; }
+    .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 4px; border-radius: 8px; background: #f1f5f9; }
+    .seg button { height: 34px; border: 0; border-radius: 6px; background: transparent; font-weight: 750; color: #475569; }
+    .seg button.active { background: #fff; color: var(--blue); box-shadow: 0 1px 2px rgba(15, 23, 42, .08); }
+    .field { margin-top: 12px; }
+    label { display: block; margin-bottom: 6px; color: #64748b; font-size: 12px; font-weight: 750; }
+    select, input { width: 100%; height: 36px; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; background: #fff; }
+    .type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .type { height: 62px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 750; color: #475569; }
+    .type.blocked { border-color: #fecaca; background: #fff7f7; color: var(--red); }
+    .type.degraded { border-color: #fed7aa; background: #fff7ed; color: var(--amber); }
+    .notice { margin-top: 12px; border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.5; }
+    .notice.red { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .notice.amber { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+    .view-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid #f1f5f9; }
+    .view-row:last-child { border-bottom: 0; }
+    .view-meta { flex: 1; min-width: 0; }
+    .view-name { font-size: 13px; font-weight: 750; }
+    .view-sub { margin-top: 2px; color: #64748b; font-size: 12px; }
+    .row-actions { display: flex; gap: 4px; }
+    .mini { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: #64748b; }
+    .mini[disabled] { opacity: .45; background: #f8fafc; }
+    @media (max-width: 1000px) {
+      .content { grid-template-columns: 1fr; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); }
+      .dropdown { left: 22px; top: 56px; width: min(340px, calc(100vw - 44px)); }
+      .actions .primary { display: none; }
+      .chips { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <h1>项目与版本</h1>
+      <button class="view-trigger" aria-label="当前视图">
+        <span class="scope-pill">我的</span>
+        Default View
+        <span class="mark green">默认</span>
+        <span class="chev">⌄</span>
+      </button>
+      <div class="actions">
+        <button class="primary">新建 BOM 项目</button>
+        <button class="icon-btn">⋯</button>
+      </div>
+    </header>
+
+    <div class="dropdown" role="listbox" aria-label="选择视图">
+      <div class="dd-head">
+        <span class="dd-title">切换视图</span>
+        <button class="dd-action">+ 新建</button>
+      </div>
+      <div class="group">
+        <div class="group-title">个人视图</div>
+        <div class="option active"><span>✓</span><span class="option-name">Default View</span><span class="mark green">默认</span></div>
+        <div class="option"><span>≡</span><span class="option-name">我的待处理</span></div>
+      </div>
+      <div class="group">
+        <div class="group-title">团队共享</div>
+        <div class="option"><span>▦</span><span class="option-name">研发团队看板</span><span class="mark">Team A</span></div>
+        <div class="option"><span>━</span><span class="option-name">项目甘特</span><span class="mark red">需配置</span></div>
+      </div>
+      <div class="group">
+        <div class="group-title">全员 / 预置</div>
+        <div class="option"><span>🔒</span><span class="option-name">插件预置: 本周修改</span><span class="mark">可复制</span></div>
+      </div>
+      <div class="dd-footer">
+        <button class="footer-btn">新建视图</button>
+        <button class="footer-btn">管理视图</button>
+      </div>
+    </div>
+
+    <nav class="toolbar">
+      <input class="search" value="查询..." readonly />
+      <button class="tool">排序</button>
+      <button class="tool">字段</button>
+      <div class="chips">
+        <button class="chip">我的记录</button>
+        <button class="chip">今日新建</button>
+        <button class="chip">本周修改</button>
+      </div>
+    </nav>
+
+    <main class="content">
+      <section class="main">
+        <div class="filter-row">+ 添加筛选</div>
+        <table>
+          <thead>
+            <tr><th>PCBA 编码</th><th>项目名称</th><th>产品名称</th><th>物料库来源</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>444</td><td>444</td><td>-</td><td><span class="badge">当前 Excel 物料库</span></td><td></td></tr>
+            <tr><td>A100270003400</td><td>ESG-B-MAIN03-V1 PCBA成品</td><td>客户编码: 1030-042231</td><td><span class="badge">当前 Excel 物料库</span></td><td>查看</td></tr>
+            <tr><td>66</td><td>66</td><td>-</td><td><span class="badge">当前 Excel 物料库</span></td><td></td></tr>
+            <tr><td>A1</td><td>A1</td><td>-</td><td><span class="badge">当前 Excel 物料库</span></td><td>查看</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <aside class="panel" aria-label="管理视图">
+        <div class="panel-head">
+          <div class="panel-title">管理视图</div>
+          <button class="icon-btn">×</button>
+        </div>
+        <div class="section">
+          <p class="section-title">新建视图</p>
+          <div class="seg">
+            <button class="active">个人</button>
+            <button>团队</button>
+            <button>全员</button>
+          </div>
+          <div class="field">
+            <label>团队</label>
+            <select><option>研发团队 Team A</option><option>供应链 Team B</option></select>
+          </div>
+          <div class="type-grid" style="margin-top:14px">
+            <button class="type">表格</button>
+            <button class="type degraded">看板</button>
+            <button class="type">日历</button>
+            <button class="type blocked">画册</button>
+            <button class="type degraded">甘特</button>
+            <button class="type degraded">树形</button>
+            <button class="type">时间线</button>
+            <button class="type">表单</button>
+          </div>
+          <div class="notice red">画册需要图片/附件字段,当前 BOM 项目数据无法支撑,不会创建半成品视图。</div>
+          <div class="notice amber">甘特只有一个日期字段时可降级创建,开始和结束日期会复用同一字段。</div>
+        </div>
+        <div class="section">
+          <p class="section-title">当前视图操作</p>
+          <div class="view-row">
+            <div class="view-meta"><div class="view-name">研发团队看板</div><div class="view-sub">Team A · 共享 draft · 可复制为个人</div></div>
+            <div class="row-actions"><button class="mini">☆</button><button class="mini">⧉</button><button class="mini">↗</button></div>
+          </div>
+          <div class="view-row">
+            <div class="view-meta"><div class="view-name">插件预置: 本周修改</div><div class="view-sub">locked preset · 直接编辑禁用</div></div>
+            <div class="row-actions"><button class="mini" disabled>✎</button><button class="mini">⧉</button><button class="mini">◎</button></div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="section-title">审计</p>
+          <div class="view-row">
+            <div class="view-meta"><div class="view-name">UPDATE · Alice</div><div class="view-sub">viewConfig · 2026-06-22 14:05</div></div>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>

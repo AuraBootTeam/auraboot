@@ -149,6 +149,9 @@ public class DeclaredAgentToolResolver {
         if (toolCode.startsWith("nq:")) {
             return loadDirectNamedQueryTool(tenantId, userId, toolCode.substring("nq:".length()));
         }
+        if (toolCode.startsWith("custom:")) {
+            return loadDirectCustomTool(tenantId, toolCode.substring("custom:".length()));
+        }
         if (toolCode.startsWith("list:")) {
             String modelCode = toolCode.substring("list:".length());
             if (!canReadModel(userId, modelCode)) {
@@ -174,7 +177,8 @@ public class DeclaredAgentToolResolver {
             return ToolDefinition.builder()
                     .toolCode(toolCode)
                     .toolName("Get " + modelCode)
-                    .description("Get a single " + modelCode + " record by pid. Params: recordPid (required); recordId is accepted for compatibility.")
+                    .description("Get a single " + modelCode + " record by pid. Params: recordPid (required); "
+                            + "recordId is accepted for compatibility.")
                     .providerCode("dsl")
                     .toolType("dsl_query")
                     .sourceCode(modelCode)
@@ -183,7 +187,7 @@ public class DeclaredAgentToolResolver {
                     .parameterSchema(getParameterSchema())
                     .build();
         }
-        return null;
+        return loadProviderDeclaredTool(tenantId, userId, toolCode);
     }
 
     private ToolDefinition loadDirectCommandTool(Long tenantId, Long userId, String commandCode) {
@@ -266,6 +270,94 @@ public class DeclaredAgentToolResolver {
             log.warn("Failed to load declared named query tool {}: {}", queryCode, e.getMessage());
             return null;
         }
+    }
+
+    private ToolDefinition loadDirectCustomTool(Long tenantId, String customCode) {
+        try {
+            String sql = "SELECT tool_code, tool_name, tool_description, tool_type, source_code, "
+                    + "input_schema, requires_approval, risk_level "
+                    + "FROM ab_agent_tool "
+                    + "WHERE tenant_id = #{params.tenantId} "
+                    + "AND tool_code = #{params.toolCode} "
+                    + "AND tool_type NOT IN ('dsl_command', 'dsl_query') "
+                    + "AND tool_status = 'active' "
+                    + "AND (deleted_flag = FALSE OR deleted_flag IS NULL) LIMIT 1";
+            List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql,
+                    Map.of("tenantId", tenantId, "toolCode", customCode));
+            if (rows == null || rows.isEmpty()) {
+                return null;
+            }
+            Map<String, Object> row = rows.get(0);
+            String rawRiskLevel = stringValue(row.get("risk_level"));
+            String normalizedRiskLevel = normalizeRiskLevel(rawRiskLevel, "L1");
+            boolean requiresApproval = booleanValue(row.get("requires_approval"))
+                    || isApprovalRisk(normalizedRiskLevel);
+            String toolType = firstNonBlank(stringValue(row.get("tool_type")), "custom");
+            String sourceCode = firstNonBlank(stringValue(row.get("source_code")), "custom:" + customCode);
+            String displayName = firstNonBlank(stringValue(row.get("tool_name")), customCode);
+            return ToolDefinition.builder()
+                    .toolCode("custom:" + customCode)
+                    .toolName(displayName)
+                    .description(stringValue(row.get("tool_description")))
+                    .providerCode("custom")
+                    .toolType(toolType)
+                    .sourceCode(sourceCode)
+                    .riskLevel(rawRiskLevel != null ? rawRiskLevel : normalizedRiskLevel)
+                    .confirmationPolicy(confirmationPolicy(normalizedRiskLevel))
+                    .requiresApproval(requiresApproval)
+                    .requiresConfirmation(requiresApproval || isConfirmationRisk(normalizedRiskLevel))
+                    .parameterSchema(parseMap(row.get("input_schema")))
+                    .build();
+        } catch (Exception e) {
+            log.warn("Failed to load declared custom tool {}: {}", customCode, e.getMessage());
+            return null;
+        }
+    }
+
+    private ToolDefinition loadProviderDeclaredTool(Long tenantId, Long userId, String toolCode) {
+        String providerCode = providerCodeFor(toolCode);
+        if (providerCode == null) {
+            return null;
+        }
+        try {
+            ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
+                    .tenantId(tenantId)
+                    .userId(userId)
+                    .maxResults(Integer.MAX_VALUE)
+                    .build();
+            List<ToolDefinition> discovered = toolProviderRegistry.discoverByProvider(providerCode, ctx);
+            if (discovered == null || discovered.isEmpty()) {
+                return null;
+            }
+            for (ToolDefinition def : discovered) {
+                if (def != null && toolCode.equals(def.getToolCode())) {
+                    return def;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Provider-specific declared-tool discovery failed: provider={}, tool={}, error={}",
+                    providerCode, toolCode, e.getMessage());
+        }
+        return null;
+    }
+
+    private String providerCodeFor(String toolCode) {
+        if (toolCode == null) {
+            return null;
+        }
+        if (toolCode.startsWith("custom:")) {
+            return "custom";
+        }
+        if (toolCode.startsWith("mcp:")) {
+            return "mcp";
+        }
+        if (toolCode.startsWith("platform.")) {
+            return "platform";
+        }
+        if (toolCode.startsWith("aurabot:")) {
+            return "aurabot";
+        }
+        return null;
     }
 
     private Map<String, Object> buildCommandParameterSchema(Object rawInputSchema,
@@ -451,6 +543,10 @@ public class DeclaredAgentToolResolver {
         }
         return switch (normalized) {
             case "L0", "L1", "L2", "L3", "L4" -> normalized;
+            case "LOW" -> "L0";
+            case "MEDIUM" -> "L2";
+            case "HIGH" -> "L3";
+            case "CRITICAL" -> "L4";
             default -> fallback;
         };
     }
@@ -479,6 +575,16 @@ public class DeclaredAgentToolResolver {
         }
         String text = String.valueOf(value);
         return text.isBlank() ? null : text;
+    }
+
+    private boolean booleanValue(Object value) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        if (value instanceof Number number) {
+            return number.intValue() != 0;
+        }
+        return value != null && Boolean.parseBoolean(String.valueOf(value));
     }
 
     private String firstNonBlank(String first, String second) {
@@ -515,9 +621,15 @@ public class DeclaredAgentToolResolver {
             String code = null;
             if (value instanceof Map<?, ?> map) {
                 Object rawCode = map.get("toolCode");
-                if (rawCode == null) rawCode = map.get("code");
-                if (rawCode == null) rawCode = map.get("name");
-                if (rawCode != null) code = String.valueOf(rawCode);
+                if (rawCode == null) {
+                    rawCode = map.get("code");
+                }
+                if (rawCode == null) {
+                    rawCode = map.get("name");
+                }
+                if (rawCode != null) {
+                    code = String.valueOf(rawCode);
+                }
             } else if (value != null) {
                 code = String.valueOf(value);
             }

@@ -22,33 +22,51 @@ import java.util.Map;
 @Component
 public class BehaviorQuarantineConsumer {
 
-    private static final String GROUP = "aura-behavior-quarantine";
+    public static final String CONSUMER_GROUP = "aura-behavior-quarantine";
 
     private final MqProvider mqProvider;
     private final BehaviorQuarantineMapper quarantineMapper;
     private final ObjectMapper objectMapper;
+    private final BehaviorIngestMetrics metrics;
     private final String group;
 
     @Autowired
     public BehaviorQuarantineConsumer(MqProvider mqProvider,
                                       BehaviorQuarantineMapper quarantineMapper,
-                                      ObjectMapper objectMapper) {
-        this(mqProvider, quarantineMapper, objectMapper, GROUP);
+                                      ObjectMapper objectMapper,
+                                      BehaviorIngestMetrics metrics) {
+        this(mqProvider, quarantineMapper, objectMapper, metrics, CONSUMER_GROUP);
+    }
+
+    BehaviorQuarantineConsumer(MqProvider mqProvider,
+                               BehaviorQuarantineMapper quarantineMapper,
+                               ObjectMapper objectMapper) {
+        this(mqProvider, quarantineMapper, objectMapper, BehaviorIngestMetrics.noop(), CONSUMER_GROUP);
     }
 
     BehaviorQuarantineConsumer(MqProvider mqProvider,
                                BehaviorQuarantineMapper quarantineMapper,
                                ObjectMapper objectMapper,
                                String group) {
+        this(mqProvider, quarantineMapper, objectMapper, BehaviorIngestMetrics.noop(), group);
+    }
+
+    BehaviorQuarantineConsumer(MqProvider mqProvider,
+                               BehaviorQuarantineMapper quarantineMapper,
+                               ObjectMapper objectMapper,
+                               BehaviorIngestMetrics metrics,
+                               String group) {
         this.mqProvider = mqProvider;
         this.quarantineMapper = quarantineMapper;
         this.objectMapper = objectMapper;
+        this.metrics = metrics;
         this.group = group;
     }
 
     @PostConstruct
     public void subscribe() {
         mqProvider.subscribe(BehaviorIngestPublisher.TOPIC_QUARANTINE, group, this::onMessage);
+        metrics.recordConsumerLag(BehaviorIngestPublisher.TOPIC_QUARANTINE, group, 0);
         log.info("Behavior quarantine consumer subscribed: topic={}, group={}",
                 BehaviorIngestPublisher.TOPIC_QUARANTINE, group);
     }
@@ -59,6 +77,7 @@ public class BehaviorQuarantineConsumer {
             env = objectMapper.readValue(body, BehaviorQuarantineEnvelope.class);
         } catch (JsonProcessingException e) {
             log.error("Dropping unparseable quarantine envelope: {}", e.getMessage());
+            metrics.recordConsumerLag(topic, group, 0);
             return;
         }
         BehaviorQuarantine q = new BehaviorQuarantine();
@@ -74,6 +93,8 @@ public class BehaviorQuarantineConsumer {
             q.setRawEvent(writeRaw(ev));
         }
         quarantineMapper.insert(q);
+        metrics.recordQuarantined(env.reason());
+        metrics.recordConsumerLag(topic, group, 0);
     }
 
     private String writeRaw(BehaviorEventInput ev) {

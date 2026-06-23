@@ -851,12 +851,12 @@ test.describe('Environment Initialization', () => {
       return;
     }
 
-    // Get all roles to find OPERATOR and VIEWER role IDs.
+    // Get all roles to find OPERATOR and VIEWER role PIDs.
     // Use /api/roles/all (stable endpoint); /api/admin/roles does not exist.
     const rolesResp = await page.request.get('/api/roles/all', {
       headers: authHeaders(adminLogin.jwt),
     });
-    let roleMap: Record<string, number> = {};
+    let roleMap: Record<string, string> = {};
     if (rolesResp.ok()) {
       const rolesData = await rolesResp.json();
       const roles = Array.isArray(rolesData?.data)
@@ -869,9 +869,9 @@ test.describe('Environment Initialization', () => {
       if (Array.isArray(roles)) {
         for (const role of roles) {
           if (role.code === 'operator' || role.code === 'viewer') {
-            const roleId = Number(role.id ?? role.roleId);
-            if (Number.isFinite(roleId)) {
-              roleMap[role.code] = roleId;
+            const rolePid = String(role.pid ?? '').trim();
+            if (rolePid) {
+              roleMap[role.code] = rolePid;
             }
           }
         }
@@ -940,7 +940,6 @@ test.describe('Environment Initialization', () => {
             (m: any) => m.email === roleUser.email || m.userEmail === roleUser.email,
           );
           if (member) {
-            const userId = member.userId || member.id;
             const memberPid = member.pid;
 
             // Approve member if pending
@@ -953,10 +952,10 @@ test.describe('Environment Initialization', () => {
             }
 
             // Assign role
-            const roleId = roleMap[roleUser.roleCode];
-            if (roleId && userId) {
-              const assignResp = await page.request.put(`/api/user-roles/sync?userId=${userId}`, {
-                data: [roleId],
+            const rolePid = roleMap[roleUser.roleCode];
+            if (rolePid && memberPid) {
+              const assignResp = await page.request.put('/api/user-roles/sync-by-pid', {
+                data: { memberPid, rolePids: [rolePid] },
                 headers: authHeaders(adminLogin.jwt),
               });
               if (assignResp.ok()) {

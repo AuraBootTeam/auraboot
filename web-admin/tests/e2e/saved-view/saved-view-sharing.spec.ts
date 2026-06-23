@@ -8,9 +8,18 @@
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
+const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
+
 async function createViewViaApi(page: Page, name: string): Promise<string> {
   const resp = await page.request.post('/api/views', {
-    data: { name, modelCode: 'e2et_order', viewType: 'table', scope: 'personal', viewConfig: {} },
+    data: {
+      name,
+      modelCode: 'e2et_order',
+      pageKey: SAVED_VIEW_PAGE_KEY,
+      viewType: 'table',
+      scope: 'personal',
+      viewConfig: {},
+    },
   });
   if (!resp.ok()) return '';
   const body = await resp.json();

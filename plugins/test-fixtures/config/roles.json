@@ -27,6 +27,15 @@
     ]
   },
   {
+    "code": "e2et_viewer",
+    "name:zh-CN": "E2E测试查看者",
+    "name:en": "E2E Test Viewer",
+    "description": "Read-only access to E2E test order plugin list and dashboards",
+    "permissions": [
+      "e2et.order.read"
+    ]
+  },
+  {
     "code": "e2et_operator",
     "name:zh-CN": "E2E测试操作员",
     "name:en": "E2E Test Operator",

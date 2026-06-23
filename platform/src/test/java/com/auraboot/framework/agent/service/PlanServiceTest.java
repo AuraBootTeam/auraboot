@@ -1,6 +1,8 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.dto.AgentPlanStep;
+import com.auraboot.framework.agent.dto.AgentToolDefinition;
+import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -24,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -108,6 +112,54 @@ class PlanServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Plan generation failed")
                 .hasMessageContaining("valid JSON plan");
+    }
+
+    @Test
+    @DisplayName("planning prompt uses structured tool catalog and SQL fallback policy")
+    void planningPromptUsesStructuredToolCatalogAndSqlFallbackPolicy() throws Exception {
+        LlmProviderFactory.ProviderConfig config = providerConfig();
+        when(provider.chat(any(), anyString(), anyString()))
+                .thenReturn(LlmChatResponse.builder()
+                        .stopReason("end_turn")
+                        .content(List.of(LlmChatResponse.ContentBlock.builder()
+                                .type("text")
+                                .text("[{\"description\":\"Create activity\","
+                                        + "\"toolCode\":\"cmd:crm:create_activity\","
+                                        + "\"requiresApproval\":false}]")
+                                .build()))
+                        .build());
+
+        service.generatePlan(
+                provider,
+                config,
+                "gpt-4o",
+                "You are Aurabot.",
+                "给客户补一条沟通记录",
+                List.of(
+                        AgentToolDefinition.builder()
+                                .name("cmd:crm:create_activity")
+                                .description("Create a CRM activity record")
+                                .toolType("dsl_command")
+                                .riskLevel("L1")
+                                .build(),
+                        AgentToolDefinition.builder()
+                                .name("platform.execute_sql")
+                                .description("Execute a read-only SQL query")
+                                .toolType("platform")
+                                .riskLevel("L1")
+                                .build()));
+
+        ArgumentCaptor<LlmChatRequest> captor = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider).chat(captor.capture(), anyString(), anyString());
+        String prompt = captor.getValue().getSystemPrompt();
+
+        assertThat(prompt)
+                .contains("Tool catalog:")
+                .contains("- cmd:crm:create_activity")
+                .contains("description: Create a CRM activity record")
+                .contains("type: dsl_command")
+                .contains("risk: L1")
+                .contains("Use platform.execute_sql only when no listed DSL/query/custom tool can satisfy the task");
     }
 
     @Test
